@@ -71,6 +71,16 @@ interface Integration {
   created_at: string
   last_used_at: string | null
   token_suffix: string
+  permissions?: {
+    users: {
+      access: boolean
+      error: string | null
+    }
+    incidents: {
+      access: boolean
+      error: string | null
+    }
+  }
 }
 
 export default function RootlySetupPage() {
@@ -130,6 +140,32 @@ export default function RootlySetupPage() {
     } finally {
       setLoadingIntegrations(false)
     }
+  }
+
+  const checkIntegrationPermissions = async (integrationId: number, token: string) => {
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) return null
+
+      const response = await fetch(`${API_BASE}/rootly/token/test`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({
+          token: token
+        })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        return data.account_info?.permissions || null
+      }
+    } catch (error) {
+      console.error('Failed to check permissions:', error)
+    }
+    return null
   }
 
   const updateIntegrationName = async (integrationId: number, newName: string) => {
@@ -704,27 +740,53 @@ export default function RootlySetupPage() {
           </Card>
 
           {/* Connected Integrations */}
-          {!loadingIntegrations && (
-            <Card className="border-2 border-green-200 bg-white shadow-lg mb-8">
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Settings className="w-5 h-5 text-green-600" />
-                  <span>Connected Integrations</span>
-                  {integrations.length > 0 && (
-                    <Badge variant="secondary" className="ml-auto">
-                      {integrations.length} active
-                    </Badge>
-                  )}
-                </CardTitle>
-                <CardDescription>
-                  {integrations.length > 0 
+          <Card className="border-2 border-green-200 bg-white shadow-lg mb-8">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Settings className="w-5 h-5 text-green-600" />
+                <span>Connected Integrations</span>
+                {!loadingIntegrations && integrations.length > 0 && (
+                  <Badge variant="secondary" className="ml-auto">
+                    {integrations.length} active
+                  </Badge>
+                )}
+              </CardTitle>
+              <CardDescription>
+                {loadingIntegrations 
+                  ? "Loading connected integrations..."
+                  : integrations.length > 0 
                     ? "Manage your connected Rootly organizations"
                     : "Add at least one Rootly integration to continue"
-                  }
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {integrations.length > 0 ? (
+                }
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {loadingIntegrations ? (
+                // Skeleton loaders while loading
+                <>
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="p-4 border border-green-200 rounded-lg bg-green-50 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-6 h-6 bg-gray-200 rounded animate-pulse"></div>
+                          <div className="space-y-2">
+                            <div className="w-32 h-4 bg-gray-200 rounded animate-pulse"></div>
+                            <div className="w-24 h-3 bg-gray-200 rounded animate-pulse"></div>
+                          </div>
+                        </div>
+                        <div className="flex space-x-2">
+                          <div className="w-16 h-8 bg-gray-200 rounded animate-pulse"></div>
+                          <div className="w-16 h-8 bg-gray-200 rounded animate-pulse"></div>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <div className="w-20 h-6 bg-gray-200 rounded animate-pulse"></div>
+                        <div className="w-24 h-6 bg-gray-200 rounded animate-pulse"></div>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              ) : integrations.length > 0 ? (
                   integrations.map((integration) => (
                   <div
                     key={integration.id}
@@ -781,6 +843,56 @@ export default function RootlySetupPage() {
                                 <p className="text-xs text-slate-500 mt-1 font-mono">
                                   API Key: {integration.token_suffix}
                                 </p>
+                                
+                                {/* Permissions Display */}
+                                {integration.permissions && (
+                                  <div className="mt-2 space-y-1">
+                                    <p className="text-xs font-semibold text-slate-700 mb-1">Permissions:</p>
+                                    <div className="flex flex-wrap gap-1">
+                                      <div className="flex items-center space-x-1">
+                                        {integration.permissions.users.access ? (
+                                          <CheckCircle className="w-3 h-3 text-green-600" />
+                                        ) : (
+                                          <AlertCircle className="w-3 h-3 text-red-600" />
+                                        )}
+                                        <span className="text-xs text-slate-600">Users</span>
+                                      </div>
+                                      <div className="flex items-center space-x-1">
+                                        {integration.permissions.incidents.access ? (
+                                          <CheckCircle className="w-3 h-3 text-green-600" />
+                                        ) : (
+                                          <AlertCircle className="w-3 h-3 text-red-600" />
+                                        )}
+                                        <span className="text-xs text-slate-600">Incidents</span>
+                                      </div>
+                                    </div>
+                                    
+                                    {/* Show errors if any */}
+                                    {(!integration.permissions.users.access && integration.permissions.users.error) && (
+                                      <p className="text-xs text-red-600 mt-1">Users: {integration.permissions.users.error}</p>
+                                    )}
+                                    {(!integration.permissions.incidents.access && integration.permissions.incidents.error) && (
+                                      <p className="text-xs text-red-600 mt-1">Incidents: {integration.permissions.incidents.error}</p>
+                                    )}
+                                    
+                                    {/* Overall permission status */}
+                                    {integration.permissions && (
+                                      <div className="mt-2 flex items-center space-x-2">
+                                        {integration.permissions.users.access && integration.permissions.incidents.access ? (
+                                          <div className="flex items-center space-x-1">
+                                            <CheckCircle className="w-3 h-3 text-green-600" />
+                                            <span className="text-xs text-green-700 font-medium">All permissions granted</span>
+                                          </div>
+                                        ) : (
+                                          <div className="flex items-center space-x-1">
+                                            <AlertCircle className="w-3 h-3 text-orange-600" />
+                                            <span className="text-xs text-orange-700 font-medium">Limited permissions</span>
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </>
@@ -799,6 +911,14 @@ export default function RootlySetupPage() {
                               <span>Added {new Date(integration.created_at).toLocaleDateString()}</span>
                             </div>
                           </div>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => loadIntegrations()}
+                            title="Refresh permissions"
+                          >
+                            <Settings className="w-4 h-4" />
+                          </Button>
                           <Button
                             size="sm"
                             variant="ghost"
@@ -851,7 +971,6 @@ export default function RootlySetupPage() {
                 )}
               </CardContent>
             </Card>
-          )}
 
           {/* Security Note */}
           <div className="mt-8 p-4 bg-purple-50 rounded-lg border border-purple-200">

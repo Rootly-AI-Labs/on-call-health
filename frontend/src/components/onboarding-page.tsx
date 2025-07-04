@@ -277,11 +277,6 @@ export default function OnboardingPage() {
               <ChevronRight className="w-5 h-5 ml-2" />
             </Button>
 
-            <div className="flex justify-center text-sm">
-              <Link href="/dashboard" className="text-slate-500 hover:text-slate-700 transition-colors">
-                I'll do this later
-              </Link>
-            </div>
           </div>
 
           {/* Next Steps Preview */}

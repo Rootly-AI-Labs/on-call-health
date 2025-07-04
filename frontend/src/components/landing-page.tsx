@@ -44,14 +44,6 @@ export default function LandingPage() {
             <span className="text-xl font-semibold text-slate-900">Rootly Burnout Detector</span>
           </div>
 
-          <nav className="flex items-center space-x-6">
-            <Link href="#about" className="text-slate-600 hover:text-slate-900 transition-colors font-medium">
-              About
-            </Link>
-            <Link href="#login" className="text-slate-600 hover:text-slate-900 transition-colors font-medium">
-              Login
-            </Link>
-          </nav>
         </div>
       </header>
 
@@ -72,7 +64,7 @@ export default function LandingPage() {
             </p>
 
             {/* OAuth Login Buttons */}
-            <div id="login" className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16">
+            <div id="login" className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-6">
               <Button
                 size="lg"
                 className="w-full sm:w-auto bg-slate-900 hover:bg-slate-800 text-white px-8 py-4 text-lg"
@@ -92,15 +84,12 @@ export default function LandingPage() {
               </Button>
             </div>
 
-            <p className="text-sm text-slate-500">
-              Secure OAuth authentication
-            </p>
           </div>
         </div>
       </section>
 
       {/* How It Works Section */}
-      <section className="py-20 bg-white">
+      <section className="pt-8 pb-12 bg-white">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">How It Works</h2>
@@ -184,25 +173,6 @@ export default function LandingPage() {
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-              <Button 
-                size="lg" 
-                className="w-full sm:w-auto bg-slate-900 hover:bg-slate-800 text-white px-8 py-4"
-                onClick={handleGitHubLogin}
-              >
-                <Github className="w-5 h-5 mr-3" />
-                Get Started with GitHub
-              </Button>
-              <Button
-                size="lg"
-                variant="outline"
-                className="w-full sm:w-auto border-slate-300 px-8 py-4 hover:bg-slate-50 bg-transparent"
-                onClick={handleGoogleLogin}
-              >
-                <Chrome className="w-5 h-5 mr-3" />
-                Get Started with Google
-              </Button>
-            </div>
           </div>
         </div>
       </section>
@@ -219,15 +189,9 @@ export default function LandingPage() {
             </div>
 
             <div className="flex items-center space-x-6 text-sm">
-              <Link href="#" className="hover:text-white transition-colors">
-                Privacy Policy
-              </Link>
-              <Link href="#" className="hover:text-white transition-colors">
-                Terms of Service
-              </Link>
-              <Link href="#" className="hover:text-white transition-colors">
+              <a href="mailto:spencer.cheng@rootly.com" className="hover:text-white transition-colors">
                 Support
-              </Link>
+              </a>
             </div>
           </div>
 

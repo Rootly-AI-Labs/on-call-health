@@ -104,6 +104,7 @@ class GitHubOAuth(OAuthProvider):
         self.auth_url = "https://github.com/login/oauth/authorize"
         self.token_url = "https://github.com/login/oauth/access_token"
         self.user_info_url = "https://api.github.com/user"
+        self.emails_url = "https://api.github.com/user/emails"
     
     def get_authorization_url(self, state: str = None) -> str:
         """Generate GitHub OAuth authorization URL."""
@@ -154,6 +155,58 @@ class GitHubOAuth(OAuthProvider):
             )
         
         return response.json()
+    
+    async def get_all_emails(self, access_token: str) -> list[Dict[str, Any]]:
+        """Get all verified emails from GitHub."""
+        headers = {
+            "Authorization": f"token {access_token}",
+            "Accept": "application/json"
+        }
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.get(self.emails_url, headers=headers)
+        
+        if response.status_code != 200:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Failed to get user emails"
+            )
+        
+        emails = response.json()
+        
+        # Filter for verified emails and exclude noreply addresses
+        verified_emails = [
+            email for email in emails 
+            if email.get("verified", False) and not email.get("email", "").endswith("noreply.github.com")
+        ]
+        
+        return verified_emails
+    
+    def select_primary_email(self, github_emails: list[Dict[str, Any]]) -> Optional[str]:
+        """Select the best primary email from GitHub emails."""
+        if not github_emails:
+            return None
+        
+        # Prioritize work domains (common business email domains)
+        work_domains = [
+            ".com", ".org", ".net", ".edu", ".gov",  # General business
+            "company", "corp", "inc", "ltd", "llc"   # Business keywords
+        ]
+        
+        # First, look for primary email
+        for email_data in github_emails:
+            if email_data.get("primary", False):
+                return email_data["email"]
+        
+        # Then, prefer work-looking emails
+        for email_data in github_emails:
+            email = email_data["email"]
+            # Skip obvious personal domains
+            if not any(personal in email.lower() for personal in ["gmail", "yahoo", "hotmail", "outlook", "icloud"]):
+                return email
+        
+        # Fall back to first verified email
+        return github_emails[0]["email"] if github_emails else None
 
 # Provider instances
 google_oauth = GoogleOAuth()

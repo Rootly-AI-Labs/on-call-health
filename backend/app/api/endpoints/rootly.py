@@ -63,10 +63,11 @@ async def test_rootly_token_preview(
         email_domain = current_user.email.split('@')[1] if '@' in current_user.email else 'Organization'
         base_name = email_domain.split('.')[0].title()
     
-    # Check if user already has this exact token
+    # Check if user already has this exact token (only active integrations)
     existing_token = db.query(RootlyIntegration).filter(
         RootlyIntegration.user_id == current_user.id,
-        RootlyIntegration.token == token_update.token
+        RootlyIntegration.token == token_update.token,
+        RootlyIntegration.is_active == True
     ).first()
     
     if existing_token:
@@ -125,10 +126,11 @@ async def add_rootly_integration(
             }
         )
     
-    # Check if user already has this exact token (prevent duplicates)
+    # Check if user already has this exact token (prevent duplicates, only active integrations)
     existing_token = db.query(RootlyIntegration).filter(
         RootlyIntegration.user_id == current_user.id,
-        RootlyIntegration.token == integration_data.token
+        RootlyIntegration.token == integration_data.token,
+        RootlyIntegration.is_active == True
     ).first()
     
     if existing_token:
@@ -198,26 +200,43 @@ async def list_integrations(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """List all Rootly integrations for the current user."""
+    """List all Rootly integrations for the current user with permissions."""
     integrations = db.query(RootlyIntegration).filter(
         RootlyIntegration.user_id == current_user.id,
         RootlyIntegration.is_active == True
     ).order_by(RootlyIntegration.created_at.desc()).all()
     
+    result_integrations = []
+    
+    for integration in integrations:
+        integration_data = {
+            "id": integration.id,
+            "name": integration.name,
+            "organization_name": integration.organization_name,
+            "total_users": integration.total_users,
+            "is_default": integration.is_default,
+            "created_at": integration.created_at.isoformat(),
+            "last_used_at": integration.last_used_at.isoformat() if integration.last_used_at else None,
+            "token_suffix": f"****{integration.token[-4:]}" if integration.token and len(integration.token) >= 4 else "****"
+        }
+        
+        # Check permissions for each integration
+        if integration.token:
+            try:
+                client = RootlyAPIClient(integration.token)
+                permissions = await client.check_permissions()
+                integration_data["permissions"] = permissions
+            except Exception as e:
+                # If we can't check permissions, include a note
+                integration_data["permissions"] = {
+                    "users": {"access": False, "error": f"Permission check failed: {str(e)}"},
+                    "incidents": {"access": False, "error": f"Permission check failed: {str(e)}"}
+                }
+        
+        result_integrations.append(integration_data)
+    
     return {
-        "integrations": [
-            {
-                "id": integration.id,
-                "name": integration.name,
-                "organization_name": integration.organization_name,
-                "total_users": integration.total_users,
-                "is_default": integration.is_default,
-                "created_at": integration.created_at.isoformat(),
-                "last_used_at": integration.last_used_at.isoformat() if integration.last_used_at else None,
-                "token_suffix": f"****{integration.token[-4:]}" if integration.token and len(integration.token) >= 4 else "****"
-            }
-            for integration in integrations
-        ]
+        "integrations": result_integrations
     }
 
 @router.put("/integrations/{integration_id}")

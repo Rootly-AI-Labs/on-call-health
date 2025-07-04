@@ -1,15 +1,16 @@
 """
 Authentication API endpoints.
 """
-from typing import Any, Dict
+from typing import Any, Dict, List
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
-from ...models import get_db, User
+from ...models import get_db, User, OAuthProvider, UserEmail
 from ...auth.oauth import google_oauth, github_oauth
 from ...auth.jwt import create_access_token
 from ...auth.dependencies import get_current_active_user
+from ...services.account_linking import AccountLinkingService
 from ...core.config import settings
 
 router = APIRouter()
@@ -28,7 +29,8 @@ async def google_login():
 
 @router.get("/google/callback")
 async def google_callback(
-    code: str = Query(...),
+    code: str = Query(None),
+    error: str = Query(None),
     state: str = Query(None),
     db: Session = Depends(get_db)
 ):
@@ -39,10 +41,25 @@ async def google_callback(
             detail="Google OAuth not configured"
         )
     
+    # Handle user cancellation
+    if error:
+        if error == "access_denied":
+            # User canceled - redirect back to landing page
+            return RedirectResponse(url=settings.FRONTEND_URL)
+        else:
+            # Other OAuth error
+            error_url = f"{settings.FRONTEND_URL}/auth/error?message=OAuth error: {error}"
+            return RedirectResponse(url=error_url)
+    
+    # No code means user canceled without error parameter
+    if not code:
+        return RedirectResponse(url=settings.FRONTEND_URL)
+    
     try:
         # Exchange code for token
         token_data = await google_oauth.exchange_code_for_token(code)
         access_token = token_data.get("access_token")
+        refresh_token = token_data.get("refresh_token")
         
         if not access_token:
             raise HTTPException(
@@ -53,30 +70,14 @@ async def google_callback(
         # Get user info
         user_info = await google_oauth.get_user_info(access_token)
         
-        # Find or create user
-        user = db.query(User).filter(
-            User.email == user_info["email"]
-        ).first()
-        
-        if not user:
-            user = User(
-                email=user_info["email"],
-                name=user_info.get("name"),
-                provider="google",
-                provider_id=user_info["id"],
-                is_verified=True
-            )
-            db.add(user)
-            db.commit()
-            db.refresh(user)
-        else:
-            # Update provider info if user exists
-            user.provider = "google"
-            user.provider_id = user_info["id"]
-            user.is_verified = True
-            if user_info.get("name"):
-                user.name = user_info["name"]
-            db.commit()
+        # Use account linking service
+        linking_service = AccountLinkingService(db)
+        user, is_new_user = await linking_service.link_or_create_user(
+            provider="google",
+            user_info=user_info,
+            access_token=access_token,
+            refresh_token=refresh_token
+        )
         
         # Create JWT token
         jwt_token = create_access_token(data={"sub": user.id})
@@ -103,7 +104,8 @@ async def github_login():
 
 @router.get("/github/callback")
 async def github_callback(
-    code: str = Query(...),
+    code: str = Query(None),
+    error: str = Query(None),
     state: str = Query(None),
     db: Session = Depends(get_db)
 ):
@@ -113,6 +115,20 @@ async def github_callback(
             status_code=status.HTTP_501_NOT_IMPLEMENTED,
             detail="GitHub OAuth not configured"
         )
+    
+    # Handle user cancellation
+    if error:
+        if error == "access_denied":
+            # User canceled - redirect back to landing page
+            return RedirectResponse(url=settings.FRONTEND_URL)
+        else:
+            # Other OAuth error
+            error_url = f"{settings.FRONTEND_URL}/auth/error?message=OAuth error: {error}"
+            return RedirectResponse(url=error_url)
+    
+    # No code means user canceled without error parameter
+    if not code:
+        return RedirectResponse(url=settings.FRONTEND_URL)
     
     try:
         # Exchange code for token
@@ -128,54 +144,14 @@ async def github_callback(
         # Get user info
         user_info = await github_oauth.get_user_info(access_token)
         
-        # GitHub doesn't always provide email in the main endpoint
-        email = user_info.get("email")
-        if not email:
-            # Get email from separate endpoint
-            import httpx
-            headers = {"Authorization": f"token {access_token}"}
-            async with httpx.AsyncClient() as client:
-                email_response = await client.get(
-                    "https://api.github.com/user/emails", 
-                    headers=headers
-                )
-                if email_response.status_code == 200:
-                    emails = email_response.json()
-                    primary_email = next(
-                        (e["email"] for e in emails if e["primary"]), 
-                        None
-                    )
-                    if primary_email:
-                        email = primary_email
-        
-        if not email:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="No email address available from GitHub"
-            )
-        
-        # Find or create user
-        user = db.query(User).filter(User.email == email).first()
-        
-        if not user:
-            user = User(
-                email=email,
-                name=user_info.get("name") or user_info.get("login"),
-                provider="github",
-                provider_id=str(user_info["id"]),
-                is_verified=True
-            )
-            db.add(user)
-            db.commit()
-            db.refresh(user)
-        else:
-            # Update provider info if user exists
-            user.provider = "github"
-            user.provider_id = str(user_info["id"])
-            user.is_verified = True
-            if user_info.get("name"):
-                user.name = user_info["name"]
-            db.commit()
+        # Use account linking service (it will handle fetching all emails)
+        linking_service = AccountLinkingService(db)
+        user, is_new_user = await linking_service.link_or_create_user(
+            provider="github",
+            user_info=user_info,
+            access_token=access_token,
+            refresh_token=None  # GitHub doesn't use refresh tokens
+        )
         
         # Create JWT token
         jwt_token = create_access_token(data={"sub": user.id})
@@ -190,15 +166,60 @@ async def github_callback(
 
 @router.get("/me")
 async def get_current_user_info(
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
 ):
     """Get current user information."""
+    linking_service = AccountLinkingService(db)
+    
     return {
         "id": current_user.id,
         "email": current_user.email,
         "name": current_user.name,
-        "provider": current_user.provider,
+        "provider": current_user.provider,  # Legacy field
         "is_verified": current_user.is_verified,
         "has_rootly_token": bool(current_user.rootly_token),
-        "created_at": current_user.created_at
+        "created_at": current_user.created_at,
+        "oauth_providers": linking_service.get_user_providers(current_user.id),
+        "emails": linking_service.get_user_emails(current_user.id)
     }
+
+@router.get("/providers")
+async def get_user_providers(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get all OAuth providers linked to current user."""
+    linking_service = AccountLinkingService(db)
+    return {
+        "providers": linking_service.get_user_providers(current_user.id)
+    }
+
+@router.get("/emails")
+async def get_user_emails(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get all emails for current user."""
+    linking_service = AccountLinkingService(db)
+    return {
+        "emails": linking_service.get_user_emails(current_user.id)
+    }
+
+@router.delete("/providers/{provider}")
+async def unlink_provider(
+    provider: str,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Unlink an OAuth provider from current user."""
+    linking_service = AccountLinkingService(db)
+    success = linking_service.unlink_provider(current_user.id, provider)
+    
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot unlink provider. At least one provider must remain linked."
+        )
+    
+    return {"message": f"{provider} provider unlinked successfully"}
