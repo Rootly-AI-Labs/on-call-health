@@ -40,6 +40,8 @@ async def test_rootly_token_preview(
     client = RootlyAPIClient(token_update.token)
     test_result = await client.test_connection()
     
+    print(f"DEBUG: Rootly test_connection result: {test_result}")
+    
     if test_result["status"] != "success":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -66,7 +68,7 @@ async def test_rootly_token_preview(
     # Check if user already has this exact token (only active integrations)
     existing_token = db.query(RootlyIntegration).filter(
         RootlyIntegration.user_id == current_user.id,
-        RootlyIntegration.token == token_update.token,
+        RootlyIntegration.api_token == token_update.token,
         RootlyIntegration.is_active == True
     ).first()
     
@@ -84,7 +86,10 @@ async def test_rootly_token_preview(
     # Generate a unique name if team name already exists
     existing_names = [
         integration.name for integration in 
-        db.query(RootlyIntegration).filter(RootlyIntegration.user_id == current_user.id).all()
+        db.query(RootlyIntegration).filter(
+            RootlyIntegration.user_id == current_user.id,
+            RootlyIntegration.platform == "rootly"
+        ).all()
     ]
     
     suggested_name = base_name
@@ -129,7 +134,7 @@ async def add_rootly_integration(
     # Check if user already has this exact token (prevent duplicates, only active integrations)
     existing_token = db.query(RootlyIntegration).filter(
         RootlyIntegration.user_id == current_user.id,
-        RootlyIntegration.token == integration_data.token,
+        RootlyIntegration.api_token == integration_data.token,
         RootlyIntegration.is_active == True
     ).first()
     
@@ -151,9 +156,10 @@ async def add_rootly_integration(
     organization_name = account_info.get("organization_name")
     total_users = account_info.get("total_users", 0)
     
-    # Check if this will be the user's first integration (make it default)
+    # Check if this will be the user's first Rootly integration (make it default)
     existing_integrations = db.query(RootlyIntegration).filter(
-        RootlyIntegration.user_id == current_user.id
+        RootlyIntegration.user_id == current_user.id,
+        RootlyIntegration.platform == "rootly"
     ).count()
     is_first_integration = existing_integrations == 0
     
@@ -162,7 +168,7 @@ async def add_rootly_integration(
         user_id=current_user.id,
         name=integration_data.name,
         organization_name=organization_name,
-        token=integration_data.token,
+        api_token=integration_data.token,
         total_users=total_users,
         is_default=is_first_integration,  # First integration becomes default
         is_active=True,
@@ -203,7 +209,8 @@ async def list_integrations(
     """List all Rootly integrations for the current user with permissions."""
     integrations = db.query(RootlyIntegration).filter(
         RootlyIntegration.user_id == current_user.id,
-        RootlyIntegration.is_active == True
+        RootlyIntegration.is_active == True,
+        RootlyIntegration.platform == "rootly"
     ).order_by(RootlyIntegration.created_at.desc()).all()
     
     result_integrations = []
@@ -217,13 +224,13 @@ async def list_integrations(
             "is_default": integration.is_default,
             "created_at": integration.created_at.isoformat(),
             "last_used_at": integration.last_used_at.isoformat() if integration.last_used_at else None,
-            "token_suffix": f"****{integration.token[-4:]}" if integration.token and len(integration.token) >= 4 else "****"
+            "token_suffix": f"****{integration.api_token[-4:]}" if integration.api_token and len(integration.api_token) >= 4 else "****"
         }
         
         # Check permissions for each integration
-        if integration.token:
+        if integration.api_token:
             try:
-                client = RootlyAPIClient(integration.token)
+                client = RootlyAPIClient(integration.api_token)
                 permissions = await client.check_permissions()
                 integration_data["permissions"] = permissions
             except Exception as e:
@@ -249,7 +256,8 @@ async def update_integration(
     """Update a Rootly integration name."""
     integration = db.query(RootlyIntegration).filter(
         RootlyIntegration.id == integration_id,
-        RootlyIntegration.user_id == current_user.id
+        RootlyIntegration.user_id == current_user.id,
+        RootlyIntegration.platform == "rootly"
     ).first()
     
     if not integration:
@@ -306,7 +314,8 @@ async def delete_integration(
     """Delete/revoke a Rootly integration."""
     integration = db.query(RootlyIntegration).filter(
         RootlyIntegration.id == integration_id,
-        RootlyIntegration.user_id == current_user.id
+        RootlyIntegration.user_id == current_user.id,
+        RootlyIntegration.platform == "rootly"
     ).first()
     
     if not integration:

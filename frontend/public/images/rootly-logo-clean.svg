@@ -1,0 +1,17 @@
+<svg width="140" height="40" viewBox="0 0 140 40" xmlns="http://www.w3.org/2000/svg">
+  <!-- Rootly Logo - Clean version based on official design -->
+  
+  <!-- Icon - simplified geometric shape -->
+  <g transform="translate(5, 8)">
+    <!-- Green leaf/flame shape -->
+    <path d="M12 0 C6 0 0 6 0 12 C0 18 3 24 12 24 C21 24 24 18 24 12 C24 6 18 0 12 0 Z" 
+          fill="#22C55E" opacity="0.9"/>
+    <!-- Purple accent -->
+    <path d="M12 8 C8 8 6 10 6 14 C6 18 8 20 12 20 C16 20 18 18 18 14 C18 10 16 8 12 8 Z" 
+          fill="#8B5CF6" opacity="0.8"/>
+  </g>
+  
+  <!-- Text "Rootly" -->
+  <text x="35" y="28" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" 
+        font-size="24" font-weight="600" fill="#1F2937">Rootly</text>
+</svg>

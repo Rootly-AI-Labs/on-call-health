@@ -2,6 +2,7 @@
 Burnout analysis service for analyzing incident patterns and calculating burnout metrics.
 """
 import logging
+import math
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
 from collections import defaultdict
@@ -442,9 +443,17 @@ class BurnoutAnalyzerService:
     
     def _calculate_emotional_exhaustion_incident(self, metrics: Dict[str, Any]) -> float:
         """Calculate Emotional Exhaustion from incident data (0-10 scale)."""
-        # Incident frequency score
+        # Incident frequency score - more realistic thresholds
         ipw = metrics["incidents_per_week"]
-        incident_frequency_score = min(10, (ipw / 3) * 10)
+        # Scale: 0-2 incidents/week = 0-3, 2-5 = 3-7, 5-8 = 7-10, 8+ = 10
+        if ipw <= 2:
+            incident_frequency_score = ipw * 1.5  # 0-3 range
+        elif ipw <= 5:
+            incident_frequency_score = 3 + ((ipw - 2) / 3) * 4  # 3-7 range
+        elif ipw <= 8:
+            incident_frequency_score = 7 + ((ipw - 5) / 3) * 3  # 7-10 range
+        else:
+            incident_frequency_score = 10  # 8+ incidents per week = maximum burnout
         
         # After hours score
         ahp = metrics["after_hours_percentage"]
@@ -457,8 +466,8 @@ class BurnoutAnalyzerService:
         # Clustering score (simplified - assume 20% clustering for now)
         clustering_score = min(10, 0.2 * 15)  # Placeholder
         
-        # Mean of all components
-        return (incident_frequency_score + after_hours_score + resolution_time_score + clustering_score) / 4
+        # Weighted average with incident frequency as primary factor (50% weight)
+        return (incident_frequency_score * 0.5 + after_hours_score * 0.2 + resolution_time_score * 0.2 + clustering_score * 0.1)
     
     def _calculate_depersonalization_incident(self, metrics: Dict[str, Any]) -> float:
         """Calculate Depersonalization from incident data (0-10 scale)."""
@@ -503,17 +512,47 @@ class BurnoutAnalyzerService:
         return (resolution_success_score + improvement_score + complexity_score + knowledge_sharing_score) / 4
     
     def _calculate_burnout_factors(self, metrics: Dict[str, Any]) -> Dict[str, float]:
-        """Calculate individual burnout factors for backward compatibility."""
-        # Keep existing factor calculation for UI compatibility
-        dimensions = self._calculate_maslach_dimensions(metrics)
+        """Calculate individual burnout factors for UI display."""
+        # Calculate factors that properly reflect incident load
+        incidents_per_week = metrics.get("incidents_per_week", 0)
         
-        # Map dimensions to legacy factors for UI
+        # Workload factor based on incident frequency (more direct)
+        # Scale: 0-2 incidents/week = 0-3, 2-5 = 3-7, 5-8 = 7-10, 8+ = 10
+        if incidents_per_week <= 2:
+            workload = incidents_per_week * 1.5
+        elif incidents_per_week <= 5:
+            workload = 3 + ((incidents_per_week - 2) / 3) * 4
+        elif incidents_per_week <= 8:
+            workload = 7 + ((incidents_per_week - 5) / 3) * 3
+        else:
+            workload = 10
+        
+        # After hours factor 
+        after_hours = min(10, metrics["after_hours_percentage"] * 20)
+        
+        # Weekend work factor
+        weekend_work = min(10, metrics["weekend_percentage"] * 25)
+        
+        # Incident load factor (direct calculation based on weekly incident rate)
+        # Scale: 0-3 incidents/week = 0-3, 3-6 = 3-7, 6-10 = 7-10, 10+ = 10
+        if incidents_per_week <= 3:
+            incident_load = incidents_per_week
+        elif incidents_per_week <= 6:
+            incident_load = 3 + ((incidents_per_week - 3) / 3) * 4
+        elif incidents_per_week <= 10:
+            incident_load = 7 + ((incidents_per_week - 6) / 4) * 3
+        else:
+            incident_load = 10
+        
+        # Response time factor
+        response_time = min(10, metrics["avg_response_time_minutes"] / 6)
+        
         factors = {
-            "workload": dimensions["emotional_exhaustion"] * 0.6,  # Primary component
-            "after_hours": min(10, metrics["after_hours_percentage"] * 20),
-            "weekend_work": min(10, metrics["weekend_percentage"] * 25),
-            "incident_load": dimensions["emotional_exhaustion"] * 0.4,
-            "response_time": min(10, metrics["avg_response_time_minutes"] / 6)  # Normalize
+            "workload": workload,
+            "after_hours": after_hours, 
+            "weekend_work": weekend_work,
+            "incident_load": incident_load,
+            "response_time": response_time
         }
         
         return {k: round(v, 2) for k, v in factors.items()}
@@ -548,9 +587,9 @@ class BurnoutAnalyzerService:
     
     def _determine_risk_level(self, burnout_score: float) -> str:
         """Determine risk level based on burnout score using Maslach methodology."""
-        if burnout_score >= 7.0:
+        if burnout_score >= 5.0:  # Further lowered to catch high-incident users
             return "high"
-        elif burnout_score >= 4.0:
+        elif burnout_score >= 3.5:  # Lowered from 4.0 to catch moderate cases
             return "medium"
         else:
             return "low"
@@ -560,7 +599,7 @@ class BurnoutAnalyzerService:
         if not member_analyses:
             return {
                 "overall_score": 10,  # Perfect health if no data
-                "risk_distribution": {"low": 0, "medium": 0, "high": 0, "critical": 0},
+                "risk_distribution": {"low": 0, "medium": 0, "high": 0},
                 "average_burnout_score": 0,
                 "health_status": "excellent",
                 "members_at_risk": 0
@@ -581,7 +620,34 @@ class BurnoutAnalyzerService:
                     risk_dist["low"] += 1
         
         # Calculate overall health score (inverse of burnout)
-        overall_score = 10 - avg_burnout
+        # Use a more balanced approach that ensures reasonable health scores
+        # even for high burnout levels
+        
+        # Define key thresholds and their corresponding health scores
+        # This creates a piecewise linear function with gentler slopes
+        if avg_burnout <= 2:
+            # Low burnout (0-2) maps to excellent health (10-8.5)
+            # Slope: -0.75
+            overall_score = 10 - (avg_burnout * 0.75)
+        elif avg_burnout <= 4:
+            # Low-medium burnout (2-4) maps to good health (8.5-7)
+            # Slope: -0.75
+            overall_score = 8.5 - ((avg_burnout - 2) * 0.75)
+        elif avg_burnout <= 6:
+            # Medium burnout (4-6) maps to fair health (7-5)
+            # Slope: -1.0
+            overall_score = 7 - ((avg_burnout - 4) * 1.0)
+        elif avg_burnout <= 8:
+            # High burnout (6-8) maps to concerning health (5-3)
+            # Slope: -1.0
+            overall_score = 5 - ((avg_burnout - 6) * 1.0)
+        else:
+            # Very high burnout (8-10) maps to poor health (3-2)
+            # Slope: -0.5 (gentler slope to avoid extremely low scores)
+            overall_score = 3 - ((avg_burnout - 8) * 0.5)
+        
+        # Ensure minimum score of 2.0 (20% when displayed)
+        overall_score = max(2.0, overall_score)
         
         # Determine health status
         if overall_score >= 8:
@@ -590,8 +656,10 @@ class BurnoutAnalyzerService:
             health_status = "good"
         elif overall_score >= 4:
             health_status = "fair"
-        else:
+        elif overall_score >= 2:
             health_status = "poor"
+        else:
+            health_status = "critical"
         
         return {
             "overall_score": round(overall_score, 2),
@@ -658,8 +726,8 @@ class BurnoutAnalyzerService:
         self, 
         team_health: Dict[str, Any], 
         team_analysis: Dict[str, Any]
-    ) -> List[str]:
-        """Generate actionable recommendations based on analysis."""
+    ) -> List[Dict[str, Any]]:
+        """Generate actionable recommendations based on Christina Maslach methodology."""
         recommendations = []
         members = team_analysis.get("members", []) if team_analysis else []
         
@@ -668,10 +736,18 @@ class BurnoutAnalyzerService:
         members_at_risk = team_health.get("members_at_risk", 0) if team_health else 0
         
         if health_status in ["poor", "fair"]:
-            recommendations.append("Consider implementing or reviewing on-call rotation schedules to distribute load more evenly")
+            recommendations.append({
+                "type": "organizational",
+                "priority": "high",
+                "message": "Consider implementing or reviewing on-call rotation schedules to distribute load more evenly"
+            })
         
         if members_at_risk > 0:
-            recommendations.append(f"Schedule 1-on-1s with the {members_at_risk} team members at high risk")
+            recommendations.append({
+                "type": "interpersonal", 
+                "priority": "high",
+                "message": f"Schedule 1-on-1s with the {members_at_risk} team members at high risk"
+            })
         
         # Pattern-based recommendations
         if members:
@@ -682,7 +758,11 @@ class BurnoutAnalyzerService:
             ]
             avg_after_hours = sum(after_hours_values) / len(after_hours_values) if after_hours_values else 0
             if avg_after_hours > 0.25:
-                recommendations.append("Implement follow-the-sun support or adjust business hours coverage")
+                recommendations.append({
+                    "type": "emotional_exhaustion",
+                    "priority": "high",
+                    "message": "Implement follow-the-sun support or adjust business hours coverage"
+                })
             
             # Weekend pattern with null safety
             weekend_values = [
@@ -691,12 +771,20 @@ class BurnoutAnalyzerService:
             ]
             avg_weekend = sum(weekend_values) / len(weekend_values) if weekend_values else 0
             if avg_weekend > 0.15:
-                recommendations.append("Review weekend on-call compensation and rotation frequency")
+                recommendations.append({
+                    "type": "emotional_exhaustion", 
+                    "priority": "medium",
+                    "message": "Review weekend on-call compensation and rotation frequency"
+                })
             
             # Workload distribution
             workload_variance = self._calculate_workload_variance(members)
             if workload_variance > 0.5:
-                recommendations.append("Incident load is unevenly distributed - consider load balancing strategies")
+                recommendations.append({
+                    "type": "depersonalization",
+                    "priority": "medium", 
+                    "message": "Incident load is unevenly distributed - consider load balancing strategies"
+                })
             
             # Response time with null safety
             response_values = [
@@ -706,11 +794,37 @@ class BurnoutAnalyzerService:
             ]
             avg_response = sum(response_values) / len(response_values) if response_values else 0
             if avg_response > 30:
-                recommendations.append("Review alerting and escalation procedures to improve response times")
+                recommendations.append({
+                    "type": "personal_accomplishment",
+                    "priority": "medium",
+                    "message": "Review alerting and escalation procedures to improve response times"
+                })
         
-        # Always include a positive recommendation with null safety
+        # Always include Christina Maslach-based recommendations
         if health_status in ["excellent", "good"]:
-            recommendations.append("Continue current practices and monitor for changes in team health metrics")
+            recommendations.append({
+                "type": "personal_accomplishment",
+                "priority": "low", 
+                "message": "Continue current practices and monitor for changes in team health metrics"
+            })
+        
+        # Add specific Maslach dimension recommendations
+        if members:
+            high_burnout_members = [m for m in members if m.get("burnout_score", 0) >= 7.0]
+            if high_burnout_members:
+                recommendations.append({
+                    "type": "emotional_exhaustion",
+                    "priority": "high",
+                    "message": "Provide stress management training and consider workload redistribution for high-burnout individuals"
+                })
+                
+        # Add organizational support recommendations
+        if members_at_risk > len(members) * 0.3:  # If more than 30% are at risk
+            recommendations.append({
+                "type": "organizational",
+                "priority": "high", 
+                "message": "Consider organizational changes: flexible schedules, mental health resources, and burnout prevention programs"
+            })
         
         return recommendations
     

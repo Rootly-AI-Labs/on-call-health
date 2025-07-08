@@ -1,0 +1,7 @@
+To download the official Rootly logo, run this command:
+
+curl -L -o rootly-logo-official.png "https://ml.globenewswire.com/Resource/Download/84c2c8ad-8f24-4119-814e-36342936302d"
+
+Or use wget:
+
+wget -O rootly-logo-official.png "https://ml.globenewswire.com/Resource/Download/84c2c8ad-8f24-4119-814e-36342936302d"

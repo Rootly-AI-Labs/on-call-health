@@ -134,7 +134,7 @@ export default function OnboardingPage() {
 
   const handleConnectRootly = () => {
     // Direct navigation to Rootly token setup
-    router.push('/setup/rootly')
+    router.push('/integrations')
   }
 
   const getProviderIcon = (provider: string) => {
