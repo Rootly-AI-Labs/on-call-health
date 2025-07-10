@@ -43,14 +43,14 @@ export default function MethodologyPage() {
           </CardHeader>
           <CardContent>
             <p className="text-gray-700 mb-4">
-              Our burnout detection system uses incident response data from Rootly to calculate three key dimensions 
+              Our burnout detection system analyzes multiple data sources to calculate three key dimensions 
               of burnout, providing an evidence-based assessment of team mental health and well-being.
             </p>
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <p className="text-sm text-blue-800">
-                <strong>Note:</strong> Currently, we analyze incident data which accounts for 70% of the total score. 
-                Future updates will incorporate GitHub activity (15%) and Slack communication patterns (15%) for a 
-                more comprehensive assessment.
+                <strong>Multi-Source Analysis:</strong> We analyze incident data from PagerDuty/Rootly (primary source), 
+                with optional GitHub activity data for code patterns and Slack communication data for sentiment analysis. 
+                The analysis adapts based on available integrations to provide the most comprehensive assessment possible.
               </p>
             </div>
           </CardContent>
@@ -83,29 +83,29 @@ export default function MethodologyPage() {
                   <div className="flex items-start space-x-3">
                     <div className="w-2 h-2 bg-red-500 rounded-full mt-1.5"></div>
                     <div>
-                      <strong className="text-sm">Incident Frequency</strong>
-                      <p className="text-sm text-gray-600">How often team members are responding to incidents</p>
+                      <strong className="text-sm">Workload Pressure</strong>
+                      <p className="text-sm text-gray-600">Incident frequency and volume over time</p>
                     </div>
                   </div>
                   <div className="flex items-start space-x-3">
                     <div className="w-2 h-2 bg-red-500 rounded-full mt-1.5"></div>
                     <div>
-                      <strong className="text-sm">After-Hours Work</strong>
-                      <p className="text-sm text-gray-600">Percentage of incidents handled outside business hours</p>
+                      <strong className="text-sm">After-Hours Activity</strong>
+                      <p className="text-sm text-gray-600">Work performed outside normal business hours (incidents, commits, messages)</p>
                     </div>
                   </div>
                   <div className="flex items-start space-x-3">
                     <div className="w-2 h-2 bg-red-500 rounded-full mt-1.5"></div>
                     <div>
-                      <strong className="text-sm">Resolution Time</strong>
-                      <p className="text-sm text-gray-600">Average time spent resolving incidents</p>
+                      <strong className="text-sm">GitHub Activity</strong>
+                      <p className="text-sm text-gray-600">Late-night commits and excessive coding activity (when available)</p>
                     </div>
                   </div>
                   <div className="flex items-start space-x-3">
                     <div className="w-2 h-2 bg-red-500 rounded-full mt-1.5"></div>
                     <div>
-                      <strong className="text-sm">Incident Clustering</strong>
-                      <p className="text-sm text-gray-600">Concentration of incidents in short time periods</p>
+                      <strong className="text-sm">Communication Stress</strong>
+                      <p className="text-sm text-gray-600">Negative sentiment patterns in Slack messages (when available)</p>
                     </div>
                   </div>
                 </div>
@@ -136,29 +136,29 @@ export default function MethodologyPage() {
                   <div className="flex items-start space-x-3">
                     <div className="w-2 h-2 bg-yellow-500 rounded-full mt-1.5"></div>
                     <div>
-                      <strong className="text-sm">Escalation Rate</strong>
-                      <p className="text-sm text-gray-600">Frequency of high-severity incidents</p>
+                      <strong className="text-sm">Response Time Pressure</strong>
+                      <p className="text-sm text-gray-600">Time pressure to respond quickly to incidents</p>
                     </div>
                   </div>
                   <div className="flex items-start space-x-3">
                     <div className="w-2 h-2 bg-yellow-500 rounded-full mt-1.5"></div>
                     <div>
-                      <strong className="text-sm">Solo Work Patterns</strong>
-                      <p className="text-sm text-gray-600">Incidents handled without collaboration</p>
+                      <strong className="text-sm">Weekend Work Disruption</strong>
+                      <p className="text-sm text-gray-600">Work performed during weekends (incidents, commits, messages)</p>
                     </div>
                   </div>
                   <div className="flex items-start space-x-3">
                     <div className="w-2 h-2 bg-yellow-500 rounded-full mt-1.5"></div>
                     <div>
-                      <strong className="text-sm">Response Time Trends</strong>
-                      <p className="text-sm text-gray-600">Changes in responsiveness over time</p>
+                      <strong className="text-sm">GitHub Patterns</strong>
+                      <p className="text-sm text-gray-600">Weekend commits and large PR patterns indicating detachment (when available)</p>
                     </div>
                   </div>
                   <div className="flex items-start space-x-3">
                     <div className="w-2 h-2 bg-yellow-500 rounded-full mt-1.5"></div>
                     <div>
-                      <strong className="text-sm">Communication Patterns</strong>
-                      <p className="text-sm text-gray-600 italic">Coming soon: Analysis of Slack interactions</p>
+                      <strong className="text-sm">Communication Cynicism</strong>
+                      <p className="text-sm text-gray-600">Declining communication quality and engagement in Slack (when available)</p>
                     </div>
                   </div>
                 </div>
@@ -190,28 +190,28 @@ export default function MethodologyPage() {
                     <div className="w-2 h-2 bg-green-500 rounded-full mt-1.5"></div>
                     <div>
                       <strong className="text-sm">Resolution Success Rate</strong>
-                      <p className="text-sm text-gray-600">Percentage of incidents successfully resolved</p>
+                      <p className="text-sm text-gray-600">Inverse of response time pressure - better response times indicate higher accomplishment</p>
                     </div>
                   </div>
                   <div className="flex items-start space-x-3">
                     <div className="w-2 h-2 bg-green-500 rounded-full mt-1.5"></div>
                     <div>
-                      <strong className="text-sm">Performance Improvement</strong>
-                      <p className="text-sm text-gray-600">Trends in resolution times and efficiency</p>
+                      <strong className="text-sm">Incident Load Management</strong>
+                      <p className="text-sm text-gray-600">Ability to handle incident volume effectively without degradation</p>
                     </div>
                   </div>
                   <div className="flex items-start space-x-3">
                     <div className="w-2 h-2 bg-green-500 rounded-full mt-1.5"></div>
                     <div>
-                      <strong className="text-sm">Complex Problem Solving</strong>
-                      <p className="text-sm text-gray-600">Handling of high-severity incidents</p>
+                      <strong className="text-sm">Code Quality</strong>
+                      <p className="text-sm text-gray-600">GitHub PR quality and code review participation (when available)</p>
                     </div>
                   </div>
                   <div className="flex items-start space-x-3">
                     <div className="w-2 h-2 bg-green-500 rounded-full mt-1.5"></div>
                     <div>
-                      <strong className="text-sm">Knowledge Sharing</strong>
-                      <p className="text-sm text-gray-600 italic">Coming soon: GitHub PR reviews and documentation</p>
+                      <strong className="text-sm">Communication Effectiveness</strong>
+                      <p className="text-sm text-gray-600">Positive sentiment and constructive communication patterns in Slack (when available)</p>
                     </div>
                   </div>
                 </div>
@@ -281,10 +281,11 @@ export default function MethodologyPage() {
             <div>
               <h4 className="font-medium mb-2">What We Analyze</h4>
               <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
-                <li>Incident frequency and timing patterns</li>
-                <li>Response and resolution metrics</li>
-                <li>Work hour distribution</li>
-                <li>Team collaboration patterns</li>
+                <li>Incident frequency, timing, and resolution patterns</li>
+                <li>GitHub commit patterns, PR activity, and code review participation (when connected)</li>
+                <li>Slack message sentiment, timing, and communication patterns (when connected)</li>
+                <li>Work hour distribution across all platforms</li>
+                <li>Weekend and after-hours activity patterns</li>
               </ul>
             </div>
             
@@ -293,10 +294,11 @@ export default function MethodologyPage() {
             <div>
               <h4 className="font-medium mb-2">What We Don't Track</h4>
               <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
-                <li>Personal communications or message content</li>
-                <li>Individual performance reviews</li>
-                <li>Private repositories or code</li>
-                <li>Non-incident related activities</li>
+                <li>Specific content of Slack messages (only sentiment analysis)</li>
+                <li>Private repository code or proprietary information</li>
+                <li>Individual performance reviews or HR data</li>
+                <li>Personal calendar or non-work related activities</li>
+                <li>Detailed code content (only commit patterns and timing)</li>
               </ul>
             </div>
             

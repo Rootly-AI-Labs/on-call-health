@@ -42,11 +42,16 @@ class BurnoutAnalyzer:
         
         # Calculate overall burnout score
         weights = self.scoring
+        # Ensure personal accomplishment score is capped at 10 to prevent negative overall scores
+        pa_score = min(10, max(0, personal_accomplishment["score"]))
         overall_score = (
             emotional_exhaustion["score"] * weights.get("emotional_exhaustion_weight", 0.4) +
             depersonalization["score"] * weights.get("depersonalization_weight", 0.3) +
-            (10 - personal_accomplishment["score"]) * weights.get("personal_accomplishment_weight", 0.3)
+            (10 - pa_score) * weights.get("personal_accomplishment_weight", 0.3)
         )
+        
+        # Ensure overall score is never negative
+        overall_score = max(0, overall_score)
         
         # Calculate data source contributions to the overall score
         has_github = github_activity and self.config.get('github_integration', {}).get('enabled', False)

@@ -51,7 +51,11 @@ class BurnoutAnalyzerService:
     async def analyze_burnout(
         self, 
         time_range_days: int = 30,
-        include_weekends: bool = True
+        include_weekends: bool = True,
+        include_github: bool = False,
+        include_slack: bool = False,
+        github_token: str = None,
+        slack_token: str = None
     ) -> Dict[str, Any]:
         """
         Analyze burnout for the team based on incident data.
@@ -81,6 +85,63 @@ class BurnoutAnalyzerService:
             metadata = data.get("collection_metadata", {}) if data else {}
             logger.info(f"TRACE: Extracted {len(users)} users, {len(incidents)} incidents")
             
+            # Collect GitHub/Slack data if enabled
+            github_data = {}
+            slack_data = {}
+            
+            if include_github or include_slack:
+                from .github_collector import collect_team_github_data
+                from .slack_collector import collect_team_slack_data
+                
+                # Get team member emails and names from JSONAPI format
+                team_emails = []
+                team_names = []
+                for user in users:
+                    if isinstance(user, dict) and "attributes" in user:
+                        attrs = user["attributes"]
+                        email = attrs.get("email")
+                        name = attrs.get("full_name") or attrs.get("name")
+                        if email:
+                            team_emails.append(email)
+                        if name:
+                            team_names.append(name)
+                    elif isinstance(user, dict):
+                        # Fallback for non-JSONAPI format
+                        email = user.get("email")
+                        name = user.get("full_name") or user.get("name")
+                        if email:
+                            team_emails.append(email)
+                        if name:
+                            team_names.append(name)
+                
+                if include_github:
+                    logger.info(f"Collecting GitHub data for {len(team_emails)} team members")
+                    logger.info(f"Team emails: {team_emails[:5]}...")  # Log first 5 emails
+                    try:
+                        logger.info(f"GitHub config - token: {'present' if github_token else 'missing'}")
+                        
+                        github_data = await collect_team_github_data(
+                            team_emails, time_range_days, github_token
+                        )
+                        logger.info(f"Collected GitHub data for {len(github_data)} users")
+                        logger.info(f"GitHub data keys: {list(github_data.keys())[:5]}")  # Log first 5 keys
+                    except Exception as e:
+                        logger.error(f"GitHub data collection failed: {e}")
+                
+                if include_slack:
+                    logger.info(f"Collecting Slack data for {len(team_names)} team members using names")
+                    logger.info(f"Team names: {team_names[:5]}...")  # Log first 5 names
+                    try:
+                        logger.info(f"Slack config - token: {'present' if slack_token else 'missing'}")
+                        
+                        # Use names for Slack correlation instead of emails
+                        slack_data = await collect_team_slack_data(
+                            team_names, time_range_days, slack_token, use_names=True
+                        )
+                        logger.info(f"Collected Slack data for {len(slack_data)} users")
+                    except Exception as e:
+                        logger.error(f"Slack data collection failed: {e}")
+            
             # Analyze team burnout
             try:
                 logger.info(f"TRACE: About to call _analyze_team_data with {len(users)} users, {len(incidents)} incidents")
@@ -88,7 +149,9 @@ class BurnoutAnalyzerService:
                     users, 
                     incidents, 
                     metadata,
-                    include_weekends
+                    include_weekends,
+                    github_data,
+                    slack_data
                 )
                 logger.info(f"TRACE: _analyze_team_data completed successfully")
             except Exception as e:
@@ -104,17 +167,47 @@ class BurnoutAnalyzerService:
             # Generate insights and recommendations
             insights = self._generate_insights(team_analysis, team_health)
             
-            return {
+            # Create data sources structure
+            data_sources = {
+                "incident_data": True,
+                "github_data": include_github,
+                "slack_data": include_slack
+            }
+            
+            # Create GitHub insights if enabled
+            github_insights = None
+            if include_github:
+                github_insights = self._calculate_github_insights(github_data)
+            
+            # Create Slack insights if enabled  
+            slack_insights = None
+            if include_slack:
+                slack_insights = self._calculate_slack_insights(slack_data)
+
+            result = {
                 "analysis_timestamp": datetime.now().isoformat(),
                 "metadata": {
                     **metadata,
-                    "include_weekends": include_weekends
+                    "include_weekends": include_weekends,
+                    "include_github": include_github,
+                    "include_slack": include_slack
                 },
+                "data_sources": data_sources,
                 "team_health": team_health,
                 "team_analysis": team_analysis,
                 "insights": insights,
                 "recommendations": self._generate_recommendations(team_health, team_analysis)
             }
+            
+            # Add GitHub insights if enabled
+            if github_insights:
+                result["github_insights"] = github_insights
+                
+            # Add Slack insights if enabled  
+            if slack_insights:
+                result["slack_insights"] = slack_insights
+                
+            return result
             
         except Exception as e:
             logger.error(f"Burnout analysis failed: {e}")
@@ -200,7 +293,9 @@ class BurnoutAnalyzerService:
         users: List[Dict[str, Any]], 
         incidents: List[Dict[str, Any]],
         metadata: Dict[str, Any],
-        include_weekends: bool
+        include_weekends: bool,
+        github_data: Dict[str, Dict] = None,
+        slack_data: Dict[str, Dict] = None
     ) -> Dict[str, Any]:
         """Analyze burnout data for the entire team."""
         # Ensure all inputs are valid
@@ -218,11 +313,25 @@ class BurnoutAnalyzerService:
             if user is None:
                 continue
             user_id = str(user.get("id")) if user.get("id") is not None else "unknown"
+            # Get GitHub/Slack data for this user - handle JSONAPI format
+            if isinstance(user, dict) and "attributes" in user:
+                user_email = user["attributes"].get("email")
+                user_name = user["attributes"].get("full_name") or user["attributes"].get("name")
+            else:
+                user_email = user.get("email")
+                user_name = user.get("full_name") or user.get("name")
+            
+            # GitHub uses email, Slack uses name
+            user_github_data = github_data.get(user_email) if github_data and user_email else None
+            user_slack_data = slack_data.get(user_name) if slack_data and user_name else None
+            
             user_analysis = self._analyze_member_burnout(
                 user,
                 user_incidents.get(user_id, []),
                 metadata,
-                include_weekends
+                include_weekends,
+                user_github_data,
+                user_slack_data
             )
             member_analyses.append(user_analysis)
         
@@ -286,7 +395,9 @@ class BurnoutAnalyzerService:
         user: Dict[str, Any],
         incidents: List[Dict[str, Any]],
         metadata: Dict[str, Any],
-        include_weekends: bool
+        include_weekends: bool,
+        github_data: Dict[str, Any] = None,
+        slack_data: Dict[str, Any] = None
     ) -> Dict[str, Any]:
         """Analyze burnout for a single team member."""
         user_attrs = user.get("attributes", {})
@@ -339,14 +450,19 @@ class BurnoutAnalyzerService:
         factors = self._calculate_burnout_factors(metrics)
         
         # Calculate overall burnout score using Maslach methodology
+        # Ensure personal accomplishment is properly bounded to prevent negative scores
+        pa_score = min(10, max(0, dimensions["personal_accomplishment"]))
         burnout_score = (dimensions["emotional_exhaustion"] * 0.4 + 
                         dimensions["depersonalization"] * 0.3 + 
-                        (10 - dimensions["personal_accomplishment"]) * 0.3)
+                        (10 - pa_score) * 0.3)
+        
+        # Ensure overall score is never negative
+        burnout_score = max(0, burnout_score)
         
         # Determine risk level
         risk_level = self._determine_risk_level(burnout_score)
         
-        return {
+        result = {
             "user_id": user_id,
             "user_name": user_name,
             "user_email": user_email,
@@ -357,6 +473,48 @@ class BurnoutAnalyzerService:
             "maslach_dimensions": dimensions,
             "metrics": metrics
         }
+        
+        # Add GitHub activity if available
+        if github_data and github_data.get("activity_data"):
+            result["github_activity"] = github_data["activity_data"]
+        else:
+            # Add placeholder GitHub activity
+            result["github_activity"] = {
+                "commits_count": 0,
+                "pull_requests_count": 0,
+                "reviews_count": 0,
+                "after_hours_commits": 0,
+                "weekend_commits": 0,
+                "avg_pr_size": 0,
+                "burnout_indicators": {
+                    "excessive_commits": False,
+                    "late_night_activity": False,
+                    "weekend_work": False,
+                    "large_prs": False
+                }
+            }
+        
+        # Add Slack activity if available
+        if slack_data and slack_data.get("activity_data"):
+            result["slack_activity"] = slack_data["activity_data"]
+        else:
+            # Add placeholder Slack activity
+            result["slack_activity"] = {
+                "messages_sent": 0,
+                "channels_active": 0,
+                "after_hours_messages": 0,
+                "weekend_messages": 0,
+                "avg_response_time_minutes": 0,
+                "sentiment_score": 0.0,
+                "burnout_indicators": {
+                    "excessive_messaging": False,
+                    "poor_sentiment": False,
+                    "late_responses": False,
+                    "after_hours_activity": False
+                }
+            }
+        
+        return result
     
     def _calculate_member_metrics(
         self,
@@ -579,11 +737,14 @@ class BurnoutAnalyzerService:
         personal_accomplishment = max(0, personal_accomplishment)
         
         # Calculate final score using Maslach weights
+        # Ensure personal accomplishment is properly bounded to prevent negative scores
+        pa_score = min(10, max(0, personal_accomplishment))
         burnout_score = (emotional_exhaustion * 0.4 + 
                         depersonalization * 0.3 + 
-                        (10 - personal_accomplishment) * 0.3)
+                        (10 - pa_score) * 0.3)
         
-        return burnout_score
+        # Ensure overall score is never negative
+        return max(0, burnout_score)
     
     def _determine_risk_level(self, burnout_score: float) -> str:
         """Determine risk level based on burnout score using Maslach methodology."""
@@ -858,3 +1019,182 @@ class BurnoutAnalyzerService:
         
         # Normalize by mean to get coefficient of variation
         return variance / mean if mean > 0 else 0
+    
+    def _calculate_github_insights(self, github_data: Dict[str, Dict]) -> Dict[str, Any]:
+        """Calculate aggregated GitHub insights from team data."""
+        if not github_data:
+            return {
+                "total_users_analyzed": 0,
+                "avg_commits_per_week": 0,
+                "avg_prs_per_week": 0,
+                "after_hours_activity_rate": 0,
+                "weekend_activity_rate": 0,
+                "top_contributors": [],
+                "burnout_indicators": {
+                    "excessive_commits": 0,
+                    "after_hours_coding": 0,
+                    "weekend_work": 0,
+                    "large_prs": 0
+                }
+            }
+        
+        users_with_data = len(github_data)
+        all_metrics = [data.get("metrics", {}) for data in github_data.values()]
+        
+        # Calculate averages
+        total_commits_per_week = sum(m.get("commits_per_week", 0) for m in all_metrics)
+        total_prs_per_week = sum(m.get("prs_per_week", 0) for m in all_metrics)
+        
+        avg_commits_per_week = total_commits_per_week / users_with_data if users_with_data > 0 else 0
+        avg_prs_per_week = total_prs_per_week / users_with_data if users_with_data > 0 else 0
+        
+        # Calculate after-hours and weekend rates
+        after_hours_rates = [m.get("after_hours_commit_percentage", 0) for m in all_metrics]
+        weekend_rates = [m.get("weekend_commit_percentage", 0) for m in all_metrics]
+        
+        avg_after_hours_rate = sum(after_hours_rates) / len(after_hours_rates) if after_hours_rates else 0
+        avg_weekend_rate = sum(weekend_rates) / len(weekend_rates) if weekend_rates else 0
+        
+        # Count burnout indicators
+        burnout_counts = {
+            "excessive_commits": 0,
+            "after_hours_coding": 0,
+            "weekend_work": 0,
+            "large_prs": 0
+        }
+        
+        for data in github_data.values():
+            indicators = data.get("burnout_indicators", {})
+            for key in burnout_counts:
+                if indicators.get(key, False):
+                    burnout_counts[key] += 1
+        
+        # Top contributors (top 5 by commits)
+        contributors = []
+        for email, data in github_data.items():
+            metrics = data.get("metrics", {})
+            contributors.append({
+                "email": email,
+                "username": data.get("username", ""),
+                "commits_per_week": metrics.get("commits_per_week", 0),
+                "total_commits": metrics.get("total_commits", 0)
+            })
+        
+        top_contributors = sorted(contributors, key=lambda x: x["total_commits"], reverse=True)[:5]
+        
+        # Calculate totals for the team
+        total_commits = sum(m.get("total_commits", 0) for m in all_metrics)
+        total_prs = sum(m.get("total_pull_requests", 0) for m in all_metrics)
+        total_reviews = sum(m.get("total_reviews", 0) for m in all_metrics)
+        
+        return {
+            "total_users_analyzed": users_with_data,
+            "total_commits": total_commits,
+            "total_pull_requests": total_prs,
+            "total_reviews": total_reviews,
+            "avg_commits_per_week": round(avg_commits_per_week, 2),
+            "avg_prs_per_week": round(avg_prs_per_week, 2),
+            "after_hours_activity_rate": round(avg_after_hours_rate, 3),
+            "after_hours_activity_percentage": round(avg_after_hours_rate * 100, 1),  # Frontend expects percentage
+            "weekend_activity_rate": round(avg_weekend_rate, 3),
+            "top_contributors": top_contributors,
+            "burnout_indicators": {
+                "excessive_commits": burnout_counts.get("excessive_commits", 0),
+                "after_hours_coding": burnout_counts.get("after_hours_coding", 0),
+                "weekend_work": burnout_counts.get("weekend_work", 0),
+                "large_prs": burnout_counts.get("large_prs", 0),
+                # Frontend specific field names
+                "excessive_late_night_commits": burnout_counts.get("after_hours_coding", 0),
+                "weekend_workers": burnout_counts.get("weekend_work", 0),
+                "large_pr_pattern": burnout_counts.get("large_prs", 0)
+            }
+        }
+    
+    def _calculate_slack_insights(self, slack_data: Dict[str, Dict]) -> Dict[str, Any]:
+        """Calculate aggregated Slack insights from team data."""
+        if not slack_data:
+            return {
+                "total_users_analyzed": 0,
+                "avg_messages_per_day": 0,
+                "avg_response_time_minutes": 0,
+                "after_hours_messaging_rate": 0,
+                "weekend_messaging_rate": 0,
+                "avg_sentiment_score": 0,
+                "channels_analyzed": 0,
+                "burnout_indicators": {
+                    "excessive_messaging": 0,
+                    "poor_sentiment": 0,
+                    "late_responses": 0,
+                    "after_hours_activity": 0
+                }
+            }
+        
+        users_with_data = len(slack_data)
+        all_metrics = [data.get("metrics", {}) for data in slack_data.values()]
+        
+        # Calculate averages
+        total_messages_per_day = sum(m.get("messages_per_day", 0) for m in all_metrics)
+        total_response_times = [m.get("avg_response_time_minutes", 0) for m in all_metrics if m.get("avg_response_time_minutes", 0) > 0]
+        
+        avg_messages_per_day = total_messages_per_day / users_with_data if users_with_data > 0 else 0
+        avg_response_time = sum(total_response_times) / len(total_response_times) if total_response_times else 0
+        
+        # Calculate after-hours and weekend rates
+        after_hours_rates = [m.get("after_hours_percentage", 0) for m in all_metrics]
+        weekend_rates = [m.get("weekend_percentage", 0) for m in all_metrics]
+        sentiment_scores = [m.get("avg_sentiment", 0) for m in all_metrics]
+        
+        avg_after_hours_rate = sum(after_hours_rates) / len(after_hours_rates) if after_hours_rates else 0
+        avg_weekend_rate = sum(weekend_rates) / len(weekend_rates) if weekend_rates else 0
+        avg_sentiment = sum(sentiment_scores) / len(sentiment_scores) if sentiment_scores else 0
+        
+        # Count unique channels
+        all_channels = set()
+        for data in slack_data.values():
+            metrics = data.get("metrics", {})
+            channel_count = metrics.get("channel_diversity", 0)
+            # This is an approximation since we don't have actual channel IDs
+            all_channels.add(f"user_{data.get('user_id', '')}_channels_{channel_count}")
+        
+        # Count burnout indicators
+        burnout_counts = {
+            "excessive_messaging": 0,
+            "poor_sentiment": 0,
+            "late_responses": 0,
+            "after_hours_activity": 0
+        }
+        
+        for data in slack_data.values():
+            indicators = data.get("burnout_indicators", {})
+            for key in burnout_counts:
+                if indicators.get(key, False):
+                    burnout_counts[key] += 1
+        
+        # Calculate totals for the team
+        total_messages = sum(m.get("total_messages", 0) for m in all_metrics)
+        total_channels = sum(m.get("channel_diversity", 0) for m in all_metrics)
+        
+        return {
+            "total_users_analyzed": users_with_data,
+            "total_messages": total_messages,
+            "active_channels": total_channels,
+            "avg_messages_per_day": round(avg_messages_per_day, 1),
+            "avg_response_time_minutes": round(avg_response_time, 1),
+            "after_hours_messaging_rate": round(avg_after_hours_rate, 3),
+            "after_hours_activity_percentage": round(avg_after_hours_rate * 100, 1),  # Frontend expects percentage
+            "weekend_messaging_rate": round(avg_weekend_rate, 3),
+            "avg_sentiment_score": round(avg_sentiment, 3),
+            "channels_analyzed": len(all_channels),
+            "sentiment_analysis": {
+                "overall_sentiment": "positive" if avg_sentiment > 0.1 else "neutral" if avg_sentiment > -0.1 else "negative",
+                "sentiment_score": round(avg_sentiment, 3),
+                "positive_ratio": round(sum(m.get("positive_sentiment_ratio", 0) for m in all_metrics) / users_with_data, 3) if users_with_data > 0 else 0,
+                "negative_ratio": round(sum(m.get("negative_sentiment_ratio", 0) for m in all_metrics) / users_with_data, 3) if users_with_data > 0 else 0
+            },
+            "burnout_indicators": {
+                "excessive_messaging": burnout_counts.get("excessive_messaging", 0),
+                "poor_sentiment": burnout_counts.get("poor_sentiment", 0),
+                "late_responses": burnout_counts.get("late_responses", 0),
+                "after_hours_activity": burnout_counts.get("after_hours_activity", 0)
+            }
+        }

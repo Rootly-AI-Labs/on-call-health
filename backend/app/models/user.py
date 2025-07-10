@@ -28,6 +28,9 @@ class User(Base):
     rootly_integrations = relationship("RootlyIntegration", back_populates="user")
     oauth_providers = relationship("OAuthProvider", back_populates="user", cascade="all, delete-orphan")
     emails = relationship("UserEmail", back_populates="user", cascade="all, delete-orphan")
+    github_integrations = relationship("GitHubIntegration", back_populates="user", cascade="all, delete-orphan")
+    slack_integrations = relationship("SlackIntegration", back_populates="user", cascade="all, delete-orphan")
+    user_correlations = relationship("UserCorrelation", back_populates="user", cascade="all, delete-orphan")
     
     def __repr__(self):
         return f"<User(id={self.id}, email='{self.email}', providers={len(self.oauth_providers)})>"
@@ -48,3 +51,41 @@ class User(Base):
     def has_provider(self, provider_name: str) -> bool:
         """Check if user has a specific OAuth provider linked."""
         return any(p.provider == provider_name for p in self.oauth_providers)
+    
+    @property
+    def github_integration(self):
+        """Get the GitHub integration for this user."""
+        return self.github_integrations[0] if self.github_integrations else None
+    
+    @property
+    def slack_integration(self):
+        """Get the Slack integration for this user."""
+        return self.slack_integrations[0] if self.slack_integrations else None
+    
+    @property
+    def primary_correlation(self):
+        """Get the primary user correlation for this user."""
+        return self.user_correlations[0] if self.user_correlations else None
+    
+    def has_github_integration(self) -> bool:
+        """Check if user has GitHub integration set up."""
+        return len(self.github_integrations) > 0
+    
+    def has_slack_integration(self) -> bool:
+        """Check if user has Slack integration set up."""
+        return len(self.slack_integrations) > 0
+    
+    @property
+    def connected_platforms(self) -> list:
+        """Get list of all connected platforms for this user."""
+        platforms = []
+        if self.rootly_integrations:
+            platforms.append("rootly")
+        if self.github_integrations:
+            platforms.append("github")
+        if self.slack_integrations:
+            platforms.append("slack")
+        # Check for PagerDuty through correlations
+        if self.user_correlations and any(c.pagerduty_user_id for c in self.user_correlations):
+            platforms.append("pagerduty")
+        return platforms

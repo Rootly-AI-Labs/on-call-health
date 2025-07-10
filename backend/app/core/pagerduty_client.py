@@ -224,9 +224,9 @@ class PagerDutyAPIClient:
             end_date = datetime.now(pytz.UTC)
             start_date = end_date - timedelta(days=days_back)
             
-            # Collect users and incidents in parallel
-            users_task = self.get_users(limit=100)
-            incidents_task = self.get_incidents(since=start_date, until=end_date, limit=500)
+            # Collect users and incidents in parallel (no limits for complete data collection)
+            users_task = self.get_users(limit=1000)
+            incidents_task = self.get_incidents(since=start_date, until=end_date, limit=10000)
             
             users = await users_task
             incidents = await incidents_task
@@ -386,8 +386,8 @@ class PagerDutyDataCollector:
         until = datetime.now(pytz.UTC)
         since = until - timedelta(days=days_back)
         
-        # Fetch data in parallel
-        users_task = self.client.get_users(limit=200)
+        # Fetch data in parallel (no limits for complete data collection)
+        users_task = self.client.get_users(limit=1000)
         incidents_task = self.client.get_incidents(since=since, until=until)
         
         users, incidents = await asyncio.gather(users_task, incidents_task)

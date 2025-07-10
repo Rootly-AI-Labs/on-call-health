@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -47,6 +48,7 @@ import {
   Trash2,
   LogOut,
   BookOpen,
+  CheckCircle,
 } from "lucide-react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
@@ -66,6 +68,25 @@ interface Integration {
   platform?: 'rootly' | 'pagerduty'
 }
 
+interface GitHubIntegration {
+  id: number
+  github_username: string
+  organizations: string[]
+  token_source: string
+  connected_at: string
+  last_updated: string
+}
+
+interface SlackIntegration {
+  id: number
+  slack_user_id: string
+  workspace_id: string
+  token_source: string
+  connected_at: string
+  last_updated: string
+  total_channels?: number
+}
+
 interface OrganizationMember {
   id: string
   name: string
@@ -83,6 +104,34 @@ interface OrganizationMember {
     weekendWork: number
     incidentLoad: number
     responseTime: number
+  }
+  github_activity?: {
+    commits_count: number
+    pull_requests_count: number
+    reviews_count: number
+    after_hours_commits: number
+    weekend_commits: number
+    avg_pr_size: number
+    burnout_indicators: {
+      excessive_commits: boolean
+      late_night_activity: boolean
+      weekend_work: boolean
+      large_prs: boolean
+    }
+  }
+  slack_activity?: {
+    messages_sent: number
+    channels_active: number
+    after_hours_messages: number
+    weekend_messages: number
+    avg_response_time_minutes: number
+    sentiment_score: number
+    burnout_indicators: {
+      excessive_messaging: boolean
+      poor_sentiment: boolean
+      late_responses: boolean
+      after_hours_activity: boolean
+    }
   }
 }
 
@@ -108,6 +157,13 @@ interface AnalysisResult {
   organizationMembers?: OrganizationMember[] // For display purposes
   burnoutFactors?: Array<{ factor: string; value: number }> // For display purposes
   analysis_data?: {
+    data_sources: {
+      incident_data: boolean
+      github_data: boolean
+      slack_data: boolean
+      github_users_analyzed?: number
+      slack_users_analyzed?: number
+    }
     team_health: {
       overall_score: number
       risk_distribution: {
@@ -116,6 +172,11 @@ interface AnalysisResult {
         high: number
       }
       health_status: string
+      data_source_contributions?: {
+        incident_contribution: number
+        github_contribution: number
+        slack_contribution: number
+      }
     }
     team_analysis: {
       members: Array<{
@@ -137,17 +198,55 @@ interface AnalysisResult {
           after_hours_percentage: number
           weekend_percentage: number
         }
+        github_activity?: any
+        slack_activity?: any
       }>
+    }
+    github_insights?: {
+      total_commits: number
+      total_pull_requests: number
+      total_reviews: number
+      after_hours_activity_percentage: number
+      weekend_activity_percentage: number
+      top_contributors: Array<{
+        username: string
+        commits: number
+        prs: number
+        reviews: number
+      }>
+      burnout_indicators: {
+        excessive_late_night_commits: number
+        large_pr_pattern: number
+        weekend_workers: number
+      }
+    }
+    slack_insights?: {
+      total_messages: number
+      active_channels: number
+      avg_response_time_minutes: number
+      after_hours_activity_percentage: number
+      weekend_activity_percentage: number
+      sentiment_analysis: {
+        avg_sentiment: number
+        negative_sentiment_users: number
+      }
+      burnout_indicators: {
+        excessive_messaging: number
+        poor_sentiment_users: number
+        after_hours_communicators: number
+      }
     }
     insights: Array<{
       type: string
       message: string
       severity: string
+      source?: 'incident' | 'github' | 'slack' | 'combined'
     }>
     recommendations: Array<{
       type: string
       message: string
       priority: string
+      source?: 'incident' | 'github' | 'slack' | 'combined'
     }>
     partial_data?: {
       users: Array<any>
@@ -162,7 +261,7 @@ interface AnalysisResult {
   }
 }
 
-type AnalysisStage = "loading" | "fetching" | "calculating" | "preparing" | "complete"
+type AnalysisStage = "loading" | "connecting" | "fetching_users" | "fetching" | "fetching_github" | "fetching_slack" | "calculating" | "analyzing" | "preparing" | "complete"
 
 // Mock data generator
 const generateMockAnalysis = (integration: Integration): AnalysisResult => {
@@ -308,6 +407,7 @@ export default function Dashboard() {
   const [timeRange, setTimeRange] = useState("30")
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [analysisToDelete, setAnalysisToDelete] = useState<AnalysisResult | null>(null)
+  const [debugSectionOpen, setDebugSectionOpen] = useState(false)
   
   const router = useRouter()
   const { toast } = useToast()
@@ -331,15 +431,12 @@ export default function Dashboard() {
       // Check if we have team_health data but with no meaningful content
       if (currentAnalysis.analysis_data?.team_health) {
         // Check if the analysis has 0 incidents or 0 members - this indicates insufficient data
-        const metadata = currentAnalysis.analysis_data.metadata
         const teamAnalysis = currentAnalysis.analysis_data.team_analysis
         
-        const hasNoIncidents = metadata?.total_incidents === 0 || 
-                              teamAnalysis?.total_incidents === 0
         const hasNoMembers = teamAnalysis?.members?.length === 0 ||
                             !teamAnalysis?.members
         
-        if (hasNoIncidents || hasNoMembers) {
+        if (hasNoMembers) {
           return true // Show insufficient data card
         }
         
@@ -582,30 +679,57 @@ export default function Dashboard() {
         return
       }
 
-      // Load both Rootly and PagerDuty integrations
+      // Load both Rootly, PagerDuty, GitHub, and Slack integrations
       console.log('Fetching integrations from:', {
         rootlyUrl: `${API_BASE}/rootly/integrations`,
-        pagerdutyUrl: `${API_BASE}/pagerduty/integrations`
+        pagerdutyUrl: `${API_BASE}/pagerduty/integrations`,
+        githubUrl: `${API_BASE}/integrations/github/status`,
+        slackUrl: `${API_BASE}/integrations/slack/status`
       })
       
-      const [rootlyResponse, pagerdutyResponse] = await Promise.all([
+      const [rootlyResponse, pagerdutyResponse, githubResponse, slackResponse] = await Promise.all([
         fetch(`${API_BASE}/rootly/integrations`, {
           headers: { 'Authorization': `Bearer ${authToken}` }
         }),
         fetch(`${API_BASE}/pagerduty/integrations`, {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        }),
+        fetch(`${API_BASE}/integrations/github/status`, {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        }),
+        fetch(`${API_BASE}/integrations/slack/status`, {
           headers: { 'Authorization': `Bearer ${authToken}` }
         })
       ])
 
       const rootlyData = rootlyResponse.ok ? await rootlyResponse.json() : { integrations: [] }
       const pagerdutyData = pagerdutyResponse.ok ? await pagerdutyResponse.json() : { integrations: [] }
+      const githubData = githubResponse.ok ? await githubResponse.json() : { connected: false, integration: null }
+      const slackData = slackResponse.ok ? await slackResponse.json() : { connected: false, integration: null }
 
       console.log('Raw API responses:', {
         rootlyResponse: { ok: rootlyResponse.ok, status: rootlyResponse.status },
         pagerdutyResponse: { ok: pagerdutyResponse.ok, status: pagerdutyResponse.status },
+        githubResponse: { ok: githubResponse.ok, status: githubResponse.status },
+        slackResponse: { ok: slackResponse.ok, status: slackResponse.status },
         rootlyData: rootlyData,
-        pagerdutyData: pagerdutyData
+        pagerdutyData: pagerdutyData,
+        githubData: githubData,
+        slackData: slackData
       })
+
+      // Set GitHub and Slack integration states
+      if (githubData.connected && githubData.integration) {
+        setGithubIntegration(githubData.integration)
+      } else {
+        setGithubIntegration(null)
+      }
+      
+      if (slackData.connected && slackData.integration) {
+        setSlackIntegration(slackData.integration)
+      } else {
+        setSlackIntegration(null)
+      }
 
       // Ensure platform is set
       const rootlyIntegrations = (rootlyData.integrations || []).map((i: Integration, index: number) => {
@@ -651,20 +775,95 @@ export default function Dashboard() {
     }
   }
 
-  const analysisStages = [
-    { key: "loading", label: "Initializing Analysis", detail: "Setting up analysis parameters", progress: 5 },
-    { key: "connecting", label: "Connecting to Rootly", detail: "Validating API credentials", progress: 10 },
-    { key: "fetching_users", label: "Fetching Organization Members", detail: "Loading user profiles", progress: 20 },
-    { key: "fetching", label: "Collecting Incident Data", detail: "Gathering incident history", progress: 40 },
-    { key: "calculating", label: "Processing Patterns", detail: "Analyzing response times and workload", progress: 60 },
-    { key: "analyzing", label: "Calculating Metrics", detail: "Computing burnout scores", progress: 75 },
-    { key: "preparing", label: "Finalizing Analysis", detail: "Preparing results", progress: 85 },
-    { key: "complete", label: "Analysis Complete", detail: "Results ready", progress: 100 },
-  ]
+  // Dynamic analysis stages based on selected data sources
+  const getAnalysisStages = () => {
+    const stages = [
+      { key: "loading", label: "Initializing Analysis", detail: "Setting up analysis parameters", progress: 5 },
+      { key: "connecting", label: "Connecting to Platform", detail: "Validating API credentials", progress: 10 },
+      { key: "fetching_users", label: "Fetching Organization Members", detail: "Loading user profiles", progress: 15 },
+      { key: "fetching", label: "Collecting Incident Data", detail: "Gathering incident history", progress: 35 }
+    ]
+
+    let currentProgress = 35
+    const remainingProgress = 50 // Leave 50% for processing/analysis phases
+    const additionalSources = (includeGithub && githubIntegration ? 1 : 0) + (includeSlack && slackIntegration ? 1 : 0)
+    const progressPerSource = additionalSources > 0 ? remainingProgress / (additionalSources + 2) : remainingProgress / 2
+
+    // Add GitHub data collection if enabled
+    if (includeGithub && githubIntegration) {
+      currentProgress += progressPerSource
+      stages.push({
+        key: "fetching_github",
+        label: "Collecting GitHub Data",
+        detail: "Gathering code activity and review patterns",
+        progress: Math.round(currentProgress)
+      })
+    }
+
+    // Add Slack data collection if enabled
+    if (includeSlack && slackIntegration) {
+      currentProgress += progressPerSource
+      stages.push({
+        key: "fetching_slack",
+        label: "Collecting Slack Data", 
+        detail: "Gathering communication patterns and activity",
+        progress: Math.round(currentProgress)
+      })
+    }
+
+    // Add final processing stages
+    currentProgress += progressPerSource
+    stages.push({
+      key: "calculating",
+      label: "Processing Patterns",
+      detail: `Analyzing ${getAnalysisDescription()}`,
+      progress: Math.round(currentProgress)
+    })
+
+    stages.push({
+      key: "analyzing",
+      label: "Calculating Metrics",
+      detail: "Computing burnout scores",
+      progress: 85
+    })
+
+    stages.push({
+      key: "preparing",
+      label: "Finalizing Analysis",
+      detail: "Preparing results",
+      progress: 95
+    })
+
+    stages.push({
+      key: "complete",
+      label: "Analysis Complete",
+      detail: "Results ready",
+      progress: 100
+    })
+
+    return stages
+  }
+
+  const getAnalysisDescription = () => {
+    const sources = []
+    sources.push("incident response patterns")
+    if (includeGithub && githubIntegration) sources.push("code activity")
+    if (includeSlack && slackIntegration) sources.push("communication patterns")
+    
+    if (sources.length === 1) return sources[0]
+    if (sources.length === 2) return `${sources[0]} and ${sources[1]}`
+    return `${sources.slice(0, -1).join(", ")}, and ${sources[sources.length - 1]}`
+  }
 
   const [showTimeRangeDialog, setShowTimeRangeDialog] = useState(false)
   const [selectedTimeRange, setSelectedTimeRange] = useState("30")
   const [dialogSelectedIntegration, setDialogSelectedIntegration] = useState<string>("")
+  
+  // GitHub/Slack integration states
+  const [githubIntegration, setGithubIntegration] = useState<GitHubIntegration | null>(null)
+  const [slackIntegration, setSlackIntegration] = useState<SlackIntegration | null>(null)
+  const [includeGithub, setIncludeGithub] = useState(true)
+  const [includeSlack, setIncludeSlack] = useState(true)
 
   const startAnalysis = async () => {
     // Load integrations when user wants to start analysis
@@ -711,7 +910,9 @@ export default function Dashboard() {
         body: JSON.stringify({
           integration_id: parseInt(dialogSelectedIntegration),
           time_range: parseInt(selectedTimeRange),
-          include_weekends: true
+          include_weekends: true,
+          include_github: githubIntegration ? includeGithub : false,
+          include_slack: slackIntegration ? includeSlack : false
         }),
       })
 
@@ -818,7 +1019,7 @@ export default function Dashboard() {
                 setTargetProgress(Math.min(analysisData.progress, 85))
               } else if (analysisData.stage) {
                 // If the API provides a stage, use it
-                const stageData = analysisStages.find(s => s.key === analysisData.stage)
+                const stageData = getAnalysisStages().find(s => s.key === analysisData.stage)
                 if (stageData) {
                   console.log('Using API stage:', analysisData.stage, 'progress:', stageData.progress)
                   setAnalysisStage(analysisData.stage as AnalysisStage)
@@ -845,8 +1046,9 @@ export default function Dashboard() {
                 setCurrentStageIndex(prevIndex => {
                   // Don't advance past "analyzing" stage (index 5) without API confirmation
                   const maxSimulatedIndex = 6 // Stop at "Finalizing Analysis" (50%)
-                  const stageIndex = Math.min(prevIndex, analysisStages.length - 1)
-                  const stage = analysisStages[stageIndex]
+                  const currentStages = getAnalysisStages()
+                  const stageIndex = Math.min(prevIndex, currentStages.length - 1)
+                  const stage = currentStages[stageIndex]
                   console.log('Advancing to stage:', stage.key, 'progress:', stage.progress, 'index:', prevIndex)
                   setAnalysisStage(stage.key as AnalysisStage)
                   
@@ -1008,44 +1210,55 @@ export default function Dashboard() {
     { date: "Week 1", score: currentAnalysis.analysis_data.team_health.overall_score * 10 },
   ] : []
   
-  const memberBarData = currentAnalysis?.analysis_data?.team_analysis?.members?.map((member) => ({
-    name: member.user_name.split(" ")[0],
-    fullName: member.user_name,
-    score: member.burnout_score * 10, // Convert 0-10 scale to 0-100 for display
-    riskLevel: member.risk_level,
-    fill: member.risk_level === "high" ? "#dc2626" :      // Red for high
-          member.risk_level === "medium" ? "#f59e0b" :    // Amber for medium
-          "#10b981",                                       // Green for low
-  })) || []
+  const memberBarData = currentAnalysis?.analysis_data?.team_analysis?.members
+    ?.filter((member) => member.incident_count > 0) // Filter out users with no incidents
+    ?.map((member) => ({
+      name: member.user_name.split(" ")[0],
+      fullName: member.user_name,
+      score: member.burnout_score * 10, // Convert 0-10 scale to 0-100 for display
+      riskLevel: member.risk_level,
+      fill: member.risk_level === "high" ? "#dc2626" :      // Red for high
+            member.risk_level === "medium" ? "#f59e0b" :    // Amber for medium
+            "#10b981",                                       // Green for low
+    })) || []
   
   const members = currentAnalysis?.analysis_data?.team_analysis?.members || []
+  // Calculate burnout factors - Backend returns 0-10 scale, we need 0-100 for chart
   const burnoutFactors = members.length > 0 ? [
     { 
       factor: "Workload", 
-      value: members.reduce((avg, m) => avg + (m.factors?.workload || 0), 0) / members.length * 10,
+      value: members.reduce((avg, m) => avg + (m.factors?.workload || 0), 0) / members.length * 100,
       metrics: `Avg incidents: ${Math.round(members.reduce((avg, m) => avg + (m.incident_count || 0), 0) / members.length)}`
     },
     { 
       factor: "After Hours", 
-      value: members.reduce((avg, m) => avg + (m.factors?.after_hours || 0), 0) / members.length * 10,
+      value: members.reduce((avg, m) => avg + (m.factors?.after_hours || 0), 0) / members.length * 100,
       metrics: `Avg after-hours: ${Math.round(members.reduce((avg, m) => avg + (m.metrics?.after_hours_percentage || 0), 0) / members.length)}%`
     },
     { 
       factor: "Weekend Work", 
-      value: members.reduce((avg, m) => avg + (m.factors?.weekend_work || 0), 0) / members.length * 10,
+      value: members.reduce((avg, m) => avg + (m.factors?.weekend_work || 0), 0) / members.length * 100,
       metrics: `Avg weekend work: ${Math.round(members.reduce((avg, m) => avg + (m.metrics?.weekend_percentage || 0), 0) / members.length)}%`
     },
     { 
       factor: "Incident Load", 
-      value: members.reduce((avg, m) => avg + (m.factors?.incident_load || 0), 0) / members.length * 10,
+      value: members.reduce((avg, m) => avg + (m.factors?.incident_load || 0), 0) / members.length * 100,
       metrics: `Total incidents: ${members.reduce((total, m) => total + (m.incident_count || 0), 0)}`
     },
     { 
       factor: "Response Time", 
-      value: members.reduce((avg, m) => avg + (m.factors?.response_time || 0), 0) / members.length * 10,
+      value: members.reduce((avg, m) => avg + (m.factors?.response_time || 0), 0) / members.length * 100,
       metrics: `Avg response: ${Math.round(members.reduce((avg, m) => avg + (m.metrics?.avg_response_time_minutes || 0), 0) / members.length)} min`
     },
   ] : []
+
+  // Debug log to check the actual values
+  console.log('🔍 DEBUG: Radar chart burnout factors:', burnoutFactors)
+  console.log('🔍 DEBUG: Members raw factors:', members.map(m => ({ name: m.user_name, factors: m.factors })))
+  console.log('🔍 DEBUG: Organization burnout score:', members.reduce((avg, m) => avg + (m.burnout_score || 0), 0) / members.length * 10, '%')
+  console.log('🔍 DEBUG: Selected member factors:', selectedMember ? selectedMember.factors : 'None selected')
+  console.log('🔍 DEBUG: Selected member slack activity:', selectedMember?.slack_activity)
+  console.log('🔍 DEBUG: Selected member github activity:', selectedMember?.github_activity)
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -1182,8 +1395,17 @@ export default function Dashboard() {
               <div className="max-h-96 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">
                 {previousAnalyses.slice(0, 20).map((analysis) => {
                 const analysisDate = new Date(analysis.created_at)
-                const timeStr = analysisDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-                const dateStr = analysisDate.toLocaleDateString([], { month: 'short', day: 'numeric' })
+                const timeStr = analysisDate.toLocaleTimeString([], { 
+                  hour: 'numeric', 
+                  minute: '2-digit',
+                  hour12: true,
+                  timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+                })
+                const dateStr = analysisDate.toLocaleDateString([], { 
+                  month: 'short', 
+                  day: 'numeric',
+                  timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+                })
                 
                 // Load integrations if needed for team name display
                 const matchingIntegration = integrations.find(i => i.id === Number(analysis.integration_id)) || 
@@ -1360,6 +1582,91 @@ export default function Dashboard() {
             )}
           </div>
 
+          {/* Debug Section - Only show in development */}
+          {process.env.NODE_ENV === 'development' && currentAnalysis && (
+            <Card className="mb-6 bg-yellow-50 border-yellow-200">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-yellow-800 flex items-center">
+                    <AlertCircle className="w-4 h-4 mr-2" />
+                    Debug: Analysis Data Structure
+                  </h3>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setDebugSectionOpen(!debugSectionOpen)}
+                    className="text-yellow-600 hover:text-yellow-800 hover:bg-yellow-100"
+                  >
+                    {debugSectionOpen ? 'Hide' : 'Show'} Debug Info
+                  </Button>
+                </div>
+                
+                {debugSectionOpen && (
+                  <div className="space-y-3">
+                    <div className="text-xs bg-white p-3 rounded border border-yellow-200">
+                      <div className="font-medium text-gray-700 mb-2">Analysis Overview:</div>
+                      <div className="space-y-1 text-gray-600">
+                        <div>ID: {currentAnalysis.id}</div>
+                        <div>Status: {currentAnalysis.status}</div>
+                        <div>Created: {new Date(currentAnalysis.created_at).toLocaleString([], {
+                          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                          hour12: true
+                        })}</div>
+                        <div>Integration ID: {currentAnalysis.integration_id}</div>
+                        <div>Has analysis_data: {currentAnalysis.analysis_data ? 'Yes' : 'No'}</div>
+                      </div>
+                    </div>
+                    
+                    {currentAnalysis.analysis_data && (
+                      <div className="text-xs bg-white p-3 rounded border border-yellow-200">
+                        <div className="font-medium text-gray-700 mb-2">Analysis Data Structure:</div>
+                        <div className="space-y-1 text-gray-600">
+                          <div>Has team_health: {currentAnalysis.analysis_data.team_health ? 'Yes' : 'No'}</div>
+                          <div>Has team_analysis: {currentAnalysis.analysis_data.team_analysis ? 'Yes' : 'No'}</div>
+                          <div>Has partial_data: {currentAnalysis.analysis_data.partial_data ? 'Yes' : 'No'}</div>
+                          
+                          {currentAnalysis.analysis_data.team_analysis && (
+                            <div className="ml-4 space-y-1 mt-2">
+                              <div className="font-medium text-gray-700">Team Analysis:</div>
+                              <div>Members count: {currentAnalysis.analysis_data.team_analysis.members?.length || 0}</div>
+                              <div>Has organization_health: {currentAnalysis.analysis_data.team_analysis.organization_health ? 'Yes' : 'No'}</div>
+                              <div>Has insights: {currentAnalysis.analysis_data.team_analysis.insights ? 'Yes' : 'No'}</div>
+                            </div>
+                          )}
+                          
+                          {currentAnalysis.analysis_data.team_analysis?.members && currentAnalysis.analysis_data.team_analysis.members.length > 0 && (
+                            <div className="ml-4 space-y-1 mt-2">
+                              <div className="font-medium text-gray-700">Sample Member Data Sources:</div>
+                              {(() => {
+                                const member = currentAnalysis.analysis_data.team_analysis.members[0]
+                                return (
+                                  <div className="ml-4 space-y-1">
+                                    <div>Has GitHub data: {member.github_data ? 'Yes' : 'No'}</div>
+                                    <div>Has Slack data: {member.slack_data ? 'Yes' : 'No'}</div>
+                                    <div>Has incident data: {member.incident_count !== undefined ? 'Yes' : 'No'}</div>
+                                    <div>Has metrics: {member.metrics ? 'Yes' : 'No'}</div>
+                                    <div>Has factors: {member.factors ? 'Yes' : 'No'}</div>
+                                  </div>
+                                )
+                              })()}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div className="text-xs bg-white p-3 rounded border border-yellow-200">
+                      <div className="font-medium text-gray-700 mb-2">Raw Analysis Data (JSON):</div>
+                      <pre className="text-xs text-gray-600 bg-gray-50 p-2 rounded border max-h-60 overflow-y-auto">
+                        {JSON.stringify(currentAnalysis.analysis_data, null, 2)}
+                      </pre>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           {/* Analysis Running State */}
           {analysisRunning && (
             <Card className="mb-6 bg-gradient-to-b from-purple-50 to-white border-purple-200 shadow-lg">
@@ -1367,12 +1674,19 @@ export default function Dashboard() {
                 <div className="w-20 h-20 bg-gradient-to-r from-purple-100 to-purple-200 rounded-full flex items-center justify-center mx-auto mb-6 animate-pulse shadow-md">
                   <Activity className="w-10 h-10 text-purple-600 animate-spin" />
                 </div>
-                <h3 className="text-xl font-bold mb-2 text-purple-900">
-                  {analysisStages.find((s) => s.key === analysisStage)?.label}
-                </h3>
-                <p className="text-sm text-purple-600 mb-6 font-medium">
-                  {analysisStages.find((s) => s.key === analysisStage)?.detail}
-                </p>
+                {(() => {
+                  const currentStage = getAnalysisStages().find((s) => s.key === analysisStage)
+                  return (
+                    <>
+                      <h3 className="text-xl font-bold mb-2 text-purple-900">
+                        {currentStage?.label}
+                      </h3>
+                      <p className="text-sm text-purple-600 mb-6 font-medium">
+                        {currentStage?.detail}
+                      </p>
+                    </>
+                  )
+                })()}
                 
                 {/* Enhanced Progress Bar */}
                 <div className="w-full max-w-md mx-auto mb-6">
@@ -1434,9 +1748,9 @@ export default function Dashboard() {
                 </Button>
                 <Button 
                   variant="outline" 
-                  onClick={() => {
+                  onClick={(e) => {
                     if (currentAnalysis) {
-                      openDeleteDialog(currentAnalysis)
+                      openDeleteDialog(currentAnalysis, e)
                     }
                   }}
                   className="border-red-300 text-red-600 hover:bg-red-50"
@@ -1451,8 +1765,56 @@ export default function Dashboard() {
           {/* Analysis Complete State - Only show if analysis has meaningful data */}
           {!shouldShowInsufficientDataCard() && !analysisRunning && currentAnalysis && (currentAnalysis.analysis_data?.team_health || currentAnalysis.analysis_data?.partial_data) && (
             <>
+              {/* Debug Section - Development Only */}
+              {process.env.NODE_ENV === 'development' && (
+                <Card className="mb-6 border-yellow-300 bg-yellow-50">
+                  <CardHeader>
+                    <CardTitle className="text-yellow-800 text-sm">🐛 Debug: Analysis Data Sources</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-xs space-y-2">
+                      <p><strong>Analysis ID:</strong> {currentAnalysis.id}</p>
+                      <p><strong>Status:</strong> {currentAnalysis.status}</p>
+                      <p><strong>Data Sources Present:</strong></p>
+                      <ul className="ml-4 space-y-1">
+                        <li>• data_sources object: {currentAnalysis.analysis_data?.data_sources ? '✅ Present' : '❌ Missing'}</li>
+                        <li>• github_data flag: {currentAnalysis.analysis_data?.data_sources?.github_data ? '✅ True' : '❌ False/Missing'}</li>
+                        <li>• slack_data flag: {currentAnalysis.analysis_data?.data_sources?.slack_data ? '✅ True' : '❌ False/Missing'}</li>
+                        <li>• github_insights: {currentAnalysis.analysis_data?.github_insights ? '✅ Present' : '❌ Missing'}</li>
+                        <li>• slack_insights: {currentAnalysis.analysis_data?.slack_insights ? '✅ Present' : '❌ Missing'}</li>
+                        <li>• team_analysis.members count: {currentAnalysis.analysis_data?.team_analysis?.members?.length || 0}</li>
+                      </ul>
+                      <p><strong>Metadata Check:</strong></p>
+                      <ul className="ml-4 space-y-1">
+                        <li>• metadata.include_github: {currentAnalysis.analysis_data?.metadata?.include_github ? '✅ True' : '❌ False/Missing'}</li>
+                        <li>• metadata.include_slack: {currentAnalysis.analysis_data?.metadata?.include_slack ? '✅ True' : '❌ False/Missing'}</li>
+                        <li>• metadata object: {currentAnalysis.analysis_data?.metadata ? '✅ Present' : '❌ Missing'}</li>
+                      </ul>
+                      <details className="mt-2">
+                        <summary className="cursor-pointer text-yellow-700 hover:text-yellow-900">Raw analysis_data structure</summary>
+                        <pre className="mt-2 p-2 bg-white rounded text-xs overflow-auto max-h-40">
+                          {JSON.stringify(currentAnalysis.analysis_data, null, 2)}
+                        </pre>
+                      </details>
+                      <details className="mt-2">
+                        <summary className="cursor-pointer text-yellow-700 hover:text-yellow-900">GitHub insights data</summary>
+                        <pre className="mt-2 p-2 bg-white rounded text-xs overflow-auto max-h-40">
+                          {JSON.stringify(currentAnalysis.analysis_data?.github_insights, null, 2)}
+                        </pre>
+                      </details>
+                      <details className="mt-2">
+                        <summary className="cursor-pointer text-yellow-700 hover:text-yellow-900">Slack insights data</summary>
+                        <pre className="mt-2 p-2 bg-white rounded text-xs overflow-auto max-h-40">
+                          {JSON.stringify(currentAnalysis.analysis_data?.slack_insights, null, 2)}
+                        </pre>
+                      </details>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Overview Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
                 <Card className="border-2 border-purple-200 bg-white/70 backdrop-blur-sm shadow-lg">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm font-medium text-purple-700">Organization Health Score</CardTitle>
@@ -1503,10 +1865,10 @@ export default function Dashboard() {
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold text-gray-900">
-                      {currentAnalysis.analysis_data?.metadata?.total_incidents !== undefined 
-                        ? currentAnalysis.analysis_data.metadata.total_incidents
-                        : currentAnalysis.analysis_data?.team_analysis?.total_incidents !== undefined
-                        ? currentAnalysis.analysis_data.team_analysis.total_incidents
+                      {(currentAnalysis.analysis_data as any)?.metadata?.total_incidents !== undefined 
+                        ? (currentAnalysis.analysis_data as any).metadata.total_incidents
+                        : (currentAnalysis.analysis_data as any)?.team_analysis?.total_incidents !== undefined
+                        ? (currentAnalysis.analysis_data as any).team_analysis.total_incidents
                         : currentAnalysis.analysis_data?.partial_data?.incidents?.length || 0}
                     </div>
                     <p className="text-xs text-gray-600 mt-1">
@@ -1517,6 +1879,64 @@ export default function Dashboard() {
                         {currentAnalysis.analysis_data.session_hours.toFixed(1)} total hours
                       </p>
                     )}
+                  </CardContent>
+                </Card>
+
+                {/* Data Sources Card */}
+                <Card className="border-2 border-blue-200 bg-white/70 backdrop-blur-sm shadow-lg">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-blue-700">Data Sources</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {/* Incident Data */}
+                      <div className="flex items-center space-x-2">
+                        <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                        <span className="text-xs font-medium text-slate-700">Incident Management</span>
+                        <CheckCircle className="w-3 h-3 text-green-600" />
+                      </div>
+                      
+                      {/* GitHub Data */}
+                      <div className="flex items-center space-x-2">
+                        <div className="w-2 h-2 bg-gray-900 rounded-full"></div>
+                        <span className="text-xs font-medium text-slate-700">GitHub Activity</span>
+                        {currentAnalysis?.analysis_data?.data_sources?.github_data ? (
+                          <CheckCircle className="w-3 h-3 text-green-600" />
+                        ) : (
+                          <Minus className="w-3 h-3 text-gray-400" />
+                        )}
+                      </div>
+                      
+                      {/* Slack Data */}
+                      <div className="flex items-center space-x-2">
+                        <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                        <span className="text-xs font-medium text-slate-700">Slack Communications</span>
+                        {currentAnalysis?.analysis_data?.data_sources?.slack_data ? (
+                          <CheckCircle className="w-3 h-3 text-green-600" />
+                        ) : (
+                          <Minus className="w-3 h-3 text-gray-400" />
+                        )}
+                      </div>
+                      
+                      {/* Analysis Type Indicator */}
+                      <div className="pt-2 border-t border-blue-100">
+                        <p className="text-xs text-blue-600 font-medium">
+                          {(() => {
+                            const dataSources = currentAnalysis?.analysis_data?.data_sources
+                            if (!dataSources) return "Single-source analysis"
+                            
+                            const sources = []
+                            if (dataSources.incident_data) sources.push("incidents")
+                            if (dataSources.github_data) sources.push("GitHub")
+                            if (dataSources.slack_data) sources.push("Slack")
+                            
+                            if (sources.length === 1) return "Single-source analysis"
+                            if (sources.length === 2) return "Multi-source analysis"
+                            return "Comprehensive analysis"
+                          })()}
+                        </p>
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
               </div>
@@ -1593,52 +2013,61 @@ export default function Dashboard() {
               <Card className="mb-6">
                 <CardHeader>
                   <CardTitle>Organization Member Scores</CardTitle>
-                  <CardDescription>Burnout risk levels across organization members</CardDescription>
+                  <CardDescription>Burnout risk levels across organization members with incident data</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="h-[350px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={memberBarData} margin={{ top: 20, right: 30, bottom: 60, left: 20 }}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis 
-                          dataKey="fullName" 
-                          angle={-45}
-                          textAnchor="end"
-                          height={60}
-                          interval={0}
-                          tick={{ fontSize: 11 }}
-                        />
-                        <YAxis domain={[0, 100]} />
-                        <Tooltip 
-                          formatter={(value, name, props) => {
-                            const data = props.payload;
-                            return [
-                              `${Number(value).toFixed(2)}%`, 
-                              `Burnout Score (${data.riskLevel.charAt(0).toUpperCase() + data.riskLevel.slice(1)} Risk)`
-                            ];
-                          }}
-                          labelFormatter={(label, payload) => {
-                            const data = payload?.[0]?.payload;
-                            return data ? `${data.fullName}` : label;
-                          }}
-                          contentStyle={{
-                            backgroundColor: 'white',
-                            border: '1px solid #e5e7eb',
-                            borderRadius: '8px',
-                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-                          }}
-                        />
-                        <Bar 
-                          dataKey="score" 
-                          radius={[4, 4, 0, 0]}
-                        >
-                          {memberBarData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.fill} />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
+                  {memberBarData.length > 0 ? (
+                    <div className="h-[350px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={memberBarData} margin={{ top: 20, right: 30, bottom: 60, left: 20 }}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis 
+                            dataKey="fullName" 
+                            angle={-45}
+                            textAnchor="end"
+                            height={60}
+                            interval={0}
+                            tick={{ fontSize: 11 }}
+                          />
+                          <YAxis domain={[0, 100]} />
+                          <Tooltip 
+                            formatter={(value, name, props) => {
+                              const data = props.payload;
+                              return [
+                                `${Number(value).toFixed(2)}%`, 
+                                `Burnout Score (${data.riskLevel.charAt(0).toUpperCase() + data.riskLevel.slice(1)} Risk)`
+                              ];
+                            }}
+                            labelFormatter={(label, payload) => {
+                              const data = payload?.[0]?.payload;
+                              return data ? `${data.fullName}` : label;
+                            }}
+                            contentStyle={{
+                              backgroundColor: 'white',
+                              border: '1px solid #e5e7eb',
+                              borderRadius: '8px',
+                              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                            }}
+                          />
+                          <Bar 
+                            dataKey="score" 
+                            radius={[4, 4, 0, 0]}
+                          >
+                            {memberBarData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.fill} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : (
+                    <div className="h-[350px] flex items-center justify-center text-gray-500">
+                      <div className="text-center">
+                        <p className="text-lg font-medium">No incident data available</p>
+                        <p className="text-sm mt-2">Members with zero incidents are not displayed in this chart</p>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -1715,6 +2144,247 @@ export default function Dashboard() {
                 </Card>
               </div>
 
+              {/* GitHub and Slack Metrics Section */}
+              {(currentAnalysis?.analysis_data?.github_insights || currentAnalysis?.analysis_data?.slack_insights) && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                  {/* GitHub Metrics Card */}
+                  {currentAnalysis?.analysis_data?.github_insights && (
+                    <Card className="border-2 border-gray-200 bg-white/70 backdrop-blur-sm shadow-lg">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="flex items-center space-x-2">
+                          <div className="w-8 h-8 bg-gray-900 rounded-lg flex items-center justify-center">
+                            <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M10 0C4.477 0 0 4.484 0 10.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0110 4.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.203 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.942.359.31.678.921.678 1.856 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0020 10.017C20 4.484 15.522 0 10 0z" clipRule="evenodd" />
+                            </svg>
+                          </div>
+                          <span className="text-gray-900">GitHub Activity</span>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        {(() => {
+                          const github = currentAnalysis.analysis_data.github_insights
+                          return (
+                            <>
+                              {/* GitHub Metrics Grid */}
+                              <div className="grid grid-cols-2 gap-4">
+                                <div className="bg-gray-50 rounded-lg p-3">
+                                  <p className="text-xs text-gray-600 font-medium">Total Commits</p>
+                                  <p className="text-lg font-bold text-gray-900">{github.total_commits?.toLocaleString() || 0}</p>
+                                </div>
+                                <div className="bg-gray-50 rounded-lg p-3">
+                                  <p className="text-xs text-gray-600 font-medium">Pull Requests</p>
+                                  <p className="text-lg font-bold text-gray-900">{github.total_pull_requests?.toLocaleString() || 0}</p>
+                                </div>
+                                <div className="bg-gray-50 rounded-lg p-3">
+                                  <p className="text-xs text-gray-600 font-medium">Code Reviews</p>
+                                  <p className="text-lg font-bold text-gray-900">{github.total_reviews?.toLocaleString() || 0}</p>
+                                </div>
+                                <div className="bg-gray-50 rounded-lg p-3">
+                                  <p className="text-xs text-gray-600 font-medium">After Hours</p>
+                                  <p className="text-lg font-bold text-gray-900">{github.after_hours_activity_percentage?.toFixed(1) || 0}%</p>
+                                </div>
+                                <div className="bg-gray-50 rounded-lg p-3">
+                                  <p className="text-xs text-gray-600 font-medium">Weekend Commits</p>
+                                  <p className="text-lg font-bold text-gray-900">{github.weekend_activity_percentage?.toFixed(1) || 0}%</p>
+                                </div>
+                                <div className="bg-gray-50 rounded-lg p-3">
+                                  <p className="text-xs text-gray-600 font-medium">Avg PR Size</p>
+                                  <p className="text-lg font-bold text-gray-900">{github.avg_pr_size?.toFixed(0) || 0} lines</p>
+                                </div>
+                              </div>
+
+                              {/* Burnout Indicators */}
+                              {github.burnout_indicators && (
+                                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                                  <h4 className="text-sm font-semibold text-red-800 mb-2">Burnout Risk Indicators</h4>
+                                  <div className="space-y-1 text-xs">
+                                    {github.burnout_indicators.excessive_late_night_commits > 0 && (
+                                      <div className="flex items-center space-x-2">
+                                        <AlertTriangle className="w-3 h-3 text-red-600" />
+                                        <span className="text-red-700">{github.burnout_indicators.excessive_late_night_commits} members with excessive late-night commits</span>
+                                      </div>
+                                    )}
+                                    {github.burnout_indicators.weekend_workers > 0 && (
+                                      <div className="flex items-center space-x-2">
+                                        <AlertTriangle className="w-3 h-3 text-red-600" />
+                                        <span className="text-red-700">{github.burnout_indicators.weekend_workers} members working weekends</span>
+                                      </div>
+                                    )}
+                                    {github.burnout_indicators.large_pr_pattern > 0 && (
+                                      <div className="flex items-center space-x-2">
+                                        <AlertTriangle className="w-3 h-3 text-red-600" />
+                                        <span className="text-red-700">{github.burnout_indicators.large_pr_pattern} members with large PR patterns</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Top Contributors */}
+                              {github.top_contributors && github.top_contributors.length > 0 && (
+                                <div>
+                                  <h4 className="text-sm font-semibold text-gray-800 mb-2">Top Contributors</h4>
+                                  <div className="space-y-1">
+                                    {github.top_contributors.slice(0, 3).map((contributor, index) => (
+                                      <div key={index} className="flex items-center justify-between text-xs bg-gray-50 rounded px-2 py-1">
+                                        <span className="font-medium text-gray-700">{contributor.username}</span>
+                                        <span className="text-gray-600">{contributor.commits} commits, {contributor.prs} PRs</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </>
+                          )
+                        })()}
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Slack Metrics Card */}
+                  {currentAnalysis?.analysis_data?.slack_insights && (
+                    <Card className="border-2 border-purple-200 bg-white/70 backdrop-blur-sm shadow-lg">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="flex items-center space-x-2">
+                          <div className="w-8 h-8 rounded-lg flex items-center justify-center">
+                            <svg className="w-8 h-8" viewBox="0 0 124 124" fill="none">
+                              <path d="M26.3996 78.2003C26.3996 84.7003 21.2996 89.8003 14.7996 89.8003C8.29961 89.8003 3.19961 84.7003 3.19961 78.2003C3.19961 71.7003 8.29961 66.6003 14.7996 66.6003H26.3996V78.2003Z" fill="#E01E5A"/>
+                              <path d="M32.2996 78.2003C32.2996 71.7003 37.3996 66.6003 43.8996 66.6003C50.3996 66.6003 55.4996 71.7003 55.4996 78.2003V109.2C55.4996 115.7 50.3996 120.8 43.8996 120.8C37.3996 120.8 32.2996 115.7 32.2996 109.2V78.2003Z" fill="#E01E5A"/>
+                              <path d="M43.8996 26.4003C37.3996 26.4003 32.2996 21.3003 32.2996 14.8003C32.2996 8.30026 37.3996 3.20026 43.8996 3.20026C50.3996 3.20026 55.4996 8.30026 55.4996 14.8003V26.4003H43.8996Z" fill="#36C5F0"/>
+                              <path d="M43.8996 32.3003C50.3996 32.3003 55.4996 37.4003 55.4996 43.9003C55.4996 50.4003 50.3996 55.5003 43.8996 55.5003H12.8996C6.39961 55.5003 1.29961 50.4003 1.29961 43.9003C1.29961 37.4003 6.39961 32.3003 12.8996 32.3003H43.8996Z" fill="#36C5F0"/>
+                              <path d="M95.5996 43.9003C95.5996 37.4003 100.7 32.3003 107.2 32.3003C113.7 32.3003 118.8 37.4003 118.8 43.9003C118.8 50.4003 113.7 55.5003 107.2 55.5003H95.5996V43.9003Z" fill="#2EB67D"/>
+                              <path d="M89.6996 43.9003C89.6996 50.4003 84.5996 55.5003 78.0996 55.5003C71.5996 55.5003 66.4996 50.4003 66.4996 43.9003V12.9003C66.4996 6.40026 71.5996 1.30026 78.0996 1.30026C84.5996 1.30026 89.6996 6.40026 89.6996 12.9003V43.9003Z" fill="#2EB67D"/>
+                              <path d="M78.0996 95.6003C84.5996 95.6003 89.6996 100.7 89.6996 107.2C89.6996 113.7 84.5996 118.8 78.0996 118.8C71.5996 118.8 66.4996 113.7 66.4996 107.2V95.6003H78.0996Z" fill="#ECB22E"/>
+                              <path d="M78.0996 89.7003C71.5996 89.7003 66.4996 84.6003 66.4996 78.1003C66.4996 71.6003 71.5996 66.5003 78.0996 66.5003H109.1C115.6 66.5003 120.7 71.6003 120.7 78.1003C120.7 84.6003 115.6 89.7003 109.1 89.7003H78.0996Z" fill="#ECB22E"/>
+                            </svg>
+                          </div>
+                          <span className="text-gray-900">Slack Communications</span>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        {(() => {
+                          const slack = currentAnalysis.analysis_data.slack_insights
+                          const hasRateLimitErrors = slack.errors?.rate_limited_channels?.length > 0
+                          const hasOtherErrors = slack.errors?.other_errors?.length > 0
+                          
+                          return (
+                            <>
+                              {/* Error Messages */}
+                              {hasRateLimitErrors && (
+                                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                                  <div className="flex items-center space-x-2">
+                                    <svg className="w-4 h-4 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                    </svg>
+                                    <span className="text-sm font-medium text-yellow-800">Rate Limited</span>
+                                  </div>
+                                  <p className="text-xs text-yellow-700 mt-1">
+                                    Some channels were rate limited: {slack.errors.rate_limited_channels.join(", ")}. 
+                                    Data may be incomplete. Please try again in a few minutes.
+                                  </p>
+                                </div>
+                              )}
+                              
+                              {hasOtherErrors && (
+                                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                                  <div className="flex items-center space-x-2">
+                                    <svg className="w-4 h-4 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                    </svg>
+                                    <span className="text-sm font-medium text-red-800">Connection Issues</span>
+                                  </div>
+                                  <p className="text-xs text-red-700 mt-1">
+                                    {slack.errors.other_errors.slice(0, 2).join("; ")}
+                                    {slack.errors.other_errors.length > 2 && ` and ${slack.errors.other_errors.length - 2} more...`}
+                                  </p>
+                                </div>
+                              )}
+                              
+                              {/* Slack Metrics Grid */}
+                              <div className="grid grid-cols-2 gap-4">
+                                <div className="bg-purple-50 rounded-lg p-3">
+                                  <p className="text-xs text-purple-600 font-medium">Total Messages</p>
+                                  <p className="text-lg font-bold text-purple-900">{slack.total_messages?.toLocaleString() || 0}</p>
+                                </div>
+                                <div className="bg-purple-50 rounded-lg p-3">
+                                  <p className="text-xs text-purple-600 font-medium">Active Channels</p>
+                                  <p className="text-lg font-bold text-purple-900">{slack.active_channels || 0}</p>
+                                </div>
+                                <div className="bg-purple-50 rounded-lg p-3">
+                                  <p className="text-xs text-purple-600 font-medium">After Hours</p>
+                                  <p className="text-lg font-bold text-purple-900">{slack.after_hours_activity_percentage?.toFixed(1) || 0}%</p>
+                                </div>
+                                <div className="bg-purple-50 rounded-lg p-3">
+                                  <p className="text-xs text-purple-600 font-medium">Weekend Messages</p>
+                                  <p className="text-lg font-bold text-purple-900">{slack.weekend_activity_percentage?.toFixed(1) || 0}%</p>
+                                </div>
+                                <div className="bg-purple-50 rounded-lg p-3">
+                                  <p className="text-xs text-purple-600 font-medium">Avg Response Time</p>
+                                  <p className="text-lg font-bold text-purple-900">{slack.avg_response_time_minutes?.toFixed(0) || 0}m</p>
+                                </div>
+                                <div className="bg-purple-50 rounded-lg p-3">
+                                  <p className="text-xs text-purple-600 font-medium">After Hours</p>
+                                  <p className="text-lg font-bold text-purple-900">{slack.after_hours_activity_percentage?.toFixed(1) || 0}%</p>
+                                </div>
+                              </div>
+
+                              {/* Sentiment Analysis */}
+                              {slack.sentiment_analysis && (
+                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                                  <h4 className="text-sm font-semibold text-blue-800 mb-2">Communication Health</h4>
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-xs text-blue-700">Average Sentiment</span>
+                                    <div className="flex items-center space-x-2">
+                                      <span className={`text-lg font-bold ${
+                                        slack.sentiment_analysis.avg_sentiment > 0.1 ? 'text-green-600' :
+                                        slack.sentiment_analysis.avg_sentiment < -0.1 ? 'text-red-600' : 'text-yellow-600'
+                                      }`}>
+                                        {slack.sentiment_analysis.avg_sentiment > 0.1 ? 'Positive' :
+                                         slack.sentiment_analysis.avg_sentiment < -0.1 ? 'Negative' : 'Neutral'}
+                                      </span>
+                                      <span className="text-xs text-blue-600">
+                                        ({slack.sentiment_analysis.avg_sentiment?.toFixed(2)})
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Burnout Indicators */}
+                              {slack.burnout_indicators && (
+                                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                                  <h4 className="text-sm font-semibold text-red-800 mb-2">Communication Risk Indicators</h4>
+                                  <div className="space-y-1 text-xs">
+                                    {slack.burnout_indicators.excessive_messaging > 0 && (
+                                      <div className="flex items-center space-x-2">
+                                        <AlertTriangle className="w-3 h-3 text-red-600" />
+                                        <span className="text-red-700">{slack.burnout_indicators.excessive_messaging} members with excessive messaging</span>
+                                      </div>
+                                    )}
+                                    {slack.burnout_indicators.poor_sentiment_users > 0 && (
+                                      <div className="flex items-center space-x-2">
+                                        <AlertTriangle className="w-3 h-3 text-red-600" />
+                                        <span className="text-red-700">{slack.burnout_indicators.poor_sentiment_users} members with poor sentiment</span>
+                                      </div>
+                                    )}
+                                    {slack.burnout_indicators.after_hours_communicators > 0 && (
+                                      <div className="flex items-center space-x-2">
+                                        <AlertTriangle className="w-3 h-3 text-red-600" />
+                                        <span className="text-red-700">{slack.burnout_indicators.after_hours_communicators} members communicating after hours</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </>
+                          )
+                        })()}
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              )}
+
               {/* Organization Members Grid */}
               <Card>
                 <CardHeader>
@@ -1742,7 +2412,9 @@ export default function Dashboard() {
                             weekendWork: Math.round(member.factors.weekend_work * 10 * 10) / 10,
                             incidentLoad: Math.round(member.factors.incident_load * 10 * 10) / 10,
                             responseTime: Math.round(member.factors.response_time * 10 * 10) / 10,
-                          }
+                          },
+                          github_activity: member.github_activity,
+                          slack_activity: member.slack_activity
                         })}
                       >
                         <CardContent className="p-4">
@@ -1936,6 +2608,80 @@ export default function Dashboard() {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Additional Data Sources */}
+            {true && (
+              <div>
+                <label className="text-sm font-medium text-gray-700 mb-2 block">
+                  Additional Data Sources
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  {/* GitHub Toggle Card */}
+                  {true && (
+                    <div className={`border rounded-lg p-3 transition-all ${includeGithub ? 'border-gray-900 bg-gray-50' : 'border-gray-200 bg-white'}`}>
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center space-x-2">
+                          <div className="w-6 h-6 bg-gray-900 rounded flex items-center justify-center">
+                            <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M10 0C4.477 0 0 4.484 0 10.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0110 4.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.203 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.942.359.31.678.921.678 1.856 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0020 10.017C20 4.484 15.522 0 10 0z" clipRule="evenodd" />
+                            </svg>
+                          </div>
+                          <div>
+                            <h3 className="text-sm font-medium text-gray-900">GitHub</h3>
+                          </div>
+                        </div>
+                        <Switch
+                          checked={includeGithub && !!githubIntegration}
+                          onCheckedChange={setIncludeGithub}
+                          disabled={!githubIntegration}
+                        />
+                      </div>
+                      <p className="text-xs text-gray-600 mb-1">Code patterns & activity</p>
+                      <p className="text-xs text-gray-500">{githubIntegration?.github_username || 'Not connected'}</p>
+                    </div>
+                  )}
+
+                  {/* Slack Toggle Card */}
+                  {true && (
+                    <div className={`border rounded-lg p-3 transition-all ${includeSlack ? 'border-purple-500 bg-purple-50' : 'border-gray-200 bg-white'}`}>
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center space-x-2">
+                          <div className="w-6 h-6 rounded flex items-center justify-center">
+                            <svg className="w-6 h-6" viewBox="0 0 124 124" fill="none">
+                              <path d="M26.3996 78.2003C26.3996 84.7003 21.2996 89.8003 14.7996 89.8003C8.29961 89.8003 3.19961 84.7003 3.19961 78.2003C3.19961 71.7003 8.29961 66.6003 14.7996 66.6003H26.3996V78.2003Z" fill="#E01E5A"/>
+                              <path d="M32.2996 78.2003C32.2996 71.7003 37.3996 66.6003 43.8996 66.6003C50.3996 66.6003 55.4996 71.7003 55.4996 78.2003V109.2C55.4996 115.7 50.3996 120.8 43.8996 120.8C37.3996 120.8 32.2996 115.7 32.2996 109.2V78.2003Z" fill="#E01E5A"/>
+                              <path d="M43.8996 26.4003C37.3996 26.4003 32.2996 21.3003 32.2996 14.8003C32.2996 8.30026 37.3996 3.20026 43.8996 3.20026C50.3996 3.20026 55.4996 8.30026 55.4996 14.8003V26.4003H43.8996Z" fill="#36C5F0"/>
+                              <path d="M43.8996 32.3003C50.3996 32.3003 55.4996 37.4003 55.4996 43.9003C55.4996 50.4003 50.3996 55.5003 43.8996 55.5003H12.8996C6.39961 55.5003 1.29961 50.4003 1.29961 43.9003C1.29961 37.4003 6.39961 32.3003 12.8996 32.3003H43.8996Z" fill="#36C5F0"/>
+                              <path d="M95.5996 43.9003C95.5996 37.4003 100.7 32.3003 107.2 32.3003C113.7 32.3003 118.8 37.4003 118.8 43.9003C118.8 50.4003 113.7 55.5003 107.2 55.5003H95.5996V43.9003Z" fill="#2EB67D"/>
+                              <path d="M89.6996 43.9003C89.6996 50.4003 84.5996 55.5003 78.0996 55.5003C71.5996 55.5003 66.4996 50.4003 66.4996 43.9003V12.9003C66.4996 6.40026 71.5996 1.30026 78.0996 1.30026C84.5996 1.30026 89.6996 6.40026 89.6996 12.9003V43.9003Z" fill="#2EB67D"/>
+                              <path d="M78.0996 95.6003C84.5996 95.6003 89.6996 100.7 89.6996 107.2C89.6996 113.7 84.5996 118.8 78.0996 118.8C71.5996 118.8 66.4996 113.7 66.4996 107.2V95.6003H78.0996Z" fill="#ECB22E"/>
+                              <path d="M78.0996 89.7003C71.5996 89.7003 66.4996 84.6003 66.4996 78.1003C66.4996 71.6003 71.5996 66.5003 78.0996 66.5003H109.1C115.6 66.5003 120.7 71.6003 120.7 78.1003C120.7 84.6003 115.6 89.7003 109.1 89.7003H78.0996Z" fill="#ECB22E"/>
+                            </svg>
+                          </div>
+                          <div>
+                            <h3 className="text-sm font-medium text-gray-900">Slack</h3>
+                          </div>
+                        </div>
+                        <Switch
+                          checked={includeSlack && !!slackIntegration}
+                          onCheckedChange={setIncludeSlack}
+                          disabled={!slackIntegration}
+                        />
+                      </div>
+                      <p className="text-xs text-gray-600 mb-1">Communication patterns</p>
+                      <p className="text-xs text-gray-500">
+                        {slackIntegration?.total_channels ? `${slackIntegration.total_channels} channels` : (slackIntegration ? 'Connected' : 'Not connected')}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Empty grid cell if only one integration */}
+                  {false && (
+                    <div></div>
+                  )}
+                </div>
+              </div>
+            )}
             
             <div>
               <label className="text-sm font-medium text-gray-700 mb-2 block">
@@ -1971,80 +2717,267 @@ export default function Dashboard() {
 
       {/* Member Detail Modal */}
       <Dialog open={!!selectedMember} onOpenChange={() => setSelectedMember(null)}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-5xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center space-x-3">
-              <Avatar>
+            <DialogTitle className="flex items-center space-x-4">
+              <Avatar className="w-16 h-16">
                 <AvatarImage src={selectedMember?.avatar} />
-                <AvatarFallback>
+                <AvatarFallback className="text-lg">
                   {selectedMember?.name
                     .split(" ")
                     .map((n) => n[0])
                     .join("")}
                 </AvatarFallback>
               </Avatar>
-              <div>
-                <span>{selectedMember?.name}</span>
-                <p className="text-sm text-gray-500 font-normal">{selectedMember?.role || selectedMember?.email}</p>
+              <div className="flex-1">
+                <h2 className="text-xl font-semibold">{selectedMember?.name}</h2>
+                <p className="text-gray-600">{selectedMember?.role || selectedMember?.email}</p>
               </div>
             </DialogTitle>
           </DialogHeader>
           {selectedMember && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-gray-600">Burnout Score</p>
-                  <p className="text-2xl font-bold">{selectedMember.burnoutScore.toFixed(1)}%</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Risk Level</p>
-                  <Badge className={getRiskColor(selectedMember.riskLevel)}>
-                    {selectedMember.riskLevel.toUpperCase()}
-                  </Badge>
+            <div className="space-y-6">
+              {/* Overall Risk Assessment */}
+              <div className="bg-gradient-to-r from-gray-50 to-gray-100 p-6 rounded-lg">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="text-lg font-semibold mb-1">Overall Risk Assessment</h3>
+                    <p className="text-gray-600 text-sm">Current burnout risk level based on recent activity</p>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-3xl font-bold mb-1">{selectedMember.burnoutScore.toFixed(1)}%</div>
+                    <Badge className={`${getRiskColor(selectedMember.riskLevel)} text-sm px-3 py-1`}>
+                      {selectedMember.riskLevel.toUpperCase()} RISK
+                    </Badge>
+                  </div>
                 </div>
               </div>
+
+              {/* Key Indicators */}
               <div>
-                <p className="text-sm text-gray-600 mb-2">Burnout Factors</p>
-                <div className="space-y-2">
-                  {Object.entries(selectedMember.factors).map(([factor, value]) => (
-                    <div key={factor} className="flex items-center justify-between">
-                      <span className="text-sm capitalize">{factor.replace(/([A-Z])/g, " $1")}</span>
-                      <div className="flex items-center space-x-2">
-                        <div className="relative h-2 w-20 overflow-hidden rounded-full bg-gray-200">
-                          <div 
-                            className={`h-full transition-all ${getProgressColor(selectedMember.riskLevel)}`}
-                            style={{ width: `${value}%` }}
-                          />
-                        </div>
-                        <span className="text-sm font-medium w-10">{value}%</span>
+                <h3 className="text-lg font-semibold mb-4">📊 Key Indicators (Last 30 Days)</h3>
+                <div className="bg-white p-4 rounded-lg border border-gray-200">
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                    <div className="space-y-1">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Total Incidents:</span>
+                        <span className="font-medium">{selectedMember.incidentsHandled}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Incidents/Week:</span>
+                        <span className="font-medium">{(selectedMember.incidentsHandled / 4.3).toFixed(2)}</span>
                       </div>
                     </div>
-                  ))}
+                    <div className="space-y-1">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">After-Hours Incidents:</span>
+                        <span className="font-medium">{Math.round(selectedMember.incidentsHandled * (selectedMember.factors.afterHours / 100) * 0.01) || 0}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Avg Resolution Time:</span>
+                        <span className="font-medium">{selectedMember.avgResponseTime}</span>
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Resolution Success Rate:</span>
+                        <span className="font-medium">{(100 - selectedMember.factors.responseTime).toFixed(1)}%</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <p className="text-gray-600">Incidents Handled</p>
-                  <p className="font-medium">{selectedMember.incidentsHandled}</p>
-                </div>
-                <div>
-                  <p className="text-gray-600">Avg Response Time</p>
-                  <p className="font-medium">{selectedMember.avgResponseTime}</p>
+
+              {/* Burnout Dimensions */}
+              <div>
+                <h3 className="text-lg font-semibold mb-4">🧠 Burnout Dimensions</h3>
+                <div className="bg-white p-4 rounded-lg border border-gray-200">
+                  <div className="space-y-4">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <h4 className="font-medium text-gray-900">Emotional Exhaustion</h4>
+                        <p className="text-xs text-gray-500 italic">Calculated from workload + after-hours factors</p>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-lg font-bold text-gray-900">{Math.min(((selectedMember.factors.workload + selectedMember.factors.afterHours) / 2) * 0.7, 10).toFixed(2)}/10</div>
+                      </div>
+                    </div>
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <h4 className="font-medium text-gray-900">Depersonalization</h4>
+                        <p className="text-xs text-gray-500 italic">Calculated from response time pressure + weekend work disruption</p>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-lg font-bold text-gray-900">{Math.min(((selectedMember.factors.responseTime + selectedMember.factors.weekendWork) / 2) * 0.8, 10).toFixed(2)}/10</div>
+                      </div>
+                    </div>
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <h4 className="font-medium text-gray-900">Personal Accomplishment</h4>
+                        <p className="text-xs text-gray-500 italic">Based on resolution success rate (higher response time = lower accomplishment)</p>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-lg font-bold text-gray-900">{Math.max(Math.min(10 - (selectedMember.factors.responseTime * 0.6), 10), 3).toFixed(2)}/10</div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
-              {currentAnalysis?.analysis_data?.recommendations?.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-sm text-gray-600 font-medium">Recommendations:</p>
-                  {currentAnalysis.analysis_data.recommendations.slice(0, 3).map((rec, index) => (
-                    <Alert key={index}>
-                      <AlertCircle className="h-4 w-4" />
-                      <AlertDescription>
-                        <strong>{rec.priority} Priority:</strong> {rec.message}
-                      </AlertDescription>
-                    </Alert>
-                  ))}
+
+              {/* Activity Summary */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                {/* PagerDuty Activity */}
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <h3 className="font-semibold mb-3 text-blue-900">🚨 PagerDuty Activity</h3>
+                  <div className="space-y-3">
+                    <div className="bg-white p-3 rounded-lg">
+                      <div className="text-2xl font-bold text-blue-600">{selectedMember.incidentsHandled}</div>
+                      <p className="text-sm text-gray-600">Incidents Handled</p>
+                      <p className="text-xs text-gray-500 mt-1">Total incidents managed recently</p>
+                    </div>
+                    <div className="bg-white p-3 rounded-lg">
+                      <div className="text-2xl font-bold text-blue-600">{selectedMember.avgResponseTime}</div>
+                      <p className="text-sm text-gray-600">Avg Response Time</p>
+                      <p className="text-xs text-gray-500 mt-1">Time to first response</p>
+                    </div>
+                  </div>
                 </div>
-              )}
+
+                {/* GitHub Activity */}
+                {selectedMember.github_activity && (
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <h3 className="font-semibold mb-3 text-gray-900">💻 GitHub Activity</h3>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="bg-white p-3 rounded-lg">
+                        <div className="text-xl font-bold text-gray-900">{selectedMember.github_activity?.commits_count || 0}</div>
+                        <p className="text-xs text-gray-600 font-medium">Total Commits</p>
+                      </div>
+                      <div className="bg-white p-3 rounded-lg">
+                        <div className="text-xl font-bold text-gray-900">{selectedMember.github_activity?.pull_requests_count || 0}</div>
+                        <p className="text-xs text-gray-600 font-medium">Pull Requests</p>
+                      </div>
+                      <div className="bg-white p-3 rounded-lg">
+                        <div className="text-xl font-bold text-gray-900">{selectedMember.github_activity?.reviews_count || 0}</div>
+                        <p className="text-xs text-gray-600 font-medium">Code Reviews</p>
+                      </div>
+                      <div className="bg-white p-3 rounded-lg">
+                        <div className="text-xl font-bold text-gray-900">{selectedMember.github_activity ? (((selectedMember.github_activity.after_hours_commits || 0) / Math.max(selectedMember.github_activity.commits_count || 1, 1)) * 100).toFixed(1) : '0.0'}%</div>
+                        <p className="text-xs text-gray-600 font-medium">After Hours</p>
+                      </div>
+                    </div>
+                    {/* Burnout Risk Indicators */}
+                    {selectedMember.github_activity.burnout_indicators && Object.values(selectedMember.github_activity.burnout_indicators).some(indicator => indicator) && (
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-3 mt-3">
+                        <h4 className="text-sm font-semibold text-red-800 mb-2">Burnout Risk Indicators</h4>
+                        <div className="space-y-1 text-xs">
+                          {selectedMember.github_activity.burnout_indicators.excessive_commits && (
+                            <div className="flex items-center space-x-2">
+                              <div className="w-1 h-1 bg-red-600 rounded-full"></div>
+                              <span className="text-red-700">Excessive commit activity detected</span>
+                            </div>
+                          )}
+                          {selectedMember.github_activity.burnout_indicators.late_night_activity && (
+                            <div className="flex items-center space-x-2">
+                              <div className="w-1 h-1 bg-red-600 rounded-full"></div>
+                              <span className="text-red-700">Late night coding patterns</span>
+                            </div>
+                          )}
+                          {selectedMember.github_activity.burnout_indicators.weekend_work && (
+                            <div className="flex items-center space-x-2">
+                              <div className="w-1 h-1 bg-red-600 rounded-full"></div>
+                              <span className="text-red-700">Weekend work detected</span>
+                            </div>
+                          )}
+                          {selectedMember.github_activity.burnout_indicators.large_prs && (
+                            <div className="flex items-center space-x-2">
+                              <div className="w-1 h-1 bg-red-600 rounded-full"></div>
+                              <span className="text-red-700">Large PR patterns</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Slack Activity */}
+                {selectedMember.slack_activity && (
+                  <div className="bg-purple-50 p-4 rounded-lg">
+                    <h3 className="font-semibold mb-3 text-purple-900">💬 Slack Communications</h3>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="bg-white p-3 rounded-lg">
+                        <div className="text-xl font-bold text-purple-900">{selectedMember.slack_activity?.messages_sent || 0}</div>
+                        <p className="text-xs text-purple-600 font-medium">Total Messages</p>
+                      </div>
+                      <div className="bg-white p-3 rounded-lg">
+                        <div className="text-xl font-bold text-purple-900">{selectedMember.slack_activity?.channels_active || 0}</div>
+                        <p className="text-xs text-purple-600 font-medium">Active Channels</p>
+                      </div>
+                      <div className="bg-white p-3 rounded-lg">
+                        <div className="text-xl font-bold text-purple-900">{selectedMember.slack_activity ? (((selectedMember.slack_activity.after_hours_messages || 0) / Math.max(selectedMember.slack_activity.messages_sent || 1, 1)) * 100).toFixed(1) : '0.0'}%</div>
+                        <p className="text-xs text-purple-600 font-medium">After Hours</p>
+                      </div>
+                      <div className="bg-white p-3 rounded-lg">
+                        <div className="text-xl font-bold text-purple-900">{selectedMember.slack_activity ? (((selectedMember.slack_activity.weekend_messages || 0) / Math.max(selectedMember.slack_activity.messages_sent || 1, 1)) * 100).toFixed(1) : '0.0'}%</div>
+                        <p className="text-xs text-purple-600 font-medium">Weekend Messages</p>
+                      </div>
+                    </div>
+                    
+                    {/* Communication Health */}
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-3">
+                      <h4 className="text-sm font-semibold text-blue-800 mb-2">Communication Health</h4>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-blue-700">Average Sentiment</span>
+                        <div className="flex items-center space-x-2">
+                          <span className={`text-lg font-bold ${
+                            selectedMember.slack_activity.sentiment_score > 0.1 ? 'text-green-600' :
+                            selectedMember.slack_activity.sentiment_score < -0.1 ? 'text-red-600' : 'text-yellow-600'
+                          }`}>
+                            {selectedMember.slack_activity.sentiment_score > 0.1 ? 'Positive' :
+                             selectedMember.slack_activity.sentiment_score < -0.1 ? 'Negative' : 'Neutral'}
+                          </span>
+                          <span className="text-xs text-blue-600">
+                            ({selectedMember.slack_activity.sentiment_score?.toFixed(2) || 'N/A'})
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Communication Risk Indicators */}
+                    {selectedMember.slack_activity.burnout_indicators && Object.values(selectedMember.slack_activity.burnout_indicators).some(indicator => indicator) && (
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-3 mt-3">
+                        <h4 className="text-sm font-semibold text-red-800 mb-2">Communication Risk Indicators</h4>
+                        <div className="space-y-1 text-xs">
+                          {selectedMember.slack_activity.burnout_indicators.excessive_messaging && (
+                            <div className="flex items-center space-x-2">
+                              <div className="w-1 h-1 bg-red-600 rounded-full"></div>
+                              <span className="text-red-700">Excessive messaging detected</span>
+                            </div>
+                          )}
+                          {selectedMember.slack_activity.burnout_indicators.poor_sentiment && (
+                            <div className="flex items-center space-x-2">
+                              <div className="w-1 h-1 bg-red-600 rounded-full"></div>
+                              <span className="text-red-700">Poor sentiment patterns</span>
+                            </div>
+                          )}
+                          {selectedMember.slack_activity.burnout_indicators.late_responses && (
+                            <div className="flex items-center space-x-2">
+                              <div className="w-1 h-1 bg-red-600 rounded-full"></div>
+                              <span className="text-red-700">Late response patterns</span>
+                            </div>
+                          )}
+                          {selectedMember.slack_activity.burnout_indicators.after_hours_activity && (
+                            <div className="flex items-center space-x-2">
+                              <div className="w-1 h-1 bg-red-600 rounded-full"></div>
+                              <span className="text-red-700">After-hours communication</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </DialogContent>
@@ -2075,12 +3008,14 @@ export default function Dashboard() {
                      `Organization ${analysisToDelete.integration_id}`}
                   </span>
                   <span className="text-gray-500">
-                    {new Date(analysisToDelete.created_at).toLocaleDateString([], { 
+                    {new Date(analysisToDelete.created_at).toLocaleString([], { 
                       month: 'short', 
                       day: 'numeric', 
                       year: 'numeric',
                       hour: 'numeric',
-                      minute: '2-digit'
+                      minute: '2-digit',
+                      hour12: true,
+                      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
                     })}
                   </span>
                 </div>

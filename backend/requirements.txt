@@ -11,6 +11,7 @@ authlib
 python-jose[cryptography]
 passlib[bcrypt]
 python-multipart
+cryptography
 
 # HTTP client for API calls
 httpx
@@ -24,6 +25,9 @@ pydantic-settings
 # Time zone and date utilities
 pytz
 python-dateutil
+
+# Sentiment analysis
+vaderSentiment
 
 # Development
 pytest

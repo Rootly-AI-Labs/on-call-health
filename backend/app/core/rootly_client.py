@@ -366,12 +366,19 @@ class RootlyAPIClient:
             if connection_test["status"] != "success":
                 raise Exception(f"Connection test failed: {connection_test['message']}")
             
-            # Collect users and incidents in parallel (reduced limits for faster processing)
-            users_task = self.get_users(limit=100)  # Reduced from 200 to 100
-            incidents_task = self.get_incidents(days_back=days_back, limit=500)  # Reduced from 1000 to 500
+            # Collect users and incidents in parallel (no limits for complete data collection)
+            users_task = self.get_users(limit=1000)  # Increased to get all users
+            incidents_task = self.get_incidents(days_back=days_back, limit=10000)  # Increased to get all incidents
             
+            # Collect users (required)
             users = await users_task
-            incidents = await incidents_task
+            
+            # Try to collect incidents but don't fail if permission denied
+            incidents = []
+            try:
+                incidents = await incidents_task
+            except Exception as e:
+                logger.warning(f"Could not fetch incidents: {e}. Proceeding with user data only.")
             
             # Validate data
             if not users:

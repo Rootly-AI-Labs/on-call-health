@@ -21,7 +21,8 @@ class RootlyIntegrationAdd(BaseModel):
     name: str
 
 class RootlyIntegrationUpdate(BaseModel):
-    name: str
+    name: str = None
+    is_default: bool = None
 
 class RootlyTestResponse(BaseModel):
     status: str
@@ -253,7 +254,7 @@ async def update_integration(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Update a Rootly integration name."""
+    """Update a Rootly integration name or set as default."""
     integration = db.query(RootlyIntegration).filter(
         RootlyIntegration.id == integration_id,
         RootlyIntegration.user_id == current_user.id,
@@ -266,28 +267,51 @@ async def update_integration(
             detail="Integration not found"
         )
     
-    # Check if new name conflicts with existing integrations
-    existing_with_name = db.query(RootlyIntegration).filter(
-        RootlyIntegration.user_id == current_user.id,
-        RootlyIntegration.name == update_data.name,
-        RootlyIntegration.id != integration_id,
-        RootlyIntegration.is_active == True
-    ).first()
+    # Handle name update
+    if update_data.name is not None:
+        # Check if new name conflicts with existing integrations
+        existing_with_name = db.query(RootlyIntegration).filter(
+            RootlyIntegration.user_id == current_user.id,
+            RootlyIntegration.name == update_data.name,
+            RootlyIntegration.id != integration_id,
+            RootlyIntegration.is_active == True
+        ).first()
+        
+        if existing_with_name:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"An integration with the name '{update_data.name}' already exists"
+            )
+        
+        integration.name = update_data.name
     
-    if existing_with_name:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"An integration with the name '{update_data.name}' already exists"
-        )
+    # Handle setting as default
+    if update_data.is_default is not None and update_data.is_default:
+        # First, set all other Rootly integrations for this user to not default
+        db.query(RootlyIntegration).filter(
+            RootlyIntegration.user_id == current_user.id,
+            RootlyIntegration.platform == "rootly",
+            RootlyIntegration.is_active == True
+        ).update({"is_default": False})
+        
+        # Then set this one as default
+        integration.is_default = True
     
     try:
-        integration.name = update_data.name
         db.commit()
         db.refresh(integration)
         
+        message = ""
+        if update_data.name is not None and update_data.is_default:
+            message = f"Integration renamed to '{update_data.name}' and set as default"
+        elif update_data.name is not None:
+            message = f"Integration renamed to '{update_data.name}'"
+        elif update_data.is_default:
+            message = "Integration set as default"
+        
         return {
             "status": "success",
-            "message": f"Integration renamed to '{update_data.name}'",
+            "message": message,
             "integration": {
                 "id": integration.id,
                 "name": integration.name,

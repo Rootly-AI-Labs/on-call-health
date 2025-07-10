@@ -30,6 +30,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form"
+import { Tooltip } from "@/components/ui/tooltip"
 import {
   Activity,
   ArrowLeft,
@@ -1224,35 +1225,31 @@ export default function IntegrationsPage() {
                             )}
                           </div>
 
-                          {/* Permissions for Rootly */}
-                          {integration.platform === 'rootly' && integration.permissions && (
+                          {/* Permissions for Rootly and PagerDuty */}
+                          {integration.permissions && (
                             <div className="mt-3 flex items-center space-x-4 text-sm">
-                              <span className="text-gray-500">Permissions:</span>
+                              <span className="text-gray-500">Read permissions:</span>
                               <div className="flex items-center space-x-1">
                                 {integration.permissions.users.access ? (
-                                  <CheckCircle 
-                                    className="w-4 h-4 text-green-500 cursor-help" 
-                                    title="Can access user data for burnout analysis"
-                                  />
+                                  <Tooltip content="✓ User read permissions: Required to run burnout analysis and identify team members">
+                                    <CheckCircle className="w-4 h-4 text-green-500 cursor-help" />
+                                  </Tooltip>
                                 ) : (
-                                  <AlertCircle 
-                                    className="w-4 h-4 text-red-500 cursor-help" 
-                                    title={`Cannot access users: ${integration.permissions.users.error || "Permission denied"}`}
-                                  />
+                                  <Tooltip content={`✗ User read permissions required: ${integration.permissions.users.error || "Permission denied"}. Both User and Incident read permissions are required to run burnout analysis.`}>
+                                    <AlertCircle className="w-4 h-4 text-red-500 cursor-help" />
+                                  </Tooltip>
                                 )}
                                 <span>Users</span>
                               </div>
                               <div className="flex items-center space-x-1">
                                 {integration.permissions.incidents.access ? (
-                                  <CheckCircle 
-                                    className="w-4 h-4 text-green-500 cursor-help" 
-                                    title="Can access incident data for burnout analysis"
-                                  />
+                                  <Tooltip content="✓ Incident read permissions: Required to run burnout analysis and analyze incident response patterns">
+                                    <CheckCircle className="w-4 h-4 text-green-500 cursor-help" />
+                                  </Tooltip>
                                 ) : (
-                                  <AlertCircle 
-                                    className="w-4 h-4 text-red-500 cursor-help" 
-                                    title={`Cannot access incidents: ${integration.permissions.incidents.error || "Permission denied"}`}
-                                  />
+                                  <Tooltip content={`✗ Incident read permissions required: ${integration.permissions.incidents.error || "Permission denied"}. Both User and Incident read permissions are required to run burnout analysis.`}>
+                                    <AlertCircle className="w-4 h-4 text-red-500 cursor-help" />
+                                  </Tooltip>
                                 )}
                                 <span>Incidents</span>
                               </div>
