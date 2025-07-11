@@ -119,6 +119,34 @@ interface Integration {
   }
 }
 
+interface GitHubIntegration {
+  id: number
+  github_username: string
+  organizations: string[]
+  token_source: "oauth" | "manual"
+  is_oauth: boolean
+  supports_refresh: boolean
+  connected_at: string
+  last_updated: string
+}
+
+interface SlackIntegration {
+  id: number
+  slack_user_id: string
+  workspace_id: string
+  token_source: "oauth" | "manual"
+  is_oauth: boolean
+  supports_refresh: boolean
+  has_webhook: boolean
+  webhook_configured: boolean
+  connected_at: string
+  last_updated: string
+  total_channels?: number
+  channel_names?: string[]
+  token_preview?: string
+  webhook_preview?: string
+}
+
 interface PreviewData {
   organization_name: string
   total_users: number
@@ -134,6 +162,27 @@ export default function IntegrationsPage() {
   const [loadingIntegrations, setLoadingIntegrations] = useState(true)
   const [activeTab, setActiveTab] = useState<"rootly" | "pagerduty" | null>(null)
   const [backUrl, setBackUrl] = useState<string>('/dashboard')
+  
+  // GitHub/Slack integration state
+  const [githubIntegration, setGithubIntegration] = useState<GitHubIntegration | null>(null)
+  const [slackIntegration, setSlackIntegration] = useState<SlackIntegration | null>(null)
+  const [activeEnhancementTab, setActiveEnhancementTab] = useState<"github" | "slack" | null>(null)
+  const [githubToken, setGithubToken] = useState('')
+  const [slackWebhookUrl, setSlackWebhookUrl] = useState('')
+  const [slackBotToken, setSlackBotToken] = useState('')
+  const [showGithubInstructions, setShowGithubInstructions] = useState(false)
+  const [showSlackInstructions, setShowSlackInstructions] = useState(false)
+  const [showGithubToken, setShowGithubToken] = useState(false)
+  const [showSlackWebhook, setShowSlackWebhook] = useState(false)
+  const [showSlackToken, setShowSlackToken] = useState(false)
+  const [isConnectingGithub, setIsConnectingGithub] = useState(false)
+  const [isConnectingSlack, setIsConnectingSlack] = useState(false)
+  
+  // Disconnect confirmation state
+  const [githubDisconnectDialogOpen, setGithubDisconnectDialogOpen] = useState(false)
+  const [slackDisconnectDialogOpen, setSlackDisconnectDialogOpen] = useState(false)
+  const [isDisconnectingGithub, setIsDisconnectingGithub] = useState(false)
+  const [isDisconnectingSlack, setIsDisconnectingSlack] = useState(false)
   
   // Add integration state
   const [addingPlatform, setAddingPlatform] = useState<"rootly" | "pagerduty" | null>(null)
@@ -208,22 +257,32 @@ export default function IntegrationsPage() {
         return
       }
 
-      const [rootlyResponse, pagerdutyResponse] = await Promise.all([
+      const [rootlyResponse, pagerdutyResponse, githubResponse, slackResponse] = await Promise.all([
         fetch(`${API_BASE}/rootly/integrations`, {
           headers: { 'Authorization': `Bearer ${authToken}` }
         }),
         fetch(`${API_BASE}/pagerduty/integrations`, {
           headers: { 'Authorization': `Bearer ${authToken}` }
-        })
+        }),
+        fetch(`${API_BASE}/integrations/github/status`, {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        }).catch(() => ({ ok: false })),
+        fetch(`${API_BASE}/integrations/slack/status`, {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        }).catch(() => ({ ok: false }))
       ])
 
       const rootlyData = rootlyResponse.ok ? await rootlyResponse.json() : { integrations: [] }
       const pagerdutyData = pagerdutyResponse.ok ? await pagerdutyResponse.json() : { integrations: [] }
+      const githubData = (githubResponse as Response).ok ? await (githubResponse as Response).json() : { connected: false, integration: null }
+      const slackData = (slackResponse as Response).ok ? await (slackResponse as Response).json() : { integration: null }
 
       const rootlyIntegrations = rootlyData.integrations.map((i: Integration) => ({ ...i, platform: 'rootly' }))
       const pagerdutyIntegrations = pagerdutyData.integrations || []
 
       setIntegrations([...rootlyIntegrations, ...pagerdutyIntegrations])
+      setGithubIntegration(githubData.connected ? githubData.integration : null)
+      setSlackIntegration(slackData.integration)
     } catch (error) {
       console.error('Failed to load integrations:', error)
       toast({
@@ -500,6 +559,214 @@ export default function IntegrationsPage() {
     }
   }
 
+  // GitHub integration handlers
+  const handleGitHubConnect = async (token: string) => {
+    setIsConnectingGithub(true)
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) {
+        throw new Error('No authentication token found')
+      }
+
+      const response = await fetch(`${API_BASE}/integrations/github/token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({ token })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.detail || 'Failed to connect GitHub')
+      }
+
+      toast({
+        title: "GitHub connected!",
+        description: "Your GitHub account has been connected successfully.",
+      })
+      
+      setGithubToken('')
+      setActiveEnhancementTab(null)
+      loadAllIntegrations()
+    } catch (error) {
+      console.error('Error connecting GitHub:', error)
+      toast({
+        title: "Failed to connect GitHub",
+        description: error instanceof Error ? error.message : "An unexpected error occurred.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsConnectingGithub(false)
+    }
+  }
+
+  const handleGitHubDisconnect = async () => {
+    setIsDisconnectingGithub(true)
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) return
+
+      const response = await fetch(`${API_BASE}/integrations/github/disconnect`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${authToken}`
+        }
+      })
+
+      if (response.ok) {
+        toast({
+          title: "GitHub disconnected",
+          description: "Your GitHub integration has been removed.",
+        })
+        setGithubDisconnectDialogOpen(false)
+        loadAllIntegrations()
+      }
+    } catch (error) {
+      console.error('Error disconnecting GitHub:', error)
+      toast({
+        title: "Failed to disconnect GitHub",
+        description: error instanceof Error ? error.message : "An unexpected error occurred.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsDisconnectingGithub(false)
+    }
+  }
+
+  const handleGitHubTest = async () => {
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) return
+
+      const response = await fetch(`${API_BASE}/integrations/github/test`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authToken}`
+        }
+      })
+
+      if (response.ok) {
+        toast({
+          title: "GitHub connection test successful",
+          description: "Your GitHub integration is working properly.",
+        })
+      } else {
+        throw new Error('Connection test failed')
+      }
+    } catch (error) {
+      console.error('Error testing GitHub connection:', error)
+      throw error
+    }
+  }
+
+  // Slack integration handlers
+  const handleSlackConnect = async (webhookUrl: string, botToken: string) => {
+    setIsConnectingSlack(true)
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) {
+        throw new Error('No authentication token found')
+      }
+
+      const response = await fetch(`${API_BASE}/integrations/slack/setup`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({ 
+          webhook_url: webhookUrl,
+          token: botToken 
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.detail || 'Failed to connect Slack')
+      }
+
+      toast({
+        title: "Slack connected!",
+        description: "Your Slack workspace has been connected successfully.",
+      })
+      
+      setSlackWebhookUrl('')
+      setSlackBotToken('')
+      setActiveEnhancementTab(null)
+      loadAllIntegrations()
+    } catch (error) {
+      console.error('Error connecting Slack:', error)
+      toast({
+        title: "Failed to connect Slack",
+        description: error instanceof Error ? error.message : "An unexpected error occurred.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsConnectingSlack(false)
+    }
+  }
+
+  const handleSlackDisconnect = async () => {
+    setIsDisconnectingSlack(true)
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) return
+
+      const response = await fetch(`${API_BASE}/integrations/slack/disconnect`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${authToken}`
+        }
+      })
+
+      if (response.ok) {
+        toast({
+          title: "Slack disconnected",
+          description: "Your Slack integration has been removed.",
+        })
+        setSlackDisconnectDialogOpen(false)
+        loadAllIntegrations()
+      }
+    } catch (error) {
+      console.error('Error disconnecting Slack:', error)
+      toast({
+        title: "Failed to disconnect Slack",
+        description: error instanceof Error ? error.message : "An unexpected error occurred.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsDisconnectingSlack(false)
+    }
+  }
+
+  const handleSlackTest = async () => {
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) return
+
+      const response = await fetch(`${API_BASE}/integrations/slack/test`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authToken}`
+        }
+      })
+
+      if (response.ok) {
+        toast({
+          title: "Slack connection test successful",
+          description: "Your Slack integration is working properly.",
+        })
+      } else {
+        throw new Error('Connection test failed')
+      }
+    } catch (error) {
+      console.error('Error testing Slack connection:', error)
+      throw error
+    }
+  }
+
   const filteredIntegrations = integrations.filter(integration => {
     if (activeTab === null) return false
     return integration.platform === activeTab
@@ -611,10 +878,14 @@ export default function IntegrationsPage() {
                 }}
               >
                 {activeTab === 'rootly' && (
-                  <div className="absolute top-4 right-4 flex items-center space-x-2">
-                    <CheckCircle className="w-6 h-6 text-purple-600" />
-                    <Badge variant="secondary" className="bg-purple-100 text-purple-700">{rootlyCount}</Badge>
-                  </div>
+                  <>
+                    <div className="absolute top-4 left-4">
+                      <CheckCircle className="w-6 h-6 text-purple-600" />
+                    </div>
+                    <div className="absolute top-4 right-4">
+                      <Badge variant="secondary" className="bg-purple-100 text-purple-700">{rootlyCount}</Badge>
+                    </div>
+                  </>
                 )}
                 {activeTab !== 'rootly' && rootlyCount > 0 && (
                   <Badge variant="secondary" className="absolute top-4 right-4">{rootlyCount}</Badge>
@@ -641,10 +912,14 @@ export default function IntegrationsPage() {
                 }}
               >
                 {activeTab === 'pagerduty' && (
-                  <div className="absolute top-4 right-4 flex items-center space-x-2">
-                    <CheckCircle className="w-6 h-6 text-green-600" />
-                    <Badge variant="secondary" className="bg-green-100 text-green-700">{pagerdutyCount}</Badge>
-                  </div>
+                  <>
+                    <div className="absolute top-4 left-4">
+                      <CheckCircle className="w-6 h-6 text-green-600" />
+                    </div>
+                    <div className="absolute top-4 right-4">
+                      <Badge variant="secondary" className="bg-green-100 text-green-700">{pagerdutyCount}</Badge>
+                    </div>
+                  </>
                 )}
                 {activeTab !== 'pagerduty' && pagerdutyCount > 0 && (
                   <Badge variant="secondary" className="absolute top-4 right-4">{pagerdutyCount}</Badge>
@@ -1295,7 +1570,599 @@ export default function IntegrationsPage() {
               </div>
             )}
         </div>
+
+        {/* GitHub and Slack Integrations Section */}
+        <div className="mt-16 space-y-8">
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-slate-900 mb-3">Enhanced Integrations</h2>
+            <p className="text-lg text-slate-600 mb-2">
+              Add GitHub and Slack for deeper burnout analysis
+            </p>
+            <p className="text-slate-500">
+              Analyze code patterns and communication trends to get additional insights
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-8 mb-8 max-w-2xl mx-auto">
+            {/* GitHub Integration Card */}
+            <Card 
+              className={`border-2 transition-all cursor-pointer hover:shadow-lg ${
+                activeEnhancementTab === 'github' 
+                  ? 'border-gray-500 shadow-lg bg-gray-50' 
+                  : 'border-gray-200 hover:border-gray-300'
+              } p-8 flex items-center justify-center relative h-32`}
+              onClick={() => {
+                setActiveEnhancementTab(activeEnhancementTab === 'github' ? null : 'github')
+              }}
+            >
+              {githubIntegration ? (
+                <div className="absolute top-4 right-4">
+                  <Badge variant="secondary" className="bg-green-100 text-green-700">Connected</Badge>
+                </div>
+              ) : null}
+              {activeEnhancementTab === 'github' && (
+                <div className="absolute top-4 left-4">
+                  <CheckCircle className="w-6 h-6 text-gray-600" />
+                </div>
+              )}
+              <div className="flex items-center space-x-2">
+                <div className="w-10 h-10 bg-gray-900 rounded flex items-center justify-center">
+                  <span className="text-white font-bold text-base">GH</span>
+                </div>
+                <span className="text-2xl font-bold text-slate-900">GitHub</span>
+              </div>
+            </Card>
+
+            {/* Slack Integration Card */}
+            <Card 
+              className={`border-2 transition-all cursor-pointer hover:shadow-lg ${
+                activeEnhancementTab === 'slack' 
+                  ? 'border-purple-500 shadow-lg bg-purple-50' 
+                  : 'border-gray-200 hover:border-purple-300'
+              } p-8 flex items-center justify-center relative h-32`}
+              onClick={() => {
+                setActiveEnhancementTab(activeEnhancementTab === 'slack' ? null : 'slack')
+              }}
+            >
+              {slackIntegration ? (
+                <div className="absolute top-4 right-4">
+                  <Badge variant="secondary" className="bg-green-100 text-green-700">Connected</Badge>
+                </div>
+              ) : null}
+              {activeEnhancementTab === 'slack' && (
+                <div className="absolute top-4 left-4">
+                  <CheckCircle className="w-6 h-6 text-purple-600" />
+                </div>
+              )}
+              <div className="flex items-center space-x-2">
+                <div className="w-10 h-10 bg-purple-600 rounded flex items-center justify-center">
+                  <span className="text-white font-bold text-base">SL</span>
+                </div>
+                <span className="text-2xl font-bold text-slate-900">Slack</span>
+              </div>
+            </Card>
+          </div>
+
+          {/* Integration Forms */}
+          <div className="space-y-6">
+            {/* GitHub Token Form */}
+            {activeEnhancementTab === 'github' && !githubIntegration && (
+              <Card className="border-gray-200 max-w-2xl mx-auto">
+                <CardHeader className="p-8">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 bg-gray-900 rounded-lg flex items-center justify-center">
+                      <span className="text-white font-bold">GH</span>
+                    </div>
+                    <div>
+                      <CardTitle>Add GitHub Integration</CardTitle>
+                      <CardDescription>Connect your GitHub account to analyze development patterns</CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4 p-8 pt-0">
+                  {/* Instructions */}
+                  <div>
+                    <button 
+                      type="button"
+                      onClick={() => setShowGithubInstructions(!showGithubInstructions)}
+                      className="flex items-center space-x-2 text-sm text-gray-600 hover:text-gray-700"
+                    >
+                      <HelpCircle className="w-4 h-4" />
+                      <span>How to get your GitHub Personal Access Token</span>
+                      <ChevronDown className={`w-4 h-4 transition-transform ${showGithubInstructions ? 'rotate-180' : ''}`} />
+                    </button>
+                    {showGithubInstructions && (
+                      <div className="mt-4">
+                        <Alert className="border-gray-200 bg-gray-50">
+                          <AlertDescription>
+                            <div className="space-y-4">
+                              <div>
+                                <h4 className="font-medium text-gray-900 mb-2">Step 1: Go to GitHub Settings</h4>
+                                <p className="text-sm text-gray-600 mb-2">
+                                  Navigate to GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)
+                                </p>
+                                <a 
+                                  href="https://github.com/settings/tokens" 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center text-sm text-blue-600 hover:underline"
+                                >
+                                  Open GitHub Settings <ExternalLink className="w-3 h-3 ml-1" />
+                                </a>
+                              </div>
+                              
+                              <div>
+                                <h4 className="font-medium text-gray-900 mb-2">Step 2: Generate New Token</h4>
+                                <p className="text-sm text-gray-600 mb-2">Click "Generate new token (classic)" and configure:</p>
+                                <ul className="text-sm text-gray-600 space-y-1 ml-4">
+                                  <li>• <strong>Note:</strong> Give it a descriptive name (e.g., "Burnout Detector")</li>
+                                  <li>• <strong>Expiration:</strong> Set an appropriate expiration date</li>
+                                </ul>
+                              </div>
+                              
+                              <div>
+                                <h4 className="font-medium text-gray-900 mb-2">Step 3: Select Required Scopes</h4>
+                                <p className="text-sm text-gray-600 mb-2">Select these permissions:</p>
+                                <ul className="text-sm text-gray-600 space-y-1 ml-4">
+                                  <li>• <code className="bg-gray-200 px-1 rounded">repo</code> - Full repository access</li>
+                                  <li>• <code className="bg-gray-200 px-1 rounded">read:user</code> - Read user profile information</li>
+                                  <li>• <code className="bg-gray-200 px-1 rounded">read:org</code> - Read organization membership</li>
+                                </ul>
+                              </div>
+                              
+                              <div>
+                                <h4 className="font-medium text-gray-900 mb-2">Step 4: Generate and Copy Token</h4>
+                                <p className="text-sm text-gray-600">
+                                  Click "Generate token" and immediately copy the token (starts with <code className="bg-gray-200 px-1 rounded">ghp_</code>). 
+                                  You won't be able to see it again!
+                                </p>
+                              </div>
+                            </div>
+                          </AlertDescription>
+                        </Alert>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <label htmlFor="github-token" className="text-sm font-medium">GitHub Personal Access Token</label>
+                    <div className="relative">
+                      <Input
+                        id="github-token"
+                        type={showGithubToken ? "text" : "password"}
+                        placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+                        className="pr-10"
+                        value={githubToken}
+                        onChange={(e) => setGithubToken(e.target.value)}
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                        onClick={() => setShowGithubToken(!showGithubToken)}
+                      >
+                        {showGithubToken ? (
+                          <EyeOff className="h-4 w-4 text-gray-400" />
+                        ) : (
+                          <Eye className="h-4 w-4 text-gray-400" />
+                        )}
+                      </Button>
+                    </div>
+                    <p className="text-sm text-gray-500">
+                      Token should start with "ghp_" followed by 36 characters
+                    </p>
+                  </div>
+                  <Button 
+                    className="bg-gray-900 hover:bg-gray-800 text-white"
+                    onClick={() => githubToken && handleGitHubConnect(githubToken)}
+                    disabled={!githubToken || isConnectingGithub}
+                  >
+                    {isConnectingGithub ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Connecting...
+                      </>
+                    ) : (
+                      'Connect GitHub'
+                    )}
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Slack Webhook Form */}
+            {activeEnhancementTab === 'slack' && !slackIntegration && (
+              <Card className="border-purple-200 max-w-2xl mx-auto">
+                <CardHeader className="p-8">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 bg-purple-600 rounded-lg flex items-center justify-center">
+                      <span className="text-white font-bold">SL</span>
+                    </div>
+                    <div>
+                      <CardTitle>Add Slack Integration</CardTitle>
+                      <CardDescription>Connect your Slack workspace to analyze communication patterns</CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4 p-8 pt-0">
+                  {/* Instructions */}
+                  <div>
+                    <button 
+                      type="button"
+                      onClick={() => setShowSlackInstructions(!showSlackInstructions)}
+                      className="flex items-center space-x-2 text-sm text-purple-600 hover:text-purple-700"
+                    >
+                      <HelpCircle className="w-4 h-4" />
+                      <span>How to get your Slack credentials</span>
+                      <ChevronDown className={`w-4 h-4 transition-transform ${showSlackInstructions ? 'rotate-180' : ''}`} />
+                    </button>
+                    {showSlackInstructions && (
+                      <div className="mt-4">
+                        <Alert className="border-purple-200 bg-purple-50">
+                          <AlertDescription>
+                            <div className="space-y-4">
+                              <div>
+                                <h4 className="font-medium text-purple-900 mb-2">Step 1: Create a Slack App</h4>
+                                <p className="text-sm text-purple-800 mb-2">
+                                  Go to the Slack API website and create a new app for your workspace:
+                                </p>
+                                <a 
+                                  href="https://api.slack.com/apps" 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center text-sm text-blue-600 hover:underline"
+                                >
+                                  Create Slack App <ExternalLink className="w-3 h-3 ml-1" />
+                                </a>
+                                <p className="text-sm text-purple-800 mt-2">Click "Create New App" → "From scratch" → Enter app name and select your workspace</p>
+                              </div>
+                              
+                              <div>
+                                <h4 className="font-medium text-purple-900 mb-2">Step 2: Configure Incoming Webhooks</h4>
+                                <p className="text-sm text-purple-800 mb-2">In your app settings:</p>
+                                <ul className="text-sm text-purple-800 space-y-1 ml-4">
+                                  <li>• Go to "Incoming Webhooks" in the sidebar</li>
+                                  <li>• Toggle "Activate Incoming Webhooks" to <strong>On</strong></li>
+                                  <li>• Click "Add New Webhook to Workspace"</li>
+                                  <li>• Select a channel and click "Allow"</li>
+                                  <li>• Copy the webhook URL (starts with <code className="bg-purple-200 px-1 rounded">https://hooks.slack.com/</code>)</li>
+                                </ul>
+                              </div>
+                              
+                              <div>
+                                <h4 className="font-medium text-purple-900 mb-2">Step 3: Add Bot Token Scopes</h4>
+                                <p className="text-sm text-purple-800 mb-2">In "OAuth & Permissions" → "Scopes" → "Bot Token Scopes", add:</p>
+                                <ul className="text-sm text-purple-800 space-y-1 ml-4">
+                                  <li>• <code className="bg-purple-200 px-1 rounded">channels:history</code> - Read public channel messages</li>
+                                  <li>• <code className="bg-purple-200 px-1 rounded">groups:history</code> - Read private channel messages</li>
+                                  <li>• <code className="bg-purple-200 px-1 rounded">users:read</code> - Read user information</li>
+                                  <li>• <code className="bg-purple-200 px-1 rounded">chat:write</code> - Send messages</li>
+                                </ul>
+                              </div>
+                              
+                              <div>
+                                <h4 className="font-medium text-purple-900 mb-2">Step 4: Install App and Get Bot Token</h4>
+                                <ul className="text-sm text-purple-800 space-y-1 ml-4">
+                                  <li>• Click "Install to Workspace" at the top of OAuth & Permissions</li>
+                                  <li>• Review permissions and click "Allow"</li>
+                                  <li>• Copy the "Bot User OAuth Token" (starts with <code className="bg-purple-200 px-1 rounded">xoxb-</code>)</li>
+                                </ul>
+                              </div>
+                              
+                              <div className="bg-purple-100 border border-purple-300 rounded p-3">
+                                <p className="text-sm text-purple-800">
+                                  <strong>Note:</strong> You'll need both the webhook URL and bot token. The webhook is for sending notifications, 
+                                  and the bot token is for reading messages and user data.
+                                </p>
+                              </div>
+                            </div>
+                          </AlertDescription>
+                        </Alert>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <label htmlFor="slack-webhook" className="text-sm font-medium">Slack Webhook URL</label>
+                    <div className="relative">
+                      <Input
+                        id="slack-webhook"
+                        type={showSlackWebhook ? "text" : "password"}
+                        placeholder="https://hooks.slack.com/services/..."
+                        className="pr-10"
+                        value={slackWebhookUrl}
+                        onChange={(e) => setSlackWebhookUrl(e.target.value)}
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                        onClick={() => setShowSlackWebhook(!showSlackWebhook)}
+                      >
+                        {showSlackWebhook ? (
+                          <EyeOff className="h-4 w-4 text-gray-400" />
+                        ) : (
+                          <Eye className="h-4 w-4 text-gray-400" />
+                        )}
+                      </Button>
+                    </div>
+                    <p className="text-sm text-gray-500">
+                      URL should start with "https://hooks.slack.com/services/"
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <label htmlFor="slack-token" className="text-sm font-medium">Slack Bot Token</label>
+                    <div className="relative">
+                      <Input
+                        id="slack-token"
+                        type={showSlackToken ? "text" : "password"}
+                        placeholder="xoxb-xxxxxxxxxxxx-xxxxxxxxxxxx"
+                        className="pr-10"
+                        value={slackBotToken}
+                        onChange={(e) => setSlackBotToken(e.target.value)}
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                        onClick={() => setShowSlackToken(!showSlackToken)}
+                      >
+                        {showSlackToken ? (
+                          <EyeOff className="h-4 w-4 text-gray-400" />
+                        ) : (
+                          <Eye className="h-4 w-4 text-gray-400" />
+                        )}
+                      </Button>
+                    </div>
+                    <p className="text-sm text-gray-500">
+                      Token should start with "xoxb-" followed by your bot token
+                    </p>
+                  </div>
+                  <Button 
+                    className="bg-purple-600 hover:bg-purple-700 text-white"
+                    onClick={() => slackWebhookUrl && slackBotToken && handleSlackConnect(slackWebhookUrl, slackBotToken)}
+                    disabled={!slackWebhookUrl || !slackBotToken || isConnectingSlack}
+                  >
+                    {isConnectingSlack ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Connecting...
+                      </>
+                    ) : (
+                      'Connect Slack'
+                    )}
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Connected GitHub Status */}
+            {activeEnhancementTab === 'github' && githubIntegration && (
+              <Card className="border-green-200 bg-green-50 max-w-2xl mx-auto">
+                <CardHeader className="p-8">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-gray-900 rounded-lg flex items-center justify-center">
+                        <span className="text-white font-bold">GH</span>
+                      </div>
+                      <div>
+                        <CardTitle className="flex items-center space-x-2">
+                          <span>GitHub Connected</span>
+                          <Badge variant="outline" className="text-xs">
+                            {githubIntegration.token_source === "oauth" ? "OAuth" : "Manual"}
+                          </Badge>
+                        </CardTitle>
+                        <CardDescription>Username: {githubIntegration.github_username}</CardDescription>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Button variant="outline" size="sm" onClick={handleGitHubTest}>
+                        Test
+                      </Button>
+                      <Button variant="destructive" size="sm" onClick={() => setGithubDisconnectDialogOpen(true)}>
+                        Disconnect
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-8 pt-0">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div className="flex items-center space-x-2">
+                      <Key className="w-4 h-4 text-gray-400" />
+                      <div>
+                        <div className="font-medium">Token Source</div>
+                        <div className="text-gray-600">{githubIntegration.token_source === "oauth" ? "OAuth" : "Personal Access Token"}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Calendar className="w-4 h-4 text-gray-400" />
+                      <div>
+                        <div className="font-medium">Connected</div>
+                        <div className="text-gray-600">{new Date(githubIntegration.connected_at).toLocaleDateString()}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Building className="w-4 h-4 text-gray-400" />
+                      <div>
+                        <div className="font-medium">Organizations</div>
+                        <div className="text-gray-600">
+                          {githubIntegration.organizations && githubIntegration.organizations.length > 0 
+                            ? githubIntegration.organizations.join(', ') 
+                            : 'None'}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Clock className="w-4 h-4 text-gray-400" />
+                      <div>
+                        <div className="font-medium">Last Updated</div>
+                        <div className="text-gray-600">{new Date(githubIntegration.last_updated).toLocaleDateString()}</div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Connected Slack Status */}
+            {activeEnhancementTab === 'slack' && slackIntegration && (
+              <Card className="border-green-200 bg-green-50 max-w-2xl mx-auto">
+                <CardHeader className="p-8">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-purple-600 rounded-lg flex items-center justify-center">
+                        <span className="text-white font-bold">SL</span>
+                      </div>
+                      <div>
+                        <CardTitle className="flex items-center space-x-2">
+                          <span>Slack Connected</span>
+                          <Badge variant="outline" className="text-xs">
+                            Manual
+                          </Badge>
+                        </CardTitle>
+                        <CardDescription>User ID: {slackIntegration.slack_user_id}</CardDescription>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Button variant="outline" size="sm" onClick={handleSlackTest}>
+                        Test
+                      </Button>
+                      <Button variant="destructive" size="sm" onClick={() => setSlackDisconnectDialogOpen(true)}>
+                        Disconnect
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-8 pt-0">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div className="flex items-center space-x-2">
+                      <Key className="w-4 h-4 text-gray-400" />
+                      <div>
+                        <div className="font-medium">Webhook URL</div>
+                        <div className="text-gray-600 font-mono text-xs">
+                          {slackIntegration.webhook_preview || 'Not configured'}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Key className="w-4 h-4 text-gray-400" />
+                      <div>
+                        <div className="font-medium">Bot Token</div>
+                        <div className="text-gray-600 font-mono text-xs">
+                          {slackIntegration.token_preview || 'Not available'}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Building className="w-4 h-4 text-gray-400" />
+                      <div>
+                        <div className="font-medium">Workspace ID</div>
+                        <div className="text-gray-600 font-mono text-xs">{slackIntegration.workspace_id}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Calendar className="w-4 h-4 text-gray-400" />
+                      <div>
+                        <div className="font-medium">Connected</div>
+                        <div className="text-gray-600">{new Date(slackIntegration.connected_at).toLocaleDateString()}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Clock className="w-4 h-4 text-gray-400" />
+                      <div>
+                        <div className="font-medium">Last Updated</div>
+                        <div className="text-gray-600">{new Date(slackIntegration.last_updated).toLocaleDateString()}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Users className="w-4 h-4 text-gray-400" />
+                      <div>
+                        <div className="font-medium">User ID</div>
+                        <div className="text-gray-600 font-mono text-xs">{slackIntegration.slack_user_id}</div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </div>
       </main>
+
+      {/* GitHub Disconnect Confirmation Dialog */}
+      <Dialog open={githubDisconnectDialogOpen} onOpenChange={setGithubDisconnectDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Disconnect GitHub Integration</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to disconnect your GitHub integration? 
+              This will remove access to your GitHub data and you'll need to reconnect to use GitHub features again.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setGithubDisconnectDialogOpen(false)}
+              disabled={isDisconnectingGithub}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleGitHubDisconnect}
+              disabled={isDisconnectingGithub}
+            >
+              {isDisconnectingGithub ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Disconnecting...
+                </>
+              ) : (
+                "Disconnect GitHub"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Slack Disconnect Confirmation Dialog */}
+      <Dialog open={slackDisconnectDialogOpen} onOpenChange={setSlackDisconnectDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Disconnect Slack Integration</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to disconnect your Slack integration? 
+              This will remove access to your Slack workspace data and you'll need to reconnect to use Slack features again.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setSlackDisconnectDialogOpen(false)}
+              disabled={isDisconnectingSlack}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleSlackDisconnect}
+              disabled={isDisconnectingSlack}
+            >
+              {isDisconnectingSlack ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Disconnecting...
+                </>
+              ) : (
+                "Disconnect Slack"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
