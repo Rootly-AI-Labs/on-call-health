@@ -183,6 +183,8 @@ export default function IntegrationsPage() {
   const [slackDisconnectDialogOpen, setSlackDisconnectDialogOpen] = useState(false)
   const [isDisconnectingGithub, setIsDisconnectingGithub] = useState(false)
   const [isDisconnectingSlack, setIsDisconnectingSlack] = useState(false)
+  const [slackPermissions, setSlackPermissions] = useState<any>(null)
+  const [isLoadingPermissions, setIsLoadingPermissions] = useState(false)
   
   // Add integration state
   const [addingPlatform, setAddingPlatform] = useState<"rootly" | "pagerduty" | null>(null)
@@ -247,6 +249,13 @@ export default function IntegrationsPage() {
       setBackUrl('/dashboard') // default when no referrer
     }
   }, [])
+
+  // Load Slack permissions when integration is available
+  useEffect(() => {
+    if (slackIntegration && activeEnhancementTab === 'slack') {
+      loadSlackPermissions()
+    }
+  }, [slackIntegration, activeEnhancementTab])
 
   const loadAllIntegrations = async () => {
     setLoadingIntegrations(true)
@@ -638,7 +647,19 @@ export default function IntegrationsPage() {
   const handleGitHubTest = async () => {
     try {
       const authToken = localStorage.getItem('auth_token')
-      if (!authToken) return
+      if (!authToken) {
+        toast({
+          title: "Authentication required",
+          description: "Please log in to test your GitHub integration.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      toast({
+        title: "Testing GitHub connection...",
+        description: "Checking your GitHub integration status.",
+      })
 
       const response = await fetch(`${API_BASE}/integrations/github/test`, {
         method: 'POST',
@@ -648,16 +669,22 @@ export default function IntegrationsPage() {
       })
 
       if (response.ok) {
+        const data = await response.json()
         toast({
-          title: "GitHub connection test successful",
-          description: "Your GitHub integration is working properly.",
+          title: "✅ GitHub test successful!",
+          description: `Connected as ${data.user_info?.username || 'GitHub user'}. Integration is working properly.`,
         })
       } else {
-        throw new Error('Connection test failed')
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.detail || 'Connection test failed')
       }
     } catch (error) {
       console.error('Error testing GitHub connection:', error)
-      throw error
+      toast({
+        title: "❌ GitHub test failed",
+        description: error instanceof Error ? error.message : "Unable to test GitHub connection.",
+        variant: "destructive",
+      })
     }
   }
 
@@ -744,6 +771,58 @@ export default function IntegrationsPage() {
   const handleSlackTest = async () => {
     try {
       const authToken = localStorage.getItem('auth_token')
+      if (!authToken) {
+        toast({
+          title: "Authentication required",
+          description: "Please log in to test your Slack integration.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      toast({
+        title: "Testing Slack connection...",
+        description: "Checking your Slack integration and permissions.",
+      })
+
+      const response = await fetch(`${API_BASE}/integrations/slack/test`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authToken}`
+        }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setSlackPermissions(data.permissions)
+        
+        const workspaceName = data.workspace_info?.team_name || 'your workspace'
+        const userName = data.user_info?.name || 'Slack user'
+        
+        toast({
+          title: "✅ Slack test successful!",
+          description: `Connected as ${userName} in ${workspaceName}. Permissions updated.`,
+        })
+      } else {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.detail || 'Connection test failed')
+      }
+    } catch (error) {
+      console.error('Error testing Slack connection:', error)
+      toast({
+        title: "❌ Slack test failed",
+        description: error instanceof Error ? error.message : "Unable to test Slack connection.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const loadSlackPermissions = async () => {
+    if (!slackIntegration) return
+    
+    setIsLoadingPermissions(true)
+    try {
+      const authToken = localStorage.getItem('auth_token')
       if (!authToken) return
 
       const response = await fetch(`${API_BASE}/integrations/slack/test`, {
@@ -754,16 +833,13 @@ export default function IntegrationsPage() {
       })
 
       if (response.ok) {
-        toast({
-          title: "Slack connection test successful",
-          description: "Your Slack integration is working properly.",
-        })
-      } else {
-        throw new Error('Connection test failed')
+        const data = await response.json()
+        setSlackPermissions(data.permissions)
       }
     } catch (error) {
-      console.error('Error testing Slack connection:', error)
-      throw error
+      console.error('Error loading Slack permissions:', error)
+    } finally {
+      setIsLoadingPermissions(false)
     }
   }
 
@@ -1584,63 +1660,87 @@ export default function IntegrationsPage() {
           </div>
 
           <div className="grid md:grid-cols-2 gap-8 mb-8 max-w-2xl mx-auto">
-            {/* GitHub Integration Card */}
-            <Card 
-              className={`border-2 transition-all cursor-pointer hover:shadow-lg ${
-                activeEnhancementTab === 'github' 
-                  ? 'border-gray-500 shadow-lg bg-gray-50' 
-                  : 'border-gray-200 hover:border-gray-300'
-              } p-8 flex items-center justify-center relative h-32`}
-              onClick={() => {
-                setActiveEnhancementTab(activeEnhancementTab === 'github' ? null : 'github')
-              }}
-            >
-              {githubIntegration ? (
-                <div className="absolute top-4 right-4">
-                  <Badge variant="secondary" className="bg-green-100 text-green-700">Connected</Badge>
-                </div>
-              ) : null}
-              {activeEnhancementTab === 'github' && (
-                <div className="absolute top-4 left-4">
-                  <CheckCircle className="w-6 h-6 text-gray-600" />
-                </div>
-              )}
-              <div className="flex items-center space-x-2">
-                <div className="w-10 h-10 bg-gray-900 rounded flex items-center justify-center">
-                  <span className="text-white font-bold text-base">GH</span>
-                </div>
-                <span className="text-2xl font-bold text-slate-900">GitHub</span>
-              </div>
-            </Card>
+            {loadingIntegrations ? (
+              <>
+                {/* GitHub Card Skeleton */}
+                <Card className="border-2 border-gray-200 p-8 flex items-center justify-center relative h-32 animate-pulse">
+                  <div className="absolute top-4 right-4 w-16 h-5 bg-gray-300 rounded"></div>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-10 h-10 bg-gray-300 rounded"></div>
+                    <div className="h-8 w-24 bg-gray-300 rounded"></div>
+                  </div>
+                </Card>
+                
+                {/* Slack Card Skeleton */}
+                <Card className="border-2 border-gray-200 p-8 flex items-center justify-center relative h-32 animate-pulse">
+                  <div className="absolute top-4 right-4 w-16 h-5 bg-gray-300 rounded"></div>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-10 h-10 bg-gray-300 rounded"></div>
+                    <div className="h-8 w-20 bg-gray-300 rounded"></div>
+                  </div>
+                </Card>
+              </>
+            ) : (
+              <>
+                {/* GitHub Integration Card */}
+                <Card 
+                  className={`border-2 transition-all cursor-pointer hover:shadow-lg ${
+                    activeEnhancementTab === 'github' 
+                      ? 'border-gray-500 shadow-lg bg-gray-50' 
+                      : 'border-gray-200 hover:border-gray-300'
+                  } p-8 flex items-center justify-center relative h-32`}
+                  onClick={() => {
+                    setActiveEnhancementTab(activeEnhancementTab === 'github' ? null : 'github')
+                  }}
+                >
+                  {githubIntegration ? (
+                    <div className="absolute top-4 right-4">
+                      <Badge variant="secondary" className="bg-green-100 text-green-700">Connected</Badge>
+                    </div>
+                  ) : null}
+                  {activeEnhancementTab === 'github' && (
+                    <div className="absolute top-4 left-4">
+                      <CheckCircle className="w-6 h-6 text-gray-600" />
+                    </div>
+                  )}
+                  <div className="flex items-center space-x-2">
+                    <div className="w-10 h-10 bg-gray-900 rounded flex items-center justify-center">
+                      <span className="text-white font-bold text-base">GH</span>
+                    </div>
+                    <span className="text-2xl font-bold text-slate-900">GitHub</span>
+                  </div>
+                </Card>
 
-            {/* Slack Integration Card */}
-            <Card 
-              className={`border-2 transition-all cursor-pointer hover:shadow-lg ${
-                activeEnhancementTab === 'slack' 
-                  ? 'border-purple-500 shadow-lg bg-purple-50' 
-                  : 'border-gray-200 hover:border-purple-300'
-              } p-8 flex items-center justify-center relative h-32`}
-              onClick={() => {
-                setActiveEnhancementTab(activeEnhancementTab === 'slack' ? null : 'slack')
-              }}
-            >
-              {slackIntegration ? (
-                <div className="absolute top-4 right-4">
-                  <Badge variant="secondary" className="bg-green-100 text-green-700">Connected</Badge>
-                </div>
-              ) : null}
-              {activeEnhancementTab === 'slack' && (
-                <div className="absolute top-4 left-4">
-                  <CheckCircle className="w-6 h-6 text-purple-600" />
-                </div>
-              )}
-              <div className="flex items-center space-x-2">
-                <div className="w-10 h-10 bg-purple-600 rounded flex items-center justify-center">
-                  <span className="text-white font-bold text-base">SL</span>
-                </div>
-                <span className="text-2xl font-bold text-slate-900">Slack</span>
-              </div>
-            </Card>
+                {/* Slack Integration Card */}
+                <Card 
+                  className={`border-2 transition-all cursor-pointer hover:shadow-lg ${
+                    activeEnhancementTab === 'slack' 
+                      ? 'border-purple-500 shadow-lg bg-purple-50' 
+                      : 'border-gray-200 hover:border-purple-300'
+                  } p-8 flex items-center justify-center relative h-32`}
+                  onClick={() => {
+                    setActiveEnhancementTab(activeEnhancementTab === 'slack' ? null : 'slack')
+                  }}
+                >
+                  {slackIntegration ? (
+                    <div className="absolute top-4 right-4">
+                      <Badge variant="secondary" className="bg-green-100 text-green-700">Connected</Badge>
+                    </div>
+                  ) : null}
+                  {activeEnhancementTab === 'slack' && (
+                    <div className="absolute top-4 left-4">
+                      <CheckCircle className="w-6 h-6 text-purple-600" />
+                    </div>
+                  )}
+                  <div className="flex items-center space-x-2">
+                    <div className="w-10 h-10 bg-purple-600 rounded flex items-center justify-center">
+                      <span className="text-white font-bold text-base">SL</span>
+                    </div>
+                    <span className="text-2xl font-bold text-slate-900">Slack</span>
+                  </div>
+                </Card>
+              </>
+            )}
           </div>
 
           {/* Integration Forms */}
@@ -2084,6 +2184,63 @@ export default function IntegrationsPage() {
                         <div className="text-gray-600 font-mono text-xs">{slackIntegration.slack_user_id}</div>
                       </div>
                     </div>
+                  </div>
+
+                  {/* Permissions Section */}
+                  <div className="border-t pt-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="font-medium text-sm">Bot Permissions</h4>
+                      {isLoadingPermissions ? (
+                        <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+                      ) : (
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={loadSlackPermissions}
+                          className="text-xs h-6 px-2"
+                        >
+                          Refresh
+                        </Button>
+                      )}
+                    </div>
+                    {slackPermissions ? (
+                      <div className="grid grid-cols-1 gap-2">
+                        {Object.entries(slackPermissions).map(([permission, hasAccess]) => {
+                          const isGranted = hasAccess === true
+                          const permissionLabels: { [key: string]: string } = {
+                            'conversations.list': 'List Channels',
+                            'conversations.history': 'Read Messages',
+                            'users.conversations': 'User Conversations',
+                            'users.list': 'List Users',
+                            'channels.history': 'Channel History',
+                            'groups.history': 'Private Channel History'
+                          }
+                          
+                          return (
+                            <div key={permission} className="flex items-center justify-between text-xs">
+                              <span className="text-gray-600">{permissionLabels[permission] || permission}</span>
+                              <div className="flex items-center space-x-1">
+                                {isGranted ? (
+                                  <>
+                                    <CheckCircle className="w-3 h-3 text-green-500" />
+                                    <span className="text-green-600 font-medium">Granted</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <AlertCircle className="w-3 h-3 text-red-500" />
+                                    <span className="text-red-600 font-medium">Missing</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    ) : (
+                      <div className="text-xs text-gray-500">
+                        Click "Test" or "Refresh" to check permissions
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
