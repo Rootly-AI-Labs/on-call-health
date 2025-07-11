@@ -2280,7 +2280,12 @@ export default function Dashboard() {
                                   </div>
                                   <p className="text-xs text-yellow-700 mt-1">
                                     Some channels were rate limited: {slack.errors.rate_limited_channels.join(", ")}. 
-                                    Data may be incomplete. Please try again in a few minutes.
+                                    Data may be incomplete. <button 
+                                      onClick={() => window.location.reload()} 
+                                      className="text-yellow-800 underline hover:text-yellow-900"
+                                    >
+                                      Refresh to retry
+                                    </button>
                                   </p>
                                 </div>
                               )}
@@ -2343,7 +2348,7 @@ export default function Dashboard() {
                                          slack.sentiment_analysis.avg_sentiment < -0.1 ? 'Negative' : 'Neutral'}
                                       </span>
                                       <span className="text-xs text-blue-600">
-                                        ({slack.sentiment_analysis.avg_sentiment?.toFixed(2)})
+                                        ({slack.sentiment_analysis.avg_sentiment?.toFixed(2) || 'N/A'})
                                       </span>
                                     </div>
                                   </div>
