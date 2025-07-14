@@ -3,7 +3,7 @@
  */
 
 import { useEffect, useState, useCallback } from 'react'
-import { useToast } from '@/hooks/use-toast-simple'
+import { useToast } from '@/hooks/use-toast'
 import { healthChecker, HealthCheckResult } from '@/lib/health-check'
 
 export function useBackendHealth(options: {

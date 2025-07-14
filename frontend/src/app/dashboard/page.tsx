@@ -52,7 +52,7 @@ import {
 } from "lucide-react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
-import { useToast } from "@/hooks/use-toast-simple"
+import { useToast } from "@/hooks/use-toast"
 import { useBackendHealth } from "@/hooks/use-backend-health"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
