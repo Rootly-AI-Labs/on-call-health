@@ -253,7 +253,9 @@ export default function IntegrationsPage() {
         setBackUrl('/dashboard') // default fallback
       }
     } else {
-      setBackUrl('/dashboard') // default when no referrer
+      // For first-time users or direct access, start without back button
+      // Will be updated based on integration status
+      setBackUrl('')
     }
   }, [])
 
@@ -296,9 +298,20 @@ export default function IntegrationsPage() {
       const rootlyIntegrations = rootlyData.integrations.map((i: Integration) => ({ ...i, platform: 'rootly' }))
       const pagerdutyIntegrations = pagerdutyData.integrations || []
 
-      setIntegrations([...rootlyIntegrations, ...pagerdutyIntegrations])
+      const allIntegrations = [...rootlyIntegrations, ...pagerdutyIntegrations]
+      setIntegrations(allIntegrations)
       setGithubIntegration(githubData.connected ? githubData.integration : null)
       setSlackIntegration(slackData.integration)
+      
+      // Update back URL based on integration status
+      if (backUrl === '') {
+        // If user has no integrations, this is onboarding - don't show back button
+        // If user has integrations, they're managing them - show back to dashboard
+        if (allIntegrations.length > 0) {
+          setBackUrl('/dashboard')
+        }
+        // Otherwise keep backUrl empty to hide the back button
+      }
     } catch (error) {
       console.error('Failed to load integrations:', error)
       toast({
@@ -867,16 +880,18 @@ export default function IntegrationsPage() {
             <h1 className="text-2xl font-bold text-slate-900">Manage Integrations</h1>
           </div>
 
-          <Link href={backUrl}>
-            <Button variant="ghost" size="sm" className="flex items-center space-x-2">
-              <ArrowLeft className="w-4 h-4" />
-              <span>
-                {backUrl === '/auth/success' ? 'Back' : 
-                 backUrl === '/dashboard' ? 'Back to Dashboard' : 
-                 'Back'}
-              </span>
-            </Button>
-          </Link>
+          {backUrl && (
+            <Link href={backUrl}>
+              <Button variant="ghost" size="sm" className="flex items-center space-x-2">
+                <ArrowLeft className="w-4 h-4" />
+                <span>
+                  {backUrl === '/auth/success' ? 'Back' : 
+                   backUrl === '/dashboard' ? 'Back to Dashboard' : 
+                   'Back'}
+                </span>
+              </Button>
+            </Link>
+          )}
         </div>
       </header>
 
