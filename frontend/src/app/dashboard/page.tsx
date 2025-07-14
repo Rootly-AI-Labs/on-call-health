@@ -52,7 +52,7 @@ import {
 } from "lucide-react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
-import { useToast } from "@/hooks/use-toast"
+import { useToast } from "@/hooks/use-toast-mock"
 import { useBackendHealth } from "@/hooks/use-backend-health"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
@@ -413,11 +413,11 @@ export default function Dashboard() {
   const router = useRouter()
   const { toast } = useToast()
   
-  // Backend health monitoring
-  const { isHealthy, healthStatus } = useBackendHealth({
-    showToasts: true,
-    autoStart: true,
-  })
+  // Backend health monitoring - temporarily disabled
+  // const { isHealthy, healthStatus } = useBackendHealth({
+  //   showToasts: true,
+  //   autoStart: true,
+  // })
 
   // Function to clear integration cache
   const clearIntegrationCache = () => {

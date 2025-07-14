@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import ErrorBoundary from '@/components/error-boundary'
-import { Toaster } from '@/components/ui/toaster'
+// import { Toaster } from '@/components/ui/toaster' // Temporarily disabled
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -22,7 +22,7 @@ export default function RootLayout({
         <ErrorBoundary>
           {children}
         </ErrorBoundary>
-        <Toaster />
+        {/* <Toaster /> Temporarily disabled */}
       </body>
     </html>
   )
