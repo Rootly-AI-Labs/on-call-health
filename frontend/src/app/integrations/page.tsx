@@ -1704,8 +1704,14 @@ export default function IntegrationsPage() {
                     </div>
                   )}
                   <div className="flex items-center space-x-2">
-                    <div className="w-10 h-10 bg-gray-900 rounded flex items-center justify-center">
-                      <span className="text-white font-bold text-base">GH</span>
+                    <div className="w-10 h-10 rounded flex items-center justify-center">
+                      <Image
+                        src="/images/github-logo.png"
+                        alt="GitHub"
+                        width={40}
+                        height={40}
+                        className="h-10 w-10 object-contain"
+                      />
                     </div>
                     <span className="text-2xl font-bold text-slate-900">GitHub</span>
                   </div>
@@ -1733,8 +1739,14 @@ export default function IntegrationsPage() {
                     </div>
                   )}
                   <div className="flex items-center space-x-2">
-                    <div className="w-10 h-10 bg-purple-600 rounded flex items-center justify-center">
-                      <span className="text-white font-bold text-base">SL</span>
+                    <div className="w-10 h-10 rounded flex items-center justify-center">
+                      <Image
+                        src="/images/slack-logo.png"
+                        alt="Slack"
+                        width={40}
+                        height={40}
+                        className="h-10 w-10 object-contain"
+                      />
                     </div>
                     <span className="text-2xl font-bold text-slate-900">Slack</span>
                   </div>
@@ -1750,8 +1762,14 @@ export default function IntegrationsPage() {
               <Card className="border-gray-200 max-w-2xl mx-auto">
                 <CardHeader className="p-8">
                   <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-gray-900 rounded-lg flex items-center justify-center">
-                      <span className="text-white font-bold">GH</span>
+                    <div className="w-10 h-10 rounded-lg flex items-center justify-center">
+                      <Image
+                        src="/images/github-logo.png"
+                        alt="GitHub"
+                        width={40}
+                        height={40}
+                        className="h-10 w-10 object-contain"
+                      />
                     </div>
                     <div>
                       <CardTitle>Add GitHub Integration</CardTitle>
@@ -1876,8 +1894,14 @@ export default function IntegrationsPage() {
               <Card className="border-purple-200 max-w-2xl mx-auto">
                 <CardHeader className="p-8">
                   <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-purple-600 rounded-lg flex items-center justify-center">
-                      <span className="text-white font-bold">SL</span>
+                    <div className="w-10 h-10 rounded-lg flex items-center justify-center">
+                      <Image
+                        src="/images/slack-logo.png"
+                        alt="Slack"
+                        width={40}
+                        height={40}
+                        className="h-10 w-10 object-contain"
+                      />
                     </div>
                     <div>
                       <CardTitle>Add Slack Integration</CardTitle>
@@ -2045,8 +2069,14 @@ export default function IntegrationsPage() {
                 <CardHeader className="p-8">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-gray-900 rounded-lg flex items-center justify-center">
-                        <span className="text-white font-bold">GH</span>
+                      <div className="w-10 h-10 rounded-lg flex items-center justify-center">
+                        <Image
+                          src="/images/github-logo.png"
+                          alt="GitHub"
+                          width={40}
+                          height={40}
+                          className="h-10 w-10 object-contain"
+                        />
                       </div>
                       <div>
                         <CardTitle className="flex items-center space-x-2">
@@ -2113,8 +2143,14 @@ export default function IntegrationsPage() {
                 <CardHeader className="p-8">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-purple-600 rounded-lg flex items-center justify-center">
-                        <span className="text-white font-bold">SL</span>
+                      <div className="w-10 h-10 rounded-lg flex items-center justify-center">
+                        <Image
+                          src="/images/slack-logo.png"
+                          alt="Slack"
+                          width={40}
+                          height={40}
+                          className="h-10 w-10 object-contain"
+                        />
                       </div>
                       <div>
                         <CardTitle className="flex items-center space-x-2">
