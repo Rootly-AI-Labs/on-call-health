@@ -52,7 +52,8 @@ import {
 } from "lucide-react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
-import { useToast } from "@/hooks/use-toast"
+import { useToast } from "@/hooks/use-toast-simple"
+import { useBackendHealth } from "@/hooks/use-backend-health"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -411,6 +412,12 @@ export default function Dashboard() {
   
   const router = useRouter()
   const { toast } = useToast()
+  
+  // Backend health monitoring
+  const { isHealthy, healthStatus } = useBackendHealth({
+    showToasts: true,
+    autoStart: true,
+  })
 
   // Function to clear integration cache
   const clearIntegrationCache = () => {
@@ -871,17 +878,35 @@ export default function Dashboard() {
       await loadIntegrations(true, true) // Force refresh, allow global loading for this case
     }
 
-    if (!selectedIntegration) {
+    // If still no integrations after loading, show helpful message
+    if (integrations.length === 0) {
       toast({
-        title: "No integration selected",
-        description: "Please select a Rootly integration to analyze",
+        title: "No integrations found",
+        description: "Please add a Rootly or PagerDuty integration first on the Integrations page",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // If no integration selected but we have integrations available, auto-select the first one
+    let integrationToUse = selectedIntegration
+    if (!integrationToUse && integrations.length > 0) {
+      const defaultIntegration = integrations.find(i => i.is_default)
+      integrationToUse = defaultIntegration ? defaultIntegration.id.toString() : integrations[0].id.toString()
+      setSelectedIntegration(integrationToUse)
+    }
+
+    if (!integrationToUse) {
+      toast({
+        title: "No integration available",
+        description: "Please ensure you have a valid Rootly or PagerDuty integration",
         variant: "destructive",
       })
       return
     }
 
     // Set the dialog integration to the currently selected one by default
-    setDialogSelectedIntegration(selectedIntegration)
+    setDialogSelectedIntegration(integrationToUse)
     setShowTimeRangeDialog(true)
   }
 
@@ -1278,8 +1303,8 @@ export default function Dashboard() {
           </Button>
         </div>
 
-        {/* Organization Selector - Always maintain space */}
-        <div className={`${!sidebarCollapsed ? 'pt-4 px-4 pb-4 border-b border-gray-700' : 'h-0'}`}>
+        {/* Organization Selector - Always maintain space with proper buffer to avoid collapse button collision */}
+        <div className={`${!sidebarCollapsed ? 'pt-8 px-4 pb-4 border-b border-gray-700' : 'h-0'}`}>
           {!sidebarCollapsed && (
             <Select 
               value={selectedIntegration} 

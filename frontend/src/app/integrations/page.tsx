@@ -62,7 +62,8 @@ import {
 import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
-import { useToast } from "@/hooks/use-toast"
+import { useToast } from "@/hooks/use-toast-simple"
+import { useBackendHealth } from "@/hooks/use-backend-health"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -209,6 +210,12 @@ export default function IntegrationsPage() {
   
   const router = useRouter()
   const { toast } = useToast()
+  
+  // Backend health monitoring
+  const { isHealthy } = useBackendHealth({
+    showToasts: true,
+    autoStart: true,
+  })
   
   // Forms
   const rootlyForm = useForm<RootlyFormData>({
