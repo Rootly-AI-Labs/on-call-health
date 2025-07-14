@@ -1654,8 +1654,8 @@ export default function Dashboard() {
                             <div className="ml-4 space-y-1 mt-2">
                               <div className="font-medium text-gray-700">Team Analysis:</div>
                               <div>Members count: {currentAnalysis.analysis_data.team_analysis.members?.length || 0}</div>
-                              <div>Has organization_health: {currentAnalysis.analysis_data.team_analysis.organization_health ? 'Yes' : 'No'}</div>
-                              <div>Has insights: {currentAnalysis.analysis_data.team_analysis.insights ? 'Yes' : 'No'}</div>
+                              <div>Has organization_health: {(currentAnalysis.analysis_data.team_analysis as any).organization_health ? 'Yes' : 'No'}</div>
+                              <div>Has insights: {(currentAnalysis.analysis_data.team_analysis as any).insights ? 'Yes' : 'No'}</div>
                             </div>
                           )}
                           
@@ -1666,8 +1666,8 @@ export default function Dashboard() {
                                 const member = currentAnalysis.analysis_data.team_analysis.members[0]
                                 return (
                                   <div className="ml-4 space-y-1">
-                                    <div>Has GitHub data: {member.github_data ? 'Yes' : 'No'}</div>
-                                    <div>Has Slack data: {member.slack_data ? 'Yes' : 'No'}</div>
+                                    <div>Has GitHub data: {(member as any).github_data ? 'Yes' : 'No'}</div>
+                                    <div>Has Slack data: {(member as any).slack_data ? 'Yes' : 'No'}</div>
                                     <div>Has incident data: {member.incident_count !== undefined ? 'Yes' : 'No'}</div>
                                     <div>Has metrics: {member.metrics ? 'Yes' : 'No'}</div>
                                     <div>Has factors: {member.factors ? 'Yes' : 'No'}</div>
@@ -1811,9 +1811,9 @@ export default function Dashboard() {
                       </ul>
                       <p><strong>Metadata Check:</strong></p>
                       <ul className="ml-4 space-y-1">
-                        <li>• metadata.include_github: {currentAnalysis.analysis_data?.metadata?.include_github ? '✅ True' : '❌ False/Missing'}</li>
-                        <li>• metadata.include_slack: {currentAnalysis.analysis_data?.metadata?.include_slack ? '✅ True' : '❌ False/Missing'}</li>
-                        <li>• metadata object: {currentAnalysis.analysis_data?.metadata ? '✅ Present' : '❌ Missing'}</li>
+                        <li>• metadata.include_github: {(currentAnalysis.analysis_data as any)?.metadata?.include_github ? '✅ True' : '❌ False/Missing'}</li>
+                        <li>• metadata.include_slack: {(currentAnalysis.analysis_data as any)?.metadata?.include_slack ? '✅ True' : '❌ False/Missing'}</li>
+                        <li>• metadata object: {(currentAnalysis.analysis_data as any)?.metadata ? '✅ Present' : '❌ Missing'}</li>
                       </ul>
                       <details className="mt-2">
                         <summary className="cursor-pointer text-yellow-700 hover:text-yellow-900">Raw analysis_data structure</summary>
@@ -2214,7 +2214,7 @@ export default function Dashboard() {
                                 </div>
                                 <div className="bg-gray-50 rounded-lg p-3">
                                   <p className="text-xs text-gray-600 font-medium">Avg PR Size</p>
-                                  <p className="text-lg font-bold text-gray-900">{github.avg_pr_size?.toFixed(0) || 0} lines</p>
+                                  <p className="text-lg font-bold text-gray-900">{(github as any).avg_pr_size?.toFixed(0) || 0} lines</p>
                                 </div>
                               </div>
 
@@ -2288,9 +2288,27 @@ export default function Dashboard() {
                       </CardHeader>
                       <CardContent className="space-y-4">
                         {(() => {
-                          const slack = currentAnalysis.analysis_data.slack_insights
-                          const hasRateLimitErrors = slack.errors?.rate_limited_channels?.length > 0
-                          const hasOtherErrors = slack.errors?.other_errors?.length > 0
+                          const slack = currentAnalysis.analysis_data.slack_insights || { errors: {} }
+                          
+                          // Check if this analysis actually has valid Slack data
+                          // If no team members have slack_activity, don't show cached/stale data
+                          const teamMembers = currentAnalysis.analysis_data.team_analysis?.members || []
+                          const hasRealSlackData = teamMembers.some(member => 
+                            member.slack_activity && 
+                            (member.slack_activity.messages_sent > 0 || member.slack_activity.channels_active > 0)
+                          )
+                          
+                          // If no real Slack data, reset metrics to 0
+                          const slackMetrics = hasRealSlackData ? slack : {
+                            total_messages: 0,
+                            active_channels: 0,
+                            after_hours_activity_percentage: 0,
+                            weekend_activity_percentage: 0,
+                            sentiment_analysis: { avg_sentiment: null, overall_sentiment: 'Neutral' }
+                          }
+                          
+                          const hasRateLimitErrors = (slack as any).errors?.rate_limited_channels?.length > 0
+                          const hasOtherErrors = (slack as any).errors?.other_errors?.length > 0
                           
                           return (
                             <>
@@ -2304,7 +2322,7 @@ export default function Dashboard() {
                                     <span className="text-sm font-medium text-yellow-800">Rate Limited</span>
                                   </div>
                                   <p className="text-xs text-yellow-700 mt-1">
-                                    Some channels were rate limited: {slack.errors.rate_limited_channels.join(", ")}. 
+                                    Some channels were rate limited: {(slack as any).errors.rate_limited_channels.join(", ")}. 
                                     Data may be incomplete. <button 
                                       onClick={() => window.location.reload()} 
                                       className="text-yellow-800 underline hover:text-yellow-900"
@@ -2324,8 +2342,8 @@ export default function Dashboard() {
                                     <span className="text-sm font-medium text-red-800">Connection Issues</span>
                                   </div>
                                   <p className="text-xs text-red-700 mt-1">
-                                    {slack.errors.other_errors.slice(0, 2).join("; ")}
-                                    {slack.errors.other_errors.length > 2 && ` and ${slack.errors.other_errors.length - 2} more...`}
+                                    {(slack as any).errors.other_errors.slice(0, 2).join("; ")}
+                                    {(slack as any).errors.other_errors.length > 2 && ` and ${(slack as any).errors.other_errors.length - 2} more...`}
                                   </p>
                                 </div>
                               )}
@@ -2334,46 +2352,46 @@ export default function Dashboard() {
                               <div className="grid grid-cols-2 gap-4">
                                 <div className="bg-purple-50 rounded-lg p-3">
                                   <p className="text-xs text-purple-600 font-medium">Total Messages</p>
-                                  <p className="text-lg font-bold text-purple-900">{slack.total_messages?.toLocaleString() || 0}</p>
+                                  <p className="text-lg font-bold text-purple-900">{(slackMetrics as any).total_messages?.toLocaleString() || 0}</p>
                                 </div>
                                 <div className="bg-purple-50 rounded-lg p-3">
                                   <p className="text-xs text-purple-600 font-medium">Active Channels</p>
-                                  <p className="text-lg font-bold text-purple-900">{slack.active_channels || 0}</p>
+                                  <p className="text-lg font-bold text-purple-900">{(slackMetrics as any).active_channels || 0}</p>
                                 </div>
                                 <div className="bg-purple-50 rounded-lg p-3">
                                   <p className="text-xs text-purple-600 font-medium">After Hours</p>
-                                  <p className="text-lg font-bold text-purple-900">{slack.after_hours_activity_percentage?.toFixed(1) || 0}%</p>
+                                  <p className="text-lg font-bold text-purple-900">{(slackMetrics as any).after_hours_activity_percentage?.toFixed(1) || 0}%</p>
                                 </div>
                                 <div className="bg-purple-50 rounded-lg p-3">
                                   <p className="text-xs text-purple-600 font-medium">Weekend Messages</p>
-                                  <p className="text-lg font-bold text-purple-900">{slack.weekend_activity_percentage?.toFixed(1) || 0}%</p>
+                                  <p className="text-lg font-bold text-purple-900">{(slackMetrics as any).weekend_activity_percentage?.toFixed(1) || 0}%</p>
                                 </div>
                                 <div className="bg-purple-50 rounded-lg p-3">
                                   <p className="text-xs text-purple-600 font-medium">Avg Response Time</p>
-                                  <p className="text-lg font-bold text-purple-900">{slack.avg_response_time_minutes?.toFixed(0) || 0}m</p>
+                                  <p className="text-lg font-bold text-purple-900">{(slackMetrics as any).avg_response_time_minutes?.toFixed(0) || 0}m</p>
                                 </div>
                                 <div className="bg-purple-50 rounded-lg p-3">
                                   <p className="text-xs text-purple-600 font-medium">After Hours</p>
-                                  <p className="text-lg font-bold text-purple-900">{slack.after_hours_activity_percentage?.toFixed(1) || 0}%</p>
+                                  <p className="text-lg font-bold text-purple-900">{(slackMetrics as any).after_hours_activity_percentage?.toFixed(1) || 0}%</p>
                                 </div>
                               </div>
 
                               {/* Sentiment Analysis */}
-                              {slack.sentiment_analysis && (
+                              {(slackMetrics as any).sentiment_analysis && (
                                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                                   <h4 className="text-sm font-semibold text-blue-800 mb-2">Communication Health</h4>
                                   <div className="flex items-center justify-between">
                                     <span className="text-xs text-blue-700">Average Sentiment</span>
                                     <div className="flex items-center space-x-2">
                                       <span className={`text-lg font-bold ${
-                                        slack.sentiment_analysis.avg_sentiment > 0.1 ? 'text-green-600' :
-                                        slack.sentiment_analysis.avg_sentiment < -0.1 ? 'text-red-600' : 'text-yellow-600'
+                                        (slackMetrics as any).sentiment_analysis.avg_sentiment > 0.1 ? 'text-green-600' :
+                                        (slackMetrics as any).sentiment_analysis.avg_sentiment < -0.1 ? 'text-red-600' : 'text-yellow-600'
                                       }`}>
-                                        {slack.sentiment_analysis.avg_sentiment > 0.1 ? 'Positive' :
-                                         slack.sentiment_analysis.avg_sentiment < -0.1 ? 'Negative' : 'Neutral'}
+                                        {(slackMetrics as any).sentiment_analysis.avg_sentiment > 0.1 ? 'Positive' :
+                                         (slackMetrics as any).sentiment_analysis.avg_sentiment < -0.1 ? 'Negative' : 'Neutral'}
                                       </span>
                                       <span className="text-xs text-blue-600">
-                                        ({slack.sentiment_analysis.avg_sentiment?.toFixed(2) || 'N/A'})
+                                        ({(slackMetrics as any).sentiment_analysis.avg_sentiment?.toFixed(2) || 'N/A'})
                                       </span>
                                     </div>
                                   </div>
@@ -2381,26 +2399,26 @@ export default function Dashboard() {
                               )}
 
                               {/* Burnout Indicators */}
-                              {slack.burnout_indicators && (
+                              {(slackMetrics as any).burnout_indicators && (
                                 <div className="bg-red-50 border border-red-200 rounded-lg p-3">
                                   <h4 className="text-sm font-semibold text-red-800 mb-2">Communication Risk Indicators</h4>
                                   <div className="space-y-1 text-xs">
-                                    {slack.burnout_indicators.excessive_messaging > 0 && (
+                                    {(slackMetrics as any).burnout_indicators.excessive_messaging > 0 && (
                                       <div className="flex items-center space-x-2">
                                         <AlertTriangle className="w-3 h-3 text-red-600" />
-                                        <span className="text-red-700">{slack.burnout_indicators.excessive_messaging} members with excessive messaging</span>
+                                        <span className="text-red-700">{(slackMetrics as any).burnout_indicators.excessive_messaging} members with excessive messaging</span>
                                       </div>
                                     )}
-                                    {slack.burnout_indicators.poor_sentiment_users > 0 && (
+                                    {(slackMetrics as any).burnout_indicators.poor_sentiment_users > 0 && (
                                       <div className="flex items-center space-x-2">
                                         <AlertTriangle className="w-3 h-3 text-red-600" />
-                                        <span className="text-red-700">{slack.burnout_indicators.poor_sentiment_users} members with poor sentiment</span>
+                                        <span className="text-red-700">{(slackMetrics as any).burnout_indicators.poor_sentiment_users} members with poor sentiment</span>
                                       </div>
                                     )}
-                                    {slack.burnout_indicators.after_hours_communicators > 0 && (
+                                    {(slackMetrics as any).burnout_indicators.after_hours_communicators > 0 && (
                                       <div className="flex items-center space-x-2">
                                         <AlertTriangle className="w-3 h-3 text-red-600" />
-                                        <span className="text-red-700">{slack.burnout_indicators.after_hours_communicators} members communicating after hours</span>
+                                        <span className="text-red-700">{(slackMetrics as any).burnout_indicators.after_hours_communicators} members communicating after hours</span>
                                       </div>
                                     )}
                                   </div>
@@ -2931,7 +2949,7 @@ export default function Dashboard() {
                 )}
 
                 {/* Slack Activity */}
-                {selectedMember.slack_activity && (
+                {selectedMember.slack_activity && selectedMember.slack_activity.messages_sent > 0 && (
                   <div className="bg-purple-50 p-4 rounded-lg">
                     <h3 className="font-semibold mb-3 text-purple-900">💬 Slack Communications</h3>
                     <div className="grid grid-cols-2 gap-3">

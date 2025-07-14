@@ -399,7 +399,7 @@ export default function IntegrationsPage() {
 
       const form = platform === 'rootly' ? rootlyForm : pagerdutyForm
       const values = form.getValues()
-      const token = platform === 'rootly' ? values.rootlyToken : values.pagerdutyToken
+      const token = platform === 'rootly' ? (values as any).rootlyToken : (values as any).pagerdutyToken
       const nickname = values.nickname
 
       const endpoint = platform === 'rootly'
