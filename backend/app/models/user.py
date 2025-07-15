@@ -20,6 +20,11 @@ class User(Base):
     
     is_verified = Column(Boolean, default=False)  # TRUE for OAuth users
     rootly_token = Column(Text, nullable=True)  # Encrypted Rootly API token
+    
+    # LLM Integration fields
+    llm_token = Column(Text, nullable=True)  # Encrypted LLM API token
+    llm_provider = Column(String(50), nullable=True)  # 'openai', 'anthropic', etc.
+    
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     
@@ -74,6 +79,10 @@ class User(Base):
     def has_slack_integration(self) -> bool:
         """Check if user has Slack integration set up."""
         return len(self.slack_integrations) > 0
+    
+    def has_llm_token(self) -> bool:
+        """Check if user has LLM token configured."""
+        return self.llm_token is not None and self.llm_provider is not None
     
     @property
     def connected_platforms(self) -> list:

@@ -187,6 +187,16 @@ export default function IntegrationsPage() {
   const [slackPermissions, setSlackPermissions] = useState<any>(null)
   const [isLoadingPermissions, setIsLoadingPermissions] = useState(false)
   
+  // AI Integration state
+  const [llmToken, setLlmToken] = useState('')
+  const [llmModel, setLlmModel] = useState('gpt-4o-mini')
+  const [llmProvider, setLlmProvider] = useState('openai')
+  const [showLlmToken, setShowLlmToken] = useState(false)
+  const [isConnectingAI, setIsConnectingAI] = useState(false)
+  const [llmConfig, setLlmConfig] = useState<{has_token: boolean, provider?: string, token_suffix?: string} | null>(null)
+  const [loadingLlmConfig, setLoadingLlmConfig] = useState(true)
+  const [tokenError, setTokenError] = useState<string | null>(null)
+  
   // Add integration state
   const [addingPlatform, setAddingPlatform] = useState<"rootly" | "pagerduty" | null>(null)
   const [isShowingToken, setIsShowingToken] = useState(false)
@@ -236,6 +246,7 @@ export default function IntegrationsPage() {
 
   useEffect(() => {
     loadAllIntegrations()
+    loadLlmConfig()
     
     // Determine back navigation based on referrer
     const referrer = document.referrer
@@ -321,6 +332,160 @@ export default function IntegrationsPage() {
       })
     } finally {
       setLoadingIntegrations(false)
+    }
+  }
+
+  const loadLlmConfig = async () => {
+    setLoadingLlmConfig(true)
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) {
+        return
+      }
+
+      const response = await fetch(`${API_BASE}/llm/token`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`
+        }
+      })
+
+      if (response.ok) {
+        const config = await response.json()
+        setLlmConfig(config)
+        if (config.provider) {
+          setLlmProvider(config.provider)
+          setLlmModel(config.provider === 'openai' ? 'gpt-4o-mini' : 'claude-3-haiku')
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load LLM config:', error)
+    } finally {
+      setLoadingLlmConfig(false)
+    }
+  }
+
+  const handleConnectAI = async () => {
+    if (!llmToken.trim()) {
+      setTokenError("Please enter your LLM API token")
+      toast({
+        title: "Token Required",
+        description: "Please enter your LLM API token",
+        variant: "destructive"
+      })
+      return
+    }
+
+    setIsConnectingAI(true)
+    setTokenError(null) // Clear any previous errors
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) {
+        throw new Error('No authentication token found')
+      }
+
+      const response = await fetch(`${API_BASE}/llm/token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({
+          token: llmToken,
+          provider: llmProvider
+        })
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        setLlmConfig({
+          has_token: true,
+          provider: result.provider,
+          token_suffix: result.token_suffix
+        })
+        setLlmToken('')
+        setTokenError(null) // Clear any errors on success
+        toast({
+          title: "AI Connected",
+          description: `Successfully connected ${result.provider} ${llmModel}`,
+        })
+      } else {
+        const error = await response.json()
+        const errorDetail = error.detail || 'Failed to connect AI'
+        
+        // Provide specific feedback based on error type
+        let title = "Connection Failed"
+        let description = errorDetail
+        
+        if (errorDetail.includes('format')) {
+          title = "Invalid Token Format"
+          description = `${llmProvider === 'openai' ? 'OpenAI' : 'Anthropic'} tokens must start with "${llmProvider === 'openai' ? 'sk-' : 'sk-ant-api'}"`
+        } else if (errorDetail.includes('verification failed') || errorDetail.includes('check your')) {
+          title = "Invalid API Token"
+          description = `The ${llmProvider === 'openai' ? 'OpenAI' : 'Anthropic'} token appears to be invalid or expired. Please verify your token and try again.`
+        } else if (errorDetail.includes('connect')) {
+          title = "Connection Error"
+          description = `Unable to connect to ${llmProvider === 'openai' ? 'OpenAI' : 'Anthropic'} API. Please check your internet connection and try again.`
+        }
+        
+        throw new Error(description)
+      }
+    } catch (error) {
+      console.error('Failed to connect AI:', error)
+      const errorMessage = error.message || "Failed to connect to AI service"
+      
+      // Determine toast title based on error content
+      let toastTitle = "Connection Failed"
+      if (errorMessage.includes('Invalid Token Format') || errorMessage.includes('must start with')) {
+        toastTitle = "Invalid Token Format"
+      } else if (errorMessage.includes('invalid or expired') || errorMessage.includes('verify your token')) {
+        toastTitle = "Invalid API Token"
+      } else if (errorMessage.includes('Connection Error') || errorMessage.includes('internet connection')) {
+        toastTitle = "Connection Error"
+      }
+      
+      // Set the error on the input field as well
+      setTokenError(errorMessage)
+      
+      toast({
+        title: toastTitle,
+        description: errorMessage,
+        variant: "destructive"
+      })
+    } finally {
+      setIsConnectingAI(false)
+    }
+  }
+
+  const handleDisconnectAI = async () => {
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) {
+        throw new Error('No authentication token found')
+      }
+
+      const response = await fetch(`${API_BASE}/llm/token`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${authToken}`
+        }
+      })
+
+      if (response.ok) {
+        setLlmConfig({has_token: false})
+        toast({
+          title: "AI Disconnected",
+          description: "LLM token removed successfully",
+        })
+      } else {
+        throw new Error('Failed to disconnect AI')
+      }
+    } catch (error) {
+      console.error('Failed to disconnect AI:', error)
+      toast({
+        title: "Disconnect Failed",
+        description: "Failed to disconnect AI service",
+        variant: "destructive"
+      })
     }
   }
 
@@ -876,22 +1041,24 @@ export default function IntegrationsPage() {
       {/* Header */}
       <header className="bg-white/80 backdrop-blur-sm border-b border-slate-200 sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div>
+          <div className="flex items-center space-x-4">
+            {backUrl && (
+              <Link href={backUrl}>
+                <Button variant="ghost" size="sm" className="flex items-center space-x-2">
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>Back</span>
+                </Button>
+              </Link>
+            )}
             <h1 className="text-2xl font-bold text-slate-900">Manage Integrations</h1>
           </div>
 
-          {backUrl && (
-            <Link href={backUrl}>
-              <Button variant="ghost" size="sm" className="flex items-center space-x-2">
-                <ArrowLeft className="w-4 h-4" />
-                <span>
-                  {backUrl === '/auth/success' ? 'Back' : 
-                   backUrl === '/dashboard' ? 'Back to Dashboard' : 
-                   'Back'}
-                </span>
-              </Button>
-            </Link>
-          )}
+          <Link href="/dashboard">
+            <Button size="sm" className="flex items-center space-x-2 bg-purple-600 hover:bg-purple-700 text-white">
+              <Activity className="w-4 h-4" />
+              <span>Go to Dashboard</span>
+            </Button>
+          </Link>
         </div>
       </header>
 
@@ -2305,6 +2472,184 @@ export default function IntegrationsPage() {
             )}
           </div>
         </div>
+
+        {/* AI Insights Section - Only show if Rootly or PagerDuty integrations exist */}
+        {integrations.length > 0 && (
+          <div className="mt-16 space-y-8">
+            <div className="text-center">
+              <h2 className="text-2xl font-bold text-slate-900 mb-3">AI Insights</h2>
+              <p className="text-lg text-slate-600 mb-2">
+                Enable AI-powered burnout analysis with natural language reasoning
+              </p>
+              <p className="text-slate-500">
+                Add an LLM API token to get intelligent insights and recommendations
+              </p>
+            </div>
+
+            <div className="max-w-xl mx-auto">
+              <Card className="border-2 border-blue-200 p-6">
+                <CardHeader className="pb-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                        <Zap className="w-6 h-6 text-blue-600" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-xl">LLM Token</CardTitle>
+                        <CardDescription>
+                          Connect your language model for AI-powered analysis
+                        </CardDescription>
+                      </div>
+                    </div>
+                    {llmConfig?.has_token && (
+                      <div className="flex items-center space-x-2">
+                        <Badge variant="secondary" className="bg-green-100 text-green-700">
+                          Connected
+                        </Badge>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleDisconnectAI}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {llmConfig?.has_token ? (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                      <div className="flex items-center space-x-2">
+                        <CheckCircle className="w-5 h-5 text-green-600" />
+                        <div className="text-sm text-green-800">
+                          <p className="font-medium">
+                            {llmConfig.provider === 'openai' ? 'OpenAI' : 'Anthropic'} Connected
+                          </p>
+                          <p className="text-xs">
+                            Token ending in {llmConfig.token_suffix} • AI-powered analysis enabled
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-slate-700">
+                          Provider
+                        </label>
+                        <select 
+                          value={llmProvider} 
+                          onChange={(e) => {
+                            setLlmProvider(e.target.value)
+                            setLlmModel(e.target.value === 'openai' ? 'gpt-4o-mini' : 'claude-3-haiku')
+                            if (tokenError) setTokenError(null) // Clear error when changing provider
+                          }}
+                          className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                          <option value="openai">OpenAI (GPT-4o-mini)</option>
+                          <option value="anthropic">Anthropic (Claude 3 Haiku)</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-slate-700">
+                          API Token
+                        </label>
+                        <div className="relative">
+                          <Input
+                            type={showLlmToken ? "text" : "password"}
+                            placeholder={`Enter your ${llmProvider === 'openai' ? 'OpenAI' : 'Anthropic'} API token`}
+                            value={llmToken}
+                            onChange={(e) => {
+                              setLlmToken(e.target.value)
+                              if (tokenError) setTokenError(null) // Clear error when user types
+                            }}
+                            className={`pr-10 ${tokenError ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setShowLlmToken(!showLlmToken)}
+                            className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0"
+                          >
+                            {showLlmToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </Button>
+                        </div>
+                        
+                        {tokenError ? (
+                          <p className="text-xs text-red-600 flex items-center space-x-1">
+                            <AlertCircle className="w-3 h-3" />
+                            <span>{tokenError}</span>
+                          </p>
+                        ) : (
+                          <p className="text-xs text-slate-500">
+                            {llmProvider === 'openai' 
+                              ? 'Token should start with "sk-" and have 51+ characters'
+                              : 'Token should start with "sk-ant-api" and have 100+ characters'
+                            }
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <div className="flex items-start space-x-2">
+                          <HelpCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                          <div className="text-sm text-blue-800">
+                            <p className="font-medium mb-1">AI Features Include:</p>
+                            <ul className="space-y-1 text-xs">
+                              <li>• Natural language reasoning about burnout patterns</li>
+                              <li>• Intelligent risk assessment with explanations</li>
+                              <li>• Context-aware recommendations</li>
+                              <li>• Team-level insights and trends</li>
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex space-x-2">
+                        <Button 
+                          className="flex-1" 
+                          onClick={handleConnectAI}
+                          disabled={isConnectingAI || !llmToken.trim()}
+                        >
+                          {isConnectingAI ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Verifying Token...
+                            </>
+                          ) : (
+                            'Connect AI'
+                          )}
+                        </Button>
+                        <Button variant="outline" size="sm" asChild>
+                          <a 
+                            href={llmProvider === 'openai' 
+                              ? 'https://platform.openai.com/api-keys' 
+                              : 'https://console.anthropic.com/'
+                            } 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                          </a>
+                        </Button>
+                      </div>
+                    </>
+                  )}
+
+                  <Alert>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription className="text-sm">
+                      AI features work without tokens using fallback analysis. Add a token for enhanced natural language insights.
+                    </AlertDescription>
+                  </Alert>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        )}
       </main>
 
       {/* GitHub Disconnect Confirmation Dialog */}

@@ -285,10 +285,9 @@ class RootlyAPIClient:
                     params = {
                         "page[number]": page,
                         "page[size]": actual_page_size,
-                        # Temporarily comment out date filters to test basic access
-                        # "filter[created_at][gte]": start_date.isoformat(),
-                        # "filter[created_at][lte]": end_date.isoformat(),
-                        # "include": "severity,user,started_by,resolved_by"
+                        "filter[created_at][gte]": start_date.isoformat(),
+                        "filter[created_at][lte]": end_date.isoformat(),
+                        "include": "severity,user,started_by,resolved_by"
                     }
                     
                     # URL encode the parameters manually since httpx doesn't encode brackets properly

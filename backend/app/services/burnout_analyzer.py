@@ -8,6 +8,7 @@ from typing import Dict, List, Any, Optional
 from collections import defaultdict
 
 from ..core.rootly_client import RootlyAPIClient
+from .ai_burnout_analyzer import get_ai_burnout_analyzer
 
 logger = logging.getLogger(__name__)
 
@@ -206,6 +207,15 @@ class BurnoutAnalyzerService:
             # Add Slack insights if enabled  
             if slack_insights:
                 result["slack_insights"] = slack_insights
+            
+            # Enhance with AI analysis
+            available_integrations = []
+            if include_github:
+                available_integrations.append('github')
+            if include_slack:
+                available_integrations.append('slack')
+            
+            result = await self._enhance_with_ai_analysis(result, available_integrations)
                 
             return result
             
@@ -1198,3 +1208,123 @@ class BurnoutAnalyzerService:
                 "after_hours_activity": burnout_counts.get("after_hours_activity", 0)
             }
         }
+    
+    async def _enhance_with_ai_analysis(
+        self, 
+        analysis_result: Dict[str, Any], 
+        available_integrations: List[str]
+    ) -> Dict[str, Any]:
+        """
+        Enhance traditional analysis with AI-powered insights.
+        
+        Args:
+            analysis_result: Result from traditional burnout analysis
+            available_integrations: List of available data integrations
+            
+        Returns:
+            Enhanced analysis with AI insights
+        """
+        try:
+            ai_analyzer = get_ai_burnout_analyzer()
+            
+            # Enhance each member analysis
+            enhanced_members = []
+            original_members = analysis_result.get("team_analysis", {}).get("members", [])
+            
+            for member in original_members:
+                # Prepare member data for AI analysis
+                member_data = {
+                    "user_id": member.get("user_id"),
+                    "user_name": member.get("user_name"), 
+                    "incidents": self._format_incidents_for_ai(member),
+                    "github_activity": member.get("github_activity"),
+                    "slack_activity": member.get("slack_activity")
+                }
+                
+                # Get AI enhancement
+                enhanced_member = ai_analyzer.enhance_member_analysis(
+                    member_data,
+                    member,  # Traditional analysis
+                    available_integrations
+                )
+                
+                enhanced_members.append(enhanced_member)
+            
+            # Update members list
+            if "team_analysis" not in analysis_result:
+                analysis_result["team_analysis"] = {}
+            analysis_result["team_analysis"]["members"] = enhanced_members
+            
+            # Generate team-level AI insights
+            team_insights = ai_analyzer.generate_team_insights(
+                enhanced_members,
+                available_integrations
+            )
+            
+            if team_insights.get("available"):
+                analysis_result["ai_team_insights"] = team_insights
+            
+            # Add AI metadata
+            analysis_result["ai_enhanced"] = True
+            analysis_result["ai_enhancement_timestamp"] = datetime.utcnow().isoformat()
+            
+            logger.info(f"Successfully enhanced analysis with AI insights for {len(enhanced_members)} members")
+            
+        except Exception as e:
+            logger.error(f"Failed to enhance analysis with AI: {e}")
+            # Add error info but don't fail the main analysis
+            analysis_result["ai_enhanced"] = False
+            analysis_result["ai_error"] = str(e)
+        
+        return analysis_result
+    
+    def _format_incidents_for_ai(self, member_analysis: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """
+        Format incident data for AI analysis.
+        
+        Args:
+            member_analysis: Member analysis containing incident metrics
+            
+        Returns:
+            List of incident dictionaries formatted for AI
+        """
+        # Since we don't store raw incident data in member analysis,
+        # we'll create approximated incident data based on the metrics
+        incidents = []
+        
+        # Extract basic metrics
+        incident_count = member_analysis.get("incident_count", 0)
+        factors = member_analysis.get("factors", {})
+        metrics = member_analysis.get("metrics", {})
+        
+        # Create approximated incident entries based on patterns
+        # This is a simplified approach - in a full implementation,
+        # we'd want to store the raw incident data
+        
+        if incident_count > 0:
+            # Create sample incidents based on the analysis
+            after_hours_rate = metrics.get("after_hours_percentage", 0)
+            weekend_rate = metrics.get("weekend_percentage", 0)
+            avg_response_time = metrics.get("avg_response_time_minutes", 15)
+            
+            for i in range(min(incident_count, 50)):  # Limit to 50 incidents for performance
+                # Create approximated incident
+                incident = {
+                    "timestamp": datetime.utcnow().isoformat(),  # Placeholder
+                    "response_time_minutes": avg_response_time + (i % 20 - 10),  # Add variance
+                    "severity": "medium",  # Default
+                    "created_at": datetime.utcnow().isoformat(),
+                }
+                
+                # Add some patterns based on rates
+                if i < incident_count * after_hours_rate:
+                    # Mark as after-hours
+                    incident["after_hours"] = True
+                
+                if i < incident_count * weekend_rate:
+                    # Mark as weekend
+                    incident["weekend"] = True
+                
+                incidents.append(incident)
+        
+        return incidents

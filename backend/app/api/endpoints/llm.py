@@ -76,6 +76,33 @@ async def store_llm_token(
                 detail="Invalid OpenAI API key format. Should start with 'sk-'"
             )
     
+    # Test the token by making a real API call
+    try:
+        if request.provider == 'anthropic':
+            import anthropic
+            client = anthropic.Anthropic(api_key=request.token)
+            # Test with a minimal API call
+            response = client.messages.create(
+                model="claude-3-haiku-20240307",
+                max_tokens=1,
+                messages=[{"role": "user", "content": "Hi"}]
+            )
+        elif request.provider == 'openai':
+            import openai
+            client = openai.OpenAI(api_key=request.token)
+            # Test with a minimal API call
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": "Hi"}],
+                max_tokens=1
+            )
+    except Exception as e:
+        logger.error(f"Token verification failed for {request.provider}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Token verification failed. Please check your {request.provider} API key and try again."
+        )
+    
     try:
         # Encrypt the token
         encrypted_token = encrypt_token(request.token)

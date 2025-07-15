@@ -28,7 +28,7 @@ class RunAnalysisRequest(BaseModel):
 
 class AnalysisResponse(BaseModel):
     id: int
-    integration_id: int
+    integration_id: Optional[int]
     status: str
     created_at: datetime
     completed_at: Optional[datetime]

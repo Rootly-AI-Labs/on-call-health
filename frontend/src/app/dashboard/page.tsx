@@ -871,6 +871,29 @@ export default function Dashboard() {
   const [slackIntegration, setSlackIntegration] = useState<SlackIntegration | null>(null)
   const [includeGithub, setIncludeGithub] = useState(true)
   const [includeSlack, setIncludeSlack] = useState(true)
+  const [enableAI, setEnableAI] = useState(true)
+  const [llmConfig, setLlmConfig] = useState<{has_token: boolean, provider?: string} | null>(null)
+
+  // Load LLM configuration
+  const loadLlmConfig = async () => {
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) return
+
+      const response = await fetch(`${API_BASE}/llm/token`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`
+        }
+      })
+
+      if (response.ok) {
+        const config = await response.json()
+        setLlmConfig(config)
+      }
+    } catch (error) {
+      console.error('Failed to load LLM config:', error)
+    }
+  }
 
   const startAnalysis = async () => {
     // Load integrations when user wants to start analysis
@@ -905,12 +928,29 @@ export default function Dashboard() {
       return
     }
 
+    // Load LLM config for the modal
+    await loadLlmConfig()
+
     // Set the dialog integration to the currently selected one by default
     setDialogSelectedIntegration(integrationToUse)
     setShowTimeRangeDialog(true)
   }
 
   const runAnalysisWithTimeRange = async () => {
+    // Check permissions before running
+    const selectedIntegration = integrations.find(i => i.id.toString() === dialogSelectedIntegration);
+    const hasUserPermission = selectedIntegration?.permissions?.users?.access;
+    const hasIncidentPermission = selectedIntegration?.permissions?.incidents?.access;
+    
+    if (!hasUserPermission || !hasIncidentPermission) {
+      toast({
+        title: "Missing Required Permissions",
+        description: "Please update your API token permissions to include user and incident read access.",
+        variant: "destructive",
+      })
+      return;
+    }
+    
     setShowTimeRangeDialog(false)
     setTimeRange(selectedTimeRange)
     setAnalysisRunning(true)
@@ -1901,7 +1941,7 @@ export default function Dashboard() {
                     </p>
                     {currentAnalysis.analysis_data?.session_hours !== undefined && (
                       <p className="text-xs text-gray-600 mt-1">
-                        {currentAnalysis.analysis_data.session_hours.toFixed(1)} total hours
+                        {currentAnalysis.analysis_data.session_hours?.toFixed(1) || '0.0'} total hours
                       </p>
                     )}
                   </CardContent>
@@ -2433,6 +2473,209 @@ export default function Dashboard() {
                 </div>
               )}
 
+              {/* AI Insights Card */}
+              {currentAnalysis?.analysis_data?.ai_team_insights?.available && (
+                <Card className="mb-6 border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50 shadow-lg">
+                  <CardHeader className="pb-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                          <div className="w-6 h-6 text-blue-600">🤖</div>
+                        </div>
+                        <div>
+                          <CardTitle className="text-xl text-blue-900">AI Insights</CardTitle>
+                          <CardDescription className="text-blue-700">
+                            Intelligent analysis of team patterns and trends
+                          </CardDescription>
+                        </div>
+                      </div>
+                      <Badge variant="secondary" className="bg-blue-100 text-blue-700 border-blue-300">
+                        Powered by AI
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    {(() => {
+                      const aiInsights = currentAnalysis.analysis_data.ai_team_insights.insights;
+                      const teamAnalysis = currentAnalysis.analysis_data.team_analysis;
+                      const riskDist = aiInsights?.risk_distribution;
+                      const highRiskCount = (riskDist?.distribution?.high || 0) + (riskDist?.distribution?.critical || 0);
+                      const mediumRiskCount = riskDist?.distribution?.medium || 0;
+                      const lowRiskCount = riskDist?.distribution?.low || 0;
+                      
+                      // Find standout members
+                      const members = teamAnalysis?.members || [];
+                      const highRiskMembers = members.filter(m => m.risk_level === 'high' || m.risk_level === 'critical');
+                      const topPerformers = members.filter(m => m.risk_level === 'low' && m.incident_count > 10).slice(0, 3);
+                      
+                      return (
+                        <div className="space-y-6">
+                          {/* Executive Summary Report */}
+                          <div className="bg-white/80 rounded-lg p-6 border border-blue-200">
+                            <h3 className="font-bold text-lg text-blue-900 mb-4 flex items-center">
+                              <FileText className="w-5 h-5 mr-2" />
+                              Executive Summary
+                            </h3>
+                            
+                            <div className="prose prose-sm max-w-none text-gray-700 space-y-4">
+                              <p className="text-gray-800 font-medium">
+                                Analysis of {aiInsights?.team_size || 0} team members over the past 30 days reveals important insights about team health and burnout risk.
+                              </p>
+                              
+                              {/* Risk Overview */}
+                              <div className="bg-blue-50 rounded-lg p-4 border-l-4 border-blue-500">
+                                <p className="font-semibold text-blue-900 mb-2">🎯 Risk Distribution Overview</p>
+                                <p className="text-sm">
+                                  The team shows {highRiskCount > 0 ? (
+                                    <span className="text-red-600 font-semibold">{highRiskCount} members at high risk</span>
+                                  ) : (
+                                    <span className="text-green-600 font-semibold">no members at high risk</span>
+                                  )}, {mediumRiskCount} at medium risk, and {lowRiskCount} maintaining healthy levels. 
+                                  {highRiskCount > 0 && (
+                                    <span> This represents <span className="font-semibold">{((highRiskCount / (aiInsights?.team_size || 1)) * 100).toFixed(0)}%</span> of the team requiring immediate attention.</span>
+                                  )}
+                                </p>
+                              </div>
+
+                              {/* Standout Members */}
+                              {highRiskMembers.length > 0 && (
+                                <div className="bg-red-50 rounded-lg p-4 border-l-4 border-red-500">
+                                  <p className="font-semibold text-red-900 mb-2">⚠️ Members Requiring Immediate Support</p>
+                                  <ul className="text-sm space-y-1">
+                                    {highRiskMembers.slice(0, 3).map((member, idx) => (
+                                      <li key={idx}>
+                                        <span className="font-medium">{member.user_name}</span> - {member.incident_count} incidents handled, 
+                                        {member.factors.after_hours > 0.7 && " extensive after-hours work,"}
+                                        {member.factors.weekend_work > 0.5 && " frequent weekend activity,"}
+                                        {" "}burnout score: {(member.burnout_score * 10).toFixed(0)}%
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+
+                              {/* Top Performers */}
+                              {topPerformers.length > 0 && (
+                                <div className="bg-green-50 rounded-lg p-4 border-l-4 border-green-500">
+                                  <p className="font-semibold text-green-900 mb-2">🌟 Resilient Team Members</p>
+                                  <p className="text-sm">
+                                    {topPerformers.map(m => m.user_name).join(", ")} are maintaining healthy work patterns despite handling significant incident volumes. 
+                                    Their practices could serve as models for the team.
+                                  </p>
+                                </div>
+                              )}
+
+                              {/* Key Patterns */}
+                              {aiInsights?.common_patterns && aiInsights.common_patterns.length > 0 && (
+                                <div className="bg-amber-50 rounded-lg p-4 border-l-4 border-amber-500">
+                                  <p className="font-semibold text-amber-900 mb-2">📊 Critical Patterns Identified</p>
+                                  <ul className="text-sm space-y-2">
+                                    {aiInsights.common_patterns.map((pattern, idx) => (
+                                      <li key={idx}>
+                                        <span className="font-medium">{pattern.pattern}:</span> {pattern.description}
+                                        <span className="text-amber-700 text-xs block mt-1">
+                                          Impacts {pattern.affected_members} team members ({((pattern.affected_members / aiInsights.team_size) * 100).toFixed(0)}%)
+                                        </span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+
+                              {/* Recommendations */}
+                              <div className="bg-purple-50 rounded-lg p-4 border-l-4 border-purple-500">
+                                <p className="font-semibold text-purple-900 mb-3">💡 Strategic Recommendations</p>
+                                {aiInsights?.team_recommendations && aiInsights.team_recommendations.length > 0 ? (
+                                  <div className="space-y-3">
+                                    {aiInsights.team_recommendations.map((rec, idx) => (
+                                      <div key={idx} className="border-l-2 border-purple-300 pl-3">
+                                        <p className="font-medium text-purple-800">
+                                          {idx + 1}. {rec.title}
+                                          <Badge className={`ml-2 text-xs ${
+                                            rec.priority === 'urgent' ? 'bg-red-100 text-red-700' : 
+                                            rec.priority === 'high' ? 'bg-orange-100 text-orange-700' : 
+                                            'bg-blue-100 text-blue-700'
+                                          }`}>
+                                            {rec.priority}
+                                          </Badge>
+                                        </p>
+                                        <p className="text-sm text-gray-700 mt-1">{rec.description}</p>
+                                        {rec.actions && rec.actions.length > 0 && (
+                                          <ul className="text-xs text-gray-600 mt-2 ml-4 list-disc">
+                                            {rec.actions.slice(0, 2).map((action, aidx) => (
+                                              <li key={aidx}>{action}</li>
+                                            ))}
+                                          </ul>
+                                        )}
+                                        {rec.expected_impact && (
+                                          <p className="text-xs text-purple-600 mt-2 font-medium">
+                                            Expected Impact: {rec.expected_impact}
+                                          </p>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <p className="text-sm text-gray-700">
+                                    Continue current management practices while monitoring for emerging patterns.
+                                  </p>
+                                )}
+                              </div>
+
+                              {/* Conclusion */}
+                              <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg">
+                                <p className="text-sm text-gray-800">
+                                  <span className="font-semibold">Next Steps:</span> Focus on supporting high-risk team members through workload redistribution and enhanced work-life boundaries. 
+                                  {aiInsights?.workload_distribution?.distribution_health === 'poor' && 
+                                    " Address workload imbalances immediately to prevent further burnout escalation."
+                                  }
+                                  {highRiskCount === 0 && 
+                                    " Maintain current positive practices and continue proactive monitoring."
+                                  }
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Quick Stats Bar */}
+                          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div className="bg-white/70 rounded-lg p-4 border border-blue-200 text-center">
+                              <p className="text-2xl font-bold text-blue-600">{aiInsights?.team_size || 0}</p>
+                              <p className="text-xs text-gray-600">Team Members</p>
+                            </div>
+                            <div className="bg-white/70 rounded-lg p-4 border border-blue-200 text-center">
+                              <p className="text-2xl font-bold text-red-600">{highRiskCount}</p>
+                              <p className="text-xs text-gray-600">High Risk</p>
+                            </div>
+                            <div className="bg-white/70 rounded-lg p-4 border border-blue-200 text-center">
+                              <p className="text-2xl font-bold text-amber-600">{aiInsights?.common_patterns?.length || 0}</p>
+                              <p className="text-xs text-gray-600">Patterns Found</p>
+                            </div>
+                            <div className="bg-white/70 rounded-lg p-4 border border-blue-200 text-center">
+                              <p className="text-2xl font-bold text-purple-600">{aiInsights?.team_recommendations?.length || 0}</p>
+                              <p className="text-xs text-gray-600">Recommendations</p>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })()}
+                    
+                    {/* Summary Footer */}
+                    <div className="bg-blue-100/50 rounded-lg p-4 border border-blue-200">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                          <span className="text-sm font-medium text-blue-900">AI Analysis Active</span>
+                        </div>
+                        <span className="text-xs text-blue-700">
+                          Last updated: {new Date(currentAnalysis.analysis_data.ai_team_insights.insights?.analysis_timestamp || currentAnalysis.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Organization Members Grid */}
               <Card>
                 <CardHeader>
@@ -2453,7 +2696,7 @@ export default function Dashboard() {
                           riskLevel: member.risk_level as 'high' | 'medium' | 'low',
                           trend: 'stable' as const,
                           incidentsHandled: member.incident_count,
-                          avgResponseTime: `${Math.round(member.metrics.avg_response_time_minutes)}m`,
+                          avgResponseTime: `${Math.round(member.metrics?.avg_response_time_minutes || 0)}m`,
                           factors: {
                             workload: Math.round(member.factors.workload * 10 * 10) / 10,
                             afterHours: Math.round(member.factors.after_hours * 10 * 10) / 10,
@@ -2488,7 +2731,7 @@ export default function Dashboard() {
                           <div className="space-y-2">
                             <div className="flex justify-between text-sm">
                               <span>Burnout Score</span>
-                              <span className="font-medium">{(member.burnout_score * 10).toFixed(1)}%</span>
+                              <span className="font-medium">{((member?.burnout_score || 0) * 10).toFixed(1)}%</span>
                             </div>
                             <div className="relative h-2 w-full overflow-hidden rounded-full bg-gray-200">
                               <div 
@@ -2498,7 +2741,7 @@ export default function Dashboard() {
                             </div>
                             <div className="flex justify-between text-xs text-gray-500">
                               <span>{member.incident_count} incidents</span>
-                              <span>{Math.round(member.metrics.avg_response_time_minutes)}m avg response</span>
+                              <span>{Math.round(member.metrics?.avg_response_time_minutes || 0)}m avg response</span>
                             </div>
                           </div>
                         </CardContent>
@@ -2574,6 +2817,45 @@ export default function Dashboard() {
             <DialogTitle>Start New Analysis</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            {/* Permission Error Alert */}
+            {dialogSelectedIntegration && (() => {
+              const selectedIntegration = integrations.find(i => i.id.toString() === dialogSelectedIntegration);
+              const hasUserPermission = selectedIntegration?.permissions?.users?.access;
+              const hasIncidentPermission = selectedIntegration?.permissions?.incidents?.access;
+              
+              if (!hasUserPermission || !hasIncidentPermission) {
+                return (
+                  <Alert className="border-red-200 bg-red-50">
+                    <AlertCircle className="w-4 h-4 text-red-600" />
+                    <AlertDescription className="text-red-800">
+                      <strong>Missing Required Permissions</strong>
+                      <p className="mt-1 text-sm">
+                        This organization's API token is missing required permissions:
+                      </p>
+                      <ul className="mt-2 text-sm space-y-1">
+                        {!hasUserPermission && (
+                          <li className="flex items-start">
+                            <X className="w-3 h-3 mt-0.5 mr-1 flex-shrink-0" />
+                            <span><strong>User read access</strong> - Required to identify team members</span>
+                          </li>
+                        )}
+                        {!hasIncidentPermission && (
+                          <li className="flex items-start">
+                            <X className="w-3 h-3 mt-0.5 mr-1 flex-shrink-0" />
+                            <span><strong>Incident read access</strong> - Required to analyze burnout patterns</span>
+                          </li>
+                        )}
+                      </ul>
+                      <p className="mt-3 text-sm">
+                        Please update the API token permissions in your {selectedIntegration?.platform === 'rootly' ? 'Rootly' : 'PagerDuty'} account settings.
+                      </p>
+                    </AlertDescription>
+                  </Alert>
+                );
+              }
+              return null;
+            })()}
+            
             {/* Previous Analysis Information */}
             {currentAnalysis && (
               <div className="bg-gray-50 p-3 rounded-md">
@@ -2730,6 +3012,58 @@ export default function Dashboard() {
                 </div>
               </div>
             )}
+
+            {/* AI Insights Toggle */}
+            <div>
+              <label className="text-sm font-medium text-gray-700 mb-2 block">
+                AI Insights
+              </label>
+              <div className={`border rounded-lg p-4 transition-all ${enableAI && llmConfig?.has_token ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white'}`}>
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+                      <div className="w-5 h-5 text-blue-600">🤖</div>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-900">Enhanced AI Analysis</h3>
+                      <p className="text-xs text-gray-600">Natural language reasoning and insights</p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={enableAI && !!llmConfig?.has_token}
+                    onCheckedChange={setEnableAI}
+                    disabled={!llmConfig?.has_token}
+                  />
+                </div>
+                
+                {llmConfig?.has_token ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                      <span className="text-xs font-medium text-green-700">
+                        {llmConfig.provider === 'openai' ? 'OpenAI' : 'Anthropic'} Connected
+                      </span>
+                    </div>
+                    <div className="text-xs text-gray-600">
+                      {enableAI ? 
+                        '✨ AI will provide intelligent analysis and recommendations' : 
+                        '⚡ Using traditional pattern analysis only'
+                      }
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                      <span className="text-xs font-medium text-gray-600">No AI token configured</span>
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      Go to <span className="font-medium">Integrations → AI Insights</span> to add your OpenAI or Anthropic token
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
             
             <div>
               <label className="text-sm font-medium text-gray-700 mb-2 block">
@@ -2753,7 +3087,12 @@ export default function Dashboard() {
               <Button 
                 onClick={runAnalysisWithTimeRange} 
                 className="bg-purple-600 hover:bg-purple-700"
-                disabled={!dialogSelectedIntegration}
+                disabled={!dialogSelectedIntegration || (() => {
+                  const selectedIntegration = integrations.find(i => i.id.toString() === dialogSelectedIntegration);
+                  const hasUserPermission = selectedIntegration?.permissions?.users?.access;
+                  const hasIncidentPermission = selectedIntegration?.permissions?.incidents?.access;
+                  return !hasUserPermission || !hasIncidentPermission;
+                })()}
               >
                 <Play className="w-4 h-4 mr-2" />
                 Start Analysis
@@ -2793,9 +3132,9 @@ export default function Dashboard() {
                     <p className="text-gray-600 text-sm">Current burnout risk level based on recent activity</p>
                   </div>
                   <div className="text-right">
-                    <div className="text-3xl font-bold mb-1">{selectedMember.burnoutScore.toFixed(1)}%</div>
-                    <Badge className={`${getRiskColor(selectedMember.riskLevel)} text-sm px-3 py-1`}>
-                      {selectedMember.riskLevel.toUpperCase()} RISK
+                    <div className="text-3xl font-bold mb-1">{selectedMember?.burnoutScore?.toFixed(1) || '0.0'}%</div>
+                    <Badge className={`${getRiskColor(selectedMember?.riskLevel || 'low')} text-sm px-3 py-1`}>
+                      {(selectedMember?.riskLevel || 'low').toUpperCase()} RISK
                     </Badge>
                   </div>
                 </div>
@@ -2809,11 +3148,11 @@ export default function Dashboard() {
                     <div className="space-y-1">
                       <div className="flex justify-between">
                         <span className="text-gray-600">Total Incidents:</span>
-                        <span className="font-medium">{selectedMember.incidentsHandled}</span>
+                        <span className="font-medium">{selectedMember?.incidentsHandled || 0}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Incidents/Week:</span>
-                        <span className="font-medium">{(selectedMember.incidentsHandled / 4.3).toFixed(2)}</span>
+                        <span className="font-medium">{((selectedMember?.incidentsHandled || 0) / 4.3).toFixed(2)}</span>
                       </div>
                     </div>
                     <div className="space-y-1">
@@ -2829,7 +3168,7 @@ export default function Dashboard() {
                     <div className="space-y-1">
                       <div className="flex justify-between">
                         <span className="text-gray-600">Resolution Success Rate:</span>
-                        <span className="font-medium">{(100 - selectedMember.factors.responseTime).toFixed(1)}%</span>
+                        <span className="font-medium">{(100 - (selectedMember?.factors?.responseTime || 0)).toFixed(1)}%</span>
                       </div>
                     </div>
                   </div>
@@ -2847,7 +3186,7 @@ export default function Dashboard() {
                         <p className="text-xs text-gray-500 italic">Calculated from workload + after-hours factors</p>
                       </div>
                       <div className="text-right">
-                        <div className="text-lg font-bold text-gray-900">{Math.min(((selectedMember.factors.workload + selectedMember.factors.afterHours) / 2) * 0.7, 10).toFixed(2)}/10</div>
+                        <div className="text-lg font-bold text-gray-900">{Math.min((((selectedMember?.factors?.workload || 0) + (selectedMember?.factors?.afterHours || 0)) / 2) * 0.7, 10).toFixed(2)}/10</div>
                       </div>
                     </div>
                     <div className="flex items-start justify-between">
@@ -2856,7 +3195,7 @@ export default function Dashboard() {
                         <p className="text-xs text-gray-500 italic">Calculated from response time pressure + weekend work disruption</p>
                       </div>
                       <div className="text-right">
-                        <div className="text-lg font-bold text-gray-900">{Math.min(((selectedMember.factors.responseTime + selectedMember.factors.weekendWork) / 2) * 0.8, 10).toFixed(2)}/10</div>
+                        <div className="text-lg font-bold text-gray-900">{Math.min((((selectedMember?.factors?.responseTime || 0) + (selectedMember?.factors?.weekendWork || 0)) / 2) * 0.8, 10).toFixed(2)}/10</div>
                       </div>
                     </div>
                     <div className="flex items-start justify-between">
@@ -2865,7 +3204,7 @@ export default function Dashboard() {
                         <p className="text-xs text-gray-500 italic">Based on resolution success rate (higher response time = lower accomplishment)</p>
                       </div>
                       <div className="text-right">
-                        <div className="text-lg font-bold text-gray-900">{Math.max(Math.min(10 - (selectedMember.factors.responseTime * 0.6), 10), 3).toFixed(2)}/10</div>
+                        <div className="text-lg font-bold text-gray-900">{Math.max(Math.min(10 - ((selectedMember?.factors?.responseTime || 0) * 0.6), 10), 3).toFixed(2)}/10</div>
                       </div>
                     </div>
                   </div>

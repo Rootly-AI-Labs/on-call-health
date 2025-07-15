@@ -29,5 +29,9 @@ python-dateutil
 # Sentiment analysis
 vaderSentiment
 
+# AI Agent Framework
+smolagents
+litellm
+
 # Development
 pytest
