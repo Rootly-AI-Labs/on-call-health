@@ -235,10 +235,13 @@ class PagerDutyAPIClient:
             if not users:
                 raise Exception("No users found - check API permissions")
             
+            # Normalize data to common format for burnout analysis
+            normalized_data = self.normalize_to_common_format(incidents, users)
+            
             # Process and return data
             processed_data = {
-                "users": users,
-                "incidents": incidents,
+                "users": normalized_data["users"],
+                "incidents": normalized_data["incidents"],
                 "collection_metadata": {
                     "timestamp": datetime.now().isoformat(),
                     "days_analyzed": days_back,

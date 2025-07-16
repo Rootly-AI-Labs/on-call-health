@@ -49,6 +49,7 @@ import {
   LogOut,
   BookOpen,
   CheckCircle,
+  Users,
 } from "lucide-react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
@@ -544,11 +545,17 @@ export default function Dashboard() {
       if (!authToken) return
 
       console.log('Loading previous analyses...')
-      const response = await fetch(`${API_BASE}/analyses`, {
-        headers: {
-          'Authorization': `Bearer ${authToken}`
-        }
-      })
+      let response
+      try {
+        response = await fetch(`${API_BASE}/analyses`, {
+          headers: {
+            'Authorization': `Bearer ${authToken}`
+          }
+        })
+      } catch (networkError) {
+        console.error('Network error loading analyses:', networkError)
+        throw new Error('Cannot connect to backend server')
+      }
 
       if (response.ok) {
         const data = await response.json()
@@ -559,6 +566,22 @@ export default function Dashboard() {
       }
     } catch (error) {
       console.error('Failed to load previous analyses:', error)
+      
+      // Check if this is a network connectivity issue
+      const isNetworkError = error instanceof Error && (
+        error.message.includes('fetch') || 
+        error.message.includes('network') ||
+        error.message.includes('Failed to fetch') ||
+        error.name === 'TypeError'
+      )
+      
+      if (isNetworkError) {
+        toast({
+          title: "Cannot connect to backend",
+          description: "Unable to load previous analyses. Please check if the backend is running.",
+          variant: "destructive",
+        })
+      }
     }
   }
 
@@ -694,20 +717,26 @@ export default function Dashboard() {
         slackUrl: `${API_BASE}/integrations/slack/status`
       })
       
-      const [rootlyResponse, pagerdutyResponse, githubResponse, slackResponse] = await Promise.all([
-        fetch(`${API_BASE}/rootly/integrations`, {
-          headers: { 'Authorization': `Bearer ${authToken}` }
-        }),
-        fetch(`${API_BASE}/pagerduty/integrations`, {
-          headers: { 'Authorization': `Bearer ${authToken}` }
-        }),
-        fetch(`${API_BASE}/integrations/github/status`, {
-          headers: { 'Authorization': `Bearer ${authToken}` }
-        }),
-        fetch(`${API_BASE}/integrations/slack/status`, {
-          headers: { 'Authorization': `Bearer ${authToken}` }
-        })
-      ])
+      let rootlyResponse, pagerdutyResponse, githubResponse, slackResponse
+      try {
+        [rootlyResponse, pagerdutyResponse, githubResponse, slackResponse] = await Promise.all([
+          fetch(`${API_BASE}/rootly/integrations`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+          }),
+          fetch(`${API_BASE}/pagerduty/integrations`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+          }),
+          fetch(`${API_BASE}/integrations/github/status`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+          }),
+          fetch(`${API_BASE}/integrations/slack/status`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+          })
+        ])
+      } catch (networkError) {
+        console.error('Network error fetching integrations:', networkError)
+        throw new Error('Cannot connect to backend server. Please check if the backend is running and try again.')
+      }
 
       const rootlyData = rootlyResponse.ok ? await rootlyResponse.json() : { integrations: [] }
       const pagerdutyData = pagerdutyResponse.ok ? await pagerdutyResponse.json() : { integrations: [] }
@@ -772,9 +801,20 @@ export default function Dashboard() {
       }
     } catch (error) {
       console.error('Failed to load integrations:', error)
+      
+      // Check if this is a network connectivity issue
+      const isNetworkError = error instanceof Error && (
+        error.message.includes('fetch') || 
+        error.message.includes('network') ||
+        error.message.includes('Failed to fetch') ||
+        error.name === 'TypeError'
+      )
+      
       toast({
         title: "Failed to load integrations",
-        description: "Please try refreshing the page",
+        description: isNetworkError 
+          ? "Cannot connect to backend server. Please check if the backend is running and try again."
+          : "Please try refreshing the page",
         variant: "destructive",
       })
     } finally {
@@ -873,6 +913,7 @@ export default function Dashboard() {
   const [includeSlack, setIncludeSlack] = useState(true)
   const [enableAI, setEnableAI] = useState(true)
   const [llmConfig, setLlmConfig] = useState<{has_token: boolean, provider?: string} | null>(null)
+  const [isLoadingGitHubSlack, setIsLoadingGitHubSlack] = useState(false)
 
   // Load LLM configuration
   const loadLlmConfig = async () => {
@@ -880,11 +921,17 @@ export default function Dashboard() {
       const authToken = localStorage.getItem('auth_token')
       if (!authToken) return
 
-      const response = await fetch(`${API_BASE}/llm/token`, {
-        headers: {
-          'Authorization': `Bearer ${authToken}`
-        }
-      })
+      let response
+      try {
+        response = await fetch(`${API_BASE}/llm/token`, {
+          headers: {
+            'Authorization': `Bearer ${authToken}`
+          }
+        })
+      } catch (networkError) {
+        console.error('Network error loading LLM config:', networkError)
+        throw new Error('Cannot connect to backend server')
+      }
 
       if (response.ok) {
         const config = await response.json()
@@ -892,23 +939,39 @@ export default function Dashboard() {
       }
     } catch (error) {
       console.error('Failed to load LLM config:', error)
+      
+      // Check if this is a network connectivity issue
+      const isNetworkError = error instanceof Error && (
+        error.message.includes('fetch') || 
+        error.message.includes('network') ||
+        error.message.includes('Failed to fetch') ||
+        error.name === 'TypeError'
+      )
+      
+      if (isNetworkError) {
+        toast({
+          title: "Cannot connect to backend",
+          description: "Unable to load AI configuration. Please check if the backend is running.",
+          variant: "destructive",
+        })
+      }
     }
   }
 
   const startAnalysis = async () => {
-    // Load integrations when user wants to start analysis
+    // Check if we have basic integrations cached
     if (integrations.length === 0) {
-      await loadIntegrations(true, true) // Force refresh, allow global loading for this case
-    }
-
-    // If still no integrations after loading, show helpful message
-    if (integrations.length === 0) {
-      toast({
-        title: "No integrations found",
-        description: "Please add a Rootly or PagerDuty integration first on the Integrations page",
-        variant: "destructive",
-      })
-      return
+      // No integrations cached, need to load them first
+      await loadIntegrations(true, true)
+      
+      if (integrations.length === 0) {
+        toast({
+          title: "No integrations found",
+          description: "Please add a Rootly or PagerDuty integration first on the Integrations page",
+          variant: "destructive",
+        })
+        return
+      }
     }
 
     // If no integration selected but we have integrations available, auto-select the first one
@@ -928,27 +991,40 @@ export default function Dashboard() {
       return
     }
 
-    // Load LLM config for the modal
-    await loadLlmConfig()
-
     // Set the dialog integration to the currently selected one by default
     setDialogSelectedIntegration(integrationToUse)
     setShowTimeRangeDialog(true)
+
+    // Load GitHub/Slack status and LLM config in background after modal is open
+    setIsLoadingGitHubSlack(true)
+    Promise.all([
+      loadIntegrations(true, false), // Refresh integrations without showing loading
+      loadLlmConfig()
+    ]).then(() => {
+      setIsLoadingGitHubSlack(false)
+    }).catch(err => {
+      console.error('Error loading modal data:', err)
+      setIsLoadingGitHubSlack(false)
+    })
   }
 
   const runAnalysisWithTimeRange = async () => {
-    // Check permissions before running
+    // Check permissions before running - only for Rootly integrations
     const selectedIntegration = integrations.find(i => i.id.toString() === dialogSelectedIntegration);
-    const hasUserPermission = selectedIntegration?.permissions?.users?.access;
-    const hasIncidentPermission = selectedIntegration?.permissions?.incidents?.access;
     
-    if (!hasUserPermission || !hasIncidentPermission) {
-      toast({
-        title: "Missing Required Permissions",
-        description: "Please update your API token permissions to include user and incident read access.",
-        variant: "destructive",
-      })
-      return;
+    // Only check permissions for Rootly integrations, not PagerDuty
+    if (selectedIntegration?.platform === 'rootly') {
+      const hasUserPermission = selectedIntegration?.permissions?.users?.access;
+      const hasIncidentPermission = selectedIntegration?.permissions?.incidents?.access;
+      
+      if (!hasUserPermission || !hasIncidentPermission) {
+        toast({
+          title: "Missing Required Permissions",
+          description: "Please update your Rootly API token permissions to include user and incident read access.",
+          variant: "destructive",
+        })
+        return;
+      }
     }
     
     setShowTimeRangeDialog(false)
@@ -966,25 +1042,42 @@ export default function Dashboard() {
       }
 
       // Start the analysis
-      const response = await fetch(`${API_BASE}/analyses/run`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`
-        },
-        body: JSON.stringify({
-          integration_id: parseInt(dialogSelectedIntegration),
-          time_range: parseInt(selectedTimeRange),
-          include_weekends: true,
-          include_github: githubIntegration ? includeGithub : false,
-          include_slack: slackIntegration ? includeSlack : false
-        }),
-      })
+      let response
+      try {
+        response = await fetch(`${API_BASE}/analyses/run`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({
+            integration_id: parseInt(dialogSelectedIntegration),
+            time_range: parseInt(selectedTimeRange),
+            include_weekends: true,
+            include_github: githubIntegration ? includeGithub : false,
+            include_slack: slackIntegration ? includeSlack : false,
+            enable_ai: enableAI && llmConfig?.has_token
+          }),
+        })
+      } catch (networkError) {
+        console.error('Network error:', networkError)
+        throw new Error('Cannot connect to backend server. Please check if the backend is running and try again.')
+      }
 
-      const responseData = await response.json()
+      if (!response) {
+        throw new Error('No response from server. Please check if the backend is running.')
+      }
+
+      let responseData
+      try {
+        responseData = await response.json()
+      } catch (parseError) {
+        console.error('JSON parse error:', parseError)
+        throw new Error(`Server returned invalid response (${response.status}). The backend may be experiencing issues.`)
+      }
       
       if (!response.ok) {
-        throw new Error(responseData.detail || 'Failed to start analysis')
+        throw new Error(responseData.detail || responseData.message || `Analysis failed with status ${response.status}`)
       }
 
       const { id: analysis_id } = responseData
@@ -1014,11 +1107,17 @@ export default function Dashboard() {
             return
           }
           
-          const pollResponse = await fetch(`${API_BASE}/analyses/${analysis_id}`, {
-            headers: {
-              'Authorization': `Bearer ${authToken}`
-            }
-          })
+          let pollResponse
+          try {
+            pollResponse = await fetch(`${API_BASE}/analyses/${analysis_id}`, {
+              headers: {
+                'Authorization': `Bearer ${authToken}`
+              }
+            })
+          } catch (networkError) {
+            console.error('Network error during polling:', networkError)
+            throw new Error('Cannot connect to backend server during polling')
+          }
 
           if (pollResponse.ok) {
             const analysisData = await pollResponse.json()
@@ -1253,18 +1352,6 @@ export default function Dashboard() {
     router.push('/')
   }
 
-  // Show full-screen loading when loading integrations
-  if (loadingIntegrations) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <Activity className="w-8 h-8 text-purple-600 animate-pulse mx-auto mb-4" />
-          <p className="text-gray-600">Loading dashboard...</p>
-        </div>
-      </div>
-    )
-  }
-
   const selectedIntegrationData = integrations.find(i => i.id.toString() === selectedIntegration)
   
   // Generate chart data from real analysis results
@@ -1285,9 +1372,9 @@ export default function Dashboard() {
       fill: member.risk_level === "high" ? "#dc2626" :      // Red for high
             member.risk_level === "medium" ? "#f59e0b" :    // Amber for medium
             "#10b981",                                       // Green for low
-    })) || []
+    })) || [];
   
-  const members = currentAnalysis?.analysis_data?.team_analysis?.members || []
+  const members = currentAnalysis?.analysis_data?.team_analysis?.members || [];
   // Calculate burnout factors - Backend returns 0-10 scale, we need 0-100 for chart
   const burnoutFactors = members.length > 0 ? [
     { 
@@ -1315,15 +1402,29 @@ export default function Dashboard() {
       value: members.reduce((avg, m) => avg + (m.factors?.response_time || 0), 0) / members.length * 100,
       metrics: `Avg response: ${Math.round(members.reduce((avg, m) => avg + (m.metrics?.avg_response_time_minutes || 0), 0) / members.length)} min`
     },
-  ] : []
+  ] : [];
 
   // Debug log to check the actual values
-  console.log('🔍 DEBUG: Radar chart burnout factors:', burnoutFactors)
-  console.log('🔍 DEBUG: Members raw factors:', members.map(m => ({ name: m.user_name, factors: m.factors })))
-  console.log('🔍 DEBUG: Organization burnout score:', members.reduce((avg, m) => avg + (m.burnout_score || 0), 0) / members.length * 10, '%')
-  console.log('🔍 DEBUG: Selected member factors:', selectedMember ? selectedMember.factors : 'None selected')
-  console.log('🔍 DEBUG: Selected member slack activity:', selectedMember?.slack_activity)
-  console.log('🔍 DEBUG: Selected member github activity:', selectedMember?.github_activity)
+  useEffect(() => {
+    console.log('🔍 DEBUG: Radar chart burnout factors:', burnoutFactors)
+    console.log('🔍 DEBUG: Members raw factors:', members.map(m => ({ name: m.user_name, factors: m.factors })))
+    console.log('🔍 DEBUG: Organization burnout score:', members.reduce((avg, m) => avg + (m.burnout_score || 0), 0) / members.length * 10, '%')
+    console.log('🔍 DEBUG: Selected member factors:', selectedMember ? selectedMember.factors : 'None selected')
+    console.log('🔍 DEBUG: Selected member slack activity:', selectedMember?.slack_activity)
+    console.log('🔍 DEBUG: Selected member github activity:', selectedMember?.github_activity)
+  }, [burnoutFactors, members, selectedMember])
+
+  // Show full-screen loading when loading integrations
+  if (loadingIntegrations) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <Activity className="w-8 h-8 text-purple-600 animate-pulse mx-auto mb-4" />
+          <p className="text-gray-600">Loading dashboard...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -1603,8 +1704,23 @@ export default function Dashboard() {
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Organization Burnout Analysis</h1>
               <p className="text-gray-600">
-                {selectedIntegrationData ? `${selectedIntegrationData.name} - ${selectedIntegrationData.organization_name}` : 
-                 currentAnalysis ? 'Analysis Dashboard' : 'Organization Burnout Analysis Dashboard'}
+                {(() => {
+                  // If viewing a specific analysis, show the integration used for that analysis
+                  if (currentAnalysis) {
+                    const analysisIntegration = integrations.find(i => i.id === currentAnalysis.integration_id);
+                    if (analysisIntegration) {
+                      const platform = analysisIntegration.platform === 'pagerduty' ? 'PagerDuty' : 'Rootly';
+                      return `${platform} - ${analysisIntegration.organization_name || analysisIntegration.name}`;
+                    }
+                    return 'Analysis Dashboard';
+                  }
+                  // Otherwise show the currently selected integration
+                  if (selectedIntegrationData) {
+                    const platform = selectedIntegrationData.platform === 'pagerduty' ? 'PagerDuty' : 'Rootly';
+                    return `${platform} - ${selectedIntegrationData.organization_name || selectedIntegrationData.name}`;
+                  }
+                  return 'Organization Burnout Analysis Dashboard';
+                })()}
               </p>
             </div>
             {/* Export Dropdown */}
@@ -2473,7 +2589,7 @@ export default function Dashboard() {
                 </div>
               )}
 
-              {/* AI Insights Card */}
+              {/* AI Insights Card - Enhanced with dynamic content */}
               {currentAnalysis?.analysis_data?.ai_team_insights?.available && (
                 <Card className="mb-6 border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50 shadow-lg">
                   <CardHeader className="pb-4">
@@ -2483,195 +2599,226 @@ export default function Dashboard() {
                           <div className="w-6 h-6 text-blue-600">🤖</div>
                         </div>
                         <div>
-                          <CardTitle className="text-xl text-blue-900">AI Insights</CardTitle>
+                          <CardTitle className="text-xl text-blue-900">AI Team Insights</CardTitle>
                           <CardDescription className="text-blue-700">
-                            Intelligent analysis of team patterns and trends
+                            Intelligent burnout analysis and actionable recommendations
                           </CardDescription>
                         </div>
                       </div>
                       <Badge variant="secondary" className="bg-blue-100 text-blue-700 border-blue-300">
-                        Powered by AI
+                        Enhanced Analysis
                       </Badge>
                     </div>
                   </CardHeader>
-                  <CardContent className="space-y-6">
+                  <CardContent className="space-y-5">
                     {(() => {
                       const aiInsights = currentAnalysis.analysis_data.ai_team_insights.insights;
                       const teamAnalysis = currentAnalysis.analysis_data.team_analysis;
+                      const members = teamAnalysis?.members || [];
                       const riskDist = aiInsights?.risk_distribution;
                       const highRiskCount = (riskDist?.distribution?.high || 0) + (riskDist?.distribution?.critical || 0);
                       const mediumRiskCount = riskDist?.distribution?.medium || 0;
-                      const lowRiskCount = riskDist?.distribution?.low || 0;
-                      
-                      // Find standout members
-                      const members = teamAnalysis?.members || [];
                       const highRiskMembers = members.filter(m => m.risk_level === 'high' || m.risk_level === 'critical');
-                      const topPerformers = members.filter(m => m.risk_level === 'low' && m.incident_count > 10).slice(0, 3);
+                      const hasPatterns = aiInsights?.common_patterns && aiInsights.common_patterns.length > 0;
+                      const hasRecommendations = aiInsights?.team_recommendations && aiInsights.team_recommendations.length > 0;
+                      
+                      // Calculate average burnout score for trend indication
+                      const avgBurnoutScore = members.length > 0 ? 
+                        members.reduce((sum, m) => sum + (m.burnout_score || 0), 0) / members.length * 10 : 0;
+                      
+                      // Generate AI-style executive summary
+                      const generateSummary = () => {
+                        if (highRiskCount > 0) {
+                          return `Critical team health alert: ${highRiskCount} member${highRiskCount > 1 ? 's' : ''} showing high burnout risk. Immediate intervention recommended to prevent team breakdown.`;
+                        } else if (mediumRiskCount > 0) {
+                          return `Team showing moderate stress levels with ${mediumRiskCount} member${mediumRiskCount > 1 ? 's' : ''} at medium risk. Proactive measures should be implemented.`;
+                        } else {
+                          return `Team health is stable with good work-life balance indicators. Continue monitoring to maintain current wellness levels.`;
+                        }
+                      };
                       
                       return (
-                        <div className="space-y-6">
-                          {/* Executive Summary Report */}
-                          <div className="bg-white/80 rounded-lg p-6 border border-blue-200">
-                            <h3 className="font-bold text-lg text-blue-900 mb-4 flex items-center">
-                              <FileText className="w-5 h-5 mr-2" />
-                              Executive Summary
-                            </h3>
-                            
-                            <div className="prose prose-sm max-w-none text-gray-700 space-y-4">
-                              <p className="text-gray-800 font-medium">
-                                Analysis of {aiInsights?.team_size || 0} team members over the past 30 days reveals important insights about team health and burnout risk.
-                              </p>
-                              
-                              {/* Risk Overview */}
-                              <div className="bg-blue-50 rounded-lg p-4 border-l-4 border-blue-500">
-                                <p className="font-semibold text-blue-900 mb-2">🎯 Risk Distribution Overview</p>
-                                <p className="text-sm">
-                                  The team shows {highRiskCount > 0 ? (
-                                    <span className="text-red-600 font-semibold">{highRiskCount} members at high risk</span>
-                                  ) : (
-                                    <span className="text-green-600 font-semibold">no members at high risk</span>
-                                  )}, {mediumRiskCount} at medium risk, and {lowRiskCount} maintaining healthy levels. 
-                                  {highRiskCount > 0 && (
-                                    <span> This represents <span className="font-semibold">{((highRiskCount / (aiInsights?.team_size || 1)) * 100).toFixed(0)}%</span> of the team requiring immediate attention.</span>
-                                  )}
-                                </p>
+                        <div className="space-y-5">
+                          {/* Executive Summary */}
+                          <div className="bg-white/90 rounded-lg p-4 border border-blue-100">
+                            <div className="flex items-start space-x-3">
+                              <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                <span className="text-blue-600 text-sm">📋</span>
                               </div>
-
-                              {/* Standout Members */}
-                              {highRiskMembers.length > 0 && (
-                                <div className="bg-red-50 rounded-lg p-4 border-l-4 border-red-500">
-                                  <p className="font-semibold text-red-900 mb-2">⚠️ Members Requiring Immediate Support</p>
-                                  <ul className="text-sm space-y-1">
-                                    {highRiskMembers.slice(0, 3).map((member, idx) => (
-                                      <li key={idx}>
-                                        <span className="font-medium">{member.user_name}</span> - {member.incident_count} incidents handled, 
-                                        {member.factors.after_hours > 0.7 && " extensive after-hours work,"}
-                                        {member.factors.weekend_work > 0.5 && " frequent weekend activity,"}
-                                        {" "}burnout score: {(member.burnout_score * 10).toFixed(0)}%
-                                      </li>
-                                    ))}
-                                  </ul>
-                                </div>
-                              )}
-
-                              {/* Top Performers */}
-                              {topPerformers.length > 0 && (
-                                <div className="bg-green-50 rounded-lg p-4 border-l-4 border-green-500">
-                                  <p className="font-semibold text-green-900 mb-2">🌟 Resilient Team Members</p>
-                                  <p className="text-sm">
-                                    {topPerformers.map(m => m.user_name).join(", ")} are maintaining healthy work patterns despite handling significant incident volumes. 
-                                    Their practices could serve as models for the team.
-                                  </p>
-                                </div>
-                              )}
-
-                              {/* Key Patterns */}
-                              {aiInsights?.common_patterns && aiInsights.common_patterns.length > 0 && (
-                                <div className="bg-amber-50 rounded-lg p-4 border-l-4 border-amber-500">
-                                  <p className="font-semibold text-amber-900 mb-2">📊 Critical Patterns Identified</p>
-                                  <ul className="text-sm space-y-2">
-                                    {aiInsights.common_patterns.map((pattern, idx) => (
-                                      <li key={idx}>
-                                        <span className="font-medium">{pattern.pattern}:</span> {pattern.description}
-                                        <span className="text-amber-700 text-xs block mt-1">
-                                          Impacts {pattern.affected_members} team members ({((pattern.affected_members / aiInsights.team_size) * 100).toFixed(0)}%)
-                                        </span>
-                                      </li>
-                                    ))}
-                                  </ul>
-                                </div>
-                              )}
-
-                              {/* Recommendations */}
-                              <div className="bg-purple-50 rounded-lg p-4 border-l-4 border-purple-500">
-                                <p className="font-semibold text-purple-900 mb-3">💡 Strategic Recommendations</p>
-                                {aiInsights?.team_recommendations && aiInsights.team_recommendations.length > 0 ? (
-                                  <div className="space-y-3">
-                                    {aiInsights.team_recommendations.map((rec, idx) => (
-                                      <div key={idx} className="border-l-2 border-purple-300 pl-3">
-                                        <p className="font-medium text-purple-800">
-                                          {idx + 1}. {rec.title}
-                                          <Badge className={`ml-2 text-xs ${
-                                            rec.priority === 'urgent' ? 'bg-red-100 text-red-700' : 
-                                            rec.priority === 'high' ? 'bg-orange-100 text-orange-700' : 
-                                            'bg-blue-100 text-blue-700'
-                                          }`}>
-                                            {rec.priority}
-                                          </Badge>
-                                        </p>
-                                        <p className="text-sm text-gray-700 mt-1">{rec.description}</p>
-                                        {rec.actions && rec.actions.length > 0 && (
-                                          <ul className="text-xs text-gray-600 mt-2 ml-4 list-disc">
-                                            {rec.actions.slice(0, 2).map((action, aidx) => (
-                                              <li key={aidx}>{action}</li>
-                                            ))}
-                                          </ul>
-                                        )}
-                                        {rec.expected_impact && (
-                                          <p className="text-xs text-purple-600 mt-2 font-medium">
-                                            Expected Impact: {rec.expected_impact}
-                                          </p>
-                                        )}
-                                      </div>
-                                    ))}
+                              <div className="flex-1">
+                                <h4 className="font-semibold text-blue-900 text-sm mb-2">Executive Summary</h4>
+                                <p className="text-sm text-gray-700 leading-relaxed">
+                                  {generateSummary()}
+                                </p>
+                                <div className="flex items-center justify-between mt-3 pt-3 border-t border-blue-100">
+                                  <span className="text-xs text-blue-600">
+                                    {aiInsights?.team_size || members.length} team members analyzed
+                                  </span>
+                                  <div className="flex items-center space-x-2">
+                                    <div className={`w-2 h-2 rounded-full ${
+                                      avgBurnoutScore >= 70 ? 'bg-red-500' : 
+                                      avgBurnoutScore >= 50 ? 'bg-yellow-500' : 'bg-green-500'
+                                    }`}></div>
+                                    <span className="text-xs text-gray-600">
+                                      {avgBurnoutScore.toFixed(1)}% avg burnout
+                                    </span>
                                   </div>
-                                ) : (
-                                  <p className="text-sm text-gray-700">
-                                    Continue current management practices while monitoring for emerging patterns.
-                                  </p>
-                                )}
-                              </div>
-
-                              {/* Conclusion */}
-                              <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg">
-                                <p className="text-sm text-gray-800">
-                                  <span className="font-semibold">Next Steps:</span> Focus on supporting high-risk team members through workload redistribution and enhanced work-life boundaries. 
-                                  {aiInsights?.workload_distribution?.distribution_health === 'poor' && 
-                                    " Address workload imbalances immediately to prevent further burnout escalation."
-                                  }
-                                  {highRiskCount === 0 && 
-                                    " Maintain current positive practices and continue proactive monitoring."
-                                  }
-                                </p>
+                                </div>
                               </div>
                             </div>
                           </div>
 
-                          {/* Quick Stats Bar */}
-                          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                            <div className="bg-white/70 rounded-lg p-4 border border-blue-200 text-center">
-                              <p className="text-2xl font-bold text-blue-600">{aiInsights?.team_size || 0}</p>
-                              <p className="text-xs text-gray-600">Team Members</p>
+                          {/* Key Finding Alert */}
+                          {highRiskMembers.length > 0 ? (
+                            <Alert className="border-red-200 bg-red-50">
+                              <AlertTriangle className="w-4 h-4 text-red-600" />
+                              <AlertDescription className="text-sm">
+                                <div className="space-y-2">
+                                  <p className="font-medium text-red-900">
+                                    🚨 Critical Alert: {highRiskMembers[0].user_name}
+                                    {highRiskMembers.length > 1 && ` (+${highRiskMembers.length - 1} other${highRiskMembers.length > 2 ? 's' : ''})`} 
+                                    showing severe burnout symptoms
+                                  </p>
+                                  <p className="text-red-700">
+                                    {highRiskMembers[0].incident_count || 0} incidents handled • 
+                                    {((highRiskMembers[0].burnout_score || 0) * 10).toFixed(1)}% burnout score
+                                  </p>
+                                </div>
+                              </AlertDescription>
+                            </Alert>
+                          ) : hasPatterns ? (
+                            <Alert className="border-amber-200 bg-amber-50">
+                              <AlertCircle className="w-4 h-4 text-amber-600" />
+                              <AlertDescription className="text-sm">
+                                <p className="font-medium text-amber-900">
+                                  📊 Pattern Detected: {aiInsights.common_patterns[0].pattern}
+                                </p>
+                                <p className="text-amber-700 mt-1">
+                                  {aiInsights.common_patterns[0].description}
+                                </p>
+                              </AlertDescription>
+                            </Alert>
+                          ) : (
+                            <Alert className="border-green-200 bg-green-50">
+                              <CheckCircle className="w-4 h-4 text-green-600" />
+                              <AlertDescription className="text-sm">
+                                <p className="font-medium text-green-900">
+                                  ✅ Team Health Stable
+                                </p>
+                                <p className="text-green-700 mt-1">
+                                  No critical burnout indicators detected. Team maintaining healthy work patterns.
+                                </p>
+                              </AlertDescription>
+                            </Alert>
+                          )}
+
+                          {/* Top Recommendation */}
+                          {hasRecommendations && (
+                            <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg p-4 border border-purple-200">
+                              <div className="flex items-start space-x-3">
+                                <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0">
+                                  <span className="text-purple-600 text-sm">💡</span>
+                                </div>
+                                <div className="flex-1">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <h4 className="font-semibold text-purple-900 text-sm">
+                                      Priority Action: {aiInsights.team_recommendations[0].title}
+                                    </h4>
+                                    <Badge variant="outline" className="border-purple-300 text-purple-700 text-xs">
+                                      {aiInsights.team_recommendations[0].priority?.toUpperCase() || 'HIGH'}
+                                    </Badge>
+                                  </div>
+                                  <p className="text-sm text-purple-800 mb-3">
+                                    {aiInsights.team_recommendations[0].description}
+                                  </p>
+                                  {aiInsights.team_recommendations[0].expected_impact && (
+                                    <div className="bg-white/50 rounded p-2 mb-2">
+                                      <p className="text-xs text-purple-700">
+                                        <span className="font-medium">Expected Impact:</span> {aiInsights.team_recommendations[0].expected_impact}
+                                      </p>
+                                    </div>
+                                  )}
+                                  {aiInsights.team_recommendations.length > 1 && (
+                                    <p className="text-xs text-purple-600">
+                                      View all {aiInsights.team_recommendations.length} recommendations in detailed report
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
                             </div>
-                            <div className="bg-white/70 rounded-lg p-4 border border-blue-200 text-center">
-                              <p className="text-2xl font-bold text-red-600">{highRiskCount}</p>
-                              <p className="text-xs text-gray-600">High Risk</p>
+                          )}
+
+                          {/* Enhanced Quick Stats Grid */}
+                          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                            <div className="bg-white/80 rounded-lg p-3 border border-gray-200">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <p className="text-lg font-bold text-gray-800">{aiInsights?.team_size || members.length}</p>
+                                  <p className="text-xs text-gray-600">Team Members</p>
+                                </div>
+                                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                                  <Users className="w-4 h-4 text-blue-600" />
+                                </div>
+                              </div>
                             </div>
-                            <div className="bg-white/70 rounded-lg p-4 border border-blue-200 text-center">
-                              <p className="text-2xl font-bold text-amber-600">{aiInsights?.common_patterns?.length || 0}</p>
-                              <p className="text-xs text-gray-600">Patterns Found</p>
+                            
+                            <div className="bg-white/80 rounded-lg p-3 border border-gray-200">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <p className="text-lg font-bold text-red-600">{highRiskCount}</p>
+                                  <p className="text-xs text-gray-600">High Risk</p>
+                                </div>
+                                <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+                                  <AlertTriangle className="w-4 h-4 text-red-600" />
+                                </div>
+                              </div>
                             </div>
-                            <div className="bg-white/70 rounded-lg p-4 border border-blue-200 text-center">
-                              <p className="text-2xl font-bold text-purple-600">{aiInsights?.team_recommendations?.length || 0}</p>
-                              <p className="text-xs text-gray-600">Recommendations</p>
+                            
+                            <div className="bg-white/80 rounded-lg p-3 border border-gray-200">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <p className="text-lg font-bold text-amber-600">{aiInsights?.common_patterns?.length || 0}</p>
+                                  <p className="text-xs text-gray-600">Risk Patterns</p>
+                                </div>
+                                <div className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center">
+                                  <TrendingUp className="w-4 h-4 text-amber-600" />
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <div className="bg-white/80 rounded-lg p-3 border border-gray-200">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <p className="text-lg font-bold text-purple-600">{aiInsights?.team_recommendations?.length || 0}</p>
+                                  <p className="text-xs text-gray-600">Recommendations</p>
+                                </div>
+                                <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                                  <BookOpen className="w-4 h-4 text-purple-600" />
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* AI Status Footer */}
+                          <div className="bg-gradient-to-r from-blue-100/70 to-indigo-100/70 rounded-lg p-3 border border-blue-200">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-2">
+                                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                                <span className="text-sm font-medium text-blue-900">
+                                  AI Analysis Complete
+                                </span>
+                                <Badge variant="outline" className="border-blue-300 text-blue-700 text-xs">
+                                  {aiInsights?.data_sources?.length || 3} Data Sources
+                                </Badge>
+                              </div>
+                              <span className="text-xs text-blue-700">
+                                Generated {new Date(aiInsights?.analysis_timestamp || currentAnalysis.created_at).toLocaleDateString()}
+                              </span>
                             </div>
                           </div>
                         </div>
                       )
                     })()}
-                    
-                    {/* Summary Footer */}
-                    <div className="bg-blue-100/50 rounded-lg p-4 border border-blue-200">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                          <span className="text-sm font-medium text-blue-900">AI Analysis Active</span>
-                        </div>
-                        <span className="text-xs text-blue-700">
-                          Last updated: {new Date(currentAnalysis.analysis_data.ai_team_insights.insights?.analysis_timestamp || currentAnalysis.created_at).toLocaleDateString()}
-                        </span>
-                      </div>
-                    </div>
                   </CardContent>
                 </Card>
               )}
@@ -2812,69 +2959,11 @@ export default function Dashboard() {
 
       {/* Time Range Selection Dialog */}
       <Dialog open={showTimeRangeDialog} onOpenChange={setShowTimeRangeDialog}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Start New Analysis</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            {/* Permission Error Alert */}
-            {dialogSelectedIntegration && (() => {
-              const selectedIntegration = integrations.find(i => i.id.toString() === dialogSelectedIntegration);
-              const hasUserPermission = selectedIntegration?.permissions?.users?.access;
-              const hasIncidentPermission = selectedIntegration?.permissions?.incidents?.access;
-              
-              if (!hasUserPermission || !hasIncidentPermission) {
-                return (
-                  <Alert className="border-red-200 bg-red-50">
-                    <AlertCircle className="w-4 h-4 text-red-600" />
-                    <AlertDescription className="text-red-800">
-                      <strong>Missing Required Permissions</strong>
-                      <p className="mt-1 text-sm">
-                        This organization's API token is missing required permissions:
-                      </p>
-                      <ul className="mt-2 text-sm space-y-1">
-                        {!hasUserPermission && (
-                          <li className="flex items-start">
-                            <X className="w-3 h-3 mt-0.5 mr-1 flex-shrink-0" />
-                            <span><strong>User read access</strong> - Required to identify team members</span>
-                          </li>
-                        )}
-                        {!hasIncidentPermission && (
-                          <li className="flex items-start">
-                            <X className="w-3 h-3 mt-0.5 mr-1 flex-shrink-0" />
-                            <span><strong>Incident read access</strong> - Required to analyze burnout patterns</span>
-                          </li>
-                        )}
-                      </ul>
-                      <p className="mt-3 text-sm">
-                        Please update the API token permissions in your {selectedIntegration?.platform === 'rootly' ? 'Rootly' : 'PagerDuty'} account settings.
-                      </p>
-                    </AlertDescription>
-                  </Alert>
-                );
-              }
-              return null;
-            })()}
-            
-            {/* Previous Analysis Information */}
-            {currentAnalysis && (
-              <div className="bg-gray-50 p-3 rounded-md">
-                <h4 className="text-sm font-medium text-gray-700 mb-2">Previous Analysis</h4>
-                <div className="space-y-1 text-sm text-gray-600">
-                  <div>
-                    <span className="font-medium">Organization:</span>{" "}
-                    {(() => {
-                      const integration = integrations.find(i => i.id === currentAnalysis.integration_id);
-                      return integration ? integration.organization_name || integration.name : "Unknown";
-                    })()}
-                  </div>
-                  <div>
-                    <span className="font-medium">Time Range:</span>{" "}
-                    {currentAnalysis.time_range || 30} days
-                  </div>
-                </div>
-              </div>
-            )}
             <div>
               <label className="text-sm font-medium text-gray-700 mb-2 block">
                 Select Organization
@@ -2939,6 +3028,37 @@ export default function Dashboard() {
               </Select>
             </div>
 
+            {/* Permission Error Alert - Only for Rootly */}
+            {dialogSelectedIntegration && (() => {
+              const selectedIntegration = integrations.find(i => i.id.toString() === dialogSelectedIntegration);
+              
+              // Only check permissions for Rootly integrations, not PagerDuty
+              if (selectedIntegration?.platform === 'rootly') {
+                const hasUserPermission = selectedIntegration?.permissions?.users?.access;
+                const hasIncidentPermission = selectedIntegration?.permissions?.incidents?.access;
+                
+                if (!hasUserPermission || !hasIncidentPermission) {
+                  return (
+                    <Alert className="border-red-200 bg-red-50 py-2 px-3">
+                      <AlertCircle className="w-4 h-4 text-red-600" />
+                      <AlertDescription className="text-red-800 text-sm">
+                        <strong>Missing Required Permissions</strong>
+                        <span className="block mt-1">
+                          {!hasUserPermission && !hasIncidentPermission 
+                            ? "User and incident read access required" 
+                            : !hasUserPermission 
+                            ? "User read access required" 
+                            : "Incident read access required"}
+                        </span>
+                        <span className="text-xs opacity-75">Update API token permissions in Rootly settings</span>
+                      </AlertDescription>
+                    </Alert>
+                  );
+                }
+              }
+              return null;
+            })()}
+
             {/* Additional Data Sources */}
             {true && (
               <div>
@@ -2948,7 +3068,7 @@ export default function Dashboard() {
                 <div className="grid grid-cols-2 gap-3">
                   {/* GitHub Toggle Card */}
                   {true && (
-                    <div className={`border rounded-lg p-3 transition-all ${includeGithub ? 'border-gray-900 bg-gray-50' : 'border-gray-200 bg-white'}`}>
+                    <div className={`border rounded-lg p-3 transition-all ${includeGithub && githubIntegration ? 'border-gray-900 bg-gray-50' : 'border-gray-200 bg-white'}`}>
                       <div className="flex items-start justify-between mb-2">
                         <div className="flex items-center space-x-2">
                           <div className="w-6 h-6 bg-gray-900 rounded flex items-center justify-center">
@@ -2962,8 +3082,18 @@ export default function Dashboard() {
                         </div>
                         <Switch
                           checked={includeGithub && !!githubIntegration}
-                          onCheckedChange={setIncludeGithub}
-                          disabled={!githubIntegration}
+                          onCheckedChange={(checked) => {
+                            if (!githubIntegration) {
+                              toast({
+                                title: "GitHub Not Connected",
+                                description: "Please connect your GitHub account on the integrations page first.",
+                                variant: "destructive",
+                              })
+                            } else {
+                              setIncludeGithub(checked)
+                            }
+                          }}
+                          disabled={false}
                         />
                       </div>
                       <p className="text-xs text-gray-600 mb-1">Code patterns & activity</p>
@@ -2973,7 +3103,7 @@ export default function Dashboard() {
 
                   {/* Slack Toggle Card */}
                   {true && (
-                    <div className={`border rounded-lg p-3 transition-all ${includeSlack ? 'border-purple-500 bg-purple-50' : 'border-gray-200 bg-white'}`}>
+                    <div className={`border rounded-lg p-3 transition-all ${includeSlack && slackIntegration ? 'border-purple-500 bg-purple-50' : 'border-gray-200 bg-white'}`}>
                       <div className="flex items-start justify-between mb-2">
                         <div className="flex items-center space-x-2">
                           <div className="w-6 h-6 rounded flex items-center justify-center">
@@ -2994,8 +3124,18 @@ export default function Dashboard() {
                         </div>
                         <Switch
                           checked={includeSlack && !!slackIntegration}
-                          onCheckedChange={setIncludeSlack}
-                          disabled={!slackIntegration}
+                          onCheckedChange={(checked) => {
+                            if (!slackIntegration) {
+                              toast({
+                                title: "Slack Not Connected",
+                                description: "Please connect your Slack workspace on the integrations page first.",
+                                variant: "destructive",
+                              })
+                            } else {
+                              setIncludeSlack(checked)
+                            }
+                          }}
+                          disabled={false}
                         />
                       </div>
                       <p className="text-xs text-gray-600 mb-1">Communication patterns</p>
@@ -3089,9 +3229,16 @@ export default function Dashboard() {
                 className="bg-purple-600 hover:bg-purple-700"
                 disabled={!dialogSelectedIntegration || (() => {
                   const selectedIntegration = integrations.find(i => i.id.toString() === dialogSelectedIntegration);
-                  const hasUserPermission = selectedIntegration?.permissions?.users?.access;
-                  const hasIncidentPermission = selectedIntegration?.permissions?.incidents?.access;
-                  return !hasUserPermission || !hasIncidentPermission;
+                  
+                  // Only check permissions for Rootly integrations, not PagerDuty
+                  if (selectedIntegration?.platform === 'rootly') {
+                    const hasUserPermission = selectedIntegration?.permissions?.users?.access;
+                    const hasIncidentPermission = selectedIntegration?.permissions?.incidents?.access;
+                    return !hasUserPermission || !hasIncidentPermission;
+                  }
+                  
+                  // For PagerDuty or other platforms, don't block based on permissions
+                  return false;
                 })()}
               >
                 <Play className="w-4 h-4 mr-2" />
@@ -3227,6 +3374,29 @@ export default function Dashboard() {
                       <p className="text-sm text-gray-600">Avg Response Time</p>
                       <p className="text-xs text-gray-500 mt-1">Time to first response</p>
                     </div>
+                    {/* Status Distribution */}
+                    {(() => {
+                      // Find the corresponding member data to get status distribution
+                      const memberData = members?.find(m => m.user_name === selectedMember.name);
+                      const statusDist = memberData?.metrics?.status_distribution;
+                      
+                      if (statusDist && Object.keys(statusDist).length > 0) {
+                        return (
+                          <div className="bg-white p-3 rounded-lg">
+                            <p className="text-sm text-gray-600 font-medium mb-2">Incident Status Breakdown</p>
+                            <div className="space-y-1">
+                              {Object.entries(statusDist).map(([status, count]) => (
+                                <div key={status} className="flex justify-between text-xs">
+                                  <span className="text-gray-500 capitalize">{status}:</span>
+                                  <span className="font-medium text-blue-600">{count}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
                 </div>
 

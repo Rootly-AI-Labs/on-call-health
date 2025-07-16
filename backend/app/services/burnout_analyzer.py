@@ -8,16 +8,22 @@ from typing import Dict, List, Any, Optional
 from collections import defaultdict
 
 from ..core.rootly_client import RootlyAPIClient
+from ..core.pagerduty_client import PagerDutyAPIClient
 from .ai_burnout_analyzer import get_ai_burnout_analyzer
 
 logger = logging.getLogger(__name__)
 
 
 class BurnoutAnalyzerService:
-    """Service for analyzing burnout based on Rootly incident data."""
+    """Service for analyzing burnout based on incident data from Rootly or PagerDuty."""
     
-    def __init__(self, api_token: str):
-        self.client = RootlyAPIClient(api_token)
+    def __init__(self, api_token: str, platform: str = "rootly"):
+        # Use the appropriate client based on platform
+        if platform == "pagerduty":
+            self.client = PagerDutyAPIClient(api_token)
+        else:
+            self.client = RootlyAPIClient(api_token)
+        self.platform = platform
         
         # Burnout scoring thresholds
         self.thresholds = {
@@ -369,30 +375,39 @@ class BurnoutAnalyzerService:
             # Add safety check for None incident
             if incident is None:
                 continue
-            attrs = incident.get("attributes", {}) if incident else {}
+            
             incident_users = set()
             
-            # Extract all users involved in the incident with comprehensive null safety
-            # Creator/Reporter
-            user_data = attrs.get("user")
-            if user_data and isinstance(user_data, dict):
-                data = user_data.get("data")
-                if data and isinstance(data, dict) and data.get("id"):
-                    incident_users.add(str(data["id"]))
-            
-            # Started by (acknowledged)
-            started_by_data = attrs.get("started_by")
-            if started_by_data and isinstance(started_by_data, dict):
-                data = started_by_data.get("data")
-                if data and isinstance(data, dict) and data.get("id"):
-                    incident_users.add(str(data["id"]))
-            
-            # Resolved by
-            resolved_by_data = attrs.get("resolved_by")
-            if resolved_by_data and isinstance(resolved_by_data, dict):
-                data = resolved_by_data.get("data")
-                if data and isinstance(data, dict) and data.get("id"):
-                    incident_users.add(str(data["id"]))
+            if self.platform == "pagerduty":
+                # PagerDuty normalized format
+                assigned_to = incident.get("assigned_to")
+                if assigned_to and assigned_to.get("id"):
+                    incident_users.add(str(assigned_to["id"]))
+            else:
+                # Rootly format
+                attrs = incident.get("attributes", {}) if incident else {}
+                
+                # Extract all users involved in the incident with comprehensive null safety
+                # Creator/Reporter
+                user_data = attrs.get("user")
+                if user_data and isinstance(user_data, dict):
+                    data = user_data.get("data")
+                    if data and isinstance(data, dict) and data.get("id"):
+                        incident_users.add(str(data["id"]))
+                
+                # Started by (acknowledged)
+                started_by_data = attrs.get("started_by")
+                if started_by_data and isinstance(started_by_data, dict):
+                    data = started_by_data.get("data")
+                    if data and isinstance(data, dict) and data.get("id"):
+                        incident_users.add(str(data["id"]))
+                
+                # Resolved by
+                resolved_by_data = attrs.get("resolved_by")
+                if resolved_by_data and isinstance(resolved_by_data, dict):
+                    data = resolved_by_data.get("data")
+                    if data and isinstance(data, dict) and data.get("id"):
+                        incident_users.add(str(data["id"]))
             
             # Add incident to each involved user
             for user_id in incident_users:
@@ -410,10 +425,18 @@ class BurnoutAnalyzerService:
         slack_data: Dict[str, Any] = None
     ) -> Dict[str, Any]:
         """Analyze burnout for a single team member."""
-        user_attrs = user.get("attributes", {})
-        user_id = user.get("id")
-        user_name = user_attrs.get("full_name") or user_attrs.get("name", "Unknown")
-        user_email = user_attrs.get("email")
+        # Extract user info based on platform
+        if self.platform == "pagerduty":
+            # PagerDuty API structure
+            user_id = user.get("id")
+            user_name = user.get("name") or user.get("summary", "Unknown")
+            user_email = user.get("email")
+        else:
+            # Rootly API structure
+            user_attrs = user.get("attributes", {})
+            user_id = user.get("id")
+            user_name = user_attrs.get("full_name") or user_attrs.get("name", "Unknown")
+            user_email = user_attrs.get("email")
         
         # If no incidents, return minimal analysis
         if not incidents:
@@ -538,12 +561,41 @@ class BurnoutAnalyzerService:
         weekend_count = 0
         response_times = []
         severity_counts = defaultdict(int)
+        status_counts = defaultdict(int)
         
         for incident in incidents:
-            attrs = incident.get("attributes", {})
+            # Handle both Rootly (with attributes) and PagerDuty (normalized) formats
+            if self.platform == "pagerduty":
+                # PagerDuty normalized format
+                created_at = incident.get("created_at")
+                acknowledged_at = incident.get("acknowledged_at")
+                severity = incident.get("severity_level", "unknown")
+                status = incident.get("status", "unknown")
+            else:
+                # Rootly format
+                attrs = incident.get("attributes", {})
+                created_at = attrs.get("created_at")
+                acknowledged_at = attrs.get("started_at")
+                
+                # Severity with null safety
+                severity = "unknown"
+                severity_data = attrs.get("severity")
+                if severity_data and isinstance(severity_data, dict):
+                    data = severity_data.get("data")
+                    if data and isinstance(data, dict):
+                        attributes = data.get("attributes")
+                        if attributes and isinstance(attributes, dict):
+                            name = attributes.get("name")
+                            if name and isinstance(name, str):
+                                severity = name.lower()
+                
+                # Status with null safety
+                status = attrs.get("status", "unknown")
+            
+            # Count status
+            status_counts[status] += 1
             
             # Check timing
-            created_at = attrs.get("created_at")
             if created_at:
                 dt = self._parse_timestamp(created_at)
                 if dt:
@@ -556,23 +608,12 @@ class BurnoutAnalyzerService:
                         weekend_count += 1
             
             # Response time (time to acknowledge)
-            started_at = attrs.get("started_at")
-            if created_at and started_at:
-                response_time = self._calculate_response_time(created_at, started_at)
+            if created_at and acknowledged_at:
+                response_time = self._calculate_response_time(created_at, acknowledged_at)
                 if response_time is not None:
                     response_times.append(response_time)
             
-            # Severity with null safety
-            severity = "unknown"
-            severity_data = attrs.get("severity")
-            if severity_data and isinstance(severity_data, dict):
-                data = severity_data.get("data")
-                if data and isinstance(data, dict):
-                    attributes = data.get("attributes")
-                    if attributes and isinstance(attributes, dict):
-                        name = attributes.get("name")
-                        if name and isinstance(name, str):
-                            severity = name.lower()
+            # Count severity
             severity_counts[severity] += 1
         
         # Calculate averages and percentages
@@ -586,7 +627,8 @@ class BurnoutAnalyzerService:
             "after_hours_percentage": round(after_hours_percentage, 3),
             "weekend_percentage": round(weekend_percentage, 3),
             "avg_response_time_minutes": round(avg_response_time, 1),
-            "severity_distribution": dict(severity_counts)
+            "severity_distribution": dict(severity_counts),
+            "status_distribution": dict(status_counts)
         }
     
     def _calculate_maslach_dimensions(self, metrics: Dict[str, Any]) -> Dict[str, float]:
