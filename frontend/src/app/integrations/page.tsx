@@ -32,6 +32,13 @@ import {
 } from "@/components/ui/form"
 import { Tooltip } from "@/components/ui/tooltip"
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
   Activity,
   ArrowLeft,
   Building,
@@ -62,7 +69,7 @@ import {
 import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
-import { useToast } from "@/hooks/use-toast-mock"
+import { toast } from "sonner"
 import { useBackendHealth } from "@/hooks/use-backend-health"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -163,6 +170,7 @@ export default function IntegrationsPage() {
   const [loadingIntegrations, setLoadingIntegrations] = useState(true)
   const [activeTab, setActiveTab] = useState<"rootly" | "pagerduty" | null>(null)
   const [backUrl, setBackUrl] = useState<string>('/dashboard')
+  const [selectedOrganization, setSelectedOrganization] = useState<string>("")
   
   // GitHub/Slack integration state
   const [githubIntegration, setGithubIntegration] = useState<GitHubIntegration | null>(null)
@@ -219,7 +227,6 @@ export default function IntegrationsPage() {
   const [showPagerDutyInstructions, setShowPagerDutyInstructions] = useState(false)
   
   const router = useRouter()
-  const { toast } = useToast()
   
   // Backend health monitoring - temporarily disabled
   // const { isHealthy } = useBackendHealth({
@@ -247,6 +254,12 @@ export default function IntegrationsPage() {
   useEffect(() => {
     loadAllIntegrations()
     loadLlmConfig()
+    
+    // Load saved organization preference
+    const savedOrg = localStorage.getItem('selected_organization')
+    if (savedOrg) {
+      setSelectedOrganization(savedOrg)
+    }
     
     // Determine back navigation based on referrer
     const referrer = document.referrer
@@ -708,40 +721,6 @@ export default function IntegrationsPage() {
     }
   }
 
-  const setAsDefault = async (integration: Integration) => {
-    try {
-      const authToken = localStorage.getItem('auth_token')
-      if (!authToken) return
-
-      const endpoint = integration.platform === 'rootly'
-        ? `${API_BASE}/rootly/integrations/${integration.id}`
-        : `${API_BASE}/pagerduty/integrations/${integration.id}`
-
-      const response = await fetch(endpoint, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ is_default: true })
-      })
-
-      if (response.ok) {
-        toast({
-          title: "Default integration updated",
-          description: `${integration.name} is now the default integration.`,
-        })
-        loadAllIntegrations()
-      }
-    } catch (error) {
-      console.error('Error setting default:', error)
-      toast({
-        title: "Failed to update",
-        description: "Could not set as default integration.",
-        variant: "destructive"
-      })
-    }
-  }
 
   const copyToClipboard = async (text: string) => {
     try {
@@ -1155,13 +1134,16 @@ export default function IntegrationsPage() {
                 {activeTab !== 'rootly' && rootlyCount > 0 && (
                   <Badge variant="secondary" className="absolute top-4 right-4">{rootlyCount}</Badge>
                 )}
-                <Image
-                  src="/images/rootly-logo-final.svg"
-                  alt="Rootly"
-                  width={220}
-                  height={50}
-                  className="h-12 w-auto object-contain"
-                />
+                <div className="flex items-center justify-center gap-3">
+                  <Image
+                    src="/images/rootly-logo-new.png"
+                    alt="Rootly"
+                    width={80}
+                    height={80}
+                    className="h-20 w-20 object-contain"
+                  />
+                  <span className="text-5xl font-bold" style={{ color: '#F5A623' }}>rootly</span>
+                </div>
               </Card>
 
               {/* PagerDuty Card */}
@@ -1200,6 +1182,128 @@ export default function IntegrationsPage() {
           )}
         </div>
 
+        {/* Organization Selector */}
+        {integrations.length > 0 && (
+          <Card className="mt-8 mb-8 max-w-2xl mx-auto border-2 border-purple-200 bg-purple-50">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-xl flex items-center">
+                <Settings className="w-5 h-5 mr-2 text-purple-600" />
+                Dashboard Organization
+              </CardTitle>
+              <CardDescription className="text-base">
+                Select which organization to analyze on the dashboard.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pb-6">
+              <Select 
+                value={selectedOrganization} 
+                onValueChange={(value) => {
+                  console.log('Organization change:', { oldValue: selectedOrganization, newValue: value })
+                  
+                  // Only show toast if selecting a different organization
+                  if (value !== selectedOrganization) {
+                    const selected = integrations.find(i => i.id.toString() === value)
+                    console.log('Selected org:', selected)
+                    if (selected) {
+                      toast.success(`${selected.name} has been set as your default organization.`)
+                    }
+                  }
+                  
+                  setSelectedOrganization(value)
+                  // Save to localStorage for persistence
+                  localStorage.setItem('selected_organization', value)
+                }}
+              >
+                <SelectTrigger className="w-full h-12 text-base bg-white">
+                  <SelectValue placeholder="Choose an organization to analyze">
+                    {selectedOrganization && (() => {
+                      const selected = integrations.find(i => i.id.toString() === selectedOrganization)
+                      if (selected) {
+                        return (
+                          <div className="flex items-center justify-between w-full">
+                            <div className="flex items-center">
+                              <div className={`w-2 h-2 rounded-full mr-2 ${
+                                selected.platform === 'rootly' ? 'bg-purple-500' : 'bg-green-500'
+                              }`}></div>
+                              {selected.name}
+                            </div>
+                            <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 ml-2" />
+                          </div>
+                        )
+                      }
+                      return null
+                    })()}
+                  </SelectValue>
+                </SelectTrigger>
+              <SelectContent>
+                {/* Group integrations by platform */}
+                {(() => {
+                  const rootlyIntegrations = integrations.filter(i => i.platform === 'rootly')
+                  const pagerdutyIntegrations = integrations.filter(i => i.platform === 'pagerduty')
+                  
+                  return (
+                    <>
+                      {/* Rootly Organizations */}
+                      {rootlyIntegrations.length > 0 && (
+                        <>
+                          <div className="px-2 py-1.5 text-xs font-medium text-gray-500 bg-gray-50 border-b">
+                            <div className="flex items-center">
+                              <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
+                              Rootly Organizations
+                            </div>
+                          </div>
+                          {rootlyIntegrations.map((integration) => (
+                            <SelectItem key={integration.id} value={integration.id.toString()}>
+                              <div className="flex items-center justify-between w-full">
+                                <div className="flex items-center">
+                                  <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
+                                  {integration.name}
+                                </div>
+                                {selectedOrganization === integration.id.toString() && (
+                                  <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 ml-2" />
+                                )}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </>
+                      )}
+                      
+                      {/* PagerDuty Organizations */}
+                      {pagerdutyIntegrations.length > 0 && (
+                        <>
+                          {rootlyIntegrations.length > 0 && (
+                            <div className="my-1 border-t border-gray-200"></div>
+                          )}
+                          <div className="px-2 py-1.5 text-xs font-medium text-gray-500 bg-gray-50 border-b">
+                            <div className="flex items-center">
+                              <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                              PagerDuty Organizations
+                            </div>
+                          </div>
+                          {pagerdutyIntegrations.map((integration) => (
+                            <SelectItem key={integration.id} value={integration.id.toString()}>
+                              <div className="flex items-center justify-between w-full">
+                                <div className="flex items-center">
+                                  <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                                  {integration.name}
+                                </div>
+                                {selectedOrganization === integration.id.toString() && (
+                                  <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 ml-2" />
+                                )}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </>
+                      )}
+                    </>
+                  )
+                })()}
+              </SelectContent>
+              </Select>
+            </CardContent>
+          </Card>
+        )}
+
         <div className="space-y-6">
 
             {/* Add Rootly Integration Form */}
@@ -1208,7 +1312,7 @@ export default function IntegrationsPage() {
                 <CardHeader className="p-8">
                   <div className="flex items-center space-x-3">
                     <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                      <Image src="/images/rootly-logo.svg" alt="Rootly" width={24} height={24} />
+                      <Image src="/images/rootly-logo-new.png" alt="Rootly" width={24} height={24} />
                     </div>
                     <div>
                       <CardTitle>Add Rootly Integration</CardTitle>
@@ -1435,10 +1539,12 @@ export default function IntegrationsPage() {
                         <Alert className="border-green-200 bg-green-50">
                           <AlertDescription>
                             <ol className="space-y-2 text-sm">
-                              <li>1. Go to your PagerDuty account and click on your profile icon</li>
-                              <li>2. Navigate to <code className="bg-green-100 px-1 rounded">My Profile → User Settings</code></li>
-                              <li>3. Click on the "User Settings" tab</li>
-                              <li>4. Create a new REST API User Token</li>
+                              <li>1. In your PagerDuty account, click on your profile icon in the top-right</li>
+                              <li>2. Select <code className="bg-green-100 px-1 rounded">User Settings</code></li>
+                              <li>3. Scroll down to the <strong>API Access</strong> section</li>
+                              <li>4. Click <code className="bg-green-100 px-1 rounded">Create API User Token</code></li>
+                              <li>5. Give it a description (e.g., "Burnout Detector") and click Create</li>
+                              <li>6. Copy the generated token (starts with letters/numbers like "u+...")</li>
                             </ol>
                           </AlertDescription>
                         </Alert>
@@ -1708,12 +1814,6 @@ export default function IntegrationsPage() {
                               {integration.platform}
                             </Badge>
                             
-                            {integration.is_default && (
-                              <Badge className="bg-yellow-100 text-yellow-700">
-                                <Star className="w-3 h-3 mr-1" />
-                                Default
-                              </Badge>
-                            )}
                           </div>
                           
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
@@ -2277,10 +2377,7 @@ export default function IntegrationsPage() {
                         <CardDescription>Username: {githubIntegration.github_username}</CardDescription>
                       </div>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <Button variant="outline" size="sm" onClick={handleGitHubTest}>
-                        Test
-                      </Button>
+                    <div className="flex items-center">
                       <Button variant="destructive" size="sm" onClick={() => setGithubDisconnectDialogOpen(true)}>
                         Disconnect
                       </Button>

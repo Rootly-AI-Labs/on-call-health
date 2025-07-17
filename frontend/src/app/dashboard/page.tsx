@@ -50,6 +50,7 @@ import {
   BookOpen,
   CheckCircle,
   Users,
+  Star,
 } from "lucide-react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
@@ -470,6 +471,10 @@ export default function Dashboard() {
   }
 
   useEffect(() => {
+    // Check for organization parameter from URL
+    const urlParams = new URLSearchParams(window.location.search)
+    const orgId = urlParams.get('org')
+    
     // Add event listener for page focus to refresh integrations
     const handlePageFocus = () => {
       console.log('Page focused, checking if integrations need refresh')
@@ -498,12 +503,21 @@ export default function Dashboard() {
           const parsed = JSON.parse(cachedIntegrations)
           setIntegrations(parsed)
           
-          // Set default integration
-          const defaultIntegration = parsed.find((i: Integration) => i.is_default)
-          if (defaultIntegration) {
-            setSelectedIntegration(defaultIntegration.id.toString())
-          } else if (parsed.length > 0) {
-            setSelectedIntegration(parsed[0].id.toString())
+          // Set integration based on URL parameter, saved preference, or first available
+          if (orgId) {
+            setSelectedIntegration(orgId)
+            // Save this selection for future use
+            localStorage.setItem('selected_organization', orgId)
+          } else {
+            // Check for saved organization preference
+            const savedOrg = localStorage.getItem('selected_organization')
+            if (savedOrg && parsed.find((i: Integration) => i.id.toString() === savedOrg)) {
+              setSelectedIntegration(savedOrg)
+            } else if (parsed.length > 0) {
+              // Fall back to first available organization
+              setSelectedIntegration(parsed[0].id.toString())
+              localStorage.setItem('selected_organization', parsed[0].id.toString())
+            }
           }
         } catch (e) {
           console.error('Failed to parse cached integrations:', e)
@@ -681,12 +695,13 @@ export default function Dashboard() {
             const cached = JSON.parse(cachedIntegrations)
             setIntegrations(cached)
             
-            // Set default integration
-            const defaultIntegration = cached.find((i: Integration) => i.is_default)
-            if (defaultIntegration) {
-              setSelectedIntegration(defaultIntegration.id.toString())
+            // Set integration based on saved preference
+            const savedOrg = localStorage.getItem('selected_organization')
+            if (savedOrg && cached.find((i: Integration) => i.id.toString() === savedOrg)) {
+              setSelectedIntegration(savedOrg)
             } else if (cached.length > 0) {
               setSelectedIntegration(cached[0].id.toString())
+              localStorage.setItem('selected_organization', cached[0].id.toString())
             }
             return
           } catch (error) {
@@ -792,12 +807,15 @@ export default function Dashboard() {
       localStorage.setItem('all_integrations', JSON.stringify(allIntegrations))
       localStorage.setItem('all_integrations_timestamp', Date.now().toString())
         
-      // Set default integration
-      const defaultIntegration = allIntegrations.find((i: Integration) => i.is_default)
-      if (defaultIntegration) {
-        setSelectedIntegration(defaultIntegration.id.toString())
-      } else if (allIntegrations.length > 0) {
-        setSelectedIntegration(allIntegrations[0].id.toString())
+      // Set integration based on saved preference if not already set
+      if (!selectedIntegration) {
+        const savedOrg = localStorage.getItem('selected_organization')
+        if (savedOrg && allIntegrations.find((i: Integration) => i.id.toString() === savedOrg)) {
+          setSelectedIntegration(savedOrg)
+        } else if (allIntegrations.length > 0) {
+          setSelectedIntegration(allIntegrations[0].id.toString())
+          localStorage.setItem('selected_organization', allIntegrations[0].id.toString())
+        }
       }
     } catch (error) {
       console.error('Failed to load integrations:', error)
@@ -977,8 +995,14 @@ export default function Dashboard() {
     // If no integration selected but we have integrations available, auto-select the first one
     let integrationToUse = selectedIntegration
     if (!integrationToUse && integrations.length > 0) {
-      const defaultIntegration = integrations.find(i => i.is_default)
-      integrationToUse = defaultIntegration ? defaultIntegration.id.toString() : integrations[0].id.toString()
+      // Use saved preference or first available
+      const savedOrg = localStorage.getItem('selected_organization')
+      if (savedOrg && integrations.find(i => i.id.toString() === savedOrg)) {
+        integrationToUse = savedOrg
+      } else {
+        integrationToUse = integrations[0].id.toString()
+        localStorage.setItem('selected_organization', integrationToUse)
+      }
       setSelectedIntegration(integrationToUse)
     }
 
@@ -1444,102 +1468,7 @@ export default function Dashboard() {
           </Button>
         </div>
 
-        {/* Organization Selector - Always maintain space with proper buffer to avoid collapse button collision */}
-        <div className={`${!sidebarCollapsed ? 'pt-8 px-4 pb-4 border-b border-gray-700' : 'h-0'}`}>
-          {!sidebarCollapsed && (
-            <Select 
-              value={selectedIntegration} 
-              onValueChange={setSelectedIntegration}
-              onOpenChange={(open) => {
-                if (open) {
-                  // Always force refresh when dropdown is opened
-                  console.log('Dropdown opened, forcing integration refresh')
-                  loadIntegrations(true, false)
-                }
-              }}
-            >
-              <SelectTrigger className="bg-gray-800 border-gray-600 text-white">
-                <SelectValue placeholder={dropdownLoading ? "Loading organizations..." : "Select organization"} />
-              </SelectTrigger>
-              <SelectContent>
-                {dropdownLoading ? (
-                  <SelectItem value="loading" disabled>
-                    <div className="flex items-center">
-                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                      Loading organizations...
-                    </div>
-                  </SelectItem>
-                ) : integrations.length > 0 ? (
-                  <>
-                    {/* Group integrations by platform */}
-                    {(() => {
-                      const rootlyIntegrations = integrations.filter(i => i.platform === 'rootly')
-                      const pagerdutyIntegrations = integrations.filter(i => i.platform === 'pagerduty')
-                      
-                      console.log('Sidebar dropdown integrations:', {
-                        total: integrations.length,
-                        rootly: rootlyIntegrations.length,
-                        pagerduty: pagerdutyIntegrations.length,
-                        allIntegrations: integrations.map(i => ({ id: i.id, name: i.name, platform: i.platform }))
-                      })
-                      
-                      return (
-                        <>
-                          {/* Rootly Organizations */}
-                          {rootlyIntegrations.length > 0 && (
-                            <>
-                              <div className="px-2 py-1.5 text-xs font-medium text-gray-500 bg-gray-50 border-b">
-                                <div className="flex items-center">
-                                  <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
-                                  Rootly Organizations
-                                </div>
-                              </div>
-                              {rootlyIntegrations.map((integration) => (
-                                <SelectItem key={integration.id} value={integration.id.toString()}>
-                                  <div className="flex items-center">
-                                    <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
-                                    {integration.name}
-                                  </div>
-                                </SelectItem>
-                              ))}
-                            </>
-                          )}
-                          
-                          {/* PagerDuty Organizations */}
-                          {pagerdutyIntegrations.length > 0 && (
-                            <>
-                              {rootlyIntegrations.length > 0 && (
-                                <div className="my-1 border-t border-gray-200"></div>
-                              )}
-                              <div className="px-2 py-1.5 text-xs font-medium text-gray-500 bg-gray-50 border-b">
-                                <div className="flex items-center">
-                                  <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                                  PagerDuty Organizations
-                                </div>
-                              </div>
-                              {pagerdutyIntegrations.map((integration) => (
-                                <SelectItem key={integration.id} value={integration.id.toString()}>
-                                  <div className="flex items-center">
-                                    <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                                    {integration.name}
-                                  </div>
-                                </SelectItem>
-                              ))}
-                            </>
-                          )}
-                        </>
-                      )
-                    })()}
-                  </>
-                ) : (
-                  <SelectItem value="no-organizations" disabled>
-                    No organizations available
-                  </SelectItem>
-                )}
-              </SelectContent>
-            </Select>
-          )}
-        </div>
+        {/* Removed organization selector - moved to integrations page */}
 
         {/* Navigation */}
         {!sidebarCollapsed && (
@@ -2966,66 +2895,25 @@ export default function Dashboard() {
           <div className="space-y-4">
             <div>
               <label className="text-sm font-medium text-gray-700 mb-2 block">
-                Select Organization
+                Organization
               </label>
-              <Select value={dialogSelectedIntegration} onValueChange={setDialogSelectedIntegration}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select organization" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(() => {
-                    const rootlyIntegrations = integrations.filter(i => i.platform === 'rootly')
-                    const pagerdutyIntegrations = integrations.filter(i => i.platform === 'pagerduty')
-                    
+              <div className="p-3 bg-gray-50 rounded-md border border-gray-200">
+                {(() => {
+                  const selected = integrations.find(i => i.id.toString() === dialogSelectedIntegration)
+                  if (selected) {
                     return (
-                      <>
-                        {/* Rootly Organizations */}
-                        {rootlyIntegrations.length > 0 && (
-                          <>
-                            <div className="px-2 py-1.5 text-xs font-medium text-gray-500 bg-gray-50 border-b">
-                              <div className="flex items-center">
-                                <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
-                                Rootly Organizations
-                              </div>
-                            </div>
-                            {rootlyIntegrations.map((integration) => (
-                              <SelectItem key={integration.id} value={integration.id.toString()}>
-                                <div className="flex items-center">
-                                  <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
-                                  {integration.name}
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </>
-                        )}
-                        
-                        {/* PagerDuty Organizations */}
-                        {pagerdutyIntegrations.length > 0 && (
-                          <>
-                            {rootlyIntegrations.length > 0 && (
-                              <div className="my-1 border-t border-gray-200"></div>
-                            )}
-                            <div className="px-2 py-1.5 text-xs font-medium text-gray-500 bg-gray-50 border-b">
-                              <div className="flex items-center">
-                                <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                                PagerDuty Organizations
-                              </div>
-                            </div>
-                            {pagerdutyIntegrations.map((integration) => (
-                              <SelectItem key={integration.id} value={integration.id.toString()}>
-                                <div className="flex items-center">
-                                  <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                                  {integration.name}
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </>
-                        )}
-                      </>
+                      <div className="flex items-center">
+                        <div className={`w-2 h-2 rounded-full mr-2 ${
+                          selected.platform === 'rootly' ? 'bg-purple-500' : 'bg-green-500'
+                        }`}></div>
+                        <span className="font-medium">{selected.name}</span>
+                        <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 ml-auto" />
+                      </div>
                     )
-                  })()}
-                </SelectContent>
-              </Select>
+                  }
+                  return <span className="text-gray-500">No organization selected</span>
+                })()}
+              </div>
             </div>
 
             {/* Permission Error Alert - Only for Rootly */}
@@ -3216,6 +3104,7 @@ export default function Dashboard() {
                 <SelectContent>
                   <SelectItem value="7">Last 7 days</SelectItem>
                   <SelectItem value="30">Last 30 days</SelectItem>
+                  <SelectItem value="60">Last 60 days</SelectItem>
                   <SelectItem value="90">Last 90 days</SelectItem>
                 </SelectContent>
               </Select>
