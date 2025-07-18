@@ -65,6 +65,8 @@ import {
   Check,
   HelpCircle,
   ExternalLink,
+  TestTube,
+  RotateCcw,
 } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
@@ -338,11 +340,7 @@ export default function IntegrationsPage() {
       }
     } catch (error) {
       console.error('Failed to load integrations:', error)
-      toast({
-        title: "Failed to load integrations",
-        description: "Please try refreshing the page",
-        variant: "destructive"
-      })
+      toast.error("Failed to load integrations. Please try refreshing the page.")
     } finally {
       setLoadingIntegrations(false)
     }
@@ -380,11 +378,7 @@ export default function IntegrationsPage() {
   const handleConnectAI = async () => {
     if (!llmToken.trim()) {
       setTokenError("Please enter your LLM API token")
-      toast({
-        title: "Token Required",
-        description: "Please enter your LLM API token",
-        variant: "destructive"
-      })
+      toast.error("Please enter your LLM API token")
       return
     }
 
@@ -417,10 +411,7 @@ export default function IntegrationsPage() {
         })
         setLlmToken('')
         setTokenError(null) // Clear any errors on success
-        toast({
-          title: "AI Connected",
-          description: `Successfully connected ${result.provider} ${llmModel}`,
-        })
+        toast.success(`Successfully connected ${result.provider} ${llmModel}`)
       } else {
         const error = await response.json()
         const errorDetail = error.detail || 'Failed to connect AI'
@@ -459,11 +450,7 @@ export default function IntegrationsPage() {
       // Set the error on the input field as well
       setTokenError(errorMessage)
       
-      toast({
-        title: toastTitle,
-        description: errorMessage,
-        variant: "destructive"
-      })
+      toast.error(errorMessage)
     } finally {
       setIsConnectingAI(false)
     }
@@ -485,20 +472,13 @@ export default function IntegrationsPage() {
 
       if (response.ok) {
         setLlmConfig({has_token: false})
-        toast({
-          title: "AI Disconnected",
-          description: "LLM token removed successfully",
-        })
+        toast.success("LLM token removed successfully")
       } else {
         throw new Error('Failed to disconnect AI')
       }
     } catch (error) {
       console.error('Failed to disconnect AI:', error)
-      toast({
-        title: "Disconnect Failed",
-        description: "Failed to disconnect AI service",
-        variant: "destructive"
-      })
+      toast.error("Failed to disconnect AI service")
     }
   }
 
@@ -607,10 +587,7 @@ export default function IntegrationsPage() {
       const responseData = await response.json()
 
       if (response.ok) {
-        toast({
-          title: "Integration added!",
-          description: `Your ${platform === 'rootly' ? 'Rootly' : 'PagerDuty'} account has been connected successfully.`,
-        })
+        toast.success(`Your ${platform === 'rootly' ? 'Rootly' : 'PagerDuty'} account has been connected successfully.`)
         
         // Clear local storage cache
         localStorage.removeItem(`${platform}_integrations`)
@@ -629,11 +606,7 @@ export default function IntegrationsPage() {
       }
     } catch (error) {
       console.error('Add integration error:', error)
-      toast({
-        title: "Failed to add integration",
-        description: error instanceof Error ? error.message : "An unexpected error occurred.",
-        variant: "destructive",
-      })
+      toast.error(error instanceof Error ? error.message : "An unexpected error occurred.")
     } finally {
       setIsAdding(false)
     }
@@ -659,10 +632,7 @@ export default function IntegrationsPage() {
       })
 
       if (response.ok) {
-        toast({
-          title: "Integration deleted",
-          description: "The integration has been removed.",
-        })
+        toast.success("The integration has been removed.")
         
         // Clear local storage
         localStorage.removeItem(`${integrationToDelete.platform}_integrations`)
@@ -676,11 +646,7 @@ export default function IntegrationsPage() {
       }
     } catch (error) {
       console.error('Delete error:', error)
-      toast({
-        title: "Failed to delete",
-        description: "An error occurred while deleting the integration.",
-        variant: "destructive",
-      })
+      toast.error("An error occurred while deleting the integration.")
     } finally {
       setIsDeleting(false)
     }
@@ -705,19 +671,12 @@ export default function IntegrationsPage() {
       })
 
       if (response.ok) {
-        toast({
-          title: "Name updated",
-          description: "Integration name has been updated.",
-        })
+        toast.success("Integration name has been updated.")
         loadAllIntegrations()
       }
     } catch (error) {
       console.error('Error updating name:', error)
-      toast({
-        title: "Failed to update",
-        description: "Could not update integration name.",
-        variant: "destructive"
-      })
+      toast.error("Could not update integration name.")
     }
   }
 
@@ -755,21 +714,14 @@ export default function IntegrationsPage() {
         throw new Error(errorData.detail || 'Failed to connect GitHub')
       }
 
-      toast({
-        title: "GitHub connected!",
-        description: "Your GitHub account has been connected successfully.",
-      })
+      toast.success("Your GitHub account has been connected successfully.")
       
       setGithubToken('')
       setActiveEnhancementTab(null)
       loadAllIntegrations()
     } catch (error) {
       console.error('Error connecting GitHub:', error)
-      toast({
-        title: "Failed to connect GitHub",
-        description: error instanceof Error ? error.message : "An unexpected error occurred.",
-        variant: "destructive",
-      })
+      toast.error(error instanceof Error ? error.message : "An unexpected error occurred.")
     } finally {
       setIsConnectingGithub(false)
     }
@@ -789,20 +741,13 @@ export default function IntegrationsPage() {
       })
 
       if (response.ok) {
-        toast({
-          title: "GitHub disconnected",
-          description: "Your GitHub integration has been removed.",
-        })
+        toast.success("Your GitHub integration has been removed.")
         setGithubDisconnectDialogOpen(false)
         loadAllIntegrations()
       }
     } catch (error) {
       console.error('Error disconnecting GitHub:', error)
-      toast({
-        title: "Failed to disconnect GitHub",
-        description: error instanceof Error ? error.message : "An unexpected error occurred.",
-        variant: "destructive",
-      })
+      toast.error(error instanceof Error ? error.message : "An unexpected error occurred.")
     } finally {
       setIsDisconnectingGithub(false)
     }
@@ -812,18 +757,11 @@ export default function IntegrationsPage() {
     try {
       const authToken = localStorage.getItem('auth_token')
       if (!authToken) {
-        toast({
-          title: "Authentication required",
-          description: "Please log in to test your GitHub integration.",
-          variant: "destructive",
-        })
+        toast.error("Please log in to test your GitHub integration.")
         return
       }
 
-      toast({
-        title: "Testing GitHub connection...",
-        description: "Checking your GitHub integration status.",
-      })
+      toast.info("Testing GitHub connection...")
 
       const response = await fetch(`${API_BASE}/integrations/github/test`, {
         method: 'POST',
@@ -834,21 +772,14 @@ export default function IntegrationsPage() {
 
       if (response.ok) {
         const data = await response.json()
-        toast({
-          title: "✅ GitHub test successful!",
-          description: `Connected as ${data.user_info?.username || 'GitHub user'}. Integration is working properly.`,
-        })
+        toast.success(`✅ GitHub test successful! Connected as ${data.user_info?.username || 'GitHub user'}. Integration is working properly.`)
       } else {
         const errorData = await response.json().catch(() => ({}))
         throw new Error(errorData.detail || 'Connection test failed')
       }
     } catch (error) {
       console.error('Error testing GitHub connection:', error)
-      toast({
-        title: "❌ GitHub test failed",
-        description: error instanceof Error ? error.message : "Unable to test GitHub connection.",
-        variant: "destructive",
-      })
+      toast.error(`❌ GitHub test failed: ${error instanceof Error ? error.message : "Unable to test GitHub connection."}`)
     }
   }
 
@@ -878,10 +809,7 @@ export default function IntegrationsPage() {
         throw new Error(errorData.detail || 'Failed to connect Slack')
       }
 
-      toast({
-        title: "Slack connected!",
-        description: "Your Slack workspace has been connected successfully.",
-      })
+      toast.success("Your Slack workspace has been connected successfully.")
       
       setSlackWebhookUrl('')
       setSlackBotToken('')
@@ -889,11 +817,7 @@ export default function IntegrationsPage() {
       loadAllIntegrations()
     } catch (error) {
       console.error('Error connecting Slack:', error)
-      toast({
-        title: "Failed to connect Slack",
-        description: error instanceof Error ? error.message : "An unexpected error occurred.",
-        variant: "destructive",
-      })
+      toast.error(error instanceof Error ? error.message : "An unexpected error occurred.")
     } finally {
       setIsConnectingSlack(false)
     }
@@ -913,20 +837,13 @@ export default function IntegrationsPage() {
       })
 
       if (response.ok) {
-        toast({
-          title: "Slack disconnected",
-          description: "Your Slack integration has been removed.",
-        })
+        toast.success("Your Slack integration has been removed.")
         setSlackDisconnectDialogOpen(false)
         loadAllIntegrations()
       }
     } catch (error) {
       console.error('Error disconnecting Slack:', error)
-      toast({
-        title: "Failed to disconnect Slack",
-        description: error instanceof Error ? error.message : "An unexpected error occurred.",
-        variant: "destructive",
-      })
+      toast.error(error instanceof Error ? error.message : "An unexpected error occurred.")
     } finally {
       setIsDisconnectingSlack(false)
     }
@@ -936,18 +853,11 @@ export default function IntegrationsPage() {
     try {
       const authToken = localStorage.getItem('auth_token')
       if (!authToken) {
-        toast({
-          title: "Authentication required",
-          description: "Please log in to test your Slack integration.",
-          variant: "destructive",
-        })
+        toast.error("Please log in to test your Slack integration.")
         return
       }
 
-      toast({
-        title: "Testing Slack connection...",
-        description: "Checking your Slack integration and permissions.",
-      })
+      toast.info("Testing Slack connection...")
 
       const response = await fetch(`${API_BASE}/integrations/slack/test`, {
         method: 'POST',
@@ -958,26 +868,25 @@ export default function IntegrationsPage() {
 
       if (response.ok) {
         const data = await response.json()
+        console.log('Full Slack test response:', data)
         setSlackPermissions(data.permissions)
+        
+        // Store channels list if available
+        if (data.channels) {
+          setSlackIntegration(prev => prev ? {...prev, channels: data.channels} : null)
+        }
         
         const workspaceName = data.workspace_info?.team_name || 'your workspace'
         const userName = data.user_info?.name || 'Slack user'
         
-        toast({
-          title: "✅ Slack test successful!",
-          description: `Connected as ${userName} in ${workspaceName}. Permissions updated.`,
-        })
+        toast.success(`✅ Slack test successful! Connected as ${userName} in ${workspaceName}. Permissions updated.`)
       } else {
         const errorData = await response.json().catch(() => ({}))
         throw new Error(errorData.detail || 'Connection test failed')
       }
     } catch (error) {
       console.error('Error testing Slack connection:', error)
-      toast({
-        title: "❌ Slack test failed",
-        description: error instanceof Error ? error.message : "Unable to test Slack connection.",
-        variant: "destructive",
-      })
+      toast.error(`❌ Slack test failed: ${error instanceof Error ? error.message : "Unable to test Slack connection."}`)
     }
   }
 
@@ -998,6 +907,8 @@ export default function IntegrationsPage() {
 
       if (response.ok) {
         const data = await response.json()
+        console.log('Slack permissions API response:', data)
+        console.log('Permissions object:', data.permissions)
         setSlackPermissions(data.permissions)
       }
     } catch (error) {
@@ -1334,12 +1245,12 @@ export default function IntegrationsPage() {
                         <Alert className="border-purple-200 bg-purple-50">
                           <AlertDescription>
                             <ol className="space-y-2 text-sm">
-                              <li>1. Log in to your Rootly account</li>
-                              <li>2. Navigate to <code className="bg-purple-100 px-1 rounded">Settings → API Keys</code></li>
-                              <li>3. Click "Create API Key"</li>
-                              <li>4. Give it a name (e.g., "Burnout Detector")</li>
-                              <li>5. Select appropriate permissions (required: read access to incidents and users)</li>
-                              <li>6. Copy the generated token (starts with "rootly_")</li>
+                              <li><strong>1.</strong> Log in to your Rootly account</li>
+                              <li><strong>2.</strong> Navigate to <code className="bg-purple-100 px-1 rounded">Settings → API Keys</code></li>
+                              <li><strong>3.</strong> Click <strong>"Create API Key"</strong></li>
+                              <li><strong>4.</strong> Give it a name (e.g., <strong>"Burnout Detector"</strong>)</li>
+                              <li><strong>5.</strong> Select appropriate permissions (<strong>required:</strong> read access to incidents and users)</li>
+                              <li><strong>6.</strong> Copy the generated token (starts with <strong>"rootly_"</strong>)</li>
                             </ol>
                           </AlertDescription>
                         </Alert>
@@ -1536,12 +1447,12 @@ export default function IntegrationsPage() {
                         <Alert className="border-green-200 bg-green-50">
                           <AlertDescription>
                             <ol className="space-y-2 text-sm">
-                              <li>1. In your PagerDuty account, click on your profile icon in the top-right</li>
-                              <li>2. Select <code className="bg-green-100 px-1 rounded">User Settings</code></li>
-                              <li>3. Scroll down to the <strong>API Access</strong> section</li>
-                              <li>4. Click <code className="bg-green-100 px-1 rounded">Create API User Token</code></li>
-                              <li>5. Give it a description (e.g., "Burnout Detector") and click Create</li>
-                              <li>6. Copy the generated token (starts with letters/numbers like "u+...")</li>
+                              <li><strong>1.</strong> In your PagerDuty account, click on your <strong>profile icon</strong> in the top-right</li>
+                              <li><strong>2.</strong> Select <code className="bg-green-100 px-1 rounded">User Settings</code></li>
+                              <li><strong>3.</strong> Scroll down to the <strong>API Access</strong> section</li>
+                              <li><strong>4.</strong> Click <code className="bg-green-100 px-1 rounded">Create API User Token</code></li>
+                              <li><strong>5.</strong> Give it a description (e.g., <strong>"Burnout Detector"</strong>) and click <strong>Create</strong></li>
+                              <li><strong>6.</strong> Copy the generated token (starts with letters/numbers like <strong>"u+..."</strong>)</li>
                             </ol>
                           </AlertDescription>
                         </Alert>
@@ -1864,47 +1775,61 @@ export default function IntegrationsPage() {
 
                           {/* Permissions for Rootly and PagerDuty */}
                           {integration.permissions && (
-                            <div className="mt-3 flex items-center space-x-4 text-sm">
-                              <span className="text-gray-500">Read permissions:</span>
-                              <div className="flex items-center space-x-1">
-                                {integration.permissions.users.access ? (
-                                  <Tooltip content="✓ User read permissions: Required to run burnout analysis and identify team members">
-                                    <CheckCircle className="w-4 h-4 text-green-500 cursor-help" />
-                                  </Tooltip>
-                                ) : (
-                                  <Tooltip content={`✗ User read permissions required: ${integration.permissions.users.error || "Permission denied"}. Both User and Incident read permissions are required to run burnout analysis.`}>
-                                    <AlertCircle className="w-4 h-4 text-red-500 cursor-help" />
-                                  </Tooltip>
-                                )}
-                                <span>Users</span>
+                            <>
+                              <div className="mt-3 flex items-center space-x-4 text-sm">
+                                <span className="text-gray-500">Read permissions:</span>
+                                <div className="flex items-center space-x-1">
+                                  {integration.permissions.users.access ? (
+                                    <Tooltip content="✓ User read permissions: Required to run burnout analysis and identify team members">
+                                      <CheckCircle className="w-4 h-4 text-green-500 cursor-help" />
+                                    </Tooltip>
+                                  ) : (
+                                    <Tooltip content={`✗ User read permissions required: ${integration.permissions.users.error || "Permission denied"}. Both User and Incident read permissions are required to run burnout analysis.`}>
+                                      <AlertCircle className="w-4 h-4 text-red-500 cursor-help" />
+                                    </Tooltip>
+                                  )}
+                                  <span>Users</span>
+                                </div>
+                                <div className="flex items-center space-x-1">
+                                  {integration.permissions.incidents.access ? (
+                                    <Tooltip content="✓ Incident read permissions: Required to run burnout analysis and analyze incident response patterns">
+                                      <CheckCircle className="w-4 h-4 text-green-500 cursor-help" />
+                                    </Tooltip>
+                                  ) : (
+                                    <Tooltip content={`✗ Incident read permissions required: ${integration.permissions.incidents.error || "Permission denied"}. Both User and Incident read permissions are required to run burnout analysis.`}>
+                                      <AlertCircle className="w-4 h-4 text-red-500 cursor-help" />
+                                    </Tooltip>
+                                  )}
+                                  <span>Incidents</span>
+                                </div>
                               </div>
-                              <div className="flex items-center space-x-1">
-                                {integration.permissions.incidents.access ? (
-                                  <Tooltip content="✓ Incident read permissions: Required to run burnout analysis and analyze incident response patterns">
-                                    <CheckCircle className="w-4 h-4 text-green-500 cursor-help" />
-                                  </Tooltip>
-                                ) : (
-                                  <Tooltip content={`✗ Incident read permissions required: ${integration.permissions.incidents.error || "Permission denied"}. Both User and Incident read permissions are required to run burnout analysis.`}>
-                                    <AlertCircle className="w-4 h-4 text-red-500 cursor-help" />
-                                  </Tooltip>
-                                )}
-                                <span>Incidents</span>
-                              </div>
-                            </div>
+                              
+                              {/* Error message for insufficient permissions */}
+                              {(!integration.permissions.users.access || !integration.permissions.incidents.access) && (
+                                <div className="mt-3">
+                                  <Alert className="border-red-200 bg-red-50">
+                                    <AlertCircle className="h-4 w-4 text-red-600" />
+                                    <AlertDescription className="text-red-800">
+                                      <strong>Insufficient permissions.</strong> Update API token with Users and Incidents read access.
+                                    </AlertDescription>
+                                  </Alert>
+                                </div>
+                              )}
+                            </>
                           )}
                         </div>
                         
                         <div className="flex items-center">
                           <Button
                             size="sm"
+                            variant="ghost"
                             onClick={() => {
                               setIntegrationToDelete(integration)
                               setDeleteDialogOpen(true)
                             }}
-                            className="bg-red-100 hover:bg-red-200 text-red-700 border border-red-200"
+                            className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
                           >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Remove Token
+                            <Trash2 className="w-4 h-4" />
                           </Button>
                         </div>
                       </div>
@@ -1912,7 +1837,7 @@ export default function IntegrationsPage() {
                   ))}
                   
                   {/* General Run Analysis Button */}
-                  <div className="pt-4 border-t border-gray-200">
+                  <div className="pt-6 mt-4 border-t border-gray-200">
                     <Button
                       onClick={() => router.push('/dashboard')}
                       className="w-full bg-purple-600 hover:bg-purple-700 text-white"
@@ -2081,9 +2006,9 @@ export default function IntegrationsPage() {
                           <AlertDescription>
                             <div className="space-y-4">
                               <div>
-                                <h4 className="font-medium text-gray-900 mb-2">Step 1: Go to GitHub Settings</h4>
+                                <h4 className="font-medium text-gray-900 mb-2"><strong>Step 1:</strong> Go to GitHub Settings</h4>
                                 <p className="text-sm text-gray-600 mb-2">
-                                  Navigate to GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)
+                                  Navigate to <strong>GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)</strong>
                                 </p>
                                 <a 
                                   href="https://github.com/settings/tokens" 
@@ -2096,8 +2021,8 @@ export default function IntegrationsPage() {
                               </div>
                               
                               <div>
-                                <h4 className="font-medium text-gray-900 mb-2">Step 2: Generate New Token</h4>
-                                <p className="text-sm text-gray-600 mb-2">Click "Generate new token (classic)" and configure:</p>
+                                <h4 className="font-medium text-gray-900 mb-2"><strong>Step 2:</strong> Generate New Token</h4>
+                                <p className="text-sm text-gray-600 mb-2">Click <strong>"Generate new token (classic)"</strong> and configure:</p>
                                 <ul className="text-sm text-gray-600 space-y-1 ml-4">
                                   <li>• <strong>Note:</strong> Give it a descriptive name (e.g., "Burnout Detector")</li>
                                   <li>• <strong>Expiration:</strong> Set an appropriate expiration date</li>
@@ -2105,8 +2030,8 @@ export default function IntegrationsPage() {
                               </div>
                               
                               <div>
-                                <h4 className="font-medium text-gray-900 mb-2">Step 3: Select Required Scopes</h4>
-                                <p className="text-sm text-gray-600 mb-2">Select these permissions:</p>
+                                <h4 className="font-medium text-gray-900 mb-2"><strong>Step 3:</strong> Select Required Scopes</h4>
+                                <p className="text-sm text-gray-600 mb-2">Select these <strong>permissions:</strong></p>
                                 <ul className="text-sm text-gray-600 space-y-1 ml-4">
                                   <li>• <code className="bg-gray-200 px-1 rounded">repo</code> - Full repository access</li>
                                   <li>• <code className="bg-gray-200 px-1 rounded">read:user</code> - Read user profile information</li>
@@ -2115,10 +2040,10 @@ export default function IntegrationsPage() {
                               </div>
                               
                               <div>
-                                <h4 className="font-medium text-gray-900 mb-2">Step 4: Generate and Copy Token</h4>
+                                <h4 className="font-medium text-gray-900 mb-2"><strong>Step 4:</strong> Generate and Copy Token</h4>
                                 <p className="text-sm text-gray-600">
-                                  Click "Generate token" and immediately copy the token (starts with <code className="bg-gray-200 px-1 rounded">ghp_</code>). 
-                                  You won't be able to see it again!
+                                  Click <strong>"Generate token"</strong> and immediately copy the token (starts with <code className="bg-gray-200 px-1 rounded">ghp_</code>). 
+                                  <strong>You won't be able to see it again!</strong>
                                 </p>
                               </div>
                             </div>
@@ -2213,9 +2138,9 @@ export default function IntegrationsPage() {
                           <AlertDescription>
                             <div className="space-y-4">
                               <div>
-                                <h4 className="font-medium text-purple-900 mb-2">Step 1: Create a Slack App</h4>
+                                <h4 className="font-medium text-purple-900 mb-2"><strong>Step 1:</strong> Create a Slack App</h4>
                                 <p className="text-sm text-purple-800 mb-2">
-                                  Go to the Slack API website and create a new app for your workspace:
+                                  Go to the <strong>Slack API website</strong> and create a new app:
                                 </p>
                                 <a 
                                   href="https://api.slack.com/apps" 
@@ -2242,13 +2167,15 @@ export default function IntegrationsPage() {
                               
                               <div>
                                 <h4 className="font-medium text-purple-900 mb-2">Step 3: Add Bot Token Scopes</h4>
-                                <p className="text-sm text-purple-800 mb-2">In "OAuth & Permissions" → "Scopes" → "Bot Token Scopes", add:</p>
+                                <p className="text-sm text-purple-800 mb-2">In "OAuth & Permissions" → "Scopes" → "Bot Token Scopes", add these <strong>3 required scopes</strong>:</p>
                                 <ul className="text-sm text-purple-800 space-y-1 ml-4">
+                                  <li>• <code className="bg-purple-200 px-1 rounded">channels:read</code> - View basic channel information</li>
                                   <li>• <code className="bg-purple-200 px-1 rounded">channels:history</code> - Read public channel messages</li>
-                                  <li>• <code className="bg-purple-200 px-1 rounded">groups:history</code> - Read private channel messages</li>
-                                  <li>• <code className="bg-purple-200 px-1 rounded">users:read</code> - Read user information</li>
-                                  <li>• <code className="bg-purple-200 px-1 rounded">chat:write</code> - Send messages</li>
+                                  <li>• <code className="bg-purple-200 px-1 rounded">users:read</code> - View user information</li>
                                 </ul>
+                                <div className="mt-2 p-2 bg-amber-100 border border-amber-300 rounded text-xs text-amber-800">
+                                  <strong>Important:</strong> After adding scopes, you MUST reinstall the app to your workspace for changes to take effect.
+                                </div>
                               </div>
                               
                               <div>
@@ -2258,6 +2185,19 @@ export default function IntegrationsPage() {
                                   <li>• Review permissions and click "Allow"</li>
                                   <li>• Copy the "Bot User OAuth Token" (starts with <code className="bg-purple-200 px-1 rounded">xoxb-</code>)</li>
                                 </ul>
+                              </div>
+                              
+                              <div>
+                                <h4 className="font-medium text-purple-900 mb-2">Step 5: Add Bot to Channels</h4>
+                                <p className="text-sm text-purple-800 mb-2">After setup, add the bot to relevant channels:</p>
+                                <ul className="text-sm text-purple-800 space-y-1 ml-4">
+                                  <li>• Go to each channel you want analyzed in Slack</li>
+                                  <li>• Type <code className="bg-purple-200 px-1 rounded">@Burnout Detector</code> and invite the bot</li>
+                                  <li>• The bot must be in channels to read message history</li>
+                                </ul>
+                                <div className="mt-2 p-2 bg-red-100 border border-red-300 rounded text-xs text-red-800">
+                                  <strong>Required:</strong> Bot permissions will show "Bot not in channels" until you add it to at least one channel.
+                                </div>
                               </div>
                               
                               <div className="bg-purple-100 border border-purple-300 rounded p-3">
@@ -2365,18 +2305,18 @@ export default function IntegrationsPage() {
                         />
                       </div>
                       <div>
-                        <CardTitle className="flex items-center space-x-2">
-                          <span>GitHub Connected</span>
-                          <Badge variant="outline" className="text-xs">
-                            {githubIntegration.token_source === "oauth" ? "OAuth" : "Manual"}
-                          </Badge>
-                        </CardTitle>
+                        <CardTitle>GitHub Connected</CardTitle>
                         <CardDescription>Username: {githubIntegration.github_username}</CardDescription>
                       </div>
                     </div>
                     <div className="flex items-center">
-                      <Button variant="destructive" size="sm" onClick={() => setGithubDisconnectDialogOpen(true)}>
-                        Disconnect
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setGithubDisconnectDialogOpen(true)}
+                        className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                      >
+                        <Trash2 className="w-4 h-4" />
                       </Button>
                     </div>
                   </div>
@@ -2436,21 +2376,26 @@ export default function IntegrationsPage() {
                         />
                       </div>
                       <div>
-                        <CardTitle className="flex items-center space-x-2">
-                          <span>Slack Connected</span>
-                          <Badge variant="outline" className="text-xs">
-                            Manual
-                          </Badge>
-                        </CardTitle>
+                        <CardTitle>Slack Connected</CardTitle>
                         <CardDescription>User ID: {slackIntegration.slack_user_id}</CardDescription>
                       </div>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <Button variant="outline" size="sm" onClick={handleSlackTest}>
-                        Test
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={handleSlackTest}
+                        className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                      >
+                        <RotateCcw className="w-4 h-4" />
                       </Button>
-                      <Button variant="destructive" size="sm" onClick={() => setSlackDisconnectDialogOpen(true)}>
-                        Disconnect
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setSlackDisconnectDialogOpen(true)}
+                        className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                      >
+                        <Trash2 className="w-4 h-4" />
                       </Button>
                     </div>
                   </div>
@@ -2516,23 +2461,22 @@ export default function IntegrationsPage() {
                           variant="ghost" 
                           size="sm" 
                           onClick={loadSlackPermissions}
-                          className="text-xs h-6 px-2"
+                          className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                         >
-                          Refresh
+                          <RotateCcw className="w-4 h-4" />
                         </Button>
                       )}
                     </div>
                     {slackPermissions ? (
                       <div className="grid grid-cols-1 gap-2">
-                        {Object.entries(slackPermissions).map(([permission, hasAccess]) => {
+                        {Object.entries(slackPermissions)
+                          .filter(([permission]) => ['channels_access', 'users_access', 'channels_history'].includes(permission))
+                          .map(([permission, hasAccess]) => {
                           const isGranted = hasAccess === true
                           const permissionLabels: { [key: string]: string } = {
-                            'conversations.list': 'List Channels',
-                            'conversations.history': 'Read Messages',
-                            'users.conversations': 'User Conversations',
-                            'users.list': 'List Users',
-                            'channels.history': 'Channel History',
-                            'groups.history': 'Private Channel History'
+                            'channels_access': 'Channel Access',
+                            'users_access': 'User Access', 
+                            'channels_history': 'Channel History'
                           }
                           
                           return (
@@ -2547,7 +2491,11 @@ export default function IntegrationsPage() {
                                 ) : (
                                   <>
                                     <AlertCircle className="w-3 h-3 text-red-500" />
-                                    <span className="text-red-600 font-medium">Missing</span>
+                                    <span className="text-red-600 font-medium">
+                                      {permission === 'channels_history' && slackPermissions.errors?.includes('not_in_channel') 
+                                        ? 'Bot not in channels' 
+                                        : 'Missing'}
+                                    </span>
                                   </>
                                 )}
                               </div>
@@ -2557,7 +2505,31 @@ export default function IntegrationsPage() {
                       </div>
                     ) : (
                       <div className="text-xs text-gray-500">
-                        Click "Test" or "Refresh" to check permissions
+                        Click "Test" or the refresh icon to check permissions
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Bot Channels Section */}
+                  <div className="mt-6">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="font-medium text-sm">Bot Channels</h4>
+                    </div>
+                    {slackIntegration?.channel_names && slackIntegration.channel_names.length > 0 ? (
+                      <div className="space-y-1">
+                        {slackIntegration.channel_names.map((channelName: string) => (
+                          <div key={channelName} className="flex items-center space-x-2 text-xs">
+                            <span className="text-gray-400">#</span>
+                            <span className="text-gray-700">{channelName}</span>
+                            <CheckCircle className="w-3 h-3 text-green-500" />
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-xs text-gray-500">
+                        {slackPermissions?.errors?.includes('not_in_channel') 
+                          ? 'Bot is not in any channels. Add it to channels in Slack.'
+                          : 'No channels found'}
                       </div>
                     )}
                   </div>

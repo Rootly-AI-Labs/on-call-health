@@ -311,18 +311,25 @@ class SlackIntegrationOAuth:
             
             # Test conversations history access (required for message counting)
             try:
-                # Get a sample channel to test history access
-                channels_response = await client.get("https://slack.com/api/conversations.list", headers=headers, params={"limit": 1})
+                # Get channels where bot is a member to test history access
+                channels_response = await client.get("https://slack.com/api/conversations.list", headers=headers, params={"limit": 100, "types": "public_channel"})
                 channels_result = channels_response.json()
                 if channels_result.get("ok") and channels_result.get("channels"):
-                    channel_id = channels_result["channels"][0]["id"]
+                    # Find a channel where the bot is a member
+                    bot_channels = [ch for ch in channels_result["channels"] if ch.get("is_member", False)]
                     
-                    # Test conversations.history API
-                    response = await client.get("https://slack.com/api/conversations.history", headers=headers, params={"channel": channel_id, "limit": 1})
-                    result = response.json()
-                    permissions["conversations_history"] = result.get("ok", False)
-                    if not permissions["conversations_history"]:
-                        permissions["errors"].append(f"Conversations history access failed: {result.get('error', 'Unknown error')}")
+                    if bot_channels:
+                        channel_id = bot_channels[0]["id"]
+                        
+                        # Test conversations.history API
+                        response = await client.get("https://slack.com/api/conversations.history", headers=headers, params={"channel": channel_id, "limit": 1})
+                        result = response.json()
+                        permissions["conversations_history"] = result.get("ok", False)
+                        permissions["channels_history"] = result.get("ok", False)  # Set both to same value
+                        if not permissions["conversations_history"]:
+                            permissions["errors"].append(f"Conversations history access failed: {result.get('error', 'Unknown error')}")
+                    else:
+                        permissions["errors"].append("Bot is not a member of any channels. Add bot to channels to enable history access.")
                 else:
                     permissions["errors"].append("No channels available to test history access")
             except Exception as e:
