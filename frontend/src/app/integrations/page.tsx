@@ -1198,12 +1198,9 @@ export default function IntegrationsPage() {
               <Select 
                 value={selectedOrganization} 
                 onValueChange={(value) => {
-                  console.log('Organization change:', { oldValue: selectedOrganization, newValue: value })
-                  
                   // Only show toast if selecting a different organization
                   if (value !== selectedOrganization) {
                     const selected = integrations.find(i => i.id.toString() === value)
-                    console.log('Selected org:', selected)
                     if (selected) {
                       toast.success(`${selected.name} has been set as your default organization.`)
                     }
@@ -1341,7 +1338,7 @@ export default function IntegrationsPage() {
                               <li>2. Navigate to <code className="bg-purple-100 px-1 rounded">Settings → API Keys</code></li>
                               <li>3. Click "Create API Key"</li>
                               <li>4. Give it a name (e.g., "Burnout Detector")</li>
-                              <li>5. Select appropriate permissions (at minimum: read access to incidents and users)</li>
+                              <li>5. Select appropriate permissions (required: read access to incidents and users)</li>
                               <li>6. Copy the generated token (starts with "rootly_")</li>
                             </ol>
                           </AlertDescription>

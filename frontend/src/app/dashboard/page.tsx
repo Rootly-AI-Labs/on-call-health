@@ -54,7 +54,7 @@ import {
 } from "lucide-react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
-import { useToast } from "@/hooks/use-toast-mock"
+import { toast } from "sonner"
 import { useBackendHealth } from "@/hooks/use-backend-health"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
@@ -413,7 +413,6 @@ export default function Dashboard() {
   const [debugSectionOpen, setDebugSectionOpen] = useState(false)
   
   const router = useRouter()
-  const { toast } = useToast()
   
   // Backend health monitoring - temporarily disabled
   // const { isHealthy, healthStatus } = useBackendHealth({
@@ -590,11 +589,7 @@ export default function Dashboard() {
       )
       
       if (isNetworkError) {
-        toast({
-          title: "Cannot connect to backend",
-          description: "Unable to load previous analyses. Please check if the backend is running.",
-          variant: "destructive",
-        })
+        toast.error("Cannot connect to backend")
       }
     }
   }
@@ -645,10 +640,7 @@ export default function Dashboard() {
           setCurrentAnalysis(null)
         }
         
-        toast({
-          title: "Analysis deleted",
-          description: "The analysis has been successfully removed.",
-        })
+        toast.success("Analysis deleted")
         
         // Close dialog and reset state
         setDeleteDialogOpen(false)
@@ -665,11 +657,7 @@ export default function Dashboard() {
       }
     } catch (error) {
       console.error('Delete error:', error)
-      toast({
-        title: "Delete failed",
-        description: error instanceof Error ? error.message : "Failed to delete analysis",
-        variant: "destructive",
-      })
+      toast.error(error instanceof Error ? error.message : "Failed to delete analysis")
       setDeleteDialogOpen(false)
       setAnalysisToDelete(null)
     }
@@ -828,13 +816,7 @@ export default function Dashboard() {
         error.name === 'TypeError'
       )
       
-      toast({
-        title: "Failed to load integrations",
-        description: isNetworkError 
-          ? "Cannot connect to backend server. Please check if the backend is running and try again."
-          : "Please try refreshing the page",
-        variant: "destructive",
-      })
+      toast.error(isNetworkError ? "Cannot connect to backend server" : "Failed to load integrations")
     } finally {
       setLoadingIntegrations(false)
     }
@@ -967,11 +949,7 @@ export default function Dashboard() {
       )
       
       if (isNetworkError) {
-        toast({
-          title: "Cannot connect to backend",
-          description: "Unable to load AI configuration. Please check if the backend is running.",
-          variant: "destructive",
-        })
+        toast.error("Cannot connect to backend")
       }
     }
   }
@@ -983,11 +961,7 @@ export default function Dashboard() {
       await loadIntegrations(true, true)
       
       if (integrations.length === 0) {
-        toast({
-          title: "No integrations found",
-          description: "Please add a Rootly or PagerDuty integration first on the Integrations page",
-          variant: "destructive",
-        })
+        toast.error("No integrations found - please add an integration first")
         return
       }
     }
@@ -1007,11 +981,7 @@ export default function Dashboard() {
     }
 
     if (!integrationToUse) {
-      toast({
-        title: "No integration available",
-        description: "Please ensure you have a valid Rootly or PagerDuty integration",
-        variant: "destructive",
-      })
+      toast.error("No integration available")
       return
     }
 
@@ -1042,11 +1012,7 @@ export default function Dashboard() {
       const hasIncidentPermission = selectedIntegration?.permissions?.incidents?.access;
       
       if (!hasUserPermission || !hasIncidentPermission) {
-        toast({
-          title: "Missing Required Permissions",
-          description: "Please update your Rootly API token permissions to include user and incident read access.",
-          variant: "destructive",
-        })
+        toast.error("Missing required permissions - update API token")
         return;
       }
     }
@@ -1168,10 +1134,7 @@ export default function Dashboard() {
               // Reload previous analyses from API to ensure sidebar is up-to-date
               await loadPreviousAnalyses()
               
-              toast({
-                title: "Analysis completed!",
-                description: "Your organization burnout analysis is ready.",
-              })
+              toast.success("Analysis completed!")
               return
             } else if (analysisData.status === 'failed') {
               setAnalysisRunning(false)
@@ -1179,18 +1142,10 @@ export default function Dashboard() {
               // Check if we have partial data to display
               if (analysisData.analysis_data?.partial_data) {
                 setCurrentAnalysis(analysisData)
-                toast({
-                  title: "Analysis completed with data",
-                  description: "Analysis processing failed, but raw data was collected successfully.",
-                  variant: "default",
-                })
+                toast("Analysis completed with partial data")
                 await loadPreviousAnalyses()
               } else {
-                toast({
-                  title: "Analysis failed",
-                  description: analysisData.error_message || "The analysis could not be completed. Please try again.",
-                  variant: "destructive",
-                })
+                toast.error(analysisData.error_message || "Analysis failed - please try again")
               }
               return
             } else if (analysisData.status === 'running') {
@@ -1270,11 +1225,7 @@ export default function Dashboard() {
           if (pollRetryCount >= maxRetries) {
             console.error('Max polling retries reached, stopping analysis')
             setAnalysisRunning(false)
-            toast({
-              title: "Analysis polling failed",
-              description: "Unable to get analysis status. Please try running the analysis again.",
-              variant: "destructive",
-            })
+            toast.error("Analysis polling failed - please try again")
             return
           }
           
@@ -1289,11 +1240,7 @@ export default function Dashboard() {
     } catch (error) {
       console.error('Analysis error:', error)
       setAnalysisRunning(false)
-      toast({
-        title: "Analysis failed",
-        description: error instanceof Error ? error.message : "Failed to run analysis",
-        variant: "destructive",
-      })
+      toast.error(error instanceof Error ? error.message : "Failed to run analysis")
     }
   }
 
@@ -2972,11 +2919,7 @@ export default function Dashboard() {
                           checked={includeGithub && !!githubIntegration}
                           onCheckedChange={(checked) => {
                             if (!githubIntegration) {
-                              toast({
-                                title: "GitHub Not Connected",
-                                description: "Please connect your GitHub account on the integrations page first.",
-                                variant: "destructive",
-                              })
+                              toast.error("GitHub not connected - please connect on integrations page")
                             } else {
                               setIncludeGithub(checked)
                             }
@@ -3014,11 +2957,7 @@ export default function Dashboard() {
                           checked={includeSlack && !!slackIntegration}
                           onCheckedChange={(checked) => {
                             if (!slackIntegration) {
-                              toast({
-                                title: "Slack Not Connected",
-                                description: "Please connect your Slack workspace on the integrations page first.",
-                                variant: "destructive",
-                              })
+                              toast.error("Slack not connected - please connect on integrations page")
                             } else {
                               setIncludeSlack(checked)
                             }
