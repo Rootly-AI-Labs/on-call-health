@@ -1607,7 +1607,7 @@ export default function Dashboard() {
                 <p className="text-xs text-gray-400 uppercase tracking-wide px-2 py-1 mt-4">Recent</p>
               )}
               <div className="max-h-96 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">
-                {previousAnalyses.slice(0, 20).map((analysis) => {
+                {previousAnalyses.slice(0, 50).map((analysis) => {
                 const analysisDate = new Date(analysis.created_at)
                 const timeStr = analysisDate.toLocaleTimeString([], { 
                   hour: 'numeric', 
@@ -2064,25 +2064,26 @@ export default function Dashboard() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6 overflow-visible">
                 <Card className="border-2 border-purple-200 bg-white/70 backdrop-blur-sm shadow-lg overflow-visible">
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-purple-700">Organization Health Score</CardTitle>
+                    <CardTitle className="text-sm font-medium text-purple-700">Team Health</CardTitle>
                   </CardHeader>
                   <CardContent>
                     {currentAnalysis?.analysis_data?.team_health ? (
                       <div>
-                        <div className="flex items-center space-x-3">
+                        <div className="flex items-start space-x-3">
                           <div>
                             <div className="text-2xl font-bold text-gray-900">{Math.round(currentAnalysis.analysis_data.team_health.overall_score * 10)}%</div>
                             <div className="text-xs text-gray-500">Current</div>
                           </div>
                           {historicalTrends?.summary?.average_score && (
                             <div className="border-l border-gray-200 pl-3">
-                              <div className="text-lg font-semibold text-gray-700">{Math.round(historicalTrends.summary.average_score * 10)}%</div>
+                              <div className="text-2xl font-bold text-gray-900">{Math.round(historicalTrends.summary.average_score * 10)}%</div>
                               <div className="text-xs text-gray-500">{currentAnalysis?.time_range || 30}-day avg</div>
                             </div>
                           )}
-                          <div className="flex items-center space-x-1">
-                            <div className="text-sm font-medium text-purple-600">{currentAnalysis.analysis_data.team_health.health_status}</div>
-                            <Info className="w-3 h-3 text-purple-500" 
+                        </div>
+                        <div className="mt-2 flex items-center space-x-1">
+                          <div className="text-sm font-medium text-purple-600">{currentAnalysis.analysis_data.team_health.health_status}</div>
+                          <Info className="w-3 h-3 text-purple-500" 
                                   onMouseEnter={(e) => {
                                     const tooltip = document.getElementById('health-score-tooltip')
                                     if (tooltip) {
@@ -2100,7 +2101,6 @@ export default function Dashboard() {
                                       tooltip.classList.remove('visible', 'opacity-100')
                                     }
                                   }} />
-                          </div>
                         </div>
                         <p className="text-xs text-gray-600 mt-1">
                           {(() => {
@@ -2132,7 +2132,7 @@ export default function Dashboard() {
 
                 <Card className="border-2 border-purple-200 bg-white/70 backdrop-blur-sm shadow-lg">
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-purple-700">At-Risk Members</CardTitle>
+                    <CardTitle className="text-sm font-medium text-purple-700">At Risk</CardTitle>
                   </CardHeader>
                   <CardContent>
                     {currentAnalysis?.analysis_data?.team_health ? (
@@ -2245,6 +2245,163 @@ export default function Dashboard() {
                 </Card>
               </div>
 
+              {/* AI Insights Card - Text-based summary */}
+              {currentAnalysis?.analysis_data?.ai_team_insights?.available && (
+                <Card className="mb-6 bg-gradient-to-br from-blue-50 via-white to-indigo-50 border-blue-200 shadow-sm">
+                  <CardHeader>
+                    <div className="flex items-center space-x-2">
+                      <CardTitle>AI Team Insights</CardTitle>
+                      <Badge variant="secondary" className="text-xs">AI Enhanced</Badge>
+                    </div>
+                    <CardDescription>
+                      Analysis generated from {currentAnalysis.analysis_data.ai_team_insights.insights?.team_size || 0} team members
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="prose prose-sm max-w-none">
+                    {(() => {
+                      const aiInsights = currentAnalysis.analysis_data.ai_team_insights.insights;
+                      const teamAnalysis = currentAnalysis.analysis_data.team_analysis;
+                      const members = teamAnalysis?.members || [];
+                      const riskDist = aiInsights?.risk_distribution;
+                      const highRiskCount = (riskDist?.distribution?.high || 0) + (riskDist?.distribution?.critical || 0);
+                      const mediumRiskCount = riskDist?.distribution?.medium || 0;
+                      const lowRiskCount = riskDist?.distribution?.low || 0;
+                      const highRiskMembers = members.filter(m => m.risk_level === 'high' || m.risk_level === 'critical');
+                      const hasPatterns = aiInsights?.common_patterns && aiInsights.common_patterns.length > 0;
+                      const hasRecommendations = aiInsights?.team_recommendations && aiInsights.team_recommendations.length > 0;
+                      
+                      // Calculate average burnout score
+                      const avgBurnoutScore = members.length > 0 ? 
+                        members.reduce((sum, m) => sum + (m.burnout_score || 0), 0) / members.length * 10 : 0;
+                      
+                      // Analyze burnout sources from team factors
+                      const analyzeBurnoutSources = () => {
+                        if (members.length === 0) return null;
+                        
+                        const factorTotals = {
+                          workload: 0,
+                          after_hours: 0,
+                          weekend_work: 0,
+                          incident_load: 0,
+                          response_time: 0
+                        };
+                        
+                        // Sum all factor scores across team members
+                        members.forEach(member => {
+                          if (member.factors) {
+                            factorTotals.workload += member.factors.workload || 0;
+                            factorTotals.after_hours += member.factors.after_hours || 0;
+                            factorTotals.weekend_work += member.factors.weekend_work || 0;
+                            factorTotals.incident_load += member.factors.incident_load || 0;
+                            factorTotals.response_time += member.factors.response_time || 0;
+                          }
+                        });
+                        
+                        // Calculate averages
+                        const factorAverages = Object.entries(factorTotals).map(([key, total]) => ({
+                          name: key,
+                          average: total / members.length,
+                          displayName: key.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())
+                        }));
+                        
+                        // Sort by highest average impact
+                        return factorAverages.sort((a, b) => b.average - a.average);
+                      };
+                      
+                      const burnoutSources = analyzeBurnoutSources();
+                      const topBurnoutFactor = burnoutSources?.[0];
+                      const secondaryFactors = burnoutSources?.slice(1, 3).filter(f => f.average > 0.3);
+                      
+                      return (
+                        <div className="space-y-4 text-gray-700">
+                          {/* Summary Paragraph */}
+                          <div>
+                            <h4 className="font-semibold text-gray-900 mb-2">Summary</h4>
+                            <p className="leading-relaxed">
+                              The team of {aiInsights?.team_size || members.length} members shows an average burnout score of {avgBurnoutScore.toFixed(0)}%. 
+                              {highRiskCount > 0 ? (
+                                <> Currently, <span className="font-semibold text-red-600">{highRiskCount} member{highRiskCount > 1 ? 's are' : ' is'} at high risk</span> of burnout, requiring immediate attention. </>
+                              ) : mediumRiskCount > 0 ? (
+                                <> The team has <span className="font-semibold text-amber-600">{mediumRiskCount} member{mediumRiskCount > 1 ? 's' : ''} at medium risk</span>, indicating emerging stress patterns that should be monitored. </>
+                              ) : (
+                                <> The team is in <span className="font-semibold text-green-600">good health</span> with no members currently at high risk. </>
+                              )}
+                              {topBurnoutFactor && topBurnoutFactor.average > 0.4 && (
+                                <> The primary burnout driver is <span className="font-semibold text-red-600">{topBurnoutFactor.displayName.toLowerCase()}</span> (impact: {Math.min(topBurnoutFactor.average * 10, 10).toFixed(1)}/10){secondaryFactors.length > 0 && (
+                                  <>, with secondary stress from {secondaryFactors.map(f => f.displayName.toLowerCase()).join(' and ')}</>
+                                )}. </>
+                              )}
+                              {hasPatterns && aiInsights.common_patterns[0] && (
+                                <> Analysis reveals {aiInsights.common_patterns[0].description.toLowerCase()} </>
+                              )}
+                            </p>
+                          </div>
+
+                          {/* Standouts Paragraph */}
+                          {(highRiskMembers.length > 0 || hasPatterns || (topBurnoutFactor && topBurnoutFactor.average > 0.3)) && (
+                            <div>
+                              <h4 className="font-semibold text-gray-900 mb-2">Key Observations</h4>
+                              <p className="leading-relaxed">
+                                {highRiskMembers.length > 0 && (
+                                  <>
+                                    <span className="font-semibold">{highRiskMembers[0].user_name}</span> stands out with a burnout score of {((highRiskMembers[0].burnout_score || 0) * 10).toFixed(0)}%, 
+                                    having handled {highRiskMembers[0].incident_count || 0} incidents in the analysis period{(() => {
+                                      const topMemberFactor = highRiskMembers[0].factors ? 
+                                        Object.entries(highRiskMembers[0].factors)
+                                          .sort(([,a], [,b]) => b - a)[0] : null;
+                                      if (topMemberFactor && topMemberFactor[1] > 0.6) {
+                                        const factorName = topMemberFactor[0].replace('_', ' ');
+                                        return `, primarily driven by ${factorName}`;
+                                      }
+                                      return '';
+                                    })()}. 
+                                    {highRiskMembers.length > 1 && (
+                                      <> Similarly, {highRiskMembers.slice(1, 3).map(m => m.user_name).join(' and ')} 
+                                      {highRiskMembers.length > 3 && ` (and ${highRiskMembers.length - 3} others)`} also show concerning burnout indicators. </>
+                                    )}
+                                  </>
+                                )}
+                                {topBurnoutFactor && topBurnoutFactor.average > 0.3 && !highRiskMembers.length && (
+                                  <>Across the team, <span className="font-semibold text-amber-600">{topBurnoutFactor.displayName.toLowerCase()}</span> is the most significant stress factor, 
+                                  affecting team members with an average impact of {Math.min(topBurnoutFactor.average * 10, 10).toFixed(1)}/10. </>
+                                )}
+                                {hasPatterns && aiInsights.common_patterns.length > 1 && (
+                                  <> The team exhibits {aiInsights.common_patterns.length} distinct burnout patterns, 
+                                  with "{aiInsights.common_patterns[0].pattern}" being the most prevalent. </>
+                                )}
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Recommendations Paragraph */}
+                          {hasRecommendations && (
+                            <div>
+                              <h4 className="font-semibold text-gray-900 mb-2">Recommendations</h4>
+                              <p className="leading-relaxed">
+                                {aiInsights.team_recommendations[0] && (
+                                  <>
+                                    The highest priority action is to <span className="font-semibold">{aiInsights.team_recommendations[0].title.toLowerCase()}</span>. 
+                                    {aiInsights.team_recommendations[0].description} 
+                                    {aiInsights.team_recommendations[0].expected_impact && (
+                                      <> This is expected to {aiInsights.team_recommendations[0].expected_impact.toLowerCase()}</>
+                                    )}
+                                  </>
+                                )}
+                                {aiInsights.team_recommendations.length > 1 && (
+                                  <> Additionally, consider {aiInsights.team_recommendations[1].title.toLowerCase()} 
+                                  {aiInsights.team_recommendations.length > 2 && 
+                                    ` along with ${aiInsights.team_recommendations.length - 2} other recommended actions`}. </>
+                                )}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })()}
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Partial Data Warning */}
               {currentAnalysis?.analysis_data?.error && currentAnalysis?.analysis_data?.partial_data && (
                 <Card className="mb-6 border-yellow-200 bg-yellow-50">
@@ -2316,8 +2473,8 @@ export default function Dashboard() {
               {/* Organization Member Scores - Full Width */}
               <Card className="mb-6">
                 <CardHeader>
-                  <CardTitle>Organization Member Scores</CardTitle>
-                  <CardDescription>Burnout risk levels across organization members with incident data</CardDescription>
+                  <CardTitle>Team Members</CardTitle>
+                  <CardDescription>Individual burnout risk levels and incident metrics</CardDescription>
                 </CardHeader>
                 <CardContent>
                   {memberBarData.length > 0 ? (
@@ -2380,7 +2537,7 @@ export default function Dashboard() {
                 {/* Burnout Journey Map */}
                 <Card>
                   <CardHeader>
-                    <CardTitle>Organization Burnout Journey</CardTitle>
+                    <CardTitle>Burnout Timeline</CardTitle>
                     <CardDescription>
                       {historicalTrends?.timeline_events?.length > 0 
                         ? `Real timeline from ${historicalTrends.timeline_events.length} burnout events in your data`
@@ -2500,7 +2657,7 @@ export default function Dashboard() {
                 {/* Historical Burnout Score Graph */}
                 <Card>
                   <CardHeader>
-                    <CardTitle>Daily Health Trend</CardTitle>
+                    <CardTitle>Health Trends</CardTitle>
                     <CardDescription>
                       {historicalTrends?.daily_trends?.length > 0 
                         ? `Real health trends from ${historicalTrends.daily_trends.length} days of analysis data`
@@ -2597,7 +2754,7 @@ export default function Dashboard() {
                 <Card>
                   <CardHeader>
                     <div className="flex items-center justify-between">
-                      <CardTitle>Burnout Factors</CardTitle>
+                      <CardTitle>Risk Factors</CardTitle>
                       {highRiskFactors.length > 0 && (
                         <div className="flex items-center space-x-2">
                           <AlertTriangle className="w-4 h-4 text-red-500" />
@@ -2660,7 +2817,7 @@ export default function Dashboard() {
                       <div className="flex items-center justify-between">
                         <CardTitle className="flex items-center space-x-2">
                           <AlertTriangle className="w-5 h-5 text-red-500" />
-                          <span>Top Risk Factors</span>
+                          <span>Critical Risks</span>
                         </CardTitle>
                         <Button
                           variant="outline"
@@ -3009,111 +3166,10 @@ export default function Dashboard() {
                 </div>
               )}
 
-              {/* AI Insights Card - Text-based summary */}
-              {currentAnalysis?.analysis_data?.ai_team_insights?.available && (
-                <Card className="mb-6">
-                  <CardHeader>
-                    <div className="flex items-center space-x-2">
-                      <CardTitle>AI Team Insights</CardTitle>
-                      <Badge variant="secondary" className="text-xs">AI Enhanced</Badge>
-                    </div>
-                    <CardDescription>
-                      Analysis generated from {currentAnalysis.analysis_data.ai_team_insights.insights?.team_size || 0} team members
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="prose prose-sm max-w-none">
-                    {(() => {
-                      const aiInsights = currentAnalysis.analysis_data.ai_team_insights.insights;
-                      const teamAnalysis = currentAnalysis.analysis_data.team_analysis;
-                      const members = teamAnalysis?.members || [];
-                      const riskDist = aiInsights?.risk_distribution;
-                      const highRiskCount = (riskDist?.distribution?.high || 0) + (riskDist?.distribution?.critical || 0);
-                      const mediumRiskCount = riskDist?.distribution?.medium || 0;
-                      const lowRiskCount = riskDist?.distribution?.low || 0;
-                      const highRiskMembers = members.filter(m => m.risk_level === 'high' || m.risk_level === 'critical');
-                      const hasPatterns = aiInsights?.common_patterns && aiInsights.common_patterns.length > 0;
-                      const hasRecommendations = aiInsights?.team_recommendations && aiInsights.team_recommendations.length > 0;
-                      
-                      // Calculate average burnout score
-                      const avgBurnoutScore = members.length > 0 ? 
-                        members.reduce((sum, m) => sum + (m.burnout_score || 0), 0) / members.length * 10 : 0;
-                      
-                      return (
-                        <div className="space-y-4 text-gray-700">
-                          {/* Summary Paragraph */}
-                          <div>
-                            <h4 className="font-semibold text-gray-900 mb-2">Summary</h4>
-                            <p className="leading-relaxed">
-                              The team of {aiInsights?.team_size || members.length} members shows an average burnout score of {avgBurnoutScore.toFixed(0)}%. 
-                              {highRiskCount > 0 ? (
-                                <> Currently, <span className="font-semibold text-red-600">{highRiskCount} member{highRiskCount > 1 ? 's are' : ' is'} at high risk</span> of burnout, requiring immediate attention. </>
-                              ) : mediumRiskCount > 0 ? (
-                                <> The team has <span className="font-semibold text-amber-600">{mediumRiskCount} member{mediumRiskCount > 1 ? 's' : ''} at medium risk</span>, indicating emerging stress patterns that should be monitored. </>
-                              ) : (
-                                <> The team is in <span className="font-semibold text-green-600">good health</span> with no members currently at high risk. </>
-                              )}
-                              {hasPatterns && aiInsights.common_patterns[0] && (
-                                <> Analysis reveals {aiInsights.common_patterns[0].description.toLowerCase()} </>
-                              )}
-                            </p>
-                          </div>
-
-                          {/* Standouts Paragraph */}
-                          {(highRiskMembers.length > 0 || hasPatterns) && (
-                            <div>
-                              <h4 className="font-semibold text-gray-900 mb-2">Key Observations</h4>
-                              <p className="leading-relaxed">
-                                {highRiskMembers.length > 0 && (
-                                  <>
-                                    <span className="font-semibold">{highRiskMembers[0].user_name}</span> stands out with a burnout score of {((highRiskMembers[0].burnout_score || 0) * 10).toFixed(0)}%, 
-                                    having handled {highRiskMembers[0].incident_count || 0} incidents in the analysis period. 
-                                    {highRiskMembers.length > 1 && (
-                                      <> Similarly, {highRiskMembers.slice(1, 3).map(m => m.user_name).join(' and ')} 
-                                      {highRiskMembers.length > 3 && ` (and ${highRiskMembers.length - 3} others)`} also show concerning burnout indicators. </>
-                                    )}
-                                  </>
-                                )}
-                                {hasPatterns && aiInsights.common_patterns.length > 1 && (
-                                  <> The team exhibits {aiInsights.common_patterns.length} distinct burnout patterns, 
-                                  with "{aiInsights.common_patterns[0].pattern}" being the most prevalent. </>
-                                )}
-                              </p>
-                            </div>
-                          )}
-
-                          {/* Recommendations Paragraph */}
-                          {hasRecommendations && (
-                            <div>
-                              <h4 className="font-semibold text-gray-900 mb-2">Recommendations</h4>
-                              <p className="leading-relaxed">
-                                {aiInsights.team_recommendations[0] && (
-                                  <>
-                                    The highest priority action is to <span className="font-semibold">{aiInsights.team_recommendations[0].title.toLowerCase()}</span>. 
-                                    {aiInsights.team_recommendations[0].description} 
-                                    {aiInsights.team_recommendations[0].expected_impact && (
-                                      <> This is expected to {aiInsights.team_recommendations[0].expected_impact.toLowerCase()}</>
-                                    )}
-                                  </>
-                                )}
-                                {aiInsights.team_recommendations.length > 1 && (
-                                  <> Additionally, consider {aiInsights.team_recommendations[1].title.toLowerCase()} 
-                                  {aiInsights.team_recommendations.length > 2 && 
-                                    ` along with ${aiInsights.team_recommendations.length - 2} other recommended actions`}. </>
-                                )}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })()}
-                  </CardContent>
-                </Card>
-              )}
-
               {/* Organization Members Grid */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Organization Members</CardTitle>
+                  <CardTitle>Team Overview</CardTitle>
                   <CardDescription>Click on a member to view detailed analysis</CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -3260,12 +3316,23 @@ export default function Dashboard() {
                   const selected = integrations.find(i => i.id.toString() === dialogSelectedIntegration)
                   if (selected) {
                     return (
-                      <div className="flex items-center">
-                        <div className={`w-2 h-2 rounded-full mr-2 ${
-                          selected.platform === 'rootly' ? 'bg-purple-500' : 'bg-green-500'
-                        }`}></div>
-                        <span className="font-medium">{selected.name}</span>
-                        <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 ml-auto" />
+                      <div>
+                        <div className="flex items-center">
+                          <div className={`w-2 h-2 rounded-full mr-2 ${
+                            selected.platform === 'rootly' ? 'bg-purple-500' : 'bg-green-500'
+                          }`}></div>
+                          <span className="font-medium">{selected.name}</span>
+                          <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 ml-auto" />
+                        </div>
+                        <button 
+                          onClick={() => {
+                            setShowTimeRangeDialog(false)
+                            router.push('/integrations')
+                          }}
+                          className="text-xs text-blue-600 hover:text-blue-800 hover:underline mt-1 block"
+                        >
+                          Manage integrations
+                        </button>
                       </div>
                     )
                   }
