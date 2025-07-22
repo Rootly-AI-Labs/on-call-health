@@ -10,7 +10,8 @@ logger = logging.getLogger(__name__)
 class SimpleBurnoutAnalyzer:
     """Simplified burnout analyzer focused on incident data."""
     
-    def __init__(self):
+    def __init__(self, api_token: str):
+        self.api_token = api_token
         # Default thresholds for risk assessment
         self.thresholds = {
             "incidents_per_week_high": 8,
@@ -20,6 +21,38 @@ class SimpleBurnoutAnalyzer:
             "avg_resolution_hours_high": 6,
             "avg_resolution_hours_medium": 3,
         }
+    
+    async def analyze_burnout(
+        self, 
+        time_range_days: int = 30,
+        include_weekends: bool = True,
+        include_github: bool = False,
+        include_slack: bool = False,
+        github_token: str = None,
+        slack_token: str = None
+    ) -> Dict[str, Any]:
+        """
+        Analyze burnout for the team based on incident data.
+        This is the simplified version without AI enhancement.
+        """
+        from ..core.rootly_client import RootlyAPIClient
+        
+        logger.info(f"Starting simplified burnout analysis for {time_range_days} days")
+        
+        # Initialize Rootly API client
+        rootly_client = RootlyAPIClient(self.api_token)
+        
+        # Collect data from Rootly
+        rootly_data = await rootly_client.collect_analysis_data(time_range_days)
+        
+        # Process the data using the existing team analysis method
+        result = self.analyze_team_burnout(
+            users=rootly_data.get("users", []),
+            incidents=rootly_data.get("incidents", []),
+            metadata=rootly_data.get("collection_metadata", {})
+        )
+        
+        return result
     
     def analyze_team_burnout(
         self, 
@@ -54,7 +87,8 @@ class SimpleBurnoutAnalyzer:
             "metadata": metadata,
             "team_summary": team_summary,
             "team_analysis": team_analysis,
-            "recommendations": self._generate_team_recommendations(team_summary, team_analysis)
+            "recommendations": self._generate_team_recommendations(team_summary, team_analysis),
+            "ai_enhanced": False
         }
     
     def _analyze_user_burnout(
@@ -283,7 +317,7 @@ class SimpleBurnoutAnalyzer:
         if high_risk_count > 0:
             recommendations.append(f"🚨 {high_risk_count} team members at high burnout risk - immediate attention needed")
         
-        if (high_risk_count + medium_risk_count) / total_users > 0.5:
+        if total_users > 0 and (high_risk_count + medium_risk_count) / total_users > 0.5:
             recommendations.append("📋 Consider team workload redistribution and process improvements")
         
         avg_score = team_summary.get("average_score", 0)

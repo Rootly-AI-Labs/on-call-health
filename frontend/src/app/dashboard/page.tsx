@@ -51,9 +51,12 @@ import {
   CheckCircle,
   Users,
   Star,
+  Info,
+  Circle,
+  ArrowRight,
 } from "lucide-react"
 import Image from "next/image"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { toast } from "sonner"
 import { useBackendHealth } from "@/hooks/use-backend-health"
 
@@ -411,14 +414,33 @@ export default function Dashboard() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [analysisToDelete, setAnalysisToDelete] = useState<AnalysisResult | null>(null)
   const [debugSectionOpen, setDebugSectionOpen] = useState(false)
+  const [riskFactorsExpanded, setRiskFactorsExpanded] = useState(false)
+  const [memberViewMode, setMemberViewMode] = useState<'radar' | 'journey'>('radar')
+  const [historicalTrends, setHistoricalTrends] = useState<any>(null)
+  const [loadingTrends, setLoadingTrends] = useState(false)
   
   const router = useRouter()
+  const searchParams = useSearchParams()
   
   // Backend health monitoring - temporarily disabled
   // const { isHealthy, healthStatus } = useBackendHealth({
   //   showToasts: true,
   //   autoStart: true,
   // })
+
+  // Function to update URL with analysis ID
+  const updateURLWithAnalysis = (analysisId: number | null) => {
+    const params = new URLSearchParams(searchParams.toString())
+    
+    if (analysisId) {
+      params.set('analysis', analysisId.toString())
+    } else {
+      params.delete('analysis')
+    }
+    
+    // Update URL without page reload
+    router.push(`/dashboard?${params.toString()}`, { scroll: false })
+  }
 
   // Function to clear integration cache
   const clearIntegrationCache = () => {
@@ -473,6 +495,7 @@ export default function Dashboard() {
     // Check for organization parameter from URL
     const urlParams = new URLSearchParams(window.location.search)
     const orgId = urlParams.get('org')
+    const analysisId = urlParams.get('analysis')
     
     // Add event listener for page focus to refresh integrations
     const handlePageFocus = () => {
@@ -526,6 +549,12 @@ export default function Dashboard() {
     
     loadPreviousAnalyses()
     loadIntegrations()
+    loadHistoricalTrends()
+    
+    // Load specific analysis if provided in URL
+    if (analysisId) {
+      loadSpecificAnalysis(parseInt(analysisId))
+    }
 
     // Cleanup event listeners
     return () => {
@@ -551,6 +580,13 @@ export default function Dashboard() {
 
     return () => clearInterval(interval)
   }, [analysisRunning, targetProgress])
+
+  // Load historical trends when current analysis changes
+  useEffect(() => {
+    if (currentAnalysis?.integration_id) {
+      loadHistoricalTrends(currentAnalysis.integration_id)
+    }
+  }, [currentAnalysis])
 
   const loadPreviousAnalyses = async () => {
     try {
@@ -591,6 +627,99 @@ export default function Dashboard() {
       if (isNetworkError) {
         toast.error("Cannot connect to backend")
       }
+    }
+  }
+
+  const loadSpecificAnalysis = async (analysisId: number) => {
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) return
+
+      const response = await fetch(`${API_BASE}/analyses/${analysisId}`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`
+        }
+      })
+
+      if (response.ok) {
+        const analysis = await response.json()
+        console.log('Loaded specific analysis from URL:', analysis.id)
+        setCurrentAnalysis(analysis)
+      } else {
+        console.error('Failed to load analysis:', analysisId)
+        // Remove invalid analysis ID from URL
+        updateURLWithAnalysis(null)
+      }
+    } catch (error) {
+      console.error('Error loading specific analysis:', error)
+    }
+  }
+
+  const loadHistoricalTrends = async (integrationId?: number) => {
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) {
+        console.error('No auth token found in localStorage')
+        return
+      }
+      
+      console.log('Auth token found:', authToken ? `${authToken.substring(0, 10)}...` : 'null')
+
+      setLoadingTrends(true)
+      console.log('Loading historical trends...')
+      
+      // Use the same time range as the current analysis
+      const analysisTimeRange = currentAnalysis?.time_range || 30
+      const params = new URLSearchParams({ days_back: analysisTimeRange.toString() })
+      if (integrationId) {
+        params.append('integration_id', integrationId.toString())
+      }
+
+      const fullUrl = `${API_BASE}/analyses/trends/historical?${params}`
+      console.log('Making request to:', fullUrl)
+      console.log('API_BASE:', API_BASE)
+      console.log('Params:', params.toString())
+      
+      // Test the main analyses endpoint with same auth token to verify auth works
+      console.log('Testing main analyses endpoint with same token...')
+      try {
+        const testResponse = await fetch(`${API_BASE}/analyses`, {
+          headers: {
+            'Authorization': `Bearer ${authToken}`
+          }
+        })
+        console.log('Main analyses endpoint test status:', testResponse.status)
+      } catch (testError) {
+        console.log('Main analyses endpoint test error:', testError)
+      }
+      
+      let response
+      try {
+        response = await fetch(fullUrl, {
+          headers: {
+            'Authorization': `Bearer ${authToken}`
+          }
+        })
+      } catch (networkError) {
+        console.error('Network error loading trends:', networkError)
+        throw new Error('Cannot connect to backend server')
+      }
+
+      if (response.ok) {
+        const data = await response.json()
+        console.log('Loaded historical trends:', data)
+        setHistoricalTrends(data)
+      } else {
+        console.error('Failed to load trends, status:', response.status)
+        console.error('Response URL:', response.url)
+        console.error('Response headers:', [...response.headers.entries()])
+        const errorText = await response.text()
+        console.error('Response body:', errorText)
+      }
+    } catch (error) {
+      console.error('Failed to load historical trends:', error)
+    } finally {
+      setLoadingTrends(false)
     }
   }
 
@@ -638,6 +767,7 @@ export default function Dashboard() {
         if (currentAnalysis?.id === analysisToDelete.id) {
           console.log('Clearing currently selected analysis')
           setCurrentAnalysis(null)
+          updateURLWithAnalysis(null)
         }
         
         toast.success("Analysis deleted")
@@ -1128,6 +1258,7 @@ export default function Dashboard() {
                 setTimeout(() => {
                   setAnalysisRunning(false)
                   setCurrentAnalysis(analysisData)
+                  updateURLWithAnalysis(analysisData.id)
                 }, 500) // Show 100% for just 0.5 seconds before showing data
               }, 800) // Wait 0.8 seconds to reach 95%
               
@@ -1142,6 +1273,7 @@ export default function Dashboard() {
               // Check if we have partial data to display
               if (analysisData.analysis_data?.partial_data) {
                 setCurrentAnalysis(analysisData)
+                updateURLWithAnalysis(analysisData.id)
                 toast("Analysis completed with partial data")
                 await loadPreviousAnalyses()
               } else {
@@ -1325,13 +1457,18 @@ export default function Dashboard() {
 
   const selectedIntegrationData = integrations.find(i => i.id.toString() === selectedIntegration)
   
-  // Generate chart data from real analysis results
-  const chartData = currentAnalysis?.analysis_data?.team_health ? [
-    { date: "Week 4", score: Math.max(0, currentAnalysis.analysis_data.team_health.overall_score * 10 - 10) },
-    { date: "Week 3", score: Math.max(0, currentAnalysis.analysis_data.team_health.overall_score * 10 - 5) },
-    { date: "Week 2", score: Math.max(0, currentAnalysis.analysis_data.team_health.overall_score * 10) },
-    { date: "Week 1", score: currentAnalysis.analysis_data.team_health.overall_score * 10 },
-  ] : []
+  // Generate chart data from real historical analysis results
+  const chartData = historicalTrends?.daily_trends?.length > 0 
+    ? historicalTrends.daily_trends.slice(-7).map((trend: any) => ({
+        date: new Date(trend.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        score: Math.round(trend.overall_score * 10) // Convert 0-10 scale to 0-100 for display
+      }))
+    : currentAnalysis?.analysis_data?.team_health 
+      ? [{ 
+          date: "Current", 
+          score: Math.round(currentAnalysis.analysis_data.team_health.overall_score * 10) 
+        }] 
+      : []
   
   const memberBarData = currentAnalysis?.analysis_data?.team_analysis?.members
     ?.filter((member) => member.incident_count > 0) // Filter out users with no incidents
@@ -1346,34 +1483,69 @@ export default function Dashboard() {
     })) || [];
   
   const members = currentAnalysis?.analysis_data?.team_analysis?.members || [];
-  // Calculate burnout factors - Backend returns 0-10 scale, we need 0-100 for chart
+  
+  // Helper function to get color based on severity
+  const getFactorColor = (value) => {
+    if (value >= 7) return '#DC2626' // Red - Critical
+    if (value >= 5) return '#F59E0B' // Orange - Warning  
+    if (value >= 3) return '#10B981' // Green - Good
+    return '#6B7280' // Gray - Low risk
+  }
+  
+  // Helper function to get recommendations
+  const getRecommendation = (factor) => {
+    switch(factor.toLowerCase()) {
+      case 'workload':
+        return 'Consider redistributing incidents or adding team members'
+      case 'after hours':
+        return 'Implement on-call rotation limits and recovery time'
+      case 'weekend work':
+        return 'Establish weekend work policies and coverage plans'
+      case 'incident load':
+        return 'Review incident prevention and escalation procedures'
+      case 'response time':
+        return 'Review escalation procedures and skill gaps'
+      default:
+        return 'Monitor this factor closely and consider intervention'
+    }
+  }
+  
+  // Calculate burnout factors with color coding - Backend returns 0-10 scale
   const burnoutFactors = members.length > 0 ? [
     { 
       factor: "Workload", 
-      value: members.reduce((avg, m) => avg + (m.factors?.workload || 0), 0) / members.length * 100,
+      value: Number((members.reduce((avg, m) => avg + (m.factors?.workload || 0), 0) / members.length).toFixed(1)),
       metrics: `Avg incidents: ${Math.round(members.reduce((avg, m) => avg + (m.incident_count || 0), 0) / members.length)}`
     },
     { 
       factor: "After Hours", 
-      value: members.reduce((avg, m) => avg + (m.factors?.after_hours || 0), 0) / members.length * 100,
+      value: Number((members.reduce((avg, m) => avg + (m.factors?.after_hours || 0), 0) / members.length).toFixed(1)),
       metrics: `Avg after-hours: ${Math.round(members.reduce((avg, m) => avg + (m.metrics?.after_hours_percentage || 0), 0) / members.length)}%`
     },
     { 
       factor: "Weekend Work", 
-      value: members.reduce((avg, m) => avg + (m.factors?.weekend_work || 0), 0) / members.length * 100,
+      value: Number((members.reduce((avg, m) => avg + (m.factors?.weekend_work || 0), 0) / members.length).toFixed(1)),
       metrics: `Avg weekend work: ${Math.round(members.reduce((avg, m) => avg + (m.metrics?.weekend_percentage || 0), 0) / members.length)}%`
     },
     { 
       factor: "Incident Load", 
-      value: members.reduce((avg, m) => avg + (m.factors?.incident_load || 0), 0) / members.length * 100,
+      value: Number((members.reduce((avg, m) => avg + (m.factors?.incident_load || 0), 0) / members.length).toFixed(1)),
       metrics: `Total incidents: ${members.reduce((total, m) => total + (m.incident_count || 0), 0)}`
     },
     { 
       factor: "Response Time", 
-      value: members.reduce((avg, m) => avg + (m.factors?.response_time || 0), 0) / members.length * 100,
+      value: Number((members.reduce((avg, m) => avg + (m.factors?.response_time || 0), 0) / members.length).toFixed(1)),
       metrics: `Avg response: ${Math.round(members.reduce((avg, m) => avg + (m.metrics?.avg_response_time_minutes || 0), 0) / members.length)} min`
     },
-  ] : [];
+  ].map(factor => ({
+    ...factor,
+    color: getFactorColor(factor.value),
+    recommendation: getRecommendation(factor.factor),
+    severity: factor.value >= 7 ? 'Critical' : factor.value >= 5 ? 'Warning' : factor.value >= 3 ? 'Good' : 'Low Risk'
+  })) : [];
+  
+  // Get high-risk factors for emphasis (temporarily lowered threshold to test)
+  const highRiskFactors = burnoutFactors.filter(f => f.value >= 2).sort((a, b) => b.value - a.value);
 
   // Debug log to check the actual values
   useEffect(() => {
@@ -1486,13 +1658,16 @@ export default function Dashboard() {
                                 memberCount: fullAnalysis.analysis_data?.team_analysis?.members?.length || 0
                               })
                               setCurrentAnalysis(fullAnalysis)
+                              updateURLWithAnalysis(fullAnalysis.id)
                             } else {
                               console.error('Failed to fetch full analysis')
                               setCurrentAnalysis(analysis)
+                              updateURLWithAnalysis(analysis.id)
                             }
                           } catch (error) {
                             console.error('Error fetching full analysis:', error)
                             setCurrentAnalysis(analysis)
+                            updateURLWithAnalysis(analysis.id)
                           }
                         } else {
                           console.log('Analysis already has data:', {
@@ -1500,6 +1675,7 @@ export default function Dashboard() {
                             memberCount: analysis.analysis_data.team_analysis?.members?.length || 0
                           })
                           setCurrentAnalysis(analysis)
+                          updateURLWithAnalysis(analysis.id)
                         }
                       }}
                     >
@@ -1573,7 +1749,7 @@ export default function Dashboard() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto bg-gray-100">
         <div className="p-6">
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
@@ -1870,21 +2046,80 @@ export default function Dashboard() {
                 </Card>
               )}
 
+              {/* Tooltip Portal */}
+              <div className="fixed z-[99999] invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gray-900 text-white text-xs rounded-lg p-3 w-64 shadow-lg pointer-events-none"
+                   id="health-score-tooltip"
+                   style={{ top: '-200px', left: '-200px' }}>
+                <div className="space-y-2">
+                  <div><strong className="text-green-400">Excellent (90-100%):</strong> Low stress, sustainable workload</div>
+                  <div><strong className="text-blue-400">Good (70-89%):</strong> Manageable workload with minor stress</div>
+                  <div><strong className="text-yellow-400">Fair (50-69%):</strong> Moderate stress, watch for trends</div>
+                  <div><strong className="text-orange-400">Poor (30-49%):</strong> High stress, intervention needed</div>
+                  <div><strong className="text-red-400">Critical (&lt;30%):</strong> Severe burnout risk</div>
+                </div>
+                <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-900"></div>
+              </div>
+
               {/* Overview Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-                <Card className="border-2 border-purple-200 bg-white/70 backdrop-blur-sm shadow-lg">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6 overflow-visible">
+                <Card className="border-2 border-purple-200 bg-white/70 backdrop-blur-sm shadow-lg overflow-visible">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm font-medium text-purple-700">Organization Health Score</CardTitle>
                   </CardHeader>
                   <CardContent>
                     {currentAnalysis?.analysis_data?.team_health ? (
                       <div>
-                        <div className="flex items-center justify-between">
-                          <div className="text-2xl font-bold text-gray-900">{Math.round(currentAnalysis.analysis_data.team_health.overall_score * 10)}%</div>
-                          <div className="text-sm font-medium text-purple-600">{currentAnalysis.analysis_data.team_health.health_status}</div>
+                        <div className="flex items-center space-x-3">
+                          <div>
+                            <div className="text-2xl font-bold text-gray-900">{Math.round(currentAnalysis.analysis_data.team_health.overall_score * 10)}%</div>
+                            <div className="text-xs text-gray-500">Current</div>
+                          </div>
+                          {historicalTrends?.summary?.average_score && (
+                            <div className="border-l border-gray-200 pl-3">
+                              <div className="text-lg font-semibold text-gray-700">{Math.round(historicalTrends.summary.average_score * 10)}%</div>
+                              <div className="text-xs text-gray-500">{currentAnalysis?.time_range || 30}-day avg</div>
+                            </div>
+                          )}
+                          <div className="flex items-center space-x-1">
+                            <div className="text-sm font-medium text-purple-600">{currentAnalysis.analysis_data.team_health.health_status}</div>
+                            <Info className="w-3 h-3 text-purple-500" 
+                                  onMouseEnter={(e) => {
+                                    const tooltip = document.getElementById('health-score-tooltip')
+                                    if (tooltip) {
+                                      const rect = e.currentTarget.getBoundingClientRect()
+                                      tooltip.style.top = `${rect.top - 180}px`
+                                      tooltip.style.left = `${rect.left - 120}px`
+                                      tooltip.classList.remove('invisible', 'opacity-0')
+                                      tooltip.classList.add('visible', 'opacity-100')
+                                    }
+                                  }}
+                                  onMouseLeave={() => {
+                                    const tooltip = document.getElementById('health-score-tooltip')
+                                    if (tooltip) {
+                                      tooltip.classList.add('invisible', 'opacity-0')
+                                      tooltip.classList.remove('visible', 'opacity-100')
+                                    }
+                                  }} />
+                          </div>
                         </div>
                         <p className="text-xs text-gray-600 mt-1">
-                          Based on {currentAnalysis.time_range || 30} days of data
+                          {(() => {
+                            const status = currentAnalysis.analysis_data.team_health.health_status.toLowerCase()
+                            switch(status) {
+                              case 'excellent':
+                                return 'Low stress, sustainable workload'
+                              case 'good':
+                                return 'Manageable workload with minor stress'
+                              case 'fair':
+                                return 'Moderate stress, watch for trends'
+                              case 'poor':
+                                return 'High stress, intervention needed'
+                              case 'critical':
+                                return 'Severe burnout risk'
+                              default:
+                                return 'Measures team workload sustainability and burnout risk levels'
+                            }
+                          })()}
                         </p>
                       </div>
                     ) : (
@@ -1902,11 +2137,23 @@ export default function Dashboard() {
                   <CardContent>
                     {currentAnalysis?.analysis_data?.team_health ? (
                       <div>
-                        <div className="flex items-center space-x-2">
-                          <div className="text-2xl font-bold text-red-600">{currentAnalysis.analysis_data.team_health.risk_distribution.high}</div>
-                          <AlertTriangle className="w-5 h-5 text-red-500" />
+                        <div className="space-y-1">
+                          <div className="flex items-center space-x-2">
+                            <div className="text-2xl font-bold text-red-600">{currentAnalysis.analysis_data.team_health.risk_distribution.high}</div>
+                            <AlertTriangle className="w-6 h-6 text-red-500" />
+                            <span className="text-sm text-gray-600">High risk</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <div className="text-2xl font-bold text-orange-600">{currentAnalysis.analysis_data.team_health.risk_distribution.medium}</div>
+                            <div className="w-6 h-6 rounded-full bg-orange-500/20 flex items-center justify-center">
+                              <div className="w-3 h-3 rounded-full bg-orange-500"></div>
+                            </div>
+                            <span className="text-sm text-gray-600">Medium risk</span>
+                          </div>
                         </div>
-                        <p className="text-xs text-gray-600 mt-1">Out of {currentAnalysis.analysis_data.team_analysis?.members?.length || 0} members</p>
+                        <p className="text-xs text-gray-600 mt-2">
+                          Out of {currentAnalysis.analysis_data.team_analysis?.members?.length || 0} members
+                        </p>
                       </div>
                     ) : (
                       <div className="text-gray-500">
@@ -2130,54 +2377,260 @@ export default function Dashboard() {
 
               {/* Charts Section */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                {/* Trend Chart */}
+                {/* Burnout Journey Map */}
                 <Card>
                   <CardHeader>
-                    <CardTitle>Burnout Trend</CardTitle>
+                    <CardTitle>Organization Burnout Journey</CardTitle>
+                    <CardDescription>
+                      {historicalTrends?.timeline_events?.length > 0 
+                        ? `Real timeline from ${historicalTrends.timeline_events.length} burnout events in your data`
+                        : "Timeline of stress patterns and recovery periods"
+                      }
+                    </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="h-[250px]">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={chartData}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="date" />
-                          <YAxis domain={[0, 100]} />
-                          <Tooltip 
-                            formatter={(value) => [`${Number(value).toFixed(2)}%`, 'Burnout Score']}
-                          />
-                          <Line type="monotone" dataKey="score" stroke="#8B5CF6" strokeWidth={2} />
-                        </LineChart>
-                      </ResponsiveContainer>
+                    <div className="space-y-6">
+                      {loadingTrends ? (
+                        <div className="flex items-center justify-center h-32">
+                          <div className="text-center">
+                            <div className="animate-spin w-6 h-6 border-2 border-purple-600 border-t-transparent rounded-full mx-auto mb-2"></div>
+                            <p className="text-sm text-gray-500">Loading journey...</p>
+                          </div>
+                        </div>
+                      ) : (
+                        (() => {
+                        // Calculate high risk members for journey map
+                        const highRiskMembers = members.filter(m => m.risk_level === 'high' || m.risk_level === 'critical');
+                        
+                        // Calculate health score
+                        const healthScore = currentAnalysis?.analysis_data?.team_health ? 
+                          Math.round(currentAnalysis.analysis_data.team_health.overall_score * 10) : 92;
+                        
+                        // Use real timeline events from historical data
+                        const journeyEvents = historicalTrends?.timeline_events?.length > 0 
+                          ? historicalTrends.timeline_events.map((event: any) => ({
+                              date: new Date(event.iso_date).toLocaleDateString('en-US', { 
+                                month: 'short', 
+                                day: 'numeric' 
+                              }),
+                              status: event.status,
+                              title: event.title,
+                              description: event.description,
+                              color: event.color,
+                              impact: event.impact,
+                              severity: event.severity,
+                              metrics: event.metrics
+                            }))
+                          : [
+                              // Fallback to current analysis if no historical timeline available
+                              {
+                                date: 'Current',
+                                status: 'current',
+                                title: 'Current State',
+                                description: `${healthScore}% organization health score`,
+                                color: 'bg-purple-500',
+                                impact: healthScore >= 80 ? 'positive' : healthScore >= 60 ? 'neutral' : 'negative'
+                              }
+                            ];
+
+                        return (
+                          <div className="relative">
+                            {/* Timeline line */}
+                            <div className="absolute left-4 top-0 bottom-0 w-px bg-gray-200"></div>
+                            
+                            {journeyEvents.map((event, index) => (
+                              <div key={index} className="relative flex items-start space-x-4 pb-6">
+                                {/* Timeline dot */}
+                                <div className={`relative z-10 flex h-8 w-8 items-center justify-center rounded-full ${(() => {
+                                  // Ensure success events have visible round colored backgrounds
+                                  if (event.status === 'excellence') return 'bg-emerald-500';
+                                  if (event.status === 'recovery') return 'bg-green-500';
+                                  if (event.status === 'improvement') return 'bg-blue-500';
+                                  if (event.status === 'risk-eliminated') return 'bg-green-500';
+                                  if (event.status === 'risk-decrease') return 'bg-green-400';
+                                  return event.color || 'bg-gray-500';
+                                })()} shadow-sm ring-4 ring-white`}>
+                                  {(() => {
+                                    // Use more vibrant colors for success icons
+                                    let iconColor = 'text-white'; // Default for dark backgrounds
+                                    
+                                    if (event.impact === 'positive' || event.status === 'risk-decrease' || event.status === 'improvement' || event.status === 'recovery' || event.status === 'excellence' || event.status === 'risk-eliminated') {
+                                      // Success icons get vibrant colors based on event type
+                                      if (event.status === 'excellence') {
+                                        iconColor = 'text-green-800'; // Dark green on emerald for vibrant success
+                                      } else if (event.status === 'risk-eliminated' || event.status === 'recovery') {
+                                        iconColor = 'text-white'; // White on green for strong contrast
+                                      } else if (event.status === 'risk-decrease') {
+                                        iconColor = 'text-green-800'; // Dark green on light green
+                                      } else if (event.status === 'improvement') {
+                                        iconColor = 'text-white'; // White on blue
+                                      } else {
+                                        iconColor = 'text-white'; // Default white for other positive events
+                                      }
+                                      return <TrendingUp className={`h-4 w-4 ${iconColor}`} />;
+                                    }
+                                    if (event.impact === 'negative' || event.status === 'critical-burnout' || event.status === 'medium-risk' || event.status === 'decline' || event.status === 'risk-increase') {
+                                      return <TrendingDown className={`h-4 w-4 text-white`} />;
+                                    }
+                                    if (event.impact === 'neutral' || event.status === 'current') {
+                                      return <Minus className={`h-4 w-4 text-white`} />;
+                                    }
+                                    return null;
+                                  })()}
+                                </div>
+                                
+                                {/* Event content */}
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center justify-between">
+                                    <p className="text-sm font-medium text-gray-900">{event.title}</p>
+                                    <time className="text-xs text-gray-500">{event.date}</time>
+                                  </div>
+                                  <p className="text-sm text-gray-600 mt-1">{event.description}</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                        })()
+                      )}
                     </div>
                   </CardContent>
                 </Card>
 
+                {/* Historical Burnout Score Graph */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Daily Health Trend</CardTitle>
+                    <CardDescription>
+                      {historicalTrends?.daily_trends?.length > 0 
+                        ? `Real health trends from ${historicalTrends.daily_trends.length} days of analysis data`
+                        : "Organization health score over time"
+                      }
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-[250px]">
+                      {loadingTrends ? (
+                        <div className="flex items-center justify-center h-full">
+                          <div className="text-center">
+                            <div className="animate-spin w-6 h-6 border-2 border-purple-600 border-t-transparent rounded-full mx-auto mb-2"></div>
+                            <p className="text-sm text-gray-500">Loading trends...</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={(() => {
+                          // Use real historical trends data if available, otherwise fallback to current score
+                          if (historicalTrends?.daily_trends?.length > 0) {
+                            return historicalTrends.daily_trends.map((trend: any) => ({
+                              date: new Date(trend.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
+                              score: Math.round(trend.overall_score * 10), // Convert 0-10 scale to 0-100 for display
+                              riskLevel: trend.overall_score >= 8 ? 'low' : trend.overall_score >= 6 ? 'medium' : 'high',
+                              membersAtRisk: trend.members_at_risk,
+                              totalMembers: trend.total_members,
+                              healthStatus: trend.health_status
+                            }));
+                          }
+                          
+                          // Fallback: show current analysis as single point if no historical data
+                          const healthScore = currentAnalysis?.analysis_data?.team_health ? 
+                            Math.round(currentAnalysis.analysis_data.team_health.overall_score * 10) : 92;
+                          
+                          return [{
+                            date: 'Current',
+                            score: healthScore,
+                            riskLevel: healthScore >= 80 ? 'low' : healthScore >= 60 ? 'medium' : 'high'
+                          }];
+                        })()}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                          <YAxis domain={[30, 100]} tick={{ fontSize: 12 }} />
+                          <Tooltip 
+                            content={({ payload, label }) => {
+                              if (payload && payload.length > 0) {
+                                const data = payload[0].payload;
+                                return (
+                                  <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
+                                    <p className="font-semibold text-gray-900">{label}</p>
+                                    <p className="text-purple-600">Health Score: {Math.round(Number(payload[0].value))}%</p>
+                                    <p className={`text-sm font-medium ${
+                                      data.riskLevel === 'low' ? 'text-green-600' :
+                                      data.riskLevel === 'medium' ? 'text-yellow-600' : 'text-red-600'
+                                    }`}>
+                                      Risk Level: {data.riskLevel.charAt(0).toUpperCase() + data.riskLevel.slice(1)}
+                                    </p>
+                                    {data.membersAtRisk !== undefined && (
+                                      <p className="text-sm text-gray-600">
+                                        At Risk: {data.membersAtRisk}/{data.totalMembers} members
+                                      </p>
+                                    )}
+                                    {data.healthStatus && (
+                                      <p className="text-sm text-gray-600">
+                                        Status: {data.healthStatus.charAt(0).toUpperCase() + data.healthStatus.slice(1)}
+                                      </p>
+                                    )}
+                                  </div>
+                                )
+                              }
+                              return null
+                            }}
+                          />
+                          <Line 
+                            type="monotone" 
+                            dataKey="score" 
+                            stroke="#8B5CF6" 
+                            strokeWidth={2}
+                            dot={{ fill: '#8B5CF6', strokeWidth: 2, r: 4 }}
+                            activeDot={{ r: 6, stroke: '#8B5CF6', strokeWidth: 2 }}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Burnout Factors Section */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                 {/* Radar Chart */}
                 <Card>
                   <CardHeader>
-                    <CardTitle>Burnout Factors</CardTitle>
+                    <div className="flex items-center justify-between">
+                      <CardTitle>Burnout Factors</CardTitle>
+                      {highRiskFactors.length > 0 && (
+                        <div className="flex items-center space-x-2">
+                          <AlertTriangle className="w-4 h-4 text-red-500" />
+                          <span className="text-sm font-medium text-red-600">
+                            {highRiskFactors.length} factor{highRiskFactors.length > 1 ? 's' : ''} need{highRiskFactors.length === 1 ? 's' : ''} attention
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="h-[250px] p-4">
+                    <div className="h-[300px] p-2">
                       <ResponsiveContainer width="100%" height="100%">
-                        <RadarChart data={burnoutFactors} margin={{ top: 20, right: 30, bottom: 20, left: 30 }}>
-                          <PolarGrid />
+                        <RadarChart data={burnoutFactors} margin={{ top: 40, right: 40, bottom: 40, left: 40 }}>
+                          <PolarGrid gridType="polygon" />
                           <PolarAngleAxis 
                             dataKey="factor" 
-                            tick={{ fontSize: 12, fill: '#374151' }}
+                            tick={{ fontSize: 11, fill: '#374151' }}
                             className="text-xs"
                           />
                           <PolarRadiusAxis 
-                            domain={[0, 100]} 
-                            tick={{ fontSize: 10, fill: '#6B7280' }}
-                            tickCount={4}
+                            domain={[0, 10]} 
+                            tick={{ fontSize: 9, fill: '#6B7280' }}
+                            tickCount={6}
+                            angle={270}
                           />
                           <Radar 
                             dataKey="value" 
                             stroke="#8B5CF6" 
                             fill="#8B5CF6" 
-                            fillOpacity={0.3}
+                            fillOpacity={0.2}
                             strokeWidth={2}
+                            dot={{ fill: '#8B5CF6', strokeWidth: 2, r: 4 }}
                           />
                           <Tooltip 
                             content={({ payload, label }) => {
@@ -2186,7 +2639,7 @@ export default function Dashboard() {
                                 return (
                                   <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
                                     <p className="font-semibold text-gray-900">{label}</p>
-                                    <p className="text-purple-600">Score: {Number(data.value).toFixed(2)}%</p>
+                                    <p className="text-purple-600">Score: {data.value}/10</p>
                                     <p className="text-sm text-gray-600 mt-1">{data.metrics}</p>
                                   </div>
                                 )
@@ -2199,6 +2652,97 @@ export default function Dashboard() {
                     </div>
                   </CardContent>
                 </Card>
+                
+                {/* Top Risk Factors Bar Chart - Only show if there are high-risk factors */}
+                {highRiskFactors.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="flex items-center space-x-2">
+                          <AlertTriangle className="w-5 h-5 text-red-500" />
+                          <span>Top Risk Factors</span>
+                        </CardTitle>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setRiskFactorsExpanded(!riskFactorsExpanded)}
+                          className="flex items-center space-x-2"
+                        >
+                          <span>{riskFactorsExpanded ? 'Hide Details' : `View ${highRiskFactors.length} Risk Factor${highRiskFactors.length > 1 ? 's' : ''}`}</span>
+                          <ChevronRight className={`w-4 h-4 transition-transform ${riskFactorsExpanded ? 'rotate-90' : ''}`} />
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    
+                    {/* Collapsed Summary View */}
+                    {!riskFactorsExpanded && (
+                      <CardContent>
+                        <div className="space-y-2">
+                          <p className="text-sm text-gray-600 mb-3">
+                            <strong>{highRiskFactors.length}</strong> burnout factor{highRiskFactors.length > 1 ? 's' : ''} require{highRiskFactors.length === 1 ? 's' : ''} immediate attention
+                          </p>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {highRiskFactors.slice(0, 4).map((factor) => (
+                              <div key={factor.factor} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                                <span className="text-sm font-medium">{factor.factor}</span>
+                                <div className="flex items-center space-x-2">
+                                  <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                    factor.severity === 'Critical' ? 'bg-red-100 text-red-700' :
+                                    'bg-orange-100 text-orange-700'
+                                  }`}>
+                                    {factor.value}/10
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </CardContent>
+                    )}
+                    
+                    {/* Expanded Detailed View */}
+                    {riskFactorsExpanded && (
+                      <CardContent>
+                        <div className="space-y-4">
+                          {highRiskFactors.map((factor, index) => (
+                            <div key={factor.factor} className="relative">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center space-x-2">
+                                  <span className="font-medium text-gray-900">{factor.factor}</span>
+                                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                    factor.severity === 'Critical' ? 'bg-red-100 text-red-800' :
+                                    factor.severity === 'Warning' ? 'bg-orange-100 text-orange-800' :
+                                    'bg-yellow-100 text-yellow-800'
+                                  }`}>
+                                    {factor.severity}
+                                  </span>
+                                </div>
+                                <span className="text-lg font-bold" style={{ color: factor.color }}>
+                                  {factor.value}/10
+                                </span>
+                              </div>
+                              <div className="w-full bg-gray-200 rounded-full h-3 mb-2">
+                                <div 
+                                  className="h-3 rounded-full transition-all duration-500" 
+                                  style={{ 
+                                    width: `${(factor.value / 10) * 100}%`,
+                                    backgroundColor: factor.color
+                                  }}
+                                ></div>
+                              </div>
+                              <div className="text-sm text-gray-600">
+                                <div>{factor.metrics}</div>
+                                <div className="mt-1 text-blue-600">
+                                  <strong>Action:</strong> {factor.recommendation}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    )}
+                  </Card>
+                )}
               </div>
 
               {/* GitHub and Slack Metrics Section */}
@@ -2465,28 +3009,19 @@ export default function Dashboard() {
                 </div>
               )}
 
-              {/* AI Insights Card - Enhanced with dynamic content */}
+              {/* AI Insights Card - Text-based summary */}
               {currentAnalysis?.analysis_data?.ai_team_insights?.available && (
-                <Card className="mb-6 border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50 shadow-lg">
-                  <CardHeader className="pb-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                          <div className="w-6 h-6 text-blue-600">🤖</div>
-                        </div>
-                        <div>
-                          <CardTitle className="text-xl text-blue-900">AI Team Insights</CardTitle>
-                          <CardDescription className="text-blue-700">
-                            Intelligent burnout analysis and actionable recommendations
-                          </CardDescription>
-                        </div>
-                      </div>
-                      <Badge variant="secondary" className="bg-blue-100 text-blue-700 border-blue-300">
-                        Enhanced Analysis
-                      </Badge>
+                <Card className="mb-6">
+                  <CardHeader>
+                    <div className="flex items-center space-x-2">
+                      <CardTitle>AI Team Insights</CardTitle>
+                      <Badge variant="secondary" className="text-xs">AI Enhanced</Badge>
                     </div>
+                    <CardDescription>
+                      Analysis generated from {currentAnalysis.analysis_data.ai_team_insights.insights?.team_size || 0} team members
+                    </CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-5">
+                  <CardContent className="prose prose-sm max-w-none">
                     {(() => {
                       const aiInsights = currentAnalysis.analysis_data.ai_team_insights.insights;
                       const teamAnalysis = currentAnalysis.analysis_data.team_analysis;
@@ -2494,204 +3029,80 @@ export default function Dashboard() {
                       const riskDist = aiInsights?.risk_distribution;
                       const highRiskCount = (riskDist?.distribution?.high || 0) + (riskDist?.distribution?.critical || 0);
                       const mediumRiskCount = riskDist?.distribution?.medium || 0;
+                      const lowRiskCount = riskDist?.distribution?.low || 0;
                       const highRiskMembers = members.filter(m => m.risk_level === 'high' || m.risk_level === 'critical');
                       const hasPatterns = aiInsights?.common_patterns && aiInsights.common_patterns.length > 0;
                       const hasRecommendations = aiInsights?.team_recommendations && aiInsights.team_recommendations.length > 0;
                       
-                      // Calculate average burnout score for trend indication
+                      // Calculate average burnout score
                       const avgBurnoutScore = members.length > 0 ? 
                         members.reduce((sum, m) => sum + (m.burnout_score || 0), 0) / members.length * 10 : 0;
                       
-                      // Generate AI-style executive summary
-                      const generateSummary = () => {
-                        if (highRiskCount > 0) {
-                          return `Critical team health alert: ${highRiskCount} member${highRiskCount > 1 ? 's' : ''} showing high burnout risk. Immediate intervention recommended to prevent team breakdown.`;
-                        } else if (mediumRiskCount > 0) {
-                          return `Team showing moderate stress levels with ${mediumRiskCount} member${mediumRiskCount > 1 ? 's' : ''} at medium risk. Proactive measures should be implemented.`;
-                        } else {
-                          return `Team health is stable with good work-life balance indicators. Continue monitoring to maintain current wellness levels.`;
-                        }
-                      };
-                      
                       return (
-                        <div className="space-y-5">
-                          {/* Executive Summary */}
-                          <div className="bg-white/90 rounded-lg p-4 border border-blue-100">
-                            <div className="flex items-start space-x-3">
-                              <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                <span className="text-blue-600 text-sm">📋</span>
-                              </div>
-                              <div className="flex-1">
-                                <h4 className="font-semibold text-blue-900 text-sm mb-2">Executive Summary</h4>
-                                <p className="text-sm text-gray-700 leading-relaxed">
-                                  {generateSummary()}
-                                </p>
-                                <div className="flex items-center justify-between mt-3 pt-3 border-t border-blue-100">
-                                  <span className="text-xs text-blue-600">
-                                    {aiInsights?.team_size || members.length} team members analyzed
-                                  </span>
-                                  <div className="flex items-center space-x-2">
-                                    <div className={`w-2 h-2 rounded-full ${
-                                      avgBurnoutScore >= 70 ? 'bg-red-500' : 
-                                      avgBurnoutScore >= 50 ? 'bg-yellow-500' : 'bg-green-500'
-                                    }`}></div>
-                                    <span className="text-xs text-gray-600">
-                                      {avgBurnoutScore.toFixed(1)}% avg burnout
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
+                        <div className="space-y-4 text-gray-700">
+                          {/* Summary Paragraph */}
+                          <div>
+                            <h4 className="font-semibold text-gray-900 mb-2">Summary</h4>
+                            <p className="leading-relaxed">
+                              The team of {aiInsights?.team_size || members.length} members shows an average burnout score of {avgBurnoutScore.toFixed(0)}%. 
+                              {highRiskCount > 0 ? (
+                                <> Currently, <span className="font-semibold text-red-600">{highRiskCount} member{highRiskCount > 1 ? 's are' : ' is'} at high risk</span> of burnout, requiring immediate attention. </>
+                              ) : mediumRiskCount > 0 ? (
+                                <> The team has <span className="font-semibold text-amber-600">{mediumRiskCount} member{mediumRiskCount > 1 ? 's' : ''} at medium risk</span>, indicating emerging stress patterns that should be monitored. </>
+                              ) : (
+                                <> The team is in <span className="font-semibold text-green-600">good health</span> with no members currently at high risk. </>
+                              )}
+                              {hasPatterns && aiInsights.common_patterns[0] && (
+                                <> Analysis reveals {aiInsights.common_patterns[0].description.toLowerCase()} </>
+                              )}
+                            </p>
                           </div>
 
-                          {/* Key Finding Alert */}
-                          {highRiskMembers.length > 0 ? (
-                            <Alert className="border-red-200 bg-red-50">
-                              <AlertTriangle className="w-4 h-4 text-red-600" />
-                              <AlertDescription className="text-sm">
-                                <div className="space-y-2">
-                                  <p className="font-medium text-red-900">
-                                    🚨 Critical Alert: {highRiskMembers[0].user_name}
-                                    {highRiskMembers.length > 1 && ` (+${highRiskMembers.length - 1} other${highRiskMembers.length > 2 ? 's' : ''})`} 
-                                    showing severe burnout symptoms
-                                  </p>
-                                  <p className="text-red-700">
-                                    {highRiskMembers[0].incident_count || 0} incidents handled • 
-                                    {((highRiskMembers[0].burnout_score || 0) * 10).toFixed(1)}% burnout score
-                                  </p>
-                                </div>
-                              </AlertDescription>
-                            </Alert>
-                          ) : hasPatterns ? (
-                            <Alert className="border-amber-200 bg-amber-50">
-                              <AlertCircle className="w-4 h-4 text-amber-600" />
-                              <AlertDescription className="text-sm">
-                                <p className="font-medium text-amber-900">
-                                  📊 Pattern Detected: {aiInsights.common_patterns[0].pattern}
-                                </p>
-                                <p className="text-amber-700 mt-1">
-                                  {aiInsights.common_patterns[0].description}
-                                </p>
-                              </AlertDescription>
-                            </Alert>
-                          ) : (
-                            <Alert className="border-green-200 bg-green-50">
-                              <CheckCircle className="w-4 h-4 text-green-600" />
-                              <AlertDescription className="text-sm">
-                                <p className="font-medium text-green-900">
-                                  ✅ Team Health Stable
-                                </p>
-                                <p className="text-green-700 mt-1">
-                                  No critical burnout indicators detected. Team maintaining healthy work patterns.
-                                </p>
-                              </AlertDescription>
-                            </Alert>
+                          {/* Standouts Paragraph */}
+                          {(highRiskMembers.length > 0 || hasPatterns) && (
+                            <div>
+                              <h4 className="font-semibold text-gray-900 mb-2">Key Observations</h4>
+                              <p className="leading-relaxed">
+                                {highRiskMembers.length > 0 && (
+                                  <>
+                                    <span className="font-semibold">{highRiskMembers[0].user_name}</span> stands out with a burnout score of {((highRiskMembers[0].burnout_score || 0) * 10).toFixed(0)}%, 
+                                    having handled {highRiskMembers[0].incident_count || 0} incidents in the analysis period. 
+                                    {highRiskMembers.length > 1 && (
+                                      <> Similarly, {highRiskMembers.slice(1, 3).map(m => m.user_name).join(' and ')} 
+                                      {highRiskMembers.length > 3 && ` (and ${highRiskMembers.length - 3} others)`} also show concerning burnout indicators. </>
+                                    )}
+                                  </>
+                                )}
+                                {hasPatterns && aiInsights.common_patterns.length > 1 && (
+                                  <> The team exhibits {aiInsights.common_patterns.length} distinct burnout patterns, 
+                                  with "{aiInsights.common_patterns[0].pattern}" being the most prevalent. </>
+                                )}
+                              </p>
+                            </div>
                           )}
 
-                          {/* Top Recommendation */}
+                          {/* Recommendations Paragraph */}
                           {hasRecommendations && (
-                            <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg p-4 border border-purple-200">
-                              <div className="flex items-start space-x-3">
-                                <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0">
-                                  <span className="text-purple-600 text-sm">💡</span>
-                                </div>
-                                <div className="flex-1">
-                                  <div className="flex items-center justify-between mb-2">
-                                    <h4 className="font-semibold text-purple-900 text-sm">
-                                      Priority Action: {aiInsights.team_recommendations[0].title}
-                                    </h4>
-                                    <Badge variant="outline" className="border-purple-300 text-purple-700 text-xs">
-                                      {aiInsights.team_recommendations[0].priority?.toUpperCase() || 'HIGH'}
-                                    </Badge>
-                                  </div>
-                                  <p className="text-sm text-purple-800 mb-3">
-                                    {aiInsights.team_recommendations[0].description}
-                                  </p>
-                                  {aiInsights.team_recommendations[0].expected_impact && (
-                                    <div className="bg-white/50 rounded p-2 mb-2">
-                                      <p className="text-xs text-purple-700">
-                                        <span className="font-medium">Expected Impact:</span> {aiInsights.team_recommendations[0].expected_impact}
-                                      </p>
-                                    </div>
-                                  )}
-                                  {aiInsights.team_recommendations.length > 1 && (
-                                    <p className="text-xs text-purple-600">
-                                      View all {aiInsights.team_recommendations.length} recommendations in detailed report
-                                    </p>
-                                  )}
-                                </div>
-                              </div>
+                            <div>
+                              <h4 className="font-semibold text-gray-900 mb-2">Recommendations</h4>
+                              <p className="leading-relaxed">
+                                {aiInsights.team_recommendations[0] && (
+                                  <>
+                                    The highest priority action is to <span className="font-semibold">{aiInsights.team_recommendations[0].title.toLowerCase()}</span>. 
+                                    {aiInsights.team_recommendations[0].description} 
+                                    {aiInsights.team_recommendations[0].expected_impact && (
+                                      <> This is expected to {aiInsights.team_recommendations[0].expected_impact.toLowerCase()}</>
+                                    )}
+                                  </>
+                                )}
+                                {aiInsights.team_recommendations.length > 1 && (
+                                  <> Additionally, consider {aiInsights.team_recommendations[1].title.toLowerCase()} 
+                                  {aiInsights.team_recommendations.length > 2 && 
+                                    ` along with ${aiInsights.team_recommendations.length - 2} other recommended actions`}. </>
+                                )}
+                              </p>
                             </div>
                           )}
-
-                          {/* Enhanced Quick Stats Grid */}
-                          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                            <div className="bg-white/80 rounded-lg p-3 border border-gray-200">
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <p className="text-lg font-bold text-gray-800">{aiInsights?.team_size || members.length}</p>
-                                  <p className="text-xs text-gray-600">Team Members</p>
-                                </div>
-                                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                                  <Users className="w-4 h-4 text-blue-600" />
-                                </div>
-                              </div>
-                            </div>
-                            
-                            <div className="bg-white/80 rounded-lg p-3 border border-gray-200">
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <p className="text-lg font-bold text-red-600">{highRiskCount}</p>
-                                  <p className="text-xs text-gray-600">High Risk</p>
-                                </div>
-                                <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
-                                  <AlertTriangle className="w-4 h-4 text-red-600" />
-                                </div>
-                              </div>
-                            </div>
-                            
-                            <div className="bg-white/80 rounded-lg p-3 border border-gray-200">
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <p className="text-lg font-bold text-amber-600">{aiInsights?.common_patterns?.length || 0}</p>
-                                  <p className="text-xs text-gray-600">Risk Patterns</p>
-                                </div>
-                                <div className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center">
-                                  <TrendingUp className="w-4 h-4 text-amber-600" />
-                                </div>
-                              </div>
-                            </div>
-                            
-                            <div className="bg-white/80 rounded-lg p-3 border border-gray-200">
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <p className="text-lg font-bold text-purple-600">{aiInsights?.team_recommendations?.length || 0}</p>
-                                  <p className="text-xs text-gray-600">Recommendations</p>
-                                </div>
-                                <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                                  <BookOpen className="w-4 h-4 text-purple-600" />
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* AI Status Footer */}
-                          <div className="bg-gradient-to-r from-blue-100/70 to-indigo-100/70 rounded-lg p-3 border border-blue-200">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center space-x-2">
-                                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                                <span className="text-sm font-medium text-blue-900">
-                                  AI Analysis Complete
-                                </span>
-                                <Badge variant="outline" className="border-blue-300 text-blue-700 text-xs">
-                                  {aiInsights?.data_sources?.length || 3} Data Sources
-                                </Badge>
-                              </div>
-                              <span className="text-xs text-blue-700">
-                                Generated {new Date(aiInsights?.analysis_timestamp || currentAnalysis.created_at).toLocaleDateString()}
-                              </span>
-                            </div>
-                          </div>
                         </div>
                       )
                     })()}
@@ -3097,10 +3508,49 @@ export default function Dashboard() {
               </div>
             </DialogTitle>
           </DialogHeader>
-          {selectedMember && (
+          {selectedMember && (() => {
+            // Create individual member radar chart data
+            const memberFactors = [
+              {
+                factor: "Workload",
+                value: Number((selectedMember.factors?.workload || 0).toFixed(1)),
+                metrics: `Incidents: ${selectedMember.incident_count || 0}`,
+                color: getFactorColor(selectedMember.factors?.workload || 0)
+              },
+              {
+                factor: "After Hours", 
+                value: Number((selectedMember.factors?.after_hours || 0).toFixed(1)),
+                metrics: `After-hours: ${Math.round(selectedMember.metrics?.after_hours_percentage || 0)}%`,
+                color: getFactorColor(selectedMember.factors?.after_hours || 0)
+              },
+              {
+                factor: "Weekend Work",
+                value: Number((selectedMember.factors?.weekend_work || 0).toFixed(1)), 
+                metrics: `Weekend work: ${Math.round(selectedMember.metrics?.weekend_percentage || 0)}%`,
+                color: getFactorColor(selectedMember.factors?.weekend_work || 0)
+              },
+              {
+                factor: "Incident Load",
+                value: Number((selectedMember.factors?.incident_load || 0).toFixed(1)),
+                metrics: `Load score: ${(selectedMember.factors?.incident_load || 0).toFixed(1)}`,
+                color: getFactorColor(selectedMember.factors?.incident_load || 0)
+              },
+              {
+                factor: "Response Time",
+                value: Number((selectedMember.factors?.response_time || 0).toFixed(1)),
+                metrics: `Avg response: ${Math.round(selectedMember.metrics?.avg_response_time_minutes || 0)}min`,
+                color: getFactorColor(selectedMember.factors?.response_time || 0)
+              }
+            ];
+            
+            const memberHighRisk = memberFactors.filter(f => f.value >= 5);
+            
+            return (
             <div className="space-y-6">
-              {/* Overall Risk Assessment */}
-              <div className="bg-gradient-to-r from-gray-50 to-gray-100 p-6 rounded-lg">
+              {/* Individual Radar Chart */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Overall Risk Assessment */}
+                <div className="bg-gradient-to-r from-gray-50 to-gray-100 p-6 rounded-lg">
                 <div className="flex items-center justify-between mb-4">
                   <div>
                     <h3 className="text-lg font-semibold mb-1">Overall Risk Assessment</h3>
@@ -3113,6 +3563,208 @@ export default function Dashboard() {
                     </Badge>
                   </div>
                 </div>
+              </div>
+                
+                {/* Individual Burnout Analysis */}
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="flex items-center space-x-2">
+                        <span>Burnout Analysis</span>
+                        {memberHighRisk.length > 0 && (
+                          <div className="flex items-center space-x-2">
+                            <AlertTriangle className="w-4 h-4 text-red-500" />
+                            <span className="text-sm font-medium text-red-600">
+                              {memberHighRisk.length} factor{memberHighRisk.length > 1 ? 's' : ''} elevated
+                            </span>
+                          </div>
+                        )}
+                      </CardTitle>
+                      <div className="flex space-x-1 bg-gray-100 rounded-lg p-1">
+                        <button
+                          onClick={() => setMemberViewMode('radar')}
+                          className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                            memberViewMode === 'radar' 
+                              ? 'bg-white text-purple-600 shadow-sm' 
+                              : 'text-gray-600 hover:text-gray-900'
+                          }`}
+                        >
+                          Factors
+                        </button>
+                        <button
+                          onClick={() => setMemberViewMode('journey')}
+                          className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                            memberViewMode === 'journey' 
+                              ? 'bg-white text-purple-600 shadow-sm' 
+                              : 'text-gray-600 hover:text-gray-900'
+                          }`}
+                        >
+                          Journey
+                        </button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {memberViewMode === 'radar' ? (
+                      <div className="h-[280px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <RadarChart data={memberFactors} margin={{ top: 20, right: 30, bottom: 20, left: 30 }}>
+                            <PolarGrid gridType="polygon" />
+                            <PolarAngleAxis 
+                              dataKey="factor" 
+                              tick={{ fontSize: 10, fill: '#374151' }}
+                              className="text-xs"
+                            />
+                            <PolarRadiusAxis 
+                              domain={[0, 10]} 
+                              tick={{ fontSize: 8, fill: '#6B7280' }}
+                              tickCount={6}
+                              angle={270}
+                            />
+                            <Radar 
+                              dataKey="value" 
+                              stroke="#8B5CF6" 
+                              fill="#8B5CF6" 
+                              fillOpacity={0.1}
+                              strokeWidth={2}
+                              dot={{ fill: '#8B5CF6', strokeWidth: 2, r: 3 }}
+                            />
+                            <Tooltip 
+                              content={({ payload, label }) => {
+                                if (payload && payload.length > 0) {
+                                  const data = payload[0].payload
+                                  return (
+                                    <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
+                                      <p className="font-semibold text-gray-900">{label}</p>
+                                      <p style={{ color: data.color }}>Score: {data.value}/10</p>
+                                      <p className="text-sm text-gray-600 mt-1">{data.metrics}</p>
+                                    </div>
+                                  )
+                                }
+                                return null
+                              }}
+                            />
+                          </RadarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    ) : (
+                      <div className="h-[280px] overflow-y-auto">
+                        {/* Burnout Journey Map */}
+                        <div className="relative">
+                          {/* Timeline line */}
+                          <div className="absolute left-8 top-0 bottom-0 w-0.5 bg-gray-300"></div>
+                          
+                          {/* Journey Events */}
+                          <div className="space-y-6">
+                            {/* Current State */}
+                            <div className="relative flex items-start">
+                              <div className="absolute left-8 w-4 h-4 bg-white rounded-full border-4 border-red-500 -translate-x-1/2 z-10"></div>
+                              <div className="ml-16 -mt-1">
+                                <div className="flex items-center space-x-2 mb-1">
+                                  <span className="text-xs text-gray-500">Today</span>
+                                  <Badge className="bg-red-100 text-red-800 text-xs px-2 py-0">Current Risk</Badge>
+                                </div>
+                                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                                  <p className="font-medium text-red-900">Burnout Score: {(selectedMember.burnout_score || 0).toFixed(1)}/10</p>
+                                  <p className="text-sm text-red-700 mt-1">
+                                    {memberHighRisk.length > 0 
+                                      ? `${memberHighRisk.length} factors need attention: ${memberHighRisk.map(f => f.factor).join(', ')}`
+                                      : 'Risk levels within acceptable range'}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Key Event: High Workload Period */}
+                            {selectedMember.factors?.workload >= 7 && (
+                              <div className="relative flex items-start">
+                                <div className="absolute left-8 w-4 h-4 bg-white rounded-full border-4 border-orange-500 -translate-x-1/2 z-10"></div>
+                                <div className="ml-16 -mt-1">
+                                  <div className="flex items-center space-x-2 mb-1">
+                                    <span className="text-xs text-gray-500">Past 2 weeks</span>
+                                    <TrendingUp className="w-3 h-3 text-orange-500" />
+                                  </div>
+                                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
+                                    <p className="font-medium text-orange-900">Workload Spike Detected</p>
+                                    <p className="text-sm text-orange-700 mt-1">
+                                      Incident count increased by {Math.round((selectedMember.incident_count / 15 - 1) * 100)}% above average
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Key Event: After Hours Work */}
+                            {selectedMember.metrics?.after_hours_percentage > 20 && (
+                              <div className="relative flex items-start">
+                                <div className="absolute left-8 w-4 h-4 bg-white rounded-full border-4 border-yellow-500 -translate-x-1/2 z-10"></div>
+                                <div className="ml-16 -mt-1">
+                                  <div className="flex items-center space-x-2 mb-1">
+                                    <span className="text-xs text-gray-500">Recurring pattern</span>
+                                    <Clock className="w-3 h-3 text-yellow-600" />
+                                  </div>
+                                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                                    <p className="font-medium text-yellow-900">Consistent After-Hours Activity</p>
+                                    <p className="text-sm text-yellow-700 mt-1">
+                                      {selectedMember.metrics.after_hours_percentage}% of work happening outside business hours
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Positive Event: Recovery Period */}
+                            {selectedMember.burnout_score < 5 && (
+                              <div className="relative flex items-start">
+                                <div className="absolute left-8 w-4 h-4 bg-white rounded-full border-4 border-green-500 -translate-x-1/2 z-10"></div>
+                                <div className="ml-16 -mt-1">
+                                  <div className="flex items-center space-x-2 mb-1">
+                                    <span className="text-xs text-gray-500">Recommendation</span>
+                                    <TrendingDown className="w-3 h-3 text-green-600" />
+                                  </div>
+                                  <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                                    <p className="font-medium text-green-900">Maintain Current Balance</p>
+                                    <p className="text-sm text-green-700 mt-1">
+                                      Current workload is sustainable. Consider this a baseline for healthy work patterns.
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Future Projection */}
+                            <div className="relative flex items-start">
+                              <div className="absolute left-8 w-4 h-4 bg-white rounded-full border-2 border-gray-400 -translate-x-1/2 z-10">
+                                <ArrowRight className="w-2 h-2 text-gray-400 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+                              </div>
+                              <div className="ml-16 -mt-1">
+                                <div className="flex items-center space-x-2 mb-1">
+                                  <span className="text-xs text-gray-500">Next 30 days</span>
+                                  <span className="text-xs text-blue-600 font-medium">Projection</span>
+                                </div>
+                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                                  <p className="font-medium text-blue-900">Recommended Actions</p>
+                                  <ul className="text-sm text-blue-700 mt-1 space-y-1">
+                                    {memberHighRisk.length > 0 && (
+                                      <li className="flex items-start space-x-1">
+                                        <Circle className="w-1.5 h-1.5 mt-1.5 flex-shrink-0" />
+                                        <span>Address {memberHighRisk[0].factor.toLowerCase()}: {memberHighRisk[0].recommendation}</span>
+                                      </li>
+                                    )}
+                                    <li className="flex items-start space-x-1">
+                                      <Circle className="w-1.5 h-1.5 mt-1.5 flex-shrink-0" />
+                                      <span>Schedule regular check-ins to monitor progress</span>
+                                    </li>
+                                  </ul>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
               </div>
 
               {/* Key Indicators */}
@@ -3364,7 +4016,7 @@ export default function Dashboard() {
                 )}
               </div>
             </div>
-          )}
+            )})()}
         </DialogContent>
       </Dialog>
 

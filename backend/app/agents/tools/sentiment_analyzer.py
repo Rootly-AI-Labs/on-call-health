@@ -89,6 +89,9 @@ class SentimentAnalyzerTool:
         # Context-specific analysis
         pattern_analysis = self._analyze_patterns(scores, context, messages)
         
+        # Log detailed sentiment analysis results
+        logger.info(f"Sentiment Analysis Complete - Messages: {len(messages)}, Overall: {overall_sentiment}, Score: {round(avg_compound, 3)}, Negative rate: {round(negativity_rate, 3)}, Stress indicators: {len(stress_indicators)}")
+        
         return {
             "overall_sentiment": overall_sentiment,
             "sentiment_score": round(avg_compound, 3),

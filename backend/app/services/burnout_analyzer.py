@@ -92,6 +92,12 @@ class BurnoutAnalyzerService:
             metadata = data.get("collection_metadata", {}) if data else {}
             logger.info(f"TRACE: Extracted {len(users)} users, {len(incidents)} incidents")
             
+            # Log detailed data breakdown for AI insights
+            if incidents:
+                incident_statuses = [i.get('status', 'unknown') for i in incidents]
+                status_breakdown = {status: incident_statuses.count(status) for status in set(incident_statuses)}
+                logger.info(f"AI Insights Data - Incident status breakdown: {status_breakdown}")
+            
             # Collect GitHub/Slack data if enabled
             github_data = {}
             slack_data = {}

@@ -140,10 +140,23 @@ Please analyze {member_name}'s burnout risk now.
 
             # Use smolagents to run the analysis with reasoning
             self.logger.info(f"Running LLM-powered analysis for {member_name}")
+            self.logger.info(f"AI Analysis Input - Data sources: {available_data_sources}, Incident count: {len(member_data.get('incidents', []))}, Metrics: {list(member_data.keys())}")
+            
             agent_result = self.agent.run(prompt)
+            
+            # Log the raw AI response for debugging
+            self.logger.info(f"AI Agent Raw Response for {member_name}: {str(agent_result)[:500]}...")
             
             # Parse and structure the agent's natural language response
             structured_result = self._parse_agent_response(agent_result, member_data, available_data_sources)
+            
+            # Log the structured AI insights
+            if structured_result:
+                confidence = structured_result.get('confidence_score', 'unknown')
+                risk_level = structured_result.get('overall_risk_level', 'unknown')
+                insight_count = len(structured_result.get('insights', []))
+                recommendation_count = len(structured_result.get('recommendations', []))
+                self.logger.info(f"AI Analysis Output for {member_name} - Risk: {risk_level}, Confidence: {confidence}, Insights: {insight_count}, Recommendations: {recommendation_count}")
             
             return structured_result
             

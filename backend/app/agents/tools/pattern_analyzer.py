@@ -203,6 +203,9 @@ class PatternAnalyzerTool:
         
         recommendations = self._generate_commit_recommendations(burnout_indicators, late_night_rate, weekend_rate)
         
+        # Log detailed pattern analysis results
+        logger.info(f"Pattern Analysis (Commits) Complete - Events: {len(events)}, Late-night rate: {late_night_rate:.2%}, Weekend rate: {weekend_rate:.2%}, Burnout indicators: {len(burnout_indicators)}")
+        
         return {
             "pattern_type": "commits",
             "total_events": len(events),
