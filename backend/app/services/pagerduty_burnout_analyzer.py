@@ -444,7 +444,12 @@ class PagerDutyBurnoutAnalyzerService:
     
     def _is_user_involved_in_incident(self, user_id: str, incident: Dict[str, Any]) -> bool:
         """Check if a user was involved in handling an incident."""
-        # Check assigned users
+        # Check the single assigned_to user (from normalization process)
+        assigned_to = incident.get("assigned_to")
+        if assigned_to and assigned_to.get("id") == user_id:
+            return True
+        
+        # Also check assigned_users array (for backward compatibility)
         assigned_users = incident.get("assigned_users", [])
         for user in assigned_users:
             if user.get("id") == user_id:

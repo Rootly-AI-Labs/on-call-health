@@ -2,6 +2,7 @@
 Burnout analysis API endpoints.
 """
 import asyncio
+import logging
 from datetime import datetime
 from typing import Dict, Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
@@ -12,7 +13,9 @@ from ...models import get_db, User, Analysis
 from ...auth.dependencies import get_current_active_user
 from ...core.rootly_client import RootlyAPIClient
 from ...core.simple_burnout_analyzer import SimpleBurnoutAnalyzer
+from ...services.burnout_analyzer import BurnoutAnalyzerService
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 class AnalysisRequest(BaseModel):
@@ -56,7 +59,8 @@ async def start_analysis(
         run_analysis_task,
         analysis.id,
         current_user.rootly_token,
-        request.days_back
+        request.days_back,
+        current_user.id  # Pass user ID for LLM token access
     )
     
     return AnalysisResponse(
@@ -186,7 +190,7 @@ async def get_analysis_history(
         for analysis in analyses
     ]
 
-async def run_analysis_task(analysis_id: int, rootly_token: str, days_back: int):
+async def run_analysis_task(analysis_id: int, rootly_token: str, days_back: int, user_id: int):
     """Background task to run the actual analysis."""
     db = next(get_db())
     
@@ -196,21 +200,44 @@ async def run_analysis_task(analysis_id: int, rootly_token: str, days_back: int)
         analysis.status = "running"
         db.commit()
         
-        # Initialize Rootly client
-        client = RootlyAPIClient(rootly_token)
+        # Get user for LLM token access
+        user = db.query(User).filter(User.id == user_id).first()
+        has_llm_token = user and user.llm_token and user.llm_provider
         
-        # Collect data
-        raw_data = await client.collect_analysis_data(days_back=days_back)
-        
-        # Initialize analyzer
-        analyzer = SimpleBurnoutAnalyzer()
-        
-        # Run analysis
-        results = analyzer.analyze_team_burnout(
-            users=raw_data["users"],
-            incidents=raw_data["incidents"],
-            metadata=raw_data["collection_metadata"]
-        )
+        # Initialize analyzer - use full analyzer if LLM token available, simple otherwise
+        if has_llm_token:
+            logger.info(f"User has LLM token ({user.llm_provider}), using full analyzer with AI enhancement")
+            
+            # Set user context for AI analysis
+            from ...services.ai_burnout_analyzer import set_user_context
+            set_user_context(user)
+            
+            analyzer = BurnoutAnalyzerService(rootly_token)
+            
+            # Run full analysis with AI enhancement
+            results = await analyzer.analyze_burnout(
+                time_range_days=days_back,
+                include_weekends=True,
+                include_github=False,  # TODO: Add GitHub integration flags
+                include_slack=False    # TODO: Add Slack integration flags
+            )
+        else:
+            logger.info("No LLM token available, using simple analyzer")
+            # Initialize Rootly client
+            client = RootlyAPIClient(rootly_token)
+            
+            # Collect data
+            raw_data = await client.collect_analysis_data(days_back=days_back)
+            
+            # Initialize simple analyzer
+            analyzer = SimpleBurnoutAnalyzer()
+            
+            # Run simple analysis
+            results = analyzer.analyze_team_burnout(
+                users=raw_data["users"],
+                incidents=raw_data["incidents"],
+                metadata=raw_data["collection_metadata"]
+            )
         
         # Update analysis with results
         analysis.status = "completed"
