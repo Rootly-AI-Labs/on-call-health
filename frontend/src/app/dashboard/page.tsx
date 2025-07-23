@@ -108,9 +108,11 @@ interface OrganizationMember {
   role?: string
   avatar?: string
   burnoutScore: number
+  burnout_score?: number // API returns snake_case
   riskLevel: 'high' | 'medium' | 'low'
   trend: 'up' | 'down' | 'stable'
   incidentsHandled: number
+  incident_count?: number // API returns this
   avgResponseTime: string
   factors: {
     workload: number
@@ -118,6 +120,17 @@ interface OrganizationMember {
     weekendWork: number
     incidentLoad: number
     responseTime: number
+    // Snake case versions from API
+    after_hours?: number
+    weekend_work?: number
+    incident_load?: number
+    response_time?: number
+  }
+  metrics?: {
+    avg_response_time_minutes: number
+    after_hours_percentage: number
+    weekend_percentage: number
+    status_distribution?: any
   }
   github_activity?: {
     commits_count: number
@@ -147,6 +160,11 @@ interface OrganizationMember {
       after_hours_activity: boolean
     }
   }
+  // Additional fields from API response
+  user_id?: string
+  user_name?: string
+  user_email?: string
+  risk_level?: string
 }
 
 interface AnalysisResult {
@@ -272,6 +290,12 @@ interface AnalysisResult {
     failure_stage?: string
     session_hours?: number
     total_incidents?: number
+    ai_team_insights?: {
+      available: boolean
+      summary?: string
+      recommendations?: string[]
+      key_insights?: string[]
+    }
   }
 }
 
@@ -3590,31 +3614,36 @@ export default function Dashboard() {
                 factor: "Workload",
                 value: Number((selectedMember.factors?.workload || 0).toFixed(1)),
                 metrics: `Incidents: ${selectedMember.incident_count || 0}`,
-                color: getFactorColor(selectedMember.factors?.workload || 0)
+                color: getFactorColor(selectedMember.factors?.workload || 0),
+                recommendation: "Redistribute incident assignments"
               },
               {
                 factor: "After Hours", 
                 value: Number((selectedMember.factors?.after_hours || 0).toFixed(1)),
                 metrics: `After-hours: ${Math.round(selectedMember.metrics?.after_hours_percentage || 0)}%`,
-                color: getFactorColor(selectedMember.factors?.after_hours || 0)
+                color: getFactorColor(selectedMember.factors?.after_hours || 0),
+                recommendation: "Adjust on-call schedule"
               },
               {
                 factor: "Weekend Work",
                 value: Number((selectedMember.factors?.weekend_work || 0).toFixed(1)), 
                 metrics: `Weekend work: ${Math.round(selectedMember.metrics?.weekend_percentage || 0)}%`,
-                color: getFactorColor(selectedMember.factors?.weekend_work || 0)
+                color: getFactorColor(selectedMember.factors?.weekend_work || 0),
+                recommendation: "Implement weekend rotation"
               },
               {
                 factor: "Incident Load",
                 value: Number((selectedMember.factors?.incident_load || 0).toFixed(1)),
                 metrics: `Load score: ${(selectedMember.factors?.incident_load || 0).toFixed(1)}`,
-                color: getFactorColor(selectedMember.factors?.incident_load || 0)
+                color: getFactorColor(selectedMember.factors?.incident_load || 0),
+                recommendation: "Review incident assignment process"
               },
               {
                 factor: "Response Time",
                 value: Number((selectedMember.factors?.response_time || 0).toFixed(1)),
                 metrics: `Avg response: ${Math.round(selectedMember.metrics?.avg_response_time_minutes || 0)}min`,
-                color: getFactorColor(selectedMember.factors?.response_time || 0)
+                color: getFactorColor(selectedMember.factors?.response_time || 0),
+                recommendation: "Optimize alert routing"
               }
             ];
             
