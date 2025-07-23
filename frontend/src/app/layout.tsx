@@ -16,6 +16,7 @@ export default function RootLayout({
 }: {
   children: React.ReactNode
 }) {
+  console.log('NEXT_PUBLIC_API_URL in layout:', process.env.NEXT_PUBLIC_API_URL)
   return (
     <html lang="en">
       <body className={inter.className}>

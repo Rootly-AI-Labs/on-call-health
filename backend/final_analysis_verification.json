@@ -1,0 +1,202 @@
+{
+  "analysis_timestamp": "2025-07-16T16:50:08.010784",
+  "metadata": {
+    "timestamp": "2025-07-16T16:50:08.009484",
+    "days_analyzed": 30,
+    "total_users": 1,
+    "total_incidents": 41,
+    "date_range": {
+      "start": "2025-06-16T23:50:05.424394+00:00",
+      "end": "2025-07-16T23:50:05.424394+00:00"
+    },
+    "include_weekends": true,
+    "include_github": false,
+    "include_slack": false
+  },
+  "data_sources": {
+    "incident_data": true,
+    "github_data": false,
+    "slack_data": false
+  },
+  "team_health": {
+    "overall_score": 5.61,
+    "risk_distribution": {
+      "low": 0,
+      "medium": 0,
+      "high": 1
+    },
+    "average_burnout_score": 5.39,
+    "health_status": "fair",
+    "members_at_risk": 1
+  },
+  "team_analysis": {
+    "members": [
+      {
+        "user_id": "PKSB8VA",
+        "user_name": "Spencer Cheng",
+        "user_email": "spencer.cheng@rootly.com",
+        "burnout_score": 5.39,
+        "risk_level": "high",
+        "incident_count": 41,
+        "factors": {
+          "workload": 10,
+          "after_hours": 10,
+          "weekend_work": 0.0,
+          "incident_load": 9.68,
+          "response_time": 0.0
+        },
+        "maslach_dimensions": {
+          "emotional_exhaustion": 7.3,
+          "depersonalization": 3.59,
+          "personal_accomplishment": 5.34
+        },
+        "metrics": {
+          "incidents_per_week": 9.57,
+          "after_hours_percentage": 1.0,
+          "weekend_percentage": 0.0,
+          "avg_response_time_minutes": 0,
+          "severity_distribution": {
+            "high": 26,
+            "low": 15
+          },
+          "status_distribution": {
+            "triggered": 29,
+            "acknowledged": 12
+          }
+        },
+        "github_activity": {
+          "commits_count": 0,
+          "pull_requests_count": 0,
+          "reviews_count": 0,
+          "after_hours_commits": 0,
+          "weekend_commits": 0,
+          "avg_pr_size": 0,
+          "burnout_indicators": {
+            "excessive_commits": false,
+            "late_night_activity": false,
+            "weekend_work": false,
+            "large_prs": false
+          }
+        },
+        "slack_activity": {
+          "messages_sent": 0,
+          "channels_active": 0,
+          "after_hours_messages": 0,
+          "weekend_messages": 0,
+          "avg_response_time_minutes": 0,
+          "sentiment_score": 0.0,
+          "burnout_indicators": {
+            "excessive_messaging": false,
+            "poor_sentiment": false,
+            "late_responses": false,
+            "after_hours_activity": false
+          }
+        },
+        "ai_insights": {},
+        "ai_risk_assessment": {
+          "overall_risk_level": "unknown",
+          "risk_score": 0,
+          "risk_factors": [
+            "Analysis error occurred"
+          ],
+          "protective_factors": []
+        },
+        "ai_recommendations": [
+          {
+            "priority": "high",
+            "category": "system",
+            "title": "Analysis Error",
+            "description": "Could not complete AI analysis. Using fallback assessment.",
+            "actions": [
+              "Contact system administrator",
+              "Review data sources"
+            ]
+          }
+        ],
+        "recommendations": [
+          "[AI] Could not complete AI analysis. Using fallback assessment."
+        ],
+        "ai_confidence": 0.0,
+        "ai_analysis_timestamp": "2025-07-16T23:50:08.026227",
+        "ai_data_sources": []
+      }
+    ],
+    "total_members": 1,
+    "total_incidents": 41
+  },
+  "insights": [
+    {
+      "type": "warning",
+      "category": "team",
+      "message": "1 team members are at high burnout risk",
+      "priority": "high"
+    },
+    {
+      "type": "pattern",
+      "category": "after_hours",
+      "message": "1 team members have >30% after-hours incidents",
+      "priority": "high"
+    }
+  ],
+  "recommendations": [
+    {
+      "type": "organizational",
+      "priority": "high",
+      "message": "Consider implementing or reviewing on-call rotation schedules to distribute load more evenly"
+    },
+    {
+      "type": "interpersonal",
+      "priority": "high",
+      "message": "Schedule 1-on-1s with the 1 team members at high risk"
+    },
+    {
+      "type": "emotional_exhaustion",
+      "priority": "high",
+      "message": "Implement follow-the-sun support or adjust business hours coverage"
+    },
+    {
+      "type": "organizational",
+      "priority": "high",
+      "message": "Consider organizational changes: flexible schedules, mental health resources, and burnout prevention programs"
+    }
+  ],
+  "ai_team_insights": {
+    "available": true,
+    "insights": {
+      "analysis_timestamp": "2025-07-16T23:50:08.026265",
+      "team_size": 1,
+      "data_sources": [],
+      "risk_distribution": {
+        "distribution": {
+          "low": 0,
+          "medium": 0,
+          "high": 1,
+          "critical": 0
+        },
+        "high_risk_percentage": 100.0,
+        "ai_escalations": 0,
+        "total_members": 1
+      },
+      "common_patterns": [],
+      "team_recommendations": [
+        {
+          "priority": "urgent",
+          "category": "team_health",
+          "title": "Team Burnout Risk Critical",
+          "description": "100.0% of team members show high burnout risk",
+          "actions": [
+            "Conduct immediate team workload review",
+            "Implement team-wide stress reduction measures",
+            "Consider bringing in additional resources",
+            "Review team processes and efficiency"
+          ]
+        }
+      ],
+      "workload_distribution": {
+        "available": false
+      }
+    }
+  },
+  "ai_enhanced": true,
+  "ai_enhancement_timestamp": "2025-07-16T23:50:08.026320"
+}

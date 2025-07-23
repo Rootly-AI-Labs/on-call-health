@@ -1,0 +1,157 @@
+{
+  "analysis_timestamp": "2025-07-16T11:47:17.352632",
+  "metadata": {
+    "timestamp": "2025-07-16T11:45:59.434829",
+    "days_analyzed": 30,
+    "total_users": 1,
+    "total_incidents": 41,
+    "date_range": {
+      "start": "2025-06-16T18:45:56.652384+00:00",
+      "end": "2025-07-16T18:45:56.652384+00:00"
+    },
+    "include_weekends": true,
+    "include_github": true,
+    "include_slack": true
+  },
+  "data_sources": {
+    "incident_data": true,
+    "github_data": true,
+    "slack_data": true
+  },
+  "team_health": {
+    "overall_score": 4.11,
+    "risk_distribution": {
+      "low": 0,
+      "medium": 0,
+      "high": 1
+    },
+    "average_burnout_score": 6.89,
+    "health_status": "fair",
+    "members_at_risk": 1
+  },
+  "team_analysis": {
+    "members": [
+      {
+        "user_id": "PKSB8VA",
+        "user_name": "Spencer Cheng",
+        "user_email": "spencer.cheng@rootly.com",
+        "incident_count": 41,
+        "burnout_score": 6.8916666666666675,
+        "risk_level": "high",
+        "factors": {
+          "workload": 1.0,
+          "after_hours": 1.0,
+          "weekend_work": 0.0,
+          "incident_load": 0.9566666666666667,
+          "response_time": 0.0
+        },
+        "metrics": {
+          "total_incidents": 41,
+          "avg_response_time_minutes": 0,
+          "after_hours_count": 41,
+          "after_hours_percentage": 100.0,
+          "weekend_count": 0,
+          "weekend_percentage": 0.0,
+          "resolved_incidents": 0
+        }
+      }
+    ],
+    "total_incidents": 41,
+    "analysis_period_days": 30,
+    "weekend_analysis_enabled": true
+  },
+  "insights": [
+    {
+      "type": "warning",
+      "title": "High Burnout Risk Detected",
+      "description": "1 out of 1 team members show high burnout risk.",
+      "recommendation": "Consider redistributing workload and providing additional support."
+    },
+    {
+      "type": "info",
+      "title": "After-Hours Work Pattern",
+      "description": "1 members frequently handle incidents outside business hours.",
+      "recommendation": "Review on-call rotation and incident escalation procedures."
+    }
+  ],
+  "recommendations": [
+    {
+      "type": "organizational",
+      "priority": "high",
+      "message": "Implement workload balancing for high-risk team members"
+    },
+    {
+      "type": "interpersonal",
+      "priority": "high",
+      "message": "Consider additional staffing or temporary support"
+    },
+    {
+      "type": "organizational",
+      "priority": "low",
+      "message": "Maintain regular team health check-ins"
+    },
+    {
+      "type": "personal_accomplishment",
+      "priority": "low",
+      "message": "Monitor incident trends and response times"
+    }
+  ],
+  "github_insights": {
+    "total_users_analyzed": 1,
+    "total_commits": 68,
+    "total_pull_requests": 6,
+    "total_reviews": 9,
+    "avg_commits_per_week": 15.87,
+    "avg_prs_per_week": 1.4,
+    "after_hours_activity_rate": 0.147,
+    "after_hours_activity_percentage": 14.7,
+    "weekend_activity_rate": 0.088,
+    "top_contributors": [
+      {
+        "email": "spencer.cheng@rootly.com",
+        "username": "spencerhcheng",
+        "commits_per_week": 15.87,
+        "total_commits": 68
+      }
+    ],
+    "burnout_indicators": {
+      "excessive_commits": 1,
+      "after_hours_coding": 0,
+      "weekend_work": 0,
+      "large_prs": 1,
+      "excessive_late_night_commits": 0,
+      "weekend_workers": 0,
+      "large_pr_pattern": 1
+    }
+  },
+  "slack_insights": {
+    "total_users_analyzed": 1,
+    "total_messages": 14,
+    "active_channels": 1,
+    "avg_messages_per_day": 0.5,
+    "avg_response_time_minutes": 0,
+    "after_hours_messaging_rate": 0.0,
+    "after_hours_activity_percentage": 0.0,
+    "weekend_messaging_rate": 0.0,
+    "avg_sentiment_score": 0.588,
+    "channels_analyzed": 1,
+    "sentiment_analysis": {
+      "overall_sentiment": "positive",
+      "sentiment_score": 0.588,
+      "positive_ratio": 1.0,
+      "negative_ratio": 0.0
+    },
+    "burnout_indicators": {
+      "excessive_messaging": 0,
+      "poor_sentiment": 0,
+      "late_responses": 0,
+      "after_hours_activity": 0
+    },
+    "errors": {
+      "rate_limited_channels": [
+        "test"
+      ],
+      "other_errors": []
+    }
+  }
+}

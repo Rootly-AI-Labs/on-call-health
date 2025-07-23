@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>API Endpoint Debug</title>
+</head>
+<body>
+    <h1>API Endpoint Debug</h1>
+    <button onclick="testAnalysesEndpoint()">Test /analyses</button>
+    <button onclick="testTrendsEndpoint()">Test /analyses/trends/historical</button>
+    <button onclick="testWithAuth()">Test /analyses/trends/historical with fake auth</button>
+    
+    <div id="results" style="margin-top: 20px; white-space: pre-wrap;"></div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000';
+        const results = document.getElementById('results');
+        
+        function log(message) {
+            results.innerHTML += message + '\n';
+            console.log(message);
+        }
+        
+        async function testAnalysesEndpoint() {
+            results.innerHTML = '';
+            log('Testing /analyses endpoint...');
+            
+            try {
+                const response = await fetch(`${API_BASE}/analyses`);
+                log(`Status: ${response.status}`);
+                log(`URL: ${response.url}`);
+                log(`Headers: ${JSON.stringify([...response.headers.entries()], null, 2)}`);
+                const text = await response.text();
+                log(`Response: ${text}`);
+            } catch (error) {
+                log(`Error: ${error.message}`);
+            }
+        }
+        
+        async function testTrendsEndpoint() {
+            results.innerHTML = '';
+            log('Testing /analyses/trends/historical endpoint...');
+            
+            const params = new URLSearchParams({ days_back: '14' });
+            const url = `${API_BASE}/analyses/trends/historical?${params}`;
+            
+            try {
+                log(`Making request to: ${url}`);
+                const response = await fetch(url);
+                log(`Status: ${response.status}`);
+                log(`URL: ${response.url}`);
+                log(`Headers: ${JSON.stringify([...response.headers.entries()], null, 2)}`);
+                const text = await response.text();
+                log(`Response: ${text}`);
+            } catch (error) {
+                log(`Error: ${error.message}`);
+            }
+        }
+        
+        async function testWithAuth() {
+            results.innerHTML = '';
+            log('Testing /analyses/trends/historical with fake auth...');
+            
+            const params = new URLSearchParams({ days_back: '14' });
+            const url = `${API_BASE}/analyses/trends/historical?${params}`;
+            
+            try {
+                log(`Making request to: ${url}`);
+                const response = await fetch(url, {
+                    headers: {
+                        'Authorization': 'Bearer fake_token'
+                    }
+                });
+                log(`Status: ${response.status}`);
+                log(`URL: ${response.url}`);
+                log(`Headers: ${JSON.stringify([...response.headers.entries()], null, 2)}`);
+                const text = await response.text();
+                log(`Response: ${text}`);
+            } catch (error) {
+                log(`Error: ${error.message}`);
+            }
+        }
+    </script>
+</body>
+</html>
