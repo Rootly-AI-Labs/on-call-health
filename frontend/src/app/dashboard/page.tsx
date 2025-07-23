@@ -3982,7 +3982,7 @@ export default function Dashboard() {
                               {Object.entries(statusDist).map(([status, count]) => (
                                 <div key={status} className="flex justify-between text-xs">
                                   <span className="text-gray-500 capitalize">{status}:</span>
-                                  <span className="font-medium text-blue-600">{count}</span>
+                                  <span className="font-medium text-blue-600">{String(count)}</span>
                                 </div>
                               ))}
                             </div>
