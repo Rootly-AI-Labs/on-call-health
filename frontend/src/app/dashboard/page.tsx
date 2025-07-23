@@ -2304,9 +2304,9 @@ export default function Dashboard() {
                       const teamAnalysis = currentAnalysis.analysis_data.team_analysis;
                       const members = teamAnalysis?.members || [];
                       const riskDist = aiInsights?.risk_distribution;
-                      const highRiskCount = (riskDist?.distribution?.high || 0) + (riskDist?.distribution?.critical || 0);
-                      const mediumRiskCount = riskDist?.distribution?.medium || 0;
-                      const lowRiskCount = riskDist?.distribution?.low || 0;
+                      const highRiskCount = (riskDist?.high || 0) + ((riskDist as any)?.critical || 0);
+                      const mediumRiskCount = riskDist?.medium || 0;
+                      const lowRiskCount = riskDist?.low || 0;
                       const highRiskMembers = members.filter(m => m.risk_level === 'high' || m.risk_level === 'critical');
                       const hasPatterns = aiInsights?.common_patterns && aiInsights.common_patterns.length > 0;
                       const hasRecommendations = aiInsights?.team_recommendations && aiInsights.team_recommendations.length > 0;
