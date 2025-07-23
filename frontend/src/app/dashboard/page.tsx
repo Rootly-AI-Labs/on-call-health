@@ -3325,19 +3325,99 @@ export default function Dashboard() {
 
           {/* Empty State */}
           {!analysisRunning && !currentAnalysis && (
-            <Card className="text-center p-8">
-              <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Activity className="w-8 h-8 text-purple-600" />
-              </div>
-              <h3 className="text-lg font-semibold mb-2">No Analysis Yet</h3>
-              <p className="text-gray-600 mb-4">
-                Click "New Analysis" to start analyzing your organization's burnout metrics
-              </p>
-              <Button onClick={startAnalysis} className="bg-purple-600 hover:bg-purple-700">
-                <Play className="w-4 h-4 mr-2" />
-                New Analysis
-              </Button>
-            </Card>
+            <>
+              {/* Check if integrations exist */}
+              {integrations.length === 0 ? (
+                <Card className="text-center p-8">
+                  <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Settings className="w-8 h-8 text-blue-600" />
+                  </div>
+                  <h3 className="text-lg font-semibold mb-2">Setup Required</h3>
+                  <p className="text-gray-600 mb-4">
+                    Connect your first integration to start analyzing burnout metrics. Both Rootly and PagerDuty are supported.
+                  </p>
+                  <Button onClick={() => router.push('/integrations')} className="bg-blue-600 hover:bg-blue-700">
+                    <Settings className="w-4 h-4 mr-2" />
+                    Setup Integrations
+                  </Button>
+                </Card>
+              ) : (
+                <>
+                  {/* Check for missing platforms */}
+                  {(() => {
+                    const hasRootly = integrations.some(i => i.platform === 'rootly')
+                    const hasPagerDuty = integrations.some(i => i.platform === 'pagerduty')
+                    
+                    if (!hasRootly || !hasPagerDuty) {
+                      return (
+                        <div className="space-y-4 mb-6">
+                          {!hasRootly && (
+                            <Alert className="border-purple-200 bg-purple-50">
+                              <Info className="w-4 h-4 text-purple-600" />
+                              <AlertDescription className="text-purple-800">
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <strong>Rootly Integration Available</strong>
+                                    <span className="block text-sm mt-1">
+                                      Connect Rootly for comprehensive incident management and team burnout analysis.
+                                    </span>
+                                  </div>
+                                  <Button 
+                                    size="sm" 
+                                    onClick={() => router.push('/integrations')} 
+                                    className="bg-purple-600 hover:bg-purple-700 ml-4"
+                                  >
+                                    Setup Rootly
+                                  </Button>
+                                </div>
+                              </AlertDescription>
+                            </Alert>
+                          )}
+                          {!hasPagerDuty && (
+                            <Alert className="border-green-200 bg-green-50">
+                              <Info className="w-4 h-4 text-green-600" />
+                              <AlertDescription className="text-green-800">
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <strong>PagerDuty Integration Available</strong>
+                                    <span className="block text-sm mt-1">
+                                      Connect PagerDuty for incident response analysis and on-call burnout metrics.
+                                    </span>
+                                  </div>
+                                  <Button 
+                                    size="sm" 
+                                    onClick={() => router.push('/integrations')} 
+                                    className="bg-green-600 hover:bg-green-700 ml-4"
+                                  >
+                                    Setup PagerDuty
+                                  </Button>
+                                </div>
+                              </AlertDescription>
+                            </Alert>
+                          )}
+                        </div>
+                      )
+                    }
+                    return null
+                  })()}
+                  
+                  {/* Standard empty state */}
+                  <Card className="text-center p-8">
+                    <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Activity className="w-8 h-8 text-purple-600" />
+                    </div>
+                    <h3 className="text-lg font-semibold mb-2">No Analysis Yet</h3>
+                    <p className="text-gray-600 mb-4">
+                      Click "New Analysis" to start analyzing your organization's burnout metrics
+                    </p>
+                    <Button onClick={startAnalysis} className="bg-purple-600 hover:bg-purple-700">
+                      <Play className="w-4 h-4 mr-2" />
+                      New Analysis
+                    </Button>
+                  </Card>
+                </>
+              )}
+            </>
           )}
         </div>
       </div>
