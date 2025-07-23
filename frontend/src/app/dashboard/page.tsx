@@ -72,6 +72,14 @@ interface Integration {
   last_used_at: string | null
   token_suffix: string
   platform?: 'rootly' | 'pagerduty'
+  permissions?: {
+    users?: {
+      access: boolean
+    }
+    incidents?: {
+      access: boolean
+    }
+  }
 }
 
 interface GitHubIntegration {
