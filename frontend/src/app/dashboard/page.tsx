@@ -229,6 +229,7 @@ interface AnalysisResult {
           avg_response_time_minutes: number
           after_hours_percentage: number
           weekend_percentage: number
+          status_distribution?: any
         }
         github_activity?: any
         slack_activity?: any
