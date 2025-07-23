@@ -1266,7 +1266,7 @@ export default function Dashboard() {
                 setTimeout(() => {
                   setAnalysisRunning(false)
                   setCurrentAnalysis(analysisData)
-                  updateURLWithAnalysis(analysisData.id)
+                  updateURLWithAnalysis(parseInt(analysisData.id))
                 }, 500) // Show 100% for just 0.5 seconds before showing data
               }, 800) // Wait 0.8 seconds to reach 95%
               
@@ -1666,16 +1666,16 @@ export default function Dashboard() {
                                 memberCount: fullAnalysis.analysis_data?.team_analysis?.members?.length || 0
                               })
                               setCurrentAnalysis(fullAnalysis)
-                              updateURLWithAnalysis(fullAnalysis.id)
+                              updateURLWithAnalysis(parseInt(fullAnalysis.id))
                             } else {
                               console.error('Failed to fetch full analysis')
                               setCurrentAnalysis(analysis)
-                              updateURLWithAnalysis(analysis.id)
+                              updateURLWithAnalysis(parseInt(analysis.id))
                             }
                           } catch (error) {
                             console.error('Error fetching full analysis:', error)
                             setCurrentAnalysis(analysis)
-                            updateURLWithAnalysis(analysis.id)
+                            updateURLWithAnalysis(parseInt(analysis.id))
                           }
                         } else {
                           console.log('Analysis already has data:', {
@@ -1683,7 +1683,7 @@ export default function Dashboard() {
                             memberCount: analysis.analysis_data.team_analysis?.members?.length || 0
                           })
                           setCurrentAnalysis(analysis)
-                          updateURLWithAnalysis(analysis.id)
+                          updateURLWithAnalysis(parseInt(analysis.id))
                         }
                       }}
                     >
