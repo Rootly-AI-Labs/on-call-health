@@ -295,6 +295,15 @@ interface AnalysisResult {
       summary?: string
       recommendations?: string[]
       key_insights?: string[]
+      insights?: {
+        team_size?: number
+        risk_distribution?: {
+          high: number
+          medium: number
+          low: number
+        }
+        [key: string]: any
+      }
     }
   }
 }
