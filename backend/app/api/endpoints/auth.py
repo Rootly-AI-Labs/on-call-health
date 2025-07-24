@@ -16,7 +16,7 @@ from ...core.config import settings
 router = APIRouter()
 
 @router.get("/google")
-async def google_login():
+async def google_login(redirect_origin: str = Query(None)):
     """Initiate Google OAuth login."""
     if not settings.GOOGLE_CLIENT_ID:
         raise HTTPException(
@@ -24,7 +24,13 @@ async def google_login():
             detail="Google OAuth not configured"
         )
     
-    authorization_url = google_oauth.get_authorization_url()
+    # Store the redirect origin in state parameter for OAuth callback
+    state = None
+    if redirect_origin and redirect_origin in ["http://localhost:3000", settings.FRONTEND_URL]:
+        # Only allow known origins for security
+        state = redirect_origin
+    
+    authorization_url = google_oauth.get_authorization_url(state=state)
     return {"authorization_url": authorization_url}
 
 @router.get("/google/callback")
@@ -82,16 +88,25 @@ async def google_callback(
         # Create JWT token
         jwt_token = create_access_token(data={"sub": user.id})
         
+        # Determine redirect URL based on state parameter
+        frontend_url = settings.FRONTEND_URL
+        if state and state in ["http://localhost:3000", settings.FRONTEND_URL]:
+            frontend_url = state
+            
         # Redirect to frontend with token
-        redirect_url = f"{settings.FRONTEND_URL}/auth/success?token={jwt_token}"
+        redirect_url = f"{frontend_url}/auth/success?token={jwt_token}"
         return RedirectResponse(url=redirect_url)
         
     except Exception as e:
-        error_url = f"{settings.FRONTEND_URL}/auth/error?message={str(e)}"
+        # Use state for error redirect too
+        frontend_url = settings.FRONTEND_URL
+        if state and state in ["http://localhost:3000", settings.FRONTEND_URL]:
+            frontend_url = state
+        error_url = f"{frontend_url}/auth/error?message={str(e)}"
         return RedirectResponse(url=error_url)
 
 @router.get("/github")
-async def github_login():
+async def github_login(redirect_origin: str = Query(None)):
     """Initiate GitHub OAuth login."""
     if not settings.GITHUB_CLIENT_ID:
         raise HTTPException(
@@ -99,7 +114,13 @@ async def github_login():
             detail="GitHub OAuth not configured"
         )
     
-    authorization_url = github_oauth.get_authorization_url()
+    # Store the redirect origin in state parameter for OAuth callback
+    state = None
+    if redirect_origin and redirect_origin in ["http://localhost:3000", settings.FRONTEND_URL]:
+        # Only allow known origins for security
+        state = redirect_origin
+    
+    authorization_url = github_oauth.get_authorization_url(state=state)
     return {"authorization_url": authorization_url}
 
 @router.get("/github/callback")
@@ -156,12 +177,21 @@ async def github_callback(
         # Create JWT token
         jwt_token = create_access_token(data={"sub": user.id})
         
+        # Determine redirect URL based on state parameter
+        frontend_url = settings.FRONTEND_URL
+        if state and state in ["http://localhost:3000", settings.FRONTEND_URL]:
+            frontend_url = state
+            
         # Redirect to frontend with token
-        redirect_url = f"{settings.FRONTEND_URL}/auth/success?token={jwt_token}"
+        redirect_url = f"{frontend_url}/auth/success?token={jwt_token}"
         return RedirectResponse(url=redirect_url)
         
     except Exception as e:
-        error_url = f"{settings.FRONTEND_URL}/auth/error?message={str(e)}"
+        # Use state for error redirect too
+        frontend_url = settings.FRONTEND_URL
+        if state and state in ["http://localhost:3000", settings.FRONTEND_URL]:
+            frontend_url = state
+        error_url = f"{frontend_url}/auth/error?message={str(e)}"
         return RedirectResponse(url=error_url)
 
 @router.get("/me")

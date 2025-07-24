@@ -11,7 +11,9 @@ console.log('API_BASE:', API_BASE) // Debug log to verify the URL
 export default function LandingPage() {
   const handleGoogleLogin = async () => {
     try {
-      const response = await fetch(`${API_BASE}/auth/google`)
+      // Pass the current origin to the backend
+      const currentOrigin = window.location.origin
+      const response = await fetch(`${API_BASE}/auth/google?redirect_origin=${encodeURIComponent(currentOrigin)}`)
       const data = await response.json()
       if (data.authorization_url) {
         window.location.href = data.authorization_url
@@ -23,7 +25,9 @@ export default function LandingPage() {
 
   const handleGitHubLogin = async () => {
     try {
-      const response = await fetch(`${API_BASE}/auth/github`)
+      // Pass the current origin to the backend
+      const currentOrigin = window.location.origin
+      const response = await fetch(`${API_BASE}/auth/github?redirect_origin=${encodeURIComponent(currentOrigin)}`)
       const data = await response.json()
       if (data.authorization_url) {
         window.location.href = data.authorization_url
