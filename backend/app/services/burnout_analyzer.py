@@ -234,6 +234,9 @@ class BurnoutAnalyzerService:
             team_overall_score = team_health.get("overall_score", 0.0)  # This is already health scale 0-10
             period_average_score = team_overall_score * 10  # Convert to percentage scale 0-100
             
+            logger.info(f"Period summary calculation: team_overall_score={team_overall_score}, period_average_score={period_average_score}")
+            logger.info(f"Team health keys: {list(team_health.keys()) if team_health else 'None'}")
+            
             result = {
                 "analysis_timestamp": datetime.now().isoformat(),
                 "metadata": {
