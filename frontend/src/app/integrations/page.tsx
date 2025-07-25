@@ -592,6 +592,14 @@ export default function IntegrationsPage() {
         // Clear local storage cache
         localStorage.removeItem(`${platform}_integrations`)
         localStorage.removeItem(`${platform}_integrations_timestamp`)
+        localStorage.removeItem('all_integrations')
+        localStorage.removeItem('all_integrations_timestamp')
+        
+        // If this is the first integration, set it as selected for dashboard
+        const newIntegrationId = responseData.integration?.id || responseData.id
+        if (newIntegrationId && integrations.length === 0) {
+          localStorage.setItem('selected_organization', newIntegrationId.toString())
+        }
         
         // Reset form and state
         form.reset()
@@ -637,6 +645,14 @@ export default function IntegrationsPage() {
         // Clear local storage
         localStorage.removeItem(`${integrationToDelete.platform}_integrations`)
         localStorage.removeItem(`${integrationToDelete.platform}_integrations_timestamp`)
+        localStorage.removeItem('all_integrations')
+        localStorage.removeItem('all_integrations_timestamp')
+        
+        // If we deleted the currently selected integration, clear the selection
+        const selectedOrg = localStorage.getItem('selected_organization')
+        if (selectedOrg === integrationToDelete.id.toString()) {
+          localStorage.removeItem('selected_organization')
+        }
         
         loadAllIntegrations()
         setDeleteDialogOpen(false)
