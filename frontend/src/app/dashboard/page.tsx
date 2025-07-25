@@ -210,6 +210,17 @@ interface AnalysisResult {
         slack_contribution: number
       }
     }
+    team_summary?: {
+      total_users: number
+      average_score: number
+      highest_score: number
+      risk_distribution: {
+        high: number
+        medium: number
+        low: number
+      }
+      users_at_risk: number
+    }
     team_analysis: {
       members: Array<{
         user_id: string
@@ -234,7 +245,25 @@ interface AnalysisResult {
         github_activity?: any
         slack_activity?: any
       }>
-    }
+    } | Array<{
+      user_id: string
+      user_name: string
+      user_email: string
+      burnout_score: number
+      risk_level: string
+      incident_count: number
+      key_metrics?: {
+        incidents_per_week: number
+        severity_weighted_per_week?: number
+        after_hours_percentage: number
+        avg_resolution_hours: number
+      }
+      recommendations?: string[]
+      factors?: any
+      metrics?: any
+      github_activity?: any
+      slack_activity?: any
+    }>
     github_insights?: {
       total_commits: number
       total_pull_requests: number
