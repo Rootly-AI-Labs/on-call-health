@@ -293,7 +293,11 @@ class RootlyAPIClient:
                     page_start_time = datetime.now()
                     
                     # Use adaptive page size based on time range to optimize performance
-                    if days_back >= 30:
+                    if days_back >= 90:
+                        # Maximum page size for very long ranges
+                        actual_page_size = min(page_size, 100)
+                        logger.info(f"🔍 INCIDENT OPTIMIZATION: Using maximum page size ({actual_page_size}) for {days_back}-day analysis")
+                    elif days_back >= 30:
                         # Larger pages for longer ranges to reduce total API calls
                         actual_page_size = min(page_size, 50)
                         logger.info(f"🔍 INCIDENT OPTIMIZATION: Using larger page size ({actual_page_size}) for {days_back}-day analysis")
@@ -431,7 +435,8 @@ class RootlyAPIClient:
                 14: 3000,  # 14-day: up to 3000 incidents  
                 30: 5000,  # 30-day: up to 5000 incidents (reduced from 10000)
                 60: 7000,  # 60-day: up to 7000 incidents
-                90: 10000  # 90-day: up to 10000 incidents
+                90: 10000, # 90-day: up to 10000 incidents
+                180: 15000 # 180-day (6 months): up to 15000 incidents
             }
             
             # Find appropriate limit for the time range
