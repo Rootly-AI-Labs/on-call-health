@@ -3346,9 +3346,8 @@ export default function Dashboard() {
                   {/* Check for missing platforms */}
                   {(() => {
                     const hasRootly = integrations.some(i => i.platform === 'rootly')
-                    const hasPagerDuty = integrations.some(i => i.platform === 'pagerduty')
                     
-                    if (!hasRootly || !hasPagerDuty) {
+                    if (!hasRootly) {
                       return (
                         <div className="space-y-4 mb-6">
                           {!hasRootly && (
@@ -3368,28 +3367,6 @@ export default function Dashboard() {
                                     className="bg-purple-600 hover:bg-purple-700 ml-4"
                                   >
                                     Setup Rootly
-                                  </Button>
-                                </div>
-                              </AlertDescription>
-                            </Alert>
-                          )}
-                          {!hasPagerDuty && (
-                            <Alert className="border-green-200 bg-green-50">
-                              <Info className="w-4 h-4 text-green-600" />
-                              <AlertDescription className="text-green-800">
-                                <div className="flex items-center justify-between">
-                                  <div>
-                                    <strong>PagerDuty Integration Available</strong>
-                                    <span className="block text-sm mt-1">
-                                      Connect PagerDuty for incident response analysis and on-call burnout metrics.
-                                    </span>
-                                  </div>
-                                  <Button 
-                                    size="sm" 
-                                    onClick={() => router.push('/integrations')} 
-                                    className="bg-green-600 hover:bg-green-700 ml-4"
-                                  >
-                                    Setup PagerDuty
                                   </Button>
                                 </div>
                               </AlertDescription>
