@@ -2204,7 +2204,15 @@ export default function Dashboard() {
                             })()}%</div>
                             <div className="text-xs text-gray-500">Current</div>
                           </div>
-                          {(historicalTrends?.summary?.average_score !== undefined || currentAnalysis.analysis_data?.period_summary?.average_score !== undefined) && (
+                          {(() => {
+                            // Debug: Log what data is available
+                            console.log("Debug - historicalTrends:", historicalTrends);
+                            console.log("Debug - period_summary:", currentAnalysis?.analysis_data?.period_summary);
+                            console.log("Debug - daily_trends length:", currentAnalysis?.analysis_data?.daily_trends?.length);
+                            console.log("Debug - team_health:", currentAnalysis?.analysis_data?.team_health);
+                            // Always show average section, handle fallbacks inside
+                            return true;
+                          })() && (
                             <div className="border-l border-gray-200 pl-3">
                               <div className="text-2xl font-bold text-gray-900">{(() => {
                                 // Use historical trends summary if available
@@ -2231,14 +2239,27 @@ export default function Dashboard() {
                           )}
                         </div>
                         <div className="mt-2 flex items-center space-x-1">
-                          <div className="text-sm font-medium text-purple-600">{currentAnalysis.analysis_data.team_health?.health_status || (() => {
-                            // Derive health status from average score for team_summary (now health scale 0-10, higher=better)
-                            const avgScore = currentAnalysis.analysis_data.team_summary?.average_score;
-                            if (!avgScore) return 'Excellent';
-                            if (avgScore >= 8) return 'Excellent';
-                            if (avgScore >= 6) return 'Good';
-                            if (avgScore >= 4) return 'Fair';
-                            if (avgScore >= 2) return 'Poor';
+                          <div className="text-sm font-medium text-purple-600">{(() => {
+                            // Use the same data source as current score for consistency
+                            let currentScore = 0;
+                            
+                            if (historicalTrends?.daily_trends?.length > 0) {
+                              const latestTrend = historicalTrends.daily_trends[historicalTrends.daily_trends.length - 1];
+                              currentScore = latestTrend.overall_score;
+                            } else if (currentAnalysis?.analysis_data?.daily_trends?.length > 0) {
+                              const latestTrend = currentAnalysis.analysis_data.daily_trends[currentAnalysis.analysis_data.daily_trends.length - 1];
+                              currentScore = latestTrend.overall_score;
+                            } else if (currentAnalysis?.analysis_data?.team_health) {
+                              currentScore = currentAnalysis.analysis_data.team_health.overall_score;
+                            } else if (currentAnalysis?.analysis_data?.team_summary) {
+                              currentScore = currentAnalysis.analysis_data.team_summary.average_score;
+                            }
+                            
+                            // Convert to health status (0-10 scale, higher=better)
+                            if (currentScore >= 8) return 'Excellent';
+                            if (currentScore >= 6) return 'Good';
+                            if (currentScore >= 4) return 'Fair';
+                            if (currentScore >= 2) return 'Poor';
                             return 'Critical';
                           })()}</div>
                           <Info className="w-3 h-3 text-purple-500" 
