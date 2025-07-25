@@ -769,27 +769,77 @@ async def run_analysis_task(
                     logger.info(f"BACKGROUND_TASK: Attempting to save raw data for failed analysis {analysis_id}")
                     raw_data = None
                     
-                    # Access the appropriate client based on platform
-                    if hasattr(analyzer_service, 'client') and analyzer_service.client:
-                        try:
-                            raw_data = await analyzer_service.client.collect_analysis_data(days_back=time_range)
-                            logger.info(f"BACKGROUND_TASK: Successfully collected raw data for analysis {analysis_id}")
-                        except Exception as client_error:
-                            logger.warning(f"BACKGROUND_TASK: Failed to collect raw data for analysis {analysis_id}: {client_error}")
-                    else:
-                        logger.warning(f"BACKGROUND_TASK: No client available for raw data collection in analysis {analysis_id}")
+                    # Access the appropriate client based on platform with comprehensive error handling
+                    try:
+                        # Check if analyzer_service exists and is not None
+                        if analyzer_service is None:
+                            logger.warning(f"BACKGROUND_TASK: analyzer_service is None for analysis {analysis_id}")
+                        elif hasattr(analyzer_service, 'client'):
+                            client = getattr(analyzer_service, 'client', None)
+                            if client is not None:
+                                try:
+                                    logger.info(f"BACKGROUND_TASK: Attempting raw data collection with client type: {type(client).__name__}")
+                                    raw_data = await client.collect_analysis_data(days_back=time_range)
+                                    logger.info(f"BACKGROUND_TASK: Successfully collected raw data for analysis {analysis_id}")
+                                except Exception as client_error:
+                                    logger.warning(f"BACKGROUND_TASK: Failed to collect raw data for analysis {analysis_id}: {client_error}")
+                            else:
+                                logger.warning(f"BACKGROUND_TASK: analyzer_service.client is None for analysis {analysis_id}")
+                        else:
+                            logger.warning(f"BACKGROUND_TASK: analyzer_service has no 'client' attribute for analysis {analysis_id} (type: {type(analyzer_service).__name__})")
+                            
+                            # Try alternative approaches for different analyzer types
+                            if hasattr(analyzer_service, 'api_token'):
+                                try:
+                                    # For SimpleBurnoutAnalyzer or similar, try to create a client
+                                    from ...core.rootly_client import RootlyAPIClient
+                                    temp_client = RootlyAPIClient(analyzer_service.api_token)
+                                    raw_data = await temp_client.collect_analysis_data(days_back=time_range)
+                                    logger.info(f"BACKGROUND_TASK: Successfully collected raw data using temporary client for analysis {analysis_id}")
+                                except Exception as temp_client_error:
+                                    logger.warning(f"BACKGROUND_TASK: Failed to collect raw data using temporary client for analysis {analysis_id}: {temp_client_error}")
+                    except Exception as client_access_error:
+                        logger.error(f"BACKGROUND_TASK: Error accessing client for raw data collection in analysis {analysis_id}: {client_access_error}")
                     
                     # Save partial results with raw data (safely handle None raw_data)
-                    partial_results = {
-                        "error": f"Analysis failed: {str(analysis_error)}",
-                        "partial_data": {
-                            "users": raw_data.get("users", []) if raw_data and isinstance(raw_data, dict) else [],
-                            "incidents": raw_data.get("incidents", []) if raw_data and isinstance(raw_data, dict) else [],
-                            "metadata": raw_data.get("collection_metadata", {}) if raw_data and isinstance(raw_data, dict) else {}
-                        },
-                        "data_collection_successful": bool(raw_data),
-                        "failure_stage": "analysis_processing"
-                    }
+                    try:
+                        partial_results = {
+                            "error": f"Analysis failed: {str(analysis_error)}",
+                            "partial_data": {
+                                "users": [],
+                                "incidents": [],
+                                "metadata": {}
+                            },
+                            "data_collection_successful": False,
+                            "failure_stage": "analysis_processing"
+                        }
+                        
+                        # Safely extract data if raw_data exists
+                        if raw_data and isinstance(raw_data, dict):
+                            try:
+                                users_data = raw_data.get("users")
+                                if users_data and isinstance(users_data, list):
+                                    partial_results["partial_data"]["users"] = users_data
+                                    
+                                incidents_data = raw_data.get("incidents")
+                                if incidents_data and isinstance(incidents_data, list):
+                                    partial_results["partial_data"]["incidents"] = incidents_data
+                                    
+                                metadata_data = raw_data.get("collection_metadata")
+                                if metadata_data and isinstance(metadata_data, dict):
+                                    partial_results["partial_data"]["metadata"] = metadata_data
+                                    
+                                partial_results["data_collection_successful"] = True
+                            except Exception as extract_error:
+                                logger.warning(f"BACKGROUND_TASK: Error extracting partial data for analysis {analysis_id}: {extract_error}")
+                    except Exception as partial_error:
+                        logger.error(f"BACKGROUND_TASK: Error creating partial results for analysis {analysis_id}: {partial_error}")
+                        partial_results = {
+                            "error": f"Analysis failed: {str(analysis_error)}",
+                            "partial_data": {"users": [], "incidents": [], "metadata": {}},
+                            "data_collection_successful": False,
+                            "failure_stage": "analysis_processing"
+                        }
                     
                     analysis.status = "failed"
                     analysis.error_message = f"Analysis failed: {str(analysis_error)}"

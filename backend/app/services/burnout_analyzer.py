@@ -305,10 +305,15 @@ class BurnoutAnalyzerService:
                 )
             }
             
-            # Log success metrics
-            members_count = len(result.get("team_analysis", {}).get("members", []))
-            incidents_count = len(incidents)
-            logger.info(f"🔍 BURNOUT ANALYSIS SUCCESS: Analyzed {members_count} members using {incidents_count} incidents over {time_range_days} days")
+            # Log success metrics with null safety
+            try:
+                team_analysis = result.get("team_analysis") if result and isinstance(result, dict) else {}
+                members = team_analysis.get("members") if team_analysis and isinstance(team_analysis, dict) else []
+                members_count = len(members) if isinstance(members, list) else 0
+                incidents_count = len(incidents) if isinstance(incidents, list) else 0
+                logger.info(f"🔍 BURNOUT ANALYSIS SUCCESS: Analyzed {members_count} members using {incidents_count} incidents over {time_range_days} days")
+            except Exception as metrics_error:
+                logger.warning(f"Error logging success metrics: {metrics_error}")
                 
             return result
             
@@ -1078,11 +1083,23 @@ class BurnoutAnalyzerService:
         
         # Pattern-based recommendations
         if members:
-            # After-hours pattern with null safety
-            after_hours_values = [
-                m.get("metrics", {}).get("after_hours_percentage", 0) 
-                for m in members if m and isinstance(m, dict)
-            ]
+            # After-hours pattern with comprehensive null safety
+            after_hours_values = []
+            try:
+                for m in members:
+                    if m and isinstance(m, dict):
+                        try:
+                            metrics = m.get("metrics")
+                            if metrics and isinstance(metrics, dict):
+                                after_hours = metrics.get("after_hours_percentage", 0)
+                                if isinstance(after_hours, (int, float)):
+                                    after_hours_values.append(after_hours)
+                        except Exception as e:
+                            logger.debug(f"Error extracting after_hours_percentage: {e}")
+                            continue
+            except Exception as e:
+                logger.warning(f"Error processing after_hours patterns: {e}")
+                after_hours_values = []
             avg_after_hours = sum(after_hours_values) / len(after_hours_values) if after_hours_values else 0
             if avg_after_hours > 0.25:
                 recommendations.append({
@@ -1091,11 +1108,23 @@ class BurnoutAnalyzerService:
                     "message": "Implement follow-the-sun support or adjust business hours coverage"
                 })
             
-            # Weekend pattern with null safety
-            weekend_values = [
-                m.get("metrics", {}).get("weekend_percentage", 0) 
-                for m in members if m and isinstance(m, dict)
-            ]
+            # Weekend pattern with comprehensive null safety
+            weekend_values = []
+            try:
+                for m in members:
+                    if m and isinstance(m, dict):
+                        try:
+                            metrics = m.get("metrics")
+                            if metrics and isinstance(metrics, dict):
+                                weekend_pct = metrics.get("weekend_percentage", 0)
+                                if isinstance(weekend_pct, (int, float)):
+                                    weekend_values.append(weekend_pct)
+                        except Exception as e:
+                            logger.debug(f"Error extracting weekend_percentage: {e}")
+                            continue
+            except Exception as e:
+                logger.warning(f"Error processing weekend patterns: {e}")
+                weekend_values = []
             avg_weekend = sum(weekend_values) / len(weekend_values) if weekend_values else 0
             if avg_weekend > 0.15:
                 recommendations.append({
@@ -1113,12 +1142,23 @@ class BurnoutAnalyzerService:
                     "message": "Incident load is unevenly distributed - consider load balancing strategies"
                 })
             
-            # Response time with null safety
-            response_values = [
-                m.get("metrics", {}).get("avg_response_time_minutes", 0) 
-                for m in members 
-                if m and isinstance(m, dict) and m.get("metrics", {}).get("avg_response_time_minutes", 0) > 0
-            ]
+            # Response time with comprehensive null safety
+            response_values = []
+            try:
+                for m in members:
+                    if m and isinstance(m, dict):
+                        try:
+                            metrics = m.get("metrics")
+                            if metrics and isinstance(metrics, dict):
+                                response_time = metrics.get("avg_response_time_minutes", 0)
+                                if isinstance(response_time, (int, float)) and response_time > 0:
+                                    response_values.append(response_time)
+                        except Exception as e:
+                            logger.debug(f"Error extracting avg_response_time_minutes: {e}")
+                            continue
+            except Exception as e:
+                logger.warning(f"Error processing response time patterns: {e}")
+                response_values = []
             avg_response = sum(response_values) / len(response_values) if response_values else 0
             if avg_response > 30:
                 recommendations.append({
@@ -1383,9 +1423,17 @@ class BurnoutAnalyzerService:
         try:
             ai_analyzer = get_ai_burnout_analyzer()
             
-            # Enhance each member analysis
+            # Enhance each member analysis with null safety
             enhanced_members = []
-            original_members = analysis_result.get("team_analysis", {}).get("members", [])
+            try:
+                team_analysis = analysis_result.get("team_analysis") if analysis_result and isinstance(analysis_result, dict) else {}
+                original_members = team_analysis.get("members") if team_analysis and isinstance(team_analysis, dict) else []
+                if not isinstance(original_members, list):
+                    original_members = []
+                    logger.warning("original_members is not a list, using empty list")
+            except Exception as e:
+                logger.warning(f"Error extracting original_members: {e}")
+                original_members = []
             
             for member in original_members:
                 # Prepare member data for AI analysis

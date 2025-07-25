@@ -267,9 +267,39 @@ class AIBurnoutAnalyzerService:
         ai_escalations = 0
         
         for member in team_members:
-            risk_level = member.get("risk_level", "low").lower()
-            member_name = member.get("user_name", "Unknown")
-            member_email = member.get("user_email", "")
+            try:
+                if not member or not isinstance(member, dict):
+                    logger.debug("Skipping invalid member in team enhancement")
+                    continue
+                    
+                # Safe extraction of member data
+                risk_level = "low"
+                member_name = "Unknown"
+                member_email = ""
+                
+                try:
+                    raw_risk_level = member.get("risk_level", "low")
+                    if isinstance(raw_risk_level, str):
+                        risk_level = raw_risk_level.lower()
+                except Exception as e:
+                    logger.debug(f"Error extracting risk_level: {e}")
+                    
+                try:
+                    raw_member_name = member.get("user_name", "Unknown")
+                    if isinstance(raw_member_name, str):
+                        member_name = raw_member_name
+                except Exception as e:
+                    logger.debug(f"Error extracting user_name: {e}")
+                    
+                try:
+                    raw_member_email = member.get("user_email", "")
+                    if isinstance(raw_member_email, str):
+                        member_email = raw_member_email
+                except Exception as e:
+                    logger.debug(f"Error extracting user_email: {e}")
+            except Exception as e:
+                logger.warning(f"Error processing member in team enhancement: {e}")
+                continue
             
             if risk_level in risk_counts:
                 risk_counts[risk_level] += 1
@@ -562,7 +592,20 @@ class AIBurnoutAnalyzerService:
         }
         
         for risk_level in ["critical", "high", "medium", "low"]:
-            members_at_risk = [m for m in team_members if m.get("risk_level", "low").lower() == risk_level]
+            members_at_risk = []
+            try:
+                for m in team_members:
+                    if m and isinstance(m, dict):
+                        try:
+                            member_risk_level = m.get("risk_level", "low")
+                            if isinstance(member_risk_level, str) and member_risk_level.lower() == risk_level:
+                                members_at_risk.append(m)
+                        except Exception as e:
+                            logger.debug(f"Error checking risk level for member: {e}")
+                            continue
+            except Exception as e:
+                logger.warning(f"Error processing risk level {risk_level}: {e}")
+                members_at_risk = []
             if members_at_risk:
                 detailed_analysis["risk_breakdown"][risk_level] = {
                     "count": len(members_at_risk),
@@ -755,7 +798,21 @@ class AIBurnoutAnalyzerService:
             "team_resilience_factors": []
         }
         
-        high_risk_count = len([m for m in team_members if m.get("risk_level", "low").lower() in ["high", "critical"]])
+        # Count high-risk members with null safety
+        high_risk_count = 0
+        try:
+            for m in team_members:
+                if m and isinstance(m, dict):
+                    try:
+                        risk_level = m.get("risk_level", "low")
+                        if isinstance(risk_level, str) and risk_level.lower() in ["high", "critical"]:
+                            high_risk_count += 1
+                    except Exception as e:
+                        logger.debug(f"Error checking high risk level for member: {e}")
+                        continue
+        except Exception as e:
+            logger.warning(f"Error counting high-risk members: {e}")
+            high_risk_count = 0
         total_members = len(team_members)
         
         if high_risk_count > total_members * 0.5:
@@ -765,8 +822,21 @@ class AIBurnoutAnalyzerService:
             trends["risk_trajectory"] = "concerning"
             trends["early_warning_signs"].append("Significant portion of team under stress")
         
-        # Identify positive indicators
-        low_risk_count = len([m for m in team_members if m.get("risk_level", "low").lower() == "low"])
+        # Identify positive indicators with null safety
+        low_risk_count = 0
+        try:
+            for m in team_members:
+                if m and isinstance(m, dict):
+                    try:
+                        risk_level = m.get("risk_level", "low")
+                        if isinstance(risk_level, str) and risk_level.lower() == "low":
+                            low_risk_count += 1
+                    except Exception as e:
+                        logger.debug(f"Error checking low risk level for member: {e}")
+                        continue
+        except Exception as e:
+            logger.warning(f"Error counting low-risk members: {e}")
+            low_risk_count = 0
         if low_risk_count > total_members * 0.6:
             trends["positive_indicators"].append("Majority of team showing healthy stress levels")
         
