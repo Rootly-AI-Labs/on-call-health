@@ -258,9 +258,10 @@ class SimpleBurnoutAnalyzer:
         
         # Generate daily trends if we have incident data
         daily_trends = []
-        # Convert team burnout score to health score (invert 0-10 scale)
-        team_burnout_avg = team_summary.get("average_score", 0.0)
-        period_average_score = max(0.0, 10.0 - team_burnout_avg)  # Convert burnout to health score
+        # team_summary.average_score is now a health score (0-10, higher = better)
+        team_health_avg = team_summary.get("average_score", 0.0)
+        # Convert health score to percentage scale (0-100)
+        period_average_score = team_health_avg * 10  # Convert to percentage scale (0-100)
         
         try:
             daily_trends = self._generate_daily_trends(incidents, team_analysis, metadata)
@@ -268,10 +269,10 @@ class SimpleBurnoutAnalyzer:
             # Calculate period average from daily trends if available
             if daily_trends and len(daily_trends) > 0:
                 daily_scores = [day["overall_score"] for day in daily_trends]
-                period_average_score = sum(daily_scores) / len(daily_scores)
-                logger.info(f"Period average from daily trends: {period_average_score}")
+                period_average_score = (sum(daily_scores) / len(daily_scores)) * 10  # Convert to percentage scale (0-100)
+                logger.info(f"Period average from daily trends: {period_average_score}% (from {len(daily_scores)} days)")
             else:
-                logger.info(f"No daily trends generated, using fallback period average: {period_average_score}")
+                logger.info(f"No daily trends generated, using fallback period average: {period_average_score}%")
         except Exception as e:
             logger.error(f"Error generating daily trends: {e}")
             daily_trends = []
@@ -700,7 +701,10 @@ class SimpleBurnoutAnalyzer:
         if not team_analysis:
             return {}
         
-        scores = [user["burnout_score"] for user in team_analysis]
+        # Convert burnout scores (0-10, higher=worse) to health scores (0-10, higher=better)
+        burnout_scores = [user["burnout_score"] for user in team_analysis]
+        health_scores = [max(0.0, 10.0 - score) for score in burnout_scores]
+        
         risk_counts = {"high": 0, "medium": 0, "low": 0}
         
         for user in team_analysis:
@@ -708,8 +712,9 @@ class SimpleBurnoutAnalyzer:
         
         return {
             "total_users": len(team_analysis),
-            "average_score": round(sum(scores) / len(scores), 2),
-            "highest_score": max(scores),
+            "average_score": round(sum(health_scores) / len(health_scores), 2),  # Now health score (0-10, higher=better)
+            "highest_score": max(health_scores),  # Highest health score  
+            "lowest_score": min(health_scores),   # Add lowest health score for completeness
             "risk_distribution": risk_counts,
             "users_at_risk": risk_counts["high"] + risk_counts["medium"]
         }
@@ -732,11 +737,12 @@ class SimpleBurnoutAnalyzer:
         if total_users > 0 and (high_risk_count + medium_risk_count) / total_users > 0.5:
             recommendations.append("📋 Consider team workload redistribution and process improvements")
         
-        avg_score = team_summary.get("average_score", 0)
-        if avg_score > 6:
-            recommendations.append("⚖️ Team average burnout score is high - review on-call policies")
-        elif avg_score < 3:
-            recommendations.append("✅ Team burnout levels are healthy - maintain current practices")
+        # team_summary.average_score is now health score (0-10, higher = better)
+        avg_health_score = team_summary.get("average_score", 0)
+        if avg_health_score < 4:  # Low health (was high burnout)
+            recommendations.append("⚖️ Team average health score is low - review on-call policies")
+        elif avg_health_score > 7:  # High health (was low burnout)
+            recommendations.append("✅ Team health levels are excellent - maintain current practices")
         
         return recommendations or ["Team analysis completed - review individual recommendations"]
     
@@ -885,14 +891,14 @@ class SimpleBurnoutAnalyzer:
                 daily_severity_rate = data["severity_weighted_count"] / total_users if total_users > 0 else 0
                 after_hours_ratio = data["after_hours_count"] / data["incident_count"] if data["incident_count"] > 0 else 0
                 
-                # More realistic scoring (inverse of burnout - higher score is better)
-                # Base score represents normal operational health (not perfect)
+                # Consistent baseline scoring (health scale: higher score = better health)
+                # All days start from the same baseline to ensure consistency
                 if data["incident_count"] == 0:
                     # Zero incident days: good but not perfect (accounting for background work/stress)
                     daily_score = 8.5 + (hash(date_str) % 10) * 0.05  # 8.5-9.0 range with slight daily variation
                 else:
-                    # Days with incidents: start higher and apply penalties
-                    daily_score = 9.0
+                    # Days with incidents: start from same baseline as zero-incident days, then apply penalties
+                    daily_score = 8.7  # Slightly higher baseline to account for normal operational activity
                     daily_score -= min(5.0, daily_severity_rate * 2.5)  # Up to -5 for severity-weighted incidents
                     daily_score -= min(2.0, after_hours_ratio * 2)      # Up to -2 for after-hours work
                     daily_score -= min(1.5, data["high_severity_count"] * 0.7)  # Up to -1.5 for high severity

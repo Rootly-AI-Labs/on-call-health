@@ -54,6 +54,10 @@ import {
   Info,
   Circle,
   ArrowRight,
+  Heart,
+  Shield,
+  BarChart3,
+  Database,
 } from "lucide-react"
 import Image from "next/image"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -2168,7 +2172,10 @@ export default function Dashboard() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6 overflow-visible">
                 <Card className="border-2 border-purple-200 bg-white/70 backdrop-blur-sm shadow-lg overflow-visible">
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-purple-700">Team Health</CardTitle>
+                    <CardTitle className="text-sm font-medium text-purple-700 flex items-center space-x-2">
+                      <Heart className="w-4 h-4" />
+                      <span>Team Health</span>
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
                     {currentAnalysis?.analysis_data?.team_health || (currentAnalysis?.analysis_data?.team_analysis && currentAnalysis?.status === 'completed') ? (
@@ -2180,20 +2187,20 @@ export default function Dashboard() {
                           </div>
                           {(historicalTrends?.summary?.average_score !== undefined || currentAnalysis.analysis_data?.period_summary?.average_score !== undefined) && (
                             <div className="border-l border-gray-200 pl-3">
-                              <div className="text-2xl font-bold text-gray-900">{Math.round((historicalTrends?.summary?.average_score ?? currentAnalysis.analysis_data?.period_summary?.average_score ?? 0) * 10)}%</div>
+                              <div className="text-2xl font-bold text-gray-900">{Math.round(historicalTrends?.summary?.average_score ?? currentAnalysis.analysis_data?.period_summary?.average_score ?? 0)}%</div>
                               <div className="text-xs text-gray-500">{currentAnalysis?.time_range || 30}-day avg</div>
                             </div>
                           )}
                         </div>
                         <div className="mt-2 flex items-center space-x-1">
                           <div className="text-sm font-medium text-purple-600">{currentAnalysis.analysis_data.team_health?.health_status || (() => {
-                            // Derive health status from average score for team_summary
+                            // Derive health status from average score for team_summary (now health scale 0-10, higher=better)
                             const avgScore = currentAnalysis.analysis_data.team_summary?.average_score;
                             if (!avgScore) return 'Excellent';
-                            if (avgScore < 3) return 'Excellent';
-                            if (avgScore < 5) return 'Good';
-                            if (avgScore < 7) return 'Fair';
-                            if (avgScore < 8) return 'Poor';
+                            if (avgScore >= 8) return 'Excellent';
+                            if (avgScore >= 6) return 'Good';
+                            if (avgScore >= 4) return 'Fair';
+                            if (avgScore >= 2) return 'Poor';
                             return 'Critical';
                           })()}</div>
                           <Info className="w-3 h-3 text-purple-500" 
@@ -2218,13 +2225,13 @@ export default function Dashboard() {
                         <p className="text-xs text-gray-600 mt-1">
                           {(() => {
                             const status = (currentAnalysis.analysis_data.team_health?.health_status || (() => {
-                              // Derive health status from average score for team_summary
+                              // Derive health status from average score for team_summary (now health scale 0-10, higher=better)
                               const avgScore = currentAnalysis.analysis_data.team_summary?.average_score;
                               if (!avgScore) return 'excellent';
-                              if (avgScore < 3) return 'excellent';
-                              if (avgScore < 5) return 'good';
-                              if (avgScore < 7) return 'fair';
-                              if (avgScore < 8) return 'poor';
+                              if (avgScore >= 8) return 'excellent';
+                              if (avgScore >= 6) return 'good';
+                              if (avgScore >= 4) return 'fair';
+                              if (avgScore >= 2) return 'poor';
                               return 'critical';
                             })()).toLowerCase()
                             switch(status) {
@@ -2254,7 +2261,10 @@ export default function Dashboard() {
 
                 <Card className="border-2 border-purple-200 bg-white/70 backdrop-blur-sm shadow-lg">
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-purple-700">At Risk</CardTitle>
+                    <CardTitle className="text-sm font-medium text-purple-700 flex items-center space-x-2">
+                      <Shield className="w-4 h-4" />
+                      <span>At Risk</span>
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
                     {currentAnalysis?.analysis_data?.team_health || (currentAnalysis?.analysis_data?.team_analysis && currentAnalysis?.status === 'completed') ? (
@@ -2287,7 +2297,10 @@ export default function Dashboard() {
 
                 <Card className="border-2 border-purple-200 bg-white/70 backdrop-blur-sm shadow-lg">
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-purple-700">Total Incidents</CardTitle>
+                    <CardTitle className="text-sm font-medium text-purple-700 flex items-center space-x-2">
+                      <BarChart3 className="w-4 h-4" />
+                      <span>Total Incidents</span>
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold text-gray-900">
@@ -2311,7 +2324,10 @@ export default function Dashboard() {
                 {/* Data Sources Card */}
                 <Card className="border-2 border-blue-200 bg-white/70 backdrop-blur-sm shadow-lg">
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-blue-700">Data Sources</CardTitle>
+                    <CardTitle className="text-sm font-medium text-blue-700 flex items-center space-x-2">
+                      <Database className="w-4 h-4" />
+                      <span>Data Sources</span>
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
