@@ -2215,23 +2215,27 @@ export default function Dashboard() {
                           })() && (
                             <div className="border-l border-gray-200 pl-3">
                               <div className="text-2xl font-bold text-gray-900">{(() => {
-                                // Use historical trends summary if available
-                                if (historicalTrends?.summary?.average_score !== undefined) {
-                                  return Math.round(historicalTrends.summary.average_score);
+                                // Calculate average directly from Health Trends chart data (same source as chart)
+                                if (historicalTrends?.daily_trends?.length > 0) {
+                                  const dailyScores = historicalTrends.daily_trends.map((d: any) => d.overall_score);
+                                  const average = dailyScores.reduce((a: number, b: number) => a + b, 0) / dailyScores.length;
+                                  console.log("Debug - calculated average from historicalTrends daily_trends:", average * 10);
+                                  return Math.round(average * 10); // Convert 0-10 to 0-100%
                                 }
-                                // Use current analysis period summary if available
-                                if (currentAnalysis?.analysis_data?.period_summary?.average_score !== undefined) {
-                                  return Math.round(currentAnalysis.analysis_data.period_summary.average_score);
-                                }
-                                // Calculate average from current analysis daily trends
+                                // Fallback: Calculate from current analysis daily trends
                                 if (currentAnalysis?.analysis_data?.daily_trends?.length > 0) {
                                   const dailyScores = currentAnalysis.analysis_data.daily_trends.map((d: any) => d.overall_score);
-                                  return Math.round((dailyScores.reduce((a: number, b: number) => a + b, 0) / dailyScores.length) * 10);
+                                  const average = dailyScores.reduce((a: number, b: number) => a + b, 0) / dailyScores.length;
+                                  console.log("Debug - calculated average from currentAnalysis daily_trends:", average * 10);
+                                  return Math.round(average * 10); // Convert 0-10 to 0-100%
                                 }
-                                // Final fallback to current score
-                                if (currentAnalysis?.analysis_data?.team_health?.overall_score) {
-                                  return Math.round(currentAnalysis.analysis_data.team_health.overall_score * 10);
+                                // Final fallback: Use current score
+                                if (historicalTrends?.daily_trends?.length > 0) {
+                                  const latestTrend = historicalTrends.daily_trends[historicalTrends.daily_trends.length - 1];
+                                  console.log("Debug - using latest trend as fallback:", latestTrend.overall_score * 10);
+                                  return Math.round(latestTrend.overall_score * 10);
                                 }
+                                console.log("Debug - no data available for average, returning 0");
                                 return 0;
                               })()}%</div>
                               <div className="text-xs text-gray-500">{currentAnalysis?.time_range || 30}-day avg</div>
