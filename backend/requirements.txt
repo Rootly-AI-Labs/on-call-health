@@ -5,6 +5,7 @@ uvicorn[standard]
 # Database
 sqlalchemy
 alembic
+psycopg2-binary
 
 # Authentication & OAuth
 authlib
