@@ -72,25 +72,38 @@ class BurnoutAnalyzerService:
         - Individual member burnout scores
         - Burnout factors
         """
-        logger.info(f"Starting burnout analysis for {time_range_days} days")
+        analysis_start_time = datetime.now()
+        logger.info(f"🔍 BURNOUT ANALYSIS START: Beginning {time_range_days}-day burnout analysis at {analysis_start_time.isoformat()}")
         
         try:
             # Fetch data from Rootly
-            logger.info(f"TRACE: About to call _fetch_analysis_data for {time_range_days} days")
+            data_fetch_start = datetime.now()
+            logger.info(f"🔍 BURNOUT ANALYSIS: Step 1 - Fetching data for {time_range_days}-day analysis")
             data = await self._fetch_analysis_data(time_range_days)
-            logger.info(f"TRACE: _fetch_analysis_data returned: type={type(data)}, is_none={data is None}")
+            data_fetch_duration = (datetime.now() - data_fetch_start).total_seconds()
+            logger.info(f"🔍 BURNOUT ANALYSIS: Step 1 completed in {data_fetch_duration:.2f}s - Data type: {type(data)}, is_none: {data is None}")
             
             # Check if data was successfully fetched (data should never be None due to fallbacks)
             if data is None:
-                logger.error("TRACE: Data is None after _fetch_analysis_data")
+                logger.error("🔍 BURNOUT ANALYSIS: CRITICAL ERROR - Data is None after _fetch_analysis_data")
                 raise Exception("Failed to fetch data from Rootly API - no data returned")
             
             # Extract users and incidents (with additional safety checks)
-            logger.info(f"TRACE: About to extract users and incidents from data")
+            extraction_start = datetime.now()
+            logger.info(f"🔍 BURNOUT ANALYSIS: Step 2 - Extracting users and incidents from {time_range_days}-day data")
             users = data.get("users", []) if data else []
             incidents = data.get("incidents", []) if data else []
             metadata = data.get("collection_metadata", {}) if data else {}
-            logger.info(f"TRACE: Extracted {len(users)} users, {len(incidents)} incidents")
+            extraction_duration = (datetime.now() - extraction_start).total_seconds()
+            logger.info(f"🔍 BURNOUT ANALYSIS: Step 2 completed in {extraction_duration:.3f}s - {len(users)} users, {len(incidents)} incidents")
+            
+            # Log potential issues based on data patterns
+            if len(users) == 0:
+                logger.error(f"🔍 BURNOUT ANALYSIS: CRITICAL - No users found for {time_range_days}-day analysis")
+            elif len(incidents) == 0:
+                logger.warning(f"🔍 BURNOUT ANALYSIS: WARNING - No incidents found for {time_range_days}-day analysis (users: {len(users)})")
+            elif time_range_days >= 30 and len(incidents) < len(users):
+                logger.warning(f"🔍 BURNOUT ANALYSIS: WARNING - {time_range_days}-day analysis has fewer incidents ({len(incidents)}) than users ({len(users)}) - possible data fetch issue")
             
             # Log detailed data breakdown for AI insights
             if incidents:
@@ -157,7 +170,9 @@ class BurnoutAnalyzerService:
             
             # Analyze team burnout
             try:
-                logger.info(f"TRACE: About to call _analyze_team_data with {len(users)} users, {len(incidents)} incidents")
+                team_analysis_start = datetime.now()
+                logger.info(f"🔍 BURNOUT ANALYSIS: Step 3 - Analyzing team data for {time_range_days}-day analysis")
+                logger.info(f"🔍 BURNOUT ANALYSIS: Team analysis inputs - {len(users)} users, {len(incidents)} incidents")
                 team_analysis = self._analyze_team_data(
                     users, 
                     incidents, 
@@ -166,21 +181,37 @@ class BurnoutAnalyzerService:
                     github_data,
                     slack_data
                 )
-                logger.info(f"TRACE: _analyze_team_data completed successfully")
+                team_analysis_duration = (datetime.now() - team_analysis_start).total_seconds()
+                logger.info(f"🔍 BURNOUT ANALYSIS: Step 3 completed in {team_analysis_duration:.2f}s")
+                
+                # Log team analysis results
+                members_analyzed = len(team_analysis.get("members", [])) if team_analysis else 0
+                logger.info(f"🔍 BURNOUT ANALYSIS: Team analysis generated results for {members_analyzed} members")
+                
             except Exception as e:
-                logger.error(f"TRACE: Error in _analyze_team_data: {e}")
-                logger.error(f"TRACE: Users data type: {type(users)}, length: {len(users) if users else 'N/A'}")
-                logger.error(f"TRACE: Incidents data type: {type(incidents)}, length: {len(incidents) if incidents else 'N/A'}")
-                logger.error(f"TRACE: Metadata data type: {type(metadata)}")
+                team_analysis_duration = (datetime.now() - team_analysis_start).total_seconds() if 'team_analysis_start' in locals() else 0
+                logger.error(f"🔍 BURNOUT ANALYSIS: Step 3 FAILED after {team_analysis_duration:.2f}s: {e}")
+                logger.error(f"🔍 BURNOUT ANALYSIS: Users data - type: {type(users)}, length: {len(users) if users else 'N/A'}")
+                logger.error(f"🔍 BURNOUT ANALYSIS: Incidents data - type: {type(incidents)}, length: {len(incidents) if incidents else 'N/A'}")
+                logger.error(f"🔍 BURNOUT ANALYSIS: Metadata type: {type(metadata)}")
                 raise
             
             # Calculate overall team health
+            health_calc_start = datetime.now()
+            logger.info(f"🔍 BURNOUT ANALYSIS: Step 4 - Calculating team health for {time_range_days}-day analysis")
             team_health = self._calculate_team_health(team_analysis["members"])
+            health_calc_duration = (datetime.now() - health_calc_start).total_seconds()
+            logger.info(f"🔍 BURNOUT ANALYSIS: Step 4 completed in {health_calc_duration:.3f}s - Health score: {team_health.get('overall_score', 'N/A')}")
             
             # Generate insights and recommendations
+            insights_start = datetime.now()
+            logger.info(f"🔍 BURNOUT ANALYSIS: Step 5 - Generating insights and recommendations")
             insights = self._generate_insights(team_analysis, team_health)
+            insights_duration = (datetime.now() - insights_start).total_seconds()
+            logger.info(f"🔍 BURNOUT ANALYSIS: Step 5 completed in {insights_duration:.3f}s - Generated {len(insights)} insights")
             
             # Create data sources structure
+            logger.info(f"🔍 BURNOUT ANALYSIS: Step 6 - Creating data source structure")
             data_sources = {
                 "incident_data": True,
                 "github_data": include_github,
@@ -190,11 +221,13 @@ class BurnoutAnalyzerService:
             # Create GitHub insights if enabled
             github_insights = None
             if include_github:
+                logger.info(f"🔍 BURNOUT ANALYSIS: Calculating GitHub insights")
                 github_insights = self._calculate_github_insights(github_data)
             
             # Create Slack insights if enabled  
             slack_insights = None
             if include_slack:
+                logger.info(f"🔍 BURNOUT ANALYSIS: Calculating Slack insights")
                 slack_insights = self._calculate_slack_insights(slack_data)
 
             result = {
@@ -221,6 +254,8 @@ class BurnoutAnalyzerService:
                 result["slack_insights"] = slack_insights
             
             # Enhance with AI analysis
+            ai_start = datetime.now()
+            logger.info(f"🔍 BURNOUT ANALYSIS: Step 7 - AI enhancement for {time_range_days}-day analysis")
             available_integrations = []
             if include_github:
                 available_integrations.append('github')
@@ -228,26 +263,76 @@ class BurnoutAnalyzerService:
                 available_integrations.append('slack')
             
             result = await self._enhance_with_ai_analysis(result, available_integrations)
+            ai_duration = (datetime.now() - ai_start).total_seconds()
+            logger.info(f"🔍 BURNOUT ANALYSIS: Step 7 completed in {ai_duration:.2f}s - AI enhanced: {result.get('ai_enhanced', False)}")
+            
+            # Calculate total analysis time and log completion
+            total_analysis_duration = (datetime.now() - analysis_start_time).total_seconds()
+            logger.info(f"🔍 BURNOUT ANALYSIS COMPLETE: {time_range_days}-day analysis finished in {total_analysis_duration:.2f}s")
+            
+            # Log performance breakdown
+            logger.info(f"🔍 BURNOUT ANALYSIS BREAKDOWN:")
+            logger.info(f"  - Data fetch: {data_fetch_duration:.2f}s")
+            logger.info(f"  - Team analysis: {team_analysis_duration:.2f}s")
+            logger.info(f"  - Health calculation: {health_calc_duration:.3f}s")
+            logger.info(f"  - Insights generation: {insights_duration:.3f}s")
+            logger.info(f"  - AI enhancement: {ai_duration:.2f}s")
+            logger.info(f"  - Total: {total_analysis_duration:.2f}s")
+            
+            # Log performance warnings for longer analyses
+            timeout_threshold = 900  # 15 minutes in seconds
+            warning_threshold = timeout_threshold * 0.8  # 12 minutes
+            
+            if total_analysis_duration > timeout_threshold:
+                logger.error(f"🔍 TIMEOUT EXCEEDED: {time_range_days}-day analysis took {total_analysis_duration:.2f}s (>{timeout_threshold}s)")
+            elif total_analysis_duration > warning_threshold:
+                logger.error(f"🔍 TIMEOUT WARNING: {time_range_days}-day analysis took {total_analysis_duration:.2f}s - approaching {timeout_threshold}s timeout")
+            elif time_range_days >= 30 and total_analysis_duration > 600:  # 10 minutes
+                logger.warning(f"🔍 PERFORMANCE CONCERN: {time_range_days}-day analysis took {total_analysis_duration:.2f}s (>10min)")
+            elif time_range_days >= 30 and total_analysis_duration > 300:  # 5 minutes
+                logger.info(f"🔍 PERFORMANCE NOTE: {time_range_days}-day analysis took {total_analysis_duration:.2f}s (>5min)")
+            
+            # Add timeout risk metadata to results
+            result["timeout_metadata"] = {
+                "analysis_duration_seconds": total_analysis_duration,
+                "timeout_threshold_seconds": timeout_threshold,
+                "approaching_timeout": total_analysis_duration > warning_threshold,
+                "timeout_risk_level": (
+                    "critical" if total_analysis_duration > timeout_threshold else
+                    "high" if total_analysis_duration > warning_threshold else
+                    "medium" if total_analysis_duration > 300 else
+                    "low"
+                )
+            }
+            
+            # Log success metrics
+            members_count = len(result.get("team_analysis", {}).get("members", []))
+            incidents_count = len(incidents)
+            logger.info(f"🔍 BURNOUT ANALYSIS SUCCESS: Analyzed {members_count} members using {incidents_count} incidents over {time_range_days} days")
                 
             return result
             
         except Exception as e:
-            logger.error(f"Burnout analysis failed: {e}")
+            total_analysis_duration = (datetime.now() - analysis_start_time).total_seconds() if 'analysis_start_time' in locals() else 0
+            logger.error(f"🔍 BURNOUT ANALYSIS FAILED: {time_range_days}-day analysis failed after {total_analysis_duration:.2f}s: {e}")
             raise
     
     async def _fetch_analysis_data(self, days_back: int) -> Dict[str, Any]:
         """Fetch all required data from Rootly API."""
+        fetch_start_time = datetime.now()
+        logger.info(f"🔍 ANALYZER DATA FETCH: Starting data collection for {days_back}-day analysis")
+        
         try:
             # Use the existing data collection method
-            logger.info(f"Fetching analysis data for {days_back} days")
+            logger.info(f"🔍 ANALYZER DATA FETCH: Delegating to client.collect_analysis_data for {days_back} days")
             data = await self.client.collect_analysis_data(days_back=days_back)
             
-            # Add detailed logging to debug the NoneType issue
-            logger.info(f"Data from collect_analysis_data: type={type(data)}, value={data}")
+            fetch_duration = (datetime.now() - fetch_start_time).total_seconds()
+            logger.info(f"🔍 ANALYZER DATA FETCH: Client returned after {fetch_duration:.2f}s - Type: {type(data)}")
             
             # Ensure we always have a valid data structure
             if data is None:
-                logger.warning("collect_analysis_data returned None, creating fallback data structure")
+                logger.warning(f"🔍 ANALYZER DATA FETCH: WARNING - collect_analysis_data returned None for {days_back}-day analysis")
                 data = {
                     "users": [],
                     "incidents": [],
@@ -266,7 +351,7 @@ class BurnoutAnalyzerService:
             
             # Additional safety check
             if not isinstance(data, dict):
-                logger.error(f"Data is not a dictionary! Type: {type(data)}, Value: {data}")
+                logger.error(f"🔍 ANALYZER DATA FETCH: ERROR - Data is not a dictionary! Type: {type(data)}")
                 data = {
                     "users": [],
                     "incidents": [],
@@ -283,16 +368,35 @@ class BurnoutAnalyzerService:
                     }
                 }
             
-            # Add additional safety check for logging
-            if data and isinstance(data, dict):
-                logger.info(f"Successfully fetched data: {len(data.get('users', []))} users, {len(data.get('incidents', []))} incidents")
-            else:
-                logger.warning(f"Data is not a valid dictionary: type={type(data)}, value={data}")
+            # Extract and log key metrics
+            users_count = len(data.get('users', [])) if data else 0
+            incidents_count = len(data.get('incidents', [])) if data else 0
+            metadata = data.get('collection_metadata', {}) if data else {}
+            performance_metrics = metadata.get('performance_metrics', {}) if metadata else {}
+            
+            logger.info(f"🔍 ANALYZER DATA RESULT: {days_back}-day analysis data fetched successfully")
+            logger.info(f"🔍 ANALYZER DATA METRICS: {users_count} users, {incidents_count} incidents in {fetch_duration:.2f}s")
+            
+            # Log performance details if available
+            if performance_metrics:
+                total_collection_time = performance_metrics.get('total_collection_time_seconds', 0)
+                incidents_per_second = performance_metrics.get('incidents_per_second', 0)
+                logger.info(f"🔍 ANALYZER PERFORMANCE: Client collection took {total_collection_time:.2f}s, {incidents_per_second:.1f} incidents/sec")
+            
+            # Log warnings for performance issues
+            if days_back >= 30 and fetch_duration > 300:  # 5 minutes
+                logger.warning(f"🔍 ANALYZER PERFORMANCE WARNING: {days_back}-day data fetch took {fetch_duration:.2f}s (>5min)")
+            elif days_back >= 30 and incidents_count == 0 and users_count > 0:
+                logger.warning(f"🔍 ANALYZER DATA WARNING: {days_back}-day analysis got users but no incidents - potential timeout or permission issue")
+            
             return data
         except Exception as e:
-            logger.error(f"Error fetching analysis data: {str(e)}")
-            logger.error(f"Exception type: {type(e).__name__}")
-            logger.error(f"Full exception details: {repr(e)}")
+            fetch_duration = (datetime.now() - fetch_start_time).total_seconds()
+            logger.error(f"🔍 ANALYZER DATA FETCH: FAILED after {fetch_duration:.2f}s for {days_back}-day analysis")
+            logger.error(f"🔍 ANALYZER ERROR: {str(e)}")
+            logger.error(f"🔍 ANALYZER ERROR TYPE: {type(e).__name__}")
+            logger.error(f"🔍 ANALYZER ERROR DETAILS: {repr(e)}")
+            
             # Return fallback data instead of raising
             return {
                 "users": [],
@@ -306,6 +410,10 @@ class BurnoutAnalyzerService:
                     "date_range": {
                         "start": (datetime.now() - timedelta(days=days_back)).isoformat(),
                         "end": datetime.now().isoformat()
+                    },
+                    "performance_metrics": {
+                        "total_collection_time_seconds": fetch_duration,
+                        "failed": True
                     }
                 }
             }

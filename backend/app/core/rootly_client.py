@@ -251,37 +251,56 @@ class RootlyAPIClient:
     
     async def get_incidents(self, days_back: int = 30, limit: int = 1000) -> List[Dict[str, Any]]:
         """Fetch incidents from Rootly API."""
+        fetch_start_time = datetime.now()
         all_incidents = []
         page = 1
         page_size = min(100, limit)  # Rootly API page size limit
+        api_calls_made = 0
         
         # Calculate date range
         end_date = datetime.now()
         start_date = end_date - timedelta(days=days_back)
         
+        logger.info(f"🔍 INCIDENT FETCH START: Fetching incidents for {days_back} days (from {start_date.date()} to {end_date.date()})")
+        logger.info(f"🔍 INCIDENT PARAMETERS: limit={limit}, initial_page_size={page_size}")
+        
         try:
             async with httpx.AsyncClient() as client:
                 # First test basic access to incidents endpoint
+                test_start = datetime.now()
+                logger.info(f"🔍 INCIDENT TEST: Testing basic endpoint access for {days_back}-day analysis")
                 test_response = await client.get(
                     f"{self.base_url}/v1/incidents",
                     headers=self.headers,
                     params={"page[size]": 1},
                     timeout=30.0
                 )
+                test_duration = (datetime.now() - test_start).total_seconds()
+                api_calls_made += 1
                 
-                logger.info(f"Basic incidents test: {test_response.status_code}")
+                logger.info(f"🔍 INCIDENT TEST: Basic test completed in {test_duration:.2f}s - Status: {test_response.status_code}")
                 if test_response.status_code == 404:
-                    logger.error("Basic incidents endpoint test failed - checking permissions")
+                    logger.error("🔍 INCIDENT TEST: FAILED - Permissions check failed")
                     raise Exception("Cannot access incidents endpoint. Please verify your Rootly API token has 'incidents:read' permission.")
                 elif test_response.status_code != 200:
-                    logger.error(f"Basic incidents endpoint test failed: {test_response.status_code} {test_response.text}")
+                    logger.error(f"🔍 INCIDENT TEST: FAILED - Status {test_response.status_code}: {test_response.text}")
                     raise Exception(f"Basic incidents endpoint failed: {test_response.status_code}")
                 else:
-                    logger.info("Basic incidents endpoint test passed!")
+                    logger.info("🔍 INCIDENT TEST: PASSED - Endpoint accessible")
                 
+                pagination_start = datetime.now()
                 while len(all_incidents) < limit:
-                    # Use smaller page size to reduce timeout risk
-                    actual_page_size = min(page_size, 20)  # Start with smaller pages
+                    page_start_time = datetime.now()
+                    
+                    # Use adaptive page size based on time range to optimize performance
+                    if days_back >= 30:
+                        # Larger pages for longer ranges to reduce total API calls
+                        actual_page_size = min(page_size, 50)
+                        logger.info(f"🔍 INCIDENT OPTIMIZATION: Using larger page size ({actual_page_size}) for {days_back}-day analysis")
+                    else:
+                        # Conservative page size for shorter ranges
+                        actual_page_size = min(page_size, 20)
+                        logger.info(f"🔍 INCIDENT OPTIMIZATION: Using standard page size ({actual_page_size}) for {days_back}-day analysis")
                     params = {
                         "page[number]": page,
                         "page[size]": actual_page_size,
@@ -293,9 +312,7 @@ class RootlyAPIClient:
                     # URL encode the parameters manually since httpx doesn't encode brackets properly
                     params_encoded = urlencode(params)
                     
-                    logger.info(f"Requesting incidents page {page} with params: {params}")
-                    logger.info(f"Request URL: {self.base_url}/v1/incidents")
-                    logger.info(f"Request headers: {self.headers}")
+                    logger.info(f"🔍 INCIDENT PAGE {page}: Requesting {actual_page_size} incidents for {days_back}-day analysis")
                     
                     try:
                         response = await client.get(
@@ -303,17 +320,18 @@ class RootlyAPIClient:
                             headers=self.headers,
                             timeout=30.0  # Increase timeout to 30 seconds
                         )
-                        logger.info(f"Got response status: {response.status_code}")
+                        api_calls_made += 1
+                        page_request_duration = (datetime.now() - page_start_time).total_seconds()
+                        logger.info(f"🔍 INCIDENT PAGE {page}: Request completed in {page_request_duration:.2f}s - Status: {response.status_code}")
                     except Exception as request_error:
-                        logger.error(f"Request failed with exception: {request_error}")
-                        logger.error(f"Exception type: {type(request_error).__name__}")
+                        page_request_duration = (datetime.now() - page_start_time).total_seconds()
+                        logger.error(f"🔍 INCIDENT PAGE {page}: REQUEST FAILED after {page_request_duration:.2f}s: {request_error}")
+                        logger.error(f"🔍 INCIDENT PAGE {page}: Exception type: {type(request_error).__name__}")
                         raise request_error
                     
                     if response.status_code != 200:
                         error_detail = response.text
-                        logger.error(f"Rootly API request failed: {response.status_code} {error_detail}")
-                        logger.error(f"Request URL: {self.base_url}/v1/incidents")
-                        logger.error(f"Request headers: Content-Type: {self.headers.get('Content-Type', 'N/A')}")
+                        logger.error(f"🔍 INCIDENT PAGE {page}: API ERROR - {response.status_code}: {error_detail}")
                         
                         # Provide more helpful error message for common issues
                         if response.status_code == 404 and "not found or unauthorized" in error_detail.lower():
@@ -325,28 +343,52 @@ class RootlyAPIClient:
                     
                     # Safety check for data
                     if data is None:
-                        logger.error("Incidents API response json() returned None")
+                        logger.error(f"🔍 INCIDENT PAGE {page}: API response returned None")
                         break
                     
                     incidents = data.get("data", [])
                     
                     if not incidents:
+                        logger.info(f"🔍 INCIDENT PAGE {page}: No more incidents found - stopping pagination")
                         break
                     
                     all_incidents.extend(incidents)
+                    page_duration = (datetime.now() - page_start_time).total_seconds()
+                    logger.info(f"🔍 INCIDENT PAGE {page}: Retrieved {len(incidents)} incidents in {page_duration:.2f}s (total: {len(all_incidents)})")
                     
                     # Check if we have more pages
                     meta = data.get("meta", {})
-                    if page >= meta.get("total_pages", 1):
+                    total_pages = meta.get("total_pages", 1)
+                    logger.info(f"🔍 INCIDENT PAGE {page}: Page {page} of {total_pages}")
+                    
+                    if page >= total_pages:
+                        logger.info(f"🔍 INCIDENT PAGINATION: Reached final page ({page}/{total_pages})")
                         break
                     
                     page += 1
                 
-                logger.info(f"Fetched {len(all_incidents)} incidents from last {days_back} days")
+                # Calculate final metrics
+                total_fetch_duration = (datetime.now() - fetch_start_time).total_seconds()
+                pagination_duration = (datetime.now() - pagination_start).total_seconds()
+                avg_incidents_per_page = len(all_incidents) / (page - 1) if page > 1 else len(all_incidents)
+                avg_time_per_page = pagination_duration / (page - 1) if page > 1 else pagination_duration
+                incidents_per_second = len(all_incidents) / total_fetch_duration if total_fetch_duration > 0 else 0
+                
+                logger.info(f"🔍 INCIDENT FETCH COMPLETE: {days_back}-day analysis fetched {len(all_incidents)} incidents")
+                logger.info(f"🔍 INCIDENT METRICS: Total time: {total_fetch_duration:.2f}s, API calls: {api_calls_made}, Pages: {page-1}")
+                logger.info(f"🔍 INCIDENT PERFORMANCE: {incidents_per_second:.1f} incidents/sec, {avg_incidents_per_page:.1f} incidents/page, {avg_time_per_page:.2f}s/page")
+                
+                # Log performance concerns for longer analyses
+                if days_back >= 30 and total_fetch_duration > 300:  # 5 minutes
+                    logger.warning(f"🔍 PERFORMANCE WARNING: {days_back}-day incident fetch took {total_fetch_duration:.2f}s (>5min) - may impact analysis timeout")
+                elif days_back >= 30 and total_fetch_duration > 600:  # 10 minutes
+                    logger.error(f"🔍 PERFORMANCE CRITICAL: {days_back}-day incident fetch took {total_fetch_duration:.2f}s (>10min) - likely to cause timeout")
+                
                 return all_incidents[:limit]
                 
         except Exception as e:
-            logger.error(f"Error fetching incidents: {e}")
+            total_fetch_duration = (datetime.now() - fetch_start_time).total_seconds()
+            logger.error(f"🔍 INCIDENT FETCH FAILED: {days_back}-day analysis failed after {total_fetch_duration:.2f}s and {api_calls_made} API calls: {e}")
             raise
     
     async def get_user_incident_roles(self, user_id: str, incident_ids: List[str]) -> List[Dict[str, Any]]:
@@ -357,31 +399,90 @@ class RootlyAPIClient:
     
     async def collect_analysis_data(self, days_back: int = 30) -> Dict[str, Any]:
         """Collect all data needed for burnout analysis."""
-        logger.info(f"Starting Rootly data collection for last {days_back} days...")
+        start_time = datetime.now()
+        logger.info(f"🔍 PERFORMANCE ANALYSIS: Starting Rootly data collection for last {days_back} days...")
+        logger.info(f"🔍 TIME RANGE ANALYSIS: {days_back}-day analysis started at {start_time.isoformat()}")
         
         try:
             # Test connection first
+            connection_start = datetime.now()
+            logger.info(f"🔍 CONNECTION TEST: Starting connection test for {days_back}-day analysis")
             connection_test = await self.test_connection()
+            connection_duration = (datetime.now() - connection_start).total_seconds()
+            logger.info(f"🔍 CONNECTION TEST: Completed in {connection_duration:.2f}s - Status: {connection_test['status']}")
+            
             if connection_test["status"] != "success":
                 raise Exception(f"Connection test failed: {connection_test['message']}")
             
+            # Log expected data volume based on time range
+            expected_incident_multiplier = days_back / 7  # Relative to 7-day baseline
+            logger.info(f"🔍 DATA VOLUME ESTIMATE: {days_back}-day analysis expected to fetch ~{expected_incident_multiplier:.1f}x more incidents than 7-day analysis")
+            
             # Collect users and incidents in parallel (no limits for complete data collection)
-            users_task = self.get_users(limit=1000)  # Increased to get all users
-            incidents_task = self.get_incidents(days_back=days_back, limit=10000)  # Increased to get all incidents
+            users_start = datetime.now()
+            incidents_start = datetime.now()
+            
+            logger.info(f"🔍 USER FETCH: Starting user collection for {days_back}-day analysis (limit: 1000)")
+            users_task = self.get_users(limit=1000)  # Get all users
+            
+            # Use adaptive incident limits to prevent timeout on longer analyses
+            incident_limits_by_range = {
+                7: 2000,   # 7-day: up to 2000 incidents
+                14: 3000,  # 14-day: up to 3000 incidents  
+                30: 5000,  # 30-day: up to 5000 incidents (reduced from 10000)
+                60: 7000,  # 60-day: up to 7000 incidents
+                90: 10000  # 90-day: up to 10000 incidents
+            }
+            
+            # Find appropriate limit for the time range
+            incident_limit = 10000  # Default fallback
+            for range_days in sorted(incident_limits_by_range.keys()):
+                if days_back <= range_days:
+                    incident_limit = incident_limits_by_range[range_days]
+                    break
+            
+            logger.info(f"🔍 DATA VOLUME CONTROL: Using incident limit of {incident_limit} for {days_back}-day analysis")
+            logger.info(f"🔍 INCIDENT FETCH: Starting incident collection for {days_back}-day analysis (limit: {incident_limit})")
+            incidents_task = self.get_incidents(days_back=days_back, limit=incident_limit)
             
             # Collect users (required)
             users = await users_task
+            users_duration = (datetime.now() - users_start).total_seconds()
+            logger.info(f"🔍 USER FETCH: Completed in {users_duration:.2f}s - Retrieved {len(users)} users")
             
             # Try to collect incidents but don't fail if permission denied
             incidents = []
             try:
                 incidents = await incidents_task
+                incidents_duration = (datetime.now() - incidents_start).total_seconds()
+                logger.info(f"🔍 INCIDENT FETCH: Completed in {incidents_duration:.2f}s - Retrieved {len(incidents)} incidents")
+                
+                # Log incident collection performance metrics
+                incidents_per_second = len(incidents) / incidents_duration if incidents_duration > 0 else 0
+                logger.info(f"🔍 INCIDENT PERFORMANCE: {incidents_per_second:.1f} incidents/second for {days_back}-day analysis")
+                
+                # Calculate incidents per day ratio
+                incidents_per_day = len(incidents) / days_back if days_back > 0 else 0
+                logger.info(f"🔍 INCIDENT DENSITY: {incidents_per_day:.1f} incidents/day for {days_back}-day analysis")
+                
             except Exception as e:
+                incidents_duration = (datetime.now() - incidents_start).total_seconds()
+                logger.error(f"🔍 INCIDENT FETCH: FAILED after {incidents_duration:.2f}s for {days_back}-day analysis: {e}")
                 logger.warning(f"Could not fetch incidents: {e}. Proceeding with user data only.")
             
             # Validate data
             if not users:
                 raise Exception("No users found - check API permissions")
+            
+            # Calculate total collection time
+            total_duration = (datetime.now() - start_time).total_seconds()
+            logger.info(f"🔍 TOTAL PERFORMANCE: {days_back}-day analysis data collection completed in {total_duration:.2f}s")
+            
+            # Log performance comparison baseline
+            if days_back == 7:
+                logger.info(f"🔍 BASELINE: 7-day analysis completed - this is the baseline for comparison")
+            elif days_back == 30:
+                logger.info(f"🔍 COMPARISON: 30-day analysis completed - compare performance to 7-day baseline")
             
             # Process and return data
             processed_data = {
@@ -395,15 +496,23 @@ class RootlyAPIClient:
                     "date_range": {
                         "start": (datetime.now() - timedelta(days=days_back)).isoformat(),
                         "end": datetime.now().isoformat()
+                    },
+                    "performance_metrics": {
+                        "total_collection_time_seconds": total_duration,
+                        "users_collection_time_seconds": users_duration,
+                        "incidents_collection_time_seconds": incidents_duration if 'incidents_duration' in locals() else 0,
+                        "incidents_per_second": incidents_per_second if 'incidents_per_second' in locals() else 0,
+                        "incidents_per_day": incidents_per_day if 'incidents_per_day' in locals() else 0
                     }
                 }
             }
             
-            logger.info(f"Data collection completed: {len(users)} users, {len(incidents)} incidents")
+            logger.info(f"🔍 FINAL RESULT: {days_back}-day analysis data collection completed: {len(users)} users, {len(incidents)} incidents")
             return processed_data
             
         except Exception as e:
-            logger.error(f"Data collection failed: {e}")
+            total_duration = (datetime.now() - start_time).total_seconds()
+            logger.error(f"🔍 DATA COLLECTION FAILED: {days_back}-day analysis failed after {total_duration:.2f}s: {e}")
             # Return minimal data structure instead of failing completely
             return {
                 "users": [],
@@ -417,6 +526,10 @@ class RootlyAPIClient:
                     "date_range": {
                         "start": (datetime.now() - timedelta(days=days_back)).isoformat(),
                         "end": datetime.now().isoformat()
+                    },
+                    "performance_metrics": {
+                        "total_collection_time_seconds": total_duration,
+                        "failed": True
                     }
                 }
             }
