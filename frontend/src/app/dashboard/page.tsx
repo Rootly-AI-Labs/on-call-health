@@ -500,8 +500,8 @@ export default function Dashboard() {
     
     // Show for completed analyses with no meaningful data
     if (currentAnalysis.status === 'completed') {
-      // Check if we have team_health data but with no meaningful content
-      if (currentAnalysis.analysis_data?.team_health) {
+      // Check if we have team_health or team_summary data but with no meaningful content
+      if (currentAnalysis.analysis_data?.team_health || currentAnalysis.analysis_data?.team_summary) {
         // Check if the analysis has 0 members - this indicates insufficient data
         const teamAnalysis = currentAnalysis.analysis_data.team_analysis
         
@@ -2053,7 +2053,7 @@ export default function Dashboard() {
           )}
 
           {/* Analysis Complete State - Only show if analysis has meaningful data */}
-          {!shouldShowInsufficientDataCard() && !analysisRunning && currentAnalysis && (currentAnalysis.analysis_data?.team_health || currentAnalysis.analysis_data?.partial_data || currentAnalysis.analysis_data?.team_analysis) && (
+          {!shouldShowInsufficientDataCard() && !analysisRunning && currentAnalysis && (currentAnalysis.analysis_data?.team_health || currentAnalysis.analysis_data?.team_summary || currentAnalysis.analysis_data?.partial_data || currentAnalysis.analysis_data?.team_analysis) && (
             <>
               {/* Debug Section - Development Only */}
               {process.env.NODE_ENV === 'development' && (
