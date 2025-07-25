@@ -256,6 +256,14 @@ class SimpleBurnoutAnalyzer:
             logger.error(f"Error generating team recommendations: {e}")
             recommendations = ["Analysis completed - please review individual user data"]
         
+        # Generate daily trends if we have incident data
+        daily_trends = []
+        try:
+            daily_trends = self._generate_daily_trends(incidents, team_analysis, metadata)
+        except Exception as e:
+            logger.error(f"Error generating daily trends: {e}")
+            daily_trends = []
+        
         # Return comprehensive results with error handling
         try:
             return {
@@ -264,6 +272,7 @@ class SimpleBurnoutAnalyzer:
                 "team_summary": team_summary,
                 "team_analysis": team_analysis,
                 "recommendations": recommendations,
+                "daily_trends": daily_trends,
                 "ai_enhanced": False
             }
         except Exception as e:
@@ -771,3 +780,161 @@ class SimpleBurnoutAnalyzer:
                 continue
         
         return total_weight
+    
+    def _generate_daily_trends(self, incidents: List[Dict[str, Any]], team_analysis: List[Dict[str, Any]], metadata: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Generate daily trend data from incidents and team analysis."""
+        try:
+            days_analyzed = metadata.get("days_analyzed", 30) if isinstance(metadata, dict) else 30
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=days_analyzed)
+            
+            # Initialize daily data structure
+            daily_data = {}
+            current_date = start_date
+            
+            # Initialize all days with zero incidents
+            while current_date <= end_date:
+                date_str = current_date.strftime("%Y-%m-%d")
+                daily_data[date_str] = {
+                    "date": date_str,
+                    "incident_count": 0,
+                    "severity_weighted_count": 0.0,
+                    "after_hours_count": 0,
+                    "users_involved": set(),
+                    "high_severity_count": 0
+                }
+                current_date += timedelta(days=1)
+            
+            # Process incidents to populate daily data
+            if incidents and isinstance(incidents, list):
+                for incident in incidents:
+                    try:
+                        if not incident or not isinstance(incident, dict):
+                            continue
+                            
+                        # Extract incident date
+                        attrs = incident.get("attributes", {})
+                        if not attrs or not isinstance(attrs, dict):
+                            continue
+                            
+                        created_at = attrs.get("created_at")
+                        if not created_at:
+                            continue
+                            
+                        # Parse date
+                        try:
+                            incident_date = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                            date_str = incident_date.strftime("%Y-%m-%d")
+                            
+                            if date_str in daily_data:
+                                daily_data[date_str]["incident_count"] += 1
+                                
+                                # Add severity weight
+                                severity_info = attrs.get("severity", {})
+                                severity_weight = 1.0
+                                if isinstance(severity_info, dict) and "data" in severity_info:
+                                    severity_name = severity_info.get("data", {}).get("attributes", {}).get("name", "sev4").lower()
+                                    severity_weights = {"sev1": 3.0, "sev2": 2.0, "sev3": 1.5, "sev4": 1.0}
+                                    severity_weight = severity_weights.get(severity_name, 1.0)
+                                    if severity_name in ["sev1", "sev2"]:
+                                        daily_data[date_str]["high_severity_count"] += 1
+                                
+                                daily_data[date_str]["severity_weighted_count"] += severity_weight
+                                
+                                # Check if after hours
+                                if incident_date.hour < 9 or incident_date.hour >= 17 or incident_date.weekday() >= 5:
+                                    daily_data[date_str]["after_hours_count"] += 1
+                                
+                                # Track user involvement
+                                user_id = self._extract_incident_user_id(incident)
+                                if user_id:
+                                    daily_data[date_str]["users_involved"].add(user_id)
+                                    
+                        except Exception as date_error:
+                            logger.debug(f"Error parsing incident date: {date_error}")
+                            continue
+                            
+                    except Exception as inc_error:
+                        logger.debug(f"Error processing incident for daily trends: {inc_error}")
+                        continue
+            
+            # Convert to list and calculate daily scores
+            daily_trends = []
+            total_users = len(team_analysis) if team_analysis else 1
+            
+            for date_str, data in sorted(daily_data.items()):
+                # Calculate daily burnout score based on incident patterns
+                daily_incident_rate = data["incident_count"] / total_users if total_users > 0 else 0
+                daily_severity_rate = data["severity_weighted_count"] / total_users if total_users > 0 else 0
+                after_hours_ratio = data["after_hours_count"] / data["incident_count"] if data["incident_count"] > 0 else 0
+                
+                # Simple scoring (inverse of burnout - higher score is better)
+                # Base score of 10, reduced by incident load
+                daily_score = 10.0
+                daily_score -= min(5.0, daily_severity_rate * 2)  # Up to -5 for severity-weighted incidents
+                daily_score -= min(2.0, after_hours_ratio * 2)    # Up to -2 for after-hours work
+                daily_score -= min(1.0, data["high_severity_count"] * 0.5)  # Up to -1 for high severity
+                daily_score = max(0.0, daily_score)  # Ensure non-negative
+                
+                # Determine risk level for the day
+                users_at_risk = 0
+                if daily_score < 4:
+                    users_at_risk = len(data["users_involved"])
+                elif daily_score < 7:
+                    users_at_risk = max(1, len(data["users_involved"]) // 2)
+                
+                daily_trends.append({
+                    "date": date_str,
+                    "overall_score": round(daily_score, 2),
+                    "incident_count": data["incident_count"],
+                    "severity_weighted_count": round(data["severity_weighted_count"], 2),
+                    "after_hours_count": data["after_hours_count"],
+                    "users_involved": len(data["users_involved"]),
+                    "members_at_risk": users_at_risk,
+                    "total_members": total_users,
+                    "health_status": self._determine_health_status_from_score(daily_score)
+                })
+            
+            return daily_trends
+            
+        except Exception as e:
+            logger.error(f"Error in _generate_daily_trends: {e}")
+            return []
+    
+    def _extract_incident_user_id(self, incident: Dict[str, Any]) -> Optional[str]:
+        """Extract user ID from incident data."""
+        try:
+            attrs = incident.get("attributes", {})
+            
+            # Try to get from user field
+            user_data = attrs.get("user", {})
+            if isinstance(user_data, dict) and "data" in user_data:
+                user_id = user_data.get("data", {}).get("id")
+                if user_id:
+                    return str(user_id)
+            
+            # Try started_by
+            started_by = attrs.get("started_by", {})
+            if isinstance(started_by, dict) and "data" in started_by:
+                user_id = started_by.get("data", {}).get("id")
+                if user_id:
+                    return str(user_id)
+                    
+            return None
+            
+        except Exception as e:
+            logger.debug(f"Error extracting user ID: {e}")
+            return None
+    
+    def _determine_health_status_from_score(self, score: float) -> str:
+        """Determine health status from a score (0-10 scale)."""
+        if score >= 8:
+            return "excellent"
+        elif score >= 6:
+            return "good"
+        elif score >= 4:
+            return "fair"
+        elif score >= 2:
+            return "poor"
+        else:
+            return "critical"

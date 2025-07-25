@@ -335,6 +335,17 @@ interface AnalysisResult {
         [key: string]: any
       }
     }
+    daily_trends?: Array<{
+      date: string
+      overall_score: number
+      incident_count: number
+      severity_weighted_count: number
+      after_hours_count: number
+      users_involved: number
+      members_at_risk: number
+      total_members: number
+      health_status: string
+    }>
   }
 }
 
@@ -2670,31 +2681,74 @@ export default function Dashboard() {
                           Math.round(currentAnalysis.analysis_data.team_health.overall_score * 10) : 92;
                         
                         // Use real timeline events from historical data
-                        const journeyEvents = historicalTrends?.timeline_events?.length > 0 
-                          ? historicalTrends.timeline_events.map((event: any) => ({
-                              date: new Date(event.iso_date).toLocaleDateString('en-US', { 
-                                month: 'short', 
-                                day: 'numeric' 
-                              }),
-                              status: event.status,
-                              title: event.title,
-                              description: event.description,
-                              color: event.color,
-                              impact: event.impact,
-                              severity: event.severity,
-                              metrics: event.metrics
-                            }))
-                          : [
-                              // Fallback to current analysis if no historical timeline available
-                              {
-                                date: 'Current',
-                                status: 'current',
-                                title: 'Current State',
-                                description: `${healthScore}% organization health score`,
-                                color: 'bg-purple-500',
-                                impact: healthScore >= 80 ? 'positive' : healthScore >= 60 ? 'neutral' : 'negative'
-                              }
-                            ];
+                        let journeyEvents = [];
+                        
+                        if (historicalTrends?.timeline_events?.length > 0) {
+                          journeyEvents = historicalTrends.timeline_events.map((event: any) => ({
+                            date: new Date(event.iso_date).toLocaleDateString('en-US', { 
+                              month: 'short', 
+                              day: 'numeric' 
+                            }),
+                            status: event.status,
+                            title: event.title,
+                            description: event.description,
+                            color: event.color,
+                            impact: event.impact,
+                            severity: event.severity,
+                            metrics: event.metrics
+                          }));
+                        } else if (currentAnalysis?.analysis_data?.daily_trends?.length > 0) {
+                          // Generate timeline events from daily trends
+                          const dailyTrends = currentAnalysis.analysis_data.daily_trends;
+                          const significantDays = dailyTrends.filter((day: any) => {
+                            // Find days with significant events
+                            return day.incident_count > 5 || 
+                                   day.members_at_risk > 2 || 
+                                   day.health_status === 'critical' || 
+                                   day.health_status === 'poor' ||
+                                   (day.after_hours_count / day.incident_count > 0.5 && day.incident_count > 0);
+                          });
+                          
+                          journeyEvents = significantDays.slice(-5).map((day: any) => ({
+                            date: new Date(day.date).toLocaleDateString('en-US', { 
+                              month: 'short', 
+                              day: 'numeric' 
+                            }),
+                            status: day.health_status === 'critical' ? 'critical-burnout' : 
+                                   day.health_status === 'poor' ? 'medium-risk' : 'current',
+                            title: day.incident_count > 5 ? 'High Incident Volume' : 
+                                  day.members_at_risk > 2 ? 'Multiple Members at Risk' :
+                                  day.health_status === 'critical' ? 'Critical Period' :
+                                  'Elevated Activity',
+                            description: `${day.incident_count} incidents, ${day.members_at_risk} at risk. Health: ${Math.round(day.overall_score * 10)}%`,
+                            color: day.overall_score < 4 ? 'bg-red-600' : 
+                                  day.overall_score < 7 ? 'bg-orange-500' : 'bg-green-500',
+                            impact: day.overall_score < 4 ? 'negative' : 
+                                   day.overall_score < 7 ? 'neutral' : 'positive'
+                          }));
+                          
+                          // Add current state
+                          if (journeyEvents.length === 0 || journeyEvents[journeyEvents.length - 1].date !== 'Current') {
+                            journeyEvents.push({
+                              date: 'Current',
+                              status: 'current',
+                              title: 'Current State',
+                              description: `${healthScore}% organization health score`,
+                              color: 'bg-purple-500',
+                              impact: healthScore >= 80 ? 'positive' : healthScore >= 60 ? 'neutral' : 'negative'
+                            });
+                          }
+                        } else {
+                          // Fallback to single current state
+                          journeyEvents = [{
+                            date: 'Current',
+                            status: 'current',
+                            title: 'Current State',
+                            description: `${healthScore}% organization health score`,
+                            color: 'bg-purple-500',
+                            impact: healthScore >= 80 ? 'positive' : healthScore >= 60 ? 'neutral' : 'negative'
+                          }];
+                        }
 
                         return (
                           <div className="relative">
@@ -2783,9 +2837,21 @@ export default function Dashboard() {
                       ) : (
                         <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={(() => {
-                          // Use real historical trends data if available, otherwise fallback to current score
+                          // Use real historical trends data if available
                           if (historicalTrends?.daily_trends?.length > 0) {
                             return historicalTrends.daily_trends.map((trend: any) => ({
+                              date: new Date(trend.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
+                              score: Math.round(trend.overall_score * 10), // Convert 0-10 scale to 0-100 for display
+                              riskLevel: trend.overall_score >= 8 ? 'low' : trend.overall_score >= 6 ? 'medium' : 'high',
+                              membersAtRisk: trend.members_at_risk,
+                              totalMembers: trend.total_members,
+                              healthStatus: trend.health_status
+                            }));
+                          }
+                          
+                          // Use daily_trends from current analysis if available (SimpleBurnoutAnalyzer)
+                          if (currentAnalysis?.analysis_data?.daily_trends?.length > 0) {
+                            return currentAnalysis.analysis_data.daily_trends.map((trend: any) => ({
                               date: new Date(trend.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
                               score: Math.round(trend.overall_score * 10), // Convert 0-10 scale to 0-100 for display
                               riskLevel: trend.overall_score >= 8 ? 'low' : trend.overall_score >= 6 ? 'medium' : 'high',
