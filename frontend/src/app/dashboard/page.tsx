@@ -1627,8 +1627,10 @@ export default function Dashboard() {
     { 
       factor: "Workload", 
       value: Number(((members as any[]).reduce((avg: number, m: any) => {
-        const val = m?.factors?.workload || 0;
-        console.log(`RADAR: Member ${m?.user_name}: workload = ${val}`);
+        // Try factors first, fallback to key_metrics (SimpleBurnoutAnalyzer format)
+        const val = m?.factors?.workload || 
+                   (m?.key_metrics?.incidents_per_week ? Math.min(m.key_metrics.incidents_per_week * 2, 10) : 0);
+        console.log(`RADAR: Member ${m?.user_name}: workload = ${val} (factors: ${m?.factors?.workload}, key_metrics: ${m?.key_metrics?.incidents_per_week})`);
         return avg + val;
       }, 0) / members.length).toFixed(1)),
       metrics: `Avg incidents: ${Math.round((members as any[]).reduce((avg: number, m: any) => avg + (m?.incident_count || 0), 0) / members.length)}`
@@ -1636,17 +1638,21 @@ export default function Dashboard() {
     { 
       factor: "After Hours", 
       value: Number(((members as any[]).reduce((avg: number, m: any) => {
-        const val = m?.factors?.after_hours || 0;
-        console.log(`RADAR: Member ${m?.user_name}: after_hours = ${val}`);
+        // Try factors first, fallback to key_metrics (SimpleBurnoutAnalyzer format)
+        const val = m?.factors?.after_hours || 
+                   (m?.key_metrics?.after_hours_percentage ? Math.min(m.key_metrics.after_hours_percentage / 10, 10) : 0);
+        console.log(`RADAR: Member ${m?.user_name}: after_hours = ${val} (factors: ${m?.factors?.after_hours}, key_metrics: ${m?.key_metrics?.after_hours_percentage})`);
         return avg + val;
       }, 0) / members.length).toFixed(1)),
-      metrics: `Avg after-hours: ${Math.round((members as any[]).reduce((avg: number, m: any) => avg + (m?.metrics?.after_hours_percentage || 0), 0) / members.length)}%`
+      metrics: `Avg after-hours: ${Math.round((members as any[]).reduce((avg: number, m: any) => avg + (m?.metrics?.after_hours_percentage || m?.key_metrics?.after_hours_percentage || 0), 0) / members.length)}%`
     },
     { 
       factor: "Weekend Work", 
       value: Number(((members as any[]).reduce((avg: number, m: any) => {
-        const val = m?.factors?.weekend_work || 0;
-        console.log(`RADAR: Member ${m?.user_name}: weekend_work = ${val}`);
+        // Try factors first, no direct equivalent in key_metrics, estimate from burnout score
+        const val = m?.factors?.weekend_work || 
+                   (m?.burnout_score ? Math.min(m.burnout_score * 1.5, 10) : 0);
+        console.log(`RADAR: Member ${m?.user_name}: weekend_work = ${val} (factors: ${m?.factors?.weekend_work}, estimated from burnout: ${m?.burnout_score})`);
         return avg + val;
       }, 0) / members.length).toFixed(1)),
       metrics: `Avg weekend work: ${Math.round((members as any[]).reduce((avg: number, m: any) => avg + (m?.metrics?.weekend_percentage || 0), 0) / members.length)}%`
@@ -1654,8 +1660,10 @@ export default function Dashboard() {
     { 
       factor: "Incident Load", 
       value: Number(((members as any[]).reduce((avg: number, m: any) => {
-        const val = m?.factors?.incident_load || 0;
-        console.log(`RADAR: Member ${m?.user_name}: incident_load = ${val}`);
+        // Try factors first, fallback to severity_weighted_per_week from key_metrics
+        const val = m?.factors?.incident_load || 
+                   (m?.key_metrics?.severity_weighted_per_week ? Math.min(m.key_metrics.severity_weighted_per_week * 1.5, 10) : 0);
+        console.log(`RADAR: Member ${m?.user_name}: incident_load = ${val} (factors: ${m?.factors?.incident_load}, key_metrics: ${m?.key_metrics?.severity_weighted_per_week})`);
         return avg + val;
       }, 0) / members.length).toFixed(1)),
       metrics: `Total incidents: ${(members as any[]).reduce((total: number, m: any) => total + (m?.incident_count || 0), 0)}`
@@ -1663,11 +1671,13 @@ export default function Dashboard() {
     { 
       factor: "Response Time", 
       value: Number(((members as any[]).reduce((avg: number, m: any) => {
-        const val = m?.factors?.response_time || 0;
-        console.log(`RADAR: Member ${m?.user_name}: response_time = ${val}`);
+        // Try factors first, fallback to avg_resolution_hours from key_metrics
+        const val = m?.factors?.response_time || 
+                   (m?.key_metrics?.avg_resolution_hours ? Math.min(m.key_metrics.avg_resolution_hours / 2, 10) : 0);
+        console.log(`RADAR: Member ${m?.user_name}: response_time = ${val} (factors: ${m?.factors?.response_time}, key_metrics: ${m?.key_metrics?.avg_resolution_hours})`);
         return avg + val;
       }, 0) / members.length).toFixed(1)),
-      metrics: `Avg response: ${Math.round((members as any[]).reduce((avg: number, m: any) => avg + (m?.metrics?.avg_response_time_minutes || 0), 0) / members.length)} min`
+      metrics: `Avg response: ${Math.round((members as any[]).reduce((avg: number, m: any) => avg + (m?.metrics?.avg_response_time_minutes || m?.key_metrics?.avg_resolution_hours * 60 || 0), 0) / members.length)} min`
     },
   ].map(factor => ({
     ...factor,
