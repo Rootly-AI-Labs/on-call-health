@@ -2182,12 +2182,50 @@ export default function Dashboard() {
                       <div>
                         <div className="flex items-start space-x-3">
                           <div>
-                            <div className="text-2xl font-bold text-gray-900">{currentAnalysis.analysis_data.team_health ? Math.round(currentAnalysis.analysis_data.team_health.overall_score * 10) : currentAnalysis.analysis_data.team_summary ? Math.round(currentAnalysis.analysis_data.team_summary.average_score * 10) : 100}%</div>
+                            <div className="text-2xl font-bold text-gray-900">{(() => {
+                              // Use the latest point from health trends for consistency with chart
+                              if (historicalTrends?.daily_trends?.length > 0) {
+                                const latestTrend = historicalTrends.daily_trends[historicalTrends.daily_trends.length - 1];
+                                return Math.round(latestTrend.overall_score * 10);
+                              }
+                              // Fallback to current analysis daily trends if available
+                              if (currentAnalysis?.analysis_data?.daily_trends?.length > 0) {
+                                const latestTrend = currentAnalysis.analysis_data.daily_trends[currentAnalysis.analysis_data.daily_trends.length - 1];
+                                return Math.round(latestTrend.overall_score * 10);
+                              }
+                              // Final fallback to team_health or team_summary
+                              if (currentAnalysis?.analysis_data?.team_health) {
+                                return Math.round(currentAnalysis.analysis_data.team_health.overall_score * 10);
+                              }
+                              if (currentAnalysis?.analysis_data?.team_summary) {
+                                return Math.round(currentAnalysis.analysis_data.team_summary.average_score * 10);
+                              }
+                              return 100;
+                            })()}%</div>
                             <div className="text-xs text-gray-500">Current</div>
                           </div>
                           {(historicalTrends?.summary?.average_score !== undefined || currentAnalysis.analysis_data?.period_summary?.average_score !== undefined) && (
                             <div className="border-l border-gray-200 pl-3">
-                              <div className="text-2xl font-bold text-gray-900">{Math.round(historicalTrends?.summary?.average_score ?? currentAnalysis.analysis_data?.period_summary?.average_score ?? (currentAnalysis.analysis_data?.team_health?.overall_score ? currentAnalysis.analysis_data.team_health.overall_score * 10 : 0))}%</div>
+                              <div className="text-2xl font-bold text-gray-900">{(() => {
+                                // Use historical trends summary if available
+                                if (historicalTrends?.summary?.average_score !== undefined) {
+                                  return Math.round(historicalTrends.summary.average_score);
+                                }
+                                // Use current analysis period summary if available
+                                if (currentAnalysis?.analysis_data?.period_summary?.average_score !== undefined) {
+                                  return Math.round(currentAnalysis.analysis_data.period_summary.average_score);
+                                }
+                                // Calculate average from current analysis daily trends
+                                if (currentAnalysis?.analysis_data?.daily_trends?.length > 0) {
+                                  const dailyScores = currentAnalysis.analysis_data.daily_trends.map((d: any) => d.overall_score);
+                                  return Math.round((dailyScores.reduce((a: number, b: number) => a + b, 0) / dailyScores.length) * 10);
+                                }
+                                // Final fallback to current score
+                                if (currentAnalysis?.analysis_data?.team_health?.overall_score) {
+                                  return Math.round(currentAnalysis.analysis_data.team_health.overall_score * 10);
+                                }
+                                return 0;
+                              })()}%</div>
                               <div className="text-xs text-gray-500">{currentAnalysis?.time_range || 30}-day avg</div>
                             </div>
                           )}
