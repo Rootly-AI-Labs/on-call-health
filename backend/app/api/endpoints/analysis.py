@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from ...models import get_db, User, Analysis
+from ...models import get_db, User, Analysis, RootlyIntegration
 from ...auth.dependencies import get_current_active_user
 from ...core.rootly_client import RootlyAPIClient
 from ...core.simple_burnout_analyzer import SimpleBurnoutAnalyzer
@@ -21,6 +21,7 @@ router = APIRouter()
 class AnalysisRequest(BaseModel):
     days_back: int = 30
     include_weekends: bool = True
+    integration_id: Optional[int] = None  # If not provided, use default integration
 
 class AnalysisResponse(BaseModel):
     analysis_id: int
@@ -35,19 +36,52 @@ async def start_analysis(
     db: Session = Depends(get_db)
 ):
     """Start a new burnout analysis."""
-    if not current_user.rootly_token:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No Rootly token configured. Please set your token first."
-        )
+    
+    # Get the integration to use
+    if request.integration_id:
+        # Use specified integration
+        integration = db.query(RootlyIntegration).filter(
+            RootlyIntegration.id == request.integration_id,
+            RootlyIntegration.user_id == current_user.id,
+            RootlyIntegration.is_active == True
+        ).first()
+        
+        if not integration:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Integration not found"
+            )
+    else:
+        # Use default integration
+        integration = db.query(RootlyIntegration).filter(
+            RootlyIntegration.user_id == current_user.id,
+            RootlyIntegration.is_active == True,
+            RootlyIntegration.is_default == True
+        ).first()
+        
+        if not integration:
+            # Fallback to any active integration
+            integration = db.query(RootlyIntegration).filter(
+                RootlyIntegration.user_id == current_user.id,
+                RootlyIntegration.is_active == True
+            ).first()
+        
+        if not integration:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No Rootly integration found. Please add a Rootly integration first."
+            )
     
     # Create analysis record
     analysis = Analysis(
         user_id=current_user.id,
+        rootly_integration_id=integration.id,
         status="pending",
         config={
             "days_back": request.days_back,
-            "include_weekends": request.include_weekends
+            "include_weekends": request.include_weekends,
+            "integration_name": integration.name,
+            "organization_name": integration.organization_name
         }
     )
     db.add(analysis)
@@ -58,7 +92,7 @@ async def start_analysis(
     background_tasks.add_task(
         run_analysis_task,
         analysis.id,
-        current_user.rootly_token,
+        integration.id,
         request.days_back,
         current_user.id  # Pass user ID for LLM token access
     )
@@ -66,7 +100,7 @@ async def start_analysis(
     return AnalysisResponse(
         analysis_id=analysis.id,
         status="started",
-        message=f"Analysis started. This usually takes 2-3 minutes for {request.days_back} days of data."
+        message=f"Analysis started using '{integration.name}'. This usually takes 2-3 minutes for {request.days_back} days of data."
     )
 
 @router.get("/{analysis_id}")
@@ -190,7 +224,7 @@ async def get_analysis_history(
         for analysis in analyses
     ]
 
-async def run_analysis_task(analysis_id: int, rootly_token: str, days_back: int, user_id: int):
+async def run_analysis_task(analysis_id: int, integration_id: int, days_back: int, user_id: int):
     """Background task to run the actual analysis."""
     db = next(get_db())
     
@@ -198,6 +232,15 @@ async def run_analysis_task(analysis_id: int, rootly_token: str, days_back: int,
         # Update status to running
         analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
         analysis.status = "running"
+        db.commit()
+        
+        # Get the integration
+        integration = db.query(RootlyIntegration).filter(RootlyIntegration.id == integration_id).first()
+        if not integration:
+            raise Exception(f"Integration with ID {integration_id} not found")
+        
+        # Update last_used_at
+        integration.last_used_at = datetime.now()
         db.commit()
         
         # Get user for LLM token access
@@ -212,7 +255,7 @@ async def run_analysis_task(analysis_id: int, rootly_token: str, days_back: int,
             from ...services.ai_burnout_analyzer import set_user_context
             set_user_context(user)
             
-            analyzer = BurnoutAnalyzerService(rootly_token)
+            analyzer = BurnoutAnalyzerService(integration.api_token, integration.platform)
             
             # Run full analysis with AI enhancement
             results = await analyzer.analyze_burnout(
@@ -224,10 +267,14 @@ async def run_analysis_task(analysis_id: int, rootly_token: str, days_back: int,
         else:
             logger.info("No LLM token available, using simple analyzer")
             # Initialize Rootly client
-            client = RootlyAPIClient(rootly_token)
+            client = RootlyAPIClient(integration.api_token)
             
             # Collect data
+            logger.info(f"Collecting data from integration '{integration.name}' for {days_back} days")
             raw_data = await client.collect_analysis_data(days_back=days_back)
+            
+            # Log detailed info about what was collected
+            logger.info(f"Data collection completed: {len(raw_data.get('users', []))} users, {len(raw_data.get('incidents', []))} incidents")
             
             # Initialize simple analyzer
             analyzer = SimpleBurnoutAnalyzer()
@@ -245,12 +292,16 @@ async def run_analysis_task(analysis_id: int, rootly_token: str, days_back: int,
         analysis.completed_at = datetime.now()
         db.commit()
         
+        logger.info(f"Analysis {analysis_id} completed successfully")
+        
     except Exception as e:
+        logger.error(f"Analysis {analysis_id} failed: {str(e)}", exc_info=True)
         # Update analysis with error
         analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
-        analysis.status = "failed"
-        analysis.error_message = str(e)
-        db.commit()
+        if analysis:
+            analysis.status = "failed"
+            analysis.error_message = str(e)
+            db.commit()
     
     finally:
         db.close()

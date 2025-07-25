@@ -57,7 +57,7 @@ def test_burnout_analyzer():
     print("=" * 40)
     
     try:
-        analyzer = SimpleBurnoutAnalyzer()
+        analyzer = SimpleBurnoutAnalyzer("test_token")
         print("✅ SimpleBurnoutAnalyzer imported and instantiated")
         
         # Create mock data

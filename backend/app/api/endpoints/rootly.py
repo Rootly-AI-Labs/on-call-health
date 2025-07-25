@@ -2,7 +2,8 @@
 Rootly integration API endpoints.
 """
 from typing import Dict, Any
-from datetime import datetime
+from datetime import datetime, timedelta
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -10,6 +11,8 @@ from sqlalchemy.orm import Session
 from ...models import get_db, User, RootlyIntegration
 from ...auth.dependencies import get_current_active_user
 from ...core.rootly_client import RootlyAPIClient
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -416,4 +419,217 @@ async def preview_rootly_data(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to preview data: {str(e)}"
+        )
+
+@router.get("/debug/incidents")
+async def debug_rootly_incidents(
+    integration_id: int,
+    days: int = 7,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Debug endpoint to show raw Rootly incident data and processing steps."""
+    # Get the integration
+    integration = db.query(RootlyIntegration).filter(
+        RootlyIntegration.id == integration_id,
+        RootlyIntegration.user_id == current_user.id,
+        RootlyIntegration.is_active == True
+    ).first()
+    
+    if not integration:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Integration not found"
+        )
+    
+    try:
+        # Initialize client with this integration
+        client = RootlyAPIClient(integration.api_token)
+        
+        # Get date range information
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=days)
+        
+        debug_info = {
+            "integration_info": {
+                "id": integration.id,
+                "name": integration.name,
+                "organization_name": integration.organization_name,
+                "platform": integration.platform,
+                "token_suffix": f"****{integration.api_token[-4:]}" if len(integration.api_token) >= 4 else "****"
+            },
+            "date_range": {
+                "days_back": days,
+                "start_date": start_date.isoformat(),
+                "end_date": end_date.isoformat(),
+                "timezone": "UTC"
+            },
+            "api_test_results": {},
+            "raw_api_response": {},
+            "processed_data": {},
+            "filters_applied": {},
+            "errors": []
+        }
+        
+        # Step 1: Test basic connection
+        logger.info(f"DEBUG: Testing connection for integration {integration.id}")
+        try:
+            connection_test = await client.test_connection()
+            debug_info["api_test_results"]["connection"] = connection_test
+        except Exception as e:
+            debug_info["errors"].append(f"Connection test failed: {str(e)}")
+            debug_info["api_test_results"]["connection"] = {"status": "error", "message": str(e)}
+        
+        # Step 2: Test permissions
+        logger.info(f"DEBUG: Testing permissions for integration {integration.id}")
+        try:
+            permissions = await client.check_permissions()
+            debug_info["api_test_results"]["permissions"] = permissions
+        except Exception as e:
+            debug_info["errors"].append(f"Permission check failed: {str(e)}")
+            debug_info["api_test_results"]["permissions"] = {"error": str(e)}
+        
+        # Step 3: Get raw incidents with detailed logging
+        logger.info(f"DEBUG: Fetching incidents for {days} days from integration {integration.id}")
+        try:
+            # Get incidents with limit for debugging
+            incidents = await client.get_incidents(days_back=days, limit=100)
+            
+            debug_info["raw_api_response"] = {
+                "total_incidents_fetched": len(incidents),
+                "sample_incidents": incidents[:3] if incidents else [],  # First 3 for inspection
+                "incident_date_range": [],
+                "status_breakdown": {},
+                "severity_breakdown": {}
+            }
+            
+            # Analyze the incidents
+            if incidents:
+                # Extract dates and analyze distribution
+                incident_dates = []
+                status_counts = {}
+                severity_counts = {}
+                
+                for incident in incidents:
+                    attrs = incident.get("attributes", {})
+                    created_at = attrs.get("created_at")
+                    status = attrs.get("status", "unknown")
+                    
+                    # Count status
+                    status_counts[status] = status_counts.get(status, 0) + 1
+                    
+                    # Count severity
+                    severity = "unknown"
+                    severity_data = attrs.get("severity")
+                    if severity_data and isinstance(severity_data, dict):
+                        data = severity_data.get("data")
+                        if data and isinstance(data, dict):
+                            attributes = data.get("attributes")
+                            if attributes and isinstance(attributes, dict):
+                                name = attributes.get("name")
+                                if name and isinstance(name, str):
+                                    severity = name.lower()
+                    severity_counts[severity] = severity_counts.get(severity, 0) + 1
+                    
+                    # Parse and collect dates
+                    if created_at:
+                        try:
+                            dt = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                            incident_dates.append(dt.isoformat())
+                        except:
+                            pass
+                
+                # Sort dates to show range
+                if incident_dates:
+                    incident_dates.sort()
+                    debug_info["raw_api_response"]["incident_date_range"] = [
+                        incident_dates[0],  # Earliest
+                        incident_dates[-1]  # Latest
+                    ]
+                
+                debug_info["raw_api_response"]["status_breakdown"] = status_counts
+                debug_info["raw_api_response"]["severity_breakdown"] = severity_counts
+            
+        except Exception as e:
+            debug_info["errors"].append(f"Incident fetch failed: {str(e)}")
+            debug_info["raw_api_response"]["error"] = str(e)
+            incidents = []
+        
+        # Step 4: Show filtering logic
+        debug_info["filters_applied"] = {
+            "date_filter": {
+                "start_date": start_date.isoformat(),
+                "end_date": end_date.isoformat(),
+                "filter_string": f"filter[created_at][gte]={start_date.isoformat()}&filter[created_at][lte]={end_date.isoformat()}"
+            },
+            "incidents_in_range": 0,
+            "incidents_outside_range": 0,
+            "date_parsing_errors": 0
+        }
+        
+        # Analyze date filtering
+        if incidents:
+            in_range = 0
+            outside_range = 0
+            parsing_errors = 0
+            
+            for incident in incidents:
+                attrs = incident.get("attributes", {})
+                created_at = attrs.get("created_at")
+                
+                if created_at:
+                    try:
+                        dt = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                        if start_date <= dt <= end_date:
+                            in_range += 1
+                        else:
+                            outside_range += 1
+                    except:
+                        parsing_errors += 1
+                else:
+                    parsing_errors += 1
+            
+            debug_info["filters_applied"]["incidents_in_range"] = in_range
+            debug_info["filters_applied"]["incidents_outside_range"] = outside_range
+            debug_info["filters_applied"]["date_parsing_errors"] = parsing_errors
+        
+        # Step 5: Show processed data structure
+        debug_info["processed_data"] = {
+            "total_incidents_processed": len(incidents),
+            "users_referenced": set(),
+            "incident_processing_summary": {}
+        }
+        
+        # Extract user references from incidents
+        user_references = set()
+        if incidents:
+            for incident in incidents:
+                attrs = incident.get("attributes", {})
+                
+                # Check various user fields
+                for field in ["user", "started_by", "resolved_by"]:
+                    user_data = attrs.get(field)
+                    if user_data and isinstance(user_data, dict):
+                        data = user_data.get("data")
+                        if data and isinstance(data, dict) and data.get("id"):
+                            user_references.add(str(data["id"]))
+            
+            debug_info["processed_data"]["users_referenced"] = list(user_references)
+            debug_info["processed_data"]["unique_users_count"] = len(user_references)
+        
+        # Step 6: Get users for comparison
+        try:
+            users = await client.get_users(limit=50)
+            debug_info["processed_data"]["total_users_fetched"] = len(users)
+            debug_info["processed_data"]["sample_users"] = users[:2] if users else []
+        except Exception as e:
+            debug_info["errors"].append(f"User fetch failed: {str(e)}")
+            debug_info["processed_data"]["user_fetch_error"] = str(e)
+        
+        return debug_info
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Debug failed: {str(e)}"
         )

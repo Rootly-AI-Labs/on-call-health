@@ -12,6 +12,8 @@ class SimpleBurnoutAnalyzer:
     
     def __init__(self, api_token: str):
         self.api_token = api_token
+        # Initialize the client attribute to fix missing client error
+        self.client = None
         # Default thresholds for risk assessment
         self.thresholds = {
             "incidents_per_week_high": 8,
@@ -39,11 +41,11 @@ class SimpleBurnoutAnalyzer:
         
         logger.info(f"Starting simplified burnout analysis for {time_range_days} days")
         
-        # Initialize Rootly API client
-        rootly_client = RootlyAPIClient(self.api_token)
+        # Initialize Rootly API client and store it for error handling
+        self.client = RootlyAPIClient(self.api_token)
         
         # Collect data from Rootly
-        rootly_data = await rootly_client.collect_analysis_data(time_range_days)
+        rootly_data = await self.client.collect_analysis_data(time_range_days)
         
         # Process the data using the existing team analysis method
         result = self.analyze_team_burnout(
@@ -61,6 +63,11 @@ class SimpleBurnoutAnalyzer:
         metadata: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Analyze burnout risk for entire team."""
+        # Handle None inputs safely
+        users = users or []
+        incidents = incidents or []
+        metadata = metadata or {}
+        
         logger.info(f"Starting team burnout analysis for {len(users)} users and {len(incidents)} incidents")
         
         # Process incidents to extract user involvement
@@ -69,15 +76,24 @@ class SimpleBurnoutAnalyzer:
         # Analyze each user
         team_analysis = []
         for user in users:
+            if not user or not isinstance(user, dict):
+                logger.warning("Skipping invalid user data (not a dict)")
+                continue
+                
             user_id = user.get("id")
             if user_id:
-                user_incidents = [
-                    inc for inc in incidents 
-                    if user_id in user_incident_mapping.get(str(user_id), [])
-                ]
-                
-                user_analysis = self._analyze_user_burnout(user, user_incidents, metadata)
-                team_analysis.append(user_analysis)
+                try:
+                    user_incidents = [
+                        inc for inc in incidents 
+                        if inc and isinstance(inc, dict) and user_id in user_incident_mapping.get(str(user_id), [])
+                    ]
+                    
+                    user_analysis = self._analyze_user_burnout(user, user_incidents, metadata)
+                    if user_analysis:
+                        team_analysis.append(user_analysis)
+                except Exception as e:
+                    logger.warning(f"Error analyzing user {user_id}: {e}")
+                    continue
         
         # Calculate team summary
         team_summary = self._calculate_team_summary(team_analysis)
@@ -179,29 +195,45 @@ class SimpleBurnoutAnalyzer:
         user_incidents = {}
         
         for incident in incidents:
+            if not incident or not isinstance(incident, dict):
+                continue
+                
             incident_id = incident.get("id")
+            if not incident_id:
+                continue
+                
             attrs = incident.get("attributes", {})
+            if not isinstance(attrs, dict):
+                continue
             
             # Extract user involvement from various fields
             involved_users = set()
             
-            # Created by
-            if attrs.get("user", {}).get("data", {}).get("id"):
-                involved_users.add(str(attrs["user"]["data"]["id"]))
-            
-            # Started by
-            if attrs.get("started_by", {}).get("data", {}).get("id"):
-                involved_users.add(str(attrs["started_by"]["data"]["id"]))
-            
-            # Resolved by
-            if attrs.get("resolved_by", {}).get("data", {}).get("id"):
-                involved_users.add(str(attrs["resolved_by"]["data"]["id"]))
-            
-            # Add incident to each involved user
-            for user_id in involved_users:
-                if user_id not in user_incidents:
-                    user_incidents[user_id] = []
-                user_incidents[user_id].append(incident_id)
+            try:
+                # Created by
+                user_data = attrs.get("user", {})
+                if isinstance(user_data, dict) and user_data.get("data", {}).get("id"):
+                    involved_users.add(str(user_data["data"]["id"]))
+                
+                # Started by
+                started_by_data = attrs.get("started_by", {})
+                if isinstance(started_by_data, dict) and started_by_data.get("data", {}).get("id"):
+                    involved_users.add(str(started_by_data["data"]["id"]))
+                
+                # Resolved by
+                resolved_by_data = attrs.get("resolved_by", {})
+                if isinstance(resolved_by_data, dict) and resolved_by_data.get("data", {}).get("id"):
+                    involved_users.add(str(resolved_by_data["data"]["id"]))
+                
+                # Add incident to each involved user
+                for user_id in involved_users:
+                    if user_id not in user_incidents:
+                        user_incidents[user_id] = []
+                    user_incidents[user_id].append(incident_id)
+                    
+            except Exception as e:
+                logger.warning(f"Error processing incident {incident_id}: {e}")
+                continue
         
         return user_incidents
     

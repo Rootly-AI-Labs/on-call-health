@@ -700,6 +700,13 @@ async def run_analysis_task(
         # Run the analysis with timeout (15 minutes max)
         logger.info(f"BACKGROUND_TASK: Starting burnout analysis with 15-minute timeout for analysis {analysis_id}")
         try:
+            # Ensure analyzer_service is properly initialized
+            if not analyzer_service:
+                raise Exception("Analyzer service is None - initialization failed")
+            
+            # Log analyzer type for debugging
+            logger.info(f"BACKGROUND_TASK: Using analyzer type: {type(analyzer_service).__name__}")
+            
             results = await asyncio.wait_for(
                 analyzer_service.analyze_burnout(
                     time_range_days=time_range,
@@ -711,7 +718,13 @@ async def run_analysis_task(
                 ),
                 timeout=900.0  # 15 minutes
             )
-            logger.info(f"BACKGROUND_TASK: Analysis {analysis_id} completed successfully")
+            
+            # Validate results
+            if not results:
+                logger.warning(f"BACKGROUND_TASK: Analysis {analysis_id} returned empty results")
+                results = {"error": "Analysis completed but returned empty results"}
+            
+            logger.info(f"BACKGROUND_TASK: Analysis {analysis_id} completed successfully with {len(str(results))} characters of results")
             
             # Update analysis with results
             analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
@@ -720,15 +733,20 @@ async def run_analysis_task(
                 analysis.results = results
                 analysis.completed_at = datetime.now()
                 db.commit()
+                logger.info(f"BACKGROUND_TASK: Successfully saved results for analysis {analysis_id}")
+            else:
+                logger.error(f"BACKGROUND_TASK: Analysis {analysis_id} not found when trying to save results")
                 
         except asyncio.TimeoutError:
             # Handle timeout
+            logger.error(f"BACKGROUND_TASK: Analysis {analysis_id} timed out after 15 minutes")
             analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
             if analysis:
                 analysis.status = "failed"
                 analysis.error_message = "Analysis timed out after 15 minutes"
                 analysis.completed_at = datetime.now()
                 db.commit()
+                logger.info(f"BACKGROUND_TASK: Updated analysis {analysis_id} status to failed due to timeout")
                 
         except Exception as analysis_error:
             # Handle analysis-specific errors
@@ -749,19 +767,25 @@ async def run_analysis_task(
                 # For other errors, try to collect raw data even if analysis failed
                 try:
                     logger.info(f"BACKGROUND_TASK: Attempting to save raw data for failed analysis {analysis_id}")
-                    # Access the appropriate client based on platform
-                    if platform == "pagerduty":
-                        raw_data = await analyzer_service.client.collect_analysis_data(days_back=time_range)
-                    else:
-                        raw_data = await analyzer_service.client.collect_analysis_data(days_back=time_range)
+                    raw_data = None
                     
-                    # Save partial results with raw data
+                    # Access the appropriate client based on platform
+                    if hasattr(analyzer_service, 'client') and analyzer_service.client:
+                        try:
+                            raw_data = await analyzer_service.client.collect_analysis_data(days_back=time_range)
+                            logger.info(f"BACKGROUND_TASK: Successfully collected raw data for analysis {analysis_id}")
+                        except Exception as client_error:
+                            logger.warning(f"BACKGROUND_TASK: Failed to collect raw data for analysis {analysis_id}: {client_error}")
+                    else:
+                        logger.warning(f"BACKGROUND_TASK: No client available for raw data collection in analysis {analysis_id}")
+                    
+                    # Save partial results with raw data (safely handle None raw_data)
                     partial_results = {
                         "error": f"Analysis failed: {str(analysis_error)}",
                         "partial_data": {
-                            "users": raw_data.get("users", []) if raw_data else [],
-                            "incidents": raw_data.get("incidents", []) if raw_data else [],
-                            "metadata": raw_data.get("collection_metadata", {}) if raw_data else {}
+                            "users": raw_data.get("users", []) if raw_data and isinstance(raw_data, dict) else [],
+                            "incidents": raw_data.get("incidents", []) if raw_data and isinstance(raw_data, dict) else [],
+                            "metadata": raw_data.get("collection_metadata", {}) if raw_data and isinstance(raw_data, dict) else {}
                         },
                         "data_collection_successful": bool(raw_data),
                         "failure_stage": "analysis_processing"
@@ -783,6 +807,7 @@ async def run_analysis_task(
         
     except Exception as e:
         # Handle any other errors (DB, etc.)
+        logger.error(f"BACKGROUND_TASK: Critical error in analysis {analysis_id}: {str(e)}", exc_info=True)
         try:
             analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
             if analysis:
@@ -790,8 +815,11 @@ async def run_analysis_task(
                 analysis.error_message = f"Task failed: {str(e)}"
                 analysis.completed_at = datetime.now()
                 db.commit()
-        except:
-            pass  # If we can't even update the DB, just let it fail
+                logger.info(f"BACKGROUND_TASK: Updated analysis {analysis_id} status to failed due to critical error")
+            else:
+                logger.error(f"BACKGROUND_TASK: Could not find analysis {analysis_id} to update error status")
+        except Exception as db_error:
+            logger.error(f"BACKGROUND_TASK: Failed to update database for analysis {analysis_id}: {str(db_error)}", exc_info=True)
     
     finally:
         try:
