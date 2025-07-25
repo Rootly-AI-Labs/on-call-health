@@ -258,13 +258,20 @@ class SimpleBurnoutAnalyzer:
         
         # Generate daily trends if we have incident data
         daily_trends = []
-        period_average_score = team_summary.get("average_score", 0.0)
+        # Convert team burnout score to health score (invert 0-10 scale)
+        team_burnout_avg = team_summary.get("average_score", 0.0)
+        period_average_score = max(0.0, 10.0 - team_burnout_avg)  # Convert burnout to health score
+        
         try:
             daily_trends = self._generate_daily_trends(incidents, team_analysis, metadata)
+            logger.info(f"Generated {len(daily_trends)} daily trends")
             # Calculate period average from daily trends if available
             if daily_trends and len(daily_trends) > 0:
                 daily_scores = [day["overall_score"] for day in daily_trends]
                 period_average_score = sum(daily_scores) / len(daily_scores)
+                logger.info(f"Period average from daily trends: {period_average_score}")
+            else:
+                logger.info(f"No daily trends generated, using fallback period average: {period_average_score}")
         except Exception as e:
             logger.error(f"Error generating daily trends: {e}")
             daily_trends = []
