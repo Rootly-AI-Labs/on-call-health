@@ -230,6 +230,10 @@ class BurnoutAnalyzerService:
                 logger.info(f"🔍 BURNOUT ANALYSIS: Calculating Slack insights")
                 slack_insights = self._calculate_slack_insights(slack_data)
 
+            # Calculate period summary for consistent UI display
+            team_overall_score = team_health.get("overall_score", 0.0)  # This is already health scale 0-10
+            period_average_score = team_overall_score * 10  # Convert to percentage scale 0-100
+            
             result = {
                 "analysis_timestamp": datetime.now().isoformat(),
                 "metadata": {
@@ -242,7 +246,12 @@ class BurnoutAnalyzerService:
                 "team_health": team_health,
                 "team_analysis": team_analysis,
                 "insights": insights,
-                "recommendations": self._generate_recommendations(team_health, team_analysis)
+                "recommendations": self._generate_recommendations(team_health, team_analysis),
+                "period_summary": {
+                    "average_score": round(period_average_score, 2),
+                    "days_analyzed": time_range_days,
+                    "total_days_with_data": time_range_days  # Full analyzer doesn't have daily breakdown
+                }
             }
             
             # Add GitHub insights if enabled
