@@ -1626,27 +1626,47 @@ export default function Dashboard() {
   const burnoutFactors = members.length > 0 ? [
     { 
       factor: "Workload", 
-      value: Number(((members as any[]).reduce((avg: number, m: any) => avg + (m?.factors?.workload || 0), 0) / members.length).toFixed(1)),
+      value: Number(((members as any[]).reduce((avg: number, m: any) => {
+        const val = m?.factors?.workload || 0;
+        console.log(`RADAR: Member ${m?.user_name}: workload = ${val}`);
+        return avg + val;
+      }, 0) / members.length).toFixed(1)),
       metrics: `Avg incidents: ${Math.round((members as any[]).reduce((avg: number, m: any) => avg + (m?.incident_count || 0), 0) / members.length)}`
     },
     { 
       factor: "After Hours", 
-      value: Number(((members as any[]).reduce((avg: number, m: any) => avg + (m?.factors?.after_hours || 0), 0) / members.length).toFixed(1)),
+      value: Number(((members as any[]).reduce((avg: number, m: any) => {
+        const val = m?.factors?.after_hours || 0;
+        console.log(`RADAR: Member ${m?.user_name}: after_hours = ${val}`);
+        return avg + val;
+      }, 0) / members.length).toFixed(1)),
       metrics: `Avg after-hours: ${Math.round((members as any[]).reduce((avg: number, m: any) => avg + (m?.metrics?.after_hours_percentage || 0), 0) / members.length)}%`
     },
     { 
       factor: "Weekend Work", 
-      value: Number(((members as any[]).reduce((avg: number, m: any) => avg + (m?.factors?.weekend_work || 0), 0) / members.length).toFixed(1)),
+      value: Number(((members as any[]).reduce((avg: number, m: any) => {
+        const val = m?.factors?.weekend_work || 0;
+        console.log(`RADAR: Member ${m?.user_name}: weekend_work = ${val}`);
+        return avg + val;
+      }, 0) / members.length).toFixed(1)),
       metrics: `Avg weekend work: ${Math.round((members as any[]).reduce((avg: number, m: any) => avg + (m?.metrics?.weekend_percentage || 0), 0) / members.length)}%`
     },
     { 
       factor: "Incident Load", 
-      value: Number(((members as any[]).reduce((avg: number, m: any) => avg + (m?.factors?.incident_load || 0), 0) / members.length).toFixed(1)),
+      value: Number(((members as any[]).reduce((avg: number, m: any) => {
+        const val = m?.factors?.incident_load || 0;
+        console.log(`RADAR: Member ${m?.user_name}: incident_load = ${val}`);
+        return avg + val;
+      }, 0) / members.length).toFixed(1)),
       metrics: `Total incidents: ${(members as any[]).reduce((total: number, m: any) => total + (m?.incident_count || 0), 0)}`
     },
     { 
       factor: "Response Time", 
-      value: Number(((members as any[]).reduce((avg: number, m: any) => avg + (m?.factors?.response_time || 0), 0) / members.length).toFixed(1)),
+      value: Number(((members as any[]).reduce((avg: number, m: any) => {
+        const val = m?.factors?.response_time || 0;
+        console.log(`RADAR: Member ${m?.user_name}: response_time = ${val}`);
+        return avg + val;
+      }, 0) / members.length).toFixed(1)),
       metrics: `Avg response: ${Math.round((members as any[]).reduce((avg: number, m: any) => avg + (m?.metrics?.avg_response_time_minutes || 0), 0) / members.length)} min`
     },
   ].map(factor => ({
@@ -1667,7 +1687,26 @@ export default function Dashboard() {
     console.log('🔍 DEBUG: Selected member factors:', selectedMember ? selectedMember.factors : 'None selected')
     console.log('🔍 DEBUG: Selected member slack activity:', selectedMember?.slack_activity)
     console.log('🔍 DEBUG: Selected member github activity:', selectedMember?.github_activity)
-  }, [burnoutFactors, members, selectedMember])
+    
+    // Additional debugging for radar chart zeros
+    if (members.length > 0) {
+      console.log('🔍 RADAR DEBUG: First member structure:', JSON.stringify(members[0], null, 2))
+      const firstMember = members[0] as any
+      console.log('🔍 RADAR DEBUG: First member factors check:', {
+        hasFactors: !!firstMember?.factors,
+        workload: firstMember?.factors?.workload,
+        afterHours: firstMember?.factors?.after_hours,
+        weekendWork: firstMember?.factors?.weekend_work,
+        incidentLoad: firstMember?.factors?.incident_load,
+        responseTime: firstMember?.factors?.response_time
+      })
+      console.log('🔍 RADAR DEBUG: Team analysis structure keys:', Object.keys(currentAnalysis?.analysis_data?.team_analysis || {}))
+      if (currentAnalysis?.analysis_data?.team_analysis && !Array.isArray(currentAnalysis.analysis_data.team_analysis)) {
+        console.log('🔍 RADAR DEBUG: Team analysis object keys:', Object.keys(currentAnalysis.analysis_data.team_analysis))
+        console.log('🔍 RADAR DEBUG: Team analysis members array length:', currentAnalysis.analysis_data.team_analysis.members?.length || 0)
+      }
+    }
+  }, [burnoutFactors, members, selectedMember, currentAnalysis])
 
   // Show full-screen loading when loading integrations
   if (loadingIntegrations) {
