@@ -2124,11 +2124,11 @@ export default function Dashboard() {
                     <CardTitle className="text-sm font-medium text-purple-700">Team Health</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    {currentAnalysis?.analysis_data?.team_health ? (
+                    {currentAnalysis?.analysis_data?.team_health || (currentAnalysis?.analysis_data?.team_analysis && currentAnalysis?.status === 'completed') ? (
                       <div>
                         <div className="flex items-start space-x-3">
                           <div>
-                            <div className="text-2xl font-bold text-gray-900">{Math.round(currentAnalysis.analysis_data.team_health.overall_score * 10)}%</div>
+                            <div className="text-2xl font-bold text-gray-900">{currentAnalysis.analysis_data.team_health ? Math.round(currentAnalysis.analysis_data.team_health.overall_score * 10) : 0}%</div>
                             <div className="text-xs text-gray-500">Current</div>
                           </div>
                           {historicalTrends?.summary?.average_score && (
@@ -2139,7 +2139,7 @@ export default function Dashboard() {
                           )}
                         </div>
                         <div className="mt-2 flex items-center space-x-1">
-                          <div className="text-sm font-medium text-purple-600">{currentAnalysis.analysis_data.team_health.health_status}</div>
+                          <div className="text-sm font-medium text-purple-600">{currentAnalysis.analysis_data.team_health?.health_status || 'Excellent'}</div>
                           <Info className="w-3 h-3 text-purple-500" 
                                   onMouseEnter={(e) => {
                                     const tooltip = document.getElementById('health-score-tooltip')
@@ -2161,7 +2161,7 @@ export default function Dashboard() {
                         </div>
                         <p className="text-xs text-gray-600 mt-1">
                           {(() => {
-                            const status = currentAnalysis.analysis_data.team_health.health_status.toLowerCase()
+                            const status = (currentAnalysis.analysis_data.team_health?.health_status || 'excellent').toLowerCase()
                             switch(status) {
                               case 'excellent':
                                 return 'Low stress, sustainable workload'
@@ -2192,16 +2192,16 @@ export default function Dashboard() {
                     <CardTitle className="text-sm font-medium text-purple-700">At Risk</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    {currentAnalysis?.analysis_data?.team_health ? (
+                    {currentAnalysis?.analysis_data?.team_health || (currentAnalysis?.analysis_data?.team_analysis && currentAnalysis?.status === 'completed') ? (
                       <div>
                         <div className="space-y-1">
                           <div className="flex items-center space-x-2">
-                            <div className="text-2xl font-bold text-red-600">{currentAnalysis.analysis_data.team_health.risk_distribution.high}</div>
+                            <div className="text-2xl font-bold text-red-600">{currentAnalysis.analysis_data.team_health?.risk_distribution?.high || 0}</div>
                             <AlertTriangle className="w-6 h-6 text-red-500" />
                             <span className="text-sm text-gray-600">High risk</span>
                           </div>
                           <div className="flex items-center space-x-2">
-                            <div className="text-2xl font-bold text-orange-600">{currentAnalysis.analysis_data.team_health.risk_distribution.medium}</div>
+                            <div className="text-2xl font-bold text-orange-600">{currentAnalysis.analysis_data.team_health?.risk_distribution?.medium || 0}</div>
                             <div className="w-6 h-6 rounded-full bg-orange-500/20 flex items-center justify-center">
                               <div className="w-3 h-3 rounded-full bg-orange-500"></div>
                             </div>
