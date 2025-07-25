@@ -2187,7 +2187,7 @@ export default function Dashboard() {
                           </div>
                           {(historicalTrends?.summary?.average_score !== undefined || currentAnalysis.analysis_data?.period_summary?.average_score !== undefined) && (
                             <div className="border-l border-gray-200 pl-3">
-                              <div className="text-2xl font-bold text-gray-900">{Math.round(historicalTrends?.summary?.average_score ?? currentAnalysis.analysis_data?.period_summary?.average_score ?? 0)}%</div>
+                              <div className="text-2xl font-bold text-gray-900">{Math.round(historicalTrends?.summary?.average_score ?? currentAnalysis.analysis_data?.period_summary?.average_score ?? (currentAnalysis.analysis_data?.team_health?.overall_score ? currentAnalysis.analysis_data.team_health.overall_score * 10 : 0))}%</div>
                               <div className="text-xs text-gray-500">{currentAnalysis?.time_range || 30}-day avg</div>
                             </div>
                           )}
