@@ -1527,7 +1527,9 @@ export default function Dashboard() {
         fill: member.risk_level === "high" ? "#dc2626" :      // Red for high
               member.risk_level === "medium" ? "#f59e0b" :    // Amber for medium
               "#10b981",                                       // Green for low
-      })) || []
+      }))
+      ?.sort((a, b) => b.score - a.score) // Sort by score descending (highest risk first)
+      || []
   })();
   
   const members = (() => {
@@ -2128,7 +2130,7 @@ export default function Dashboard() {
                       <div>
                         <div className="flex items-start space-x-3">
                           <div>
-                            <div className="text-2xl font-bold text-gray-900">{currentAnalysis.analysis_data.team_health ? Math.round(currentAnalysis.analysis_data.team_health.overall_score * 10) : 100}%</div>
+                            <div className="text-2xl font-bold text-gray-900">{currentAnalysis.analysis_data.team_health ? Math.round(currentAnalysis.analysis_data.team_health.overall_score * 10) : currentAnalysis.analysis_data.team_summary ? Math.round(currentAnalysis.analysis_data.team_summary.average_score * 10) : 100}%</div>
                             <div className="text-xs text-gray-500">Current</div>
                           </div>
                           {historicalTrends?.summary?.average_score && currentAnalysis.analysis_data.team_health && (
@@ -2139,7 +2141,16 @@ export default function Dashboard() {
                           )}
                         </div>
                         <div className="mt-2 flex items-center space-x-1">
-                          <div className="text-sm font-medium text-purple-600">{currentAnalysis.analysis_data.team_health?.health_status || 'Excellent'}</div>
+                          <div className="text-sm font-medium text-purple-600">{currentAnalysis.analysis_data.team_health?.health_status || (() => {
+                            // Derive health status from average score for team_summary
+                            const avgScore = currentAnalysis.analysis_data.team_summary?.average_score;
+                            if (!avgScore) return 'Excellent';
+                            if (avgScore < 3) return 'Excellent';
+                            if (avgScore < 5) return 'Good';
+                            if (avgScore < 7) return 'Fair';
+                            if (avgScore < 8) return 'Poor';
+                            return 'Critical';
+                          })()}</div>
                           <Info className="w-3 h-3 text-purple-500" 
                                   onMouseEnter={(e) => {
                                     const tooltip = document.getElementById('health-score-tooltip')
@@ -2161,7 +2172,16 @@ export default function Dashboard() {
                         </div>
                         <p className="text-xs text-gray-600 mt-1">
                           {(() => {
-                            const status = (currentAnalysis.analysis_data.team_health?.health_status || 'excellent').toLowerCase()
+                            const status = (currentAnalysis.analysis_data.team_health?.health_status || (() => {
+                              // Derive health status from average score for team_summary
+                              const avgScore = currentAnalysis.analysis_data.team_summary?.average_score;
+                              if (!avgScore) return 'excellent';
+                              if (avgScore < 3) return 'excellent';
+                              if (avgScore < 5) return 'good';
+                              if (avgScore < 7) return 'fair';
+                              if (avgScore < 8) return 'poor';
+                              return 'critical';
+                            })()).toLowerCase()
                             switch(status) {
                               case 'excellent':
                                 return 'Low stress, sustainable workload'
@@ -2196,12 +2216,12 @@ export default function Dashboard() {
                       <div>
                         <div className="space-y-1">
                           <div className="flex items-center space-x-2">
-                            <div className="text-2xl font-bold text-red-600">{currentAnalysis.analysis_data.team_health?.risk_distribution?.high || 0}</div>
+                            <div className="text-2xl font-bold text-red-600">{currentAnalysis.analysis_data.team_health?.risk_distribution?.high || currentAnalysis.analysis_data.team_summary?.risk_distribution?.high || 0}</div>
                             <AlertTriangle className="w-6 h-6 text-red-500" />
                             <span className="text-sm text-gray-600">High risk</span>
                           </div>
                           <div className="flex items-center space-x-2">
-                            <div className="text-2xl font-bold text-orange-600">{currentAnalysis.analysis_data.team_health?.risk_distribution?.medium || 0}</div>
+                            <div className="text-2xl font-bold text-orange-600">{currentAnalysis.analysis_data.team_health?.risk_distribution?.medium || currentAnalysis.analysis_data.team_summary?.risk_distribution?.medium || 0}</div>
                             <div className="w-6 h-6 rounded-full bg-orange-500/20 flex items-center justify-center">
                               <div className="w-3 h-3 rounded-full bg-orange-500"></div>
                             </div>
@@ -3235,7 +3255,9 @@ export default function Dashboard() {
                     {(() => {
                       const teamAnalysis = currentAnalysis?.analysis_data?.team_analysis
                       const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members
-                      return members?.map((member) => (
+                      return members
+                        ?.sort((a, b) => b.burnout_score - a.burnout_score) // Sort by burnout score descending (highest risk first)
+                        ?.map((member) => (
                       <Card
                         key={member.user_id}
                         className="cursor-pointer hover:shadow-md transition-shadow"
