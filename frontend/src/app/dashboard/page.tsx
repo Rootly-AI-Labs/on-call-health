@@ -2131,7 +2131,7 @@ export default function Dashboard() {
                             <div className="text-2xl font-bold text-gray-900">{currentAnalysis.analysis_data.team_health ? Math.round(currentAnalysis.analysis_data.team_health.overall_score * 10) : 0}%</div>
                             <div className="text-xs text-gray-500">Current</div>
                           </div>
-                          {historicalTrends?.summary?.average_score && (
+                          {historicalTrends?.summary?.average_score && currentAnalysis.analysis_data.team_health && (
                             <div className="border-l border-gray-200 pl-3">
                               <div className="text-2xl font-bold text-gray-900">{Math.round(historicalTrends.summary.average_score * 10)}%</div>
                               <div className="text-xs text-gray-500">{currentAnalysis?.time_range || 30}-day avg</div>
