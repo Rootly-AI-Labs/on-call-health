@@ -22,12 +22,21 @@ Deploy the Rootly Burnout Detector in production in **5 minutes**.
 1. **Railway**: Go to [railway.app](https://railway.app)
 2. **New Project** → Deploy from GitHub → Select your repo
 3. **Add Database** → PostgreSQL
-4. **Environment Variables**:
+4. **Connect Database**: 
+   - Go to your PostgreSQL service → Variables tab
+   - Copy the `DATABASE_URL` 
+   - Go to your backend service → Variables tab
+   - Add: `DATABASE_URL` = (paste the connection string)
+5. **Environment Variables**:
    ```
    SECRET_KEY=your-random-32-character-string
    FRONTEND_URL=https://your-app.vercel.app
    GOOGLE_CLIENT_ID=your-google-client-id
    GOOGLE_CLIENT_SECRET=your-google-client-secret
+   GOOGLE_REDIRECT_URI=https://your-railway-app.railway.app/auth/google/callback
+   GITHUB_CLIENT_ID=your-github-client-id (if using GitHub)
+   GITHUB_CLIENT_SECRET=your-github-client-secret (if using GitHub)
+   GITHUB_REDIRECT_URI=https://your-railway-app.railway.app/auth/github/callback
    ```
 
 ### Step 3: Deploy Frontend (1 minute)
