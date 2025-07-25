@@ -596,9 +596,14 @@ export default function IntegrationsPage() {
         localStorage.removeItem('all_integrations_timestamp')
         
         // If this is the first integration, set it as selected for dashboard
-        const newIntegrationId = responseData.integration?.id || responseData.id
-        if (newIntegrationId && integrations.length === 0) {
-          localStorage.setItem('selected_organization', newIntegrationId.toString())
+        try {
+          const newIntegrationId = responseData.integration?.id || responseData.id
+          if (newIntegrationId && integrations.length === 0) {
+            localStorage.setItem('selected_organization', newIntegrationId.toString())
+          }
+        } catch (error) {
+          console.error('Error setting default integration:', error)
+          // Continue without setting default - not critical
         }
         
         // Reset form and state
