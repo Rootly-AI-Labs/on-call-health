@@ -214,7 +214,8 @@ export default function IntegrationsPage() {
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'success' | 'error' | 'duplicate'>('idle')
   const [previewData, setPreviewData] = useState<PreviewData | null>(null)
   const [duplicateInfo, setDuplicateInfo] = useState<any>(null)
-  const [isAdding, setIsAdding] = useState(false)
+  const [isAddingRootly, setIsAddingRootly] = useState(false)
+  const [isAddingPagerDuty, setIsAddingPagerDuty] = useState(false)
   const [copied, setCopied] = useState(false)
   
   // Edit/Delete state
@@ -548,7 +549,12 @@ export default function IntegrationsPage() {
   const addIntegration = async (platform: "rootly" | "pagerduty") => {
     if (!previewData) return
     
-    setIsAdding(true)
+    // Set service-specific loading state
+    if (platform === 'rootly') {
+      setIsAddingRootly(true)
+    } else {
+      setIsAddingPagerDuty(true)
+    }
     try {
       const authToken = localStorage.getItem('auth_token')
       if (!authToken) {
@@ -612,8 +618,18 @@ export default function IntegrationsPage() {
         setPreviewData(null)
         setAddingPlatform(null)
         
-        // Reload integrations
-        loadAllIntegrations()
+        // Reload only the specific integration type instead of all integrations
+        const authToken = localStorage.getItem('auth_token')
+        if (authToken) {
+          // Refresh just the integrations list without showing global loading
+          const response = await fetch('/api/integrations', {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+          })
+          if (response.ok) {
+            const data = await response.json()
+            setIntegrations(data.integrations || [])
+          }
+        }
       } else {
         throw new Error(responseData.detail?.message || responseData.message || 'Failed to add integration')
       }
@@ -621,7 +637,12 @@ export default function IntegrationsPage() {
       console.error('Add integration error:', error)
       toast.error(error instanceof Error ? error.message : "An unexpected error occurred.")
     } finally {
-      setIsAdding(false)
+      // Reset service-specific loading state
+      if (platform === 'rootly') {
+        setIsAddingRootly(false)
+      } else {
+        setIsAddingPagerDuty(false)
+      }
     }
   }
 
@@ -1414,10 +1435,10 @@ export default function IntegrationsPage() {
                           <Button
                             type="button"
                             onClick={() => addIntegration('rootly')}
-                            disabled={isAdding}
+                            disabled={isAddingRootly}
                             className="bg-green-600 hover:bg-green-700"
                           >
-                            {isAdding ? (
+                            {isAddingRootly ? (
                               <>
                                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                                 Adding...
@@ -1617,10 +1638,10 @@ export default function IntegrationsPage() {
                           <Button
                             type="button"
                             onClick={() => addIntegration('pagerduty')}
-                            disabled={isAdding}
+                            disabled={isAddingPagerDuty}
                             className="bg-blue-600 hover:bg-blue-700"
                           >
-                            {isAdding ? (
+                            {isAddingPagerDuty ? (
                               <>
                                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                                 Adding...
