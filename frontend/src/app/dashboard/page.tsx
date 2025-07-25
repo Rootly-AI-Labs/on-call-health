@@ -703,6 +703,16 @@ export default function Dashboard() {
         const data = await response.json()
         console.log('Loaded analyses:', data.analyses?.length || 0, 'analyses')
         setPreviousAnalyses(data.analyses || [])
+        
+        // If no specific analysis is loaded and we have analyses, load the most recent one
+        const urlParams = new URLSearchParams(window.location.search)
+        const analysisId = urlParams.get('analysis')
+        
+        if (!analysisId && data.analyses && data.analyses.length > 0 && !currentAnalysis) {
+          const mostRecentAnalysis = data.analyses[0] // Analyses should be ordered by created_at desc
+          console.log('Auto-loading most recent analysis:', mostRecentAnalysis.id)
+          setCurrentAnalysis(mostRecentAnalysis)
+        }
       } else {
         console.error('Failed to load analyses, status:', response.status)
       }
