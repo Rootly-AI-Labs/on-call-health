@@ -502,17 +502,18 @@ export default function Dashboard() {
     if (currentAnalysis.status === 'completed') {
       // Check if we have team_health data but with no meaningful content
       if (currentAnalysis.analysis_data?.team_health) {
-        // Check if the analysis has 0 incidents or 0 members - this indicates insufficient data
+        // Check if the analysis has 0 members - this indicates insufficient data
         const teamAnalysis = currentAnalysis.analysis_data.team_analysis
         
-        const hasNoMembers = teamAnalysis?.members?.length === 0 ||
-                            !teamAnalysis?.members
+        // Handle both array format (team_analysis directly) and object format (team_analysis.members)
+        const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members
+        const hasNoMembers = !members || members.length === 0
         
         if (hasNoMembers) {
           return true // Show insufficient data card
         }
         
-        return false // Has meaningful data
+        return false // Has meaningful data - even if 0 incidents, show normal dashboard
       }
       
       // If we have partial data with incidents/users, show the partial data UI
@@ -521,8 +522,9 @@ export default function Dashboard() {
       }
       
       // If we have team_analysis with members, we have data
-      if (currentAnalysis.analysis_data?.team_analysis?.members && 
-          currentAnalysis.analysis_data.team_analysis.members.length > 0) {
+      const teamAnalysis = currentAnalysis.analysis_data?.team_analysis
+      const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members
+      if (members && members.length > 0) {
         return false
       }
       
@@ -1512,19 +1514,26 @@ export default function Dashboard() {
         }] 
       : []
   
-  const memberBarData = currentAnalysis?.analysis_data?.team_analysis?.members
-    ?.filter((member) => member.incident_count > 0) // Filter out users with no incidents
-    ?.map((member) => ({
-      name: member.user_name.split(" ")[0],
-      fullName: member.user_name,
-      score: member.burnout_score * 10, // Convert 0-10 scale to 0-100 for display
-      riskLevel: member.risk_level,
-      fill: member.risk_level === "high" ? "#dc2626" :      // Red for high
-            member.risk_level === "medium" ? "#f59e0b" :    // Amber for medium
-            "#10b981",                                       // Green for low
-    })) || [];
+  const memberBarData = (() => {
+    const teamAnalysis = currentAnalysis?.analysis_data?.team_analysis
+    const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members
+    return members
+      ?.filter((member) => member.incident_count > 0) // Filter out users with no incidents
+      ?.map((member) => ({
+        name: member.user_name.split(" ")[0],
+        fullName: member.user_name,
+        score: member.burnout_score * 10, // Convert 0-10 scale to 0-100 for display
+        riskLevel: member.risk_level,
+        fill: member.risk_level === "high" ? "#dc2626" :      // Red for high
+              member.risk_level === "medium" ? "#f59e0b" :    // Amber for medium
+              "#10b981",                                       // Green for low
+      })) || []
+  })();
   
-  const members = currentAnalysis?.analysis_data?.team_analysis?.members || [];
+  const members = (() => {
+    const teamAnalysis = currentAnalysis?.analysis_data?.team_analysis
+    return Array.isArray(teamAnalysis) ? teamAnalysis : (teamAnalysis?.members || [])
+  })();
   
   // Helper function to get color based on severity
   const getFactorColor = (value) => {
@@ -1556,28 +1565,28 @@ export default function Dashboard() {
   const burnoutFactors = members.length > 0 ? [
     { 
       factor: "Workload", 
-      value: Number((members.reduce((avg, m) => avg + (m.factors?.workload || 0), 0) / members.length).toFixed(1)),
-      metrics: `Avg incidents: ${Math.round(members.reduce((avg, m) => avg + (m.incident_count || 0), 0) / members.length)}`
+      value: Number(((members as any[]).reduce((avg: number, m: any) => avg + (m?.factors?.workload || 0), 0) / members.length).toFixed(1)),
+      metrics: `Avg incidents: ${Math.round((members as any[]).reduce((avg: number, m: any) => avg + (m?.incident_count || 0), 0) / members.length)}`
     },
     { 
       factor: "After Hours", 
-      value: Number((members.reduce((avg, m) => avg + (m.factors?.after_hours || 0), 0) / members.length).toFixed(1)),
-      metrics: `Avg after-hours: ${Math.round(members.reduce((avg, m) => avg + (m.metrics?.after_hours_percentage || 0), 0) / members.length)}%`
+      value: Number(((members as any[]).reduce((avg: number, m: any) => avg + (m?.factors?.after_hours || 0), 0) / members.length).toFixed(1)),
+      metrics: `Avg after-hours: ${Math.round((members as any[]).reduce((avg: number, m: any) => avg + (m?.metrics?.after_hours_percentage || 0), 0) / members.length)}%`
     },
     { 
       factor: "Weekend Work", 
-      value: Number((members.reduce((avg, m) => avg + (m.factors?.weekend_work || 0), 0) / members.length).toFixed(1)),
-      metrics: `Avg weekend work: ${Math.round(members.reduce((avg, m) => avg + (m.metrics?.weekend_percentage || 0), 0) / members.length)}%`
+      value: Number(((members as any[]).reduce((avg: number, m: any) => avg + (m?.factors?.weekend_work || 0), 0) / members.length).toFixed(1)),
+      metrics: `Avg weekend work: ${Math.round((members as any[]).reduce((avg: number, m: any) => avg + (m?.metrics?.weekend_percentage || 0), 0) / members.length)}%`
     },
     { 
       factor: "Incident Load", 
-      value: Number((members.reduce((avg, m) => avg + (m.factors?.incident_load || 0), 0) / members.length).toFixed(1)),
-      metrics: `Total incidents: ${members.reduce((total, m) => total + (m.incident_count || 0), 0)}`
+      value: Number(((members as any[]).reduce((avg: number, m: any) => avg + (m?.factors?.incident_load || 0), 0) / members.length).toFixed(1)),
+      metrics: `Total incidents: ${(members as any[]).reduce((total: number, m: any) => total + (m?.incident_count || 0), 0)}`
     },
     { 
       factor: "Response Time", 
-      value: Number((members.reduce((avg, m) => avg + (m.factors?.response_time || 0), 0) / members.length).toFixed(1)),
-      metrics: `Avg response: ${Math.round(members.reduce((avg, m) => avg + (m.metrics?.avg_response_time_minutes || 0), 0) / members.length)} min`
+      value: Number(((members as any[]).reduce((avg: number, m: any) => avg + (m?.factors?.response_time || 0), 0) / members.length).toFixed(1)),
+      metrics: `Avg response: ${Math.round((members as any[]).reduce((avg: number, m: any) => avg + (m?.metrics?.avg_response_time_minutes || 0), 0) / members.length)} min`
     },
   ].map(factor => ({
     ...factor,
@@ -1592,8 +1601,8 @@ export default function Dashboard() {
   // Debug log to check the actual values
   useEffect(() => {
     console.log('🔍 DEBUG: Radar chart burnout factors:', burnoutFactors)
-    console.log('🔍 DEBUG: Members raw factors:', members.map(m => ({ name: m.user_name, factors: m.factors })))
-    console.log('🔍 DEBUG: Organization burnout score:', members.reduce((avg, m) => avg + (m.burnout_score || 0), 0) / members.length * 10, '%')
+    console.log('🔍 DEBUG: Members raw factors:', (members as any[]).map((m: any) => ({ name: m.user_name, factors: m.factors })))
+    console.log('🔍 DEBUG: Organization burnout score:', (members as any[]).reduce((avg: number, m: any) => avg + (m.burnout_score || 0), 0) / members.length * 10, '%')
     console.log('🔍 DEBUG: Selected member factors:', selectedMember ? selectedMember.factors : 'None selected')
     console.log('🔍 DEBUG: Selected member slack activity:', selectedMember?.slack_activity)
     console.log('🔍 DEBUG: Selected member github activity:', selectedMember?.github_activity)
@@ -1714,7 +1723,7 @@ export default function Dashboard() {
                         } else {
                           console.log('Analysis already has data:', {
                             hasTeamAnalysis: !!analysis.analysis_data.team_analysis,
-                            memberCount: analysis.analysis_data.team_analysis?.members?.length || 0
+                            memberCount: Array.isArray(analysis.analysis_data.team_analysis) ? analysis.analysis_data.team_analysis.length : (analysis.analysis_data.team_analysis?.members?.length || 0)
                           })
                           setCurrentAnalysis(analysis)
                           updateURLWithAnalysis(parseInt(analysis.id))
@@ -1903,17 +1912,23 @@ export default function Dashboard() {
                           {currentAnalysis.analysis_data.team_analysis && (
                             <div className="ml-4 space-y-1 mt-2">
                               <div className="font-medium text-gray-700">Team Analysis:</div>
-                              <div>Members count: {currentAnalysis.analysis_data.team_analysis.members?.length || 0}</div>
+                              <div>Members count: {Array.isArray(currentAnalysis.analysis_data.team_analysis) ? currentAnalysis.analysis_data.team_analysis.length : (currentAnalysis.analysis_data.team_analysis.members?.length || 0)}</div>
                               <div>Has organization_health: {(currentAnalysis.analysis_data.team_analysis as any).organization_health ? 'Yes' : 'No'}</div>
                               <div>Has insights: {(currentAnalysis.analysis_data.team_analysis as any).insights ? 'Yes' : 'No'}</div>
                             </div>
                           )}
                           
-                          {currentAnalysis.analysis_data.team_analysis?.members && currentAnalysis.analysis_data.team_analysis.members.length > 0 && (
+                          {(() => {
+                            const teamAnalysis = currentAnalysis.analysis_data.team_analysis
+                            const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members
+                            return members && members.length > 0
+                          })() && (
                             <div className="ml-4 space-y-1 mt-2">
                               <div className="font-medium text-gray-700">Sample Member Data Sources:</div>
                               {(() => {
-                                const member = currentAnalysis.analysis_data.team_analysis.members[0]
+                                const teamAnalysis = currentAnalysis.analysis_data.team_analysis
+                                const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members
+                                const member = members[0]
                                 return (
                                   <div className="ml-4 space-y-1">
                                     <div>Has GitHub data: {(member as any).github_data ? 'Yes' : 'No'}</div>
@@ -2057,7 +2072,7 @@ export default function Dashboard() {
                         <li>• slack_data flag: {currentAnalysis.analysis_data?.data_sources?.slack_data ? '✅ True' : '❌ False/Missing'}</li>
                         <li>• github_insights: {currentAnalysis.analysis_data?.github_insights ? '✅ Present' : '❌ Missing'}</li>
                         <li>• slack_insights: {currentAnalysis.analysis_data?.slack_insights ? '✅ Present' : '❌ Missing'}</li>
-                        <li>• team_analysis.members count: {currentAnalysis.analysis_data?.team_analysis?.members?.length || 0}</li>
+                        <li>• team_analysis.members count: {Array.isArray(currentAnalysis.analysis_data?.team_analysis) ? currentAnalysis.analysis_data.team_analysis.length : (currentAnalysis.analysis_data?.team_analysis?.members?.length || 0)}</li>
                       </ul>
                       <p><strong>Metadata Check:</strong></p>
                       <ul className="ml-4 space-y-1">
@@ -2194,7 +2209,7 @@ export default function Dashboard() {
                           </div>
                         </div>
                         <p className="text-xs text-gray-600 mt-2">
-                          Out of {currentAnalysis.analysis_data.team_analysis?.members?.length || 0} members
+                          Out of {Array.isArray(currentAnalysis.analysis_data.team_analysis) ? currentAnalysis.analysis_data.team_analysis.length : (currentAnalysis.analysis_data.team_analysis?.members?.length || 0)} members
                         </p>
                       </div>
                     ) : (
@@ -2303,7 +2318,7 @@ export default function Dashboard() {
                     {(() => {
                       const aiInsights = currentAnalysis.analysis_data.ai_team_insights.insights;
                       const teamAnalysis = currentAnalysis.analysis_data.team_analysis;
-                      const members = teamAnalysis?.members || [];
+                      const members = Array.isArray(teamAnalysis) ? teamAnalysis : (teamAnalysis?.members || []);
                       const riskDist = aiInsights?.risk_distribution;
                       const highRiskCount = (riskDist?.high || 0) + ((riskDist as any)?.critical || 0);
                       const mediumRiskCount = riskDist?.medium || 0;
@@ -2314,7 +2329,7 @@ export default function Dashboard() {
                       
                       // Calculate average burnout score
                       const avgBurnoutScore = members.length > 0 ? 
-                        members.reduce((sum, m) => sum + (m.burnout_score || 0), 0) / members.length * 10 : 0;
+                        (members as any[]).reduce((sum: number, m: any) => sum + (m.burnout_score || 0), 0) / members.length * 10 : 0;
                       
                       // Analyze burnout sources from team factors
                       const analyzeBurnoutSources = () => {
@@ -2390,8 +2405,8 @@ export default function Dashboard() {
                                     having handled {highRiskMembers[0].incident_count || 0} incidents in the analysis period{(() => {
                                       const topMemberFactor = highRiskMembers[0].factors ? 
                                         Object.entries(highRiskMembers[0].factors)
-                                          .sort(([,a], [,b]) => b - a)[0] : null;
-                                      if (topMemberFactor && topMemberFactor[1] > 0.6) {
+                                          .sort(([,a], [,b]) => (b as number) - (a as number))[0] : null;
+                                      if (topMemberFactor && (topMemberFactor[1] as number) > 0.6) {
                                         const factorName = topMemberFactor[0].replace('_', ' ');
                                         return `, primarily driven by ${factorName}`;
                                       }
@@ -3067,7 +3082,8 @@ export default function Dashboard() {
                           
                           // Check if this analysis actually has valid Slack data
                           // If no team members have slack_activity, don't show cached/stale data
-                          const teamMembers = currentAnalysis.analysis_data.team_analysis?.members || []
+                          const teamAnalysis = currentAnalysis.analysis_data.team_analysis
+                          const teamMembers = Array.isArray(teamAnalysis) ? teamAnalysis : (teamAnalysis?.members || [])
                           const hasRealSlackData = teamMembers.some(member => 
                             member.slack_activity && 
                             (member.slack_activity.messages_sent > 0 || member.slack_activity.channels_active > 0)
@@ -3216,7 +3232,10 @@ export default function Dashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {currentAnalysis?.analysis_data?.team_analysis?.members?.map((member) => (
+                    {(() => {
+                      const teamAnalysis = currentAnalysis?.analysis_data?.team_analysis
+                      const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members
+                      return members?.map((member) => (
                       <Card
                         key={member.user_id}
                         className="cursor-pointer hover:shadow-md transition-shadow"
@@ -3278,11 +3297,12 @@ export default function Dashboard() {
                           </div>
                         </CardContent>
                       </Card>
-                    )) || (
-                      <div className="col-span-full text-center text-gray-500 py-8">
-                        No organization member data available yet
-                      </div>
-                    )}
+                      )) || (
+                        <div className="col-span-full text-center text-gray-500 py-8">
+                          No organization member data available yet
+                        </div>
+                      )
+                    })()}
                   </div>
                 </CardContent>
               </Card>
