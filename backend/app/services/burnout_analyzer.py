@@ -949,19 +949,19 @@ class BurnoutAnalyzerService:
                 "members_at_risk": 0
             }
         
-        # Calculate averages and distributions with null safety
-        burnout_scores = [m.get("burnout_score", 0) for m in member_analyses if m and isinstance(m, dict)]
+        # Calculate averages and distributions with null safety - only include users with incidents
+        members_with_incidents = [m for m in member_analyses if m and isinstance(m, dict) and m.get("incident_count", 0) > 0]
+        burnout_scores = [m.get("burnout_score", 0) for m in members_with_incidents]
         avg_burnout = sum(burnout_scores) / len(burnout_scores) if burnout_scores else 0
         
-        # Count risk levels (updated for 3-tier system)
+        # Count risk levels (updated for 3-tier system) - only include users with incidents
         risk_dist = {"low": 0, "medium": 0, "high": 0}
-        for member in member_analyses:
-            if member and isinstance(member, dict):
-                risk_level = member.get("risk_level", "low")
-                if risk_level in risk_dist:
-                    risk_dist[risk_level] += 1
-                else:
-                    risk_dist["low"] += 1
+        for member in members_with_incidents:
+            risk_level = member.get("risk_level", "low")
+            if risk_level in risk_dist:
+                risk_dist[risk_level] += 1
+            else:
+                risk_dist["low"] += 1
         
         # Calculate overall health score (inverse of burnout)
         # Use a more balanced approach that ensures reasonable health scores

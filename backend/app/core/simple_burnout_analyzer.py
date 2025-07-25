@@ -260,8 +260,11 @@ class SimpleBurnoutAnalyzer:
         daily_trends = []
         # team_summary.average_score is now a health score (0-10, higher = better)
         team_health_avg = team_summary.get("average_score", 0.0)
-        # Convert health score to percentage scale (0-100)
+        logger.info(f"Team summary average_score: {team_health_avg}, team_summary keys: {list(team_summary.keys())}")
+        
+        # Convert health score to percentage scale (0-100)  
         period_average_score = team_health_avg * 10  # Convert to percentage scale (0-100)
+        logger.info(f"Initial period_average_score from team_summary: {period_average_score}%")
         
         try:
             daily_trends = self._generate_daily_trends(incidents, team_analysis, metadata)
@@ -701,17 +704,32 @@ class SimpleBurnoutAnalyzer:
         if not team_analysis:
             return {}
         
+        # Filter to only include users with at least one incident
+        users_with_incidents = [user for user in team_analysis if user.get("incident_count", 0) > 0]
+        
+        if not users_with_incidents:
+            return {
+                "total_users": len(team_analysis),
+                "users_with_incidents": 0,
+                "average_score": 10.0,  # Perfect score if no one has incidents
+                "highest_score": 10.0,
+                "lowest_score": 10.0,
+                "risk_distribution": {"high": 0, "medium": 0, "low": 0},
+                "users_at_risk": 0
+            }
+        
         # Convert burnout scores (0-10, higher=worse) to health scores (0-10, higher=better)
-        burnout_scores = [user["burnout_score"] for user in team_analysis]
+        burnout_scores = [user["burnout_score"] for user in users_with_incidents]
         health_scores = [max(0.0, 10.0 - score) for score in burnout_scores]
         
         risk_counts = {"high": 0, "medium": 0, "low": 0}
         
-        for user in team_analysis:
+        for user in users_with_incidents:
             risk_counts[user["risk_level"]] += 1
         
         return {
             "total_users": len(team_analysis),
+            "users_with_incidents": len(users_with_incidents),
             "average_score": round(sum(health_scores) / len(health_scores), 2),  # Now health score (0-10, higher=better)
             "highest_score": max(health_scores),  # Highest health score  
             "lowest_score": min(health_scores),   # Add lowest health score for completeness

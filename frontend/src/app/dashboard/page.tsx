@@ -1623,61 +1623,64 @@ export default function Dashboard() {
   }
   
   // Calculate burnout factors with color coding - Backend returns 0-10 scale
-  const burnoutFactors = members.length > 0 ? [
+  // Filter to only include members with at least one incident
+  const membersWithIncidents = members.filter((m: any) => (m?.incident_count || 0) > 0);
+  
+  const burnoutFactors = membersWithIncidents.length > 0 ? [
     { 
       factor: "Workload", 
-      value: Number(((members as any[]).reduce((avg: number, m: any) => {
+      value: Number(((membersWithIncidents as any[]).reduce((avg: number, m: any) => {
         // Try factors first, fallback to key_metrics (SimpleBurnoutAnalyzer format)
         const val = m?.factors?.workload || 
                    (m?.key_metrics?.incidents_per_week ? Math.min(m.key_metrics.incidents_per_week * 2, 10) : 0);
         console.log(`RADAR: Member ${m?.user_name}: workload = ${val} (factors: ${m?.factors?.workload}, key_metrics: ${m?.key_metrics?.incidents_per_week})`);
         return avg + val;
-      }, 0) / members.length).toFixed(1)),
-      metrics: `Avg incidents: ${Math.round((members as any[]).reduce((avg: number, m: any) => avg + (m?.incident_count || 0), 0) / members.length)}`
+      }, 0) / membersWithIncidents.length).toFixed(1)),
+      metrics: `Avg incidents: ${Math.round((membersWithIncidents as any[]).reduce((avg: number, m: any) => avg + (m?.incident_count || 0), 0) / membersWithIncidents.length)}`
     },
     { 
       factor: "After Hours", 
-      value: Number(((members as any[]).reduce((avg: number, m: any) => {
+      value: Number(((membersWithIncidents as any[]).reduce((avg: number, m: any) => {
         // Try factors first, fallback to key_metrics (SimpleBurnoutAnalyzer format)
         const val = m?.factors?.after_hours || 
                    (m?.key_metrics?.after_hours_percentage ? Math.min(m.key_metrics.after_hours_percentage / 10, 10) : 0);
         console.log(`RADAR: Member ${m?.user_name}: after_hours = ${val} (factors: ${m?.factors?.after_hours}, key_metrics: ${m?.key_metrics?.after_hours_percentage})`);
         return avg + val;
-      }, 0) / members.length).toFixed(1)),
-      metrics: `Avg after-hours: ${Math.round((members as any[]).reduce((avg: number, m: any) => avg + (m?.metrics?.after_hours_percentage || m?.key_metrics?.after_hours_percentage || 0), 0) / members.length)}%`
+      }, 0) / membersWithIncidents.length).toFixed(1)),
+      metrics: `Avg after-hours: ${Math.round((membersWithIncidents as any[]).reduce((avg: number, m: any) => avg + (m?.metrics?.after_hours_percentage || m?.key_metrics?.after_hours_percentage || 0), 0) / membersWithIncidents.length)}%`
     },
     { 
       factor: "Weekend Work", 
-      value: Number(((members as any[]).reduce((avg: number, m: any) => {
+      value: Number(((membersWithIncidents as any[]).reduce((avg: number, m: any) => {
         // Try factors first, no direct equivalent in key_metrics, estimate from burnout score
         const val = m?.factors?.weekend_work || 
                    (m?.burnout_score ? Math.min(m.burnout_score * 1.5, 10) : 0);
         console.log(`RADAR: Member ${m?.user_name}: weekend_work = ${val} (factors: ${m?.factors?.weekend_work}, estimated from burnout: ${m?.burnout_score})`);
         return avg + val;
-      }, 0) / members.length).toFixed(1)),
-      metrics: `Avg weekend work: ${Math.round((members as any[]).reduce((avg: number, m: any) => avg + (m?.metrics?.weekend_percentage || 0), 0) / members.length)}%`
+      }, 0) / membersWithIncidents.length).toFixed(1)),
+      metrics: `Avg weekend work: ${Math.round((membersWithIncidents as any[]).reduce((avg: number, m: any) => avg + (m?.metrics?.weekend_percentage || 0), 0) / membersWithIncidents.length)}%`
     },
     { 
       factor: "Incident Load", 
-      value: Number(((members as any[]).reduce((avg: number, m: any) => {
+      value: Number(((membersWithIncidents as any[]).reduce((avg: number, m: any) => {
         // Try factors first, fallback to severity_weighted_per_week from key_metrics
         const val = m?.factors?.incident_load || 
                    (m?.key_metrics?.severity_weighted_per_week ? Math.min(m.key_metrics.severity_weighted_per_week * 1.5, 10) : 0);
         console.log(`RADAR: Member ${m?.user_name}: incident_load = ${val} (factors: ${m?.factors?.incident_load}, key_metrics: ${m?.key_metrics?.severity_weighted_per_week})`);
         return avg + val;
-      }, 0) / members.length).toFixed(1)),
-      metrics: `Total incidents: ${(members as any[]).reduce((total: number, m: any) => total + (m?.incident_count || 0), 0)}`
+      }, 0) / membersWithIncidents.length).toFixed(1)),
+      metrics: `Total incidents: ${(membersWithIncidents as any[]).reduce((total: number, m: any) => total + (m?.incident_count || 0), 0)}`
     },
     { 
       factor: "Response Time", 
-      value: Number(((members as any[]).reduce((avg: number, m: any) => {
+      value: Number(((membersWithIncidents as any[]).reduce((avg: number, m: any) => {
         // Try factors first, fallback to avg_resolution_hours from key_metrics
         const val = m?.factors?.response_time || 
                    (m?.key_metrics?.avg_resolution_hours ? Math.min(m.key_metrics.avg_resolution_hours / 2, 10) : 0);
         console.log(`RADAR: Member ${m?.user_name}: response_time = ${val} (factors: ${m?.factors?.response_time}, key_metrics: ${m?.key_metrics?.avg_resolution_hours})`);
         return avg + val;
-      }, 0) / members.length).toFixed(1)),
-      metrics: `Avg response: ${Math.round((members as any[]).reduce((avg: number, m: any) => avg + (m?.metrics?.avg_response_time_minutes || m?.key_metrics?.avg_resolution_hours * 60 || 0), 0) / members.length)} min`
+      }, 0) / membersWithIncidents.length).toFixed(1)),
+      metrics: `Avg response: ${Math.round((membersWithIncidents as any[]).reduce((avg: number, m: any) => avg + (m?.metrics?.avg_response_time_minutes || m?.key_metrics?.avg_resolution_hours * 60 || 0), 0) / membersWithIncidents.length)} min`
     },
   ].map(factor => ({
     ...factor,
@@ -1693,7 +1696,8 @@ export default function Dashboard() {
   useEffect(() => {
     console.log('🔍 DEBUG: Radar chart burnout factors:', burnoutFactors)
     console.log('🔍 DEBUG: Members raw factors:', (members as any[]).map((m: any) => ({ name: m.user_name, factors: m.factors })))
-    console.log('🔍 DEBUG: Organization burnout score:', (members as any[]).reduce((avg: number, m: any) => avg + (m.burnout_score || 0), 0) / members.length * 10, '%')
+    console.log('🔍 DEBUG: Organization burnout score:', membersWithIncidents.length > 0 ? (membersWithIncidents as any[]).reduce((avg: number, m: any) => avg + (m.burnout_score || 0), 0) / membersWithIncidents.length * 10 : 0, '%')
+    console.log('🔍 DEBUG: Members with incidents:', membersWithIncidents.length, '/', members.length)
     console.log('🔍 DEBUG: Selected member factors:', selectedMember ? selectedMember.factors : 'None selected')
     console.log('🔍 DEBUG: Selected member slack activity:', selectedMember?.slack_activity)
     console.log('🔍 DEBUG: Selected member github activity:', selectedMember?.github_activity)
@@ -2530,9 +2534,10 @@ export default function Dashboard() {
                       const hasPatterns = aiInsights?.common_patterns && aiInsights.common_patterns.length > 0;
                       const hasRecommendations = aiInsights?.team_recommendations && aiInsights.team_recommendations.length > 0;
                       
-                      // Calculate average burnout score
-                      const avgBurnoutScore = members.length > 0 ? 
-                        (members as any[]).reduce((sum: number, m: any) => sum + (m.burnout_score || 0), 0) / members.length * 10 : 0;
+                      // Calculate average burnout score - only include users with incidents
+                      const membersWithIncidentsForInsights = (members as any[]).filter((m: any) => (m?.incident_count || 0) > 0);
+                      const avgBurnoutScore = membersWithIncidentsForInsights.length > 0 ? 
+                        membersWithIncidentsForInsights.reduce((sum: number, m: any) => sum + (m.burnout_score || 0), 0) / membersWithIncidentsForInsights.length * 10 : 0;
                       
                       // Analyze burnout sources from team factors
                       const analyzeBurnoutSources = () => {
@@ -2578,7 +2583,7 @@ export default function Dashboard() {
                           <div>
                             <h4 className="font-semibold text-gray-900 mb-2">Summary</h4>
                             <p className="leading-relaxed">
-                              The team of {aiInsights?.team_size || members.length} members shows an average burnout score of {avgBurnoutScore.toFixed(0)}%. 
+                              The team has {members.length} members total, with {membersWithIncidentsForInsights.length} handling incidents. Among active incident responders, the average burnout score is {avgBurnoutScore.toFixed(0)}%. 
                               {highRiskCount > 0 ? (
                                 <> Currently, <span className="font-semibold text-red-600">{highRiskCount} member{highRiskCount > 1 ? 's are' : ' is'} at high risk</span> of burnout, requiring immediate attention. </>
                               ) : mediumRiskCount > 0 ? (
