@@ -258,8 +258,13 @@ class SimpleBurnoutAnalyzer:
         
         # Generate daily trends if we have incident data
         daily_trends = []
+        period_average_score = team_summary.get("average_score", 0.0)
         try:
             daily_trends = self._generate_daily_trends(incidents, team_analysis, metadata)
+            # Calculate period average from daily trends if available
+            if daily_trends and len(daily_trends) > 0:
+                daily_scores = [day["overall_score"] for day in daily_trends]
+                period_average_score = sum(daily_scores) / len(daily_scores)
         except Exception as e:
             logger.error(f"Error generating daily trends: {e}")
             daily_trends = []
@@ -273,6 +278,11 @@ class SimpleBurnoutAnalyzer:
                 "team_analysis": team_analysis,
                 "recommendations": recommendations,
                 "daily_trends": daily_trends,
+                "period_summary": {
+                    "average_score": round(period_average_score, 2),
+                    "days_analyzed": metadata.get("days_analyzed", 30) if metadata else 30,
+                    "total_days_with_data": len(daily_trends) if daily_trends else 0
+                },
                 "ai_enhanced": False
             }
         except Exception as e:
