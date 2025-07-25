@@ -18,6 +18,8 @@ class SimpleBurnoutAnalyzer:
         self.thresholds = {
             "incidents_per_week_high": 8,
             "incidents_per_week_medium": 4,
+            "severity_weighted_per_week_high": 12,  # Accounts for severity weighting
+            "severity_weighted_per_week_medium": 6,
             "after_hours_percentage_high": 0.3,
             "after_hours_percentage_medium": 0.15,
             "avg_resolution_hours_high": 6,
@@ -341,6 +343,10 @@ class SimpleBurnoutAnalyzer:
             incidents_count = len(user_incidents) if user_incidents else 0
             incidents_per_week = (incidents_count / days_analyzed) * 7 if days_analyzed > 0 else 0
             
+            # Calculate severity-weighted incident load
+            severity_weighted_load = self._calculate_severity_weighted_load(user_incidents)
+            severity_weighted_per_week = (severity_weighted_load / days_analyzed) * 7 if days_analyzed > 0 else 0
+            
             # Calculate after-hours percentage with comprehensive error handling
             after_hours_count = 0
             try:
@@ -379,22 +385,24 @@ class SimpleBurnoutAnalyzer:
             thresholds = getattr(self, 'thresholds', {}) or {}
             
             frequency_threshold = thresholds.get("incidents_per_week_high", 8)
+            severity_threshold = thresholds.get("severity_weighted_per_week_high", 12)  # New threshold for severity-weighted load
             after_hours_threshold = thresholds.get("after_hours_percentage_high", 0.3)
             duration_threshold = thresholds.get("avg_resolution_hours_high", 6)
             
             frequency_score = min(10, (incidents_per_week / frequency_threshold) * 10) if frequency_threshold > 0 else 0
+            severity_score = min(10, (severity_weighted_per_week / severity_threshold) * 10) if severity_threshold > 0 else 0
             after_hours_score = min(10, (after_hours_percentage / after_hours_threshold) * 10) if after_hours_threshold > 0 else 0
             duration_score = min(10, (avg_resolution_hours / duration_threshold) * 10) if duration_threshold > 0 else 0
             
-            # Weight the scores (frequency is most important)
-            burnout_score = (frequency_score * 0.5) + (after_hours_score * 0.3) + (duration_score * 0.2)
+            # Weight the scores (severity-weighted frequency is higher priority than raw frequency)
+            burnout_score = (severity_score * 0.4) + (frequency_score * 0.3) + (after_hours_score * 0.2) + (duration_score * 0.1)
             
             # Determine risk level
             risk_level = self._determine_risk_level(burnout_score)
             
             # Generate recommendations
             recommendations = self._generate_user_recommendations(
-                incidents_per_week, after_hours_percentage, avg_resolution_hours, risk_level
+                incidents_per_week, after_hours_percentage, avg_resolution_hours, risk_level, severity_weighted_per_week
             )
         except Exception as e:
             logger.warning(f"Error calculating burnout score for user {user_id}: {e}")
@@ -414,6 +422,7 @@ class SimpleBurnoutAnalyzer:
                 "incident_count": len(user_incidents) if user_incidents else 0,
                 "key_metrics": {
                     "incidents_per_week": round(float(incidents_per_week), 2) if incidents_per_week is not None else 0.0,
+                    "severity_weighted_per_week": round(float(severity_weighted_per_week), 2) if 'severity_weighted_per_week' in locals() and severity_weighted_per_week is not None else 0.0,
                     "after_hours_percentage": round(float(after_hours_percentage) * 100, 1) if after_hours_percentage is not None else 0.0,
                     "avg_resolution_hours": round(float(avg_resolution_hours), 2) if avg_resolution_hours is not None else 0.0
                 },
@@ -634,7 +643,8 @@ class SimpleBurnoutAnalyzer:
         incidents_per_week: float, 
         after_hours_percentage: float, 
         avg_resolution_hours: float,
-        risk_level: str
+        risk_level: str,
+        severity_weighted_per_week: float = 0.0
     ) -> List[str]:
         """Generate personalized recommendations."""
         recommendations = []
@@ -644,6 +654,9 @@ class SimpleBurnoutAnalyzer:
         
         if incidents_per_week > self.thresholds["incidents_per_week_medium"]:
             recommendations.append(f"📊 High incident volume ({incidents_per_week:.1f}/week) - review on-call rotations")
+        
+        if severity_weighted_per_week > self.thresholds["severity_weighted_per_week_medium"]:
+            recommendations.append(f"🚨 High severity-weighted load ({severity_weighted_per_week:.1f}/week) - prioritize critical incident handling")
         
         if after_hours_percentage > self.thresholds["after_hours_percentage_medium"]:
             recommendations.append(f"🌙 High after-hours activity ({after_hours_percentage*100:.1f}%) - establish boundaries")
@@ -700,3 +713,61 @@ class SimpleBurnoutAnalyzer:
             recommendations.append("✅ Team burnout levels are healthy - maintain current practices")
         
         return recommendations or ["Team analysis completed - review individual recommendations"]
+    
+    def _calculate_severity_weighted_load(self, incidents: List[Dict[str, Any]]) -> float:
+        """Calculate severity-weighted incident load."""
+        # Severity weights matching the full BurnoutAnalyzer
+        weights = {
+            "sev1": 3.0,  # Critical
+            "sev2": 2.0,  # High  
+            "sev3": 1.5,  # Medium
+            "sev4": 1.0   # Low
+        }
+        
+        if not incidents or not isinstance(incidents, list):
+            return 0.0
+            
+        total_weight = 0.0
+        for incident in incidents:
+            try:
+                if not incident or not isinstance(incident, dict):
+                    continue
+                    
+                # Extract severity from incident attributes
+                attrs = incident.get("attributes", {}) if incident else {}
+                if not attrs or not isinstance(attrs, dict):
+                    # Default to sev4 if no attributes
+                    total_weight += weights.get("sev4", 1.0)
+                    continue
+                
+                # Try to get severity from nested severity data structure
+                severity_info = attrs.get("severity", {})
+                severity_name = "sev4"  # Default
+                
+                if isinstance(severity_info, dict) and "data" in severity_info:
+                    severity_data = severity_info.get("data", {})
+                    if isinstance(severity_data, dict) and "attributes" in severity_data:
+                        severity_attrs = severity_data["attributes"]
+                        # Look for severity name or level
+                        severity_name = severity_attrs.get("name", "sev4").lower()
+                        if not severity_name.startswith("sev"):
+                            # Map common severity names to sev levels
+                            severity_map = {
+                                "critical": "sev1",
+                                "high": "sev2", 
+                                "medium": "sev3",
+                                "low": "sev4"
+                            }
+                            severity_name = severity_map.get(severity_name.lower(), "sev4")
+                
+                # Apply weight
+                weight = weights.get(severity_name, 1.0)
+                total_weight += weight
+                
+            except Exception as e:
+                logger.debug(f"Error processing incident severity: {e}")
+                # Default to sev4 weight on error
+                total_weight += weights.get("sev4", 1.0)
+                continue
+        
+        return total_weight
