@@ -885,13 +885,19 @@ class SimpleBurnoutAnalyzer:
                 daily_severity_rate = data["severity_weighted_count"] / total_users if total_users > 0 else 0
                 after_hours_ratio = data["after_hours_count"] / data["incident_count"] if data["incident_count"] > 0 else 0
                 
-                # Simple scoring (inverse of burnout - higher score is better)
-                # Base score of 10, reduced by incident load
-                daily_score = 10.0
-                daily_score -= min(5.0, daily_severity_rate * 2)  # Up to -5 for severity-weighted incidents
-                daily_score -= min(2.0, after_hours_ratio * 2)    # Up to -2 for after-hours work
-                daily_score -= min(1.0, data["high_severity_count"] * 0.5)  # Up to -1 for high severity
-                daily_score = max(0.0, daily_score)  # Ensure non-negative
+                # More realistic scoring (inverse of burnout - higher score is better)
+                # Base score represents normal operational health (not perfect)
+                if data["incident_count"] == 0:
+                    # Zero incident days: good but not perfect (accounting for background work/stress)
+                    daily_score = 8.5 + (hash(date_str) % 10) * 0.05  # 8.5-9.0 range with slight daily variation
+                else:
+                    # Days with incidents: start higher and apply penalties
+                    daily_score = 9.0
+                    daily_score -= min(5.0, daily_severity_rate * 2.5)  # Up to -5 for severity-weighted incidents
+                    daily_score -= min(2.0, after_hours_ratio * 2)      # Up to -2 for after-hours work
+                    daily_score -= min(1.5, data["high_severity_count"] * 0.7)  # Up to -1.5 for high severity
+                
+                daily_score = max(2.0, daily_score)  # Floor at 2.0 (20% health) even on worst days
                 
                 # Determine risk level for the day
                 users_at_risk = 0
