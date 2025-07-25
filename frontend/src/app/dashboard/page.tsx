@@ -3961,66 +3961,69 @@ export default function Dashboard() {
             </DialogTitle>
           </DialogHeader>
           {selectedMember && (() => {
-            // Create individual member radar chart data
-            const memberFactors = [
+            // Calculate Maslach Burnout Inventory dimensions
+            const memberData = members?.find(m => m.user_name === selectedMember.name) || selectedMember;
+            
+            // Extract Maslach dimensions from member data or calculate from available metrics
+            const maslachDimensions = [
               {
-                factor: "Workload",
-                value: Number((selectedMember.factors?.workload || 0).toFixed(1)),
-                metrics: `Incidents: ${selectedMember.incident_count || 0}`,
-                color: getFactorColor(selectedMember.factors?.workload || 0),
-                recommendation: "Redistribute incident assignments"
+                dimension: "Emotional Exhaustion",
+                value: Number((memberData?.maslach_dimensions?.emotional_exhaustion || 
+                          memberData?.burnout_score * 10 || 0).toFixed(1)),
+                description: "Feeling emotionally drained and depleted by work demands",
+                color: "#DC2626"
               },
               {
-                factor: "After Hours", 
-                value: Number((selectedMember.factors?.after_hours || 0).toFixed(1)),
-                metrics: `After-hours: ${Math.round(selectedMember.metrics?.after_hours_percentage || 0)}%`,
-                color: getFactorColor(selectedMember.factors?.after_hours || 0),
-                recommendation: "Adjust on-call schedule"
+                dimension: "Depersonalization", 
+                value: Number((memberData?.maslach_dimensions?.depersonalization || 
+                          (memberData?.burnout_score * 8) || 0).toFixed(1)),
+                description: "Detached or cynical attitudes toward work and colleagues",
+                color: "#7C2D12"
               },
               {
-                factor: "Weekend Work",
-                value: Number((selectedMember.factors?.weekend_work || 0).toFixed(1)), 
-                metrics: `Weekend work: ${Math.round(selectedMember.metrics?.weekend_percentage || 0)}%`,
-                color: getFactorColor(selectedMember.factors?.weekend_work || 0),
-                recommendation: "Implement weekend rotation"
-              },
-              {
-                factor: "Incident Load",
-                value: Number((selectedMember.factors?.incident_load || 0).toFixed(1)),
-                metrics: `Load score: ${(selectedMember.factors?.incident_load || 0).toFixed(1)}`,
-                color: getFactorColor(selectedMember.factors?.incident_load || 0),
-                recommendation: "Review incident assignment process"
-              },
-              {
-                factor: "Response Time",
-                value: Number((selectedMember.factors?.response_time || 0).toFixed(1)),
-                metrics: `Avg response: ${Math.round(selectedMember.metrics?.avg_response_time_minutes || 0)}min`,
-                color: getFactorColor(selectedMember.factors?.response_time || 0),
-                recommendation: "Optimize alert routing"
+                dimension: "Reduced Personal Accomplishment",
+                value: Number((memberData?.maslach_dimensions?.personal_accomplishment || 
+                          (10 - (memberData?.burnout_score * 6)) || 10).toFixed(1)),
+                description: "Diminished sense of personal achievement and effectiveness",
+                color: "#B45309"
               }
             ];
             
-            const memberHighRisk = memberFactors.filter(f => f.value >= 5);
+            // Calculate overall burnout health score (lower is better)
+            const overallBurnoutScore = (maslachDimensions[0].value + maslachDimensions[1].value + (10 - maslachDimensions[2].value)) / 3;
+            const healthStatus = overallBurnoutScore <= 3 ? 'Excellent' : 
+                               overallBurnoutScore <= 5 ? 'Good' : 
+                               overallBurnoutScore <= 7 ? 'Moderate Concern' : 'High Concern';
+            const healthColor = overallBurnoutScore <= 3 ? 'text-green-600 bg-green-50' : 
+                              overallBurnoutScore <= 5 ? 'text-blue-600 bg-blue-50' : 
+                              overallBurnoutScore <= 7 ? 'text-yellow-600 bg-yellow-50' : 'text-red-600 bg-red-50';
             
             return (
             <div className="space-y-6">
-              {/* Individual Radar Chart */}
+              {/* Burnout Health Overview */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Overall Risk Assessment */}
-                <div className="bg-gradient-to-r from-gray-50 to-gray-100 p-6 rounded-lg">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h3 className="text-lg font-semibold mb-1">Overall Risk Assessment</h3>
-                    <p className="text-gray-600 text-sm">Current burnout risk level based on recent activity</p>
+                {/* Health Status Card */}
+                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-lg border border-blue-100">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h3 className="text-lg font-semibold mb-1 text-gray-900">Burnout Health Assessment</h3>
+                      <p className="text-gray-600 text-sm">Based on Christina Maslach's Burnout Inventory</p>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-2xl font-bold mb-1 text-gray-900">{(10 - overallBurnoutScore).toFixed(1)}/10</div>
+                      <Badge className={`${healthColor} text-sm px-3 py-1 border-0`}>
+                        {healthStatus}
+                      </Badge>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-3xl font-bold mb-1">{selectedMember?.burnoutScore?.toFixed(1) || '0.0'}%</div>
-                    <Badge className={`${getRiskColor(selectedMember?.riskLevel || 'low')} text-sm px-3 py-1`}>
-                      {(selectedMember?.riskLevel || 'low').toUpperCase()} RISK
-                    </Badge>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      className="bg-gradient-to-r from-green-400 to-blue-500 h-2 rounded-full transition-all duration-500"
+                      style={{ width: `${Math.max((10 - overallBurnoutScore) * 10, 5)}%` }}
+                    />
                   </div>
+                  <p className="text-xs text-gray-500 mt-2">Higher scores indicate better burnout resilience</p>
                 </div>
-              </div>
                 
                 {/* Individual Burnout Analysis */}
                 <Card>
