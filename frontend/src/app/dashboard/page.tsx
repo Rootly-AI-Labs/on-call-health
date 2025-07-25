@@ -2345,12 +2345,12 @@ export default function Dashboard() {
                         
                         // Sum all factor scores across team members
                         members.forEach(member => {
-                          if (member.factors) {
-                            factorTotals.workload += member.factors.workload || 0;
-                            factorTotals.after_hours += member.factors.after_hours || 0;
-                            factorTotals.weekend_work += member.factors.weekend_work || 0;
-                            factorTotals.incident_load += member.factors.incident_load || 0;
-                            factorTotals.response_time += member.factors.response_time || 0;
+                          if (member.factors || member.key_metrics) {
+                            factorTotals.workload += member.factors?.workload || member.key_metrics?.incidents_per_week || 0;
+                            factorTotals.after_hours += member.factors?.after_hours || member.key_metrics?.after_hours_percentage || 0;
+                            factorTotals.weekend_work += member.factors?.weekend_work || 0;
+                            factorTotals.incident_load += member.factors?.incident_load || member.key_metrics?.incidents_per_week || 0;
+                            factorTotals.response_time += member.factors?.response_time || member.key_metrics?.avg_resolution_hours || 0;
                           }
                         });
                         
@@ -3249,11 +3249,11 @@ export default function Dashboard() {
                           incidentsHandled: member.incident_count,
                           avgResponseTime: `${Math.round(member.metrics?.avg_response_time_minutes || 0)}m`,
                           factors: {
-                            workload: Math.round(member.factors.workload * 10 * 10) / 10,
-                            afterHours: Math.round(member.factors.after_hours * 10 * 10) / 10,
-                            weekendWork: Math.round(member.factors.weekend_work * 10 * 10) / 10,
-                            incidentLoad: Math.round(member.factors.incident_load * 10 * 10) / 10,
-                            responseTime: Math.round(member.factors.response_time * 10 * 10) / 10,
+                            workload: Math.round((member.factors?.workload || member.key_metrics?.incidents_per_week || 0) * 10) / 10,
+                            afterHours: Math.round((member.factors?.after_hours || member.key_metrics?.after_hours_percentage || 0) * 10) / 10,
+                            weekendWork: Math.round((member.factors?.weekend_work || 0) * 10) / 10,
+                            incidentLoad: Math.round((member.factors?.incident_load || member.key_metrics?.incidents_per_week || 0) * 10) / 10,
+                            responseTime: Math.round((member.factors?.response_time || member.key_metrics?.avg_resolution_hours || 0) * 10) / 10,
                           },
                           github_activity: member.github_activity,
                           slack_activity: member.slack_activity
