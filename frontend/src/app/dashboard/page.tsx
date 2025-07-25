@@ -2128,7 +2128,7 @@ export default function Dashboard() {
                       <div>
                         <div className="flex items-start space-x-3">
                           <div>
-                            <div className="text-2xl font-bold text-gray-900">{currentAnalysis.analysis_data.team_health ? Math.round(currentAnalysis.analysis_data.team_health.overall_score * 10) : 0}%</div>
+                            <div className="text-2xl font-bold text-gray-900">{currentAnalysis.analysis_data.team_health ? Math.round(currentAnalysis.analysis_data.team_health.overall_score * 10) : 100}%</div>
                             <div className="text-xs text-gray-500">Current</div>
                           </div>
                           {historicalTrends?.summary?.average_score && currentAnalysis.analysis_data.team_health && (
