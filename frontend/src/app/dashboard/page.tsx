@@ -4028,37 +4028,69 @@ export default function Dashboard() {
                               overallBurnoutScore <= 5 ? 'text-yellow-600 bg-yellow-50' : 
                               overallBurnoutScore <= 7 ? 'text-orange-600 bg-orange-50' : 'text-red-600 bg-red-50';
                               
-            // Generate burnout summary highlighting key risks and trends
+            // Generate burnout summary highlighting concrete metrics and patterns
             const burnoutSummary = (() => {
-              const risks = [];
-              const activities = [];
+              const concerns = [];
+              const metrics = [];
               
-              // Check Maslach dimensions for high risk areas
-              if (maslachDimensions[0].value >= 7) risks.push("high emotional exhaustion");
-              if (maslachDimensions[1].value >= 7) risks.push("significant depersonalization");  
-              if (maslachDimensions[2].value <= 3) risks.push("reduced sense of accomplishment");
+              // Analyze concrete incident data
+              const incidentCount = memberData?.incident_count || 0;
+              const afterHoursPercent = memberData?.metrics?.after_hours_percentage || 0;
+              const weekendPercent = memberData?.metrics?.weekend_percentage || 0;
+              const avgResponseTime = memberData?.metrics?.avg_response_time_minutes || 0;
               
-              // Check external activity indicators
-              if (selectedMember.github_activity && Object.values(selectedMember.github_activity.burnout_indicators || {}).some(Boolean)) {
-                activities.push("concerning GitHub patterns detected");
+              // Incident load concerns
+              if (incidentCount > 30) {
+                concerns.push(`handling ${incidentCount} incidents (high volume)`);
+              } else if (incidentCount > 15) {
+                concerns.push(`managing ${incidentCount} incidents`);
               }
-              if (selectedMember.slack_activity && Object.values(selectedMember.slack_activity.burnout_indicators || {}).some(Boolean)) {
-                activities.push("communication stress indicators");
+              
+              // After-hours work patterns
+              if (afterHoursPercent > 50) {
+                concerns.push(`${afterHoursPercent.toFixed(0)}% of incidents handled after-hours`);
+              } else if (afterHoursPercent > 20) {
+                concerns.push(`${afterHoursPercent.toFixed(0)}% after-hours incident work`);
+              }
+              
+              // Weekend work disruption
+              if (weekendPercent > 20) {
+                concerns.push(`${weekendPercent.toFixed(0)}% weekend incident activity`);
+              }
+              
+              // Response time pressure
+              if (avgResponseTime > 60) {
+                concerns.push(`${Math.round(avgResponseTime)} min average response time`);
+              }
+              
+              // GitHub activity patterns
+              if (selectedMember.github_activity?.burnout_indicators) {
+                const indicators = selectedMember.github_activity.burnout_indicators;
+                if (indicators.excessive_commits) metrics.push("high commit frequency");
+                if (indicators.late_night_activity) metrics.push("late-night coding");
+                if (indicators.weekend_work) metrics.push("weekend development work");
+              }
+              
+              // Slack communication patterns  
+              if (selectedMember.slack_activity?.burnout_indicators) {
+                const indicators = selectedMember.slack_activity.burnout_indicators;
+                if (indicators.excessive_messaging) metrics.push("high message volume");
+                if (indicators.after_hours_activity) metrics.push("after-hours communication");
               }
               
               // Build summary message
-              if (risks.length === 0 && activities.length === 0) {
-                return "Overall burnout levels are within acceptable range. Continue monitoring for early warning signs.";
+              if (concerns.length === 0 && metrics.length === 0) {
+                return `Workload appears balanced with ${incidentCount} incidents handled. Continue monitoring incident patterns and work-life boundaries.`;
               }
               
-              let summary = "";
-              if (risks.length > 0) {
-                summary += `Primary concerns: ${risks.join(", ")}.`;
+              let summary = "Key concerns: ";
+              if (concerns.length > 0) {
+                summary += concerns.join(", ");
               }
-              if (activities.length > 0) {
-                summary += ` ${summary ? " Additionally, " : ""}${activities.join(" and ")}.`;
+              if (metrics.length > 0) {
+                summary += `${concerns.length > 0 ? ". Additional patterns: " : ""}${metrics.join(", ")}`;
               }
-              summary += " Recommend workload review and support interventions.";
+              summary += ". Recommend workload redistribution and schedule review.";
               
               return summary;
             })();
