@@ -657,6 +657,10 @@ export default function Dashboard() {
         } catch (e) {
           console.error('Failed to parse cached integrations:', e)
         }
+        
+        // Set loading to false when using cache
+        setLoadingIntegrations(false)
+        return // Exit early since we used cache
       }
     }
     
@@ -966,6 +970,9 @@ export default function Dashboard() {
               setSelectedIntegration(cached[0].id.toString())
               localStorage.setItem('selected_organization', cached[0].id.toString())
             }
+            
+            // Set loading to false when using cache
+            setLoadingIntegrations(false)
             return
           } catch (error) {
             console.error('Failed to parse cached integrations:', error)
