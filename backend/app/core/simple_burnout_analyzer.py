@@ -936,7 +936,7 @@ class SimpleBurnoutAnalyzer:
                     "after_hours_count": data["after_hours_count"],
                     "users_involved": len(data["users_involved"]),
                     "members_at_risk": users_at_risk,
-                    "total_members": total_users,
+                    "total_members": len(data["users_involved"]),  # Users with incidents on this day
                     "health_status": self._determine_health_status_from_score(daily_score)
                 })
             

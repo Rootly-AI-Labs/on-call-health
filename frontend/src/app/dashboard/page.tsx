@@ -3227,7 +3227,7 @@ export default function Dashboard() {
                                     </p>
                                     {data.membersAtRisk !== undefined && (
                                       <p className="text-sm text-gray-600">
-                                        At Risk: {data.membersAtRisk}/{data.totalMembers} members
+                                        At Risk: {data.membersAtRisk}/{data.totalMembers} users with incidents
                                       </p>
                                     )}
                                     {data.healthStatus && (
