@@ -663,6 +663,11 @@ export default function Dashboard() {
         // Set loading to false when using cache
         setLoadingIntegrations(false)
         setHasDataFromCache(true)
+        
+        // Still need to load previous analyses and trends even if integrations are cached
+        loadPreviousAnalyses()
+        loadHistoricalTrends()
+        
         return // Exit early since we used cache
       }
     }
@@ -1047,6 +1052,11 @@ export default function Dashboard() {
             // Set loading to false when using cache
             setLoadingIntegrations(false)
             setHasDataFromCache(true)
+            
+            // Still need to load previous analyses and trends even if integrations are cached
+            loadPreviousAnalyses()
+            loadHistoricalTrends()
+            
             return
           } catch (error) {
             console.error('Failed to parse cached integrations:', error)
