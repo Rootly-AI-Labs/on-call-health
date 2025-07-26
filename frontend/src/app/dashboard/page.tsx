@@ -3315,18 +3315,18 @@ export default function Dashboard() {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="h-[600px] p-2">
+                    <div className="h-[450px] p-4">
                       <ResponsiveContainer width="100%" height="100%">
-                        <RadarChart data={burnoutFactors} margin={{ top: 40, right: 60, bottom: 40, left: 60 }}>
+                        <RadarChart data={burnoutFactors} margin={{ top: 50, right: 70, bottom: 50, left: 70 }}>
                           <PolarGrid gridType="polygon" />
                           <PolarAngleAxis 
                             dataKey="factor" 
-                            tick={{ fontSize: 16, fill: '#374151', fontWeight: 500 }}
-                            className="text-base"
+                            tick={{ fontSize: 13, fill: '#374151', fontWeight: 500 }}
+                            className="text-sm"
                           />
                           <PolarRadiusAxis 
                             domain={[0, 10]} 
-                            tick={{ fontSize: 14, fill: '#6B7280' }}
+                            tick={{ fontSize: 11, fill: '#6B7280' }}
                             tickCount={6}
                             angle={270}
                           />
