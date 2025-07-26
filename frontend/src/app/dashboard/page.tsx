@@ -3534,23 +3534,24 @@ export default function Dashboard() {
                         key={member.user_id}
                         className="cursor-pointer hover:shadow-md transition-shadow"
                         onClick={() => setSelectedMember({
-                          id: member.user_id,
-                          name: member.user_name,
-                          email: member.user_email,
-                          burnoutScore: member.burnout_score * 10, // Convert 0-10 scale to 0-100 percentage
-                          riskLevel: member.risk_level as 'high' | 'medium' | 'low',
+                          id: member.user_id || '',
+                          name: member.user_name || 'Unknown',
+                          email: member.user_email || '',
+                          burnoutScore: (member.burnout_score || 0) * 10, // Convert 0-10 scale to 0-100 percentage
+                          riskLevel: (member.risk_level || 'low') as 'high' | 'medium' | 'low',
                           trend: 'stable' as const,
-                          incidentsHandled: member.incident_count,
+                          incidentsHandled: member.incident_count || 0,
                           avgResponseTime: `${Math.round(member.metrics?.avg_response_time_minutes || 0)}m`,
                           factors: {
-                            workload: Math.round((member.factors?.workload || member.key_metrics?.incidents_per_week || 0) * 10) / 10,
-                            afterHours: Math.round((member.factors?.after_hours || member.key_metrics?.after_hours_percentage || 0) * 10) / 10,
-                            weekendWork: Math.round((member.factors?.weekend_work || 0) * 10) / 10,
-                            incidentLoad: Math.round((member.factors?.incident_load || member.key_metrics?.incidents_per_week || 0) * 10) / 10,
-                            responseTime: Math.round((member.factors?.response_time || member.key_metrics?.avg_resolution_hours || 0) * 10) / 10,
+                            workload: Math.round(((member.factors?.workload || member.key_metrics?.incidents_per_week || 0)) * 10) / 10,
+                            afterHours: Math.round(((member.factors?.after_hours || member.key_metrics?.after_hours_percentage || 0)) * 10) / 10,
+                            weekendWork: Math.round(((member.factors?.weekend_work || 0)) * 10) / 10,
+                            incidentLoad: Math.round(((member.factors?.incident_load || member.key_metrics?.incidents_per_week || 0)) * 10) / 10,
+                            responseTime: Math.round(((member.factors?.response_time || member.key_metrics?.avg_resolution_hours || 0)) * 10) / 10,
                           },
-                          github_activity: member.github_activity,
-                          slack_activity: member.slack_activity
+                          metrics: member.metrics || {},
+                          github_activity: member.github_activity || null,
+                          slack_activity: member.slack_activity || null
                         })}
                       >
                         <CardContent className="p-4">
@@ -4245,29 +4246,29 @@ export default function Dashboard() {
                       </div>
                     </div>
                     {/* Burnout Risk Indicators */}
-                    {selectedMember.github_activity.burnout_indicators && Object.values(selectedMember.github_activity.burnout_indicators).some(indicator => indicator) && (
+                    {selectedMember.github_activity?.burnout_indicators && Object.values(selectedMember.github_activity.burnout_indicators).some(indicator => indicator) && (
                       <div className="bg-red-50 border border-red-200 rounded-lg p-3 mt-3">
                         <h4 className="text-sm font-semibold text-red-800 mb-2">Burnout Risk Indicators</h4>
                         <div className="space-y-1 text-xs">
-                          {selectedMember.github_activity.burnout_indicators.excessive_commits && (
+                          {selectedMember.github_activity?.burnout_indicators?.excessive_commits && (
                             <div className="flex items-center space-x-2">
                               <div className="w-1 h-1 bg-red-600 rounded-full"></div>
                               <span className="text-red-700">Excessive commit activity detected</span>
                             </div>
                           )}
-                          {selectedMember.github_activity.burnout_indicators.late_night_activity && (
+                          {selectedMember.github_activity?.burnout_indicators?.late_night_activity && (
                             <div className="flex items-center space-x-2">
                               <div className="w-1 h-1 bg-red-600 rounded-full"></div>
                               <span className="text-red-700">Late night coding patterns</span>
                             </div>
                           )}
-                          {selectedMember.github_activity.burnout_indicators.weekend_work && (
+                          {selectedMember.github_activity?.burnout_indicators?.weekend_work && (
                             <div className="flex items-center space-x-2">
                               <div className="w-1 h-1 bg-red-600 rounded-full"></div>
                               <span className="text-red-700">Weekend work detected</span>
                             </div>
                           )}
-                          {selectedMember.github_activity.burnout_indicators.large_prs && (
+                          {selectedMember.github_activity?.burnout_indicators?.large_prs && (
                             <div className="flex items-center space-x-2">
                               <div className="w-1 h-1 bg-red-600 rounded-full"></div>
                               <span className="text-red-700">Large PR patterns</span>
@@ -4309,43 +4310,43 @@ export default function Dashboard() {
                         <span className="text-xs text-blue-700">Average Sentiment</span>
                         <div className="flex items-center space-x-2">
                           <span className={`text-lg font-bold ${
-                            selectedMember.slack_activity.sentiment_score > 0.1 ? 'text-green-600' :
-                            selectedMember.slack_activity.sentiment_score < -0.1 ? 'text-red-600' : 'text-yellow-600'
+                            (selectedMember.slack_activity?.sentiment_score || 0) > 0.1 ? 'text-green-600' :
+                            (selectedMember.slack_activity?.sentiment_score || 0) < -0.1 ? 'text-red-600' : 'text-yellow-600'
                           }`}>
-                            {selectedMember.slack_activity.sentiment_score > 0.1 ? 'Positive' :
-                             selectedMember.slack_activity.sentiment_score < -0.1 ? 'Negative' : 'Neutral'}
+                            {(selectedMember.slack_activity?.sentiment_score || 0) > 0.1 ? 'Positive' :
+                             (selectedMember.slack_activity?.sentiment_score || 0) < -0.1 ? 'Negative' : 'Neutral'}
                           </span>
                           <span className="text-xs text-blue-600">
-                            ({selectedMember.slack_activity.sentiment_score?.toFixed(2) || 'N/A'})
+                            ({selectedMember.slack_activity?.sentiment_score?.toFixed(2) || 'N/A'})
                           </span>
                         </div>
                       </div>
                     </div>
                     
                     {/* Communication Risk Indicators */}
-                    {selectedMember.slack_activity.burnout_indicators && Object.values(selectedMember.slack_activity.burnout_indicators).some(indicator => indicator) && (
+                    {selectedMember.slack_activity?.burnout_indicators && Object.values(selectedMember.slack_activity.burnout_indicators).some(indicator => indicator) && (
                       <div className="bg-red-50 border border-red-200 rounded-lg p-3 mt-3">
                         <h4 className="text-sm font-semibold text-red-800 mb-2">Communication Risk Indicators</h4>
                         <div className="space-y-1 text-xs">
-                          {selectedMember.slack_activity.burnout_indicators.excessive_messaging && (
+                          {selectedMember.slack_activity?.burnout_indicators?.excessive_messaging && (
                             <div className="flex items-center space-x-2">
                               <div className="w-1 h-1 bg-red-600 rounded-full"></div>
                               <span className="text-red-700">Excessive messaging detected</span>
                             </div>
                           )}
-                          {selectedMember.slack_activity.burnout_indicators.poor_sentiment && (
+                          {selectedMember.slack_activity?.burnout_indicators?.poor_sentiment && (
                             <div className="flex items-center space-x-2">
                               <div className="w-1 h-1 bg-red-600 rounded-full"></div>
                               <span className="text-red-700">Poor sentiment patterns</span>
                             </div>
                           )}
-                          {selectedMember.slack_activity.burnout_indicators.late_responses && (
+                          {selectedMember.slack_activity?.burnout_indicators?.late_responses && (
                             <div className="flex items-center space-x-2">
                               <div className="w-1 h-1 bg-red-600 rounded-full"></div>
                               <span className="text-red-700">Late response patterns</span>
                             </div>
                           )}
-                          {selectedMember.slack_activity.burnout_indicators.after_hours_activity && (
+                          {selectedMember.slack_activity?.burnout_indicators?.after_hours_activity && (
                             <div className="flex items-center space-x-2">
                               <div className="w-1 h-1 bg-red-600 rounded-full"></div>
                               <span className="text-red-700">After-hours communication</span>
