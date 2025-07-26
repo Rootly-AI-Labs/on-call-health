@@ -716,11 +716,17 @@ export default function IntegrationsPage() {
       if (response.ok) {
         toast.success("The integration has been removed.")
         
-        // Clear local storage
+        // Optimized: Update local state directly instead of full reload
+        const updatedIntegrations = integrations.filter(i => i.id !== integrationToDelete.id)
+        setIntegrations(updatedIntegrations)
+        
+        // Update cache with filtered results
+        localStorage.setItem('all_integrations', JSON.stringify(updatedIntegrations))
+        localStorage.setItem('all_integrations_timestamp', Date.now().toString())
+        
+        // Clear platform-specific cache
         localStorage.removeItem(`${integrationToDelete.platform}_integrations`)
         localStorage.removeItem(`${integrationToDelete.platform}_integrations_timestamp`)
-        localStorage.removeItem('all_integrations')
-        localStorage.removeItem('all_integrations_timestamp')
         
         // If we deleted the currently selected integration, clear the selection
         const selectedOrg = localStorage.getItem('selected_organization')
@@ -728,7 +734,6 @@ export default function IntegrationsPage() {
           localStorage.removeItem('selected_organization')
         }
         
-        loadAllIntegrations(true) // Force refresh after changes
         setDeleteDialogOpen(false)
         setIntegrationToDelete(null)
       } else {
