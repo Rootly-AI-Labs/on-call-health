@@ -1776,27 +1776,6 @@ export default function Dashboard() {
   
   const burnoutFactors = membersWithIncidents.length > 0 ? [
     { 
-      factor: "Workload", 
-      value: Number(((membersWithIncidents as any[]).reduce((avg: number, m: any) => {
-        // Try factors first, fallback using backend workload scaling logic
-        const incidentsPerWeek = m?.key_metrics?.incidents_per_week || (m?.incident_count / 4.3) || 0;
-        let calculatedWorkload = 0;
-        if (incidentsPerWeek <= 2) {
-          calculatedWorkload = incidentsPerWeek * 1.5;
-        } else if (incidentsPerWeek <= 5) {
-          calculatedWorkload = 3 + ((incidentsPerWeek - 2) / 3) * 4;
-        } else if (incidentsPerWeek <= 8) {
-          calculatedWorkload = 7 + ((incidentsPerWeek - 5) / 3) * 3;
-        } else {
-          calculatedWorkload = 10; // 53 incidents/week = max score
-        }
-        const val = m?.factors?.workload || calculatedWorkload;
-        console.log(`RADAR: Member ${m?.user_name}: workload = ${val} (factors: ${m?.factors?.workload}, incidents_per_week: ${incidentsPerWeek}, calculated: ${calculatedWorkload})`);
-        return avg + val;
-      }, 0) / membersWithIncidents.length).toFixed(1)),
-      metrics: `Avg incidents: ${Math.round((membersWithIncidents as any[]).reduce((avg: number, m: any) => avg + (m?.incident_count || 0), 0) / membersWithIncidents.length)}`
-    },
-    { 
       factor: "After Hours", 
       value: Number(((membersWithIncidents as any[]).reduce((avg: number, m: any) => {
         // Use consistent after-hours percentage data
@@ -1838,20 +1817,46 @@ export default function Dashboard() {
     { 
       factor: "Incident Load", 
       value: Number(((membersWithIncidents as any[]).reduce((avg: number, m: any) => {
-        // Try factors first, fallback to severity_weighted_per_week from key_metrics
-        const val = m?.factors?.incident_load || 
-                   (m?.key_metrics?.severity_weighted_per_week ? Math.min(m.key_metrics.severity_weighted_per_week * 1.5, 10) : 0);
-        console.log(`RADAR: Member ${m?.user_name}: incident_load = ${val} (factors: ${m?.factors?.incident_load}, key_metrics: ${m?.key_metrics?.severity_weighted_per_week})`);
+        // Combine workload and incident severity into one metric
+        const incidentsPerWeek = m?.key_metrics?.incidents_per_week || (m?.incident_count / 4.3) || 0;
+        const severityWeighted = m?.key_metrics?.severity_weighted_per_week || 0;
+        
+        // Calculate workload component (40% weight)
+        let workloadScore = 0;
+        if (incidentsPerWeek <= 2) {
+          workloadScore = incidentsPerWeek * 1.5;
+        } else if (incidentsPerWeek <= 5) {
+          workloadScore = 3 + ((incidentsPerWeek - 2) / 3) * 4;
+        } else if (incidentsPerWeek <= 8) {
+          workloadScore = 7 + ((incidentsPerWeek - 5) / 3) * 3;
+        } else {
+          workloadScore = 10;
+        }
+        
+        // Calculate severity component (60% weight)
+        const severityScore = Math.min(severityWeighted * 1.5, 10);
+        
+        // Combined score
+        const val = m?.factors?.incident_load || (workloadScore * 0.4 + severityScore * 0.6);
+        console.log(`RADAR: Member ${m?.user_name}: incident_load = ${val} (workload: ${workloadScore}, severity: ${severityScore})`);
         return avg + val;
       }, 0) / membersWithIncidents.length).toFixed(1)),
-      metrics: `Total incidents: ${(membersWithIncidents as any[]).reduce((total: number, m: any) => total + (m?.incident_count || 0), 0)}`
+      metrics: `Total: ${(membersWithIncidents as any[]).reduce((total: number, m: any) => total + (m?.incident_count || 0), 0)} incidents (${Math.round((membersWithIncidents as any[]).reduce((avg: number, m: any) => avg + (m?.key_metrics?.incidents_per_week || 0), 0) / membersWithIncidents.length)}/week)`
     },
     { 
       factor: "Response Time", 
       value: Number(((membersWithIncidents as any[]).reduce((avg: number, m: any) => {
         // Try factors first, fallback using backend logic: avg_response_time_minutes / 6
         const responseTimeMinutes = m?.metrics?.avg_response_time_minutes || m?.key_metrics?.avg_resolution_hours * 60 || 0;
-        const val = m?.factors?.response_time || Math.min(responseTimeMinutes / 6, 10); // 738 min = 123/10 = 10 (max)
+        // Industry standard: <30 min = excellent (2), <60 min = good (4), <120 min = acceptable (6), >240 min = critical (9+)
+        const val = m?.factors?.response_time || (() => {
+          if (responseTimeMinutes <= 30) return 2.0;      // Excellent
+          if (responseTimeMinutes <= 60) return 4.0;      // Good
+          if (responseTimeMinutes <= 120) return 6.0;     // Acceptable
+          if (responseTimeMinutes <= 240) return 8.0;     // Poor
+          if (responseTimeMinutes <= 480) return 9.0;     // Very Poor
+          return 10.0;  // Critical (>8 hours)
+        })()
         console.log(`RADAR: Member ${m?.user_name}: response_time = ${val} (factors: ${m?.factors?.response_time}, key_metrics: ${m?.key_metrics?.avg_resolution_hours})`);
         return avg + val;
       }, 0) / membersWithIncidents.length).toFixed(1)),
@@ -3282,18 +3287,18 @@ export default function Dashboard() {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="h-[300px] p-2">
+                    <div className="h-[500px] p-4">
                       <ResponsiveContainer width="100%" height="100%">
-                        <RadarChart data={burnoutFactors} margin={{ top: 40, right: 40, bottom: 40, left: 40 }}>
+                        <RadarChart data={burnoutFactors} margin={{ top: 60, right: 80, bottom: 60, left: 80 }}>
                           <PolarGrid gridType="polygon" />
                           <PolarAngleAxis 
                             dataKey="factor" 
-                            tick={{ fontSize: 11, fill: '#374151' }}
-                            className="text-xs"
+                            tick={{ fontSize: 14, fill: '#374151', fontWeight: 500 }}
+                            className="text-sm"
                           />
                           <PolarRadiusAxis 
                             domain={[0, 10]} 
-                            tick={{ fontSize: 9, fill: '#6B7280' }}
+                            tick={{ fontSize: 12, fill: '#6B7280' }}
                             tickCount={6}
                             angle={270}
                           />
