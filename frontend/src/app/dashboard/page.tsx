@@ -3142,7 +3142,11 @@ export default function Dashboard() {
                                   <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
                                     <p className="font-semibold text-gray-900">{label}</p>
                                     <p className="text-purple-600">Score: {data.value}/10</p>
-                                    <p className="text-sm text-gray-600 mt-1">{data.metrics}</p>
+                                    <p className="text-xs text-gray-500 mt-1">
+                                      {data.value <= 3 ? 'Low Risk' : 
+                                       data.value <= 5 ? 'Moderate Risk' : 
+                                       data.value <= 7 ? 'High Risk' : 'Critical Risk'}
+                                    </p>
                                   </div>
                                 )
                               }
@@ -4138,7 +4142,11 @@ export default function Dashboard() {
                                   <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
                                     <p className="font-semibold text-gray-900">{label}</p>
                                     <p style={{ color: data.color }}>Score: {data.value}/10</p>
-                                    <p className="text-sm text-gray-600 mt-1">{data.metrics}</p>
+                                    <p className="text-xs text-gray-500 mt-1">
+                                      {data.value <= 3 ? 'Low Risk' : 
+                                       data.value <= 5 ? 'Moderate Risk' : 
+                                       data.value <= 7 ? 'High Risk' : 'Critical Risk'}
+                                    </p>
                                   </div>
                                 )
                               }
