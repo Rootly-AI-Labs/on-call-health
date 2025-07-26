@@ -3345,7 +3345,7 @@ export default function Dashboard() {
                                 return (
                                   <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
                                     <p className="font-semibold text-gray-900">{label}</p>
-                                    <p className="text-purple-600">Score: {data.value}/10</p>
+                                    <p className="text-purple-600">Score: {Math.round(data.value)}/10</p>
                                     <p className="text-xs text-gray-500 mt-1">
                                       {data.value <= 3 ? 'Low Risk' : 
                                        data.value <= 5 ? 'Moderate Risk' : 
@@ -4376,12 +4376,13 @@ export default function Dashboard() {
                 factor: 'Response Pressure',
                 value: m?.factors?.response_time ?? ((() => {
                   const responseMinutes = m?.metrics?.avg_response_time_minutes || 0;
-                  // Convert response time to burnout risk (higher time = higher pressure/burnout)
-                  // 0-15 min = low risk (0-2), 15-60 = moderate (2-5), 60-240 = high (5-8), 240+ = critical (8-10)
-                  if (responseMinutes <= 15) return Math.min(responseMinutes / 7.5, 2);
-                  if (responseMinutes <= 60) return 2 + ((responseMinutes - 15) / 15);
-                  if (responseMinutes <= 240) return 5 + ((responseMinutes - 60) / 60);
-                  return Math.min(8 + ((responseMinutes - 240) / 120), 10);
+                  // Industry standard: <30 min = excellent (2), <60 min = good (4), <120 min = acceptable (6), >240 min = critical (9+)
+                  if (responseMinutes <= 30) return 2.0;      // Excellent
+                  if (responseMinutes <= 60) return 4.0;      // Good
+                  if (responseMinutes <= 120) return 6.0;     // Acceptable
+                  if (responseMinutes <= 240) return 8.0;     // Poor
+                  if (responseMinutes <= 480) return 9.0;     // Very Poor
+                  return 10.0;  // Critical (>8 hours)
                 })()),
                 color: '#45B7D1'
               },
@@ -4495,7 +4496,7 @@ export default function Dashboard() {
                                 return (
                                   <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
                                     <p className="font-semibold text-gray-900">{label}</p>
-                                    <p style={{ color: data.color }}>Score: {data.value}/10</p>
+                                    <p style={{ color: data.color }}>Score: {Math.round(data.value)}/10</p>
                                     <p className="text-xs text-gray-500 mt-1">
                                       {data.value <= 3 ? 'Low Risk' : 
                                        data.value <= 5 ? 'Moderate Risk' : 
