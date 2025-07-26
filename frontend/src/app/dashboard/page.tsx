@@ -1847,7 +1847,7 @@ export default function Dashboard() {
       factor: "Response Time", 
       value: Number(((membersWithIncidents as any[]).reduce((avg: number, m: any) => {
         // Try factors first, fallback using backend logic: avg_response_time_minutes / 6
-        const responseTimeMinutes = m?.metrics?.avg_response_time_minutes || m?.key_metrics?.avg_resolution_hours * 60 || 0;
+        const responseTimeMinutes = m?.metrics?.avg_response_time_minutes || (m?.key_metrics?.avg_resolution_hours ? m.key_metrics.avg_resolution_hours * 60 : 0);
         // Industry standard: <30 min = excellent (2), <60 min = good (4), <120 min = acceptable (6), >240 min = critical (9+)
         const val = m?.factors?.response_time || (() => {
           if (responseTimeMinutes <= 30) return 2.0;      // Excellent
@@ -1860,7 +1860,7 @@ export default function Dashboard() {
         console.log(`RADAR: Member ${m?.user_name}: response_time = ${val} (factors: ${m?.factors?.response_time}, key_metrics: ${m?.key_metrics?.avg_resolution_hours})`);
         return avg + val;
       }, 0) / membersWithIncidents.length).toFixed(1)),
-      metrics: `Avg response: ${Math.round((membersWithIncidents as any[]).reduce((avg: number, m: any) => avg + (m?.metrics?.avg_response_time_minutes || m?.key_metrics?.avg_resolution_hours * 60 || 0), 0) / membersWithIncidents.length)} min`
+      metrics: `Avg response: ${Math.round((membersWithIncidents as any[]).reduce((avg: number, m: any) => avg + (m?.metrics?.avg_response_time_minutes || (m?.key_metrics?.avg_resolution_hours ? m.key_metrics.avg_resolution_hours * 60 : 0)), 0) / membersWithIncidents.length)} min`
     },
   ].map(factor => ({
     ...factor,
@@ -3797,7 +3797,7 @@ export default function Dashboard() {
                             </div>
                             <div className="flex justify-between text-xs text-gray-500">
                               <span>{member.incident_count} incidents</span>
-                              <span>{Math.round(member.metrics?.avg_response_time_minutes || 0)}m avg response</span>
+                              <span>{Math.round(member.metrics?.avg_response_time_minutes || (member.key_metrics?.avg_resolution_hours ? member.key_metrics.avg_resolution_hours * 60 : 0))}m avg response</span>
                             </div>
                           </div>
                         </CardContent>
