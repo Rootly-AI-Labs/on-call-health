@@ -3992,26 +3992,23 @@ export default function Dashboard() {
             // Get the correct burnout score (handle both data formats)
             const burnoutScore = memberData?.burnout_score || (selectedMember.burnoutScore / 10) || 0;
             
-            // Extract Maslach dimensions from member data or calculate from consistent burnout score
+            // Calculate Maslach dimensions from consistent burnout score (no maslach_dimensions in data)
             const maslachDimensions = [
               {
                 dimension: "Emotional Exhaustion",
-                value: Math.min(Math.max(Number((memberData?.maslach_dimensions?.emotional_exhaustion || 
-                          burnoutScore * 1.2).toFixed(1)), 0), 10),
+                value: Math.min(Math.max(Number((burnoutScore * 1.2).toFixed(1)), 0), 10),
                 description: "Feeling emotionally drained and depleted by work demands",
                 color: "#DC2626"
               },
               {
                 dimension: "Depersonalization", 
-                value: Math.min(Math.max(Number((memberData?.maslach_dimensions?.depersonalization || 
-                          burnoutScore * 1.0).toFixed(1)), 0), 10),
+                value: Math.min(Math.max(Number((burnoutScore * 1.0).toFixed(1)), 0), 10),
                 description: "Detached or cynical attitudes toward work and colleagues",
                 color: "#7C2D12"
               },
               {
                 dimension: "Reduced Personal Accomplishment",
-                value: Math.min(Math.max(Number((memberData?.maslach_dimensions?.personal_accomplishment || 
-                          Math.max(10 - (burnoutScore * 0.8), 3)).toFixed(1)), 0), 10),
+                value: Math.min(Math.max(Number(Math.max(10 - (burnoutScore * 0.8), 3).toFixed(1)), 0), 10),
                 description: "Diminished sense of personal achievement and effectiveness",
                 color: "#B45309"
               }
