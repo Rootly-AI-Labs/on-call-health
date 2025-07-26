@@ -4019,15 +4019,49 @@ export default function Dashboard() {
               }
             ];
             
-            // Calculate overall burnout health score (0-10 scale, higher is better health)
-            // Use the burnout score directly (consistent with dashboard risk assessment)
-            const overallBurnoutScore = Math.max(0, Math.min(10, 10 - burnoutScore));
-            const healthStatus = overallBurnoutScore >= 7 ? 'Excellent' : 
-                               overallBurnoutScore >= 5 ? 'Good' : 
-                               overallBurnoutScore >= 3 ? 'Moderate Concern' : 'High Concern';
-            const healthColor = overallBurnoutScore >= 7 ? 'text-green-600 bg-green-50' : 
-                              overallBurnoutScore >= 5 ? 'text-blue-600 bg-blue-50' : 
-                              overallBurnoutScore >= 3 ? 'text-yellow-600 bg-yellow-50' : 'text-red-600 bg-red-50';
+            // Calculate overall burnout score (0-10 scale, higher = more burnout, consistent with dimensions)
+            const overallBurnoutScore = Math.max(0, Math.min(10, burnoutScore));
+            const healthStatus = overallBurnoutScore <= 3 ? 'Low Risk' : 
+                               overallBurnoutScore <= 5 ? 'Moderate Risk' : 
+                               overallBurnoutScore <= 7 ? 'High Risk' : 'Critical Risk';
+            const healthColor = overallBurnoutScore <= 3 ? 'text-green-600 bg-green-50' : 
+                              overallBurnoutScore <= 5 ? 'text-yellow-600 bg-yellow-50' : 
+                              overallBurnoutScore <= 7 ? 'text-orange-600 bg-orange-50' : 'text-red-600 bg-red-50';
+                              
+            // Generate burnout summary highlighting key risks and trends
+            const burnoutSummary = (() => {
+              const risks = [];
+              const activities = [];
+              
+              // Check Maslach dimensions for high risk areas
+              if (maslachDimensions[0].value >= 7) risks.push("high emotional exhaustion");
+              if (maslachDimensions[1].value >= 7) risks.push("significant depersonalization");  
+              if (maslachDimensions[2].value <= 3) risks.push("reduced sense of accomplishment");
+              
+              // Check external activity indicators
+              if (selectedMember.github_activity && Object.values(selectedMember.github_activity.burnout_indicators || {}).some(Boolean)) {
+                activities.push("concerning GitHub patterns detected");
+              }
+              if (selectedMember.slack_activity && Object.values(selectedMember.slack_activity.burnout_indicators || {}).some(Boolean)) {
+                activities.push("communication stress indicators");
+              }
+              
+              // Build summary message
+              if (risks.length === 0 && activities.length === 0) {
+                return "Overall burnout levels are within acceptable range. Continue monitoring for early warning signs.";
+              }
+              
+              let summary = "";
+              if (risks.length > 0) {
+                summary += `Primary concerns: ${risks.join(", ")}.`;
+              }
+              if (activities.length > 0) {
+                summary += ` ${summary ? " Additionally, " : ""}${activities.join(" and ")}.`;
+              }
+              summary += " Recommend workload review and support interventions.";
+              
+              return summary;
+            })();
             
             // Temporary: Keep memberHighRisk for old code that hasn't been replaced yet
             const memberHighRisk = []; // Will be removed when modal redesign is complete
@@ -4086,11 +4120,23 @@ export default function Dashboard() {
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
                     <div 
-                      className="bg-gradient-to-r from-green-400 to-blue-500 h-2 rounded-full transition-all duration-500"
-                      style={{ width: `${Math.max(overallBurnoutScore * 10, 5)}%` }}
+                      className="h-2 rounded-full transition-all duration-500"
+                      style={{ 
+                        width: `${Math.max(overallBurnoutScore * 10, 5)}%`,
+                        backgroundColor: overallBurnoutScore <= 3 ? '#10B981' : 
+                                       overallBurnoutScore <= 5 ? '#F59E0B' : 
+                                       overallBurnoutScore <= 7 ? '#F97316' : '#EF4444'
+                      }}
                     />
                   </div>
-                  <p className="text-xs text-gray-500 mt-2">Higher scores indicate better burnout resilience</p>
+                  <p className="text-xs text-gray-500 mt-2">Higher scores indicate greater burnout risk</p>
+                  
+                  {/* Burnout Summary */}
+                  <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <p className="text-sm text-gray-700 leading-relaxed">
+                      {burnoutSummary}
+                    </p>
+                  </div>
                 </div>
                 
                 {/* Individual Burnout Analysis */}
