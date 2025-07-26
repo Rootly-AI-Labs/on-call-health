@@ -673,10 +673,40 @@ export default function Dashboard() {
       loadSpecificAnalysis(parseInt(analysisId))
     }
 
+    // Listen for localStorage changes (when integrations are updated on other pages)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'all_integrations' && e.newValue) {
+        console.log('Detected integration cache update, refreshing...')
+        try {
+          const updatedIntegrations = JSON.parse(e.newValue)
+          setIntegrations(updatedIntegrations)
+          
+          // Also check for GitHub/Slack updates
+          const githubCache = localStorage.getItem('github_integration')
+          const slackCache = localStorage.getItem('slack_integration')
+          
+          if (githubCache) {
+            const githubData = JSON.parse(githubCache)
+            setGithubIntegration(githubData.connected ? githubData.integration : null)
+          }
+          
+          if (slackCache) {
+            const slackData = JSON.parse(slackCache)
+            setSlackIntegration(slackData.integration)
+          }
+        } catch (e) {
+          console.error('Failed to parse updated integrations:', e)
+        }
+      }
+    }
+    
+    window.addEventListener('storage', handleStorageChange)
+
     // Cleanup event listeners
     return () => {
       window.removeEventListener('focus', handlePageFocus)
       document.removeEventListener('visibilitychange', handlePageFocus)
+      window.removeEventListener('storage', handleStorageChange)
     }
   }, [])
 
