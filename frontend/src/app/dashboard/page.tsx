@@ -3988,29 +3988,32 @@ export default function Dashboard() {
             </DialogTitle>
           </DialogHeader>
           {selectedMember && (() => {
-            // Calculate Maslach Burnout Inventory dimensions
-            const memberData = members?.find(m => m.user_name === selectedMember.name) || selectedMember;
+            // Find the correct member data from the analysis (consistent with dashboard)
+            const memberData = members?.find(m => m.user_name === selectedMember.name);
             
-            // Extract Maslach dimensions from member data or calculate from available metrics
+            // Get the correct burnout score (handle both data formats)
+            const burnoutScore = memberData?.burnout_score || (selectedMember.burnoutScore / 10) || 0;
+            
+            // Extract Maslach dimensions from member data or calculate from consistent burnout score
             const maslachDimensions = [
               {
                 dimension: "Emotional Exhaustion",
-                value: Number((memberData?.maslach_dimensions?.emotional_exhaustion || 
-                          memberData?.burnout_score * 10 || 0).toFixed(1)),
+                value: Math.min(Math.max(Number((memberData?.maslach_dimensions?.emotional_exhaustion || 
+                          burnoutScore * 1.2).toFixed(1)), 0), 10),
                 description: "Feeling emotionally drained and depleted by work demands",
                 color: "#DC2626"
               },
               {
                 dimension: "Depersonalization", 
-                value: Number((memberData?.maslach_dimensions?.depersonalization || 
-                          (memberData?.burnout_score * 8) || 0).toFixed(1)),
+                value: Math.min(Math.max(Number((memberData?.maslach_dimensions?.depersonalization || 
+                          burnoutScore * 1.0).toFixed(1)), 0), 10),
                 description: "Detached or cynical attitudes toward work and colleagues",
                 color: "#7C2D12"
               },
               {
                 dimension: "Reduced Personal Accomplishment",
-                value: Number((memberData?.maslach_dimensions?.personal_accomplishment || 
-                          (10 - (memberData?.burnout_score * 6)) || 10).toFixed(1)),
+                value: Math.min(Math.max(Number((memberData?.maslach_dimensions?.personal_accomplishment || 
+                          Math.max(10 - (burnoutScore * 0.8), 3)).toFixed(1)), 0), 10),
                 description: "Diminished sense of personal achievement and effectiveness",
                 color: "#B45309"
               }
