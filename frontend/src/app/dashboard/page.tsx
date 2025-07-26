@@ -4102,32 +4102,47 @@ export default function Dashboard() {
             const m = memberData;
             const memberFactors = [
               {
-                factor: 'Workload',
+                factor: 'Incident Volume',
                 value: m?.factors?.workload ?? ((() => {
                   const incidentsCount = m?.incident_count || m?.metrics?.total_incidents || 0;
                   const incidentsPerWeek = incidentsCount / 4.3;
-                  return incidentsPerWeek <= 5 ? incidentsPerWeek * 2 : 10;
+                  // More incidents = higher burnout risk (0-10 scale)
+                  return Math.min(incidentsPerWeek * 0.5, 10);
                 })()),
                 color: '#FF6B6B'
               },
               {
                 factor: 'After Hours',
-                value: m?.factors?.after_hours ?? Math.min((m?.metrics?.after_hours_percentage || 0) * 20, 10),
+                value: m?.factors?.after_hours ?? (((m?.metrics?.after_hours_percentage || 0) / 100) * 10),
                 color: '#4ECDC4'
               },
               {
-                factor: 'Response Time',
-                value: m?.factors?.response_time ?? Math.min((m?.metrics?.avg_response_time_minutes || 0) / 6, 10),
+                factor: 'Response Pressure',
+                value: m?.factors?.response_time ?? ((() => {
+                  const responseMinutes = m?.metrics?.avg_response_time_minutes || 0;
+                  // Convert response time to burnout risk (higher time = higher pressure/burnout)
+                  // 0-15 min = low risk (0-2), 15-60 = moderate (2-5), 60-240 = high (5-8), 240+ = critical (8-10)
+                  if (responseMinutes <= 15) return Math.min(responseMinutes / 7.5, 2);
+                  if (responseMinutes <= 60) return 2 + ((responseMinutes - 15) / 15);
+                  if (responseMinutes <= 240) return 5 + ((responseMinutes - 60) / 60);
+                  return Math.min(8 + ((responseMinutes - 240) / 120), 10);
+                })()),
                 color: '#45B7D1'
               },
               {
                 factor: 'Weekend Work',
-                value: m?.factors?.weekend_work ?? Math.min((m?.metrics?.weekend_percentage || 0) * 20, 10),
+                value: m?.factors?.weekend_work ?? (((m?.metrics?.weekend_percentage || 0) / 100) * 10),
                 color: '#96CEB4'
               },
               {
-                factor: 'Incident Load',
-                value: m?.factors?.incident_load ?? Math.min((m?.incident_count || 0) / 5, 10),
+                factor: 'Schedule Disruption',
+                value: m?.factors?.schedule_disruption ?? ((() => {
+                  // Calculate schedule disruption from after-hours + weekend + response pressure
+                  const afterHoursImpact = ((m?.metrics?.after_hours_percentage || 0) / 100) * 3;
+                  const weekendImpact = ((m?.metrics?.weekend_percentage || 0) / 100) * 3;
+                  const responseImpact = (m?.metrics?.avg_response_time_minutes || 0) > 60 ? 4 : 0;
+                  return Math.min(afterHoursImpact + weekendImpact + responseImpact, 10);
+                })()),
                 color: '#FECA57'
               }
             ];
