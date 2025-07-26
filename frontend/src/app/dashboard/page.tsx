@@ -1641,10 +1641,11 @@ export default function Dashboard() {
     { 
       factor: "After Hours", 
       value: Number(((membersWithIncidents as any[]).reduce((avg: number, m: any) => {
-        // Try factors first, fallback to key_metrics (SimpleBurnoutAnalyzer format)
-        const val = m?.factors?.after_hours || 
-                   (m?.key_metrics?.after_hours_percentage ? Math.min(m.key_metrics.after_hours_percentage / 10, 10) : 0);
-        console.log(`RADAR: Member ${m?.user_name}: after_hours = ${val} (factors: ${m?.factors?.after_hours}, key_metrics: ${m?.key_metrics?.after_hours_percentage})`);
+        // Use consistent after-hours percentage data
+        const afterHoursPercent = m?.metrics?.after_hours_percentage || m?.key_metrics?.after_hours_percentage || 0;
+        // Convert percentage to factor scale (0-10)
+        const val = m?.factors?.after_hours || (afterHoursPercent / 10); // 30% after-hours = 3.0 factor
+        console.log(`RADAR: Member ${m?.user_name}: after_hours = ${val} (factors: ${m?.factors?.after_hours}, after_hours_percentage: ${afterHoursPercent}%)`);
         return avg + val;
       }, 0) / membersWithIncidents.length).toFixed(1)),
       metrics: `Avg after-hours: ${Math.round((membersWithIncidents as any[]).reduce((avg: number, m: any) => avg + (m?.metrics?.after_hours_percentage || m?.key_metrics?.after_hours_percentage || 0), 0) / membersWithIncidents.length)}%`
@@ -1652,13 +1653,14 @@ export default function Dashboard() {
     { 
       factor: "Weekend Work", 
       value: Number(((membersWithIncidents as any[]).reduce((avg: number, m: any) => {
-        // Try factors first, no direct equivalent in key_metrics, estimate from burnout score
-        const val = m?.factors?.weekend_work || 
-                   (m?.burnout_score ? Math.min(m.burnout_score * 1.5, 10) : 0);
-        console.log(`RADAR: Member ${m?.user_name}: weekend_work = ${val} (factors: ${m?.factors?.weekend_work}, estimated from burnout: ${m?.burnout_score})`);
+        // Use actual weekend percentage data for consistency
+        const weekendPercent = m?.metrics?.weekend_percentage || m?.key_metrics?.weekend_percentage || 0;
+        // Convert percentage (0-100) to factor scale (0-10)
+        const val = m?.factors?.weekend_work || (weekendPercent / 10); // 30% weekend work = 3.0 factor
+        console.log(`RADAR: Member ${m?.user_name}: weekend_work = ${val} (factors: ${m?.factors?.weekend_work}, weekend_percentage: ${weekendPercent}%)`);
         return avg + val;
       }, 0) / membersWithIncidents.length).toFixed(1)),
-      metrics: `Avg weekend work: ${Math.round((membersWithIncidents as any[]).reduce((avg: number, m: any) => avg + (m?.metrics?.weekend_percentage || 0), 0) / membersWithIncidents.length)}%`
+      metrics: `Avg weekend work: ${Math.round((membersWithIncidents as any[]).reduce((avg: number, m: any) => avg + (m?.metrics?.weekend_percentage || m?.key_metrics?.weekend_percentage || 0), 0) / membersWithIncidents.length)}%`
     },
     { 
       factor: "Incident Load", 
