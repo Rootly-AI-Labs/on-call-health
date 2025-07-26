@@ -52,8 +52,6 @@ import {
   Users,
   Star,
   Info,
-  Circle,
-  ArrowRight,
   Heart,
   Shield,
   BarChart3,
@@ -506,7 +504,7 @@ export default function Dashboard() {
   const [analysisToDelete, setAnalysisToDelete] = useState<AnalysisResult | null>(null)
   const [debugSectionOpen, setDebugSectionOpen] = useState(false)
   const [riskFactorsExpanded, setRiskFactorsExpanded] = useState(false)
-  const [memberViewMode, setMemberViewMode] = useState<'radar' | 'journey'>('radar')
+  // Removed member view mode - only showing radar chart now
   const [historicalTrends, setHistoricalTrends] = useState<any>(null)
   const [loadingTrends, setLoadingTrends] = useState(false)
   
@@ -4020,15 +4018,14 @@ export default function Dashboard() {
             ];
             
             // Calculate overall burnout health score (0-10 scale, higher is better health)
-            const overallBurnoutScore = Math.max(0, Math.min(10, 
-              10 - ((maslachDimensions[0].value + maslachDimensions[1].value + (10 - maslachDimensions[2].value)) / 3)
-            ));
-            const healthStatus = overallBurnoutScore <= 3 ? 'Excellent' : 
-                               overallBurnoutScore <= 5 ? 'Good' : 
-                               overallBurnoutScore <= 7 ? 'Moderate Concern' : 'High Concern';
-            const healthColor = overallBurnoutScore <= 3 ? 'text-green-600 bg-green-50' : 
-                              overallBurnoutScore <= 5 ? 'text-blue-600 bg-blue-50' : 
-                              overallBurnoutScore <= 7 ? 'text-yellow-600 bg-yellow-50' : 'text-red-600 bg-red-50';
+            // Use the burnout score directly (consistent with dashboard risk assessment)
+            const overallBurnoutScore = Math.max(0, Math.min(10, 10 - burnoutScore));
+            const healthStatus = overallBurnoutScore >= 7 ? 'Excellent' : 
+                               overallBurnoutScore >= 5 ? 'Good' : 
+                               overallBurnoutScore >= 3 ? 'Moderate Concern' : 'High Concern';
+            const healthColor = overallBurnoutScore >= 7 ? 'text-green-600 bg-green-50' : 
+                              overallBurnoutScore >= 5 ? 'text-blue-600 bg-blue-50' : 
+                              overallBurnoutScore >= 3 ? 'text-yellow-600 bg-yellow-50' : 'text-red-600 bg-red-50';
             
             // Temporary: Keep memberHighRisk for old code that hasn't been replaced yet
             const memberHighRisk = []; // Will be removed when modal redesign is complete
@@ -4109,189 +4106,51 @@ export default function Dashboard() {
                           </div>
                         )}
                       </CardTitle>
-                      <div className="flex space-x-1 bg-gray-100 rounded-lg p-1">
-                        <button
-                          onClick={() => setMemberViewMode('radar')}
-                          className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-                            memberViewMode === 'radar' 
-                              ? 'bg-white text-purple-600 shadow-sm' 
-                              : 'text-gray-600 hover:text-gray-900'
-                          }`}
-                        >
-                          Factors
-                        </button>
-                        <button
-                          onClick={() => setMemberViewMode('journey')}
-                          className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-                            memberViewMode === 'journey' 
-                              ? 'bg-white text-purple-600 shadow-sm' 
-                              : 'text-gray-600 hover:text-gray-900'
-                          }`}
-                        >
-                          Journey
-                        </button>
-                      </div>
+                      {/* Single view mode - only Factors */}
                     </div>
                   </CardHeader>
                   <CardContent>
-                    {memberViewMode === 'radar' ? (
-                      <div className="h-[280px]">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <RadarChart data={memberFactors} margin={{ top: 20, right: 30, bottom: 20, left: 30 }}>
-                            <PolarGrid gridType="polygon" />
-                            <PolarAngleAxis 
-                              dataKey="factor" 
-                              tick={{ fontSize: 10, fill: '#374151' }}
-                              className="text-xs"
-                            />
-                            <PolarRadiusAxis 
-                              domain={[0, 10]} 
-                              tick={{ fontSize: 8, fill: '#6B7280' }}
-                              tickCount={6}
-                              angle={270}
-                            />
-                            <Radar 
-                              dataKey="value" 
-                              stroke="#8B5CF6" 
-                              fill="#8B5CF6" 
-                              fillOpacity={0.1}
-                              strokeWidth={2}
-                              dot={{ fill: '#8B5CF6', strokeWidth: 2, r: 3 }}
-                            />
-                            <Tooltip 
-                              content={({ payload, label }) => {
-                                if (payload && payload.length > 0) {
-                                  const data = payload[0].payload
-                                  return (
-                                    <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
-                                      <p className="font-semibold text-gray-900">{label}</p>
-                                      <p style={{ color: data.color }}>Score: {data.value}/10</p>
-                                      <p className="text-sm text-gray-600 mt-1">{data.metrics}</p>
-                                    </div>
-                                  )
-                                }
-                                return null
-                              }}
-                            />
-                          </RadarChart>
-                        </ResponsiveContainer>
-                      </div>
-                    ) : (
-                      <div className="h-[280px] overflow-y-auto">
-                        {/* Burnout Journey Map */}
-                        <div className="relative">
-                          {/* Timeline line */}
-                          <div className="absolute left-8 top-0 bottom-0 w-0.5 bg-gray-300"></div>
-                          
-                          {/* Journey Events */}
-                          <div className="space-y-6">
-                            {/* Current State */}
-                            <div className="relative flex items-start">
-                              <div className="absolute left-8 w-4 h-4 bg-white rounded-full border-4 border-red-500 -translate-x-1/2 z-10"></div>
-                              <div className="ml-16 -mt-1">
-                                <div className="flex items-center space-x-2 mb-1">
-                                  <span className="text-xs text-gray-500">Today</span>
-                                  <Badge className="bg-red-100 text-red-800 text-xs px-2 py-0">Current Risk</Badge>
-                                </div>
-                                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                                  <p className="font-medium text-red-900">Burnout Score: {(selectedMember.burnout_score || 0).toFixed(1)}/10</p>
-                                  <p className="text-sm text-red-700 mt-1">
-                                    {memberHighRisk.length > 0 
-                                      ? `${memberHighRisk.length} factors need attention: ${memberHighRisk.map(f => f.factor).join(', ')}`
-                                      : 'Risk levels within acceptable range'}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Key Event: High Workload Period */}
-                            {selectedMember.factors?.workload >= 7 && (
-                              <div className="relative flex items-start">
-                                <div className="absolute left-8 w-4 h-4 bg-white rounded-full border-4 border-orange-500 -translate-x-1/2 z-10"></div>
-                                <div className="ml-16 -mt-1">
-                                  <div className="flex items-center space-x-2 mb-1">
-                                    <span className="text-xs text-gray-500">Past 2 weeks</span>
-                                    <TrendingUp className="w-3 h-3 text-orange-500" />
+                    <div className="h-[280px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <RadarChart data={memberFactors} margin={{ top: 20, right: 30, bottom: 20, left: 30 }}>
+                          <PolarGrid gridType="polygon" />
+                          <PolarAngleAxis 
+                            dataKey="factor" 
+                            tick={{ fontSize: 10, fill: '#374151' }}
+                            className="text-xs"
+                          />
+                          <PolarRadiusAxis 
+                            domain={[0, 10]} 
+                            tick={{ fontSize: 8, fill: '#6B7280' }}
+                            tickCount={6}
+                            angle={270}
+                          />
+                          <Radar 
+                            dataKey="value" 
+                            stroke="#8B5CF6" 
+                            fill="#8B5CF6" 
+                            fillOpacity={0.1}
+                            strokeWidth={2}
+                            dot={{ fill: '#8B5CF6', strokeWidth: 2, r: 3 }}
+                          />
+                          <Tooltip 
+                            content={({ payload, label }) => {
+                              if (payload && payload.length > 0) {
+                                const data = payload[0].payload
+                                return (
+                                  <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
+                                    <p className="font-semibold text-gray-900">{label}</p>
+                                    <p style={{ color: data.color }}>Score: {data.value}/10</p>
+                                    <p className="text-sm text-gray-600 mt-1">{data.metrics}</p>
                                   </div>
-                                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
-                                    <p className="font-medium text-orange-900">Workload Spike Detected</p>
-                                    <p className="text-sm text-orange-700 mt-1">
-                                      Incident count increased by {Math.round((selectedMember.incident_count / 15 - 1) * 100)}% above average
-                                    </p>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Key Event: After Hours Work */}
-                            {selectedMember.metrics?.after_hours_percentage > 20 && (
-                              <div className="relative flex items-start">
-                                <div className="absolute left-8 w-4 h-4 bg-white rounded-full border-4 border-yellow-500 -translate-x-1/2 z-10"></div>
-                                <div className="ml-16 -mt-1">
-                                  <div className="flex items-center space-x-2 mb-1">
-                                    <span className="text-xs text-gray-500">Recurring pattern</span>
-                                    <Clock className="w-3 h-3 text-yellow-600" />
-                                  </div>
-                                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                                    <p className="font-medium text-yellow-900">Consistent After-Hours Activity</p>
-                                    <p className="text-sm text-yellow-700 mt-1">
-                                      {selectedMember.metrics.after_hours_percentage}% of work happening outside business hours
-                                    </p>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Positive Event: Recovery Period */}
-                            {selectedMember.burnout_score < 5 && (
-                              <div className="relative flex items-start">
-                                <div className="absolute left-8 w-4 h-4 bg-white rounded-full border-4 border-green-500 -translate-x-1/2 z-10"></div>
-                                <div className="ml-16 -mt-1">
-                                  <div className="flex items-center space-x-2 mb-1">
-                                    <span className="text-xs text-gray-500">Recommendation</span>
-                                    <TrendingDown className="w-3 h-3 text-green-600" />
-                                  </div>
-                                  <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                                    <p className="font-medium text-green-900">Maintain Current Balance</p>
-                                    <p className="text-sm text-green-700 mt-1">
-                                      Current workload is sustainable. Consider this a baseline for healthy work patterns.
-                                    </p>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Future Projection */}
-                            <div className="relative flex items-start">
-                              <div className="absolute left-8 w-4 h-4 bg-white rounded-full border-2 border-gray-400 -translate-x-1/2 z-10">
-                                <ArrowRight className="w-2 h-2 text-gray-400 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
-                              </div>
-                              <div className="ml-16 -mt-1">
-                                <div className="flex items-center space-x-2 mb-1">
-                                  <span className="text-xs text-gray-500">Next 30 days</span>
-                                  <span className="text-xs text-blue-600 font-medium">Projection</span>
-                                </div>
-                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                                  <p className="font-medium text-blue-900">Recommended Actions</p>
-                                  <ul className="text-sm text-blue-700 mt-1 space-y-1">
-                                    {memberHighRisk.length > 0 && (
-                                      <li className="flex items-start space-x-1">
-                                        <Circle className="w-1.5 h-1.5 mt-1.5 flex-shrink-0" />
-                                        <span>Address {memberHighRisk[0].factor.toLowerCase()}: {memberHighRisk[0].recommendation}</span>
-                                      </li>
-                                    )}
-                                    <li className="flex items-start space-x-1">
-                                      <Circle className="w-1.5 h-1.5 mt-1.5 flex-shrink-0" />
-                                      <span>Schedule regular check-ins to monitor progress</span>
-                                    </li>
-                                  </ul>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
+                                )
+                              }
+                              return null
+                            }}
+                          />
+                        </RadarChart>
+                      </ResponsiveContainer>
+                    </div>
                   </CardContent>
                 </Card>
               </div>
@@ -4318,9 +4177,25 @@ export default function Dashboard() {
                         />
                       </div>
                       
-                      <p className="text-xs text-gray-600 text-center leading-relaxed">
+                      <p className="text-xs text-gray-600 text-center leading-relaxed mb-2">
                         {dimension.description}
                       </p>
+                      
+                      {/* Show contributing factors/metrics */}
+                      <div className="text-xs text-gray-500 text-center">
+                        <span className="font-medium">Contributing factors:</span>
+                        <div className="mt-1">
+                          {dimension.dimension === "Emotional Exhaustion" && (
+                            <span>Workload intensity + After-hours incidents + Incident frequency</span>
+                          )}
+                          {dimension.dimension === "Depersonalization" && (
+                            <span>Response time pressure + Weekend work disruption + High incident load</span>
+                          )}
+                          {dimension.dimension === "Reduced Personal Accomplishment" && (
+                            <span>Incident resolution success + Response effectiveness + Team contribution</span>
+                          )}
+                        </div>
+                      </div>
                       
                       <div className="mt-3 text-center">
                         <Badge className={`${
