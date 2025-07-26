@@ -3182,7 +3182,8 @@ export default function Dashboard() {
                               riskLevel: trend.overall_score >= 8 ? 'low' : trend.overall_score >= 6 ? 'medium' : 'high',
                               membersAtRisk: trend.members_at_risk,
                               totalMembers: trend.total_members,
-                              healthStatus: trend.health_status
+                              healthStatus: trend.health_status,
+                              incidentCount: trend.incident_count
                             }));
                           }
                           
@@ -3194,7 +3195,8 @@ export default function Dashboard() {
                               riskLevel: trend.overall_score >= 8 ? 'low' : trend.overall_score >= 6 ? 'medium' : 'high',
                               membersAtRisk: trend.members_at_risk,
                               totalMembers: trend.total_members,
-                              healthStatus: trend.health_status
+                              healthStatus: trend.health_status,
+                              incidentCount: trend.incident_count
                             }));
                           }
                           
@@ -3225,6 +3227,11 @@ export default function Dashboard() {
                                     }`}>
                                       Risk Level: {data.riskLevel.charAt(0).toUpperCase() + data.riskLevel.slice(1)}
                                     </p>
+                                    {data.incidentCount !== undefined && (
+                                      <p className="text-sm text-gray-600">
+                                        Incidents: {data.incidentCount}
+                                      </p>
+                                    )}
                                     {data.membersAtRisk !== undefined && (
                                       <p className="text-sm text-gray-600">
                                         At Risk: {data.membersAtRisk}/{data.totalMembers} users with incidents
