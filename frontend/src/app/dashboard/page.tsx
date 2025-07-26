@@ -508,6 +508,7 @@ export default function Dashboard() {
   const [historicalTrends, setHistoricalTrends] = useState<any>(null)
   const [loadingTrends, setLoadingTrends] = useState(false)
   const [initialDataLoaded, setInitialDataLoaded] = useState(false)
+  const [hasDataFromCache, setHasDataFromCache] = useState(false)
   
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -661,12 +662,19 @@ export default function Dashboard() {
         
         // Set loading to false when using cache
         setLoadingIntegrations(false)
+        setHasDataFromCache(true)
         return // Exit early since we used cache
       }
     }
     
     const loadInitialData = async () => {
       try {
+        // If we already have cached data, mark as loaded immediately
+        if (hasDataFromCache) {
+          setInitialDataLoaded(true)
+          return
+        }
+        
         // Load data with individual error handling to prevent blocking
         const results = await Promise.allSettled([
           loadPreviousAnalyses(),
@@ -1034,6 +1042,7 @@ export default function Dashboard() {
             
             // Set loading to false when using cache
             setLoadingIntegrations(false)
+            setHasDataFromCache(true)
             return
           } catch (error) {
             console.error('Failed to parse cached integrations:', error)
@@ -1886,8 +1895,8 @@ export default function Dashboard() {
     )
   }
 
-  // Show main page loader while initial data loads
-  if (!initialDataLoaded) {
+  // Show main page loader while initial data loads (but not if we have cached data)
+  if (!initialDataLoaded && !hasDataFromCache) {
     return (
       <div className="flex h-screen bg-gray-50">
         <div className="flex-1 flex items-center justify-center">
