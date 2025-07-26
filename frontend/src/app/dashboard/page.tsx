@@ -4304,10 +4304,10 @@ export default function Dashboard() {
                       <div className="mt-3 text-center">
                         <Badge className={`${
                           dimension.dimension === "Reduced Personal Accomplishment" ? (
-                            // For Personal Accomplishment: Lower scores = Higher risk (inverted)
-                            dimension.value >= 7 ? 'text-green-600 bg-green-50' : 
-                            dimension.value >= 5 ? 'text-yellow-600 bg-yellow-50' : 
-                            dimension.value >= 3 ? 'text-green-600 bg-green-50' : 
+                            // For Reduced Personal Accomplishment: Lower scores = Lower risk (less reduction = better)
+                            dimension.value <= 3 ? 'text-green-600 bg-green-50' : 
+                            dimension.value <= 5 ? 'text-yellow-600 bg-yellow-50' : 
+                            dimension.value <= 7 ? 'text-orange-600 bg-orange-50' : 
                             'text-red-600 bg-red-50'
                           ) : (
                             // For other dimensions: Higher scores = Higher risk (normal)
@@ -4318,10 +4318,10 @@ export default function Dashboard() {
                           )
                         } text-xs px-2 py-1 border-0`}>
                           {dimension.dimension === "Reduced Personal Accomplishment" ? (
-                            // For Personal Accomplishment: Lower scores = Higher risk (inverted)
-                            dimension.value >= 7 ? 'Low Risk' : 
-                            dimension.value >= 5 ? 'Moderate' : 
-                            dimension.value >= 3 ? 'Elevated' : 'High Risk'
+                            // For Reduced Personal Accomplishment: Lower scores = Lower risk (less reduction = better)
+                            dimension.value <= 3 ? 'Low Risk' : 
+                            dimension.value <= 5 ? 'Moderate' : 
+                            dimension.value <= 7 ? 'Elevated' : 'High Risk'
                           ) : (
                             // For other dimensions: Higher scores = Higher risk (normal)
                             dimension.value <= 3 ? 'Low Risk' : 
