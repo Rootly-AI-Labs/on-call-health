@@ -3998,6 +3998,9 @@ export default function Dashboard() {
                               overallBurnoutScore <= 5 ? 'text-blue-600 bg-blue-50' : 
                               overallBurnoutScore <= 7 ? 'text-yellow-600 bg-yellow-50' : 'text-red-600 bg-red-50';
             
+            // Temporary: Keep memberHighRisk for old code that hasn't been replaced yet
+            const memberHighRisk = []; // Will be removed when modal redesign is complete
+            
             return (
             <div className="space-y-6">
               {/* Burnout Health Overview */}
