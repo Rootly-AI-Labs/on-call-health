@@ -909,17 +909,15 @@ class SimpleBurnoutAnalyzer:
                 daily_severity_rate = data["severity_weighted_count"] / total_users if total_users > 0 else 0
                 after_hours_ratio = data["after_hours_count"] / data["incident_count"] if data["incident_count"] > 0 else 0
                 
-                # Consistent baseline scoring (health scale: higher score = better health)
-                # All days start from the same baseline to ensure consistency
+                # Skip days with zero incidents - only include meaningful data points
                 if data["incident_count"] == 0:
-                    # Zero incident days: neutral baseline (no incidents doesn't mean perfect health)
-                    daily_score = 6.5  # 65% baseline - neutral, not artificially high
-                else:
-                    # Days with incidents: start from same baseline as zero-incident days, then apply penalties
-                    daily_score = 8.7  # Slightly higher baseline to account for normal operational activity
-                    daily_score -= min(5.0, daily_severity_rate * 2.5)  # Up to -5 for severity-weighted incidents
-                    daily_score -= min(2.0, after_hours_ratio * 2)      # Up to -2 for after-hours work
-                    daily_score -= min(1.5, data["high_severity_count"] * 0.7)  # Up to -1.5 for high severity
+                    continue  # Omit zero-incident days from trends
+                
+                # Calculate burnout score for days with incidents
+                daily_score = 8.7  # Start with baseline for operational activity
+                daily_score -= min(5.0, daily_severity_rate * 2.5)  # Up to -5 for severity-weighted incidents
+                daily_score -= min(2.0, after_hours_ratio * 2)      # Up to -2 for after-hours work
+                daily_score -= min(1.5, data["high_severity_count"] * 0.7)  # Up to -1.5 for high severity
                 
                 daily_score = max(2.0, daily_score)  # Floor at 2.0 (20% health) even on worst days
                 
