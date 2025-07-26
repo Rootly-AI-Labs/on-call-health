@@ -616,6 +616,28 @@ export default function Dashboard() {
           const parsed = JSON.parse(cachedIntegrations)
           setIntegrations(parsed)
           
+          // Also load GitHub and Slack from cache if available
+          const cachedGithub = localStorage.getItem('github_integration')
+          const cachedSlack = localStorage.getItem('slack_integration')
+          
+          if (cachedGithub) {
+            const githubData = JSON.parse(cachedGithub)
+            if (githubData.connected && githubData.integration) {
+              setGithubIntegration(githubData.integration)
+            } else {
+              setGithubIntegration(null)
+            }
+          }
+          
+          if (cachedSlack) {
+            const slackData = JSON.parse(cachedSlack)
+            if (slackData.connected && slackData.integration) {
+              setSlackIntegration(slackData.integration)
+            } else {
+              setSlackIntegration(null)
+            }
+          }
+          
           // Set integration based on URL parameter, saved preference, or first available
           if (orgId) {
             setSelectedIntegration(orgId)
@@ -914,6 +936,28 @@ export default function Dashboard() {
             const cached = JSON.parse(cachedIntegrations)
             setIntegrations(cached)
             
+            // Also load GitHub and Slack from cache if available
+            const cachedGithub = localStorage.getItem('github_integration')
+            const cachedSlack = localStorage.getItem('slack_integration')
+            
+            if (cachedGithub) {
+              const githubData = JSON.parse(cachedGithub)
+              if (githubData.connected && githubData.integration) {
+                setGithubIntegration(githubData.integration)
+              } else {
+                setGithubIntegration(null)
+              }
+            }
+            
+            if (cachedSlack) {
+              const slackData = JSON.parse(cachedSlack)
+              if (slackData.connected && slackData.integration) {
+                setSlackIntegration(slackData.integration)
+              } else {
+                setSlackIntegration(null)
+              }
+            }
+            
             // Set integration based on saved preference
             const savedOrg = localStorage.getItem('selected_organization')
             if (savedOrg && cached.find((i: Integration) => i.id.toString() === savedOrg)) {
@@ -1000,6 +1044,10 @@ export default function Dashboard() {
       } else {
         setSlackIntegration(null)
       }
+      
+      // Cache GitHub and Slack integration status separately
+      localStorage.setItem('github_integration', JSON.stringify(githubData))
+      localStorage.setItem('slack_integration', JSON.stringify(slackData))
 
       // Ensure platform is set
       const rootlyIntegrations = (rootlyData.integrations || []).map((i: Integration, index: number) => {
@@ -1220,17 +1268,28 @@ export default function Dashboard() {
     setDialogSelectedIntegration(integrationToUse)
     setShowTimeRangeDialog(true)
 
-    // Load GitHub/Slack status and LLM config in background after modal is open
-    setIsLoadingGitHubSlack(true)
-    Promise.all([
-      loadIntegrations(true, false), // Refresh integrations without showing loading
-      loadLlmConfig()
-    ]).then(() => {
-      setIsLoadingGitHubSlack(false)
-    }).catch(err => {
-      console.error('Error loading modal data:', err)
-      setIsLoadingGitHubSlack(false)
-    })
+    // Only load GitHub/Slack data if we don't already have it or if LLM config is missing
+    const needsGitHubSlackData = !githubIntegration && !slackIntegration
+    const needsLlmConfig = !llmConfig
+    
+    if (needsGitHubSlackData || needsLlmConfig) {
+      setIsLoadingGitHubSlack(true)
+      
+      const promises = []
+      if (needsGitHubSlackData) {
+        promises.push(loadIntegrations(true, false)) // Refresh integrations without showing loading
+      }
+      if (needsLlmConfig) {
+        promises.push(loadLlmConfig())
+      }
+      
+      Promise.all(promises).then(() => {
+        setIsLoadingGitHubSlack(false)
+      }).catch(err => {
+        console.error('Error loading modal data:', err)
+        setIsLoadingGitHubSlack(false)
+      })
+    }
   }
 
   const runAnalysisWithTimeRange = async () => {
@@ -3227,12 +3286,18 @@ export default function Dashboard() {
                                   {factor.value}/10
                                 </span>
                               </div>
-                              <div className="w-full bg-gray-200 rounded-full h-3 mb-2">
+                              <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
                                 <div 
-                                  className="h-3 rounded-full transition-all duration-500" 
+                                  className="h-2 rounded-full transition-all duration-500" 
                                   style={{ 
                                     width: `${(factor.value / 10) * 100}%`,
-                                    backgroundColor: factor.color
+                                    backgroundColor: (() => {
+                                      // Standardize colors to match burnout risk levels
+                                      if (factor.value <= 3) return '#10B981'; // green-500 - Low Risk
+                                      if (factor.value <= 5) return '#F59E0B'; // yellow-500 - Moderate Risk
+                                      if (factor.value <= 7) return '#F97316'; // orange-500 - High Risk
+                                      return '#EF4444'; // red-500 - Critical Risk
+                                    })()
                                   }}
                                 ></div>
                               </div>
@@ -3796,71 +3861,105 @@ export default function Dashboard() {
                   {/* GitHub Toggle Card */}
                   {true && (
                     <div className={`border rounded-lg p-3 transition-all ${includeGithub && githubIntegration ? 'border-gray-900 bg-gray-50' : 'border-gray-200 bg-white'}`}>
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex items-center space-x-2">
-                          <div className="w-6 h-6 bg-gray-900 rounded flex items-center justify-center">
-                            <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M10 0C4.477 0 0 4.484 0 10.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0110 4.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.203 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.942.359.31.678.921.678 1.856 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0020 10.017C20 4.484 15.522 0 10 0z" clipRule="evenodd" />
-                            </svg>
+                      {isLoadingGitHubSlack ? (
+                        /* Skeleton loader for GitHub */
+                        <div className="animate-pulse">
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex items-center space-x-2">
+                              <div className="w-6 h-6 bg-gray-300 rounded"></div>
+                              <div className="h-4 bg-gray-300 rounded w-16"></div>
+                            </div>
+                            <div className="w-10 h-6 bg-gray-300 rounded-full"></div>
                           </div>
-                          <div>
-                            <h3 className="text-sm font-medium text-gray-900">GitHub</h3>
-                          </div>
+                          <div className="h-3 bg-gray-300 rounded w-24 mb-1"></div>
+                          <div className="h-3 bg-gray-300 rounded w-20"></div>
                         </div>
-                        <Switch
-                          checked={includeGithub && !!githubIntegration}
-                          onCheckedChange={(checked) => {
-                            if (!githubIntegration) {
-                              toast.error("GitHub not connected - please connect on integrations page")
-                            } else {
-                              setIncludeGithub(checked)
-                            }
-                          }}
-                          disabled={false}
-                        />
-                      </div>
-                      <p className="text-xs text-gray-600 mb-1">Code patterns & activity</p>
-                      <p className="text-xs text-gray-500">{githubIntegration?.github_username || 'Not connected'}</p>
+                      ) : (
+                        <>
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex items-center space-x-2">
+                              <div className="w-6 h-6 bg-gray-900 rounded flex items-center justify-center">
+                                <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M10 0C4.477 0 0 4.484 0 10.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0110 4.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.203 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.942.359.31.678.921.678 1.856 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0020 10.017C20 4.484 15.522 0 10 0z" clipRule="evenodd" />
+                                </svg>
+                              </div>
+                              <div>
+                                <h3 className="text-sm font-medium text-gray-900">GitHub</h3>
+                              </div>
+                            </div>
+                            <Switch
+                              checked={includeGithub && !!githubIntegration}
+                              onCheckedChange={(checked) => {
+                                if (!githubIntegration) {
+                                  toast.error("GitHub not connected - please connect on integrations page")
+                                } else {
+                                  setIncludeGithub(checked)
+                                }
+                              }}
+                              disabled={isLoadingGitHubSlack}
+                            />
+                          </div>
+                          <p className="text-xs text-gray-600 mb-1">Code patterns & activity</p>
+                          <p className="text-xs text-gray-500">{githubIntegration?.github_username || 'Not connected'}</p>
+                        </>
+                      )}
                     </div>
                   )}
 
                   {/* Slack Toggle Card */}
                   {true && (
                     <div className={`border rounded-lg p-3 transition-all ${includeSlack && slackIntegration ? 'border-purple-500 bg-purple-50' : 'border-gray-200 bg-white'}`}>
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex items-center space-x-2">
-                          <div className="w-6 h-6 rounded flex items-center justify-center">
-                            <svg className="w-6 h-6" viewBox="0 0 124 124" fill="none">
-                              <path d="M26.3996 78.2003C26.3996 84.7003 21.2996 89.8003 14.7996 89.8003C8.29961 89.8003 3.19961 84.7003 3.19961 78.2003C3.19961 71.7003 8.29961 66.6003 14.7996 66.6003H26.3996V78.2003Z" fill="#E01E5A"/>
-                              <path d="M32.2996 78.2003C32.2996 71.7003 37.3996 66.6003 43.8996 66.6003C50.3996 66.6003 55.4996 71.7003 55.4996 78.2003V109.2C55.4996 115.7 50.3996 120.8 43.8996 120.8C37.3996 120.8 32.2996 115.7 32.2996 109.2V78.2003Z" fill="#E01E5A"/>
-                              <path d="M43.8996 26.4003C37.3996 26.4003 32.2996 21.3003 32.2996 14.8003C32.2996 8.30026 37.3996 3.20026 43.8996 3.20026C50.3996 3.20026 55.4996 8.30026 55.4996 14.8003V26.4003H43.8996Z" fill="#36C5F0"/>
-                              <path d="M43.8996 32.3003C50.3996 32.3003 55.4996 37.4003 55.4996 43.9003C55.4996 50.4003 50.3996 55.5003 43.8996 55.5003H12.8996C6.39961 55.5003 1.29961 50.4003 1.29961 43.9003C1.29961 37.4003 6.39961 32.3003 12.8996 32.3003H43.8996Z" fill="#36C5F0"/>
-                              <path d="M95.5996 43.9003C95.5996 37.4003 100.7 32.3003 107.2 32.3003C113.7 32.3003 118.8 37.4003 118.8 43.9003C118.8 50.4003 113.7 55.5003 107.2 55.5003H95.5996V43.9003Z" fill="#2EB67D"/>
-                              <path d="M89.6996 43.9003C89.6996 50.4003 84.5996 55.5003 78.0996 55.5003C71.5996 55.5003 66.4996 50.4003 66.4996 43.9003V12.9003C66.4996 6.40026 71.5996 1.30026 78.0996 1.30026C84.5996 1.30026 89.6996 6.40026 89.6996 12.9003V43.9003Z" fill="#2EB67D"/>
-                              <path d="M78.0996 95.6003C84.5996 95.6003 89.6996 100.7 89.6996 107.2C89.6996 113.7 84.5996 118.8 78.0996 118.8C71.5996 118.8 66.4996 113.7 66.4996 107.2V95.6003H78.0996Z" fill="#ECB22E"/>
-                              <path d="M78.0996 89.7003C71.5996 89.7003 66.4996 84.6003 66.4996 78.1003C66.4996 71.6003 71.5996 66.5003 78.0996 66.5003H109.1C115.6 66.5003 120.7 71.6003 120.7 78.1003C120.7 84.6003 115.6 89.7003 109.1 89.7003H78.0996Z" fill="#ECB22E"/>
-                            </svg>
+                      {isLoadingGitHubSlack ? (
+                        /* Skeleton loader for Slack */
+                        <div className="animate-pulse">
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex items-center space-x-2">
+                              <div className="w-6 h-6 bg-gray-300 rounded"></div>
+                              <div className="h-4 bg-gray-300 rounded w-12"></div>
+                            </div>
+                            <div className="w-10 h-6 bg-gray-300 rounded-full"></div>
                           </div>
-                          <div>
-                            <h3 className="text-sm font-medium text-gray-900">Slack</h3>
-                          </div>
+                          <div className="h-3 bg-gray-300 rounded w-28 mb-1"></div>
+                          <div className="h-3 bg-gray-300 rounded w-20"></div>
                         </div>
-                        <Switch
-                          checked={includeSlack && !!slackIntegration}
-                          onCheckedChange={(checked) => {
-                            if (!slackIntegration) {
-                              toast.error("Slack not connected - please connect on integrations page")
-                            } else {
-                              setIncludeSlack(checked)
-                            }
-                          }}
-                          disabled={false}
-                        />
-                      </div>
-                      <p className="text-xs text-gray-600 mb-1">Communication patterns</p>
-                      <p className="text-xs text-gray-500">
-                        {slackIntegration?.total_channels ? `${slackIntegration.total_channels} channels` : (slackIntegration ? 'Connected' : 'Not connected')}
-                      </p>
+                      ) : (
+                        <>
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex items-center space-x-2">
+                              <div className="w-6 h-6 rounded flex items-center justify-center">
+                                <svg className="w-6 h-6" viewBox="0 0 124 124" fill="none">
+                                  <path d="M26.3996 78.2003C26.3996 84.7003 21.2996 89.8003 14.7996 89.8003C8.29961 89.8003 3.19961 84.7003 3.19961 78.2003C3.19961 71.7003 8.29961 66.6003 14.7996 66.6003H26.3996V78.2003Z" fill="#E01E5A"/>
+                                  <path d="M32.2996 78.2003C32.2996 71.7003 37.3996 66.6003 43.8996 66.6003C50.3996 66.6003 55.4996 71.7003 55.4996 78.2003V109.2C55.4996 115.7 50.3996 120.8 43.8996 120.8C37.3996 120.8 32.2996 115.7 32.2996 109.2V78.2003Z" fill="#E01E5A"/>
+                                  <path d="M43.8996 26.4003C37.3996 26.4003 32.2996 21.3003 32.2996 14.8003C32.2996 8.30026 37.3996 3.20026 43.8996 3.20026C50.3996 3.20026 55.4996 8.30026 55.4996 14.8003V26.4003H43.8996Z" fill="#36C5F0"/>
+                                  <path d="M43.8996 32.3003C50.3996 32.3003 55.4996 37.4003 55.4996 43.9003C55.4996 50.4003 50.3996 55.5003 43.8996 55.5003H12.8996C6.39961 55.5003 1.29961 50.4003 1.29961 43.9003C1.29961 37.4003 6.39961 32.3003 12.8996 32.3003H43.8996Z" fill="#36C5F0"/>
+                                  <path d="M95.5996 43.9003C95.5996 37.4003 100.7 32.3003 107.2 32.3003C113.7 32.3003 118.8 37.4003 118.8 43.9003C118.8 50.4003 113.7 55.5003 107.2 55.5003H95.5996V43.9003Z" fill="#2EB67D"/>
+                                  <path d="M89.6996 43.9003C89.6996 50.4003 84.5996 55.5003 78.0996 55.5003C71.5996 55.5003 66.4996 50.4003 66.4996 43.9003V12.9003C66.4996 6.40026 71.5996 1.30026 78.0996 1.30026C84.5996 1.30026 89.6996 6.40026 89.6996 12.9003V43.9003Z" fill="#2EB67D"/>
+                                  <path d="M78.0996 95.6003C84.5996 95.6003 89.6996 100.7 89.6996 107.2C89.6996 113.7 84.5996 118.8 78.0996 118.8C71.5996 118.8 66.4996 113.7 66.4996 107.2V95.6003H78.0996Z" fill="#ECB22E"/>
+                                  <path d="M78.0996 89.7003C71.5996 89.7003 66.4996 84.6003 66.4996 78.1003C66.4996 71.6003 71.5996 66.5003 78.0996 66.5003H109.1C115.6 66.5003 120.7 71.6003 120.7 78.1003C120.7 84.6003 115.6 89.7003 109.1 89.7003H78.0996Z" fill="#ECB22E"/>
+                                </svg>
+                              </div>
+                              <div>
+                                <h3 className="text-sm font-medium text-gray-900">Slack</h3>
+                              </div>
+                            </div>
+                            <Switch
+                              checked={includeSlack && !!slackIntegration}
+                              onCheckedChange={(checked) => {
+                                if (!slackIntegration) {
+                                  toast.error("Slack not connected - please connect on integrations page")
+                                } else {
+                                  setIncludeSlack(checked)
+                                }
+                              }}
+                              disabled={isLoadingGitHubSlack}
+                            />
+                          </div>
+                          <p className="text-xs text-gray-600 mb-1">Communication patterns</p>
+                          <p className="text-xs text-gray-500">
+                            {slackIntegration?.total_channels ? `${slackIntegration.total_channels} channels` : (slackIntegration ? 'Connected' : 'Not connected')}
+                          </p>
+                        </>
+                      )}
                     </div>
                   )}
 
@@ -3948,7 +4047,7 @@ export default function Dashboard() {
               <Button 
                 onClick={runAnalysisWithTimeRange} 
                 className="bg-purple-600 hover:bg-purple-700"
-                disabled={!dialogSelectedIntegration || (() => {
+                disabled={isLoadingGitHubSlack || !dialogSelectedIntegration || (() => {
                   const selectedIntegration = integrations.find(i => i.id.toString() === dialogSelectedIntegration);
                   
                   // Only check permissions for Rootly integrations, not PagerDuty
@@ -3962,8 +4061,17 @@ export default function Dashboard() {
                   return false;
                 })()}
               >
-                <Play className="w-4 h-4 mr-2" />
-                Start Analysis
+                {isLoadingGitHubSlack ? (
+                  <>
+                    <div className="w-4 h-4 mr-2 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                    Loading...
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-4 h-4 mr-2" />
+                    Start Analysis
+                  </>
+                )}
               </Button>
             </div>
           </div>
@@ -4002,18 +4110,21 @@ export default function Dashboard() {
               {
                 dimension: "Emotional Exhaustion",
                 value: Math.min(Math.max(Number((burnoutScore * 1.2).toFixed(1)), 0), 10),
+                weight: 40,
                 description: "Feeling emotionally drained and depleted by work demands",
                 color: "#DC2626"
               },
               {
                 dimension: "Depersonalization", 
                 value: Math.min(Math.max(Number((burnoutScore * 1.0).toFixed(1)), 0), 10),
+                weight: 30,
                 description: "Detached or cynical attitudes toward work and colleagues",
                 color: "#7C2D12"
               },
               {
-                dimension: "Reduced Personal Accomplishment",
+                dimension: "Personal Accomplishment",
                 value: Math.min(Math.max(Number(Math.max(10 - (burnoutScore * 0.8), 3).toFixed(1)), 0), 10),
+                weight: 30,
                 description: "Diminished sense of personal achievement and effectiveness",
                 color: "#B45309"
               }
@@ -4170,9 +4281,13 @@ export default function Dashboard() {
                       className="h-2 rounded-full transition-all duration-500"
                       style={{ 
                         width: `${Math.max(overallBurnoutScore * 10, 5)}%`,
-                        backgroundColor: overallBurnoutScore <= 3 ? '#10B981' : 
-                                       overallBurnoutScore <= 5 ? '#F59E0B' : 
-                                       overallBurnoutScore <= 7 ? '#F97316' : '#EF4444'
+                        backgroundColor: (() => {
+                          // Standardize colors to match burnout risk levels
+                          if (overallBurnoutScore <= 3) return '#10B981'; // green-500 - Low Risk
+                          if (overallBurnoutScore <= 5) return '#F59E0B'; // yellow-500 - Moderate Risk
+                          if (overallBurnoutScore <= 7) return '#F97316'; // orange-500 - High Risk
+                          return '#EF4444'; // red-500 - Critical Risk
+                        })()
                       }}
                     />
                   </div>
@@ -4262,7 +4377,10 @@ export default function Dashboard() {
                   {maslachDimensions.map((dimension, index) => (
                     <div key={index} className="bg-white p-4 rounded-lg border border-gray-200">
                       <div className="text-center mb-3">
-                        <div className="text-2xl font-bold text-gray-900 mb-1">{dimension.value.toFixed(1)}/10</div>
+                        <div className="text-2xl font-bold text-gray-900 mb-1">
+                          {dimension.value.toFixed(1)}/10 
+                          <span className="text-sm text-gray-500 font-normal ml-2">({dimension.weight}% weight)</span>
+                        </div>
                         <div className="flex items-center justify-center space-x-2">
                           <h4 className="font-semibold text-gray-900">{dimension.dimension}</h4>
                           <div className="group relative">
@@ -4280,7 +4398,13 @@ export default function Dashboard() {
                           className="h-2 rounded-full transition-all duration-500"
                           style={{ 
                             width: `${Math.max(dimension.value * 10, 5)}%`,
-                            backgroundColor: dimension.color
+                            backgroundColor: (() => {
+                              // Standardize colors to match burnout risk levels
+                              if (dimension.value <= 3) return '#10B981'; // green-500 - Low Risk
+                              if (dimension.value <= 5) return '#F59E0B'; // yellow-500 - Moderate Risk
+                              if (dimension.value <= 7) return '#F97316'; // orange-500 - High Risk
+                              return '#EF4444'; // red-500 - Critical Risk
+                            })()
                           }}
                         />
                       </div>
@@ -4295,7 +4419,7 @@ export default function Dashboard() {
                           {dimension.dimension === "Depersonalization" && (
                             <span>Response time pressure + Weekend work disruption + High incident load</span>
                           )}
-                          {dimension.dimension === "Reduced Personal Accomplishment" && (
+                          {dimension.dimension === "Personal Accomplishment" && (
                             <span>Incident resolution success + Response effectiveness + Team contribution</span>
                           )}
                         </div>
@@ -4303,8 +4427,8 @@ export default function Dashboard() {
                       
                       <div className="mt-3 text-center">
                         <Badge className={`${
-                          dimension.dimension === "Reduced Personal Accomplishment" ? (
-                            // For Reduced Personal Accomplishment: Lower scores = Lower risk (less reduction = better)
+                          dimension.dimension === "Personal Accomplishment" ? (
+                            // For Personal Accomplishment: Lower scores = Lower risk (less reduction = better)
                             dimension.value <= 3 ? 'text-green-600 bg-green-50' : 
                             dimension.value <= 5 ? 'text-yellow-600 bg-yellow-50' : 
                             dimension.value <= 7 ? 'text-orange-600 bg-orange-50' : 
@@ -4317,8 +4441,8 @@ export default function Dashboard() {
                             'text-red-600 bg-red-50'
                           )
                         } text-xs px-2 py-1 border-0`}>
-                          {dimension.dimension === "Reduced Personal Accomplishment" ? (
-                            // For Reduced Personal Accomplishment: Lower scores = Lower risk (less reduction = better)
+                          {dimension.dimension === "Personal Accomplishment" ? (
+                            // For Personal Accomplishment: Lower scores = Lower risk (less reduction = better)
                             dimension.value <= 3 ? 'Low Risk' : 
                             dimension.value <= 5 ? 'Moderate' : 
                             dimension.value <= 7 ? 'Elevated' : 'High Risk'

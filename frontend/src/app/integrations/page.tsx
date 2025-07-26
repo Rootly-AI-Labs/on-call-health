@@ -293,7 +293,47 @@ export default function IntegrationsPage() {
     }
   }, [slackIntegration, activeEnhancementTab])
 
-  const loadAllIntegrations = async () => {
+  const loadAllIntegrations = async (forceRefresh = false) => {
+    // Check localStorage cache first if not forcing refresh
+    if (!forceRefresh) {
+      const cachedIntegrations = localStorage.getItem('all_integrations')
+      const cacheTimestamp = localStorage.getItem('all_integrations_timestamp')
+      
+      if (cachedIntegrations && cacheTimestamp) {
+        const cacheAge = Date.now() - parseInt(cacheTimestamp)
+        const maxCacheAge = 5 * 60 * 1000 // 5 minutes
+        
+        if (cacheAge < maxCacheAge) {
+          try {
+            const parsedIntegrations = JSON.parse(cachedIntegrations)
+            console.log('Loading integrations from cache:', parsedIntegrations.length, 'integrations')
+            setIntegrations(parsedIntegrations)
+            
+            // Still fetch GitHub/Slack status if not cached separately
+            const cachedGithub = localStorage.getItem('github_integration')
+            const cachedSlack = localStorage.getItem('slack_integration')
+            
+            if (cachedGithub) {
+              const githubData = JSON.parse(cachedGithub)
+              setGithubIntegration(githubData.connected ? githubData.integration : null)
+            }
+            if (cachedSlack) {
+              const slackData = JSON.parse(cachedSlack)
+              setSlackIntegration(slackData.integration)
+            }
+            
+            // If we have all cached data, no need to fetch
+            if (cachedGithub && cachedSlack) {
+              setLoadingIntegrations(false)
+              return
+            }
+          } catch (error) {
+            console.error('Error parsing cached integrations:', error)
+          }
+        }
+      }
+    }
+
     setLoadingIntegrations(true)
     try {
       const authToken = localStorage.getItem('auth_token')
@@ -329,6 +369,14 @@ export default function IntegrationsPage() {
       setIntegrations(allIntegrations)
       setGithubIntegration(githubData.connected ? githubData.integration : null)
       setSlackIntegration(slackData.integration)
+      
+      // Cache the integrations (same as dashboard caching)
+      localStorage.setItem('all_integrations', JSON.stringify(allIntegrations))
+      localStorage.setItem('all_integrations_timestamp', Date.now().toString())
+      
+      // Cache GitHub and Slack integration status separately
+      localStorage.setItem('github_integration', JSON.stringify(githubData))
+      localStorage.setItem('slack_integration', JSON.stringify(slackData))
       
       // Update back URL based on integration status
       if (backUrl === '') {
@@ -680,7 +728,7 @@ export default function IntegrationsPage() {
           localStorage.removeItem('selected_organization')
         }
         
-        loadAllIntegrations()
+        loadAllIntegrations(true) // Force refresh after changes
         setDeleteDialogOpen(false)
         setIntegrationToDelete(null)
       } else {
@@ -714,7 +762,7 @@ export default function IntegrationsPage() {
 
       if (response.ok) {
         toast.success("Integration name has been updated.")
-        loadAllIntegrations()
+        loadAllIntegrations(true) // Force refresh after changes
       }
     } catch (error) {
       console.error('Error updating name:', error)
@@ -785,7 +833,7 @@ export default function IntegrationsPage() {
       if (response.ok) {
         toast.success("Your GitHub integration has been removed.")
         setGithubDisconnectDialogOpen(false)
-        loadAllIntegrations()
+        loadAllIntegrations(true) // Force refresh after changes
       }
     } catch (error) {
       console.error('Error disconnecting GitHub:', error)
@@ -881,7 +929,7 @@ export default function IntegrationsPage() {
       if (response.ok) {
         toast.success("Your Slack integration has been removed.")
         setSlackDisconnectDialogOpen(false)
-        loadAllIntegrations()
+        loadAllIntegrations(true) // Force refresh after changes
       }
     } catch (error) {
       console.error('Error disconnecting Slack:', error)
