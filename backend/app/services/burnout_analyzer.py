@@ -942,10 +942,10 @@ class BurnoutAnalyzerService:
         """Calculate overall team health metrics."""
         if not member_analyses:
             return {
-                "overall_score": 10,  # Perfect health if no data
+                "overall_score": 6.5,  # Neutral baseline if no data (not perfect health)
                 "risk_distribution": {"low": 0, "medium": 0, "high": 0},
                 "average_burnout_score": 0,
-                "health_status": "excellent",
+                "health_status": "fair",
                 "members_at_risk": 0
             }
         

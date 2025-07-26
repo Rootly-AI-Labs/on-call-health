@@ -912,8 +912,8 @@ class SimpleBurnoutAnalyzer:
                 # Consistent baseline scoring (health scale: higher score = better health)
                 # All days start from the same baseline to ensure consistency
                 if data["incident_count"] == 0:
-                    # Zero incident days: good but not perfect (accounting for background work/stress)
-                    daily_score = 8.5 + (hash(date_str) % 10) * 0.05  # 8.5-9.0 range with slight daily variation
+                    # Zero incident days: neutral baseline (no incidents doesn't mean perfect health)
+                    daily_score = 6.5  # 65% baseline - neutral, not artificially high
                 else:
                     # Days with incidents: start from same baseline as zero-incident days, then apply penalties
                     daily_score = 8.7  # Slightly higher baseline to account for normal operational activity
