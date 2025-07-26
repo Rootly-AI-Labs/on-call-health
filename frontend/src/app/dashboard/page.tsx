@@ -1653,11 +1653,26 @@ export default function Dashboard() {
     { 
       factor: "Weekend Work", 
       value: Number(((membersWithIncidents as any[]).reduce((avg: number, m: any) => {
-        // Use actual weekend percentage data for consistency
-        const weekendPercent = m?.metrics?.weekend_percentage || m?.key_metrics?.weekend_percentage || 0;
-        // Convert percentage (0-100) to factor scale (0-10)
-        const val = m?.factors?.weekend_work || (weekendPercent / 10); // 30% weekend work = 3.0 factor
-        console.log(`RADAR: Member ${m?.user_name}: weekend_work = ${val} (factors: ${m?.factors?.weekend_work}, weekend_percentage: ${weekendPercent}%)`);
+        // Use authoritative weekend percentage data first, fallback to factors only if needed
+        const weekendPercent = m?.metrics?.weekend_percentage ?? m?.key_metrics?.weekend_percentage ?? null;
+        let val;
+        
+        if (weekendPercent !== null) {
+          // Use actual weekend incident percentage (authoritative source)
+          val = Math.min(weekendPercent * 0.25, 10); // Backend uses weekend_percentage * 25 scaling
+          console.log(`RADAR: Member ${m?.user_name}: Using weekend_percentage = ${weekendPercent}% -> factor = ${val}`);
+        } else if (m?.factors?.weekend_work !== undefined) {
+          // Fallback to pre-calculated factor
+          val = m.factors.weekend_work;
+          console.log(`RADAR: Member ${m?.user_name}: Using factors.weekend_work = ${val}`);
+        } else {
+          // No weekend data available
+          val = 0;
+          console.log(`RADAR: Member ${m?.user_name}: No weekend work data available, using 0`);
+        }
+        
+        console.log(`  - Final weekend_work value: ${val}`);
+        console.log(`  - Available data: weekend_percentage=${m?.metrics?.weekend_percentage}, factors.weekend_work=${m?.factors?.weekend_work}`);
         return avg + val;
       }, 0) / membersWithIncidents.length).toFixed(1)),
       metrics: `Avg weekend work: ${Math.round((membersWithIncidents as any[]).reduce((avg: number, m: any) => avg + (m?.metrics?.weekend_percentage || m?.key_metrics?.weekend_percentage || 0), 0) / membersWithIncidents.length)}%`
