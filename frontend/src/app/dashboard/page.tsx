@@ -507,6 +507,7 @@ export default function Dashboard() {
   // Removed member view mode - only showing radar chart now
   const [historicalTrends, setHistoricalTrends] = useState<any>(null)
   const [loadingTrends, setLoadingTrends] = useState(false)
+  const [initialDataLoaded, setInitialDataLoaded] = useState(false)
   
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -664,9 +665,16 @@ export default function Dashboard() {
       }
     }
     
-    loadPreviousAnalyses()
-    loadIntegrations()
-    loadHistoricalTrends()
+    const loadInitialData = async () => {
+      await Promise.all([
+        loadPreviousAnalyses(),
+        loadIntegrations(),
+        loadHistoricalTrends()
+      ])
+      setInitialDataLoaded(true)
+    }
+    
+    loadInitialData()
     
     // Load specific analysis if provided in URL
     if (analysisId) {
@@ -1850,6 +1858,20 @@ export default function Dashboard() {
         <div className="text-center">
           <Activity className="w-8 h-8 text-purple-600 animate-pulse mx-auto mb-4" />
           <p className="text-gray-600">Loading dashboard...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show main page loader while initial data loads
+  if (!initialDataLoaded) {
+    return (
+      <div className="flex h-screen bg-gray-50">
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-8 h-8 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading dashboard...</p>
+          </div>
         </div>
       </div>
     )
