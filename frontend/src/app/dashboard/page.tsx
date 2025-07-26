@@ -1957,7 +1957,6 @@ export default function Dashboard() {
               </Button>
 
             <div className="space-y-1">
-              {console.log('Sidebar render - previousAnalyses.length:', previousAnalyses.length, 'sidebarCollapsed:', sidebarCollapsed)}
               {!sidebarCollapsed && previousAnalyses.length > 0 && (
                 <p className="text-xs text-gray-400 uppercase tracking-wide px-2 py-1 mt-4">Recent</p>
               )}
