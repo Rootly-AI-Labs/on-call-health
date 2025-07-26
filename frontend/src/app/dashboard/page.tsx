@@ -666,15 +666,37 @@ export default function Dashboard() {
     }
     
     const loadInitialData = async () => {
-      await Promise.all([
-        loadPreviousAnalyses(),
-        loadIntegrations(),
-        loadHistoricalTrends()
-      ])
-      setInitialDataLoaded(true)
+      try {
+        // Load data with individual error handling to prevent blocking
+        const results = await Promise.allSettled([
+          loadPreviousAnalyses(),
+          loadIntegrations(),
+          loadHistoricalTrends()
+        ])
+        
+        // Log any failures but don't block the UI
+        results.forEach((result, index) => {
+          const functionNames = ['loadPreviousAnalyses', 'loadIntegrations', 'loadHistoricalTrends']
+          if (result.status === 'rejected') {
+            console.error(`${functionNames[index]} failed:`, result.reason)
+          }
+        })
+        
+        setInitialDataLoaded(true)
+      } catch (error) {
+        console.error('Error loading initial data:', error)
+        // Always set to true to prevent endless loading, even if some data fails
+        setInitialDataLoaded(true)
+      }
     }
     
     loadInitialData()
+    
+    // Fallback timeout to prevent endless loading (max 10 seconds)
+    const timeoutId = setTimeout(() => {
+      console.warn('Initial data loading timed out after 10 seconds')
+      setInitialDataLoaded(true)
+    }, 10000)
     
     // Load specific analysis if provided in URL
     if (analysisId) {
@@ -710,11 +732,12 @@ export default function Dashboard() {
     
     window.addEventListener('storage', handleStorageChange)
 
-    // Cleanup event listeners
+    // Cleanup event listeners and timeout
     return () => {
       window.removeEventListener('focus', handlePageFocus)
       document.removeEventListener('visibilitychange', handlePageFocus)
       window.removeEventListener('storage', handleStorageChange)
+      clearTimeout(timeoutId)
     }
   }, [])
 
