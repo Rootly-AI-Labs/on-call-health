@@ -777,7 +777,10 @@ export default function Dashboard() {
   const loadPreviousAnalyses = async () => {
     try {
       const authToken = localStorage.getItem('auth_token')
-      if (!authToken) return
+      if (!authToken) {
+        console.warn('No auth token found, skipping previous analyses load')
+        return
+      }
 
       console.log('Loading previous analyses...')
       let response
@@ -795,6 +798,7 @@ export default function Dashboard() {
       if (response.ok) {
         const data = await response.json()
         console.log('Loaded analyses:', data.analyses?.length || 0, 'analyses')
+        console.log('Previous analyses data:', data.analyses)
         setPreviousAnalyses(data.analyses || [])
         
         // If no specific analysis is loaded and we have analyses, load the most recent one
@@ -1943,6 +1947,7 @@ export default function Dashboard() {
               </Button>
 
             <div className="space-y-1">
+              {console.log('Sidebar render - previousAnalyses.length:', previousAnalyses.length, 'sidebarCollapsed:', sidebarCollapsed)}
               {!sidebarCollapsed && previousAnalyses.length > 0 && (
                 <p className="text-xs text-gray-400 uppercase tracking-wide px-2 py-1 mt-4">Recent</p>
               )}
