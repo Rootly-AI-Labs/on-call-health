@@ -4016,8 +4016,10 @@ export default function Dashboard() {
               }
             ];
             
-            // Calculate overall burnout health score (lower is better)
-            const overallBurnoutScore = (maslachDimensions[0].value + maslachDimensions[1].value + (10 - maslachDimensions[2].value)) / 3;
+            // Calculate overall burnout health score (0-10 scale, higher is better health)
+            const overallBurnoutScore = Math.max(0, Math.min(10, 
+              10 - ((maslachDimensions[0].value + maslachDimensions[1].value + (10 - maslachDimensions[2].value)) / 3)
+            ));
             const healthStatus = overallBurnoutScore <= 3 ? 'Excellent' : 
                                overallBurnoutScore <= 5 ? 'Good' : 
                                overallBurnoutScore <= 7 ? 'Moderate Concern' : 'High Concern';
@@ -4027,6 +4029,40 @@ export default function Dashboard() {
             
             // Temporary: Keep memberHighRisk for old code that hasn't been replaced yet
             const memberHighRisk = []; // Will be removed when modal redesign is complete
+            
+            // Calculate member factors for radar chart
+            const m = memberData;
+            const memberFactors = [
+              {
+                factor: 'Workload',
+                value: m?.factors?.workload ?? ((() => {
+                  const incidentsCount = m?.incident_count || m?.metrics?.total_incidents || 0;
+                  const incidentsPerWeek = incidentsCount / 4.3;
+                  return incidentsPerWeek <= 5 ? incidentsPerWeek * 2 : 10;
+                })()),
+                color: '#FF6B6B'
+              },
+              {
+                factor: 'After Hours',
+                value: m?.factors?.after_hours ?? Math.min((m?.metrics?.after_hours_percentage || 0) * 20, 10),
+                color: '#4ECDC4'
+              },
+              {
+                factor: 'Response Time',
+                value: m?.factors?.response_time ?? Math.min((m?.metrics?.avg_response_time_minutes || 0) / 6, 10),
+                color: '#45B7D1'
+              },
+              {
+                factor: 'Weekend Work',
+                value: m?.factors?.weekend_work ?? Math.min((m?.metrics?.weekend_percentage || 0) * 20, 10),
+                color: '#96CEB4'
+              },
+              {
+                factor: 'Incident Load',
+                value: m?.factors?.incident_load ?? Math.min((m?.incident_count || 0) / 5, 10),
+                color: '#FECA57'
+              }
+            ];
             
             return (
             <div className="space-y-6">
@@ -4040,7 +4076,7 @@ export default function Dashboard() {
                       <p className="text-gray-600 text-sm">Based on Christina Maslach's Burnout Inventory</p>
                     </div>
                     <div className="text-right">
-                      <div className="text-2xl font-bold mb-1 text-gray-900">{(10 - overallBurnoutScore).toFixed(1)}/10</div>
+                      <div className="text-2xl font-bold mb-1 text-gray-900">{overallBurnoutScore.toFixed(1)}/10</div>
                       <Badge className={`${healthColor} text-sm px-3 py-1 border-0`}>
                         {healthStatus}
                       </Badge>
@@ -4049,7 +4085,7 @@ export default function Dashboard() {
                   <div className="w-full bg-gray-200 rounded-full h-2">
                     <div 
                       className="bg-gradient-to-r from-green-400 to-blue-500 h-2 rounded-full transition-all duration-500"
-                      style={{ width: `${Math.max((10 - overallBurnoutScore) * 10, 5)}%` }}
+                      style={{ width: `${Math.max(overallBurnoutScore * 10, 5)}%` }}
                     />
                   </div>
                   <p className="text-xs text-gray-500 mt-2">Higher scores indicate better burnout resilience</p>
@@ -4257,118 +4293,51 @@ export default function Dashboard() {
                 </Card>
               </div>
 
-              {/* Key Indicators */}
-              <div>
-                <h3 className="text-lg font-semibold mb-4">📊 Key Indicators (Last 30 Days)</h3>
-                <div className="bg-white p-4 rounded-lg border border-gray-200">
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-                    <div className="space-y-1">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Total Incidents:</span>
-                        <span className="font-medium">{selectedMember?.incidentsHandled || 0}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Incidents/Week:</span>
-                        <span className="font-medium">{((selectedMember?.incidentsHandled || 0) / 4.3).toFixed(2)}</span>
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">After-Hours Incidents:</span>
-                        <span className="font-medium">{Math.round(selectedMember.incidentsHandled * (selectedMember.factors.afterHours / 100) * 0.01) || 0}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Avg Resolution Time:</span>
-                        <span className="font-medium">{selectedMember.avgResponseTime}</span>
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Resolution Success Rate:</span>
-                        <span className="font-medium">{(100 - (selectedMember?.factors?.responseTime || 0)).toFixed(1)}%</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
 
               {/* Burnout Dimensions */}
               <div>
-                <h3 className="text-lg font-semibold mb-4">🧠 Burnout Dimensions</h3>
-                <div className="bg-white p-4 rounded-lg border border-gray-200">
-                  <div className="space-y-4">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <h4 className="font-medium text-gray-900">Emotional Exhaustion</h4>
-                        <p className="text-xs text-gray-500 italic">Calculated from workload + after-hours factors</p>
+                <h3 className="text-lg font-semibold mb-4">🧠 Maslach Burnout Dimensions</h3>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                  {maslachDimensions.map((dimension, index) => (
+                    <div key={index} className="bg-white p-4 rounded-lg border border-gray-200">
+                      <div className="text-center mb-3">
+                        <div className="text-2xl font-bold text-gray-900 mb-1">{dimension.value.toFixed(1)}/10</div>
+                        <h4 className="font-semibold text-gray-900">{dimension.dimension}</h4>
                       </div>
-                      <div className="text-right">
-                        <div className="text-lg font-bold text-gray-900">{Math.min((((selectedMember?.factors?.workload || 0) + (selectedMember?.factors?.afterHours || 0)) / 2) * 0.7, 10).toFixed(2)}/10</div>
+                      
+                      <div className="w-full bg-gray-200 rounded-full h-2 mb-3">
+                        <div 
+                          className="h-2 rounded-full transition-all duration-500"
+                          style={{ 
+                            width: `${Math.max(dimension.value * 10, 5)}%`,
+                            backgroundColor: dimension.color
+                          }}
+                        />
+                      </div>
+                      
+                      <p className="text-xs text-gray-600 text-center leading-relaxed">
+                        {dimension.description}
+                      </p>
+                      
+                      <div className="mt-3 text-center">
+                        <Badge className={`${
+                          dimension.value <= 3 ? 'text-green-600 bg-green-50' : 
+                          dimension.value <= 5 ? 'text-yellow-600 bg-yellow-50' : 
+                          dimension.value <= 7 ? 'text-orange-600 bg-orange-50' : 
+                          'text-red-600 bg-red-50'
+                        } text-xs px-2 py-1 border-0`}>
+                          {dimension.value <= 3 ? 'Low Risk' : 
+                           dimension.value <= 5 ? 'Moderate' : 
+                           dimension.value <= 7 ? 'Elevated' : 'High Risk'}
+                        </Badge>
                       </div>
                     </div>
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <h4 className="font-medium text-gray-900">Depersonalization</h4>
-                        <p className="text-xs text-gray-500 italic">Calculated from response time pressure + weekend work disruption</p>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-lg font-bold text-gray-900">{Math.min((((selectedMember?.factors?.responseTime || 0) + (selectedMember?.factors?.weekendWork || 0)) / 2) * 0.8, 10).toFixed(2)}/10</div>
-                      </div>
-                    </div>
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <h4 className="font-medium text-gray-900">Personal Accomplishment</h4>
-                        <p className="text-xs text-gray-500 italic">Based on resolution success rate (higher response time = lower accomplishment)</p>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-lg font-bold text-gray-900">{Math.max(Math.min(10 - ((selectedMember?.factors?.responseTime || 0) * 0.6), 10), 3).toFixed(2)}/10</div>
-                      </div>
-                    </div>
-                  </div>
+                  ))}
                 </div>
               </div>
 
               {/* Activity Summary */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                {/* PagerDuty Activity */}
-                <div className="bg-blue-50 p-4 rounded-lg">
-                  <h3 className="font-semibold mb-3 text-blue-900">🚨 PagerDuty Activity</h3>
-                  <div className="space-y-3">
-                    <div className="bg-white p-3 rounded-lg">
-                      <div className="text-2xl font-bold text-blue-600">{selectedMember.incidentsHandled}</div>
-                      <p className="text-sm text-gray-600">Incidents Handled</p>
-                      <p className="text-xs text-gray-500 mt-1">Total incidents managed recently</p>
-                    </div>
-                    <div className="bg-white p-3 rounded-lg">
-                      <div className="text-2xl font-bold text-blue-600">{selectedMember.avgResponseTime}</div>
-                      <p className="text-sm text-gray-600">Avg Response Time</p>
-                      <p className="text-xs text-gray-500 mt-1">Time to first response</p>
-                    </div>
-                    {/* Status Distribution */}
-                    {(() => {
-                      // Find the corresponding member data to get status distribution
-                      const memberData = members?.find(m => m.user_name === selectedMember.name);
-                      const statusDist = memberData?.metrics?.status_distribution;
-                      
-                      if (statusDist && Object.keys(statusDist).length > 0) {
-                        return (
-                          <div className="bg-white p-3 rounded-lg">
-                            <p className="text-sm text-gray-600 font-medium mb-2">Incident Status Breakdown</p>
-                            <div className="space-y-1">
-                              {Object.entries(statusDist).map(([status, count]) => (
-                                <div key={status} className="flex justify-between text-xs">
-                                  <span className="text-gray-500 capitalize">{status}:</span>
-                                  <span className="font-medium text-blue-600">{String(count)}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        );
-                      }
-                      return null;
-                    })()}
-                  </div>
-                </div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
                 {/* GitHub Activity */}
                 {selectedMember.github_activity && (
