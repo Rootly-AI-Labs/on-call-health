@@ -2634,22 +2634,30 @@ export default function Dashboard() {
                       In the last {currentAnalysis.time_range || 30} days
                     </p>
                     {(currentAnalysis.analysis_data as any)?.metadata?.severity_breakdown && (
-                      <div className="mt-3 space-y-1">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-red-600 font-medium">SEV1</span>
-                          <span className="text-gray-700">{(currentAnalysis.analysis_data as any).metadata.severity_breakdown.sev1_count || 0}</span>
+                      <div className="mt-4 grid grid-cols-4 gap-2">
+                        <div className="bg-red-50 rounded-lg p-2 text-center">
+                          <div className="text-xs font-semibold text-red-700">SEV1</div>
+                          <div className="text-lg font-bold text-red-600">
+                            {(currentAnalysis.analysis_data as any).metadata.severity_breakdown.sev1_count || 0}
+                          </div>
                         </div>
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-orange-600 font-medium">SEV2</span>
-                          <span className="text-gray-700">{(currentAnalysis.analysis_data as any).metadata.severity_breakdown.sev2_count || 0}</span>
+                        <div className="bg-orange-50 rounded-lg p-2 text-center">
+                          <div className="text-xs font-semibold text-orange-700">SEV2</div>
+                          <div className="text-lg font-bold text-orange-600">
+                            {(currentAnalysis.analysis_data as any).metadata.severity_breakdown.sev2_count || 0}
+                          </div>
                         </div>
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-yellow-600 font-medium">SEV3</span>
-                          <span className="text-gray-700">{(currentAnalysis.analysis_data as any).metadata.severity_breakdown.sev3_count || 0}</span>
+                        <div className="bg-yellow-50 rounded-lg p-2 text-center">
+                          <div className="text-xs font-semibold text-yellow-700">SEV3</div>
+                          <div className="text-lg font-bold text-yellow-600">
+                            {(currentAnalysis.analysis_data as any).metadata.severity_breakdown.sev3_count || 0}
+                          </div>
                         </div>
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-green-600 font-medium">SEV4</span>
-                          <span className="text-gray-700">{(currentAnalysis.analysis_data as any).metadata.severity_breakdown.sev4_count || 0}</span>
+                        <div className="bg-green-50 rounded-lg p-2 text-center">
+                          <div className="text-xs font-semibold text-green-700">SEV4</div>
+                          <div className="text-lg font-bold text-green-600">
+                            {(currentAnalysis.analysis_data as any).metadata.severity_breakdown.sev4_count || 0}
+                          </div>
                         </div>
                       </div>
                     )}
