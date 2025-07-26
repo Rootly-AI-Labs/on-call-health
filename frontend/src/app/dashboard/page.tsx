@@ -4113,7 +4113,7 @@ export default function Dashboard() {
               },
               {
                 factor: 'After Hours',
-                value: m?.factors?.after_hours ?? (((m?.metrics?.after_hours_percentage || 0) / 100) * 10),
+                value: m?.factors?.after_hours ?? Math.min(((m?.metrics?.after_hours_percentage || 0) / 10), 10),
                 color: '#4ECDC4'
               },
               {
@@ -4131,17 +4131,17 @@ export default function Dashboard() {
               },
               {
                 factor: 'Weekend Work',
-                value: m?.factors?.weekend_work ?? (((m?.metrics?.weekend_percentage || 0) / 100) * 10),
+                value: m?.factors?.weekend_work ?? Math.max(((m?.metrics?.weekend_percentage || 0) / 10), 0.1),
                 color: '#96CEB4'
               },
               {
                 factor: 'Schedule Disruption',
                 value: m?.factors?.schedule_disruption ?? ((() => {
                   // Calculate schedule disruption from after-hours + weekend + response pressure
-                  const afterHoursImpact = ((m?.metrics?.after_hours_percentage || 0) / 100) * 3;
-                  const weekendImpact = ((m?.metrics?.weekend_percentage || 0) / 100) * 3;
-                  const responseImpact = (m?.metrics?.avg_response_time_minutes || 0) > 60 ? 4 : 0;
-                  return Math.min(afterHoursImpact + weekendImpact + responseImpact, 10);
+                  const afterHoursImpact = ((m?.metrics?.after_hours_percentage || 0) / 10) * 0.4;
+                  const weekendImpact = ((m?.metrics?.weekend_percentage || 0) / 10) * 0.3;
+                  const responseImpact = (m?.metrics?.avg_response_time_minutes || 0) > 60 ? 3 : 1;
+                  return Math.max(Math.min(afterHoursImpact + weekendImpact + responseImpact, 10), 0.1);
                 })()),
                 color: '#FECA57'
               }
@@ -4263,7 +4263,16 @@ export default function Dashboard() {
                     <div key={index} className="bg-white p-4 rounded-lg border border-gray-200">
                       <div className="text-center mb-3">
                         <div className="text-2xl font-bold text-gray-900 mb-1">{dimension.value.toFixed(1)}/10</div>
-                        <h4 className="font-semibold text-gray-900">{dimension.dimension}</h4>
+                        <div className="flex items-center justify-center space-x-2">
+                          <h4 className="font-semibold text-gray-900">{dimension.dimension}</h4>
+                          <div className="group relative">
+                            <Info className="w-4 h-4 text-gray-400 cursor-help" />
+                            <div className="invisible group-hover:visible absolute z-10 bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 text-xs text-white bg-gray-900 rounded-lg whitespace-nowrap max-w-xs">
+                              {dimension.description}
+                              <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                       
                       <div className="w-full bg-gray-200 rounded-full h-2 mb-3">
@@ -4275,10 +4284,6 @@ export default function Dashboard() {
                           }}
                         />
                       </div>
-                      
-                      <p className="text-xs text-gray-600 text-center leading-relaxed mb-2">
-                        {dimension.description}
-                      </p>
                       
                       {/* Show contributing factors/metrics */}
                       <div className="text-xs text-gray-500 text-center">
@@ -4302,7 +4307,7 @@ export default function Dashboard() {
                             // For Personal Accomplishment: Lower scores = Higher risk (inverted)
                             dimension.value >= 7 ? 'text-green-600 bg-green-50' : 
                             dimension.value >= 5 ? 'text-yellow-600 bg-yellow-50' : 
-                            dimension.value >= 3 ? 'text-orange-600 bg-orange-50' : 
+                            dimension.value >= 3 ? 'text-green-600 bg-green-50' : 
                             'text-red-600 bg-red-50'
                           ) : (
                             // For other dimensions: Higher scores = Higher risk (normal)
