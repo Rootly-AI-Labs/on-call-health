@@ -2633,6 +2633,26 @@ export default function Dashboard() {
                     <p className="text-xs text-gray-600 mt-1">
                       In the last {currentAnalysis.time_range || 30} days
                     </p>
+                    {(currentAnalysis.analysis_data as any)?.metadata?.severity_breakdown && (
+                      <div className="mt-3 space-y-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-red-600 font-medium">SEV1</span>
+                          <span className="text-gray-700">{(currentAnalysis.analysis_data as any).metadata.severity_breakdown.sev1_count || 0}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-orange-600 font-medium">SEV2</span>
+                          <span className="text-gray-700">{(currentAnalysis.analysis_data as any).metadata.severity_breakdown.sev2_count || 0}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-yellow-600 font-medium">SEV3</span>
+                          <span className="text-gray-700">{(currentAnalysis.analysis_data as any).metadata.severity_breakdown.sev3_count || 0}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-green-600 font-medium">SEV4</span>
+                          <span className="text-gray-700">{(currentAnalysis.analysis_data as any).metadata.severity_breakdown.sev4_count || 0}</span>
+                        </div>
+                      </div>
+                    )}
                     {currentAnalysis.analysis_data?.session_hours !== undefined && (
                       <p className="text-xs text-gray-600 mt-1">
                         {currentAnalysis.analysis_data.session_hours?.toFixed(1) || '0.0'} total hours
