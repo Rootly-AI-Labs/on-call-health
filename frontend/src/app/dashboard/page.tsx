@@ -1630,10 +1630,20 @@ export default function Dashboard() {
     { 
       factor: "Workload", 
       value: Number(((membersWithIncidents as any[]).reduce((avg: number, m: any) => {
-        // Try factors first, fallback to key_metrics (SimpleBurnoutAnalyzer format)
-        const val = m?.factors?.workload || 
-                   (m?.key_metrics?.incidents_per_week ? Math.min(m.key_metrics.incidents_per_week * 2, 10) : 0);
-        console.log(`RADAR: Member ${m?.user_name}: workload = ${val} (factors: ${m?.factors?.workload}, key_metrics: ${m?.key_metrics?.incidents_per_week})`);
+        // Try factors first, fallback using backend workload scaling logic
+        const incidentsPerWeek = m?.key_metrics?.incidents_per_week || (m?.incident_count / 4.3) || 0;
+        let calculatedWorkload = 0;
+        if (incidentsPerWeek <= 2) {
+          calculatedWorkload = incidentsPerWeek * 1.5;
+        } else if (incidentsPerWeek <= 5) {
+          calculatedWorkload = 3 + ((incidentsPerWeek - 2) / 3) * 4;
+        } else if (incidentsPerWeek <= 8) {
+          calculatedWorkload = 7 + ((incidentsPerWeek - 5) / 3) * 3;
+        } else {
+          calculatedWorkload = 10; // 53 incidents/week = max score
+        }
+        const val = m?.factors?.workload || calculatedWorkload;
+        console.log(`RADAR: Member ${m?.user_name}: workload = ${val} (factors: ${m?.factors?.workload}, incidents_per_week: ${incidentsPerWeek}, calculated: ${calculatedWorkload})`);
         return avg + val;
       }, 0) / membersWithIncidents.length).toFixed(1)),
       metrics: `Avg incidents: ${Math.round((membersWithIncidents as any[]).reduce((avg: number, m: any) => avg + (m?.incident_count || 0), 0) / membersWithIncidents.length)}`
@@ -1643,8 +1653,8 @@ export default function Dashboard() {
       value: Number(((membersWithIncidents as any[]).reduce((avg: number, m: any) => {
         // Use consistent after-hours percentage data
         const afterHoursPercent = m?.metrics?.after_hours_percentage || m?.key_metrics?.after_hours_percentage || 0;
-        // Convert percentage to factor scale (0-10)
-        const val = m?.factors?.after_hours || (afterHoursPercent / 10); // 30% after-hours = 3.0 factor
+        // Convert percentage to factor scale using backend logic: percentage * 20
+        const val = m?.factors?.after_hours || Math.min(afterHoursPercent * 20, 10); // 39% = 7.8 factor
         console.log(`RADAR: Member ${m?.user_name}: after_hours = ${val} (factors: ${m?.factors?.after_hours}, after_hours_percentage: ${afterHoursPercent}%)`);
         return avg + val;
       }, 0) / membersWithIncidents.length).toFixed(1)),
@@ -1691,9 +1701,9 @@ export default function Dashboard() {
     { 
       factor: "Response Time", 
       value: Number(((membersWithIncidents as any[]).reduce((avg: number, m: any) => {
-        // Try factors first, fallback to avg_resolution_hours from key_metrics
-        const val = m?.factors?.response_time || 
-                   (m?.key_metrics?.avg_resolution_hours ? Math.min(m.key_metrics.avg_resolution_hours / 2, 10) : 0);
+        // Try factors first, fallback using backend logic: avg_response_time_minutes / 6
+        const responseTimeMinutes = m?.metrics?.avg_response_time_minutes || m?.key_metrics?.avg_resolution_hours * 60 || 0;
+        const val = m?.factors?.response_time || Math.min(responseTimeMinutes / 6, 10); // 738 min = 123/10 = 10 (max)
         console.log(`RADAR: Member ${m?.user_name}: response_time = ${val} (factors: ${m?.factors?.response_time}, key_metrics: ${m?.key_metrics?.avg_resolution_hours})`);
         return avg + val;
       }, 0) / membersWithIncidents.length).toFixed(1)),
