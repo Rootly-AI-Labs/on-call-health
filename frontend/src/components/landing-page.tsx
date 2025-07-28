@@ -47,9 +47,9 @@ export default function LandingPage() {
             <Image 
               src="/images/rootly-logo-final.svg" 
               alt="Rootly Logo" 
-              width={32} 
-              height={32}
-              className="w-8 h-8"
+              width={200} 
+              height={200}
+              className="w-40 h-40"
             />
             <span className="text-xl font-semibold text-slate-900">Rootly Burnout Detector</span>
           </div>

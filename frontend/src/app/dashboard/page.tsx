@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -1412,6 +1413,26 @@ export default function Dashboard() {
         throw new Error('No authentication token found')
       }
 
+      // Debug log the request data
+      const requestData = {
+        integration_id: parseInt(dialogSelectedIntegration),
+        time_range: parseInt(selectedTimeRange),
+        include_weekends: true,
+        include_github: githubIntegration ? includeGithub : false,
+        include_slack: slackIntegration ? includeSlack : false,
+        enable_ai: enableAI && llmConfig?.has_token
+      }
+      
+      console.log('DEBUG: Analysis request data:', requestData)
+      console.log('DEBUG: State values:', {
+        githubIntegration,
+        slackIntegration,
+        includeGithub,
+        includeSlack,
+        enableAI,
+        llmConfig
+      })
+
       // Start the analysis
       let response
       try {
@@ -1421,14 +1442,7 @@ export default function Dashboard() {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${authToken}`
           },
-          body: JSON.stringify({
-            integration_id: parseInt(dialogSelectedIntegration),
-            time_range: parseInt(selectedTimeRange),
-            include_weekends: true,
-            include_github: githubIntegration ? includeGithub : false,
-            include_slack: slackIntegration ? includeSlack : false,
-            enable_ai: enableAI && llmConfig?.has_token
-          }),
+          body: JSON.stringify(requestData),
         })
       } catch (networkError) {
         console.error('Network error:', networkError)
@@ -4160,9 +4174,12 @@ export default function Dashboard() {
                       <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
                       <span className="text-xs font-medium text-gray-600">No AI token configured</span>
                     </div>
-                    <div className="text-xs text-gray-500">
-                      Go to <span className="font-medium">Integrations → AI Insights</span> to add your OpenAI or Anthropic token
-                    </div>
+                    <Link 
+                      href="/integrations" 
+                      className="text-xs text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                    >
+                      Configure AI token
+                    </Link>
                   </div>
                 )}
               </div>

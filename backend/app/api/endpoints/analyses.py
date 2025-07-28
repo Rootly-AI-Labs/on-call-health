@@ -680,13 +680,22 @@ async def run_analysis_task(
         logger.info(f"BACKGROUND_TASK: Final analyzer decision - use_ai_analyzer: {use_ai_analyzer}")
         print(f"BACKGROUND_TASK: Final analyzer decision - use_ai_analyzer: {use_ai_analyzer}")
         
-        # Platform-agnostic analyzer selection based on AI enablement
+        # Platform-agnostic analyzer selection based on AI enablement and GitHub/Slack requirements
+        needs_github_slack = include_github or include_slack
+        logger.info(f"BACKGROUND_TASK: GitHub/Slack requirements - needs_github_slack: {needs_github_slack} (include_github: {include_github}, include_slack: {include_slack})")
+        print(f"BACKGROUND_TASK: GitHub/Slack requirements - needs_github_slack: {needs_github_slack} (include_github: {include_github}, include_slack: {include_slack})")
+        
         if use_ai_analyzer:
             analyzer_service = BurnoutAnalyzerService(api_token, platform=platform)
             logger.info(f"BACKGROUND_TASK: Using BurnoutAnalyzerService (AI-enhanced) for {platform}")
             print(f"BACKGROUND_TASK: Using BurnoutAnalyzerService (AI-enhanced) for {platform}")
+        elif needs_github_slack:
+            # Use full analyzer for GitHub/Slack even without AI
+            analyzer_service = BurnoutAnalyzerService(api_token, platform=platform)
+            logger.info(f"BACKGROUND_TASK: Using BurnoutAnalyzerService (GitHub/Slack support) for {platform}")
+            print(f"BACKGROUND_TASK: Using BurnoutAnalyzerService (GitHub/Slack support) for {platform}")
         else:
-            # Use platform-specific basic analyzers when AI is not enabled
+            # Use platform-specific basic analyzers when neither AI nor GitHub/Slack is needed
             if platform == "pagerduty":
                 analyzer_service = PagerDutyBurnoutAnalyzerService(api_token)
                 logger.info(f"BACKGROUND_TASK: Using PagerDutyBurnoutAnalyzerService (basic)")
