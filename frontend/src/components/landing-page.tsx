@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Activity, Link2, Brain, Target, Github, Chrome, Shield, Users, TrendingUp } from "lucide-react"
 import Link from "next/link"
+import Image from "next/image"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 console.log('API_BASE:', API_BASE) // Debug log to verify the URL
@@ -43,9 +44,13 @@ export default function LandingPage() {
       <header className="border-b border-slate-200">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-gradient-to-br from-purple-600 to-purple-700 rounded-lg flex items-center justify-center">
-              <Activity className="w-5 h-5 text-white" />
-            </div>
+            <Image 
+              src="/images/rootly-logo-final.svg" 
+              alt="Rootly Logo" 
+              width={32} 
+              height={32}
+              className="w-8 h-8"
+            />
             <span className="text-xl font-semibold text-slate-900">Rootly Burnout Detector</span>
           </div>
 
