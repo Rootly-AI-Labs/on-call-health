@@ -1195,10 +1195,20 @@ export default function Dashboard() {
 
   // Format radar chart labels to fit in multiple lines
   const formatRadarLabel = (value: string) => {
-    const words = value.split(' ');
-    if (words.length <= 1) return value;
+    // If text is short enough, keep it as is
+    if (value.length <= 8) return value;
     
-    // For two words, put each on separate line
+    const words = value.split(' ');
+    if (words.length <= 1) {
+      // Single long word - try to break it intelligently
+      if (value.length > 10) {
+        const mid = Math.floor(value.length / 2);
+        return `${value.substring(0, mid)}\n${value.substring(mid)}`;
+      }
+      return value;
+    }
+    
+    // For multiple words, put each word on separate line if reasonable
     if (words.length === 2) {
       return `${words[0]}\n${words[1]}`;
     }
@@ -3369,7 +3379,7 @@ export default function Dashboard() {
                   <CardContent>
                     <div className="h-[450px] p-4">
                       <ResponsiveContainer width="100%" height="100%">
-                        <RadarChart data={burnoutFactors} margin={{ top: 50, right: 70, bottom: 50, left: 70 }}>
+                        <RadarChart data={burnoutFactors} margin={{ top: 60, right: 80, bottom: 60, left: 80 }}>
                           <PolarGrid gridType="polygon" />
                           <PolarAngleAxis 
                             dataKey="factor" 
@@ -4524,7 +4534,7 @@ export default function Dashboard() {
                   <CardContent>
                     <div className="h-[280px]">
                       <ResponsiveContainer width="100%" height="100%">
-                        <RadarChart data={memberFactors} margin={{ top: 20, right: 30, bottom: 20, left: 30 }}>
+                        <RadarChart data={memberFactors} margin={{ top: 30, right: 40, bottom: 30, left: 40 }}>
                           <PolarGrid gridType="polygon" />
                           <PolarAngleAxis 
                             dataKey="factor" 
