@@ -2760,6 +2760,26 @@ export default function Dashboard() {
                   <CardContent className="prose prose-sm max-w-none">
                     {(() => {
                       const aiInsights = currentAnalysis.analysis_data.ai_team_insights.insights;
+                      
+                      // Check if we have LLM-generated narrative
+                      if (aiInsights?.llm_team_analysis) {
+                        return (
+                          <div className="space-y-4">
+                            <div 
+                              className="leading-relaxed text-gray-800"
+                              dangerouslySetInnerHTML={{ 
+                                __html: aiInsights.llm_team_analysis
+                                  .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                                  .replace(/\n\n/g, '</p><p class="mt-4">')
+                                  .replace(/^/, '<p>')
+                                  .replace(/$/, '</p>')
+                              }}
+                            />
+                          </div>
+                        );
+                      }
+                      
+                      // Fallback to template-based insights
                       const teamAnalysis = currentAnalysis.analysis_data.team_analysis;
                       const members = Array.isArray(teamAnalysis) ? teamAnalysis : (teamAnalysis?.members || []);
                       const riskDist = aiInsights?.risk_distribution;
