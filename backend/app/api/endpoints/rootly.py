@@ -102,6 +102,9 @@ async def test_rootly_token_preview(
         suggested_name = f"{base_name} #{counter}"
         counter += 1
     
+    # Check permissions for the token
+    permissions = await client.check_permissions()
+    
     return {
         "status": "success",
         "message": "Token is valid and ready to add",
@@ -111,7 +114,10 @@ async def test_rootly_token_preview(
             "total_users": total_users,
             "can_add": True
         },
-        "account_info": account_info
+        "account_info": {
+            **account_info,
+            "permissions": permissions
+        }
     }
 
 @router.post("/token/add")

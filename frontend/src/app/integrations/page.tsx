@@ -164,6 +164,16 @@ interface PreviewData {
   suggested_name?: string
   can_add?: boolean
   current_user?: string
+  permissions?: {
+    users?: {
+      access: boolean
+      error?: string
+    }
+    incidents?: {
+      access: boolean
+      error?: string
+    }
+  }
 }
 
 export default function IntegrationsPage() {
@@ -576,6 +586,7 @@ export default function IntegrationsPage() {
             total_users: data.preview?.total_users || data.account_info?.total_users,
             suggested_name: data.preview?.suggested_name || data.account_info?.suggested_name,
             can_add: data.preview?.can_add || data.account_info?.can_add,
+            permissions: data.account_info?.permissions
           })
         } else {
           setPreviewData(data.account_info)
@@ -1421,6 +1432,40 @@ export default function IntegrationsPage() {
                                 <div className="space-y-1 text-sm">
                                   <p><span className="font-medium">Organization:</span> {previewData.organization_name}</p>
                                   <p><span className="font-medium">Users:</span> {previewData.total_users}</p>
+                                  {previewData.permissions && (
+                                    <div className="mt-2">
+                                      <p className="font-medium">Permissions:</p>
+                                      <div className="grid grid-cols-2 gap-2 mt-1">
+                                        <div className="flex items-center">
+                                          {previewData.permissions.users?.access ? (
+                                            <CheckCircle className="w-3 h-3 text-green-600 mr-1" />
+                                          ) : (
+                                            <AlertCircle className="w-3 h-3 text-red-600 mr-1" />
+                                          )}
+                                          <span className="text-xs">Users</span>
+                                        </div>
+                                        <div className="flex items-center">
+                                          {previewData.permissions.incidents?.access ? (
+                                            <CheckCircle className="w-3 h-3 text-green-600 mr-1" />
+                                          ) : (
+                                            <AlertCircle className="w-3 h-3 text-red-600 mr-1" />
+                                          )}
+                                          <span className="text-xs">Incidents</span>
+                                        </div>
+                                      </div>
+                                      {(!previewData.permissions.users?.access || !previewData.permissions.incidents?.access) && (
+                                        <div className="mt-2 p-2 bg-yellow-100 rounded text-xs">
+                                          <p className="font-medium text-yellow-800">Missing permissions:</p>
+                                          {!previewData.permissions.users?.access && (
+                                            <p className="text-yellow-700">• Users: {previewData.permissions.users?.error}</p>
+                                          )}
+                                          {!previewData.permissions.incidents?.access && (
+                                            <p className="text-yellow-700">• Incidents: {previewData.permissions.incidents?.error}</p>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             </AlertDescription>
