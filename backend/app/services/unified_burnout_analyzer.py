@@ -140,7 +140,7 @@ class UnifiedBurnoutAnalyzer:
             github_data = {}
             slack_data = {}
             
-            if include_github or include_slack:
+            if self.features['github'] or self.features['slack']:
                 from .github_collector import collect_team_github_data
                 from .slack_collector import collect_team_slack_data
                 
