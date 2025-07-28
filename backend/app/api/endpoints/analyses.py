@@ -2,6 +2,7 @@
 Burnout analysis API endpoints.
 """
 import logging
+import os
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
 from collections import defaultdict
@@ -13,6 +14,7 @@ from ...models import get_db, User, Analysis, RootlyIntegration, SlackIntegratio
 from ...auth.dependencies import get_current_active_user
 from ...services.burnout_analyzer import BurnoutAnalyzerService
 from ...services.pagerduty_burnout_analyzer import PagerDutyBurnoutAnalyzerService
+from ...services.unified_burnout_analyzer import UnifiedBurnoutAnalyzer
 
 logger = logging.getLogger(__name__)
 
@@ -680,31 +682,54 @@ async def run_analysis_task(
         logger.info(f"BACKGROUND_TASK: Final analyzer decision - use_ai_analyzer: {use_ai_analyzer}")
         print(f"BACKGROUND_TASK: Final analyzer decision - use_ai_analyzer: {use_ai_analyzer}")
         
-        # Platform-agnostic analyzer selection based on AI enablement and GitHub/Slack requirements
-        needs_github_slack = include_github or include_slack
-        logger.info(f"BACKGROUND_TASK: GitHub/Slack requirements - needs_github_slack: {needs_github_slack} (include_github: {include_github}, include_slack: {include_slack})")
-        print(f"BACKGROUND_TASK: GitHub/Slack requirements - needs_github_slack: {needs_github_slack} (include_github: {include_github}, include_slack: {include_slack})")
+        # Check if we should use the new UnifiedBurnoutAnalyzer (feature flag)
+        use_unified_analyzer = os.getenv('USE_UNIFIED_ANALYZER', 'false').lower() == 'true'
+        logger.info(f"BACKGROUND_TASK: Feature flag - USE_UNIFIED_ANALYZER: {use_unified_analyzer}")
+        print(f"BACKGROUND_TASK: Feature flag - USE_UNIFIED_ANALYZER: {use_unified_analyzer}")
         
-        if use_ai_analyzer:
-            analyzer_service = BurnoutAnalyzerService(api_token, platform=platform)
-            logger.info(f"BACKGROUND_TASK: Using BurnoutAnalyzerService (AI-enhanced) for {platform}")
-            print(f"BACKGROUND_TASK: Using BurnoutAnalyzerService (AI-enhanced) for {platform}")
-        elif needs_github_slack:
-            # Use full analyzer for GitHub/Slack even without AI
-            analyzer_service = BurnoutAnalyzerService(api_token, platform=platform)
-            logger.info(f"BACKGROUND_TASK: Using BurnoutAnalyzerService (GitHub/Slack support) for {platform}")
-            print(f"BACKGROUND_TASK: Using BurnoutAnalyzerService (GitHub/Slack support) for {platform}")
+        if use_unified_analyzer:
+            # NEW UNIFIED ANALYZER PATH (TESTING)
+            logger.info(f"BACKGROUND_TASK: 🔬 TESTING MODE - Using UnifiedBurnoutAnalyzer")
+            print(f"BACKGROUND_TASK: 🔬 TESTING MODE - Using UnifiedBurnoutAnalyzer")
+            
+            analyzer_service = UnifiedBurnoutAnalyzer(
+                api_token=api_token,
+                platform=platform,
+                enable_ai=use_ai_analyzer,
+                github_token=github_token if include_github else None,
+                slack_token=slack_token if include_slack else None
+            )
+            logger.info(f"BACKGROUND_TASK: 🔬 UnifiedBurnoutAnalyzer initialized - Features: AI={use_ai_analyzer}, GitHub={include_github}, Slack={include_slack}")
         else:
-            # Use platform-specific basic analyzers when neither AI nor GitHub/Slack is needed
-            if platform == "pagerduty":
-                analyzer_service = PagerDutyBurnoutAnalyzerService(api_token)
-                logger.info(f"BACKGROUND_TASK: Using PagerDutyBurnoutAnalyzerService (basic)")
-                print(f"BACKGROUND_TASK: Using PagerDutyBurnoutAnalyzerService (basic)")
-            else:  # Default to Rootly for backward compatibility
-                from ...core.simple_burnout_analyzer import SimpleBurnoutAnalyzer
-                analyzer_service = SimpleBurnoutAnalyzer(api_token)
-                logger.info(f"BACKGROUND_TASK: Using SimpleBurnoutAnalyzer (basic)")
-                print(f"BACKGROUND_TASK: Using SimpleBurnoutAnalyzer (basic)")
+            # EXISTING ANALYZER SELECTION LOGIC (PRODUCTION)
+            logger.info(f"BACKGROUND_TASK: 🏭 PRODUCTION MODE - Using legacy analyzers")
+            print(f"BACKGROUND_TASK: 🏭 PRODUCTION MODE - Using legacy analyzers")
+        
+            # Platform-agnostic analyzer selection based on AI enablement and GitHub/Slack requirements
+            needs_github_slack = include_github or include_slack
+            logger.info(f"BACKGROUND_TASK: GitHub/Slack requirements - needs_github_slack: {needs_github_slack} (include_github: {include_github}, include_slack: {include_slack})")
+            print(f"BACKGROUND_TASK: GitHub/Slack requirements - needs_github_slack: {needs_github_slack} (include_github: {include_github}, include_slack: {include_slack})")
+            
+            if use_ai_analyzer:
+                analyzer_service = BurnoutAnalyzerService(api_token, platform=platform)
+                logger.info(f"BACKGROUND_TASK: Using BurnoutAnalyzerService (AI-enhanced) for {platform}")
+                print(f"BACKGROUND_TASK: Using BurnoutAnalyzerService (AI-enhanced) for {platform}")
+            elif needs_github_slack:
+                # Use full analyzer for GitHub/Slack even without AI
+                analyzer_service = BurnoutAnalyzerService(api_token, platform=platform)
+                logger.info(f"BACKGROUND_TASK: Using BurnoutAnalyzerService (GitHub/Slack support) for {platform}")
+                print(f"BACKGROUND_TASK: Using BurnoutAnalyzerService (GitHub/Slack support) for {platform}")
+            else:
+                # Use platform-specific basic analyzers when neither AI nor GitHub/Slack is needed
+                if platform == "pagerduty":
+                    analyzer_service = PagerDutyBurnoutAnalyzerService(api_token)
+                    logger.info(f"BACKGROUND_TASK: Using PagerDutyBurnoutAnalyzerService (basic)")
+                    print(f"BACKGROUND_TASK: Using PagerDutyBurnoutAnalyzerService (basic)")
+                else:  # Default to Rootly for backward compatibility
+                    from ...core.simple_burnout_analyzer import SimpleBurnoutAnalyzer
+                    analyzer_service = SimpleBurnoutAnalyzer(api_token)
+                    logger.info(f"BACKGROUND_TASK: Using SimpleBurnoutAnalyzer (basic)")
+                    print(f"BACKGROUND_TASK: Using SimpleBurnoutAnalyzer (basic)")
         
         # Run the analysis with timeout (15 minutes max)
         logger.info(f"BACKGROUND_TASK: Starting burnout analysis with 15-minute timeout for analysis {analysis_id}")
@@ -716,17 +741,31 @@ async def run_analysis_task(
             # Log analyzer type for debugging
             logger.info(f"BACKGROUND_TASK: Using analyzer type: {type(analyzer_service).__name__}")
             
-            results = await asyncio.wait_for(
-                analyzer_service.analyze_burnout(
-                    time_range_days=time_range,
-                    include_weekends=include_weekends,
-                    include_github=include_github,
-                    include_slack=include_slack,
-                    github_token=github_token,
-                    slack_token=slack_token
-                ),
-                timeout=900.0  # 15 minutes
-            )
+            # Call analyzer with appropriate API based on type
+            if use_unified_analyzer:
+                # UnifiedBurnoutAnalyzer has simpler API (tokens passed in constructor)
+                logger.info(f"BACKGROUND_TASK: 🔬 Calling UnifiedBurnoutAnalyzer.analyze_burnout()")
+                results = await asyncio.wait_for(
+                    analyzer_service.analyze_burnout(
+                        time_range_days=time_range,
+                        include_weekends=include_weekends
+                    ),
+                    timeout=900.0  # 15 minutes
+                )
+            else:
+                # Legacy analyzers have complex API (tokens passed as parameters)
+                logger.info(f"BACKGROUND_TASK: 🏭 Calling {type(analyzer_service).__name__}.analyze_burnout()")
+                results = await asyncio.wait_for(
+                    analyzer_service.analyze_burnout(
+                        time_range_days=time_range,
+                        include_weekends=include_weekends,
+                        include_github=include_github,
+                        include_slack=include_slack,
+                        github_token=github_token,
+                        slack_token=slack_token
+                    ),
+                    timeout=900.0  # 15 minutes
+                )
             
             # Validate results
             if not results:
@@ -734,6 +773,27 @@ async def run_analysis_task(
                 results = {"error": "Analysis completed but returned empty results"}
             
             logger.info(f"BACKGROUND_TASK: Analysis {analysis_id} completed successfully with {len(str(results))} characters of results")
+            
+            # A/B Testing: Log comparative metrics for monitoring
+            try:
+                analyzer_type = "unified" if use_unified_analyzer else "legacy"
+                daily_trends_count = len(results.get("daily_trends", [])) if results else 0
+                team_members_count = len(results.get("team_analysis", {}).get("members", [])) if results else 0
+                ai_enhanced = results.get("ai_enhanced", False) if results else False
+                
+                logger.info(f"🔬 A/B_TESTING_METRICS: analysis_id={analysis_id}, analyzer_type={analyzer_type}, "
+                           f"daily_trends_count={daily_trends_count}, team_members_count={team_members_count}, "
+                           f"ai_enhanced={ai_enhanced}, platform={platform}, "
+                           f"features=AI:{use_ai_analyzer},GitHub:{include_github},Slack:{include_slack}")
+                
+                # Log specific result structure for comparison
+                if results:
+                    result_keys = list(results.keys())
+                    logger.info(f"🔬 A/B_TESTING_STRUCTURE: analysis_id={analysis_id}, analyzer_type={analyzer_type}, "
+                               f"result_keys={result_keys}")
+                    
+            except Exception as monitoring_error:
+                logger.warning(f"A/B testing monitoring failed: {monitoring_error}")
             
             # Update analysis with results
             analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
