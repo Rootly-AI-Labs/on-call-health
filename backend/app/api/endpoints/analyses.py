@@ -692,6 +692,12 @@ async def run_analysis_task(
             logger.info(f"BACKGROUND_TASK: 🔬 TESTING MODE - Using UnifiedBurnoutAnalyzer")
             print(f"BACKGROUND_TASK: 🔬 TESTING MODE - Using UnifiedBurnoutAnalyzer")
             
+            # Set user context for AI analysis if needed
+            if use_ai_analyzer:
+                from ...services.ai_burnout_analyzer import set_user_context
+                set_user_context(user)
+                logger.info(f"BACKGROUND_TASK: 🔬 Set user context for AI analysis (LLM provider: {user.llm_provider if user.llm_token else 'none'})")
+            
             analyzer_service = UnifiedBurnoutAnalyzer(
                 api_token=api_token,
                 platform=platform,
