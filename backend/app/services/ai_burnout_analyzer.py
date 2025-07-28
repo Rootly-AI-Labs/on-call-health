@@ -1100,7 +1100,18 @@ Make it engaging, specific, and actionable. Use concrete examples from the data.
             if total_commits > 0:
                 after_hours_pct = (after_hours_commits / total_commits) * 100
                 weekend_pct = (weekend_commits / total_commits) * 100
-                github_insights = f" Code activity analysis reveals {after_hours_pct:.1f}% of commits happen after hours and {weekend_pct:.1f}% on weekends, indicating significant work-life boundary challenges."
+                
+                # Determine work-life balance assessment based on actual percentages
+                if after_hours_pct > 30 or weekend_pct > 15:
+                    boundary_assessment = "indicating significant work-life boundary challenges"
+                elif after_hours_pct > 20 or weekend_pct > 10:
+                    boundary_assessment = "suggesting some work-life balance concerns"
+                elif after_hours_pct > 10 or weekend_pct > 5:
+                    boundary_assessment = "showing minor after-hours activity"
+                else:
+                    boundary_assessment = "demonstrating excellent work-life boundaries"
+                
+                github_insights = f" Code activity analysis reveals {after_hours_pct:.1f}% of commits happen after hours and {weekend_pct:.1f}% on weekends, {boundary_assessment}."
         
         # Slack insights  
         slack_insights = ""
