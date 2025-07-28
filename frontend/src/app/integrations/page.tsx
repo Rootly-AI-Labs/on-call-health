@@ -1542,13 +1542,11 @@ export default function IntegrationsPage() {
                         <Alert className="border-green-200 bg-green-50">
                           <AlertDescription>
                             <ol className="space-y-2 text-sm">
-                              <li><strong>1.</strong> In your PagerDuty account, click on your <strong>profile icon</strong> in the top-right</li>
-                              <li><strong>2.</strong> Click <strong>My Profile</strong> from the dropdown menu</li>
-                              <li><strong>3.</strong> Select <code className="bg-green-100 px-1 rounded">User Settings</code></li>
-                              <li><strong>4.</strong> Scroll down to the <strong>API Access</strong> section</li>
-                              <li><strong>5.</strong> Click <code className="bg-green-100 px-1 rounded">Create API User Token</code></li>
-                              <li><strong>6.</strong> Give it a description (e.g., <strong>"Burnout Detector"</strong>) and click <strong>Create</strong></li>
-                              <li><strong>7.</strong> Copy the generated token (starts with letters/numbers like <strong>"u+..."</strong>)</li>
+                              <li><strong>1.</strong> In your PagerDuty account, click on <strong>Integrations</strong> in the top navigation</li>
+                              <li><strong>2.</strong> Look for <strong>API Access Keys</strong> in the dropdown menu</li>
+                              <li><strong>3.</strong> Click <code className="bg-green-100 px-1 rounded">Create API User Token</code> (NOT "Create API Key" - must be user-level)</li>
+                              <li><strong>4.</strong> Give it a description (e.g., <strong>"Burnout Detector"</strong>) and click <strong>Create</strong></li>
+                              <li><strong>5.</strong> Copy the generated token (starts with letters/numbers like <strong>"u+..."</strong>)</li>
                             </ol>
                           </AlertDescription>
                         </Alert>

@@ -26,33 +26,49 @@ class PagerDutyAPIClient:
     async def test_connection(self) -> Dict[str, Any]:
         """Test the PagerDuty API connection and get account info."""
         try:
-            # Get current user to verify token
+            # Test connection by fetching users (works with both user and account tokens)
             async with aiohttp.ClientSession() as session:
                 async with session.get(
-                    f"{self.base_url}/users/me",
-                    headers=self.headers
+                    f"{self.base_url}/users",
+                    headers=self.headers,
+                    params={"limit": 1}
                 ) as response:
                     if response.status != 200:
-                        return {"valid": False, "error": f"HTTP {response.status}"}
+                        error_text = await response.text()
+                        return {"valid": False, "error": f"HTTP {response.status}: {error_text}"}
                     
-                    user_data = await response.json()
+                    users_data = await response.json()
                     
-                # Get organization info from the current user's HTML URL
-                # This contains the actual PagerDuty organization subdomain
+                # Try to get current user info if it's a user token
+                current_user = "Account Token"
+                try:
+                    async with session.get(
+                        f"{self.base_url}/users/me",
+                        headers=self.headers
+                    ) as me_response:
+                        if me_response.status == 200:
+                            user_data = await me_response.json()
+                            current_user = user_data.get("user", {}).get("name", "Unknown User")
+                except:
+                    # Account token - can't get current user
+                    pass
+                
+                # Get organization info from first user's HTML URL if available
                 org_name = "PagerDuty Account"
-                html_url = user_data.get("user", {}).get("html_url", "")
-                if html_url and "pagerduty.com" in html_url:
-                    try:
-                        # Extract subdomain from URL like https://orgname.pagerduty.com/...
-                        subdomain = html_url.split("//")[1].split(".")[0]
-                        if subdomain and subdomain != "www":
-                            org_name = subdomain.title()
-                    except (IndexError, AttributeError):
-                        # Fallback to default name if URL parsing fails
-                        pass
+                users = users_data.get("users", [])
+                if users:
+                    html_url = users[0].get("html_url", "")
+                    if html_url and "pagerduty.com" in html_url:
+                        try:
+                            # Extract subdomain from URL like https://orgname.pagerduty.com/...
+                            subdomain = html_url.split("//")[1].split(".")[0]
+                            if subdomain and subdomain != "www":
+                                org_name = subdomain.title()
+                        except (IndexError, AttributeError):
+                            # Fallback to default name if URL parsing fails
+                            pass
                 
                 # Get user and service counts
-                users = await self.get_users(limit=1)
                 services = await self.get_services(limit=1)
                 
                 # Count total users and services
@@ -65,7 +81,7 @@ class PagerDutyAPIClient:
                         "organization_name": org_name,
                         "total_users": total_users,
                         "total_services": total_services,
-                        "current_user": user_data.get("user", {}).get("name", "Unknown")
+                        "current_user": current_user
                     }
                 }
                 

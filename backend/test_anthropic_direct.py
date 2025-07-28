@@ -6,7 +6,7 @@ import os
 
 def test_anthropic_direct():
     """Test direct Anthropic API call."""
-    api_key = "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"
+    api_key = os.getenv('ANTHROPIC_API_KEY', 'your-api-key-here')
     
     try:
         from anthropic import Anthropic
@@ -32,7 +32,7 @@ def test_anthropic_direct():
 
 def test_litellm_anthropic():
     """Test LiteLLM with Anthropic."""
-    os.environ['ANTHROPIC_API_KEY'] = "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"
+    os.environ['ANTHROPIC_API_KEY'] = os.getenv('ANTHROPIC_API_KEY', 'your-api-key-here')
     
     try:
         import litellm
@@ -57,7 +57,7 @@ def test_litellm_anthropic():
 
 def test_smolagents_anthropic():
     """Test smolagents with Anthropic."""
-    os.environ['ANTHROPIC_API_KEY'] = "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"
+    os.environ['ANTHROPIC_API_KEY'] = os.getenv('ANTHROPIC_API_KEY', 'your-api-key-here')
     
     try:
         from smolagents import CodeAgent, LiteLLMModel
