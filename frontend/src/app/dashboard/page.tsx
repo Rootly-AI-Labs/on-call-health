@@ -1198,7 +1198,12 @@ export default function Dashboard() {
     const words = value.split(' ');
     if (words.length <= 1) return value;
     
-    // Split into two lines for better fit - return as string with newline
+    // For two words, put each on separate line
+    if (words.length === 2) {
+      return `${words[0]}\n${words[1]}`;
+    }
+    
+    // For more words, split in half
     const midpoint = Math.ceil(words.length / 2);
     const firstLine = words.slice(0, midpoint).join(' ');
     const secondLine = words.slice(midpoint).join(' ');
