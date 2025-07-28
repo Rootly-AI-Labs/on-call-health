@@ -1193,6 +1193,24 @@ export default function Dashboard() {
     }
   }
 
+  // Format radar chart labels to fit in multiple lines
+  const formatRadarLabel = (value: string) => {
+    const words = value.split(' ');
+    if (words.length <= 1) return value;
+    
+    // Split into two lines for better fit
+    const midpoint = Math.ceil(words.length / 2);
+    const firstLine = words.slice(0, midpoint).join(' ');
+    const secondLine = words.slice(midpoint).join(' ');
+    
+    return (
+      <tspan>
+        <tspan x="0" dy="0">{firstLine}</tspan>
+        <tspan x="0" dy="12">{secondLine}</tspan>
+      </tspan>
+    );
+  };
+
   // Dynamic analysis stages based on selected data sources
   const getAnalysisStages = () => {
     const stages = [
@@ -3357,6 +3375,7 @@ export default function Dashboard() {
                             dataKey="factor" 
                             tick={{ fontSize: 13, fill: '#374151', fontWeight: 500 }}
                             className="text-sm"
+                            tickFormatter={formatRadarLabel}
                           />
                           <PolarRadiusAxis 
                             domain={[0, 10]} 
@@ -4511,6 +4530,7 @@ export default function Dashboard() {
                             dataKey="factor" 
                             tick={{ fontSize: 10, fill: '#374151' }}
                             className="text-xs"
+                            tickFormatter={formatRadarLabel}
                           />
                           <PolarRadiusAxis 
                             domain={[0, 10]} 
