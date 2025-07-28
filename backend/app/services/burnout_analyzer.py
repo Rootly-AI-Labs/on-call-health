@@ -237,6 +237,9 @@ class BurnoutAnalyzerService:
             logger.info(f"Period summary calculation: team_overall_score={team_overall_score}, period_average_score={period_average_score}")
             logger.info(f"Team health keys: {list(team_health.keys()) if team_health else 'None'}")
             
+            # Generate daily trends from incident data
+            daily_trends = self._generate_daily_trends(incidents, team_analysis["members"], metadata)
+            
             result = {
                 "analysis_timestamp": datetime.now().isoformat(),
                 "metadata": {
@@ -250,10 +253,11 @@ class BurnoutAnalyzerService:
                 "team_analysis": team_analysis,
                 "insights": insights,
                 "recommendations": self._generate_recommendations(team_health, team_analysis),
+                "daily_trends": daily_trends,
                 "period_summary": {
                     "average_score": round(period_average_score, 2),
                     "days_analyzed": time_range_days,
-                    "total_days_with_data": time_range_days  # Full analyzer doesn't have daily breakdown
+                    "total_days_with_data": len([d for d in daily_trends if d.get("incident_count", 0) > 0])
                 }
             }
             
@@ -1544,3 +1548,156 @@ class BurnoutAnalyzerService:
                 incidents.append(incident)
         
         return incidents
+
+    def _generate_daily_trends(self, incidents: List[Dict[str, Any]], team_analysis: List[Dict[str, Any]], metadata: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Generate daily trend data from incidents and team analysis."""
+        try:
+            days_analyzed = metadata.get("days_analyzed", 30) if isinstance(metadata, dict) else 30
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=days_analyzed)
+            
+            # Initialize daily data structure
+            daily_data = {}
+            current_date = start_date
+            
+            # Initialize all days with zero incidents
+            while current_date <= end_date:
+                date_str = current_date.strftime("%Y-%m-%d")
+                daily_data[date_str] = {
+                    "date": date_str,
+                    "incident_count": 0,
+                    "severity_weighted_count": 0.0,
+                    "after_hours_count": 0,
+                    "users_involved": set(),
+                    "high_severity_count": 0
+                }
+                current_date += timedelta(days=1)
+            
+            # Process incidents to populate daily data
+            if incidents and isinstance(incidents, list):
+                for incident in incidents:
+                    try:
+                        if not incident or not isinstance(incident, dict):
+                            continue
+                            
+                        # Extract incident date - handle both Rootly and PagerDuty formats
+                        created_at = None
+                        if self.platform == "pagerduty":
+                            created_at = incident.get("created_at")
+                        else:  # Rootly
+                            attrs = incident.get("attributes", {})
+                            if attrs and isinstance(attrs, dict):
+                                created_at = attrs.get("created_at")
+                        
+                        if not created_at:
+                            continue
+                            
+                        # Parse date
+                        try:
+                            incident_date = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                            date_str = incident_date.strftime("%Y-%m-%d")
+                            
+                            if date_str in daily_data:
+                                daily_data[date_str]["incident_count"] += 1
+                                
+                                # Add severity weight - handle both platforms
+                                severity_weight = 1.0
+                                if self.platform == "pagerduty":
+                                    urgency = incident.get("urgency", "low")
+                                    if urgency == "high":
+                                        severity_weight = 2.0
+                                        daily_data[date_str]["high_severity_count"] += 1
+                                else:  # Rootly
+                                    attrs = incident.get("attributes", {})
+                                    severity_info = attrs.get("severity", {}) if attrs else {}
+                                    if isinstance(severity_info, dict) and "data" in severity_info:
+                                        severity_data = severity_info.get("data", {})
+                                        if isinstance(severity_data, dict) and "attributes" in severity_data:
+                                            severity_attrs = severity_data["attributes"]
+                                            severity_name = severity_attrs.get("name", "medium").lower()
+                                            if "critical" in severity_name or "sev1" in severity_name:
+                                                severity_weight = 3.0
+                                                daily_data[date_str]["high_severity_count"] += 1
+                                            elif "high" in severity_name or "sev2" in severity_name:
+                                                severity_weight = 2.0
+                                            elif "medium" in severity_name or "sev3" in severity_name:
+                                                severity_weight = 1.5
+                                
+                                daily_data[date_str]["severity_weighted_count"] += severity_weight
+                                
+                                # Check if after hours (rough approximation)
+                                incident_hour = incident_date.hour
+                                if incident_hour < 8 or incident_hour > 18:
+                                    daily_data[date_str]["after_hours_count"] += 1
+                                
+                                # Track users involved - handle both platforms
+                                if self.platform == "pagerduty":
+                                    # PagerDuty format
+                                    assignments = incident.get("assignments", [])
+                                    if assignments:
+                                        assignee = assignments[0].get("assignee", {})
+                                        user_id = assignee.get("id")
+                                        if user_id:
+                                            daily_data[date_str]["users_involved"].add(user_id)
+                                else:  # Rootly
+                                    # Rootly format
+                                    attrs = incident.get("attributes", {})
+                                    if attrs:
+                                        user_info = attrs.get("user", {})
+                                        if isinstance(user_info, dict) and "data" in user_info:
+                                            user_data = user_info.get("data", {})
+                                            user_id = user_data.get("id")
+                                            if user_id:
+                                                daily_data[date_str]["users_involved"].add(user_id)
+                                        
+                        except Exception as date_error:
+                            logger.debug(f"Error parsing incident date: {date_error}")
+                            continue
+                            
+                    except Exception as inc_error:
+                        logger.debug(f"Error processing incident for daily trends: {inc_error}")
+                        continue
+            
+            # Convert to list and calculate daily scores
+            daily_trends = []
+            for date_str in sorted(daily_data.keys()):
+                day_data = daily_data[date_str]
+                
+                # Convert set to count
+                users_involved_count = len(day_data["users_involved"])
+                
+                # Calculate daily health score based on incident load
+                incident_count = day_data["incident_count"]
+                severity_weighted = day_data["severity_weighted_count"]
+                after_hours_count = day_data["after_hours_count"]
+                
+                # Simple scoring: start with 90% health, deduct for incidents
+                daily_score = 90.0
+                if incident_count > 0:
+                    # Deduct points for incidents (more for high severity)
+                    daily_score -= min(severity_weighted * 5, 40)  # Max 40 point deduction
+                    # Extra deduction for after-hours incidents
+                    daily_score -= min(after_hours_count * 3, 20)  # Max 20 point deduction
+                    # Extra deduction for many users involved (distributed load is better)
+                    if users_involved_count < 2 and incident_count > 3:
+                        daily_score -= 10  # Concentration penalty
+                
+                daily_score = max(daily_score, 10.0)  # Minimum 10% health
+                
+                daily_trends.append({
+                    "date": date_str,
+                    "overall_score": round(daily_score / 10, 2),  # Convert to 0-10 scale
+                    "incident_count": incident_count,
+                    "severity_weighted_count": round(severity_weighted, 1),
+                    "after_hours_count": after_hours_count,
+                    "high_severity_count": day_data["high_severity_count"],
+                    "users_involved_count": users_involved_count,
+                    "health_percentage": round(daily_score, 1)
+                })
+            
+            logger.info(f"Generated {len(daily_trends)} daily trend data points for {days_analyzed}-day analysis")
+            return daily_trends
+            
+        except Exception as e:
+            logger.error(f"Error in _generate_daily_trends: {e}")
+            return []
