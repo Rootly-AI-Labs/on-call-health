@@ -1198,17 +1198,12 @@ export default function Dashboard() {
     const words = value.split(' ');
     if (words.length <= 1) return value;
     
-    // Split into two lines for better fit
+    // Split into two lines for better fit - return as string with newline
     const midpoint = Math.ceil(words.length / 2);
     const firstLine = words.slice(0, midpoint).join(' ');
     const secondLine = words.slice(midpoint).join(' ');
     
-    return (
-      <tspan>
-        <tspan x="0" dy="0">{firstLine}</tspan>
-        <tspan x="0" dy="12">{secondLine}</tspan>
-      </tspan>
-    );
+    return `${firstLine}\n${secondLine}`;
   };
 
   // Dynamic analysis stages based on selected data sources
