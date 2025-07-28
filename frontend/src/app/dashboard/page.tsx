@@ -504,7 +504,6 @@ export default function Dashboard() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [analysisToDelete, setAnalysisToDelete] = useState<AnalysisResult | null>(null)
   const [debugSectionOpen, setDebugSectionOpen] = useState(false)
-  const [riskFactorsExpanded, setRiskFactorsExpanded] = useState(false)
   // Removed member view mode - only showing radar chart now
   const [historicalTrends, setHistoricalTrends] = useState<any>(null)
   const [loadingTrends, setLoadingTrends] = useState(false)
@@ -3430,96 +3429,56 @@ export default function Dashboard() {
                 {highRiskFactors.length > 0 && (
                   <Card>
                     <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="flex items-center space-x-2">
-                          <AlertTriangle className="w-5 h-5 text-red-500" />
-                          <span>Critical Risks</span>
-                        </CardTitle>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setRiskFactorsExpanded(!riskFactorsExpanded)}
-                          className="flex items-center space-x-2"
-                        >
-                          <span>{riskFactorsExpanded ? 'Hide Details' : `View ${highRiskFactors.length} Risk Factor${highRiskFactors.length > 1 ? 's' : ''}`}</span>
-                          <ChevronRight className={`w-4 h-4 transition-transform ${riskFactorsExpanded ? 'rotate-90' : ''}`} />
-                        </Button>
-                      </div>
+                      <CardTitle className="flex items-center space-x-2">
+                        <AlertTriangle className="w-5 h-5 text-red-500" />
+                        <span>Critical Risks</span>
+                      </CardTitle>
                     </CardHeader>
                     
-                    {/* Collapsed Summary View */}
-                    {!riskFactorsExpanded && (
-                      <CardContent>
-                        <div className="space-y-2">
-                          <p className="text-sm text-gray-600 mb-3">
-                            <strong>{highRiskFactors.length}</strong> burnout factor{highRiskFactors.length > 1 ? 's' : ''} require{highRiskFactors.length === 1 ? 's' : ''} immediate attention
-                          </p>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            {highRiskFactors.slice(0, 4).map((factor) => (
-                              <div key={factor.factor} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                                <span className="text-sm font-medium">{factor.factor}</span>
-                                <div className="flex items-center space-x-2">
-                                  <span className={`px-2 py-1 rounded text-xs font-medium ${
-                                    factor.severity === 'Critical' ? 'bg-red-100 text-red-700' :
-                                    'bg-orange-100 text-orange-700'
-                                  }`}>
-                                    {factor.value}/10
-                                  </span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </CardContent>
-                    )}
-                    
-                    {/* Expanded Detailed View */}
-                    {riskFactorsExpanded && (
-                      <CardContent>
-                        <div className="space-y-4">
-                          {highRiskFactors.map((factor, index) => (
-                            <div key={factor.factor} className="relative">
-                              <div className="flex items-center justify-between mb-2">
-                                <div className="flex items-center space-x-2">
-                                  <span className="font-medium text-gray-900">{factor.factor}</span>
-                                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                    factor.severity === 'Critical' ? 'bg-red-100 text-red-800' :
-                                    factor.severity === 'Warning' ? 'bg-orange-100 text-orange-800' :
-                                    'bg-yellow-100 text-yellow-800'
-                                  }`}>
-                                    {factor.severity}
-                                  </span>
-                                </div>
-                                <span className="text-lg font-bold" style={{ color: factor.color }}>
-                                  {factor.value}/10
+                    <CardContent>
+                      <div className="space-y-4">
+                        {highRiskFactors.map((factor, index) => (
+                          <div key={factor.factor} className="relative">
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center space-x-2">
+                                <span className="font-medium text-gray-900">{factor.factor}</span>
+                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                  factor.severity === 'Critical' ? 'bg-red-100 text-red-800' :
+                                  factor.severity === 'Warning' ? 'bg-orange-100 text-orange-800' :
+                                  'bg-yellow-100 text-yellow-800'
+                                }`}>
+                                  {factor.severity}
                                 </span>
                               </div>
-                              <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
-                                <div 
-                                  className="h-2 rounded-full transition-all duration-500" 
-                                  style={{ 
-                                    width: `${(factor.value / 10) * 100}%`,
-                                    backgroundColor: (() => {
-                                      // Standardize colors to match burnout risk levels
-                                      if (factor.value <= 3) return '#10B981'; // green-500 - Low Risk
-                                      if (factor.value <= 5) return '#F59E0B'; // yellow-500 - Moderate Risk
-                                      if (factor.value <= 7) return '#F97316'; // orange-500 - High Risk
-                                      return '#EF4444'; // red-500 - Critical Risk
-                                    })()
-                                  }}
-                                ></div>
-                              </div>
-                              <div className="text-sm text-gray-600">
-                                <div>{factor.metrics}</div>
-                                <div className="mt-1 text-blue-600">
-                                  <strong>Action:</strong> {factor.recommendation}
-                                </div>
+                              <span className="text-lg font-bold" style={{ color: factor.color }}>
+                                {factor.value}/10
+                              </span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
+                              <div 
+                                className="h-2 rounded-full transition-all duration-500" 
+                                style={{ 
+                                  width: `${(factor.value / 10) * 100}%`,
+                                  backgroundColor: (() => {
+                                    // Standardize colors to match burnout risk levels
+                                    if (factor.value <= 3) return '#10B981'; // green-500 - Low Risk
+                                    if (factor.value <= 5) return '#F59E0B'; // yellow-500 - Moderate Risk
+                                    if (factor.value <= 7) return '#F97316'; // orange-500 - High Risk
+                                    return '#EF4444'; // red-500 - Critical Risk
+                                  })()
+                                }}
+                              ></div>
+                            </div>
+                            <div className="text-sm text-gray-600">
+                              <div>{factor.metrics}</div>
+                              <div className="mt-1 text-blue-600">
+                                <strong>Action:</strong> {factor.recommendation}
                               </div>
                             </div>
-                          ))}
-                        </div>
-                      </CardContent>
-                    )}
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
                   </Card>
                 )}
               </div>
