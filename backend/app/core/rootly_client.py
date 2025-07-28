@@ -46,9 +46,9 @@ class RootlyAPIClient:
                     elif response.status_code == 401:
                         permissions["users"]["error"] = "Unauthorized - check API token"
                     elif response.status_code == 403:
-                        permissions["users"]["error"] = "Forbidden - insufficient permissions"
+                        permissions["users"]["error"] = "Token needs 'users:read' permission"
                     elif response.status_code == 404:
-                        permissions["users"]["error"] = "Endpoint not found"
+                        permissions["users"]["error"] = "API token doesn't have access to user data"
                     else:
                         permissions["users"]["error"] = f"HTTP {response.status_code}"
                         
@@ -69,9 +69,9 @@ class RootlyAPIClient:
                     elif response.status_code == 401:
                         permissions["incidents"]["error"] = "Unauthorized - check API token"
                     elif response.status_code == 403:
-                        permissions["incidents"]["error"] = "Forbidden - insufficient permissions"
+                        permissions["incidents"]["error"] = "Token needs 'incidents:read' permission"
                     elif response.status_code == 404:
-                        permissions["incidents"]["error"] = "Endpoint not found"
+                        permissions["incidents"]["error"] = "API token doesn't have access to incident data"
                     else:
                         permissions["incidents"]["error"] = f"HTTP {response.status_code}"
                         

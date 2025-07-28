@@ -33,6 +33,8 @@ vaderSentiment
 # AI Agent Framework
 smolagents
 litellm
+anthropic
+openai
 
 # Development
 pytest

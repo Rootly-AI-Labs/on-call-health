@@ -1454,13 +1454,13 @@ export default function IntegrationsPage() {
                                         </div>
                                       </div>
                                       {(!previewData.permissions.users?.access || !previewData.permissions.incidents?.access) && (
-                                        <div className="mt-2 p-2 bg-yellow-100 rounded text-xs">
-                                          <p className="font-medium text-yellow-800">Missing permissions:</p>
+                                        <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs">
+                                          <p className="font-medium text-red-800">Missing permissions:</p>
                                           {!previewData.permissions.users?.access && (
-                                            <p className="text-yellow-700">• Users: {previewData.permissions.users?.error}</p>
+                                            <p className="text-red-700">• Users: {previewData.permissions.users?.error}</p>
                                           )}
                                           {!previewData.permissions.incidents?.access && (
-                                            <p className="text-yellow-700">• Incidents: {previewData.permissions.incidents?.error}</p>
+                                            <p className="text-red-700">• Incidents: {previewData.permissions.incidents?.error}</p>
                                           )}
                                         </div>
                                       )}
