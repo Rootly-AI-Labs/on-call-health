@@ -10,9 +10,10 @@ from .github_integration import GitHubIntegration
 from .slack_integration import SlackIntegration
 from .user_correlation import UserCorrelation
 from .integration_mapping import IntegrationMapping
+from .user_mapping import UserMapping
 
 __all__ = [
     "Base", "get_db", "create_tables", "SessionLocal", "User", "Analysis", 
     "RootlyIntegration", "OAuthProvider", "UserEmail", "GitHubIntegration", 
-    "SlackIntegration", "UserCorrelation", "IntegrationMapping"
+    "SlackIntegration", "UserCorrelation", "IntegrationMapping", "UserMapping"
 ]

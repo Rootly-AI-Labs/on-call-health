@@ -37,6 +37,8 @@ class User(Base):
     slack_integrations = relationship("SlackIntegration", back_populates="user", cascade="all, delete-orphan")
     user_correlations = relationship("UserCorrelation", back_populates="user", cascade="all, delete-orphan")
     integration_mappings = relationship("IntegrationMapping", back_populates="user", cascade="all, delete-orphan")
+    user_mappings_owned = relationship("UserMapping", foreign_keys="UserMapping.user_id", back_populates="user", cascade="all, delete-orphan")
+    user_mappings_created = relationship("UserMapping", foreign_keys="UserMapping.created_by", back_populates="creator")
     
     def __repr__(self):
         return f"<User(id={self.id}, email='{self.email}', providers={len(self.oauth_providers)})>"
