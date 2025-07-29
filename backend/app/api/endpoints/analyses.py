@@ -102,18 +102,26 @@ async def run_burnout_analysis(
     
     # Create new analysis record
     import uuid as uuid_module
-    analysis = Analysis(
-        user_id=current_user.id,
-        rootly_integration_id=integration.id,
-        time_range=request.time_range,
-        status="pending",
-        uuid=str(uuid_module.uuid4()),  # Ensure UUID is always generated
-        config={
+    analysis_data = {
+        "user_id": current_user.id,
+        "rootly_integration_id": integration.id,
+        "time_range": request.time_range,
+        "status": "pending",
+        "config": {
             "include_weekends": request.include_weekends,
             "include_github": request.include_github,
             "include_slack": request.include_slack
         }
-    )
+    }
+    
+    # Try to add UUID if column exists
+    try:
+        analysis_data["uuid"] = str(uuid_module.uuid4())
+    except Exception:
+        # Column doesn't exist yet, will be added during migration
+        pass
+    
+    analysis = Analysis(**analysis_data)
     db.add(analysis)
     db.commit()
     db.refresh(analysis)
@@ -145,7 +153,7 @@ async def run_burnout_analysis(
     
     return AnalysisResponse(
         id=analysis.id,
-        uuid=analysis.uuid,
+        uuid=getattr(analysis, 'uuid', None),
         integration_id=analysis.rootly_integration_id,
         status=analysis.status,
         created_at=analysis.created_at,
@@ -194,7 +202,7 @@ async def list_analyses(
         response_analyses.append(
             AnalysisResponse(
                 id=analysis.id,
-                uuid=analysis.uuid,
+                uuid=getattr(analysis, 'uuid', None),
                 integration_id=analysis.rootly_integration_id,
                 status=analysis.status,
                 created_at=analysis.created_at,
@@ -217,10 +225,17 @@ async def get_analysis_by_uuid(
     db: Session = Depends(get_db)
 ):
     """Get a specific analysis result by UUID."""
-    analysis = db.query(Analysis).filter(
-        Analysis.uuid == analysis_uuid,
-        Analysis.user_id == current_user.id
-    ).first()
+    try:
+        analysis = db.query(Analysis).filter(
+            Analysis.uuid == analysis_uuid,
+            Analysis.user_id == current_user.id
+        ).first()
+    except Exception:
+        # UUID column doesn't exist yet
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="UUID lookup not available until migration is complete"
+        )
     
     if not analysis:
         raise HTTPException(
@@ -230,7 +245,7 @@ async def get_analysis_by_uuid(
     
     return AnalysisResponse(
         id=analysis.id,
-        uuid=analysis.uuid,
+        uuid=getattr(analysis, 'uuid', None),
         integration_id=analysis.rootly_integration_id,
         status=analysis.status,
         created_at=analysis.created_at,
@@ -260,7 +275,7 @@ async def get_analysis(
     
     return AnalysisResponse(
         id=analysis.id,
-        uuid=analysis.uuid,
+        uuid=getattr(analysis, 'uuid', None),
         integration_id=analysis.rootly_integration_id,
         status=analysis.status,
         created_at=analysis.created_at,
