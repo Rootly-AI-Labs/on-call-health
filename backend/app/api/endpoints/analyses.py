@@ -101,27 +101,17 @@ async def run_burnout_analysis(
         )
     
     # Create new analysis record
-    import uuid as uuid_module
-    analysis_data = {
-        "user_id": current_user.id,
-        "rootly_integration_id": integration.id,
-        "time_range": request.time_range,
-        "status": "pending",
-        "config": {
+    analysis = Analysis(
+        user_id=current_user.id,
+        rootly_integration_id=integration.id,
+        time_range=request.time_range,
+        status="pending",
+        config={
             "include_weekends": request.include_weekends,
             "include_github": request.include_github,
             "include_slack": request.include_slack
         }
-    }
-    
-    # Try to add UUID if column exists
-    try:
-        analysis_data["uuid"] = str(uuid_module.uuid4())
-    except Exception:
-        # Column doesn't exist yet, will be added during migration
-        pass
-    
-    analysis = Analysis(**analysis_data)
+    )
     db.add(analysis)
     db.commit()
     db.refresh(analysis)
