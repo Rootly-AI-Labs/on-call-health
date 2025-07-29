@@ -67,6 +67,9 @@ import {
   ExternalLink,
   TestTube,
   RotateCcw,
+  BarChart3,
+  Database,
+  Users2,
 } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
@@ -76,6 +79,34 @@ import { useBackendHealth } from "@/hooks/use-backend-health"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
+
+interface IntegrationMapping {
+  id: number
+  source_platform: string
+  source_identifier: string
+  target_platform: string
+  target_identifier: string | null
+  mapping_successful: boolean
+  mapping_method: string | null
+  error_message: string | null
+  data_collected: boolean
+  data_points_count: number | null
+  created_at: string
+  mapping_key: string
+}
+
+interface MappingStatistics {
+  overall_success_rate: number
+  total_attempts: number
+  platform_breakdown: {
+    [key: string]: {
+      total_attempts: number
+      successful: number
+      failed: number
+      success_rate: number
+    }
+  }
+}
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -188,6 +219,13 @@ export default function IntegrationsPage() {
   const [githubIntegration, setGithubIntegration] = useState<GitHubIntegration | null>(null)
   const [slackIntegration, setSlackIntegration] = useState<SlackIntegration | null>(null)
   const [activeEnhancementTab, setActiveEnhancementTab] = useState<"github" | "slack" | null>(null)
+  
+  // Mapping data state
+  const [showMappingDialog, setShowMappingDialog] = useState(false)
+  const [selectedMappingPlatform, setSelectedMappingPlatform] = useState<'github' | 'slack' | null>(null)
+  const [mappingData, setMappingData] = useState<IntegrationMapping[]>([])
+  const [mappingStats, setMappingStats] = useState<MappingStatistics | null>(null)
+  const [loadingMappingData, setLoadingMappingData] = useState(false)
   const [githubToken, setGithubToken] = useState('')
   const [slackWebhookUrl, setSlackWebhookUrl] = useState('')
   const [slackBotToken, setSlackBotToken] = useState('')
@@ -1021,6 +1059,46 @@ export default function IntegrationsPage() {
       console.error('Error loading Slack permissions:', error)
     } finally {
       setIsLoadingPermissions(false)
+    }
+  }
+
+  // Mapping data handlers
+  const loadMappingData = async (platform: 'github' | 'slack') => {
+    setLoadingMappingData(true)
+    setSelectedMappingPlatform(platform)
+    
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) {
+        toast.error('Please log in to view mapping data')
+        return
+      }
+
+      // Fetch both platform-specific mappings and overall statistics
+      const [mappingsResponse, statsResponse] = await Promise.all([
+        fetch(`${API_BASE}/integrations/mappings/platform/${platform}`, {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        }),
+        fetch(`${API_BASE}/integrations/mappings/success-rate`, {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        })
+      ])
+
+      if (mappingsResponse.ok && statsResponse.ok) {
+        const mappings = await mappingsResponse.json()
+        const stats = await statsResponse.json()
+        
+        setMappingData(mappings)
+        setMappingStats(stats)
+        setShowMappingDialog(true)
+      } else {
+        throw new Error('Failed to fetch mapping data')
+      }
+    } catch (error) {
+      console.error('Error loading mapping data:', error)
+      toast.error('Failed to load mapping data')
+    } finally {
+      setLoadingMappingData(false)
     }
   }
 
@@ -2448,7 +2526,21 @@ export default function IntegrationsPage() {
                         <CardDescription>Username: {githubIntegration.github_username}</CardDescription>
                       </div>
                     </div>
-                    <div className="flex items-center">
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => loadMappingData('github')}
+                        disabled={loadingMappingData}
+                        className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                        title="View Data Mapping"
+                      >
+                        {loadingMappingData && selectedMappingPlatform === 'github' ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <BarChart3 className="w-4 h-4" />
+                        )}
+                      </Button>
                       <Button
                         size="sm"
                         variant="ghost"
@@ -2520,6 +2612,20 @@ export default function IntegrationsPage() {
                       </div>
                     </div>
                     <div className="flex items-center space-x-2">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => loadMappingData('slack')}
+                        disabled={loadingMappingData}
+                        className="h-8 w-8 p-0 text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+                        title="View Data Mapping"
+                      >
+                        {loadingMappingData && selectedMappingPlatform === 'slack' ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <BarChart3 className="w-4 h-4" />
+                        )}
+                      </Button>
                       <Button
                         size="sm"
                         variant="ghost"
@@ -2856,6 +2962,129 @@ export default function IntegrationsPage() {
           </div>
         )}
       </main>
+
+      {/* Data Mapping Dialog */}
+      <Dialog open={showMappingDialog} onOpenChange={setShowMappingDialog}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <BarChart3 className="w-5 h-5" />
+              <span>
+                {selectedMappingPlatform === 'github' ? 'GitHub' : 'Slack'} Data Mapping
+              </span>
+            </DialogTitle>
+            <DialogDescription>
+              View how team members from your incident data are mapped to {selectedMappingPlatform === 'github' ? 'GitHub' : 'Slack'} accounts.
+            </DialogDescription>
+          </DialogHeader>
+
+          {mappingStats && (
+            <div className="space-y-6">
+              {/* Overall Statistics */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Card className="p-4">
+                  <div className="flex items-center space-x-2">
+                    <Users2 className="w-4 h-4 text-blue-600" />
+                    <div>
+                      <div className="text-2xl font-bold">{mappingStats.total_attempts}</div>
+                      <div className="text-sm text-gray-600">Total Attempts</div>
+                    </div>
+                  </div>
+                </Card>
+                <Card className="p-4">
+                  <div className="flex items-center space-x-2">
+                    <CheckCircle className="w-4 h-4 text-green-600" />
+                    <div>
+                      <div className="text-2xl font-bold text-green-600">
+                        {mappingStats.overall_success_rate}%
+                      </div>
+                      <div className="text-sm text-gray-600">Success Rate</div>
+                    </div>
+                  </div>
+                </Card>
+                <Card className="p-4">
+                  <div className="flex items-center space-x-2">
+                    <Database className="w-4 h-4 text-purple-600" />
+                    <div>
+                      <div className="text-2xl font-bold">
+                        {mappingData.filter(m => m.data_collected).length}
+                      </div>
+                      <div className="text-sm text-gray-600">With Data</div>
+                    </div>
+                  </div>
+                </Card>
+              </div>
+
+              {/* Mapping Results Table */}
+              <div className="space-y-3">
+                <h3 className="text-lg font-semibold">Mapping Results</h3>
+                <div className="border rounded-lg overflow-hidden">
+                  <div className="bg-gray-50 px-4 py-3 border-b">
+                    <div className="grid grid-cols-5 gap-4 text-sm font-medium text-gray-600">
+                      <div>Team Member</div>
+                      <div>Status</div>
+                      <div>{selectedMappingPlatform === 'github' ? 'GitHub User' : 'Slack User'}</div>
+                      <div>Data Points</div>
+                      <div>Method</div>
+                    </div>
+                  </div>
+                  <div className="divide-y max-h-64 overflow-y-auto">
+                    {mappingData.length > 0 ? mappingData.map((mapping) => (
+                      <div key={mapping.id} className="px-4 py-3">
+                        <div className="grid grid-cols-5 gap-4 text-sm">
+                          <div className="font-medium truncate" title={mapping.source_identifier}>
+                            {mapping.source_identifier}
+                          </div>
+                          <div>
+                            {mapping.mapping_successful ? (
+                              <Badge variant="default" className="bg-green-100 text-green-800 border-green-200">
+                                <CheckCircle className="w-3 h-3 mr-1" />
+                                Success
+                              </Badge>
+                            ) : (
+                              <Badge variant="destructive" className="bg-red-100 text-red-800 border-red-200">
+                                <AlertCircle className="w-3 h-3 mr-1" />
+                                Failed
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="truncate" title={mapping.target_identifier || mapping.error_message || ''}>
+                            {mapping.target_identifier || (
+                              <span className="text-gray-400 italic">
+                                {mapping.error_message || 'No data found'}
+                              </span>
+                            )}
+                          </div>
+                          <div>
+                            {mapping.data_points_count ? (
+                              <span className="text-blue-600 font-medium">{mapping.data_points_count}</span>
+                            ) : (
+                              <span className="text-gray-400">0</span>
+                            )}
+                          </div>
+                          <div className="text-gray-600">
+                            {mapping.mapping_method?.replace('_', ' ') || 'Unknown'}
+                          </div>
+                        </div>
+                      </div>
+                    )) : (
+                      <div className="px-4 py-8 text-center text-gray-500">
+                        No mapping data available yet. Run an analysis to see mapping results.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowMappingDialog(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* GitHub Disconnect Confirmation Dialog */}
       <Dialog open={githubDisconnectDialogOpen} onOpenChange={setGithubDisconnectDialogOpen}>
