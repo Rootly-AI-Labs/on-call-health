@@ -32,6 +32,7 @@ class RunAnalysisRequest(BaseModel):
 
 class AnalysisResponse(BaseModel):
     id: int
+    uuid: str
     integration_id: Optional[int]
     status: str
     created_at: datetime
@@ -142,6 +143,7 @@ async def run_burnout_analysis(
     
     return AnalysisResponse(
         id=analysis.id,
+        uuid=analysis.uuid,
         integration_id=analysis.rootly_integration_id,
         status=analysis.status,
         created_at=analysis.created_at,
@@ -190,6 +192,7 @@ async def list_analyses(
         response_analyses.append(
             AnalysisResponse(
                 id=analysis.id,
+                uuid=analysis.uuid,
                 integration_id=analysis.rootly_integration_id,
                 status=analysis.status,
                 created_at=analysis.created_at,
@@ -202,6 +205,36 @@ async def list_analyses(
     return AnalysisListResponse(
         analyses=response_analyses,
         total=total
+    )
+
+
+@router.get("/uuid/{analysis_uuid}", response_model=AnalysisResponse)
+async def get_analysis_by_uuid(
+    analysis_uuid: str,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get a specific analysis result by UUID."""
+    analysis = db.query(Analysis).filter(
+        Analysis.uuid == analysis_uuid,
+        Analysis.user_id == current_user.id
+    ).first()
+    
+    if not analysis:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Analysis not found"
+        )
+    
+    return AnalysisResponse(
+        id=analysis.id,
+        uuid=analysis.uuid,
+        integration_id=analysis.rootly_integration_id,
+        status=analysis.status,
+        created_at=analysis.created_at,
+        completed_at=analysis.completed_at,
+        time_range=analysis.time_range or 30,
+        analysis_data=analysis.results
     )
 
 
@@ -225,6 +258,7 @@ async def get_analysis(
     
     return AnalysisResponse(
         id=analysis.id,
+        uuid=analysis.uuid,
         integration_id=analysis.rootly_integration_id,
         status=analysis.status,
         created_at=analysis.created_at,

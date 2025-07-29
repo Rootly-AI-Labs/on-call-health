@@ -1,6 +1,7 @@
 """
 Analysis model for storing burnout analysis results.
 """
+import uuid
 from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, JSON
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -10,6 +11,7 @@ class Analysis(Base):
     __tablename__ = "analyses"
     
     id = Column(Integer, primary_key=True, index=True)
+    uuid = Column(String(36), unique=True, index=True, nullable=False, default=lambda: str(uuid.uuid4()))
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     rootly_integration_id = Column(Integer, ForeignKey("rootly_integrations.id"), nullable=True)
     time_range = Column(Integer, default=30)  # Time range in days
