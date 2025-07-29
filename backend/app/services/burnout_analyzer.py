@@ -1213,18 +1213,33 @@ class BurnoutAnalyzerService:
     
     def _parse_timestamp(self, timestamp: str) -> Optional[datetime]:
         """Parse ISO format timestamp."""
+        if not timestamp:
+            return None
         try:
+            # Handle various timestamp formats
+            if isinstance(timestamp, datetime):
+                return timestamp
             return datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
-        except:
+        except Exception as e:
+            logger.warning(f"Error parsing timestamp '{timestamp}': {e}")
             return None
     
     def _calculate_response_time(self, created_at: str, started_at: str) -> Optional[float]:
         """Calculate response time in minutes."""
+        # Check for None or empty values before parsing
+        if not created_at or not started_at:
+            return None
+            
         created = self._parse_timestamp(created_at)
         started = self._parse_timestamp(started_at)
         
         if created and started:
-            return (started - created).total_seconds() / 60
+            try:
+                delta = started - created
+                return delta.total_seconds() / 60
+            except Exception as e:
+                logger.warning(f"Error calculating response time: {e}")
+                return None
         return None
     
     def _calculate_workload_variance(self, members: List[Dict[str, Any]]) -> float:

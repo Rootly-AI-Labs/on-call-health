@@ -4,6 +4,9 @@ Sentiment Analysis Tool for Burnout Detection Agent
 from typing import Dict, List, Any
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 import statistics
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class SentimentAnalyzerTool:

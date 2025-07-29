@@ -1421,15 +1421,14 @@ export default function IntegrationsPage() {
                 {activeTab !== 'rootly' && rootlyCount > 0 && (
                   <Badge variant="secondary" className="absolute top-4 right-4">{rootlyCount}</Badge>
                 )}
-                <div className="flex items-center justify-center gap-3">
+                <div className="flex items-center justify-center">
                   <Image
-                    src="/images/rootly-logo-new.png"
+                    src="/images/rootly-logo-branded.png"
                     alt="Rootly"
-                    width={80}
+                    width={200}
                     height={80}
-                    className="h-20 w-20 object-contain"
+                    className="h-16 w-auto object-contain"
                   />
-                  <span className="text-5xl font-bold" style={{ color: '#F5A623' }}>rootly</span>
                 </div>
               </Card>
 
@@ -1596,7 +1595,7 @@ export default function IntegrationsPage() {
                 <CardHeader className="p-8">
                   <div className="flex items-center space-x-3">
                     <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                      <Image src="/images/rootly-logo-new.png" alt="Rootly" width={24} height={24} />
+                      <Image src="/images/rootly-logo-branded.png" alt="Rootly" width={24} height={24} />
                     </div>
                     <div>
                       <CardTitle>Add Rootly Integration</CardTitle>

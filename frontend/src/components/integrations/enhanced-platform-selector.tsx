@@ -78,7 +78,7 @@ export function EnhancedPlatformSelector({
       description: "Incident management and response",
       icon: (
         <Image
-          src="/images/rootly-logo-final.svg"
+          src="/images/rootly-logo-branded.png"
           alt="Rootly"
           width={48}
           height={48}

@@ -269,7 +269,7 @@ export default function PlatformSelectionPage() {
                 <CheckCircle className="w-6 h-6 text-purple-600 absolute top-4 right-4" />
               )}
               <Image
-                src="/images/rootly-logo-final.svg"
+                src="/images/rootly-logo-branded.png"
                 alt="Rootly"
                 width={220}
                 height={50}

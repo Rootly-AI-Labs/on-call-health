@@ -4,7 +4,10 @@ Pattern Analysis Tool for Burnout Detection Agent
 from typing import Dict, List, Any, Tuple
 from datetime import datetime, timedelta
 import statistics
+import logging
 from collections import defaultdict, Counter
+
+logger = logging.getLogger(__name__)
 
 
 class PatternAnalyzerTool:

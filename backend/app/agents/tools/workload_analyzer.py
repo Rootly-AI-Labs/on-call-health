@@ -3,7 +3,10 @@ Workload Analysis Tool for Burnout Detection Agent
 """
 from typing import Dict, List, Any, Optional
 import statistics
+import logging
 from datetime import datetime, timedelta
+
+logger = logging.getLogger(__name__)
 
 
 class WorkloadAnalyzerTool:

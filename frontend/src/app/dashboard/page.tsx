@@ -172,6 +172,7 @@ interface OrganizationMember {
 
 interface AnalysisResult {
   id: string
+  uuid?: string
   integration_id: number
   created_at: string
   status: string
@@ -519,12 +520,12 @@ export default function Dashboard() {
   //   autoStart: true,
   // })
 
-  // Function to update URL with analysis ID
-  const updateURLWithAnalysis = (analysisId: number | null) => {
+  // Function to update URL with analysis ID (UUID)
+  const updateURLWithAnalysis = (analysisId: string | null) => {
     const params = new URLSearchParams(searchParams.toString())
     
     if (analysisId) {
-      params.set('analysis', analysisId.toString())
+      params.set('analysis', analysisId)
     } else {
       params.delete('analysis')
     }
@@ -713,7 +714,7 @@ export default function Dashboard() {
     
     // Load specific analysis if provided in URL
     if (analysisId) {
-      loadSpecificAnalysis(parseInt(analysisId))
+      loadSpecificAnalysis(analysisId)
     }
 
     // Listen for localStorage changes (when integrations are updated on other pages)
@@ -835,12 +836,16 @@ export default function Dashboard() {
     }
   }
 
-  const loadSpecificAnalysis = async (analysisId: number) => {
+  const loadSpecificAnalysis = async (analysisId: string) => {
     try {
       const authToken = localStorage.getItem('auth_token')
       if (!authToken) return
 
-      const response = await fetch(`${API_BASE}/analyses/${analysisId}`, {
+      // Check if analysisId is a UUID or integer ID
+      const isUuid = analysisId.includes('-')
+      const endpoint = isUuid ? `${API_BASE}/analyses/uuid/${analysisId}` : `${API_BASE}/analyses/${analysisId}`
+
+      const response = await fetch(endpoint, {
         headers: {
           'Authorization': `Bearer ${authToken}`
         }
@@ -848,8 +853,12 @@ export default function Dashboard() {
 
       if (response.ok) {
         const analysis = await response.json()
-        console.log('Loaded specific analysis from URL:', analysis.id)
+        console.log('Loaded specific analysis from URL:', analysis.uuid || analysis.id)
         setCurrentAnalysis(analysis)
+        // Update URL to use UUID if we loaded by integer ID
+        if (!isUuid && analysis.uuid) {
+          updateURLWithAnalysis(analysis.uuid || analysis.id)
+        }
       } else {
         console.error('Failed to load analysis:', analysisId)
         // Remove invalid analysis ID from URL
@@ -1550,7 +1559,7 @@ export default function Dashboard() {
                 setTimeout(() => {
                   setAnalysisRunning(false)
                   setCurrentAnalysis(analysisData)
-                  updateURLWithAnalysis(parseInt(analysisData.id))
+                  updateURLWithAnalysis(analysisData.uuid || analysisData.id)
                 }, 500) // Show 100% for just 0.5 seconds before showing data
               }, 800) // Wait 0.8 seconds to reach 95%
               
@@ -1565,7 +1574,7 @@ export default function Dashboard() {
               // Check if we have partial data to display
               if (analysisData.analysis_data?.partial_data) {
                 setCurrentAnalysis(analysisData)
-                updateURLWithAnalysis(analysisData.id)
+                updateURLWithAnalysis(analysisData.uuid)
                 toast("Analysis completed with partial data")
                 await loadPreviousAnalyses()
               } else {
@@ -2058,16 +2067,16 @@ export default function Dashboard() {
                                 memberCount: fullAnalysis.analysis_data?.team_analysis?.members?.length || 0
                               })
                               setCurrentAnalysis(fullAnalysis)
-                              updateURLWithAnalysis(parseInt(fullAnalysis.id))
+                              updateURLWithAnalysis(fullAnalysis.uuid || fullAnalysis.id)
                             } else {
                               console.error('Failed to fetch full analysis')
                               setCurrentAnalysis(analysis)
-                              updateURLWithAnalysis(parseInt(analysis.id))
+                              updateURLWithAnalysis(analysis.uuid || analysis.id)
                             }
                           } catch (error) {
                             console.error('Error fetching full analysis:', error)
                             setCurrentAnalysis(analysis)
-                            updateURLWithAnalysis(parseInt(analysis.id))
+                            updateURLWithAnalysis(analysis.uuid || analysis.id)
                           }
                         } else {
                           console.log('Analysis already has data:', {
@@ -2075,7 +2084,7 @@ export default function Dashboard() {
                             memberCount: Array.isArray(analysis.analysis_data.team_analysis) ? analysis.analysis_data.team_analysis.length : (analysis.analysis_data.team_analysis?.members?.length || 0)
                           })
                           setCurrentAnalysis(analysis)
-                          updateURLWithAnalysis(parseInt(analysis.id))
+                          updateURLWithAnalysis(analysis.uuid || analysis.id)
                         }
                       }}
                     >
