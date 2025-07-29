@@ -53,7 +53,16 @@ export default function LandingPage() {
             />
             <div className="flex items-center">
               <span className="text-xl font-bold text-slate-900">OnCall Burnout</span>
-              <span className="text-sm text-slate-500 ml-2">powered by Rootly</span>
+              <span className="text-sm text-slate-500 ml-2 flex items-center">
+                powered by
+                <Image 
+                  src="/images/rootly-logo-final.svg" 
+                  alt="Rootly" 
+                  width={16} 
+                  height={16}
+                  className="w-4 h-4 ml-1"
+                />
+              </span>
             </div>
           </div>
           <div className="flex items-center space-x-4">
@@ -207,7 +216,16 @@ export default function LandingPage() {
               </div>
               <div className="flex items-center">
                 <span className="text-xl font-semibold text-white">OnCall Burnout</span>
-                <span className="text-sm text-slate-400 ml-2">powered by Rootly</span>
+                <span className="text-sm text-slate-400 ml-2 flex items-center">
+                  powered by
+                  <Image 
+                    src="/images/rootly-logo-final.svg" 
+                    alt="Rootly" 
+                    width={16} 
+                    height={16}
+                    className="w-4 h-4 ml-1 opacity-80"
+                  />
+                </span>
               </div>
             </div>
 
