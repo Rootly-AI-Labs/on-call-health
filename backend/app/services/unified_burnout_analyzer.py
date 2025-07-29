@@ -1587,30 +1587,14 @@ class UnifiedBurnoutAnalyzer:
         return incidents
 
     def _generate_daily_trends(self, incidents: List[Dict[str, Any]], team_analysis: List[Dict[str, Any]], metadata: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Generate daily trend data from incidents and team analysis."""
+        """Generate daily trend data from incidents and team analysis - only includes days with incidents."""
         try:
             days_analyzed = metadata.get("days_analyzed", 30) if isinstance(metadata, dict) else 30
-            end_date = datetime.now()
-            start_date = end_date - timedelta(days=days_analyzed)
             
-            # Initialize daily data structure
+            # Initialize daily data structure - only for days with incidents
             daily_data = {}
-            current_date = start_date
             
-            # Initialize all days with zero incidents
-            while current_date <= end_date:
-                date_str = current_date.strftime("%Y-%m-%d")
-                daily_data[date_str] = {
-                    "date": date_str,
-                    "incident_count": 0,
-                    "severity_weighted_count": 0.0,
-                    "after_hours_count": 0,
-                    "users_involved": set(),
-                    "high_severity_count": 0
-                }
-                current_date += timedelta(days=1)
-            
-            # Process incidents to populate daily data
+            # Process incidents to populate daily data - only for days with incidents
             if incidents and isinstance(incidents, list):
                 for incident in incidents:
                     try:
@@ -1634,12 +1618,22 @@ class UnifiedBurnoutAnalyzer:
                             incident_date = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
                             date_str = incident_date.strftime("%Y-%m-%d")
                             
-                            if date_str in daily_data:
-                                daily_data[date_str]["incident_count"] += 1
-                                
-                                # Add severity weight - handle both platforms
-                                severity_weight = 1.0
-                                if self.platform == "pagerduty":
+                            # Initialize day data if this is the first incident for this day
+                            if date_str not in daily_data:
+                                daily_data[date_str] = {
+                                    "date": date_str,
+                                    "incident_count": 0,
+                                    "severity_weighted_count": 0.0,
+                                    "after_hours_count": 0,
+                                    "users_involved": set(),
+                                    "high_severity_count": 0
+                                }
+                            
+                            daily_data[date_str]["incident_count"] += 1
+                            
+                            # Add severity weight - handle both platforms
+                            severity_weight = 1.0
+                            if self.platform == "pagerduty":
                                     urgency = incident.get("urgency", "low")
                                     if urgency == "high":
                                         severity_weight = 2.0
@@ -1703,38 +1697,98 @@ class UnifiedBurnoutAnalyzer:
                 # Convert set to count
                 users_involved_count = len(day_data["users_involved"])
                 
-                # Calculate daily health score based on incident load
+                # Calculate daily health score (SimpleBurnoutAnalyzer approach)
                 incident_count = day_data["incident_count"]
                 severity_weighted = day_data["severity_weighted_count"]
                 after_hours_count = day_data["after_hours_count"]
+                high_severity_count = day_data["high_severity_count"]
                 
-                # Simple scoring: start with 90% health, deduct for incidents
-                daily_score = 90.0
-                if incident_count > 0:
-                    # Deduct points for incidents (more for high severity)
-                    daily_score -= min(severity_weighted * 5, 40)  # Max 40 point deduction
-                    # Extra deduction for after-hours incidents
-                    daily_score -= min(after_hours_count * 3, 20)  # Max 20 point deduction
-                    # Extra deduction for many users involved (distributed load is better)
-                    if users_involved_count < 2 and incident_count > 3:
-                        daily_score -= 10  # Concentration penalty
+                # Advanced scoring algorithm from SimpleBurnoutAnalyzer
+                # Start with baseline of 8.7 for operational activity days
+                daily_score = 8.7
+                total_team_size = len(team_analysis) if team_analysis else 1
                 
-                daily_score = max(daily_score, 10.0)  # Minimum 10% health
+                # Calculate proportional rates based on team size (normalized to team size)
+                daily_incident_rate = incident_count / max(total_team_size, 1)
+                daily_severity_rate = severity_weighted / max(total_team_size, 1)
+                
+                # Apply targeted penalties with team-size normalization
+                # Base incident load penalty (proportional to team size)
+                daily_score -= min(daily_incident_rate * 0.8, 2.0)
+                
+                # Severity penalty (more aggressive for high severity)
+                daily_score -= min(daily_severity_rate * 1.2, 3.0)
+                
+                # After-hours penalty (operational stress)
+                if after_hours_count > 0:
+                    after_hours_penalty = min(after_hours_count * 0.5, 1.5)
+                    daily_score -= after_hours_penalty
+                
+                # High-severity incident penalty (critical operational impact)
+                if high_severity_count > 0:
+                    critical_penalty = min(high_severity_count * 0.8, 2.0)
+                    daily_score -= critical_penalty
+                
+                # Concentration penalty - if too few people handling too many incidents
+                if users_involved_count > 0 and users_involved_count < total_team_size * 0.3:
+                    concentration_ratio = incident_count / users_involved_count
+                    if concentration_ratio > 2:
+                        concentration_penalty = min((concentration_ratio - 2) * 0.3, 1.0)
+                        daily_score -= concentration_penalty
+                
+                # Floor at 2.0 (20% health) even on worst days
+                daily_score = max(daily_score, 2.0)
+                
+                # Calculate members at risk for this day (sophisticated risk assessment)
+                members_at_risk = 0
+                total_members = users_involved_count
+                
+                if users_involved_count > 0:
+                    # Risk assessment based on daily load per person
+                    avg_incidents_per_person = incident_count / users_involved_count
+                    if avg_incidents_per_person > 3:
+                        members_at_risk = max(1, int(users_involved_count * 0.8))
+                    elif avg_incidents_per_person > 2:
+                        members_at_risk = max(1, int(users_involved_count * 0.5))
+                    elif after_hours_count > 0:
+                        members_at_risk = max(1, int(users_involved_count * 0.3))
+                
+                # Determine health status
+                health_status = self._determine_health_status_from_score(daily_score)
                 
                 daily_trends.append({
                     "date": date_str,
-                    "overall_score": round(daily_score / 10, 2),  # Convert to 0-10 scale
+                    "overall_score": round(daily_score, 2),  # Keep as 0-10 scale (SimpleBurnoutAnalyzer approach)
                     "incident_count": incident_count,
                     "severity_weighted_count": round(severity_weighted, 1),
                     "after_hours_count": after_hours_count,
-                    "high_severity_count": day_data["high_severity_count"],
-                    "users_involved_count": users_involved_count,
-                    "health_percentage": round(daily_score, 1)
+                    "high_severity_count": high_severity_count,
+                    "users_involved": users_involved_count,  # Match SimpleBurnoutAnalyzer field name
+                    "members_at_risk": members_at_risk,
+                    "total_members": total_members,
+                    "health_status": health_status,
+                    "health_percentage": round(daily_score * 10, 1)  # Convert to percentage for display
                 })
             
-            logger.info(f"Generated {len(daily_trends)} daily trend data points for {days_analyzed}-day analysis")
-            return daily_trends
+            # Filter out days with zero incidents (SimpleBurnoutAnalyzer approach)
+            meaningful_trends = [day for day in daily_trends if day["incident_count"] > 0]
+            
+            logger.info(f"Generated {len(meaningful_trends)} meaningful daily trend data points (filtered from {len(daily_trends)} total days) for {days_analyzed}-day analysis")
+            return meaningful_trends
             
         except Exception as e:
             logger.error(f"Error in _generate_daily_trends: {e}")
             return []
+    
+    def _determine_health_status_from_score(self, score: float) -> str:
+        """Determine health status from burnout score (SimpleBurnoutAnalyzer approach)."""
+        if score >= 8.5:
+            return "excellent"
+        elif score >= 7.0:
+            return "good"  
+        elif score >= 5.0:
+            return "fair"
+        elif score >= 3.0:
+            return "poor"
+        else:
+            return "critical"
