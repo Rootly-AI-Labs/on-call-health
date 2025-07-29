@@ -41,19 +41,29 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}
-      <header className="border-b border-slate-200">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
+      <header className="border-b border-slate-200 bg-white">
+        <div className="container mx-auto px-4 py-2 flex items-center justify-between">
+          <div className="flex items-center space-x-2">
             <Image 
               src="/images/rootly-logo-final.svg" 
               alt="Rootly Logo" 
-              width={200} 
-              height={200}
-              className="w-40 h-40"
+              width={40} 
+              height={40}
+              className="w-10 h-10"
             />
-            <span className="text-xl font-semibold text-slate-900">Rootly Burnout Detector</span>
+            <div className="flex items-center">
+              <span className="text-xl font-bold text-slate-900">OnCall Burnout</span>
+              <span className="text-sm text-slate-500 ml-2">powered by Rootly</span>
+            </div>
           </div>
-
+          <div className="flex items-center space-x-4">
+            <Link href="#login" className="text-sm text-slate-600 hover:text-slate-900 transition-colors">
+              Sign In
+            </Link>
+            <Button size="sm" className="bg-purple-600 hover:bg-purple-700 text-white">
+              Get Started
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -195,7 +205,10 @@ export default function LandingPage() {
               <div className="w-8 h-8 bg-gradient-to-br from-purple-600 to-purple-700 rounded-lg flex items-center justify-center">
                 <Activity className="w-5 h-5 text-white" />
               </div>
-              <span className="text-xl font-semibold text-white">Rootly Burnout Detector</span>
+              <div className="flex items-center">
+                <span className="text-xl font-semibold text-white">OnCall Burnout</span>
+                <span className="text-sm text-slate-400 ml-2">powered by Rootly</span>
+              </div>
             </div>
 
             <div className="flex items-center space-x-6 text-sm">
@@ -207,7 +220,7 @@ export default function LandingPage() {
 
           <div className="border-t border-slate-800 mt-8 pt-8 text-center">
             <p className="text-slate-400">
-              © {new Date().getFullYear()} Rootly Burnout Detector. Free for all engineering teams.
+              © {new Date().getFullYear()} OnCall Burnout by Rootly. Free for all engineering teams.
             </p>
           </div>
         </div>
