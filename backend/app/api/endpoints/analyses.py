@@ -32,7 +32,7 @@ class RunAnalysisRequest(BaseModel):
 
 class AnalysisResponse(BaseModel):
     id: int
-    uuid: str
+    uuid: Optional[str]
     integration_id: Optional[int]
     status: str
     created_at: datetime
@@ -101,11 +101,13 @@ async def run_burnout_analysis(
         )
     
     # Create new analysis record
+    import uuid as uuid_module
     analysis = Analysis(
         user_id=current_user.id,
         rootly_integration_id=integration.id,
         time_range=request.time_range,
         status="pending",
+        uuid=str(uuid_module.uuid4()),  # Ensure UUID is always generated
         config={
             "include_weekends": request.include_weekends,
             "include_github": request.include_github,
