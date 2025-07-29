@@ -108,6 +108,32 @@ interface MappingStatistics {
   }
 }
 
+interface ManualMapping {
+  id: number
+  source_platform: string
+  source_identifier: string
+  target_platform: string
+  target_identifier: string
+  mapping_type: string
+  confidence_score?: number
+  last_verified?: string
+  created_at: string
+  updated_at?: string
+  status: string
+  is_verified: boolean
+  mapping_key: string
+}
+
+interface ManualMappingStatistics {
+  total_mappings: number
+  manual_mappings: number
+  auto_detected_mappings: number
+  verified_mappings: number
+  verification_rate: number
+  platform_breakdown: { [key: string]: { [key: string]: number } }
+  last_updated?: string
+}
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 // Validation schemas
@@ -226,6 +252,21 @@ export default function IntegrationsPage() {
   const [mappingData, setMappingData] = useState<IntegrationMapping[]>([])
   const [mappingStats, setMappingStats] = useState<MappingStatistics | null>(null)
   const [loadingMappingData, setLoadingMappingData] = useState(false)
+  
+  // Manual mapping state
+  const [showManualMappingDialog, setShowManualMappingDialog] = useState(false)
+  const [manualMappings, setManualMappings] = useState<ManualMapping[]>([])
+  const [manualMappingStats, setManualMappingStats] = useState<ManualMappingStatistics | null>(null)
+  const [selectedManualMappingPlatform, setSelectedManualMappingPlatform] = useState<'github' | 'slack' | null>(null)
+  const [loadingManualMappings, setLoadingManualMappings] = useState(false)
+  const [newMappingDialogOpen, setNewMappingDialogOpen] = useState(false)
+  const [editingMapping, setEditingMapping] = useState<ManualMapping | null>(null)
+  const [newMappingForm, setNewMappingForm] = useState({
+    source_platform: 'rootly' as string,
+    source_identifier: '',
+    target_platform: 'github' as string,
+    target_identifier: ''
+  })
   const [githubToken, setGithubToken] = useState('')
   const [slackWebhookUrl, setSlackWebhookUrl] = useState('')
   const [slackBotToken, setSlackBotToken] = useState('')
@@ -1099,6 +1140,157 @@ export default function IntegrationsPage() {
       toast.error('Failed to load mapping data')
     } finally {
       setLoadingMappingData(false)
+    }
+  }
+
+  // Manual mapping handlers
+  const loadManualMappings = async (platform: 'github' | 'slack') => {
+    try {
+      setLoadingManualMappings(true)
+      setSelectedManualMappingPlatform(platform)
+      
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) {
+        toast.error('Please log in to view manual mappings')
+        return
+      }
+      
+      const [mappingsResponse, statsResponse] = await Promise.all([
+        fetch(`${API_BASE}/integrations/manual-mappings?target_platform=${platform}`, {
+          headers: {
+            'Authorization': `Bearer ${authToken}`,
+            'Content-Type': 'application/json'
+          }
+        }),
+        fetch(`${API_BASE}/integrations/manual-mappings/statistics`, {
+          headers: {
+            'Authorization': `Bearer ${authToken}`,
+            'Content-Type': 'application/json'
+          }
+        })
+      ])
+      
+      if (mappingsResponse.ok && statsResponse.ok) {
+        const mappingsData = await mappingsResponse.json()
+        const statsData = await statsResponse.json()
+        
+        setManualMappings(mappingsData)
+        setManualMappingStats(statsData)
+        setShowManualMappingDialog(true)
+      } else {
+        toast.error('Failed to load manual mappings')
+      }
+    } catch (error) {
+      console.error('Error loading manual mappings:', error)
+      toast.error('Failed to load manual mappings')
+    } finally {
+      setLoadingManualMappings(false)
+    }
+  }
+
+  const createManualMapping = async () => {
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) {
+        toast.error('Please log in to create mappings')
+        return
+      }
+
+      const response = await fetch(`${API_BASE}/integrations/manual-mappings`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(newMappingForm)
+      })
+      
+      if (response.ok) {
+        toast.success('Manual mapping created successfully')
+        // Reload mappings if dialog is open
+        if (showManualMappingDialog && selectedManualMappingPlatform) {
+          loadManualMappings(selectedManualMappingPlatform)
+        }
+        setNewMappingDialogOpen(false)
+        setNewMappingForm({
+          source_platform: 'rootly',
+          source_identifier: '',
+          target_platform: selectedManualMappingPlatform || 'github',
+          target_identifier: ''
+        })
+      } else {
+        const errorData = await response.json()
+        toast.error(errorData.detail || 'Failed to create mapping')
+      }
+    } catch (error) {
+      console.error('Error creating manual mapping:', error)
+      toast.error('Failed to create mapping')
+    }
+  }
+
+  const updateManualMapping = async (mappingId: number, targetIdentifier: string) => {
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) {
+        toast.error('Please log in to update mappings')
+        return
+      }
+
+      const response = await fetch(`${API_BASE}/integrations/manual-mappings/${mappingId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ target_identifier: targetIdentifier })
+      })
+      
+      if (response.ok) {
+        toast.success('Manual mapping updated successfully')
+        // Reload mappings
+        if (showManualMappingDialog && selectedManualMappingPlatform) {
+          loadManualMappings(selectedManualMappingPlatform)
+        }
+        setEditingMapping(null)
+      } else {
+        const errorData = await response.json()
+        toast.error(errorData.detail || 'Failed to update mapping')
+      }
+    } catch (error) {
+      console.error('Error updating manual mapping:', error)
+      toast.error('Failed to update mapping')
+    }
+  }
+
+  const deleteManualMapping = async (mappingId: number) => {
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) {
+        toast.error('Please log in to delete mappings')
+        return
+      }
+
+      const response = await fetch(`${API_BASE}/integrations/manual-mappings/${mappingId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      if (response.ok) {
+        toast.success('Manual mapping deleted successfully')
+        // Reload mappings
+        if (showManualMappingDialog && selectedManualMappingPlatform) {
+          loadManualMappings(selectedManualMappingPlatform)
+        }
+      } else {
+        const errorData = await response.json()
+        toast.error(errorData.detail || 'Failed to delete mapping')
+      }
+    } catch (error) {
+      console.error('Error deleting manual mapping:', error)
+      toast.error('Failed to delete mapping')
     }
   }
 
@@ -2544,6 +2736,20 @@ export default function IntegrationsPage() {
                       <Button
                         size="sm"
                         variant="ghost"
+                        onClick={() => loadManualMappings('github')}
+                        disabled={loadingManualMappings}
+                        className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
+                        title="Manage Manual Mappings"
+                      >
+                        {loadingManualMappings && selectedManualMappingPlatform === 'github' ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Users2 className="w-4 h-4" />
+                        )}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
                         onClick={() => setGithubDisconnectDialogOpen(true)}
                         className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
                       >
@@ -2624,6 +2830,20 @@ export default function IntegrationsPage() {
                           <Loader2 className="w-4 h-4 animate-spin" />
                         ) : (
                           <BarChart3 className="w-4 h-4" />
+                        )}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => loadManualMappings('slack')}
+                        disabled={loadingManualMappings}
+                        className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
+                        title="Manage Manual Mappings"
+                      >
+                        {loadingManualMappings && selectedManualMappingPlatform === 'slack' ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Users2 className="w-4 h-4" />
                         )}
                       </Button>
                       <Button
@@ -3081,6 +3301,317 @@ export default function IntegrationsPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowMappingDialog(false)}>
               Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Manual Mapping Management Dialog */}
+      <Dialog open={showManualMappingDialog} onOpenChange={setShowManualMappingDialog}>
+        <DialogContent className="max-w-5xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <Users2 className="w-5 h-5" />
+              <span>
+                Manage {selectedManualMappingPlatform === 'github' ? 'GitHub' : 'Slack'} Manual Mappings
+              </span>
+            </DialogTitle>
+            <DialogDescription>
+              Create and manage manual user mappings for {selectedManualMappingPlatform === 'github' ? 'GitHub' : 'Slack'} platform correlations.
+            </DialogDescription>
+          </DialogHeader>
+
+          {manualMappingStats && (
+            <div className="space-y-6">
+              {/* Statistics Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <Card className="p-4">
+                  <div className="flex items-center space-x-2">
+                    <Database className="w-4 h-4 text-blue-600" />
+                    <div>
+                      <div className="text-2xl font-bold">{manualMappingStats.total_mappings}</div>
+                      <div className="text-sm text-gray-600">Total Mappings</div>
+                    </div>
+                  </div>
+                </Card>
+                <Card className="p-4">
+                  <div className="flex items-center space-x-2">
+                    <Edit3 className="w-4 h-4 text-green-600" />
+                    <div>
+                      <div className="text-2xl font-bold text-green-600">
+                        {manualMappingStats.manual_mappings}
+                      </div>
+                      <div className="text-sm text-gray-600">Manual</div>
+                    </div>
+                  </div>
+                </Card>
+                <Card className="p-4">
+                  <div className="flex items-center space-x-2">
+                    <Zap className="w-4 h-4 text-purple-600" />
+                    <div>
+                      <div className="text-2xl font-bold text-purple-600">
+                        {manualMappingStats.auto_detected_mappings}
+                      </div>
+                      <div className="text-sm text-gray-600">Auto-Detected</div>
+                    </div>
+                  </div>
+                </Card>
+                <Card className="p-4">
+                  <div className="flex items-center space-x-2">
+                    <CheckCircle className="w-4 h-4 text-green-600" />
+                    <div>
+                      <div className="text-2xl font-bold text-green-600">
+                        {Math.round(manualMappingStats.verification_rate * 100)}%
+                      </div>
+                      <div className="text-sm text-gray-600">Verified</div>
+                    </div>
+                  </div>
+                </Card>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex justify-between items-center">
+                <Button 
+                  onClick={() => {
+                    setNewMappingForm({
+                      source_platform: 'rootly',
+                      source_identifier: '',
+                      target_platform: selectedManualMappingPlatform || 'github',
+                      target_identifier: ''
+                    })
+                    setNewMappingDialogOpen(true)
+                  }}
+                  className="flex items-center space-x-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Add New Mapping</span>
+                </Button>
+                
+                <Button 
+                  variant="outline" 
+                  onClick={() => selectedManualMappingPlatform && loadManualMappings(selectedManualMappingPlatform)}
+                  disabled={loadingManualMappings}
+                >
+                  {loadingManualMappings ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <RotateCcw className="w-4 h-4 mr-2" />
+                  )}
+                  Refresh
+                </Button>
+              </div>
+
+              {/* Mappings Table */}
+              <div className="space-y-3">
+                <h3 className="text-lg font-semibold">Current Mappings</h3>
+                {manualMappings.length > 0 ? (
+                  <div className="border rounded-lg overflow-hidden">
+                    <div className="bg-gray-50 px-4 py-3 border-b">
+                      <div className="grid grid-cols-6 gap-4 text-sm font-medium text-gray-600">
+                        <div>Source Platform</div>
+                        <div>Source Identifier</div>
+                        <div>Target Identifier</div>
+                        <div>Type</div>
+                        <div>Status</div>
+                        <div>Actions</div>
+                      </div>
+                    </div>
+                    <div className="divide-y max-h-64 overflow-y-auto">
+                      {manualMappings.map((mapping) => (
+                        <div key={mapping.id} className="px-4 py-3">
+                          <div className="grid grid-cols-6 gap-4 text-sm items-center">
+                            <div className="font-medium">
+                              {mapping.source_platform}
+                            </div>
+                            <div className="truncate" title={mapping.source_identifier}>
+                              {mapping.source_identifier}
+                            </div>
+                            <div className="truncate" title={mapping.target_identifier}>
+                              {editingMapping?.id === mapping.id ? (
+                                <Input
+                                  value={mapping.target_identifier}
+                                  onChange={(e) => setEditingMapping({
+                                    ...editingMapping,
+                                    target_identifier: e.target.value
+                                  })}
+                                  className="h-8"
+                                />
+                              ) : (
+                                mapping.target_identifier
+                              )}
+                            </div>
+                            <div>
+                              <Badge variant={mapping.mapping_type === 'manual' ? 'default' : 'secondary'}>
+                                {mapping.mapping_type}
+                              </Badge>
+                            </div>
+                            <div>
+                              {mapping.is_verified ? (
+                                <Badge variant="default" className="bg-green-100 text-green-800 border-green-200">
+                                  <CheckCircle className="w-3 h-3 mr-1" />
+                                  Verified
+                                </Badge>
+                              ) : (
+                                <Badge variant="secondary">
+                                  <Clock className="w-3 h-3 mr-1" />
+                                  Pending
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="flex items-center space-x-1">
+                              {editingMapping?.id === mapping.id ? (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => updateManualMapping(mapping.id, editingMapping.target_identifier)}
+                                    className="h-8 w-8 p-0 text-green-600 hover:text-green-700"
+                                  >
+                                    <Check className="w-4 h-4" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => setEditingMapping(null)}
+                                    className="h-8 w-8 p-0 text-gray-600 hover:text-gray-700"
+                                  >
+                                    <ArrowLeft className="w-4 h-4" />
+                                  </Button>
+                                </>
+                              ) : (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => setEditingMapping(mapping)}
+                                    className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700"
+                                  >
+                                    <Edit3 className="w-4 h-4" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => deleteManualMapping(mapping.id)}
+                                    className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="border rounded-lg p-8 text-center text-gray-500">
+                    <Users2 className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                    <h3 className="text-lg font-medium mb-2">No manual mappings yet</h3>
+                    <p className="text-sm">Create your first manual mapping to get started.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowManualMappingDialog(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* New Manual Mapping Dialog */}
+      <Dialog open={newMappingDialogOpen} onOpenChange={setNewMappingDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <Plus className="w-5 h-5" />
+              <span>Create New Manual Mapping</span>
+            </DialogTitle>
+            <DialogDescription>
+              Create a manual mapping between a source platform user and {selectedManualMappingPlatform === 'github' ? 'GitHub' : 'Slack'} account.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Source Platform</label>
+                <Select 
+                  value={newMappingForm.source_platform} 
+                  onValueChange={(value) => setNewMappingForm(prev => ({...prev, source_platform: value}))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select source platform" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="rootly">Rootly</SelectItem>
+                    <SelectItem value="pagerduty">PagerDuty</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Target Platform</label>
+                <Select 
+                  value={newMappingForm.target_platform} 
+                  onValueChange={(value) => setNewMappingForm(prev => ({...prev, target_platform: value}))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select target platform" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="github">GitHub</SelectItem>
+                    <SelectItem value="slack">Slack</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Source Identifier</label>
+              <Input
+                placeholder="e.g., john.doe@company.com or John Doe"
+                value={newMappingForm.source_identifier}
+                onChange={(e) => setNewMappingForm(prev => ({...prev, source_identifier: e.target.value}))}
+              />
+              <p className="text-xs text-gray-500">
+                The email or name as it appears in {newMappingForm.source_platform} incidents
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Target Identifier</label>
+              <Input
+                placeholder={
+                  newMappingForm.target_platform === 'github' 
+                    ? "e.g., johndoe or john-doe-123"
+                    : "e.g., U1234567890 or @johndoe"
+                }
+                value={newMappingForm.target_identifier}
+                onChange={(e) => setNewMappingForm(prev => ({...prev, target_identifier: e.target.value}))}
+              />
+              <p className="text-xs text-gray-500">
+                The {newMappingForm.target_platform === 'github' ? 'GitHub username' : 'Slack user ID or @username'}
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setNewMappingDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={createManualMapping}
+              disabled={!newMappingForm.source_identifier || !newMappingForm.target_identifier}
+            >
+              Create Mapping
             </Button>
           </DialogFooter>
         </DialogContent>
