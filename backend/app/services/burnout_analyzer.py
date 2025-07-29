@@ -604,7 +604,7 @@ class BurnoutAnalyzerService:
             }
         
         # Calculate metrics
-        days_analyzed = metadata.get("days_analyzed", 30)
+        days_analyzed = metadata.get("days_analyzed", 30) or 30
         metrics = self._calculate_member_metrics(
             incidents, 
             days_analyzed, 
@@ -752,7 +752,7 @@ class BurnoutAnalyzerService:
             severity_counts[severity] += 1
         
         # Calculate averages and percentages
-        incidents_per_week = (len(incidents) / days_analyzed) * 7
+        incidents_per_week = (len(incidents) / days_analyzed) * 7 if days_analyzed and days_analyzed > 0 else 0
         after_hours_percentage = after_hours_count / len(incidents) if incidents else 0
         weekend_percentage = weekend_count / len(incidents) if incidents else 0
         avg_response_time = sum(response_times) / len(response_times) if response_times else 0
@@ -806,7 +806,7 @@ class BurnoutAnalyzerService:
         
         # Resolution time score (using response time as proxy)
         art = metrics["avg_response_time_minutes"]
-        resolution_time_score = min(10, (art / 60) * 10)  # Normalize to hours
+        resolution_time_score = min(10, (art / 60) * 10) if art is not None and art > 0 else 0  # Normalize to hours
         
         # Clustering score (simplified - assume 20% clustering for now)
         clustering_score = min(10, 0.2 * 15)  # Placeholder
@@ -1567,7 +1567,7 @@ class BurnoutAnalyzerService:
     def _generate_daily_trends(self, incidents: List[Dict[str, Any]], team_analysis: List[Dict[str, Any]], metadata: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Generate daily trend data from incidents and team analysis."""
         try:
-            days_analyzed = metadata.get("days_analyzed", 30) if isinstance(metadata, dict) else 30
+            days_analyzed = metadata.get("days_analyzed", 30) or 30 if isinstance(metadata, dict) else 30
             end_date = datetime.now()
             start_date = end_date - timedelta(days=days_analyzed)
             

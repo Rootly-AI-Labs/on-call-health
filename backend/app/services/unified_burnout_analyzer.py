@@ -648,7 +648,7 @@ class UnifiedBurnoutAnalyzer:
             }
         
         # Calculate metrics
-        days_analyzed = metadata.get("days_analyzed", 30)
+        days_analyzed = metadata.get("days_analyzed", 30) or 30
         metrics = self._calculate_member_metrics(
             incidents, 
             days_analyzed, 
@@ -850,7 +850,7 @@ class UnifiedBurnoutAnalyzer:
         
         # Resolution time score (using response time as proxy)
         art = metrics["avg_response_time_minutes"]
-        resolution_time_score = min(10, (art / 60) * 10)  # Normalize to hours
+        resolution_time_score = min(10, (art / 60) * 10) if art is not None and art > 0 else 0  # Normalize to hours
         
         # Clustering score (simplified - assume 20% clustering for now)
         clustering_score = min(10, 0.2 * 15)  # Placeholder
@@ -1596,7 +1596,7 @@ class UnifiedBurnoutAnalyzer:
     def _generate_daily_trends(self, incidents: List[Dict[str, Any]], team_analysis: List[Dict[str, Any]], metadata: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Generate daily trend data from incidents and team analysis - only includes days with incidents."""
         try:
-            days_analyzed = metadata.get("days_analyzed", 30) if isinstance(metadata, dict) else 30
+            days_analyzed = metadata.get("days_analyzed", 30) or 30 if isinstance(metadata, dict) else 30
             
             # Initialize daily data structure - only for days with incidents
             daily_data = {}

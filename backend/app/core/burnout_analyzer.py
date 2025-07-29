@@ -128,7 +128,7 @@ class BurnoutAnalyzer:
         
         # Incident frequency
         days = self.analysis_config.get("days_to_analyze", 30)
-        incidents_per_week = (len(incidents) / days) * 7
+        incidents_per_week = (len(incidents) / days) * 7 if days and days > 0 else 0
         
         # After-hours incidents
         after_hours_count = self._count_after_hours_incidents(user, incidents)
