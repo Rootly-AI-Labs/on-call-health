@@ -358,6 +358,13 @@ class SimpleBurnoutAnalyzer:
                 "burnout_score": 0.0,
                 "risk_level": "low",
                 "incident_count": 0,
+                "factors": {
+                    "workload": 0,
+                    "after_hours": 0,
+                    "weekend_work": 0,
+                    "incident_load": 0,
+                    "response_time": 0
+                },
                 "key_metrics": {
                     "incidents_per_week": 0,
                     "after_hours_percentage": 0,
@@ -377,15 +384,18 @@ class SimpleBurnoutAnalyzer:
             severity_weighted_load = self._calculate_severity_weighted_load(user_incidents)
             severity_weighted_per_week = (severity_weighted_load / days_analyzed) * 7 if days_analyzed > 0 else 0
             
-            # Calculate after-hours percentage with comprehensive error handling
+            # Calculate after-hours and weekend percentages with comprehensive error handling
             after_hours_count = 0
+            weekend_count = 0
             try:
-                after_hours_count = self._count_after_hours_incidents(user_incidents)
+                after_hours_count, weekend_count = self._count_after_hours_and_weekend_incidents(user_incidents)
             except Exception as e:
                 logger.warning(f"Error counting after-hours incidents for user {user_id}: {e}")
                 after_hours_count = 0
+                weekend_count = 0
                 
             after_hours_percentage = after_hours_count / incidents_count if incidents_count > 0 else 0
+            weekend_percentage = weekend_count / incidents_count if incidents_count > 0 else 0
             
             # Calculate average resolution time with error handling
             resolution_times = []
@@ -441,6 +451,32 @@ class SimpleBurnoutAnalyzer:
             recommendations = ["Analysis incomplete - please retry"]
             
         
+        # Calculate factors for frontend compatibility (matching BurnoutAnalyzerService structure)
+        try:
+            # Convert to factors structure that matches full analyzer
+            workload = min(10, incidents_per_week * 1.5) if incidents_per_week else 0
+            after_hours = min(10, after_hours_percentage * 20) if after_hours_percentage else 0
+            weekend_work = min(10, weekend_percentage * 25) if 'weekend_percentage' in locals() and weekend_percentage else 0
+            incident_load = min(10, incidents_per_week) if incidents_per_week else 0
+            response_time = min(10, avg_resolution_hours / 6) if avg_resolution_hours else 0
+            
+            factors = {
+                "workload": round(workload, 2),
+                "after_hours": round(after_hours, 2),
+                "weekend_work": round(weekend_work, 2),
+                "incident_load": round(incident_load, 2),
+                "response_time": round(response_time, 2)
+            }
+        except Exception as e:
+            logger.warning(f"Error calculating factors for user {user_id}: {e}")
+            factors = {
+                "workload": 0,
+                "after_hours": 0,
+                "weekend_work": 0,
+                "incident_load": 0,
+                "response_time": 0
+            }
+        
         # Return results with comprehensive error handling
         try:
             return {
@@ -450,6 +486,7 @@ class SimpleBurnoutAnalyzer:
                 "burnout_score": round(float(burnout_score), 2) if burnout_score is not None else 0.0,
                 "risk_level": str(risk_level) if risk_level else "low",
                 "incident_count": len(user_incidents) if user_incidents else 0,
+                "factors": factors,
                 "key_metrics": {
                     "incidents_per_week": round(float(incidents_per_week), 2) if incidents_per_week is not None else 0.0,
                     "severity_weighted_per_week": round(float(severity_weighted_per_week), 2) if 'severity_weighted_per_week' in locals() and severity_weighted_per_week is not None else 0.0,
@@ -467,6 +504,13 @@ class SimpleBurnoutAnalyzer:
                 "burnout_score": 0.0,
                 "risk_level": "low",
                 "incident_count": 0,
+                "factors": {
+                    "workload": 0,
+                    "after_hours": 0,
+                    "weekend_work": 0,
+                    "incident_load": 0,
+                    "response_time": 0
+                },
                 "key_metrics": {
                     "incidents_per_week": 0.0,
                     "after_hours_percentage": 0.0,
@@ -564,6 +608,60 @@ class SimpleBurnoutAnalyzer:
         logger.info(f"_map_users_to_incidents: Successfully mapped incidents for {len(user_incidents)} users")
         return user_incidents
     
+    def _count_after_hours_and_weekend_incidents(self, incidents: List[Dict[str, Any]]) -> tuple[int, int]:
+        """Count incidents that occurred outside business hours and on weekends."""
+        after_hours_count = 0
+        weekend_count = 0
+        
+        # Handle None or invalid incidents list
+        if not incidents or not isinstance(incidents, list):
+            logger.debug("_count_after_hours_and_weekend_incidents: incidents is None or not a list")
+            return 0, 0
+        
+        for incident in incidents:
+            try:
+                if not incident or not isinstance(incident, dict):
+                    logger.debug("Skipping invalid incident in after-hours count")
+                    continue
+                    
+                # Safely extract created_at with multiple null checks
+                attrs = incident.get("attributes") if incident else None
+                if not attrs or not isinstance(attrs, dict):
+                    logger.debug("Skipping incident without valid attributes in after-hours count")
+                    continue
+                    
+                created_at = attrs.get("created_at") if attrs else None
+                if not created_at or not isinstance(created_at, str):
+                    logger.debug("Skipping incident without valid created_at timestamp")
+                    continue
+                
+                try:
+                    # Parse ISO format timestamp
+                    dt = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                    
+                    # Check if weekend (Saturday=5, Sunday=6)
+                    is_weekend = dt.weekday() >= 5
+                    
+                    # Check if outside business hours (9 AM - 5 PM)
+                    is_after_hours = dt.hour < 9 or dt.hour >= 17
+                    
+                    if is_weekend:
+                        weekend_count += 1
+                    
+                    if is_weekend or is_after_hours:
+                        after_hours_count += 1
+                        
+                except Exception as e:
+                    logger.debug(f"Error parsing timestamp '{created_at}': {e}")
+                    continue
+                    
+            except Exception as e:
+                logger.debug(f"Error processing incident in after-hours count: {e}")
+                continue
+        
+        logger.debug(f"_count_after_hours_and_weekend_incidents: Found {after_hours_count} after-hours and {weekend_count} weekend incidents out of {len(incidents)} total")
+        return after_hours_count, weekend_count
+
     def _count_after_hours_incidents(self, incidents: List[Dict[str, Any]]) -> int:
         """Count incidents that occurred outside business hours."""
         after_hours_count = 0
