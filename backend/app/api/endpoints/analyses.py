@@ -754,7 +754,9 @@ async def run_analysis_task(
                 results = await asyncio.wait_for(
                     analyzer_service.analyze_burnout(
                         time_range_days=time_range,
-                        include_weekends=include_weekends
+                        include_weekends=include_weekends,
+                        user_id=user_id,
+                        analysis_id=analysis_id
                     ),
                     timeout=900.0  # 15 minutes
                 )

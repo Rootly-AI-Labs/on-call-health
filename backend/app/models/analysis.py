@@ -23,6 +23,7 @@ class Analysis(Base):
     # Relationships
     user = relationship("User", back_populates="analyses")
     rootly_integration = relationship("RootlyIntegration", back_populates="analyses")
+    integration_mappings = relationship("IntegrationMapping", back_populates="analysis")
     
     def __repr__(self):
         return f"<Analysis(id={self.id}, user_id={self.user_id}, status='{self.status}')>"

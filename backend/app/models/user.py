@@ -36,6 +36,7 @@ class User(Base):
     github_integrations = relationship("GitHubIntegration", back_populates="user", cascade="all, delete-orphan")
     slack_integrations = relationship("SlackIntegration", back_populates="user", cascade="all, delete-orphan")
     user_correlations = relationship("UserCorrelation", back_populates="user", cascade="all, delete-orphan")
+    integration_mappings = relationship("IntegrationMapping", back_populates="user", cascade="all, delete-orphan")
     
     def __repr__(self):
         return f"<User(id={self.id}, email='{self.email}', providers={len(self.oauth_providers)})>"

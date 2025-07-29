@@ -87,7 +87,9 @@ class UnifiedBurnoutAnalyzer:
     async def analyze_burnout(
         self, 
         time_range_days: int = 30,
-        include_weekends: bool = True
+        include_weekends: bool = True,
+        user_id: Optional[int] = None,
+        analysis_id: Optional[int] = None
     ) -> Dict[str, Any]:
         """
         Analyze burnout for the team based on incident data.
@@ -141,8 +143,8 @@ class UnifiedBurnoutAnalyzer:
             slack_data = {}
             
             if self.features['github'] or self.features['slack']:
-                from .github_collector import collect_team_github_data
-                from .slack_collector import collect_team_slack_data
+                from .enhanced_github_collector import collect_team_github_data_with_mapping
+                from .enhanced_slack_collector import collect_team_slack_data_with_mapping
                 
                 # Get team member emails and names from JSONAPI format
                 team_emails = []
@@ -171,8 +173,9 @@ class UnifiedBurnoutAnalyzer:
                     try:
                         logger.info(f"GitHub config - token: {'present' if self.github_token else 'missing'}")
                         
-                        github_data = await collect_team_github_data(
-                            team_emails, time_range_days, self.github_token
+                        github_data = await collect_team_github_data_with_mapping(
+                            team_emails, time_range_days, self.github_token,
+                            user_id=user_id, analysis_id=analysis_id, source_platform=self.platform
                         )
                         logger.info(f"🔍 UNIFIED ANALYZER: Collected GitHub data for {len(github_data)} users")
                         logger.info(f"GitHub data keys: {list(github_data.keys())[:5]}")  # Log first 5 keys
@@ -188,8 +191,9 @@ class UnifiedBurnoutAnalyzer:
                         logger.info(f"Slack config - token: {'present' if self.slack_token else 'missing'}")
                         
                         # Use names for Slack correlation instead of emails
-                        slack_data = await collect_team_slack_data(
-                            team_names, time_range_days, self.slack_token, use_names=True
+                        slack_data = await collect_team_slack_data_with_mapping(
+                            team_names, time_range_days, self.slack_token, use_names=True,
+                            user_id=user_id, analysis_id=analysis_id, source_platform=self.platform
                         )
                         logger.info(f"Collected Slack data for {len(slack_data)} users")
                     except Exception as e:

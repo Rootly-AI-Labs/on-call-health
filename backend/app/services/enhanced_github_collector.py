@@ -1,0 +1,97 @@
+"""
+Enhanced GitHub collector that records mapping data.
+"""
+import logging
+from typing import Dict, List, Optional
+from .github_collector import collect_team_github_data as original_collect_team_github_data
+from .mapping_recorder import MappingRecorder
+
+logger = logging.getLogger(__name__)
+
+async def collect_team_github_data_with_mapping(
+    team_emails: List[str], 
+    days: int = 30, 
+    github_token: str = None,
+    user_id: Optional[int] = None,
+    analysis_id: Optional[int] = None,
+    source_platform: str = "rootly"
+) -> Dict[str, Dict]:
+    """
+    Enhanced version of collect_team_github_data that records mapping attempts.
+    """
+    recorder = MappingRecorder() if user_id else None
+    
+    # Call original function
+    github_data = await original_collect_team_github_data(team_emails, days, github_token)
+    
+    # Record mapping attempts if we have user context
+    if recorder and user_id:
+        for email in team_emails:
+            if email in github_data:
+                # Successful mapping
+                data_points = 0
+                user_data = github_data[email]
+                
+                # Count data points
+                if isinstance(user_data, dict):
+                    data_points += len(user_data.get("commits", []))
+                    data_points += len(user_data.get("pull_requests", []))
+                    data_points += len(user_data.get("issues", []))
+                
+                # Try to extract the GitHub username from the data
+                github_username = None
+                if isinstance(user_data, dict) and "github_username" in user_data:
+                    github_username = user_data["github_username"]
+                elif isinstance(user_data, dict) and "commits" in user_data and user_data["commits"]:
+                    # Extract from first commit
+                    first_commit = user_data["commits"][0]
+                    if isinstance(first_commit, dict) and "author" in first_commit:
+                        github_username = first_commit["author"].get("login")
+                
+                if github_username:
+                    # Determine mapping method
+                    from .github_collector import GitHubCollector
+                    collector = GitHubCollector()
+                    if email in collector.manual_email_mappings:
+                        mapping_method = "manual_mapping"
+                    else:
+                        mapping_method = "api_search"
+                    
+                    recorder.record_successful_mapping(
+                        user_id=user_id,
+                        analysis_id=analysis_id,
+                        source_platform=source_platform,
+                        source_identifier=email,
+                        target_platform="github",
+                        target_identifier=github_username,
+                        mapping_method=mapping_method,
+                        data_points_count=data_points
+                    )
+                    logger.info(f"✓ Recorded successful GitHub mapping: {email} -> {github_username} ({data_points} data points)")
+                else:
+                    # Data collected but no clear username
+                    recorder.record_successful_mapping(
+                        user_id=user_id,
+                        analysis_id=analysis_id,
+                        source_platform=source_platform,
+                        source_identifier=email,
+                        target_platform="github",
+                        target_identifier="unknown",
+                        mapping_method="api_collection",
+                        data_points_count=data_points
+                    )
+                    logger.info(f"? Recorded GitHub data collection: {email} -> unknown user ({data_points} data points)")
+            else:
+                # Failed mapping
+                recorder.record_failed_mapping(
+                    user_id=user_id,
+                    analysis_id=analysis_id,
+                    source_platform=source_platform,
+                    source_identifier=email,
+                    target_platform="github",
+                    error_message="No GitHub data found for email",
+                    mapping_method="email_search"
+                )
+                logger.info(f"✗ Recorded failed GitHub mapping: {email} -> no data found")
+    
+    return github_data
