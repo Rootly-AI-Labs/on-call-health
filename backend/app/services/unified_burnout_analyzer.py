@@ -1634,52 +1634,52 @@ class UnifiedBurnoutAnalyzer:
                             # Add severity weight - handle both platforms
                             severity_weight = 1.0
                             if self.platform == "pagerduty":
-                                    urgency = incident.get("urgency", "low")
-                                    if urgency == "high":
-                                        severity_weight = 2.0
-                                        daily_data[date_str]["high_severity_count"] += 1
-                                else:  # Rootly
-                                    attrs = incident.get("attributes", {})
-                                    severity_info = attrs.get("severity", {}) if attrs else {}
-                                    if isinstance(severity_info, dict) and "data" in severity_info:
-                                        severity_data = severity_info.get("data", {})
-                                        if isinstance(severity_data, dict) and "attributes" in severity_data:
-                                            severity_attrs = severity_data["attributes"]
-                                            severity_name = severity_attrs.get("name", "medium").lower()
-                                            if "critical" in severity_name or "sev1" in severity_name:
-                                                severity_weight = 3.0
-                                                daily_data[date_str]["high_severity_count"] += 1
-                                            elif "high" in severity_name or "sev2" in severity_name:
-                                                severity_weight = 2.0
-                                            elif "medium" in severity_name or "sev3" in severity_name:
-                                                severity_weight = 1.5
-                                
-                                daily_data[date_str]["severity_weighted_count"] += severity_weight
-                                
-                                # Check if after hours (rough approximation)
-                                incident_hour = incident_date.hour
-                                if incident_hour < 8 or incident_hour > 18:
-                                    daily_data[date_str]["after_hours_count"] += 1
-                                
-                                # Track users involved - handle both platforms
-                                if self.platform == "pagerduty":
-                                    # PagerDuty format
-                                    assignments = incident.get("assignments", [])
-                                    if assignments:
-                                        assignee = assignments[0].get("assignee", {})
-                                        user_id = assignee.get("id")
+                                urgency = incident.get("urgency", "low")
+                                if urgency == "high":
+                                    severity_weight = 2.0
+                                    daily_data[date_str]["high_severity_count"] += 1
+                            else:  # Rootly
+                                attrs = incident.get("attributes", {})
+                                severity_info = attrs.get("severity", {}) if attrs else {}
+                                if isinstance(severity_info, dict) and "data" in severity_info:
+                                    severity_data = severity_info.get("data", {})
+                                    if isinstance(severity_data, dict) and "attributes" in severity_data:
+                                        severity_attrs = severity_data["attributes"]
+                                        severity_name = severity_attrs.get("name", "medium").lower()
+                                        if "critical" in severity_name or "sev1" in severity_name:
+                                            severity_weight = 3.0
+                                            daily_data[date_str]["high_severity_count"] += 1
+                                        elif "high" in severity_name or "sev2" in severity_name:
+                                            severity_weight = 2.0
+                                        elif "medium" in severity_name or "sev3" in severity_name:
+                                            severity_weight = 1.5
+                            
+                            daily_data[date_str]["severity_weighted_count"] += severity_weight
+                            
+                            # Check if after hours (rough approximation)
+                            incident_hour = incident_date.hour
+                            if incident_hour < 8 or incident_hour > 18:
+                                daily_data[date_str]["after_hours_count"] += 1
+                            
+                            # Track users involved - handle both platforms
+                            if self.platform == "pagerduty":
+                                # PagerDuty format
+                                assignments = incident.get("assignments", [])
+                                if assignments:
+                                    assignee = assignments[0].get("assignee", {})
+                                    user_id = assignee.get("id")
+                                    if user_id:
+                                        daily_data[date_str]["users_involved"].add(user_id)
+                            else:  # Rootly
+                                # Rootly format
+                                attrs = incident.get("attributes", {})
+                                if attrs:
+                                    user_info = attrs.get("user", {})
+                                    if isinstance(user_info, dict) and "data" in user_info:
+                                        user_data = user_info.get("data", {})
+                                        user_id = user_data.get("id")
                                         if user_id:
                                             daily_data[date_str]["users_involved"].add(user_id)
-                                else:  # Rootly
-                                    # Rootly format
-                                    attrs = incident.get("attributes", {})
-                                    if attrs:
-                                        user_info = attrs.get("user", {})
-                                        if isinstance(user_info, dict) and "data" in user_info:
-                                            user_data = user_info.get("data", {})
-                                            user_id = user_data.get("id")
-                                            if user_id:
-                                                daily_data[date_str]["users_involved"].add(user_id)
                                         
                         except Exception as date_error:
                             logger.debug(f"Error parsing incident date: {date_error}")
