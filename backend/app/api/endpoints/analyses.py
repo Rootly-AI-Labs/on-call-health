@@ -347,6 +347,7 @@ async def get_historical_trends(
         # Return empty trends if no historical data
         return HistoricalTrendsResponse(
             daily_trends=[],
+            timeline_events=[],
             summary={
                 "total_analyses": 0,
                 "days_with_data": 0,

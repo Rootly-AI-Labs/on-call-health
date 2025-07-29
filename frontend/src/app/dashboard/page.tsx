@@ -775,9 +775,8 @@ export default function Dashboard() {
 
   // Load historical trends when current analysis changes
   useEffect(() => {
-    if (currentAnalysis?.integration_id) {
-      loadHistoricalTrends(currentAnalysis.integration_id)
-    }
+    // Load trends for all integrations to show complete health overview
+    loadHistoricalTrends()
   }, [currentAnalysis])
 
   const loadPreviousAnalyses = async () => {
@@ -3097,8 +3096,8 @@ export default function Dashboard() {
                     <CardTitle>Burnout Timeline</CardTitle>
                     <CardDescription>
                       {historicalTrends?.timeline_events?.length > 0 
-                        ? `Real timeline from ${historicalTrends.timeline_events.length} burnout events in your data`
-                        : "Timeline of stress patterns and recovery periods"
+                        ? `Timeline from ${historicalTrends.timeline_events.length} burnout events across all integrations`
+                        : "Timeline of stress patterns and recovery periods across all integrations"
                       }
                     </CardDescription>
                   </CardHeader>
@@ -3260,8 +3259,8 @@ export default function Dashboard() {
                     <CardTitle>Health Trends</CardTitle>
                     <CardDescription>
                       {historicalTrends?.daily_trends?.length > 0 
-                        ? `Real health trends from ${historicalTrends.daily_trends.length} days of analysis data`
-                        : "Organization health score over time"
+                        ? `Health trends from ${historicalTrends.daily_trends.length} days of analysis data across all integrations`
+                        : "Organization health score over time across all integrations"
                       }
                     </CardDescription>
                   </CardHeader>
