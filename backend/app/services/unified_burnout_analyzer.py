@@ -270,6 +270,7 @@ class UnifiedBurnoutAnalyzer:
             
             # Generate daily trends from incident data
             daily_trends = self._generate_daily_trends(incidents, team_analysis["members"], metadata)
+            logger.info(f"🔍 MAIN_ANALYSIS_DEBUG: Generated {len(daily_trends)} daily trends for final result")
             
             result = {
                 "analysis_timestamp": datetime.now().isoformat(),
@@ -367,6 +368,12 @@ class UnifiedBurnoutAnalyzer:
                 logger.info(f"🔍 BURNOUT ANALYSIS SUCCESS: Analyzed {members_count} members using {incidents_count} incidents over {time_range_days} days")
             except Exception as metrics_error:
                 logger.warning(f"Error logging success metrics: {metrics_error}")
+            
+            # Debug: Log final result structure
+            logger.info(f"🔍 FINAL_RESULT_DEBUG: Final result keys: {list(result.keys())}")
+            logger.info(f"🔍 FINAL_RESULT_DEBUG: daily_trends in result: {'daily_trends' in result}, length: {len(result.get('daily_trends', []))}")
+            if result.get('daily_trends'):
+                logger.info(f"🔍 FINAL_RESULT_DEBUG: Sample daily_trends entry: {result['daily_trends'][0]}")
                 
             return result
             
@@ -1774,6 +1781,17 @@ class UnifiedBurnoutAnalyzer:
             meaningful_trends = [day for day in daily_trends if day["incident_count"] > 0]
             
             logger.info(f"Generated {len(meaningful_trends)} meaningful daily trend data points (filtered from {len(daily_trends)} total days) for {days_analyzed}-day analysis")
+            
+            # Debug: Log sample data for troubleshooting
+            if meaningful_trends:
+                logger.info(f"🔍 DAILY_TRENDS_DEBUG: Sample trend data - First entry: {meaningful_trends[0]}")
+                logger.info(f"🔍 DAILY_TRENDS_DEBUG: Date range: {meaningful_trends[0]['date']} to {meaningful_trends[-1]['date']}")
+                logger.info(f"🔍 DAILY_TRENDS_DEBUG: Score range: {min(d['overall_score'] for d in meaningful_trends):.2f} to {max(d['overall_score'] for d in meaningful_trends):.2f}")
+            else:
+                logger.warning(f"🔍 DAILY_TRENDS_DEBUG: No meaningful trends generated! Total raw trends: {len(daily_trends)}")
+                if daily_trends:
+                    logger.warning(f"🔍 DAILY_TRENDS_DEBUG: Sample raw trend: {daily_trends[0]}")
+            
             return meaningful_trends
             
         except Exception as e:
