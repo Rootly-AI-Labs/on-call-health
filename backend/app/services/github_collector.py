@@ -197,7 +197,7 @@ class GitHubCollector:
         return emails
         
     async def _fetch_real_github_data(self, username: str, email: str, start_date: datetime, end_date: datetime, token: str) -> Dict:
-        """Fetch real GitHub data using the GitHub API."""
+        """Fetch real GitHub data using the GitHub API with enterprise resilience."""
         
         headers = {
             'Authorization': f'token {token}',
@@ -212,33 +212,42 @@ class GitHubCollector:
         user_url = f"https://api.github.com/users/{username}"
         
         try:
+            # Phase 2.3: Use API manager for resilient GitHub API calls
+            from .github_api_manager import github_api_manager
+            
             # Get commits across all repos
             commits_url = f"https://api.github.com/search/commits?q=author:{username}+author-date:{start_date.strftime('%Y-%m-%d')}..{end_date.strftime('%Y-%m-%d')}"
             
             # Get pull requests
             prs_url = f"https://api.github.com/search/issues?q=author:{username}+type:pr+created:{start_date.strftime('%Y-%m-%d')}..{end_date.strftime('%Y-%m-%d')}"
             
-            # Make API calls
-            async with asyncio.timeout(30):  # 30 second timeout
+            # Make resilient API calls with rate limiting and circuit breaker
+            async def fetch_commits():
                 import aiohttp
                 async with aiohttp.ClientSession() as session:
-                    # Fetch commits
                     async with session.get(commits_url, headers=headers) as resp:
                         if resp.status == 200:
-                            commits_data = await resp.json()
-                            total_commits = commits_data.get('total_count', 0)
+                            return await resp.json()
                         else:
-                            logger.warning(f"GitHub API error for commits: {resp.status}")
-                            total_commits = 0
-                    
-                    # Fetch PRs
+                            raise aiohttp.ClientError(f"GitHub API error for commits: {resp.status}")
+            
+            async def fetch_prs():
+                import aiohttp
+                async with aiohttp.ClientSession() as session:
                     async with session.get(prs_url, headers=headers) as resp:
                         if resp.status == 200:
-                            prs_data = await resp.json()
-                            total_prs = prs_data.get('total_count', 0)
+                            return await resp.json()
                         else:
-                            logger.warning(f"GitHub API error for PRs: {resp.status}")
-                            total_prs = 0
+                            raise aiohttp.ClientError(f"GitHub API error for PRs: {resp.status}")
+            
+            # Execute with enterprise resilience patterns
+            commits_data = await github_api_manager.safe_api_call(fetch_commits, max_retries=3)
+            total_commits = commits_data.get('total_count', 0) if commits_data else 0
+            
+            prs_data = await github_api_manager.safe_api_call(fetch_prs, max_retries=3)
+            total_prs = prs_data.get('total_count', 0) if prs_data else 0
+            
+            logger.info(f"📊 GitHub API calls completed - Commits: {total_commits}, PRs: {total_prs}")
             
             # For now, estimate other metrics based on commits/PRs
             # In a full implementation, we'd make additional API calls

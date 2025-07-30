@@ -1,7 +1,8 @@
 """
-Enhanced GitHub collector that records mapping data.
+Enhanced GitHub collector that records mapping data with smart caching.
 """
 import logging
+import os
 from typing import Dict, List, Optional
 from .github_collector import collect_team_github_data as original_collect_team_github_data
 from .mapping_recorder import MappingRecorder
@@ -18,7 +19,31 @@ async def collect_team_github_data_with_mapping(
 ) -> Dict[str, Dict]:
     """
     Enhanced version of collect_team_github_data that records mapping attempts.
+    
+    Phase 2: Uses smart caching service when enabled, falls back to original logic.
     """
+    # Phase 2: Check if smart caching is enabled
+    use_smart_caching = os.getenv('USE_SMART_GITHUB_CACHING', 'true').lower() == 'true'
+    
+    if use_smart_caching and user_id:
+        logger.info(f"🧠 SMART CACHING: Using GitHubMappingService for {len(team_emails)} emails")
+        try:
+            from .github_mapping_service import GitHubMappingService
+            mapping_service = GitHubMappingService()
+            return await mapping_service.get_smart_github_data(
+                team_emails=team_emails,
+                days=days,
+                github_token=github_token,
+                user_id=user_id,
+                analysis_id=analysis_id,
+                source_platform=source_platform
+            )
+        except Exception as e:
+            logger.error(f"Smart caching failed, falling back to original logic: {e}")
+            # Fall through to original logic
+    
+    # Original logic (Phase 1) - fallback or when smart caching disabled
+    logger.info(f"📦 ORIGINAL LOGIC: Using enhanced collector for {len(team_emails)} emails")
     recorder = MappingRecorder() if user_id else None
     
     # Phase 1.3: Track processed emails to prevent duplicates within this analysis session
