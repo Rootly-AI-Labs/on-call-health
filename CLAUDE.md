@@ -219,12 +219,137 @@ cd backend && python debug_trends_data.py
 // Display: {incidents.length === 0 ? "No incidents to display" : <IncidentChart />}
 ```
 
+### DATA VERIFICATION & CROSS-CHECK PLAN
+
+#### Automated Data Consistency Verification System
+
+**1. Backend Validation Endpoint** (`/analyses/{id}/verify-consistency`):
+```python
+# Returns detailed consistency report
+{
+  "analysis_id": 140,
+  "consistency_checks": {
+    "incident_totals": {
+      "metadata_total": 110,
+      "team_analysis_sum": 108,
+      "daily_trends_sum": 18,
+      "match": false,
+      "discrepancy": "Daily trends only sum to 18, not 110"
+    },
+    "member_counts": {
+      "metadata_users": 38,
+      "team_analysis_members": 38,
+      "members_with_incidents": 5,
+      "match": true
+    },
+    "date_ranges": {
+      "metadata_days": 30,
+      "daily_trends_days": 18,
+      "expected_data_points": 30,
+      "actual_data_points": 18,
+      "match": false,
+      "discrepancy": "Missing 12 days of daily trend data"
+    },
+    "severity_distribution": {
+      "metadata_breakdown": {"SEV1": 3, "SEV2": 60, "SEV3": 16, "SEV4": 31},
+      "calculated_total": 110,
+      "incidents_with_severity": 110,
+      "match": true
+    }
+  },
+  "overall_consistency": false,
+  "critical_issues": [
+    "Daily trends incomplete: 18/30 days",
+    "Daily incident sum (18) doesn't match total (110)"
+  ]
+}
+```
+
+**2. Frontend Consistency Dashboard** (Development Mode):
+- Add debug panel showing all data sources
+- Visual indicators when numbers don't match
+- Color coding: ✅ Green (match), ❌ Red (mismatch), ⚠️ Yellow (close but off)
+
+**3. Cross-Component Validation Rules**:
+
+**Top Cards vs Source Data**:
+```typescript
+// Team Health Card
+- Value shown: analysis.results.team_health.overall_score
+- Validation: Must be between 0-100
+- Cross-check: Average of member scores should be within 10% of overall
+
+// At Risk Card  
+- Value shown: analysis.results.team_health.members_at_risk
+- Validation: Cannot exceed total members
+- Cross-check: Count of members with risk_level !== 'low'
+
+// Total Incidents Card
+- Value shown: analysis.results.metadata.total_incidents
+- Cross-checks:
+  1. Sum of daily_trends[].incident_count
+  2. Sum of team_analysis.members[].incident_count
+  3. Sum of severity_breakdown values
+  - ALL must match exactly
+```
+
+**Health Trends Chart vs Source Data**:
+```typescript
+// Each data point
+- Date: daily_trends[i].date
+- Score: daily_trends[i].overall_score
+- Incidents: daily_trends[i].incident_count
+
+// Validations:
+- Number of points === metadata.days_analyzed
+- Date range covers full analysis period
+- Sum of incidents === metadata.total_incidents
+- No duplicate dates
+- Dates in chronological order
+```
+
+**4. Automated Test Suite**:
+```python
+# tests/test_data_consistency.py
+def test_analysis_data_consistency():
+    for analysis in get_all_completed_analyses():
+        # Test 1: Incident totals match across all sources
+        assert sum(day['incident_count'] for day in analysis.daily_trends) == analysis.metadata.total_incidents
+        
+        # Test 2: Daily trends cover full time period
+        assert len(analysis.daily_trends) == analysis.metadata.days_analyzed
+        
+        # Test 3: Member incident counts sum to total
+        member_incident_sum = sum(m['incident_count'] for m in analysis.team_analysis.members)
+        assert member_incident_sum == analysis.metadata.total_incidents
+        
+        # Test 4: At-risk count matches actual risk levels
+        at_risk_calculated = len([m for m in analysis.team_analysis.members if m['risk_level'] != 'low'])
+        assert at_risk_calculated == analysis.team_health.members_at_risk
+```
+
+**5. Manual Verification Checklist** (For QA):
+- [ ] Total Incidents card matches sum of severity breakdown
+- [ ] Health trends chart shows correct number of days
+- [ ] Each day's incidents sum to total when added
+- [ ] Team health percentage matches calculation
+- [ ] At-risk count matches highlighted members
+- [ ] Timeline events correspond to daily trend data
+- [ ] Burnout factors chart values sum correctly
+- [ ] All dates match analysis time range
+
+**6. Real-time Consistency Monitor**:
+- Add console warnings when displaying inconsistent data
+- Log discrepancies to monitoring system
+- Email alert if consistency < 95% for new analyses
+
 ### EXECUTION ORDER:
 1. **Day 1**: Fix frontend fallback data (Issue #1) - HIGHEST PRIORITY
 2. **Day 1**: Add trends regeneration endpoint (Issue #2)
 3. **Day 2**: Complete UUID implementation (Issue #3)
 4. **Day 2**: Fix API permissions (Issue #4)
 5. **Day 3**: Implement data consistency checks (Issue #5)
+6. **Day 3**: Deploy verification system
 
 ### Outstanding Issues:
 1. Slack channel access errors (bot not in channels) - Low priority
