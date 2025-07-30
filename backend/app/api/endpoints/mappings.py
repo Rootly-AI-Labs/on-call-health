@@ -64,8 +64,8 @@ async def get_analysis_mappings(
     analysis_id: int,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
-) -> List[dict]:
-    """Get all integration mappings for a specific analysis."""
+) -> dict:
+    """Get all integration mappings for a specific analysis with proper team member statistics."""
     try:
         # Verify the analysis belongs to the current user
         from ...models import Analysis
@@ -79,7 +79,40 @@ async def get_analysis_mappings(
         
         recorder = MappingRecorder(db)
         mappings = recorder.get_analysis_mappings(analysis_id)
-        return [mapping.to_dict() for mapping in mappings]
+        
+        # Calculate proper team member statistics
+        github_mappings = [m for m in mappings if m.target_platform == "github"]
+        
+        # Get unique team members (by email)
+        unique_emails = set(m.source_identifier for m in github_mappings)
+        total_team_members = len(unique_emails)
+        
+        # Count successful mappings (unique emails with successful mapping)
+        successful_emails = set()
+        members_with_data = 0
+        
+        for mapping in github_mappings:
+            if mapping.mapping_successful and mapping.target_identifier != "unknown":
+                successful_emails.add(mapping.source_identifier)
+                if mapping.data_points_count and mapping.data_points_count > 0:
+                    members_with_data += 1
+        
+        successful_mappings = len(successful_emails)
+        
+        # Calculate proper success rate based on team members, not API calls
+        success_rate = (successful_mappings / total_team_members * 100) if total_team_members > 0 else 0
+        
+        return {
+            "mappings": [mapping.to_dict() for mapping in mappings],
+            "statistics": {
+                "total_team_members": total_team_members,
+                "successful_mappings": successful_mappings,
+                "members_with_data": members_with_data,
+                "success_rate": round(success_rate, 1),
+                "failed_mappings": total_team_members - successful_mappings
+            },
+            "analysis_id": analysis_id
+        }
     except HTTPException:
         raise
     except Exception as e:
