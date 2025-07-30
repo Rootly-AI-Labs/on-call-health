@@ -309,18 +309,12 @@ async def get_historical_trends(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Calculate daily health trends from historical analyses."""
+    """Get daily incident trends from the most recent analysis period."""
     
-    # Calculate date range
-    end_date = datetime.now()
-    start_date = end_date - timedelta(days=days_back)
-    
-    # Build query for completed analyses within date range
+    # Find the most recent completed analysis
     query = db.query(Analysis).filter(
         Analysis.user_id == current_user.id,
         Analysis.status == "completed",
-        Analysis.created_at >= start_date,
-        Analysis.created_at <= end_date,
         Analysis.results.isnot(None)
     )
     
@@ -340,11 +334,13 @@ async def get_historical_trends(
         
         query = query.filter(Analysis.rootly_integration_id == integration_id)
     
-    # Get all analyses and order by date
-    analyses = query.order_by(Analysis.created_at.asc()).all()
+    # Get the most recent analysis
+    analysis = query.order_by(Analysis.created_at.desc()).first()
     
-    if not analyses:
-        # Return empty trends if no historical data
+    if not analysis:
+        # Return empty trends if no analysis found
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=days_back)
         return HistoricalTrendsResponse(
             daily_trends=[],
             timeline_events=[],
@@ -360,69 +356,110 @@ async def get_historical_trends(
             }
         )
     
-    # Group analyses by date and calculate daily averages
-    daily_data = defaultdict(list)
+    # Extract daily trends from the analysis results
+    results = analysis.results
+    if not results or not isinstance(results, dict):
+        # Fallback to empty response
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=days_back)
+        return HistoricalTrendsResponse(
+            daily_trends=[],
+            timeline_events=[],
+            summary={
+                "total_analyses": 1,
+                "days_with_data": 0,
+                "trend_direction": "insufficient_data",
+                "average_score": 0.0
+            },
+            date_range={
+                "start_date": start_date.strftime("%Y-%m-%d"),
+                "end_date": end_date.strftime("%Y-%m-%d")
+            }
+        )
     
-    for analysis in analyses:
-        analysis_date = analysis.created_at.strftime("%Y-%m-%d")
-        
-        # Extract health metrics from results
-        results = analysis.results
-        if not results or not isinstance(results, dict):
-            continue
-        
-        team_health = results.get("team_health", {})
-        if not team_health:
-            continue
-        
-        # Calculate metrics for this analysis
-        overall_score = team_health.get("overall_score", 0.0)
-        average_burnout_score = team_health.get("average_burnout_score", 0.0) 
-        members_at_risk = team_health.get("members_at_risk", 0)
-        health_status = team_health.get("health_status", "unknown")
-        
-        # Count total members from team_analysis
-        team_analysis = results.get("team_analysis", [])
-        total_members = len(team_analysis) if isinstance(team_analysis, list) else 0
-        
-        daily_data[analysis_date].append({
-            "overall_score": float(overall_score),
-            "average_burnout_score": float(average_burnout_score),
-            "members_at_risk": int(members_at_risk),
-            "total_members": int(total_members),
-            "health_status": str(health_status)
-        })
+    # Get daily trends from analysis results
+    analysis_daily_trends = results.get("daily_trends", [])
+    if not analysis_daily_trends or not isinstance(analysis_daily_trends, list):
+        # Fallback to empty response
+        metadata = results.get("metadata", {})
+        days_analyzed = metadata.get("days_analyzed", days_back)
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=days_analyzed)
+        return HistoricalTrendsResponse(
+            daily_trends=[],
+            timeline_events=[],
+            summary={
+                "total_analyses": 1,
+                "days_with_data": 0,
+                "trend_direction": "insufficient_data",
+                "average_score": 0.0
+            },
+            date_range={
+                "start_date": start_date.strftime("%Y-%m-%d"),
+                "end_date": end_date.strftime("%Y-%m-%d")
+            }
+        )
     
-    # Calculate daily averages and create trend points
+    # Convert analysis daily trends to API format and filter by days_back if needed
     daily_trends = []
     all_scores = []
     
-    for date in sorted(daily_data.keys()):
-        day_analyses = daily_data[date]
+    # Calculate cutoff date for filtering
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=days_back)
+    
+    for trend_data in analysis_daily_trends:
+        if not isinstance(trend_data, dict):
+            continue
+            
+        trend_date = trend_data.get("date")
+        if not trend_date:
+            continue
+            
+        # Filter by date range if specified
+        try:
+            trend_datetime = datetime.strptime(trend_date, "%Y-%m-%d")
+            if trend_datetime < start_date:
+                continue
+        except (ValueError, TypeError):
+            continue
         
-        # Calculate averages for the day
-        avg_overall = sum(a["overall_score"] for a in day_analyses) / len(day_analyses)
-        avg_burnout = sum(a["average_burnout_score"] for a in day_analyses) / len(day_analyses)
-        avg_at_risk = sum(a["members_at_risk"] for a in day_analyses) / len(day_analyses)
-        avg_total = sum(a["total_members"] for a in day_analyses) / len(day_analyses)
+        # Get incident count to determine members at risk
+        incident_count = trend_data.get("incident_count", 0)
+        users_involved_count = trend_data.get("users_involved_count", 0)
         
-        # Use most common health status for the day
-        status_counts = defaultdict(int)
-        for a in day_analyses:
-            status_counts[a["health_status"]] += 1
-        most_common_status = max(status_counts.items(), key=lambda x: x[1])[0]
+        # Estimate members at risk based on incident patterns
+        members_at_risk = 0
+        if incident_count > 0:
+            if incident_count >= 5:  # High incident volume
+                members_at_risk = min(users_involved_count + 1, 5)
+            elif incident_count >= 3:  # Medium incident volume
+                members_at_risk = min(users_involved_count, 3)
+            elif users_involved_count > 0:  # Low volume but someone involved
+                members_at_risk = users_involved_count
+        
+        # Get health status based on score
+        overall_score = trend_data.get("overall_score", 0.0)
+        if overall_score <= 4.0:
+            health_status = "critical"
+        elif overall_score <= 6.5:
+            health_status = "at_risk" 
+        elif overall_score <= 8.0:
+            health_status = "moderate"
+        else:
+            health_status = "healthy"
         
         daily_trends.append(DailyTrendPoint(
-            date=date,
-            overall_score=round(avg_overall, 2),
-            average_burnout_score=round(avg_burnout, 2),
-            members_at_risk=round(avg_at_risk),
-            total_members=round(avg_total),
-            health_status=most_common_status,
-            analysis_count=len(day_analyses)
+            date=trend_date,
+            overall_score=float(overall_score),
+            average_burnout_score=float(trend_data.get("overall_score", 0.0)),  # Use same score for consistency
+            members_at_risk=int(members_at_risk),
+            total_members=max(int(users_involved_count), 1),  # At least 1 to avoid division by zero
+            health_status=health_status,
+            analysis_count=1  # Single analysis
         ))
         
-        all_scores.append(avg_overall)
+        all_scores.append(overall_score)
     
     # Calculate trend summary
     trend_direction = "stable"
@@ -434,7 +471,7 @@ async def get_historical_trends(
             trend_direction = "declining"
     
     summary = {
-        "total_analyses": len(analyses),
+        "total_analyses": 1,  # Single analysis
         "days_with_data": len(daily_trends),
         "trend_direction": trend_direction,
         "average_score": round(sum(all_scores) / len(all_scores) if all_scores else 0.0, 2),
@@ -442,6 +479,21 @@ async def get_historical_trends(
         "best_day": max(daily_trends, key=lambda x: x.overall_score).date if daily_trends else None,
         "worst_day": min(daily_trends, key=lambda x: x.overall_score).date if daily_trends else None
     }
+    
+    # Get date range from the analysis metadata or daily trends
+    metadata = results.get("metadata", {})
+    days_analyzed = metadata.get("days_analyzed", days_back)
+    
+    if daily_trends:
+        # Use actual date range from trends
+        start_date_str = min(trend.date for trend in daily_trends)
+        end_date_str = max(trend.date for trend in daily_trends)
+    else:
+        # Use calculated date range
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=days_analyzed)
+        start_date_str = start_date.strftime("%Y-%m-%d")
+        end_date_str = end_date.strftime("%Y-%m-%d")
     
     # Generate timeline events from historical analysis data
     timeline_events = []
@@ -606,8 +658,139 @@ async def get_historical_trends(
         timeline_events=timeline_events,
         summary=summary,
         date_range={
-            "start_date": start_date.strftime("%Y-%m-%d"),
-            "end_date": end_date.strftime("%Y-%m-%d")
+            "start_date": start_date_str,
+            "end_date": end_date_str
+        }
+    )
+
+
+class DailyIncidentTrendPoint(BaseModel):
+    date: str
+    overall_score: float
+    incident_count: int
+    severity_weighted_count: float
+    after_hours_count: int
+    high_severity_count: int
+    users_involved: int
+    members_at_risk: int
+    total_members: int
+    health_status: str
+    health_percentage: float
+
+
+class DailyIncidentTrendsResponse(BaseModel):
+    daily_trends: List[DailyIncidentTrendPoint]
+    summary: Dict[str, Any]
+    metadata: Dict[str, Any]
+
+
+@router.get("/{analysis_id}/daily-trends", response_model=DailyIncidentTrendsResponse)
+async def get_analysis_daily_trends(
+    analysis_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get daily incident trends from a specific analysis."""
+    
+    # Get the analysis
+    analysis = db.query(Analysis).filter(
+        Analysis.id == analysis_id,
+        Analysis.user_id == current_user.id
+    ).first()
+    
+    if not analysis:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Analysis not found"
+        )
+    
+    if analysis.status != "completed" or not analysis.results:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Analysis is not completed or has no results"
+        )
+    
+    results = analysis.results
+    daily_trends_data = results.get("daily_trends", [])
+    
+    if not daily_trends_data:
+        # Return empty trends if no daily data available
+        return DailyIncidentTrendsResponse(
+            daily_trends=[],
+            summary={
+                "total_days": 0,
+                "days_with_incidents": 0,
+                "avg_daily_score": 0.0,
+                "trend_direction": "insufficient_data"
+            },
+            metadata={
+                "analysis_id": analysis_id,
+                "time_range": analysis.time_range or 30,
+                "data_source": "current_analysis_daily_trends",
+                "generated_at": datetime.now().isoformat()
+            }
+        )
+    
+    # Convert to response format
+    daily_trends = []
+    for trend in daily_trends_data:
+        daily_trends.append(DailyIncidentTrendPoint(
+            date=trend["date"],
+            overall_score=trend["overall_score"],
+            incident_count=trend["incident_count"],
+            severity_weighted_count=trend.get("severity_weighted_count", 0.0),
+            after_hours_count=trend.get("after_hours_count", 0),
+            high_severity_count=trend.get("high_severity_count", 0),
+            users_involved=trend.get("users_involved", 0),
+            members_at_risk=trend.get("members_at_risk", 0),
+            total_members=trend.get("total_members", 0),
+            health_status=trend.get("health_status", "unknown"),
+            health_percentage=trend.get("health_percentage", trend["overall_score"] * 10)
+        ))
+    
+    # Calculate summary statistics
+    if daily_trends:
+        scores = [t.overall_score for t in daily_trends]
+        avg_score = sum(scores) / len(scores)
+        
+        # Determine trend direction
+        trend_direction = "stable"
+        if len(scores) >= 2:
+            score_change = scores[-1] - scores[0]
+            if score_change > 0.5:
+                trend_direction = "improving"
+            elif score_change < -0.5:
+                trend_direction = "declining"
+        
+        summary = {
+            "total_days": len(daily_trends),
+            "days_with_incidents": len([t for t in daily_trends if t.incident_count > 0]),
+            "avg_daily_score": round(avg_score, 2),
+            "trend_direction": trend_direction,
+            "score_range": {
+                "min": round(min(scores), 2),
+                "max": round(max(scores), 2)
+            },
+            "total_incidents": sum(t.incident_count for t in daily_trends),
+            "total_after_hours": sum(t.after_hours_count for t in daily_trends),
+            "peak_incident_day": max(daily_trends, key=lambda x: x.incident_count).date if daily_trends else None
+        }
+    else:
+        summary = {
+            "total_days": 0,
+            "days_with_incidents": 0,
+            "avg_daily_score": 0.0,
+            "trend_direction": "insufficient_data"
+        }
+    
+    return DailyIncidentTrendsResponse(
+        daily_trends=daily_trends,
+        summary=summary,
+        metadata={
+            "analysis_id": analysis_id,
+            "time_range": analysis.time_range or 30,
+            "data_source": "current_analysis_daily_trends",
+            "generated_at": datetime.now().isoformat()
         }
     )
 
