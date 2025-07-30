@@ -626,22 +626,29 @@ export default function Dashboard() {
     }
   }, [])
 
-  // Load specific analysis from URL after initial data is loaded
+  // Load specific analysis from URL - with delay to ensure auth token is available
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
     const analysisId = urlParams.get('analysis')
     
-    // Only attempt to load if we have initial data loaded and an analysis ID
-    if (initialDataLoaded && analysisId) {
-      const authToken = localStorage.getItem('auth_token')
-      if (authToken) {
-        console.log('Initial data loaded, loading specific analysis:', analysisId)
-        loadSpecificAnalysis(analysisId)
-      } else {
-        console.warn('No auth token available for loading specific analysis')
+    if (analysisId) {
+      // Small delay to ensure auth token and integrations are loaded
+      const loadAnalysisWithDelay = () => {
+        const authToken = localStorage.getItem('auth_token')
+        if (authToken) {
+          console.log('Loading specific analysis from URL:', analysisId)
+          loadSpecificAnalysis(analysisId)
+        } else {
+          console.warn('Auth token not yet available, retrying in 500ms...')
+          // Retry after another short delay
+          setTimeout(loadAnalysisWithDelay, 500)
+        }
       }
+      
+      // Initial delay to let other useEffects run first
+      setTimeout(loadAnalysisWithDelay, 100)
     }
-  }, [initialDataLoaded]) // Runs when initial data loading completes
+  }, []) // Only run once on mount
 
   // Smooth progress animation effect
   useEffect(() => {
@@ -730,12 +737,16 @@ export default function Dashboard() {
   const loadSpecificAnalysis = async (analysisId: string) => {
     try {
       const authToken = localStorage.getItem('auth_token')
-      if (!authToken) return
+      if (!authToken) {
+        console.warn('loadSpecificAnalysis called but no auth token available')
+        return
+      }
 
       // Check if analysisId is a UUID or integer ID
       const isUuid = analysisId.includes('-')
       const endpoint = isUuid ? `${API_BASE}/analyses/uuid/${analysisId}` : `${API_BASE}/analyses/${analysisId}`
-
+      
+      console.log(`Making API call to load analysis: ${endpoint}`)
       const response = await fetch(endpoint, {
         headers: {
           'Authorization': `Bearer ${authToken}`
