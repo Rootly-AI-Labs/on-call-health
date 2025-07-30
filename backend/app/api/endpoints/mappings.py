@@ -232,3 +232,84 @@ def _generate_cache_insights(cache_stats: dict) -> List[str]:
         insights.append("🧹 Many stale mappings detected. Cache cleanup may improve performance.")
     
     return insights
+
+@router.post("/mappings/github/cleanup-duplicates", summary="Clean up duplicate GitHub mappings")
+async def cleanup_duplicate_github_mappings(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+) -> dict:
+    """
+    Clean up duplicate GitHub mappings, keeping only the most recent for each user-email.
+    This removes stale data from before Phase 1 fixes.
+    """
+    try:
+        from sqlalchemy import text
+        
+        logger.info(f"🧹 Starting duplicate cleanup for user {current_user.id}")
+        
+        # Get duplicates for this user
+        query = text("""
+        SELECT source_identifier, COUNT(*) as duplicate_count,
+               array_agg(id ORDER BY created_at DESC) as mapping_ids,
+               array_agg(target_identifier ORDER BY created_at DESC) as usernames,
+               array_agg(mapping_successful ORDER BY created_at DESC) as success_flags
+        FROM integration_mappings 
+        WHERE target_platform = 'github' AND user_id = :user_id
+        GROUP BY source_identifier 
+        HAVING COUNT(*) > 1
+        ORDER BY COUNT(*) DESC
+        """)
+        
+        duplicates = db.execute(query, {"user_id": current_user.id}).fetchall()
+        
+        if not duplicates:
+            return {
+                "message": "✅ No duplicate mappings found for your account",
+                "duplicates_found": 0,
+                "duplicates_removed": 0,
+                "emails_processed": 0
+            }
+        
+        total_deleted = 0
+        emails_processed = len(duplicates)
+        
+        for row in duplicates:
+            email = row[0]
+            duplicate_count = row[1]
+            mapping_ids = row[2]  # Already sorted DESC by created_at
+            usernames = row[3]
+            success_flags = row[4]
+            
+            # Keep the most recent (first), delete the rest
+            keep_id = mapping_ids[0]
+            delete_ids = mapping_ids[1:]
+            
+            logger.info(f"📧 {email}: Keeping ID {keep_id} -> {usernames[0]}, deleting {len(delete_ids)} older mappings")
+            
+            # Delete older mappings
+            delete_query = text("DELETE FROM integration_mappings WHERE id = ANY(:ids)")
+            result = db.execute(delete_query, {"ids": delete_ids})
+            deleted_count = result.rowcount
+            total_deleted += deleted_count
+        
+        # Commit all deletions
+        db.commit()
+        
+        logger.info(f"🎉 Cleanup complete: {emails_processed} emails processed, {total_deleted} duplicates removed")
+        
+        return {
+            "message": f"🎉 Successfully cleaned up duplicate mappings!",
+            "duplicates_found": sum(row[1] - 1 for row in duplicates),  # Total duplicates (excluding kept ones)
+            "duplicates_removed": total_deleted,
+            "emails_processed": emails_processed,
+            "next_steps": [
+                "Run a new burnout analysis with GitHub integration",
+                "Check GitHub Data Mapping modal",
+                "Verify each team member appears only once"
+            ]
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Cleanup failed for user {current_user.id}: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Cleanup failed: {str(e)}")
