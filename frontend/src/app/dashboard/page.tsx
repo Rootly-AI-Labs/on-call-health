@@ -627,6 +627,26 @@ export default function Dashboard() {
     }
   }, [])
 
+  // Check if URL analysis exists in loaded analyses and show loader if not
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const analysisId = urlParams.get('analysis')
+    
+    if (analysisId && analyses.length > 0 && !redirectingToSuggested) {
+      // Check if this analysis ID exists in our current analyses list
+      const analysisExists = analyses.some(analysis => 
+        analysis.id.toString() === analysisId || 
+        (analysis.uuid && analysis.uuid === analysisId)
+      )
+      
+      // If this ID doesn't exist, show loader immediately
+      if (!analysisExists) {
+        console.log(`Analysis ${analysisId} not found in loaded analyses, showing redirect loader`)
+        setRedirectingToSuggested(true)
+      }
+    }
+  }, [analyses, redirectingToSuggested])
+
   // Load specific analysis from URL - with delay to ensure auth token is available
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
