@@ -70,6 +70,7 @@ import {
   BarChart3,
   Database,
   Users2,
+  RefreshCw,
 } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
@@ -1145,6 +1146,11 @@ export default function IntegrationsPage() {
         setAnalysisMappingStats(null)
         setCurrentAnalysisId(null)
         setShowMappingDialog(true)
+        
+        // Show success message only if dialog is already open (refresh action)
+        if (showMappingDialog) {
+          toast.success(`${platform === 'github' ? 'GitHub' : 'Slack'} mapping data refreshed successfully`)
+        }
       } else {
         throw new Error('Failed to fetch mapping data')
       }
@@ -3199,19 +3205,41 @@ export default function IntegrationsPage() {
       <Dialog open={showMappingDialog} onOpenChange={setShowMappingDialog}>
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center space-x-2">
-              <BarChart3 className="w-5 h-5" />
-              <span>
-                {selectedMappingPlatform === 'github' ? 'GitHub' : 'Slack'} Data Mapping
-              </span>
+            <DialogTitle className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <BarChart3 className="w-5 h-5" />
+                <span>
+                  {selectedMappingPlatform === 'github' ? 'GitHub' : 'Slack'} Data Mapping
+                </span>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => selectedMappingPlatform && loadMappingData(selectedMappingPlatform)}
+                disabled={loadingMappingData}
+                className="h-8 w-8 p-0"
+                title="Refresh mapping data"
+              >
+                <RefreshCw className={`w-4 h-4 ${loadingMappingData ? 'animate-spin' : ''}`} />
+              </Button>
             </DialogTitle>
             <DialogDescription>
-              View how team members from your incident data are mapped to {selectedMappingPlatform === 'github' ? 'GitHub' : 'Slack'} accounts.
+              View how team members from your incident data are mapped to {selectedMappingPlatform === 'github' ? 'GitHub' : 'Slack'} accounts. Click the refresh button to reload the latest mapping data.
             </DialogDescription>
           </DialogHeader>
 
           {mappingStats && (
-            <div className="space-y-6">
+            <div className="relative space-y-6">
+              {/* Loading overlay when refreshing */}
+              {loadingMappingData && (
+                <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-10 rounded-lg">
+                  <div className="flex items-center space-x-2 text-gray-600">
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span className="text-sm">Refreshing mapping data...</span>
+                  </div>
+                </div>
+              )}
+              
               {/* Overall Statistics */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Card className="p-4">
