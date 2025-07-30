@@ -32,11 +32,12 @@ async def collect_team_github_data_with_mapping(
                 data_points = 0
                 user_data = github_data[email]
                 
-                # Count data points
+                # Count data points from actual GitHub data structure
                 if isinstance(user_data, dict):
-                    data_points += len(user_data.get("commits", []))
-                    data_points += len(user_data.get("pull_requests", []))
-                    data_points += len(user_data.get("issues", []))
+                    metrics = user_data.get("metrics", {})
+                    data_points += metrics.get("total_commits", 0)
+                    data_points += metrics.get("total_pull_requests", 0)
+                    data_points += metrics.get("total_reviews", 0)
                 
                 # Try to extract the GitHub username from the data
                 github_username = None
