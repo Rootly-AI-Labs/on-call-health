@@ -1131,7 +1131,7 @@ export default function IntegrationsPage() {
         fetch(`${API_BASE}/integrations/mappings/platform/${platform}`, {
           headers: { 'Authorization': `Bearer ${authToken}` }
         }),
-        fetch(`${API_BASE}/integrations/mappings/success-rate`, {
+        fetch(`${API_BASE}/integrations/mappings/success-rate?platform=${platform}`, {
           headers: { 'Authorization': `Bearer ${authToken}` }
         })
       ])
@@ -3239,7 +3239,7 @@ export default function IntegrationsPage() {
                     <Database className="w-4 h-4 text-purple-600" />
                     <div>
                       <div className="text-2xl font-bold">
-                        {mappingData.filter(m => m.data_collected && m.mapping_successful).length}
+                        {mappingStats.members_with_data || mappingData.filter(m => m.data_collected && m.mapping_successful).length}
                       </div>
                       <div className="text-sm text-gray-600">With Data</div>
                     </div>

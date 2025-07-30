@@ -139,15 +139,22 @@ async def get_platform_mappings(
 
 @router.get("/mappings/success-rate", summary="Get success rates by platform")
 async def get_success_rates(
+    platform: str = None,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ) -> dict:
-    """Get success rates broken down by platform combinations - now returns team member focused statistics."""
+    """Get success rates broken down by platform combinations - now returns team member focused statistics.
+    If platform is specified, returns statistics for that platform only."""
     try:
-        # Get all mappings for this user
-        mappings = db.query(IntegrationMapping).filter(
+        # Get mappings for this user, optionally filtered by platform
+        query = db.query(IntegrationMapping).filter(
             IntegrationMapping.user_id == current_user.id
-        ).all()
+        )
+        
+        if platform:
+            query = query.filter(IntegrationMapping.target_platform == platform)
+            
+        mappings = query.all()
         
         if not mappings:
             return {
@@ -156,57 +163,40 @@ async def get_success_rates(
                 "platform_breakdown": {}
             }
         
-        # Calculate team member statistics instead of API attempt statistics
-        # Group by unique email addresses to count team members, not API calls
-        team_members_by_platform = {}
-        successful_mappings_by_platform = {}
+        # Calculate team member statistics (unique by email)
+        unique_emails = set()
+        successful_emails = set()
+        members_with_data = 0
         
         for mapping in mappings:
-            platform = mapping.target_platform
             email = mapping.source_identifier
-            
-            # Initialize platform tracking
-            if platform not in team_members_by_platform:
-                team_members_by_platform[platform] = set()
-                successful_mappings_by_platform[platform] = set()
-            
-            # Count unique team members (by email)
-            team_members_by_platform[platform].add(email)
+            unique_emails.add(email)
             
             # Count successful mappings (team members with successful mapping)
             if mapping.mapping_successful and mapping.target_identifier != "unknown":
-                successful_mappings_by_platform[platform].add(email)
+                successful_emails.add(email)
+                # Count members with actual data points
+                if mapping.data_collected and mapping.data_points_count and mapping.data_points_count > 0:
+                    members_with_data += 1
         
-        # Calculate overall statistics
-        all_team_members = set()
-        all_successful_members = set()
-        
-        for platform in team_members_by_platform:
-            all_team_members.update(team_members_by_platform[platform])
-            all_successful_members.update(successful_mappings_by_platform[platform])
-        
-        total_team_members = len(all_team_members)
-        total_successful = len(all_successful_members)
+        total_team_members = len(unique_emails)
+        total_successful = len(successful_emails)
         overall_success_rate = (total_successful / total_team_members * 100) if total_team_members > 0 else 0
         
-        # Calculate platform breakdown
+        # Create platform breakdown (even for single platform)
         platform_success_rates = {}
-        for platform in team_members_by_platform:
-            platform_team_count = len(team_members_by_platform[platform])
-            platform_successful_count = len(successful_mappings_by_platform[platform])
-            platform_failed_count = platform_team_count - platform_successful_count
-            platform_success_rate = (platform_successful_count / platform_team_count * 100) if platform_team_count > 0 else 0
-            
+        if platform and total_team_members > 0:
             platform_success_rates[platform] = {
-                "total_attempts": platform_team_count,  # Now means "team members"
-                "successful": platform_successful_count,
-                "failed": platform_failed_count,
-                "success_rate": round(platform_success_rate, 1)
+                "total_attempts": total_team_members,
+                "successful": total_successful,
+                "failed": total_team_members - total_successful,
+                "success_rate": round(overall_success_rate, 1)
             }
         
         return {
             "overall_success_rate": round(overall_success_rate, 1),
-            "total_attempts": total_team_members,  # Now means "total team members"  
+            "total_attempts": total_team_members,
+            "members_with_data": members_with_data,
             "platform_breakdown": platform_success_rates
         }
     except Exception as e:
