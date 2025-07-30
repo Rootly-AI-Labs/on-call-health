@@ -1594,28 +1594,12 @@ class UnifiedBurnoutAnalyzer:
         return incidents
 
     def _generate_daily_trends(self, incidents: List[Dict[str, Any]], team_analysis: List[Dict[str, Any]], metadata: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Generate daily trend data from incidents and team analysis - includes ALL days in time period."""
+        """Generate daily trend data from incidents and team analysis - only includes days with actual incident data."""
         try:
             days_analyzed = metadata.get("days_analyzed", 30) or 30 if isinstance(metadata, dict) else 30
-            end_date = datetime.now()
-            start_date = end_date - timedelta(days=days_analyzed)
             
-            # Initialize daily data structure for ALL days in the time period
+            # Initialize daily data structure - only for days with incidents
             daily_data = {}
-            current_date = start_date
-            
-            # Initialize all days with zero incidents (ensuring full time period coverage)
-            while current_date <= end_date:
-                date_str = current_date.strftime("%Y-%m-%d")
-                daily_data[date_str] = {
-                    "date": date_str,
-                    "incident_count": 0,
-                    "severity_weighted_count": 0.0,
-                    "after_hours_count": 0,
-                    "users_involved": set(),
-                    "high_severity_count": 0
-                }
-                current_date += timedelta(days=1)
             
             # Process incidents to populate daily data - only for days with incidents
             if incidents and isinstance(incidents, list):
@@ -1793,21 +1777,16 @@ class UnifiedBurnoutAnalyzer:
                     "health_percentage": round(daily_score * 10, 1)  # Convert to percentage for display
                 })
             
-            # Return ALL days in the time period (including days with zero incidents)
-            # This ensures the frontend chart has complete data for the full analysis period
-            logger.info(f"Generated {len(daily_trends)} daily trend data points for complete {days_analyzed}-day analysis period")
+            # Return only days with actual incident data - no fake data generation
+            logger.info(f"Generated {len(daily_trends)} daily trend data points with actual incident data for {days_analyzed}-day analysis")
             
             # Debug: Log sample data for troubleshooting
             if daily_trends:
-                logger.info(f"🔍 DAILY_TRENDS_DEBUG: Full period coverage - First entry: {daily_trends[0]}")
+                logger.info(f"🔍 DAILY_TRENDS_DEBUG: Sample trend data - First entry: {daily_trends[0]}")
                 logger.info(f"🔍 DAILY_TRENDS_DEBUG: Date range: {daily_trends[0]['date']} to {daily_trends[-1]['date']}")
-                incidents_with_data = [d for d in daily_trends if d["incident_count"] > 0]
-                if incidents_with_data:
-                    logger.info(f"🔍 DAILY_TRENDS_DEBUG: {len(incidents_with_data)} days with incidents, score range: {min(d['overall_score'] for d in incidents_with_data):.2f} to {max(d['overall_score'] for d in incidents_with_data):.2f}")
-                else:
-                    logger.info(f"🔍 DAILY_TRENDS_DEBUG: No incidents found in period, all days at baseline health score")
+                logger.info(f"🔍 DAILY_TRENDS_DEBUG: Score range: {min(d['overall_score'] for d in daily_trends):.2f} to {max(d['overall_score'] for d in daily_trends):.2f}")
             else:
-                logger.warning(f"🔍 DAILY_TRENDS_DEBUG: No trend data generated for {days_analyzed}-day analysis")
+                logger.warning(f"🔍 DAILY_TRENDS_DEBUG: No incident data available - returning empty trends")
                 
             return daily_trends
             

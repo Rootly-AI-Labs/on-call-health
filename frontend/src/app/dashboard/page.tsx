@@ -2461,22 +2461,23 @@ export default function Dashboard() {
                               // Use the latest point from health trends for consistency with chart
                               if (historicalTrends?.daily_trends?.length > 0) {
                                 const latestTrend = historicalTrends.daily_trends[historicalTrends.daily_trends.length - 1];
-                                return Math.round(latestTrend.overall_score * 10);
+                                return `${Math.round(latestTrend.overall_score * 10)}%`;
                               }
                               // Fallback to current analysis daily trends if available
                               if (currentAnalysis?.analysis_data?.daily_trends?.length > 0) {
                                 const latestTrend = currentAnalysis.analysis_data.daily_trends[currentAnalysis.analysis_data.daily_trends.length - 1];
-                                return Math.round(latestTrend.overall_score * 10);
+                                return `${Math.round(latestTrend.overall_score * 10)}%`;
                               }
-                              // Final fallback to team_health or team_summary
+                              // Show real data from team_health if available
                               if (currentAnalysis?.analysis_data?.team_health) {
-                                return Math.round(currentAnalysis.analysis_data.team_health.overall_score * 10);
+                                return `${Math.round(currentAnalysis.analysis_data.team_health.overall_score * 10)}%`;
                               }
                               if (currentAnalysis?.analysis_data?.team_summary) {
-                                return Math.round(currentAnalysis.analysis_data.team_summary.average_score * 10);
+                                return `${Math.round(currentAnalysis.analysis_data.team_summary.average_score * 10)}%`;
                               }
-                              return 100;
-                            })()}%</div>
+                              // NO FALLBACK DATA - show actual system state
+                              return "No data";
+                            })()}</div>
                             <div className="text-xs text-gray-500">Current</div>
                           </div>
                           {(() => {
@@ -2502,17 +2503,17 @@ export default function Dashboard() {
                                   const dailyScores = currentAnalysis.analysis_data.daily_trends.map((d: any) => d.overall_score);
                                   const average = dailyScores.reduce((a: number, b: number) => a + b, 0) / dailyScores.length;
                                   console.log("Debug - calculated average from currentAnalysis daily_trends:", average * 10);
-                                  return Math.round(average * 10); // Convert 0-10 to 0-100%
+                                  return `${Math.round(average * 10)}%`; // Convert 0-10 to 0-100%
                                 }
-                                // Final fallback: Use current score
+                                // Use current score if daily trends are empty but historical available
                                 if (historicalTrends?.daily_trends?.length > 0) {
                                   const latestTrend = historicalTrends.daily_trends[historicalTrends.daily_trends.length - 1];
-                                  console.log("Debug - using latest trend as fallback:", latestTrend.overall_score * 10);
-                                  return Math.round(latestTrend.overall_score * 10);
+                                  console.log("Debug - using latest trend:", latestTrend.overall_score * 10);
+                                  return `${Math.round(latestTrend.overall_score * 10)}%`;
                                 }
-                                console.log("Debug - no data available for average, returning 0");
-                                return 0;
-                              })()}%</div>
+                                console.log("Debug - no data available for average");
+                                return "No data";
+                              })()}</div>
                               <div className="text-xs text-gray-500">{currentAnalysis?.time_range || 30}-day avg</div>
                             </div>
                           )}
