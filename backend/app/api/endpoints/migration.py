@@ -10,7 +10,7 @@ from ...auth.dependencies import get_current_active_user
 
 router = APIRouter()
 
-@router.post("/migrate/add-uuid-column")
+@router.post("/add-uuid-column")
 async def migrate_add_uuid_column(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
@@ -101,7 +101,7 @@ async def migrate_add_uuid_column(
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Migration failed: {str(e)}")
 
-@router.get("/migrate/check-uuid-status")
+@router.get("/check-uuid-status")
 async def check_uuid_status(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
