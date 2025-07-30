@@ -36,6 +36,17 @@ async def health():
 @app.on_event("startup")
 async def startup_event():
     create_tables()
+    
+    # Auto-cleanup duplicate mappings from before Phase 1 fixes
+    try:
+        import sys
+        from pathlib import Path
+        backend_path = Path(__file__).parent.parent
+        sys.path.insert(0, str(backend_path))
+        from auto_cleanup_duplicates import auto_cleanup_duplicates
+        auto_cleanup_duplicates()
+    except Exception as e:
+        print(f"⚠️ Auto-cleanup failed (non-critical): {e}")
 
 # Include API routers
 app.include_router(auth.router, prefix="/auth", tags=["authentication"])
