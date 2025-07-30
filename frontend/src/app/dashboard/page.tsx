@@ -868,7 +868,7 @@ export default function Dashboard() {
     }
   }
 
-  const loadHistoricalTrends = async (integrationId?: number) => {
+  const loadHistoricalTrends = async () => {
     try {
       const authToken = localStorage.getItem('auth_token')
       if (!authToken) {
@@ -881,12 +881,9 @@ export default function Dashboard() {
       setLoadingTrends(true)
       console.log('Loading historical trends...')
       
-      // Use the same time range as the current analysis
-      const analysisTimeRange = currentAnalysis?.time_range || 30
-      const params = new URLSearchParams({ days_back: analysisTimeRange.toString() })
-      if (integrationId) {
-        params.append('integration_id', integrationId.toString())
-      }
+      // Use 30 days to get more historical data points for all integrations
+      const params = new URLSearchParams({ days_back: '30' })
+      // No integration filtering - show data from all integrations
 
       const fullUrl = `${API_BASE}/analyses/trends/historical?${params}`
       console.log('Making request to:', fullUrl)
