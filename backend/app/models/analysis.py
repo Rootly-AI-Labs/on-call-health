@@ -11,7 +11,7 @@ class Analysis(Base):
     __tablename__ = "analyses"
     
     id = Column(Integer, primary_key=True, index=True)
-    # uuid = Column(String(36), unique=True, index=True, nullable=True, default=lambda: str(uuid.uuid4()))  # Commented until migration
+    uuid = Column(String(36), unique=True, index=True, nullable=True, default=lambda: str(uuid.uuid4()))
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     rootly_integration_id = Column(Integer, ForeignKey("rootly_integrations.id"), nullable=True)
     time_range = Column(Integer, default=30)  # Time range in days

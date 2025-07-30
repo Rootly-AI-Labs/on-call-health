@@ -256,6 +256,78 @@ async def list_integrations(
         "integrations": result_integrations
     }
 
+
+@router.get("/integrations/{integration_id}/permissions")
+async def check_integration_permissions(
+    integration_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Check API permissions for a specific integration."""
+    integration = db.query(RootlyIntegration).filter(
+        RootlyIntegration.id == integration_id,
+        RootlyIntegration.user_id == current_user.id,
+        RootlyIntegration.is_active == True
+    ).first()
+    
+    if not integration:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Integration not found"
+        )
+    
+    if not integration.api_token:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Integration has no API token configured"
+        )
+    
+    try:
+        client = RootlyAPIClient(integration.api_token)
+        permissions = await client.check_permissions()
+        
+        # Add helpful recommendations
+        recommendations = []
+        if not permissions.get("incidents", {}).get("access", False):
+            recommendations.append({
+                "type": "error",
+                "title": "Missing Incidents Permission",
+                "message": "Your API token needs 'incidents:read' permission to fetch incident data for burnout analysis.",
+                "action": "Update your Rootly API token with the required permission."
+            })
+        
+        if not permissions.get("users", {}).get("access", False):
+            recommendations.append({
+                "type": "error", 
+                "title": "Missing Users Permission",
+                "message": "Your API token needs 'users:read' permission to fetch team member data.",
+                "action": "Update your Rootly API token with the required permission."
+            })
+        
+        if not recommendations:
+            recommendations.append({
+                "type": "success",
+                "title": "All Permissions OK",
+                "message": "Your API token has all required permissions for burnout analysis.",
+                "action": "You're ready to run analyses!"
+            })
+        
+        return {
+            "integration_id": integration_id,
+            "integration_name": integration.name,
+            "permissions": permissions,
+            "recommendations": recommendations,
+            "status": "error" if any(r["type"] == "error" for r in recommendations) else "success"
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to check permissions for integration {integration_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to check permissions: {str(e)}"
+        )
+
+
 @router.put("/integrations/{integration_id}")
 async def update_integration(
     integration_id: int,

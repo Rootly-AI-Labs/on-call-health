@@ -773,10 +773,14 @@ export default function Dashboard() {
     return () => clearInterval(interval)
   }, [analysisRunning, targetProgress])
 
-  // Load historical trends when current analysis changes
+  // Only load historical trends when we have a valid current analysis
   useEffect(() => {
-    // Load trends for all integrations to show complete health overview
-    loadHistoricalTrends()
+    if (currentAnalysis && currentAnalysis.status === 'completed') {
+      loadHistoricalTrends()
+    } else {
+      // Clear trends data when no valid analysis
+      setHistoricalTrends(null)
+    }
   }, [currentAnalysis])
 
   const loadPreviousAnalyses = async () => {
@@ -859,9 +863,16 @@ export default function Dashboard() {
           updateURLWithAnalysis(analysis.uuid || analysis.id)
         }
       } else {
-        console.error('Failed to load analysis:', analysisId)
+        console.error('Failed to load analysis:', analysisId, 'Status:', response.status)
+        // Clear current analysis and trends when analysis not found
+        setCurrentAnalysis(null)
+        setHistoricalTrends(null)
         // Remove invalid analysis ID from URL
         updateURLWithAnalysis(null)
+        // Show user-friendly error message
+        if (response.status === 404) {
+          console.warn(`Analysis ${analysisId} not found. Please select a valid analysis from the history.`)
+        }
       }
     } catch (error) {
       console.error('Error loading specific analysis:', error)
@@ -3255,10 +3266,18 @@ export default function Dashboard() {
                   <CardHeader>
                     <CardTitle>Health Trends</CardTitle>
                     <CardDescription>
-                      {historicalTrends?.daily_trends?.length > 0 
-                        ? `Health trends from ${historicalTrends.daily_trends.length} days of analysis data across all integrations`
-                        : "Organization health score over time across all integrations"
-                      }
+                      {(() => {
+                        if (!currentAnalysis) {
+                          return "No analysis selected - please select an analysis to view health trends";
+                        }
+                        if (currentAnalysis?.analysis_data?.daily_trends?.length > 0) {
+                          return `Health trends from ${currentAnalysis.analysis_data.daily_trends.length} days of analysis data`;
+                        }
+                        if (historicalTrends?.daily_trends?.length > 0) {
+                          return `Health trends from ${historicalTrends.daily_trends.length} days of analysis data`;
+                        }
+                        return "No daily trend data available for this analysis";
+                      })()}
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -3270,23 +3289,46 @@ export default function Dashboard() {
                             <p className="text-sm text-gray-500">Loading trends...</p>
                           </div>
                         </div>
-                      ) : (
-                        <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={(() => {
-                          // Use real historical trends data if available
-                          if (historicalTrends?.daily_trends?.length > 0) {
-                            return historicalTrends.daily_trends.map((trend: any) => ({
-                              date: new Date(trend.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
-                              score: Math.round(trend.overall_score * 10), // Convert 0-10 scale to 0-100 for display
-                              riskLevel: trend.overall_score >= 8 ? 'low' : trend.overall_score >= 6 ? 'medium' : 'high',
-                              membersAtRisk: trend.members_at_risk,
-                              totalMembers: trend.total_members,
-                              healthStatus: trend.health_status,
-                              incidentCount: trend.incident_count
-                            }));
+                      ) : (() => {
+                        // Check if we have any data to show before rendering the chart
+                        const hasData = (() => {
+                          if (!currentAnalysis || currentAnalysis.status !== 'completed') {
+                            return false;
+                          }
+                          return (currentAnalysis?.analysis_data?.daily_trends?.length > 0) || 
+                                 (historicalTrends?.daily_trends?.length > 0);
+                        })()
+                        
+                        if (!hasData) {
+                          return (
+                            <div className="flex items-center justify-center h-full">
+                              <div className="text-center">
+                                <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                  <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                  </svg>
+                                </div>
+                                <p className="text-sm text-gray-500 font-medium">No Health Trends Data</p>
+                                <p className="text-xs text-gray-400 mt-1">
+                                  {!currentAnalysis 
+                                    ? "Select an analysis to view health trends"
+                                    : "This analysis has no daily trend data available"
+                                  }
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        }
+                        
+                        return (
+                          <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={(() => {
+                          // ONLY show data if we have a valid current analysis - NO FALLBACK DATA
+                          if (!currentAnalysis || currentAnalysis.status !== 'completed') {
+                            return []; // Return empty array - no fallback data
                           }
                           
-                          // Use daily_trends from current analysis if available (SimpleBurnoutAnalyzer)
+                          // Use daily_trends from current analysis (primary source)
                           if (currentAnalysis?.analysis_data?.daily_trends?.length > 0) {
                             return currentAnalysis.analysis_data.daily_trends.map((trend: any) => ({
                               date: new Date(trend.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
@@ -3295,19 +3337,25 @@ export default function Dashboard() {
                               membersAtRisk: trend.members_at_risk,
                               totalMembers: trend.total_members,
                               healthStatus: trend.health_status,
-                              incidentCount: trend.incident_count
+                              incidentCount: trend.incident_count || trend.analysis_count || 0
                             }));
                           }
                           
-                          // Fallback: show current analysis as single point if no historical data
-                          const healthScore = currentAnalysis?.analysis_data?.team_health ? 
-                            Math.round(currentAnalysis.analysis_data.team_health.overall_score * 10) : 92;
+                          // Use historical trends as secondary source (only if current analysis exists)
+                          if (historicalTrends?.daily_trends?.length > 0) {
+                            return historicalTrends.daily_trends.map((trend: any) => ({
+                              date: new Date(trend.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
+                              score: Math.round(trend.overall_score * 10), // Convert 0-10 scale to 0-100 for display
+                              riskLevel: trend.overall_score >= 8 ? 'low' : trend.overall_score >= 6 ? 'medium' : 'high',
+                              membersAtRisk: trend.members_at_risk,
+                              totalMembers: trend.total_members,
+                              healthStatus: trend.health_status,
+                              incidentCount: trend.incident_count || trend.analysis_count || 0
+                            }));
+                          }
                           
-                          return [{
-                            date: 'Current',
-                            score: healthScore,
-                            riskLevel: healthScore >= 80 ? 'low' : healthScore >= 60 ? 'medium' : 'high'
-                          }];
+                          // Return empty array if no valid data available - NO FALLBACK
+                          return [];
                         })()}>
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis dataKey="date" tick={{ fontSize: 12 }} />
@@ -3328,7 +3376,7 @@ export default function Dashboard() {
                                     </p>
                                     {data.incidentCount !== undefined && (
                                       <p className="text-sm text-gray-600">
-                                        Incidents: {data.incidentCount}
+                                        Incidents Analyzed: {data.incidentCount}
                                       </p>
                                     )}
                                     {data.membersAtRisk !== undefined && (
@@ -3357,7 +3405,8 @@ export default function Dashboard() {
                           />
                         </LineChart>
                       </ResponsiveContainer>
-                      )}
+                        );
+                      })()}
                     </div>
                   </CardContent>
                 </Card>
@@ -3875,8 +3924,44 @@ export default function Dashboard() {
             </Card>
           )}
 
+          {/* Analysis Not Found State */}
+          {!analysisRunning && !currentAnalysis && searchParams.get('analysis') && (
+            <Card className="text-center p-8 border-red-200 bg-red-50">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.728-.833-2.498 0L4.316 15.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-semibold text-red-900 mb-2">Analysis Not Found</h3>
+              <p className="text-red-700 mb-6">
+                The analysis with ID "{searchParams.get('analysis')}" could not be found or may have been deleted.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <Button 
+                  onClick={() => {
+                    updateURLWithAnalysis(null)
+                    if (previousAnalyses.length > 0) {
+                      setCurrentAnalysis(previousAnalyses[0])
+                      updateURLWithAnalysis(previousAnalyses[0].uuid || previousAnalyses[0].id)
+                    }
+                  }}
+                  className="bg-red-600 hover:bg-red-700"
+                >
+                  Load Most Recent Analysis
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => updateURLWithAnalysis(null)}
+                  className="border-red-300 text-red-700 hover:bg-red-50"
+                >
+                  Clear URL and Start Fresh
+                </Button>
+              </div>
+            </Card>
+          )}
+
           {/* Empty State */}
-          {!analysisRunning && !currentAnalysis && (
+          {!analysisRunning && !currentAnalysis && !searchParams.get('analysis') && (
             <>
               {/* Check if integrations exist */}
               {integrations.length === 0 ? (

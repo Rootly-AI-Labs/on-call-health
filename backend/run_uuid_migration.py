@@ -12,10 +12,14 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 if __name__ == "__main__":
     try:
-        from migrate_add_uuid_column import add_uuid_to_analyses
+        from migrate_uuid_step1 import add_uuid_column_only
         print("Starting UUID migration for Railway PostgreSQL...")
-        add_uuid_to_analyses()
-        print("UUID migration completed successfully!")
+        success = add_uuid_column_only()
+        if success:
+            print("UUID migration completed successfully!")
+        else:
+            print("UUID migration failed!")
+            sys.exit(1)
     except ImportError as e:
         print(f"Error importing migration: {e}")
         sys.exit(1)

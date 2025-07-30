@@ -367,3 +367,418 @@ def test_analysis_data_consistency():
   - `backend/app/services/burnout_analyzer.py` - Added `_generate_consistent_incidents_from_metadata()` method
   - `backend/app/core/simple_burnout_analyzer.py` - Added same consistency fix
 - **Result**: All dashboard components now use the same incident data source, ensuring consistency between total counts, daily trends, and individual metrics
+
+### COMPREHENSIVE DATA COLLECTION & STORAGE PLAN
+
+#### Objective: Maximize Data Granularity for Superior Analysis Results
+
+**Core Principle**: "Store everything we can access - more data = better insights"
+
+#### 1. Enhanced API Data Collection
+
+**Rootly Incidents API - Collect ALL Available Fields**:
+```python
+# Current: Basic incident data
+# Enhanced: Comprehensive incident metadata
+incident_data = {
+    # Core fields (already collected)
+    "id": incident.id,
+    "title": incident.title,
+    "status": incident.status,
+    "severity": incident.severity,
+    "created_at": incident.created_at,
+    "resolved_at": incident.resolved_at,
+    
+    # NEW: Enhanced metadata
+    "description": incident.description,
+    "summary": incident.summary,
+    "impact": incident.impact,
+    "priority": incident.priority,
+    "category": incident.category,
+    "subcategory": incident.subcategory,
+    "environment": incident.environment,
+    "services_affected": incident.services,
+    "root_cause": incident.root_cause,
+    "resolution_notes": incident.resolution_notes,
+    
+    # NEW: Timeline and response metrics
+    "first_response_time_minutes": calculate_first_response_time(incident),
+    "time_to_acknowledge_minutes": calculate_ack_time(incident),
+    "time_to_resolve_minutes": calculate_resolve_time(incident),
+    "escalation_count": count_escalations(incident),
+    "number_of_updates": len(incident.updates),
+    
+    # NEW: Team involvement
+    "assignees": [user.id for user in incident.assignees],
+    "responders": [user.id for user in incident.responders],
+    "followers": [user.id for user in incident.followers],
+    "incident_commander": incident.commander.id if incident.commander else None,
+    "escalated_to": incident.escalated_to if hasattr(incident, 'escalated_to') else None,
+    
+    # NEW: Communication metrics
+    "total_comments": len(incident.comments),
+    "external_communications": count_external_comms(incident),
+    "stakeholder_updates": count_stakeholder_updates(incident),
+    "notification_channels": incident.notification_channels,
+    
+    # NEW: Business impact
+    "customer_impact_level": incident.customer_impact,
+    "financial_impact": incident.financial_impact,
+    "affected_user_count": incident.affected_users,
+    "business_services_impacted": incident.business_services,
+    
+    # NEW: Detection and response patterns
+    "detection_method": incident.detection_method,
+    "automated_detection": incident.automated_detection,
+    "alert_source": incident.alert_source,
+    "monitoring_tools": incident.monitoring_tools,
+    
+    # NEW: Post-incident data
+    "post_mortem_completed": bool(incident.post_mortem),
+    "action_items_count": count_action_items(incident),
+    "lessons_learned": incident.lessons_learned,
+    "follow_up_required": incident.follow_up_required
+}
+```
+
+**GitHub Activity API - Comprehensive Code Metrics**:
+```python
+github_metrics = {
+    # Current: Basic commit/PR data
+    # Enhanced: Development pattern analysis
+    "commits": {
+        "total_count": len(commits),
+        "commits_by_hour": group_commits_by_hour(commits),
+        "commits_by_day_of_week": group_commits_by_weekday(commits),
+        "weekend_commits": count_weekend_commits(commits),
+        "after_hours_commits": count_after_hours_commits(commits),
+        "commit_message_length_avg": avg_commit_message_length(commits),
+        "commit_size_lines_avg": avg_lines_changed(commits),
+        "force_pushes": count_force_pushes(commits),
+        "merge_commits": count_merge_commits(commits),
+        "revert_commits": count_revert_commits(commits)
+    },
+    "pull_requests": {
+        "total_prs": len(pull_requests),
+        "draft_prs": count_draft_prs(pull_requests),
+        "pr_review_time_avg": avg_pr_review_time(pull_requests),
+        "self_approved_prs": count_self_approved(pull_requests),
+        "large_prs": count_large_prs(pull_requests),  # >500 lines
+        "pr_comments_avg": avg_pr_comments(pull_requests),
+        "pr_iterations_avg": avg_pr_iterations(pull_requests),
+        "hotfix_prs": count_hotfix_prs(pull_requests)
+    },
+    "code_review_patterns": {
+        "reviews_given": count_reviews_given(user),
+        "reviews_received": count_reviews_received(user),
+        "review_response_time_avg": avg_review_response_time(user),
+        "constructive_feedback_ratio": calculate_feedback_ratio(user),
+        "approval_rate": calculate_approval_rate(user)
+    },
+    "repository_activity": {
+        "repos_contributed_to": count_unique_repos(user),
+        "primary_languages": get_primary_languages(user),
+        "issue_creation": count_issues_created(user),
+        "issue_comments": count_issue_comments(user),
+        "wiki_edits": count_wiki_edits(user),
+        "release_participation": count_release_participation(user)
+    }
+}
+```
+
+**Slack Communications API - Deep Communication Analysis**:
+```python
+slack_metrics = {
+    # Current: Basic message counts
+    # Enhanced: Communication pattern analysis
+    "messaging_patterns": {
+        "total_messages": len(messages),
+        "messages_by_hour": group_messages_by_hour(messages),
+        "weekend_messages": count_weekend_messages(messages),
+        "after_hours_messages": count_after_hours_messages(messages),
+        "thread_participation": count_thread_messages(messages),
+        "broadcast_messages": count_broadcast_messages(messages),
+        "direct_messages_sent": count_dm_sent(messages),
+        "direct_messages_received": count_dm_received(messages)
+    },
+    "communication_quality": {
+        "message_length_avg": avg_message_length(messages),
+        "emoji_usage": count_emoji_usage(messages),
+        "reaction_patterns": analyze_reaction_patterns(messages),
+        "urgency_indicators": count_urgency_keywords(messages),
+        "question_asking_rate": count_questions_asked(messages),
+        "helping_behavior": count_help_provided(messages)
+    },
+    "collaboration_metrics": {
+        "channels_active_in": count_active_channels(user),
+        "channel_creation": count_channels_created(user),
+        "mentions_given": count_mentions_given(user),
+        "mentions_received": count_mentions_received(user),
+        "file_shares": count_file_shares(user),
+        "link_shares": count_link_shares(user)
+    },
+    "incident_communication": {
+        "incident_channel_messages": count_incident_messages(user),
+        "status_updates_provided": count_status_updates(user), 
+        "escalation_messages": count_escalation_messages(user),
+        "resolution_confirmations": count_resolution_messages(user),
+        "post_incident_discussion": count_post_incident_messages(user)
+    },
+    "sentiment_analysis": {
+        "message_sentiment_avg": calculate_avg_sentiment(messages),
+        "sentiment_trend": calculate_sentiment_trend(messages),
+        "stress_indicators": count_stress_keywords(messages),
+        "frustration_indicators": count_frustration_keywords(messages),
+        "positive_language_ratio": calculate_positive_ratio(messages)
+    }
+}
+```
+
+#### 2. Raw API Response Storage
+
+**Complete API Response Archival**:
+```python
+# Store complete API responses for debugging and future analysis
+api_response_archive = {
+    "rootly_incidents_raw": {
+        "timestamp": datetime.utcnow(),
+        "endpoint": "/incidents",
+        "query_params": {"start_date": "...", "end_date": "..."},
+        "response_status": 200,
+        "raw_response": complete_api_response,  # Full JSON response
+        "response_headers": dict(response.headers),
+        "processing_notes": "Any issues or observations during processing"
+    },
+    "github_activity_raw": {
+        "timestamp": datetime.utcnow(),
+        "endpoints_called": ["/user/commits", "/user/pulls", "/user/events"],
+        "raw_responses": [response1, response2, response3],
+        "rate_limit_info": github_rate_limit_status,
+        "processing_notes": "API rate limit status, any pagination issues"
+    },
+    "slack_messages_raw": {
+        "timestamp": datetime.utcnow(), 
+        "channels_queried": ["#incidents", "#engineering", "#alerts"],
+        "raw_responses": channel_message_responses,
+        "message_count_total": total_messages_retrieved,
+        "processing_notes": "Channel access permissions, message filtering applied"
+    }
+}
+```
+
+#### 3. Enhanced Calculated Metrics
+
+**Advanced Burnout Indicators**:
+```python
+advanced_burnout_metrics = {
+    # Workload intensity patterns
+    "workload_patterns": {
+        "incident_clustering": {
+            "incidents_per_day_avg": avg_incidents_per_day,
+            "max_incidents_single_day": max_daily_incidents,
+            "incident_free_days": count_incident_free_days,
+            "consecutive_incident_days": longest_incident_streak,
+            "weekend_incident_ratio": weekend_incidents / total_incidents,
+            "holiday_incidents": count_holiday_incidents,
+            "time_between_incidents_avg": avg_time_between_incidents
+        },
+        "response_patterns": {
+            "fastest_response_time": min_response_time,
+            "slowest_response_time": max_response_time,
+            "response_time_consistency": response_time_std_dev,
+            "late_night_responses": count_responses_after_midnight,
+            "immediate_responses": count_responses_under_5min,
+            "response_degradation": calculate_response_time_trend
+        }
+    },
+    
+    # Stress progression indicators
+    "stress_progression": {
+        "communication_changes": {
+            "message_length_trend": calculate_message_length_trend,
+            "response_delay_trend": calculate_response_delay_trend,
+            "emoji_usage_change": calculate_emoji_trend,
+            "formality_increase": calculate_formality_trend,
+            "question_asking_decrease": calculate_question_trend
+        },
+        "work_pattern_changes": {
+            "working_hours_expansion": calculate_hours_expansion,
+            "weekend_work_increase": calculate_weekend_increase,
+            "break_frequency_decrease": calculate_break_decrease,
+            "multitasking_increase": calculate_multitask_increase
+        }
+    },
+    
+    # Recovery and resilience indicators
+    "recovery_patterns": {
+        "post_incident_activity": {
+            "follow_up_time": time_to_follow_up_actions,
+            "documentation_completeness": assess_documentation_quality,
+            "knowledge_sharing": count_knowledge_sharing_activities,
+            "process_improvement_suggestions": count_improvement_suggestions
+        },
+        "learning_indicators": {
+            "similar_incident_handling_improvement": measure_handling_improvement,
+            "proactive_monitoring_setup": count_monitoring_improvements,
+            "automation_contributions": count_automation_efforts,
+            "mentoring_activity": count_mentoring_activities
+        }
+    }
+}
+```
+
+#### 4. Historical Trend Analysis
+
+**Long-term Pattern Storage**:
+```python
+historical_analysis = {
+    "weekly_trends": {
+        "week_1": {"incidents": 5, "avg_response": 45, "burnout_score": 6.2},
+        "week_2": {"incidents": 8, "avg_response": 52, "burnout_score": 6.8},
+        # ... store weekly snapshots for trend analysis
+    },
+    "monthly_comparisons": {
+        "month_over_month_changes": {
+            "incident_volume_change": "+15%",
+            "response_time_change": "+12%",
+            "team_health_change": "-8%",
+            "automation_adoption": "+25%"
+        }
+    },
+    "seasonal_patterns": {
+        "peak_incident_months": ["March", "September"],  # Release seasons
+        "lowest_activity_periods": ["December", "August"],  # Holiday seasons
+        "on_call_rotation_effectiveness": analyze_rotation_success
+    }
+}
+```
+
+#### 5. Cross-System Correlation Analysis
+
+**Multi-Source Data Correlation**:
+```python
+correlation_analysis = {
+    "incident_to_code_correlation": {
+        "incidents_following_large_deployments": count_post_deploy_incidents,
+        "code_complexity_vs_incidents": correlate_complexity_incidents,
+        "review_thoroughness_vs_stability": correlate_reviews_stability,
+        "hotfix_frequency_vs_burnout": correlate_hotfix_burnout
+    },
+    "communication_to_performance_correlation": {
+        "response_time_vs_message_sentiment": correlate_time_sentiment,
+        "collaboration_level_vs_resolution_speed": correlate_collab_speed,
+        "knowledge_sharing_vs_incident_prevention": correlate_knowledge_prevention
+    },
+    "temporal_correlations": {
+        "time_of_day_vs_incident_severity": analyze_time_severity,
+        "day_of_week_vs_response_quality": analyze_day_quality,
+        "season_vs_team_health": analyze_seasonal_health
+    }
+}
+```
+
+#### 6. Implementation Plan
+
+**Database Schema Enhancements**:
+```sql
+-- New tables for granular data storage
+CREATE TABLE incident_details (
+    id SERIAL PRIMARY KEY,
+    incident_id VARCHAR(255),
+    analysis_id INTEGER REFERENCES analyses(id),
+    raw_api_response JSONB,
+    enhanced_metrics JSONB,
+    timeline_data JSONB,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE github_activity_details (
+    id SERIAL PRIMARY KEY,
+    user_id VARCHAR(255),
+    analysis_id INTEGER REFERENCES analyses(id),
+    raw_api_responses JSONB,
+    calculated_metrics JSONB,
+    pattern_analysis JSONB,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE slack_communication_details (
+    id SERIAL PRIMARY KEY,
+    user_id VARCHAR(255),
+    analysis_id INTEGER REFERENCES analyses(id),
+    raw_messages JSONB,
+    sentiment_analysis JSONB,
+    communication_patterns JSONB,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE analysis_correlations (
+    id SERIAL PRIMARY KEY,
+    analysis_id INTEGER REFERENCES analyses(id),
+    correlation_type VARCHAR(100),
+    correlation_data JSONB,
+    significance_score FLOAT,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+**File Structure for Enhanced Data Collection**:
+```
+backend/app/services/
+├── enhanced_data_collector.py      # Orchestrates all data collection
+├── rootly_enhanced_collector.py    # Comprehensive Rootly data
+├── github_enhanced_collector.py    # Detailed GitHub analysis
+├── slack_enhanced_collector.py     # Deep Slack communication analysis
+├── correlation_analyzer.py         # Cross-system pattern analysis
+├── pattern_detector.py            # Advanced pattern recognition
+└── data_archiver.py               # Raw response storage and retrieval
+```
+
+**Configuration for Maximum Data Collection**:
+```python
+# config/data_collection.py
+DATA_COLLECTION_CONFIG = {
+    "rootly": {
+        "collect_all_incident_fields": True,
+        "include_comments": True,
+        "include_timeline": True,
+        "include_post_mortems": True,
+        "archive_raw_responses": True
+    },
+    "github": {
+        "analyze_commit_patterns": True,
+        "include_code_review_metrics": True,
+        "analyze_repository_activity": True,
+        "include_issue_participation": True,
+        "archive_raw_responses": True
+    },
+    "slack": {
+        "perform_sentiment_analysis": True,
+        "analyze_communication_patterns": True,
+        "include_emoji_analysis": True,
+        "track_collaboration_metrics": True,
+        "archive_raw_messages": True
+    },
+    "analysis": {
+        "calculate_correlations": True,
+        "detect_patterns": True,
+        "generate_predictions": True,
+        "store_intermediate_calculations": True
+    }
+}
+```
+
+#### Expected Benefits:
+1. **Better Burnout Prediction**: More data points = earlier warning signs
+2. **Deeper Root Cause Analysis**: Full context for why burnout occurs
+3. **Personalized Recommendations**: Individual patterns drive specific advice
+4. **Trend Analysis**: Historical data reveals long-term patterns
+5. **Preventive Insights**: Predict issues before they become critical
+6. **Debugging Capability**: Raw data helps troubleshoot analysis issues
+7. **Research Opportunities**: Rich dataset enables burnout research
+
+#### Data Retention Policy:
+- **Raw API Responses**: 1 year (for debugging and reprocessing)
+- **Calculated Metrics**: Permanent (for trend analysis)
+- **Personal Communication Data**: 6 months (privacy compliance)
+- **Aggregated Team Metrics**: Permanent (organizational insights)
