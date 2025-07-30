@@ -142,24 +142,71 @@ async def get_success_rates(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ) -> dict:
-    """Get success rates broken down by platform combinations."""
+    """Get success rates broken down by platform combinations - now returns team member focused statistics."""
     try:
-        recorder = MappingRecorder(db)
-        stats = recorder.get_mapping_statistics(current_user.id)
+        # Get all mappings for this user
+        mappings = db.query(IntegrationMapping).filter(
+            IntegrationMapping.user_id == current_user.id
+        ).all()
         
-        # Extract just the platform stats for easier consumption
+        if not mappings:
+            return {
+                "overall_success_rate": 0,
+                "total_attempts": 0,
+                "platform_breakdown": {}
+            }
+        
+        # Calculate team member statistics instead of API attempt statistics
+        # Group by unique email addresses to count team members, not API calls
+        team_members_by_platform = {}
+        successful_mappings_by_platform = {}
+        
+        for mapping in mappings:
+            platform = mapping.target_platform
+            email = mapping.source_identifier
+            
+            # Initialize platform tracking
+            if platform not in team_members_by_platform:
+                team_members_by_platform[platform] = set()
+                successful_mappings_by_platform[platform] = set()
+            
+            # Count unique team members (by email)
+            team_members_by_platform[platform].add(email)
+            
+            # Count successful mappings (team members with successful mapping)
+            if mapping.mapping_successful and mapping.target_identifier != "unknown":
+                successful_mappings_by_platform[platform].add(email)
+        
+        # Calculate overall statistics
+        all_team_members = set()
+        all_successful_members = set()
+        
+        for platform in team_members_by_platform:
+            all_team_members.update(team_members_by_platform[platform])
+            all_successful_members.update(successful_mappings_by_platform[platform])
+        
+        total_team_members = len(all_team_members)
+        total_successful = len(all_successful_members)
+        overall_success_rate = (total_successful / total_team_members * 100) if total_team_members > 0 else 0
+        
+        # Calculate platform breakdown
         platform_success_rates = {}
-        for platform_combo, stats_data in stats.get("platform_stats", {}).items():
-            platform_success_rates[platform_combo] = {
-                "total_attempts": stats_data["total"],
-                "successful": stats_data["successful"],
-                "failed": stats_data["failed"],
-                "success_rate": round(stats_data["success_rate"] * 100, 1)  # Convert to percentage
+        for platform in team_members_by_platform:
+            platform_team_count = len(team_members_by_platform[platform])
+            platform_successful_count = len(successful_mappings_by_platform[platform])
+            platform_failed_count = platform_team_count - platform_successful_count
+            platform_success_rate = (platform_successful_count / platform_team_count * 100) if platform_team_count > 0 else 0
+            
+            platform_success_rates[platform] = {
+                "total_attempts": platform_team_count,  # Now means "team members"
+                "successful": platform_successful_count,
+                "failed": platform_failed_count,
+                "success_rate": round(platform_success_rate, 1)
             }
         
         return {
-            "overall_success_rate": round(stats.get("success_rate", 0) * 100, 1),
-            "total_attempts": stats.get("total_attempts", 0),
+            "overall_success_rate": round(overall_success_rate, 1),
+            "total_attempts": total_team_members,  # Now means "total team members"  
             "platform_breakdown": platform_success_rates
         }
     except Exception as e:
