@@ -3065,10 +3065,30 @@ export default function Dashboard() {
                   <CardHeader>
                     <CardTitle>Burnout Timeline</CardTitle>
                     <CardDescription>
-                      {historicalTrends?.timeline_events?.length > 0 
-                        ? `Timeline from ${historicalTrends.timeline_events.length} burnout events across all integrations`
-                        : "Timeline of stress patterns and recovery periods across all integrations"
-                      }
+                      {(() => {
+                        if (currentAnalysis?.analysis_data?.daily_trends?.length > 0) {
+                          const dailyTrends = currentAnalysis.analysis_data.daily_trends;
+                          // Quick count of standout events
+                          let standoutCount = 0;
+                          for (let i = 1; i < dailyTrends.length - 1; i++) {
+                            const prev = dailyTrends[i-1];
+                            const curr = dailyTrends[i];
+                            const next = dailyTrends[i+1];
+                            const score = Math.round(curr.overall_score * 10);
+                            const prevChange = prev ? score - Math.round(prev.overall_score * 10) : 0;
+                            
+                            if ((prev && next && score > Math.round(prev.overall_score * 10) && score > Math.round(next.overall_score * 10) && score >= 75) ||
+                                (prev && next && score < Math.round(prev.overall_score * 10) && score < Math.round(next.overall_score * 10) && score <= 60) ||
+                                Math.abs(prevChange) >= 20 ||
+                                curr.incident_count >= 15 ||
+                                (score <= 45 && curr.members_at_risk >= 3)) {
+                              standoutCount++;
+                            }
+                          }
+                          return `Timeline from ${standoutCount} significant events across the selected time range`;
+                        }
+                        return "Timeline of significant events and trends across the selected time range";
+                      })()
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -3089,52 +3109,119 @@ export default function Dashboard() {
                         const healthScore = currentAnalysis?.analysis_data?.team_health ? 
                           Math.round(currentAnalysis.analysis_data.team_health.overall_score * 10) : 92;
                         
-                        // Use real timeline events from historical data
+                        // Generate timeline events using the same intelligent detection as the health trends chart
                         let journeyEvents = [];
                         
-                        if (historicalTrends?.timeline_events?.length > 0) {
-                          journeyEvents = historicalTrends.timeline_events.map((event: any) => ({
-                            date: new Date(event.iso_date).toLocaleDateString('en-US', { 
-                              month: 'short', 
-                              day: 'numeric' 
-                            }),
-                            status: event.status,
-                            title: event.title,
-                            description: event.description,
-                            color: event.color,
-                            impact: event.impact,
-                            severity: event.severity,
-                            metrics: event.metrics
-                          }));
-                        } else if (currentAnalysis?.analysis_data?.daily_trends?.length > 0) {
-                          // Generate timeline events from daily trends
+                        if (currentAnalysis?.analysis_data?.daily_trends?.length > 0) {
                           const dailyTrends = currentAnalysis.analysis_data.daily_trends;
-                          const significantDays = dailyTrends.filter((day: any) => {
-                            // Find days with significant events
-                            return day.incident_count > 5 || 
-                                   day.members_at_risk > 2 || 
-                                   day.health_status === 'critical' || 
-                                   day.health_status === 'poor' ||
-                                   (day.after_hours_count / day.incident_count > 0.5 && day.incident_count > 0);
-                          });
                           
-                          journeyEvents = significantDays.slice(-5).map((day: any) => ({
-                            date: new Date(day.date).toLocaleDateString('en-US', { 
-                              month: 'short', 
-                              day: 'numeric' 
-                            }),
-                            status: day.health_status === 'critical' ? 'critical-burnout' : 
-                                   day.health_status === 'poor' ? 'medium-risk' : 'current',
-                            title: day.incident_count > 5 ? 'High Incident Volume' : 
-                                  day.members_at_risk > 2 ? 'Multiple Members at Risk' :
-                                  day.health_status === 'critical' ? 'Critical Period' :
-                                  'Elevated Activity',
-                            description: `${day.incident_count} incidents, ${day.members_at_risk} at risk. Health: ${Math.round(day.overall_score * 10)}%`,
-                            color: day.overall_score < 4 ? 'bg-red-600' : 
-                                  day.overall_score < 7 ? 'bg-orange-500' : 'bg-green-500',
-                            impact: day.overall_score < 4 ? 'negative' : 
-                                   day.overall_score < 7 ? 'neutral' : 'positive'
+                          // Transform data and detect standout events (same logic as chart)
+                          const chartData = dailyTrends.map((trend: any, index: number) => ({
+                            date: trend.date,
+                            score: Math.round(trend.overall_score * 10),
+                            membersAtRisk: trend.members_at_risk,
+                            totalMembers: trend.total_members,
+                            incidentCount: trend.incident_count || 0,
+                            rawScore: trend.overall_score,
+                            index: index
                           }));
+                          
+                          // Identify standout events (same algorithm as chart)
+                          const identifyStandoutEvents = (data: any[]) => {
+                            if (data.length < 3) return data;
+                            
+                            return data.map((point: any, i: number) => {
+                              let eventType = 'normal';
+                              let eventDescription = '';
+                              let significance = 0;
+                              
+                              const prev = i > 0 ? data[i-1] : null;
+                              const next = i < data.length-1 ? data[i+1] : null;
+                              
+                              // Calculate changes
+                              const prevChange = prev ? point.score - prev.score : 0;
+                              
+                              // Detect peaks (local maxima)
+                              if (prev && next && point.score > prev.score && point.score > next.score && point.score >= 75) {
+                                eventType = 'peak';
+                                eventDescription = `Health peaked at ${point.score}% with ${point.incidentCount} incidents managed excellently`;
+                                significance = point.score >= 90 ? 3 : 2;
+                              }
+                              // Detect valleys (local minima)  
+                              else if (prev && next && point.score < prev.score && point.score < next.score && point.score <= 60) {
+                                eventType = 'valley';
+                                eventDescription = `Health dropped to ${point.score}% with ${point.incidentCount} incidents and ${point.membersAtRisk} members at risk`;
+                                significance = point.score <= 40 ? 3 : 2;
+                              }
+                              // Detect sharp improvements
+                              else if (prevChange >= 20) {
+                                eventType = 'recovery';
+                                eventDescription = `Major recovery with ${prevChange}% health improvement to ${point.score}%`;
+                                significance = prevChange >= 30 ? 3 : 2;
+                              }
+                              // Detect sharp declines
+                              else if (prevChange <= -20) {
+                                eventType = 'decline';
+                                eventDescription = `Significant decline with ${Math.abs(prevChange)}% health drop to ${point.score}%`;
+                                significance = prevChange <= -30 ? 3 : 2;
+                              }
+                              // Detect high incident volume days
+                              else if (point.incidentCount >= 15) {
+                                eventType = 'high-volume';
+                                eventDescription = `High incident volume day with ${point.incidentCount} incidents handled`;
+                                significance = point.incidentCount >= 25 ? 3 : 2;
+                              }
+                              // Detect critical health days
+                              else if (point.score <= 45 && point.membersAtRisk >= 3) {
+                                eventType = 'critical';
+                                eventDescription = `Critical period with ${point.score}% health and ${point.membersAtRisk} members at risk`;
+                                significance = 3;
+                              }
+                              
+                              return {
+                                ...point,
+                                eventType,
+                                eventDescription,
+                                significance,
+                                isStandout: significance > 0
+                              };
+                            });
+                          };
+                          
+                          const standoutEvents = identifyStandoutEvents(chartData);
+                          
+                          // Convert standout events to timeline format, sorted by significance
+                          journeyEvents = standoutEvents
+                            .filter(event => event.isStandout)
+                            .sort((a, b) => b.significance - a.significance) // Highest significance first
+                            .slice(0, 8) // Limit to top 8 events
+                            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()) // Sort by date for timeline
+                            .map((event: any) => ({
+                              date: new Date(event.date).toLocaleDateString('en-US', { 
+                                month: 'short', 
+                                day: 'numeric' 
+                              }),
+                              status: event.eventType,
+                              title: event.eventType === 'peak' ? 'Health Peak' :
+                                    event.eventType === 'valley' ? 'Health Valley' :
+                                    event.eventType === 'recovery' ? 'Major Recovery' :
+                                    event.eventType === 'decline' ? 'Health Decline' :
+                                    event.eventType === 'high-volume' ? 'High Incident Volume' :
+                                    event.eventType === 'critical' ? 'Critical Period' :
+                                    'Significant Event',
+                              description: event.eventDescription,
+                              color: event.eventType === 'peak' ? 'bg-green-500' :
+                                    event.eventType === 'valley' ? 'bg-red-500' :
+                                    event.eventType === 'recovery' ? 'bg-blue-500' :
+                                    event.eventType === 'decline' ? 'bg-orange-500' :
+                                    event.eventType === 'high-volume' ? 'bg-purple-500' :
+                                    event.eventType === 'critical' ? 'bg-red-600' :
+                                    'bg-gray-500',
+                              impact: event.eventType === 'peak' || event.eventType === 'recovery' ? 'positive' :
+                                     event.eventType === 'valley' || event.eventType === 'decline' || event.eventType === 'critical' ? 'negative' :
+                                     'neutral',
+                              significance: event.significance
+                            }));
                           
                           // Add current state
                           if (journeyEvents.length === 0 || journeyEvents[journeyEvents.length - 1].date !== 'Current') {
