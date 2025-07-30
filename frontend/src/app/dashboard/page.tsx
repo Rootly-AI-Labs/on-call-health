@@ -587,11 +587,6 @@ export default function Dashboard() {
       console.warn('Initial data loading timed out after 10 seconds')
       setInitialDataLoaded(true)
     }, 10000)
-    
-    // Load specific analysis if provided in URL
-    if (analysisId) {
-      loadSpecificAnalysis(analysisId)
-    }
 
     // Listen for localStorage changes (when integrations are updated on other pages)
     const handleStorageChange = (e: StorageEvent) => {
@@ -630,6 +625,23 @@ export default function Dashboard() {
       clearTimeout(timeoutId)
     }
   }, [])
+
+  // Load specific analysis from URL after initial data is loaded
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const analysisId = urlParams.get('analysis')
+    
+    // Only attempt to load if we have initial data loaded and an analysis ID
+    if (initialDataLoaded && analysisId) {
+      const authToken = localStorage.getItem('auth_token')
+      if (authToken) {
+        console.log('Initial data loaded, loading specific analysis:', analysisId)
+        loadSpecificAnalysis(analysisId)
+      } else {
+        console.warn('No auth token available for loading specific analysis')
+      }
+    }
+  }, [initialDataLoaded]) // Runs when initial data loading completes
 
   // Smooth progress animation effect
   useEffect(() => {
@@ -751,6 +763,7 @@ export default function Dashboard() {
           try {
             const errorData = await response.json()
             console.warn(`Analysis ${analysisId} not found:`, errorData.detail)
+            console.log('Attempting to parse suggestion from error response:', errorData)
             
             // Check if backend provided a suggested analysis ID
             const suggestionMatch = errorData.detail?.match(/Most recent analysis available: (.+)$/)
