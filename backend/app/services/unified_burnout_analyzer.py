@@ -1594,12 +1594,28 @@ class UnifiedBurnoutAnalyzer:
         return incidents
 
     def _generate_daily_trends(self, incidents: List[Dict[str, Any]], team_analysis: List[Dict[str, Any]], metadata: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Generate daily trend data from incidents and team analysis - only includes days with incidents."""
+        """Generate daily trend data from incidents and team analysis - includes ALL days in time period."""
         try:
             days_analyzed = metadata.get("days_analyzed", 30) or 30 if isinstance(metadata, dict) else 30
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=days_analyzed)
             
-            # Initialize daily data structure - only for days with incidents
+            # Initialize daily data structure for ALL days in the time period
             daily_data = {}
+            current_date = start_date
+            
+            # Initialize all days with zero incidents (ensuring full time period coverage)
+            while current_date <= end_date:
+                date_str = current_date.strftime("%Y-%m-%d")
+                daily_data[date_str] = {
+                    "date": date_str,
+                    "incident_count": 0,
+                    "severity_weighted_count": 0.0,
+                    "after_hours_count": 0,
+                    "users_involved": set(),
+                    "high_severity_count": 0
+                }
+                current_date += timedelta(days=1)
             
             # Process incidents to populate daily data - only for days with incidents
             if incidents and isinstance(incidents, list):
@@ -1777,22 +1793,23 @@ class UnifiedBurnoutAnalyzer:
                     "health_percentage": round(daily_score * 10, 1)  # Convert to percentage for display
                 })
             
-            # Filter out days with zero incidents (SimpleBurnoutAnalyzer approach)
-            meaningful_trends = [day for day in daily_trends if day["incident_count"] > 0]
-            
-            logger.info(f"Generated {len(meaningful_trends)} meaningful daily trend data points (filtered from {len(daily_trends)} total days) for {days_analyzed}-day analysis")
+            # Return ALL days in the time period (including days with zero incidents)
+            # This ensures the frontend chart has complete data for the full analysis period
+            logger.info(f"Generated {len(daily_trends)} daily trend data points for complete {days_analyzed}-day analysis period")
             
             # Debug: Log sample data for troubleshooting
-            if meaningful_trends:
-                logger.info(f"🔍 DAILY_TRENDS_DEBUG: Sample trend data - First entry: {meaningful_trends[0]}")
-                logger.info(f"🔍 DAILY_TRENDS_DEBUG: Date range: {meaningful_trends[0]['date']} to {meaningful_trends[-1]['date']}")
-                logger.info(f"🔍 DAILY_TRENDS_DEBUG: Score range: {min(d['overall_score'] for d in meaningful_trends):.2f} to {max(d['overall_score'] for d in meaningful_trends):.2f}")
+            if daily_trends:
+                logger.info(f"🔍 DAILY_TRENDS_DEBUG: Full period coverage - First entry: {daily_trends[0]}")
+                logger.info(f"🔍 DAILY_TRENDS_DEBUG: Date range: {daily_trends[0]['date']} to {daily_trends[-1]['date']}")
+                incidents_with_data = [d for d in daily_trends if d["incident_count"] > 0]
+                if incidents_with_data:
+                    logger.info(f"🔍 DAILY_TRENDS_DEBUG: {len(incidents_with_data)} days with incidents, score range: {min(d['overall_score'] for d in incidents_with_data):.2f} to {max(d['overall_score'] for d in incidents_with_data):.2f}")
+                else:
+                    logger.info(f"🔍 DAILY_TRENDS_DEBUG: No incidents found in period, all days at baseline health score")
             else:
-                logger.warning(f"🔍 DAILY_TRENDS_DEBUG: No meaningful trends generated! Total raw trends: {len(daily_trends)}")
-                if daily_trends:
-                    logger.warning(f"🔍 DAILY_TRENDS_DEBUG: Sample raw trend: {daily_trends[0]}")
-            
-            return meaningful_trends
+                logger.warning(f"🔍 DAILY_TRENDS_DEBUG: No trend data generated for {days_analyzed}-day analysis")
+                
+            return daily_trends
             
         except Exception as e:
             logger.error(f"Error in _generate_daily_trends: {e}")
