@@ -105,11 +105,18 @@ cd backend && python debug_trends_data.py
    - Show clear error message: "Analysis not found" 
    - Redirect to most recent valid analysis or show empty state
    - Remove hardcoded fallback data (110 incidents, 18 days pattern)
+   - **CRITICAL: NO FALLBACK DATA - Always show real state:**
+     - If no data: "No incident data available"
+     - If 0 incidents: "0 incidents analyzed" 
+     - If API error: "Failed to fetch incidents: [error message]"
+     - If daily trends empty: "No daily trend data generated"
+     - NEVER show fake/demo data
 
 2. **Backend**: Return proper 404 with redirect suggestion
    - File: `backend/app/api/endpoints/analyses.py`
    - When analysis not found, include most recent valid analysis ID in error response
    - Frontend can use this to auto-redirect
+   - Include error details in response for frontend to display
 
 #### Issue #2: Daily Trends Generation Completely Broken
 **Problem**: ALL 78 completed analyses have 0 daily trends data, causing empty charts
@@ -170,11 +177,47 @@ cd backend && python debug_trends_data.py
    - All components must read from analysis.results
    - Remove any hardcoded values
    - Add data validation to ensure consistency
+   - **NO FALLBACK DATA PRINCIPLE**:
+     - Every component shows EXACTLY what's in the database
+     - If data is missing, show "Data not available" 
+     - If calculation fails, show "Unable to calculate"
+     - Log all issues for debugging
 
 2. **Add Data Integrity Check**:
    - Create consistency validator
    - Run before displaying analysis
    - Log any discrepancies found
+   - Display warnings to user when data inconsistencies detected
+
+#### CORE PRINCIPLE: Transparency Over Prettiness
+**Always show the real state of the system:**
+- Empty data → Show empty state with explanation
+- Failed API calls → Show error with details
+- Missing permissions → Show "Insufficient permissions to access incidents"
+- Broken calculations → Show "Calculation error" with details
+- NEVER hide problems with fake data
+
+### IMMEDIATE ACTIONS - Remove All Fallback Data
+
+**Search and Remove These Patterns**:
+1. **Frontend** (`frontend/src/app/dashboard/page.tsx`):
+   - Any hardcoded "110 incidents"
+   - Any "18 days" pattern
+   - Default health scores when data missing
+   - Mock timeline events
+   - Placeholder member data
+   
+2. **Backend** (all analyzer files):
+   - Remove any demo/mock data generation
+   - Remove default values that hide real issues
+   - Keep ONLY the incident generation for consistency (when metadata shows incidents but API fails)
+
+**Replace With**:
+```typescript
+// Instead of: incidents = fallbackData || []
+// Use: incidents = data?.incidents || []
+// Display: {incidents.length === 0 ? "No incidents to display" : <IncidentChart />}
+```
 
 ### EXECUTION ORDER:
 1. **Day 1**: Fix frontend fallback data (Issue #1) - HIGHEST PRIORITY
