@@ -92,6 +92,97 @@ cd backend && python debug_trends_data.py
 - ✅ Background analysis processing
 - ✅ Error handling and recovery
 
+### CRITICAL ISSUES TO FIX - EXECUTION PLAN
+
+#### Issue #1: Frontend Shows Fallback/Demo Data for Non-Existent Analyses
+**Problem**: URL shows `?analysis=64` but analysis doesn't exist, causing frontend to show hardcoded demo data (110 incidents, 18 days)
+**Impact**: Users see inconsistent fake data that doesn't match any real analysis
+
+**Fix Plan**:
+1. **Frontend**: Add proper error handling when analysis not found
+   - File: `frontend/src/app/dashboard/page.tsx`
+   - Check if analysis exists before displaying data
+   - Show clear error message: "Analysis not found" 
+   - Redirect to most recent valid analysis or show empty state
+   - Remove hardcoded fallback data (110 incidents, 18 days pattern)
+
+2. **Backend**: Return proper 404 with redirect suggestion
+   - File: `backend/app/api/endpoints/analyses.py`
+   - When analysis not found, include most recent valid analysis ID in error response
+   - Frontend can use this to auto-redirect
+
+#### Issue #2: Daily Trends Generation Completely Broken
+**Problem**: ALL 78 completed analyses have 0 daily trends data, causing empty charts
+**Impact**: Health trends chart shows no real data for any analysis
+
+**Fix Plan**:
+1. **Immediate Fix**: Add data regeneration endpoint
+   - Create `/analyses/{id}/regenerate-trends` endpoint
+   - Regenerate daily trends for existing analyses
+   - Use the incident generation logic when API permissions blocked
+
+2. **Root Cause Fix**: Ensure daily trends always generated
+   - File: `backend/app/services/burnout_analyzer.py`
+   - Add validation that daily_trends is never empty
+   - If no incidents but time period exists, generate empty daily entries
+   - Log warnings when daily trends generation fails
+
+#### Issue #3: UUID Implementation Incomplete
+**Problem**: UUID column commented out, using integer IDs, no shareable URLs
+**Impact**: URLs not shareable, sequential IDs expose data
+
+**Fix Plan**:
+1. **Complete UUID Implementation**:
+   - File: `backend/app/models/analysis.py`
+   - Uncomment UUID column: `uuid = Column(String(36), unique=True, index=True, nullable=True, default=lambda: str(uuid.uuid4()))`
+   - Commit and push the change
+
+2. **Run Migration on Railway**:
+   - The migration script already exists: `backend/migrate_uuid_step1.py`
+   - Run via Railway CLI or web console
+   - Verify UUID column added to all existing analyses
+
+3. **Update Frontend to Use UUIDs**:
+   - File: `frontend/src/app/dashboard/page.tsx`
+   - Switch from `?analysis={id}` to `?analysis={uuid}`
+   - Keep fallback to integer ID for backward compatibility
+
+#### Issue #4: API Permissions Preventing Real Data
+**Problem**: Rootly API returns 404 on incidents endpoint (missing incidents:read permission)
+**Impact**: All analyses show 0 real incidents, only generated/fake data
+
+**Fix Plan**:
+1. **Update Rootly API Token**:
+   - Get new token with 'incidents:read' permission from Rootly
+   - Update in integration settings
+   
+2. **Add Permission Check on Integration Setup**:
+   - File: `backend/app/api/endpoints/rootly.py`
+   - Test permissions when saving integration
+   - Show clear warning if incidents:read missing
+
+#### Issue #5: Data Consistency Between Components
+**Problem**: Different dashboard components show different data sources
+**Impact**: Total incidents, charts, and metrics don't match
+
+**Fix Plan**:
+1. **Single Source of Truth**:
+   - All components must read from analysis.results
+   - Remove any hardcoded values
+   - Add data validation to ensure consistency
+
+2. **Add Data Integrity Check**:
+   - Create consistency validator
+   - Run before displaying analysis
+   - Log any discrepancies found
+
+### EXECUTION ORDER:
+1. **Day 1**: Fix frontend fallback data (Issue #1) - HIGHEST PRIORITY
+2. **Day 1**: Add trends regeneration endpoint (Issue #2)
+3. **Day 2**: Complete UUID implementation (Issue #3)
+4. **Day 2**: Fix API permissions (Issue #4)
+5. **Day 3**: Implement data consistency checks (Issue #5)
+
 ### Outstanding Issues:
 1. Slack channel access errors (bot not in channels) - Low priority
 2. Invalid Anthropic API key for AI narratives - User configuration issue
