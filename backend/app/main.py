@@ -4,7 +4,7 @@ FastAPI main application for Rootly Burnout Detector.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .models import create_tables
-from .api.endpoints import auth, rootly, analysis, analyses, pagerduty, github, slack, llm, debug, mappings, manual_mappings
+from .api.endpoints import auth, rootly, analysis, analyses, pagerduty, github, slack, llm, debug, mappings, manual_mappings, migration
 
 # Create FastAPI application
 app = FastAPI(
@@ -49,3 +49,4 @@ app.include_router(llm.router, tags=["llm-tokens"])
 app.include_router(mappings.router, prefix="/integrations", tags=["integration-mappings"])
 app.include_router(manual_mappings.router, prefix="/integrations", tags=["manual-mappings"])
 app.include_router(debug.router, prefix="/api", tags=["debug"])
+app.include_router(migration.router, prefix="/migration", tags=["database-migration"])
