@@ -16,6 +16,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import {
   Line,
   LineChart,
+  Area,
+  AreaChart,
   Bar,
   BarChart,
   Radar,
@@ -769,6 +771,9 @@ export default function Dashboard() {
         console.warn('loadSpecificAnalysis called but no auth token available')
         return
       }
+
+      // Check if analysisId is a UUID (contains hyphens) or integer ID
+      const isUuid = analysisId.includes('-')
 
       // Use the unified endpoint that handles both UUIDs and integer IDs
       const endpoint = `${API_BASE}/analyses/by-id/${analysisId}`
@@ -1777,7 +1782,7 @@ export default function Dashboard() {
         return 'Establish weekend work policies and coverage plans'
       case 'incident load':
         return 'Review incident prevention and escalation procedures'
-      case 'response time':
+      case 'resolution time':
         return 'Review escalation procedures and skill gaps'
       default:
         return 'Monitor this factor closely and consider intervention'
@@ -1799,7 +1804,11 @@ export default function Dashboard() {
         console.log(`RADAR: Member ${m?.user_name}: after_hours = ${val} (factors: ${m?.factors?.after_hours}, after_hours_percentage: ${afterHoursPercent}%)`);
         return avg + val;
       }, 0) / membersWithIncidents.length).toFixed(1)),
-      metrics: `Avg after-hours: ${Math.round((membersWithIncidents as any[]).reduce((avg: number, m: any) => avg + (m?.metrics?.after_hours_percentage || m?.key_metrics?.after_hours_percentage || 0), 0) / membersWithIncidents.length)}%`
+      metrics: `Avg after-hours: ${Math.round((Number(((membersWithIncidents as any[]).reduce((avg: number, m: any) => {
+        const afterHoursPercent = m?.metrics?.after_hours_percentage || m?.key_metrics?.after_hours_percentage || 0;
+        const val = m?.factors?.after_hours || Math.min(afterHoursPercent * 20, 10);
+        return avg + val;
+      }, 0) / membersWithIncidents.length).toFixed(1)) / 20) * 100)}%`
     },
     { 
       factor: "Weekend Work", 
@@ -1826,10 +1835,21 @@ export default function Dashboard() {
         console.log(`  - Available data: weekend_percentage=${m?.metrics?.weekend_percentage}, factors.weekend_work=${m?.factors?.weekend_work}`);
         return avg + val;
       }, 0) / membersWithIncidents.length).toFixed(1)),
-      metrics: `Avg weekend work: ${Math.round((membersWithIncidents as any[]).reduce((avg: number, m: any) => avg + (m?.metrics?.weekend_percentage || m?.key_metrics?.weekend_percentage || 0), 0) / membersWithIncidents.length)}%`
+      metrics: `Avg weekend work: ${Math.round((Number(((membersWithIncidents as any[]).reduce((avg: number, m: any) => {
+        const weekendPercent = m?.metrics?.weekend_percentage ?? m?.key_metrics?.weekend_percentage ?? null;
+        let val;
+        if (weekendPercent !== null) {
+          val = Math.min(weekendPercent * 0.25, 10);
+        } else if (m?.factors?.weekend_work !== undefined) {
+          val = m.factors.weekend_work;
+        } else {
+          val = 0;
+        }
+        return avg + val;
+      }, 0) / membersWithIncidents.length).toFixed(1)) / 0.25))}%`
     },
     { 
-      factor: "Incident Load", 
+      factor: "Incident Volume", 
       value: Number(((membersWithIncidents as any[]).reduce((avg: number, m: any) => {
         // Combine workload and incident severity into one metric
         const incidentsPerWeek = m?.key_metrics?.incidents_per_week || (m?.incident_count / 4.3) || 0;
@@ -1855,10 +1875,10 @@ export default function Dashboard() {
         console.log(`RADAR: Member ${m?.user_name}: incident_load = ${val} (workload: ${workloadScore}, severity: ${severityScore})`);
         return avg + val;
       }, 0) / membersWithIncidents.length).toFixed(1)),
-      metrics: `Total: ${(membersWithIncidents as any[]).reduce((total: number, m: any) => total + (m?.incident_count || 0), 0)} incidents (${Math.round((membersWithIncidents as any[]).reduce((avg: number, m: any) => avg + (m?.key_metrics?.incidents_per_week || 0), 0) / membersWithIncidents.length)}/week)`
+      metrics: `Total: ${(membersWithIncidents as any[]).reduce((total: number, m: any) => total + (m?.incident_count || 0), 0)} incidents (avg ${Math.round((membersWithIncidents as any[]).reduce((avg: number, m: any) => avg + (m?.key_metrics?.incidents_per_week || m?.incident_count / 4.3 || 0), 0) / membersWithIncidents.length)}/week per responder)`
     },
     { 
-      factor: "Response Time", 
+      factor: "Resolution Time", 
       value: Number(((membersWithIncidents as any[]).reduce((avg: number, m: any) => {
         // Try factors first, fallback using backend logic: avg_response_time_minutes / 6
         const responseTimeMinutes = m?.metrics?.avg_response_time_minutes || (m?.key_metrics?.avg_resolution_hours ? m.key_metrics.avg_resolution_hours * 60 : 0);
@@ -1874,7 +1894,12 @@ export default function Dashboard() {
         console.log(`RADAR: Member ${m?.user_name}: response_time = ${val} (factors: ${m?.factors?.response_time}, key_metrics: ${m?.key_metrics?.avg_resolution_hours})`);
         return avg + val;
       }, 0) / membersWithIncidents.length).toFixed(1)),
-      metrics: `Avg response: ${Math.round((membersWithIncidents as any[]).reduce((avg: number, m: any) => avg + (m?.metrics?.avg_response_time_minutes || (m?.key_metrics?.avg_resolution_hours ? m.key_metrics.avg_resolution_hours * 60 : 0)), 0) / membersWithIncidents.length)} min`
+      metrics: `Avg resolution: ${Math.round((membersWithIncidents as any[]).reduce((sum: number, m: any) => {
+        const responseTimeMinutes = m?.metrics?.avg_response_time_minutes || 
+                                   (m?.key_metrics?.avg_resolution_hours ? m.key_metrics.avg_resolution_hours * 60 : 0) ||
+                                   (m?.factors?.response_time ? m.factors.response_time * 6 : 0); // Fallback: reverse engineer from factor
+        return sum + responseTimeMinutes;
+      }, 0) / membersWithIncidents.length)} min`
     },
   ].map(factor => ({
     ...factor,
@@ -1959,8 +1984,6 @@ export default function Dashboard() {
             {sidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
           </Button>
         </div>
-
-        {/* Removed organization selector - moved to integrations page */}
 
         {/* Navigation */}
         {!sidebarCollapsed && (
@@ -2120,6 +2143,25 @@ export default function Dashboard() {
               <LogOut className="w-4 h-4 mr-2" />
               Sign Out
             </Button>
+            
+            {/* Powered by Rootly */}
+            <div className="mt-4 pt-4 border-t border-gray-700">
+              <a 
+                href="https://rootly.com" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex flex-col items-center -space-y-1 hover:opacity-80 transition-opacity"
+              >
+                <span className="text-xs text-gray-400">powered by</span>
+                <Image 
+                  src="/images/rootly-logo-branded.png" 
+                  alt="Rootly" 
+                  width={90} 
+                  height={24} 
+                  className="h-6 w-auto ml-3"
+                />
+              </a>
+            </div>
           </div>
           </div>
         )}
@@ -2496,7 +2538,7 @@ export default function Dashboard() {
                                   const dailyScores = historicalTrends.daily_trends.map((d: any) => d.overall_score);
                                   const average = dailyScores.reduce((a: number, b: number) => a + b, 0) / dailyScores.length;
                                   console.log("Debug - calculated average from historicalTrends daily_trends:", average * 10);
-                                  return Math.round(average * 10); // Convert 0-10 to 0-100%
+                                  return `${Math.round(average * 10)}%`; // Convert 0-10 to 0-100%
                                 }
                                 // Fallback: Calculate from current analysis daily trends
                                 if (currentAnalysis?.analysis_data?.daily_trends?.length > 0) {
@@ -2699,10 +2741,16 @@ export default function Dashboard() {
                   <CardContent>
                     <div className="space-y-3">
                       {/* Incident Data */}
-                      <div className="flex items-center">
-                        <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
-                        <span className="text-xs font-medium text-slate-700 flex-1">Incident Management</span>
-                        <CheckCircle className="w-3 h-3 text-green-600 ml-2" />
+                      <div className="space-y-2">
+                        <div className="flex items-center">
+                          <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
+                          <span className="text-xs font-medium text-slate-700 flex-1">Incident Management</span>
+                          <CheckCircle className="w-3 h-3 text-green-600 ml-2" />
+                        </div>
+                        <div className="ml-4 text-xs text-gray-600 space-y-1">
+                          <div>• {(currentAnalysis?.analysis_data as any)?.metadata?.total_incidents || 0} incidents</div>
+                          <div>• {(currentAnalysis?.analysis_data as any)?.team_analysis?.members?.length || 0} users</div>
+                        </div>
                       </div>
                       
                       {/* GitHub Data */}
@@ -2725,25 +2773,6 @@ export default function Dashboard() {
                         ) : (
                           <Minus className="w-3 h-3 text-gray-400 ml-2" />
                         )}
-                      </div>
-                      
-                      {/* Analysis Type Indicator */}
-                      <div className="pt-2 border-t border-blue-100">
-                        <p className="text-xs text-blue-600 font-medium">
-                          {(() => {
-                            const dataSources = currentAnalysis?.analysis_data?.data_sources
-                            if (!dataSources) return "Single-source analysis"
-                            
-                            const sources = []
-                            if (dataSources.incident_data) sources.push("incidents")
-                            if (dataSources.github_data) sources.push("GitHub")
-                            if (dataSources.slack_data) sources.push("Slack")
-                            
-                            if (sources.length === 1) return "Single-source analysis"
-                            if (sources.length === 2) return "Multi-source analysis"
-                            return "Comprehensive analysis"
-                          })()}
-                        </p>
                       </div>
                     </div>
                   </CardContent>
@@ -3088,7 +3117,7 @@ export default function Dashboard() {
                           return `Timeline from ${standoutCount} significant events across the selected time range`;
                         }
                         return "Timeline of significant events and trends across the selected time range";
-                      })()
+                      })()}
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -3144,37 +3173,37 @@ export default function Dashboard() {
                               // Detect peaks (local maxima)
                               if (prev && next && point.score > prev.score && point.score > next.score && point.score >= 75) {
                                 eventType = 'peak';
-                                eventDescription = `Health peaked at ${point.score}% with ${point.incidentCount} incidents managed excellently`;
+                                eventDescription = `Team wellness at peak (${point.score}% healthy) - ${point.incidentCount} incidents handled without stress signs`;
                                 significance = point.score >= 90 ? 3 : 2;
                               }
                               // Detect valleys (local minima)  
                               else if (prev && next && point.score < prev.score && point.score < next.score && point.score <= 60) {
                                 eventType = 'valley';
-                                eventDescription = `Health dropped to ${point.score}% with ${point.incidentCount} incidents and ${point.membersAtRisk} members at risk`;
+                                eventDescription = `Team showing signs of strain (${point.score}% score) - ${point.incidentCount} incidents, ${point.membersAtRisk} team members need support`;
                                 significance = point.score <= 40 ? 3 : 2;
                               }
                               // Detect sharp improvements
                               else if (prevChange >= 20) {
                                 eventType = 'recovery';
-                                eventDescription = `Major recovery with ${prevChange}% health improvement to ${point.score}%`;
+                                eventDescription = `Great turnaround! Team wellness improved by ${prevChange}% - interventions working well`;
                                 significance = prevChange >= 30 ? 3 : 2;
                               }
                               // Detect sharp declines
                               else if (prevChange <= -20) {
                                 eventType = 'decline';
-                                eventDescription = `Significant decline with ${Math.abs(prevChange)}% health drop to ${point.score}%`;
+                                eventDescription = `Warning: Team wellness declined by ${Math.abs(prevChange)}% - immediate attention recommended`;
                                 significance = prevChange <= -30 ? 3 : 2;
                               }
                               // Detect high incident volume days
                               else if (point.incidentCount >= 15) {
                                 eventType = 'high-volume';
-                                eventDescription = `High incident volume day with ${point.incidentCount} incidents handled`;
+                                eventDescription = `Heavy workload day - ${point.incidentCount} incidents may be causing team stress`;
                                 significance = point.incidentCount >= 25 ? 3 : 2;
                               }
                               // Detect critical health days
                               else if (point.score <= 45 && point.membersAtRisk >= 3) {
                                 eventType = 'critical';
-                                eventDescription = `Critical period with ${point.score}% health and ${point.membersAtRisk} members at risk`;
+                                eventDescription = `URGENT: Team at burnout risk (${point.score}% wellness) - ${point.membersAtRisk} members need immediate support`;
                                 significance = 3;
                               }
                               
@@ -3202,12 +3231,12 @@ export default function Dashboard() {
                                 day: 'numeric' 
                               }),
                               status: event.eventType,
-                              title: event.eventType === 'peak' ? 'Health Peak' :
-                                    event.eventType === 'valley' ? 'Health Valley' :
-                                    event.eventType === 'recovery' ? 'Major Recovery' :
-                                    event.eventType === 'decline' ? 'Health Decline' :
-                                    event.eventType === 'high-volume' ? 'High Incident Volume' :
-                                    event.eventType === 'critical' ? 'Critical Period' :
+                              title: event.eventType === 'peak' ? 'Team Wellness Peak' :
+                                    event.eventType === 'valley' ? 'Team Support Needed' :
+                                    event.eventType === 'recovery' ? 'Wellness Recovery' :
+                                    event.eventType === 'decline' ? 'Burnout Risk Increase' :
+                                    event.eventType === 'high-volume' ? 'High Workload Period' :
+                                    event.eventType === 'critical' ? 'Burnout Alert' :
                                     'Significant Event',
                               description: event.eventDescription,
                               color: event.eventType === 'peak' ? 'bg-green-500' :
@@ -3320,10 +3349,10 @@ export default function Dashboard() {
                           return "No analysis selected - please select an analysis to view health trends";
                         }
                         if (currentAnalysis?.analysis_data?.daily_trends?.length > 0) {
-                          return `Health trends from ${currentAnalysis.analysis_data.daily_trends.length} days of analysis data`;
+                          return `Health trends from ${currentAnalysis.analysis_data.daily_trends.length} days with active incidents`;
                         }
                         if (historicalTrends?.daily_trends?.length > 0) {
-                          return `Health trends from ${historicalTrends.daily_trends.length} days of analysis data`;
+                          return `Health trends from ${historicalTrends.daily_trends.length} days with active incidents`;
                         }
                         return "No daily trend data available for this analysis";
                       })()}
@@ -3371,7 +3400,7 @@ export default function Dashboard() {
                         
                         return (
                           <ResponsiveContainer width="100%" height="100%">
-                          <LineChart data={(() => {
+                          <AreaChart data={(() => {
                           // ONLY show data if we have a valid current analysis - NO FALLBACK DATA
                           if (!currentAnalysis || currentAnalysis.status !== 'completed') {
                             return []; // Return empty array - no fallback data
@@ -3477,6 +3506,12 @@ export default function Dashboard() {
                           // Return empty array if no valid data available - NO FALLBACK
                           return [];
                         })()}>
+                          <defs>
+                            <linearGradient id="healthGradient" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="#8B5CF6" stopOpacity={1.0}/>
+                              <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0}/>
+                            </linearGradient>
+                          </defs>
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis dataKey="date" tick={{ fontSize: 12 }} />
                           <YAxis domain={[30, 100]} tick={{ fontSize: 12 }} />
@@ -3542,76 +3577,21 @@ export default function Dashboard() {
                               return null
                             }}
                           />
+                          <Area
+                            type="monotone"
+                            dataKey="score"
+                            stroke="none"
+                            fill="url(#healthGradient)"
+                          />
                           <Line 
                             type="monotone" 
                             dataKey="score" 
                             stroke="#8B5CF6" 
                             strokeWidth={2}
-                            dot={(props: any) => {
-                              const { cx, cy, payload } = props;
-                              if (!payload || !payload.isStandout) {
-                                // Normal dots
-                                return <circle cx={cx} cy={cy} r={4} fill="#8B5CF6" strokeWidth={2} stroke="#8B5CF6" />;
-                              }
-                              
-                              // Standout event dots with different colors and sizes
-                              const getEventStyle = (eventType: string, significance: number) => {
-                                const baseSize = significance === 3 ? 7 : 6; // Larger for high significance
-                                
-                                switch (eventType) {
-                                  case 'peak':
-                                    return { fill: '#10B981', stroke: '#059669', r: baseSize }; // Green
-                                  case 'valley':
-                                    return { fill: '#EF4444', stroke: '#DC2626', r: baseSize }; // Red
-                                  case 'recovery':
-                                    return { fill: '#3B82F6', stroke: '#2563EB', r: baseSize }; // Blue
-                                  case 'decline':
-                                    return { fill: '#F59E0B', stroke: '#D97706', r: baseSize }; // Orange
-                                  case 'high-volume':
-                                    return { fill: '#8B5CF6', stroke: '#7C3AED', r: baseSize }; // Purple
-                                  case 'critical':
-                                    return { fill: '#DC2626', stroke: '#B91C1C', r: baseSize + 1 }; // Dark red, largest
-                                  default:
-                                    return { fill: '#6B7280', stroke: '#4B5563', r: baseSize };
-                                }
-                              };
-                              
-                              const style = getEventStyle(payload.eventType, payload.significance);
-                              return (
-                                <g>
-                                  {/* Outer glow for high significance events */}
-                                  {payload.significance === 3 && (
-                                    <circle 
-                                      cx={cx} 
-                                      cy={cy} 
-                                      r={style.r + 3} 
-                                      fill={style.fill} 
-                                      opacity={0.2}
-                                    />
-                                  )}
-                                  {/* Main dot */}
-                                  <circle 
-                                    cx={cx} 
-                                    cy={cy} 
-                                    r={style.r} 
-                                    fill={style.fill} 
-                                    stroke={style.stroke} 
-                                    strokeWidth={2}
-                                  />
-                                  {/* Inner highlight */}
-                                  <circle 
-                                    cx={cx} 
-                                    cy={cy} 
-                                    r={2} 
-                                    fill="white" 
-                                    opacity={0.6}
-                                  />
-                                </g>
-                              );
-                            }}
-                            activeDot={{ r: 8, stroke: '#8B5CF6', strokeWidth: 2 }}
+                            dot={false}
+                            activeDot={{ r: 6, stroke: '#8B5CF6', strokeWidth: 2, fill: '#8B5CF6' }}
                           />
-                        </LineChart>
+                        </AreaChart>
                       </ResponsiveContainer>
                         );
                       })()}
@@ -4949,64 +4929,7 @@ export default function Dashboard() {
               </div>
 
               {/* Activity Summary */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-
-                {/* GitHub Activity */}
-                {selectedMember.github_activity && (
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <h3 className="font-semibold mb-3 text-gray-900">💻 GitHub Activity</h3>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="bg-white p-3 rounded-lg">
-                        <div className="text-xl font-bold text-gray-900">{selectedMember.github_activity?.commits_count || 0}</div>
-                        <p className="text-xs text-gray-600 font-medium">Total Commits</p>
-                      </div>
-                      <div className="bg-white p-3 rounded-lg">
-                        <div className="text-xl font-bold text-gray-900">{selectedMember.github_activity?.pull_requests_count || 0}</div>
-                        <p className="text-xs text-gray-600 font-medium">Pull Requests</p>
-                      </div>
-                      <div className="bg-white p-3 rounded-lg">
-                        <div className="text-xl font-bold text-gray-900">{selectedMember.github_activity?.reviews_count || 0}</div>
-                        <p className="text-xs text-gray-600 font-medium">Code Reviews</p>
-                      </div>
-                      <div className="bg-white p-3 rounded-lg">
-                        <div className="text-xl font-bold text-gray-900">{selectedMember.github_activity ? (((selectedMember.github_activity.after_hours_commits || 0) / Math.max(selectedMember.github_activity.commits_count || 1, 1)) * 100).toFixed(1) : '0.0'}%</div>
-                        <p className="text-xs text-gray-600 font-medium">After Hours</p>
-                      </div>
-                    </div>
-                    {/* Burnout Risk Indicators */}
-                    {selectedMember.github_activity?.burnout_indicators && Object.values(selectedMember.github_activity.burnout_indicators).some(indicator => indicator) && (
-                      <div className="bg-red-50 border border-red-200 rounded-lg p-3 mt-3">
-                        <h4 className="text-sm font-semibold text-red-800 mb-2">Burnout Risk Indicators</h4>
-                        <div className="space-y-1 text-xs">
-                          {selectedMember.github_activity?.burnout_indicators?.excessive_commits && (
-                            <div className="flex items-center space-x-2">
-                              <div className="w-1 h-1 bg-red-600 rounded-full"></div>
-                              <span className="text-red-700">Excessive commit activity detected</span>
-                            </div>
-                          )}
-                          {selectedMember.github_activity?.burnout_indicators?.late_night_activity && (
-                            <div className="flex items-center space-x-2">
-                              <div className="w-1 h-1 bg-red-600 rounded-full"></div>
-                              <span className="text-red-700">Late night coding patterns</span>
-                            </div>
-                          )}
-                          {selectedMember.github_activity?.burnout_indicators?.weekend_work && (
-                            <div className="flex items-center space-x-2">
-                              <div className="w-1 h-1 bg-red-600 rounded-full"></div>
-                              <span className="text-red-700">Weekend work detected</span>
-                            </div>
-                          )}
-                          {selectedMember.github_activity?.burnout_indicators?.large_prs && (
-                            <div className="flex items-center space-x-2">
-                              <div className="w-1 h-1 bg-red-600 rounded-full"></div>
-                              <span className="text-red-700">Large PR patterns</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
+              <div className="grid grid-cols-1 gap-4">
 
                 {/* Slack Activity */}
                 {selectedMember.slack_activity && selectedMember.slack_activity.messages_sent > 0 && (

@@ -84,7 +84,14 @@ export default function MethodologyPage() {
                     <div className="w-2 h-2 bg-red-500 rounded-full mt-1.5"></div>
                     <div>
                       <strong className="text-sm">Workload Pressure</strong>
-                      <p className="text-sm text-gray-600">Incident frequency and volume over time</p>
+                      <p className="text-sm text-gray-600">Incident frequency and volume over time, weighted by severity:</p>
+                      <ul className="text-xs text-gray-500 mt-1 ml-4">
+                        <li>• SEV0 incidents: 5x weight (catastrophic - complete outage)</li>
+                        <li>• SEV1 incidents: 4x weight (critical business impact)</li>
+                        <li>• SEV2 incidents: 2x weight (major functionality affected)</li>
+                        <li>• SEV3 incidents: 1.5x weight (moderate impact)</li>
+                        <li>• SEV4 incidents: 1x weight (minor issues)</li>
+                      </ul>
                     </div>
                   </div>
                   <div className="flex items-start space-x-3">
@@ -197,7 +204,11 @@ export default function MethodologyPage() {
                     <div className="w-2 h-2 bg-green-500 rounded-full mt-1.5"></div>
                     <div>
                       <strong className="text-sm">Incident Load Management</strong>
-                      <p className="text-sm text-gray-600">Ability to handle incident volume effectively without degradation</p>
+                      <p className="text-sm text-gray-600">Ability to handle incident volume effectively without degradation. The incident volume score combines:</p>
+                      <ul className="text-xs text-gray-500 mt-1 ml-4">
+                        <li>• Workload component (40%): Based on incidents per week per responder</li>
+                        <li>• Severity component (60%): Weighted by incident severity (SEV0-4)</li>
+                      </ul>
                     </div>
                   </div>
                   <div className="flex items-start space-x-3">
