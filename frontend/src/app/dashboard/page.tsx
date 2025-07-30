@@ -386,7 +386,14 @@ export default function Dashboard() {
   const [loadingTrends, setLoadingTrends] = useState(false)
   const [initialDataLoaded, setInitialDataLoaded] = useState(false)
   const [hasDataFromCache, setHasDataFromCache] = useState(false)
-  const [redirectingToSuggested, setRedirectingToSuggested] = useState(false)
+  // Initialize redirectingToSuggested to true if there's an analysis ID in URL
+  const [redirectingToSuggested, setRedirectingToSuggested] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search)
+      return urlParams.get('analysis') !== null
+    }
+    return false
+  })
   
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -778,6 +785,8 @@ export default function Dashboard() {
         const analysis = await response.json()
         console.log('Loaded specific analysis from URL:', analysis.uuid || analysis.id)
         setCurrentAnalysis(analysis)
+        // Turn off redirect loader since we successfully loaded the analysis
+        setRedirectingToSuggested(false)
         // Update URL to use UUID if we loaded by integer ID
         if (!isUuid && analysis.uuid) {
           updateURLWithAnalysis(analysis.uuid || analysis.id)
@@ -1514,6 +1523,7 @@ export default function Dashboard() {
                 setTimeout(() => {
                   setAnalysisRunning(false)
                   setCurrentAnalysis(analysisData)
+                  setRedirectingToSuggested(false) // Turn off redirect loader
                   updateURLWithAnalysis(analysisData.uuid || analysisData.id)
                 }, 500) // Show 100% for just 0.5 seconds before showing data
               }, 800) // Wait 0.8 seconds to reach 95%
@@ -2022,15 +2032,18 @@ export default function Dashboard() {
                                 memberCount: fullAnalysis.analysis_data?.team_analysis?.members?.length || 0
                               })
                               setCurrentAnalysis(fullAnalysis)
+                              setRedirectingToSuggested(false) // Turn off redirect loader
                               updateURLWithAnalysis(fullAnalysis.uuid || fullAnalysis.id)
                             } else {
                               console.error('Failed to fetch full analysis')
                               setCurrentAnalysis(analysis)
+                              setRedirectingToSuggested(false) // Turn off redirect loader
                               updateURLWithAnalysis(analysis.uuid || analysis.id)
                             }
                           } catch (error) {
                             console.error('Error fetching full analysis:', error)
                             setCurrentAnalysis(analysis)
+                            setRedirectingToSuggested(false) // Turn off redirect loader
                             updateURLWithAnalysis(analysis.uuid || analysis.id)
                           }
                         } else {
@@ -2039,6 +2052,7 @@ export default function Dashboard() {
                             memberCount: Array.isArray(analysis.analysis_data.team_analysis) ? analysis.analysis_data.team_analysis.length : (analysis.analysis_data.team_analysis?.members?.length || 0)
                           })
                           setCurrentAnalysis(analysis)
+                          setRedirectingToSuggested(false) // Turn off redirect loader
                           updateURLWithAnalysis(analysis.uuid || analysis.id)
                         }
                       }}
