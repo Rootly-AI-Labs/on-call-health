@@ -801,7 +801,6 @@ export default function Dashboard() {
         setHistoricalTrends(null)
         // Remove invalid analysis ID from URL
         updateURLWithAnalysis(null)
-        }
       }
     } catch (error) {
       console.error('Error loading specific analysis:', error)
