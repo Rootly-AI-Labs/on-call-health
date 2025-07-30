@@ -360,132 +360,8 @@ interface AnalysisResult {
 
 type AnalysisStage = "loading" | "connecting" | "fetching_users" | "fetching" | "fetching_github" | "fetching_slack" | "calculating" | "analyzing" | "preparing" | "complete"
 
-// Mock data generator
-const generateMockAnalysis = (integration: Integration): AnalysisResult => {
-  // Add some randomness to make each analysis unique
-  const baseScore = 72 + Math.floor(Math.random() * 10) - 5
-  const mockMembers: OrganizationMember[] = [
-    {
-      id: "1",
-      name: "Alex Chen",
-      email: "alex.chen@rootly.com",
-      role: "Senior Engineer",
-      avatar: "/placeholder.svg?height=40&width=40",
-      burnoutScore: 85,
-      riskLevel: "high",
-      trend: "up",
-      incidentsHandled: 23,
-      avgResponseTime: "12m",
-      factors: {
-        workload: 90,
-        afterHours: 85,
-        weekendWork: 70,
-        incidentLoad: 95,
-        responseTime: 60,
-      },
-    },
-    {
-      id: "2",
-      name: "Sarah Johnson",
-      email: "sarah.johnson@rootly.com",
-      role: "Staff Engineer",
-      avatar: "/placeholder.svg?height=40&width=40",
-      burnoutScore: 78,
-      riskLevel: "high",
-      trend: "up",
-      incidentsHandled: 19,
-      avgResponseTime: "8m",
-      factors: {
-        workload: 80,
-        afterHours: 90,
-        weekendWork: 85,
-        incidentLoad: 75,
-        responseTime: 45,
-      },
-    },
-    {
-      id: "3",
-      name: "Mike Rodriguez",
-      email: "mike.rodriguez@rootly.com",
-      role: "Engineering Manager",
-      avatar: "/placeholder.svg?height=40&width=40",
-      burnoutScore: 68,
-      riskLevel: "medium",
-      trend: "stable",
-      incidentsHandled: 15,
-      avgResponseTime: "15m",
-      factors: {
-        workload: 70,
-        afterHours: 65,
-        weekendWork: 60,
-        incidentLoad: 80,
-        responseTime: 70,
-      },
-    },
-    {
-      id: "4",
-      name: "Emily Davis",
-      email: "emily.davis@rootly.com",
-      role: "Senior Engineer",
-      avatar: "/placeholder.svg?height=40&width=40",
-      burnoutScore: 45,
-      riskLevel: "low",
-      trend: "down",
-      incidentsHandled: 12,
-      avgResponseTime: "10m",
-      factors: {
-        workload: 50,
-        afterHours: 40,
-        weekendWork: 30,
-        incidentLoad: 60,
-        responseTime: 45,
-      },
-    },
-  ]
-
-  return {
-    id: `analysis-${Date.now()}`,
-    integration_id: integration.id,
-    created_at: new Date().toISOString(),
-    status: "completed",
-    time_range: 30,
-    organizationName: integration.name,
-    timeRange: "30", // This will be set from the actual selected range
-    overallScore: baseScore,
-    trend: baseScore > 72 ? "up" : baseScore < 72 ? "down" : "stable",
-    atRiskCount: baseScore > 75 ? 3 : baseScore > 65 ? 2 : 1,
-    totalMembers: mockMembers.length,
-    lastAnalysis: new Date().toISOString(),
-    trends: {
-      daily: [
-        { date: "Jan 1", score: 65 },
-        { date: "Jan 8", score: 68 },
-        { date: "Jan 15", score: 72 },
-        { date: "Jan 22", score: 75 },
-        { date: "Jan 29", score: 72 },
-      ],
-      weekly: [
-        { week: "Week 1", score: 65 },
-        { week: "Week 2", score: 68 },
-        { week: "Week 3", score: 72 },
-        { week: "Week 4", score: 75 },
-      ],
-      monthly: [
-        { month: "Dec", score: 68 },
-        { month: "Jan", score: 72 },
-        { month: "Feb", score: 75 },
-      ],
-    },
-    organizationMembers: mockMembers,
-    burnoutFactors: [
-      { factor: "Workload", value: 75 },
-      { factor: "After Hours", value: 70 },
-      { factor: "Weekend Work", value: 60 },
-      { factor: "Incident Load", value: 80 },
-      { factor: "Response Time", value: 55 },
-    ],
-  }
-}
+// Mock data generator function removed - following "NO FALLBACK DATA" principle
+// All dashboard components now only display real analysis data from the API
 
 export default function Dashboard() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -869,9 +745,29 @@ export default function Dashboard() {
         setHistoricalTrends(null)
         // Remove invalid analysis ID from URL
         updateURLWithAnalysis(null)
-        // Show user-friendly error message
+        
+        // Show user-friendly error message and handle suggested redirect
         if (response.status === 404) {
-          console.warn(`Analysis ${analysisId} not found. Please select a valid analysis from the history.`)
+          try {
+            const errorData = await response.json()
+            console.warn(`Analysis ${analysisId} not found:`, errorData.detail)
+            
+            // Check if backend provided a suggested analysis ID
+            const suggestionMatch = errorData.detail?.match(/Most recent analysis available: (.+)$/)
+            if (suggestionMatch && suggestionMatch[1]) {
+              const suggestedId = suggestionMatch[1]
+              console.log(`Backend suggested redirecting to analysis: ${suggestedId}`)
+              
+              // Auto-redirect to suggested analysis after a brief delay
+              setTimeout(() => {
+                console.log(`Auto-redirecting to suggested analysis: ${suggestedId}`)
+                updateURLWithAnalysis(suggestedId)
+                loadSpecificAnalysis(suggestedId)
+              }, 1500) // 1.5 second delay to let user see the error message
+            }
+          } catch (parseError) {
+            console.warn(`Analysis ${analysisId} not found. Please select a valid analysis from the history.`)
+          }
         }
       }
     } catch (error) {

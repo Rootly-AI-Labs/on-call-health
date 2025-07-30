@@ -250,9 +250,20 @@ async def get_analysis_by_uuid(
         )
     
     if not analysis:
+        # Get the most recent analysis for this user to suggest as alternative
+        most_recent = db.query(Analysis).filter(
+            Analysis.user_id == current_user.id,
+            Analysis.status == "completed"
+        ).order_by(Analysis.created_at.desc()).first()
+        
+        error_detail = "Analysis not found"
+        if most_recent:
+            most_recent_id = getattr(most_recent, 'uuid', None) or most_recent.id
+            error_detail = f"Analysis not found. Most recent analysis available: {most_recent_id}"
+        
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Analysis not found"
+            detail=error_detail
         )
     
     return AnalysisResponse(
@@ -280,9 +291,20 @@ async def get_analysis(
     ).first()
     
     if not analysis:
+        # Get the most recent analysis for this user to suggest as alternative
+        most_recent = db.query(Analysis).filter(
+            Analysis.user_id == current_user.id,
+            Analysis.status == "completed"
+        ).order_by(Analysis.created_at.desc()).first()
+        
+        error_detail = "Analysis not found"
+        if most_recent:
+            most_recent_id = getattr(most_recent, 'uuid', None) or most_recent.id
+            error_detail = f"Analysis not found. Most recent analysis available: {most_recent_id}"
+        
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Analysis not found"
+            detail=error_detail
         )
     
     return AnalysisResponse(
