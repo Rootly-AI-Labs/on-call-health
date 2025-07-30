@@ -1870,7 +1870,7 @@ export default function Dashboard() {
           if (responseTimeMinutes <= 240) return 8.0;     // Poor
           if (responseTimeMinutes <= 480) return 9.0;     // Very Poor
           return 10.0;  // Critical (>8 hours)
-        })()
+        })();
         console.log(`RADAR: Member ${m?.user_name}: response_time = ${val} (factors: ${m?.factors?.response_time}, key_metrics: ${m?.key_metrics?.avg_resolution_hours})`);
         return avg + val;
       }, 0) / membersWithIncidents.length).toFixed(1)),
