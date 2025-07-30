@@ -3292,15 +3292,86 @@ export default function Dashboard() {
                           
                           // Use daily_trends from current analysis (primary source)
                           if (currentAnalysis?.analysis_data?.daily_trends?.length > 0) {
-                            return currentAnalysis.analysis_data.daily_trends.map((trend: any) => ({
+                            const dailyTrends = currentAnalysis.analysis_data.daily_trends;
+                            
+                            // Transform data and detect standout events
+                            const chartData = dailyTrends.map((trend: any, index: number) => ({
                               date: new Date(trend.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
                               score: Math.round(trend.overall_score * 10), // Convert 0-10 scale to 0-100 for display
                               riskLevel: trend.overall_score >= 8 ? 'low' : trend.overall_score >= 6 ? 'medium' : 'high',
                               membersAtRisk: trend.members_at_risk,
                               totalMembers: trend.total_members,
                               healthStatus: trend.health_status,
-                              incidentCount: trend.incident_count || trend.analysis_count || 0
+                              incidentCount: trend.incident_count || trend.analysis_count || 0,
+                              rawScore: trend.overall_score,
+                              originalDate: trend.date,
+                              index: index
                             }));
+                            
+                            // Identify standout events
+                            const identifyStandoutEvents = (data: any[]) => {
+                              if (data.length < 3) return data; // Need at least 3 points for analysis
+                              
+                              return data.map((point: any, i: number) => {
+                                let eventType = 'normal';
+                                let eventDescription = '';
+                                let significance = 0;
+                                
+                                const prev = i > 0 ? data[i-1] : null;
+                                const next = i < data.length-1 ? data[i+1] : null;
+                                
+                                // Calculate changes
+                                const prevChange = prev ? point.score - prev.score : 0;
+                                const nextChange = next ? next.score - point.score : 0;
+                                
+                                // Detect peaks (local maxima)
+                                if (prev && next && point.score > prev.score && point.score > next.score && point.score >= 75) {
+                                  eventType = 'peak';
+                                  eventDescription = `Health peak: Excellent day with ${point.incidentCount} incidents`;
+                                  significance = point.score >= 90 ? 3 : 2;
+                                }
+                                // Detect valleys (local minima)  
+                                else if (prev && next && point.score < prev.score && point.score < next.score && point.score <= 60) {
+                                  eventType = 'valley';
+                                  eventDescription = `Health valley: Challenging day with ${point.incidentCount} incidents, ${point.membersAtRisk} at risk`;
+                                  significance = point.score <= 40 ? 3 : 2;
+                                }
+                                // Detect sharp improvements
+                                else if (prevChange >= 20) {
+                                  eventType = 'recovery';
+                                  eventDescription = `Major recovery: +${prevChange}% improvement from previous day`;
+                                  significance = prevChange >= 30 ? 3 : 2;
+                                }
+                                // Detect sharp declines
+                                else if (prevChange <= -20) {
+                                  eventType = 'decline';
+                                  eventDescription = `Significant decline: ${prevChange}% drop from previous day`;
+                                  significance = prevChange <= -30 ? 3 : 2;
+                                }
+                                // Detect high incident volume days
+                                else if (point.incidentCount >= 15) {
+                                  eventType = 'high-volume';
+                                  eventDescription = `High incident volume: ${point.incidentCount} incidents managed`;
+                                  significance = point.incidentCount >= 25 ? 3 : 2;
+                                }
+                                // Detect critical health days
+                                else if (point.score <= 45 && point.membersAtRisk >= 3) {
+                                  eventType = 'critical';
+                                  eventDescription = `Critical period: ${point.score}% health, ${point.membersAtRisk} members at risk`;
+                                  significance = 3;
+                                }
+                                
+                                return {
+                                  ...point,
+                                  eventType,
+                                  eventDescription,
+                                  significance,
+                                  isStandout: significance > 0
+                                };
+                              });
+                            };
+                            
+                            return identifyStandoutEvents(chartData);
                           }
                           
                           // Use historical trends as secondary source (only if current analysis exists)
@@ -3330,6 +3401,33 @@ export default function Dashboard() {
                                   <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
                                     <p className="font-semibold text-gray-900">{label}</p>
                                     <p className="text-purple-600">Health Score: {Math.round(Number(payload[0].value))}%</p>
+                                    
+                                    {/* Show standout event information */}
+                                    {data.isStandout && data.eventDescription && (
+                                      <div className={`p-2 rounded-md mt-2 border-l-4 ${
+                                        data.eventType === 'peak' ? 'bg-green-50 border-green-400' :
+                                        data.eventType === 'valley' ? 'bg-red-50 border-red-400' :
+                                        data.eventType === 'recovery' ? 'bg-blue-50 border-blue-400' :
+                                        data.eventType === 'decline' ? 'bg-orange-50 border-orange-400' :
+                                        data.eventType === 'high-volume' ? 'bg-purple-50 border-purple-400' :
+                                        data.eventType === 'critical' ? 'bg-red-100 border-red-500' :
+                                        'bg-gray-50 border-gray-400'
+                                      }`}>
+                                        <p className={`text-sm font-medium ${
+                                          data.eventType === 'peak' ? 'text-green-700' :
+                                          data.eventType === 'valley' ? 'text-red-700' :
+                                          data.eventType === 'recovery' ? 'text-blue-700' :
+                                          data.eventType === 'decline' ? 'text-orange-700' :
+                                          data.eventType === 'high-volume' ? 'text-purple-700' :
+                                          data.eventType === 'critical' ? 'text-red-800' :
+                                          'text-gray-700'
+                                        }`}>
+                                          🎯 Standout Event
+                                        </p>
+                                        <p className="text-xs text-gray-600 mt-1">{data.eventDescription}</p>
+                                      </div>
+                                    )}
+                                    
                                     <p className={`text-sm font-medium ${
                                       data.riskLevel === 'low' ? 'text-green-600' :
                                       data.riskLevel === 'medium' ? 'text-yellow-600' : 'text-red-600'
@@ -3338,12 +3436,12 @@ export default function Dashboard() {
                                     </p>
                                     {data.incidentCount !== undefined && (
                                       <p className="text-sm text-gray-600">
-                                        Incidents Analyzed: {data.incidentCount}
+                                        Incidents: {data.incidentCount}
                                       </p>
                                     )}
                                     {data.membersAtRisk !== undefined && (
                                       <p className="text-sm text-gray-600">
-                                        At Risk: {data.membersAtRisk}/{data.totalMembers} users with incidents
+                                        At Risk: {data.membersAtRisk}/{data.totalMembers} members
                                       </p>
                                     )}
                                     {data.healthStatus && (
@@ -3362,8 +3460,69 @@ export default function Dashboard() {
                             dataKey="score" 
                             stroke="#8B5CF6" 
                             strokeWidth={2}
-                            dot={{ fill: '#8B5CF6', strokeWidth: 2, r: 4 }}
-                            activeDot={{ r: 6, stroke: '#8B5CF6', strokeWidth: 2 }}
+                            dot={(props: any) => {
+                              const { cx, cy, payload } = props;
+                              if (!payload || !payload.isStandout) {
+                                // Normal dots
+                                return <circle cx={cx} cy={cy} r={4} fill="#8B5CF6" strokeWidth={2} stroke="#8B5CF6" />;
+                              }
+                              
+                              // Standout event dots with different colors and sizes
+                              const getEventStyle = (eventType: string, significance: number) => {
+                                const baseSize = significance === 3 ? 7 : 6; // Larger for high significance
+                                
+                                switch (eventType) {
+                                  case 'peak':
+                                    return { fill: '#10B981', stroke: '#059669', r: baseSize }; // Green
+                                  case 'valley':
+                                    return { fill: '#EF4444', stroke: '#DC2626', r: baseSize }; // Red
+                                  case 'recovery':
+                                    return { fill: '#3B82F6', stroke: '#2563EB', r: baseSize }; // Blue
+                                  case 'decline':
+                                    return { fill: '#F59E0B', stroke: '#D97706', r: baseSize }; // Orange
+                                  case 'high-volume':
+                                    return { fill: '#8B5CF6', stroke: '#7C3AED', r: baseSize }; // Purple
+                                  case 'critical':
+                                    return { fill: '#DC2626', stroke: '#B91C1C', r: baseSize + 1 }; // Dark red, largest
+                                  default:
+                                    return { fill: '#6B7280', stroke: '#4B5563', r: baseSize };
+                                }
+                              };
+                              
+                              const style = getEventStyle(payload.eventType, payload.significance);
+                              return (
+                                <g>
+                                  {/* Outer glow for high significance events */}
+                                  {payload.significance === 3 && (
+                                    <circle 
+                                      cx={cx} 
+                                      cy={cy} 
+                                      r={style.r + 3} 
+                                      fill={style.fill} 
+                                      opacity={0.2}
+                                    />
+                                  )}
+                                  {/* Main dot */}
+                                  <circle 
+                                    cx={cx} 
+                                    cy={cy} 
+                                    r={style.r} 
+                                    fill={style.fill} 
+                                    stroke={style.stroke} 
+                                    strokeWidth={2}
+                                  />
+                                  {/* Inner highlight */}
+                                  <circle 
+                                    cx={cx} 
+                                    cy={cy} 
+                                    r={2} 
+                                    fill="white" 
+                                    opacity={0.6}
+                                  />
+                                </g>
+                              );
+                            }}
+                            activeDot={{ r: 8, stroke: '#8B5CF6', strokeWidth: 2 }}
                           />
                         </LineChart>
                       </ResponsiveContainer>
