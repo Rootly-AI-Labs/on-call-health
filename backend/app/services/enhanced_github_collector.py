@@ -40,18 +40,26 @@ async def collect_team_github_data_with_mapping(
                 
                 # Try to extract the GitHub username from the data
                 github_username = None
-                if isinstance(user_data, dict) and "github_username" in user_data:
-                    github_username = user_data["github_username"]
-                elif isinstance(user_data, dict) and "commits" in user_data and user_data["commits"]:
-                    # Extract from first commit
-                    first_commit = user_data["commits"][0]
-                    if isinstance(first_commit, dict) and "author" in first_commit:
-                        github_username = first_commit["author"].get("login")
+                
+                # First, check manual mappings
+                from .github_collector import GitHubCollector
+                collector = GitHubCollector()
+                if email in collector.manual_email_mappings:
+                    github_username = collector.manual_email_mappings[email]
+                    logger.info(f"Found manual mapping: {email} -> {github_username}")
+                
+                # If no manual mapping, try to extract from data
+                if not github_username:
+                    if isinstance(user_data, dict) and "github_username" in user_data:
+                        github_username = user_data["github_username"]
+                    elif isinstance(user_data, dict) and "commits" in user_data and user_data["commits"]:
+                        # Extract from first commit
+                        first_commit = user_data["commits"][0]
+                        if isinstance(first_commit, dict) and "author" in first_commit:
+                            github_username = first_commit["author"].get("login")
                 
                 if github_username:
-                    # Determine mapping method
-                    from .github_collector import GitHubCollector
-                    collector = GitHubCollector()
+                    # Determine mapping method based on how we found the username
                     if email in collector.manual_email_mappings:
                         mapping_method = "manual_mapping"
                     else:
