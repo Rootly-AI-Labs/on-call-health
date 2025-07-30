@@ -386,6 +386,7 @@ export default function Dashboard() {
   const [loadingTrends, setLoadingTrends] = useState(false)
   const [initialDataLoaded, setInitialDataLoaded] = useState(false)
   const [hasDataFromCache, setHasDataFromCache] = useState(false)
+  const [redirectingToSuggested, setRedirectingToSuggested] = useState(false)
   
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -782,12 +783,16 @@ export default function Dashboard() {
               const suggestedId = suggestionMatch[1]
               console.log(`Backend suggested redirecting to analysis: ${suggestedId}`)
               
+              // Set redirect state to show loader instead of error
+              setRedirectingToSuggested(true)
+              
               // Auto-redirect to suggested analysis after a brief delay
               setTimeout(() => {
                 console.log(`Auto-redirecting to suggested analysis: ${suggestedId}`)
                 updateURLWithAnalysis(suggestedId)
                 loadSpecificAnalysis(suggestedId)
-              }, 1500) // 1.5 second delay to let user see the error message
+                setRedirectingToSuggested(false)
+              }, 1000) // Reduced to 1 second since we're showing a loader
             }
           } catch (parseError) {
             console.warn(`Analysis ${analysisId} not found. Please select a valid analysis from the history.`)
@@ -3844,39 +3849,58 @@ export default function Dashboard() {
             </Card>
           )}
 
-          {/* Analysis Not Found State */}
+          {/* Analysis Not Found State or Auto-Redirect Loader */}
           {!analysisRunning && !currentAnalysis && searchParams.get('analysis') && (
-            <Card className="text-center p-8 border-red-200 bg-red-50">
-              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.728-.833-2.498 0L4.316 15.5c-.77.833.192 2.5 1.732 2.5z" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-semibold text-red-900 mb-2">Analysis Not Found</h3>
-              <p className="text-red-700 mb-6">
-                The analysis with ID "{searchParams.get('analysis')}" could not be found or may have been deleted.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                <Button 
-                  onClick={() => {
-                    updateURLWithAnalysis(null)
-                    if (previousAnalyses.length > 0) {
-                      setCurrentAnalysis(previousAnalyses[0])
-                      updateURLWithAnalysis(previousAnalyses[0].uuid || previousAnalyses[0].id)
-                    }
-                  }}
-                  className="bg-red-600 hover:bg-red-700"
-                >
-                  Load Most Recent Analysis
-                </Button>
-                <Button 
-                  variant="outline" 
-                  onClick={() => updateURLWithAnalysis(null)}
-                  className="border-red-300 text-red-700 hover:bg-red-50"
-                >
-                  Clear URL and Start Fresh
-                </Button>
-              </div>
+            <Card className={`text-center p-8 ${redirectingToSuggested ? 'border-blue-200 bg-blue-50' : 'border-red-200 bg-red-50'}`}>
+              {redirectingToSuggested ? (
+                <>
+                  <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg className="w-8 h-8 text-blue-600 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-semibold text-blue-900 mb-2">Redirecting to Recent Analysis</h3>
+                  <p className="text-blue-700 mb-6">
+                    Analysis "{searchParams.get('analysis')}" not found. Redirecting to your most recent analysis...
+                  </p>
+                </>
+              ) : (
+                <>
+                  <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.728-.833-2.498 0L4.316 15.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-semibold text-red-900 mb-2">Analysis Not Found</h3>
+                  <p className="text-red-700 mb-6">
+                    The analysis with ID "{searchParams.get('analysis')}" could not be found or may have been deleted.
+                  </p>
+                </>
+              )}
+              {!redirectingToSuggested && (
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  <Button 
+                    onClick={() => {
+                      updateURLWithAnalysis(null)
+                      if (previousAnalyses.length > 0) {
+                        setCurrentAnalysis(previousAnalyses[0])
+                        updateURLWithAnalysis(previousAnalyses[0].uuid || previousAnalyses[0].id)
+                      }
+                    }}
+                    className="bg-red-600 hover:bg-red-700"
+                  >
+                    Load Most Recent Analysis
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => updateURLWithAnalysis(null)}
+                    className="border-red-300 text-red-700 hover:bg-red-50"
+                  >
+                    Clear URL and Start Fresh
+                  </Button>
+                </div>
+              )}
             </Card>
           )}
 
