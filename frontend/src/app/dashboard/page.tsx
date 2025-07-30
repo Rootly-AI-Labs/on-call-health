@@ -3160,7 +3160,7 @@ export default function Dashboard() {
                         }
 
                         return (
-                          <div className="relative">
+                          <div className="relative max-h-80 overflow-y-auto pr-2">
                             {/* Timeline line */}
                             <div className="absolute left-4 top-0 bottom-0 w-px bg-gray-200"></div>
                             
