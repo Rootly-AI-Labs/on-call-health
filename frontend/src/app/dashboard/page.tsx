@@ -770,9 +770,8 @@ export default function Dashboard() {
         return
       }
 
-      // Check if analysisId is a UUID or integer ID
-      const isUuid = analysisId.includes('-')
-      const endpoint = isUuid ? `${API_BASE}/analyses/uuid/${analysisId}` : `${API_BASE}/analyses/${analysisId}`
+      // Use the unified endpoint that handles both UUIDs and integer IDs
+      const endpoint = `${API_BASE}/analyses/by-id/${analysisId}`
       
       console.log(`Making API call to load analysis: ${endpoint}`)
       const response = await fetch(endpoint, {

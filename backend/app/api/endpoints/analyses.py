@@ -319,6 +319,77 @@ async def get_analysis(
     )
 
 
+def is_uuid(value: str) -> bool:
+    """Check if a string is a valid UUID format."""
+    try:
+        import uuid
+        uuid.UUID(value)
+        return True
+    except ValueError:
+        return False
+
+
+@router.get("/by-id/{analysis_identifier}", response_model=AnalysisResponse)
+async def get_analysis_by_identifier(
+    analysis_identifier: str,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get a specific analysis result by UUID or integer ID."""
+    analysis = None
+    
+    # Try UUID first if it looks like a UUID
+    if is_uuid(analysis_identifier):
+        try:
+            analysis = db.query(Analysis).filter(
+                Analysis.uuid == analysis_identifier,
+                Analysis.user_id == current_user.id
+            ).first()
+        except Exception:
+            # UUID column might not exist yet, fall back to integer
+            pass
+    
+    # If not found by UUID or not a UUID, try integer ID
+    if not analysis:
+        try:
+            analysis_id = int(analysis_identifier)
+            analysis = db.query(Analysis).filter(
+                Analysis.id == analysis_id,
+                Analysis.user_id == current_user.id
+            ).first()
+        except ValueError:
+            # Not a valid integer either
+            pass
+    
+    if not analysis:
+        # Get the most recent analysis for this user to suggest as alternative
+        most_recent = db.query(Analysis).filter(
+            Analysis.user_id == current_user.id,
+            Analysis.status == "completed"
+        ).order_by(Analysis.created_at.desc()).first()
+        
+        error_detail = "Analysis not found"
+        if most_recent:
+            most_recent_id = getattr(most_recent, 'uuid', None) or most_recent.id
+            error_detail = f"Analysis not found. Most recent analysis available: {most_recent_id}"
+        
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=error_detail
+        )
+    
+    return AnalysisResponse(
+        id=analysis.id,
+        uuid=getattr(analysis, 'uuid', None),
+        integration_id=analysis.rootly_integration_id,
+        status=analysis.status,
+        created_at=analysis.created_at,
+        completed_at=analysis.completed_at,
+        time_range=analysis.time_range or 30,
+        analysis_data=analysis.results
+    )
+
+
 @router.delete("/{analysis_id}")
 async def delete_analysis(
     analysis_id: int,
