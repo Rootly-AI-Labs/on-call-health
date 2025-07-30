@@ -103,8 +103,7 @@ async def migrate_add_uuid_column(
 
 @router.get("/check-uuid-status")
 async def check_uuid_status(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    db: Session = Depends(get_db)
 ):
     """Check current UUID migration status"""
     
