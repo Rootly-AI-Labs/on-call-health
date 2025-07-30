@@ -108,6 +108,15 @@ interface MappingStatistics {
   }
 }
 
+// New interface for analysis-specific mapping statistics
+interface AnalysisMappingStatistics {
+  total_team_members: number
+  successful_mappings: number
+  members_with_data: number
+  success_rate: number
+  failed_mappings: number
+}
+
 interface ManualMapping {
   id: number
   source_platform: string
@@ -251,6 +260,8 @@ export default function IntegrationsPage() {
   const [selectedMappingPlatform, setSelectedMappingPlatform] = useState<'github' | 'slack' | null>(null)
   const [mappingData, setMappingData] = useState<IntegrationMapping[]>([])
   const [mappingStats, setMappingStats] = useState<MappingStatistics | null>(null)
+  const [analysisMappingStats, setAnalysisMappingStats] = useState<AnalysisMappingStatistics | null>(null)
+  const [currentAnalysisId, setCurrentAnalysisId] = useState<number | null>(null)
   const [loadingMappingData, setLoadingMappingData] = useState(false)
   
   // Manual mapping state
@@ -1115,25 +1126,65 @@ export default function IntegrationsPage() {
         return
       }
 
-      // Fetch both platform-specific mappings and overall statistics
-      const [mappingsResponse, statsResponse] = await Promise.all([
-        fetch(`${API_BASE}/integrations/mappings/platform/${platform}`, {
-          headers: { 'Authorization': `Bearer ${authToken}` }
-        }),
-        fetch(`${API_BASE}/integrations/mappings/success-rate`, {
-          headers: { 'Authorization': `Bearer ${authToken}` }
-        })
-      ])
+      // First, get the most recent analysis with GitHub/Slack data
+      const analysesResponse = await fetch(`${API_BASE}/analyses`, {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      })
 
-      if (mappingsResponse.ok && statsResponse.ok) {
-        const mappings = await mappingsResponse.json()
-        const stats = await statsResponse.json()
+      if (!analysesResponse.ok) {
+        throw new Error('Failed to fetch analyses')
+      }
+
+      const analyses = await analysesResponse.json()
+      const recentAnalysis = analyses.find((analysis: any) => 
+        analysis.status === 'completed' && 
+        analysis.analysis_data?.data_sources?.[`${platform}_data`] === true
+      )
+
+      if (!recentAnalysis) {
+        // Fallback to old method if no recent analysis with this platform
+        const [mappingsResponse, statsResponse] = await Promise.all([
+          fetch(`${API_BASE}/integrations/mappings/platform/${platform}`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+          }),
+          fetch(`${API_BASE}/integrations/mappings/success-rate`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+          })
+        ])
+
+        if (mappingsResponse.ok && statsResponse.ok) {
+          const mappings = await mappingsResponse.json()
+          const stats = await statsResponse.json()
+          
+          setMappingData(mappings)
+          setMappingStats(stats)
+          setAnalysisMappingStats(null)
+          setCurrentAnalysisId(null)
+          setShowMappingDialog(true)
+        } else {
+          throw new Error('Failed to fetch mapping data')
+        }
+        return
+      }
+
+      // Use the analysis-specific mapping endpoint for team member statistics
+      const analysisResponse = await fetch(`${API_BASE}/integrations/mappings/analysis/${recentAnalysis.id}`, {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      })
+
+      if (analysisResponse.ok) {
+        const analysisData = await analysisResponse.json()
         
-        setMappingData(mappings)
-        setMappingStats(stats)
+        // Filter mappings for the selected platform
+        const platformMappings = analysisData.mappings?.filter((m: any) => m.target_platform === platform) || []
+        
+        setMappingData(platformMappings)
+        setAnalysisMappingStats(analysisData.statistics)
+        setCurrentAnalysisId(recentAnalysis.id)
+        setMappingStats(null) // Clear old stats
         setShowMappingDialog(true)
       } else {
-        throw new Error('Failed to fetch mapping data')
+        throw new Error('Failed to fetch analysis mapping data')
       }
     } catch (error) {
       console.error('Error loading mapping data:', error)
@@ -3197,16 +3248,31 @@ export default function IntegrationsPage() {
             </DialogDescription>
           </DialogHeader>
 
-          {mappingStats && (
+          {(analysisMappingStats || mappingStats) && (
             <div className="space-y-6">
+              {analysisMappingStats && currentAnalysisId && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                  <div className="flex items-center space-x-2">
+                    <Info className="w-4 h-4 text-blue-600" />
+                    <span className="text-sm text-blue-700">
+                      Showing team member mapping statistics from analysis #{currentAnalysisId}
+                    </span>
+                  </div>
+                </div>
+              )}
+              
               {/* Overall Statistics */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Card className="p-4">
                   <div className="flex items-center space-x-2">
                     <Users2 className="w-4 h-4 text-blue-600" />
                     <div>
-                      <div className="text-2xl font-bold">{mappingStats.total_attempts}</div>
-                      <div className="text-sm text-gray-600">Total Attempts</div>
+                      <div className="text-2xl font-bold">
+                        {analysisMappingStats ? analysisMappingStats.total_team_members : mappingStats?.total_attempts}
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        {analysisMappingStats ? 'Team Members' : 'Total Attempts'}
+                      </div>
                     </div>
                   </div>
                 </Card>
@@ -3215,7 +3281,7 @@ export default function IntegrationsPage() {
                     <CheckCircle className="w-4 h-4 text-green-600" />
                     <div>
                       <div className="text-2xl font-bold text-green-600">
-                        {mappingStats.overall_success_rate}%
+                        {analysisMappingStats ? analysisMappingStats.success_rate : mappingStats?.overall_success_rate}%
                       </div>
                       <div className="text-sm text-gray-600">Success Rate</div>
                     </div>
@@ -3226,7 +3292,7 @@ export default function IntegrationsPage() {
                     <Database className="w-4 h-4 text-purple-600" />
                     <div>
                       <div className="text-2xl font-bold">
-                        {mappingData.filter(m => m.data_collected).length}
+                        {analysisMappingStats ? analysisMappingStats.members_with_data : mappingData.filter(m => m.data_collected).length}
                       </div>
                       <div className="text-sm text-gray-600">With Data</div>
                     </div>
