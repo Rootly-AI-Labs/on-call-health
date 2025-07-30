@@ -42,14 +42,14 @@ async def collect_team_github_data_with_mapping(
                 # Try to extract the GitHub username from the data
                 github_username = None
                 
-                # First, check manual mappings
+                # First, check predefined mappings
                 from .github_collector import GitHubCollector
                 collector = GitHubCollector()
-                if email in collector.manual_email_mappings:
-                    github_username = collector.manual_email_mappings[email]
-                    logger.info(f"Found manual mapping: {email} -> {github_username}")
+                if email in collector.predefined_email_mappings:
+                    github_username = collector.predefined_email_mappings[email]
+                    logger.info(f"Found predefined mapping: {email} -> {github_username}")
                 
-                # If no manual mapping, try to extract from data
+                # If no predefined mapping, try to extract from data
                 if not github_username:
                     if isinstance(user_data, dict) and "username" in user_data:
                         github_username = user_data["username"]
@@ -58,10 +58,10 @@ async def collect_team_github_data_with_mapping(
                 
                 if github_username:
                     # Determine mapping method based on how we found the username
-                    if email in collector.manual_email_mappings:
-                        mapping_method = "manual_mapping"
+                    if email in collector.predefined_email_mappings:
+                        mapping_method = "predefined_mapping"
                     else:
-                        mapping_method = "api_search"
+                        mapping_method = "api_discovery"
                     
                     recorder.record_successful_mapping(
                         user_id=user_id,
@@ -73,7 +73,7 @@ async def collect_team_github_data_with_mapping(
                         mapping_method=mapping_method,
                         data_points_count=data_points
                     )
-                    logger.info(f"✓ Recorded successful GitHub mapping: {email} -> {github_username} ({data_points} data points)")
+                    logger.info(f"✓ Recorded successful GitHub mapping: {email} -> {github_username} ({data_points} data points) via {mapping_method}")
                 else:
                     # Data collected but no clear username
                     recorder.record_successful_mapping(

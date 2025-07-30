@@ -32,8 +32,8 @@ class GitHubCollector:
         # GitHub organizations to search
         self.organizations = ["Rootly-AI-Labs", "rootlyhq"]
         
-        # Manual email mappings (from original config, to handle cases where GitHub email != Rootly email)
-        self.manual_email_mappings = {
+        # Predefined email mappings (from original config, to handle cases where GitHub email != Rootly email)
+        self.predefined_email_mappings = {
             "spencer.cheng@rootly.com": "spencerhcheng",
             "jasmeet.singh@rootly.com": "jasmeetluthra", 
             "sylvain@rootly.com": "sylvainkalache",
@@ -67,15 +67,15 @@ class GitHubCollector:
             return None
             
         try:
-            # First check manual mappings
-            logger.info(f"Checking manual mappings for {email}. Available mappings: {list(self.manual_email_mappings.keys())}")
-            logger.info(f"Manual mappings dict: {self.manual_email_mappings}")
-            username = self.manual_email_mappings.get(email)
+            # First check predefined mappings
+            logger.info(f"Checking predefined mappings for {email}. Available mappings: {list(self.predefined_email_mappings.keys())}")
+            logger.info(f"Predefined mappings dict: {self.predefined_email_mappings}")
+            username = self.predefined_email_mappings.get(email)
             if username:
-                logger.info(f"Found GitHub correlation via manual mapping: {email} -> {username}")
+                logger.info(f"Found GitHub correlation via predefined mapping: {email} -> {username}")
                 return username
             else:
-                logger.warning(f"No manual mapping found for {email}")
+                logger.warning(f"No predefined mapping found for {email}")
             
             # Build email mapping if not cached
             if self._email_mapping_cache is None:
