@@ -21,43 +21,51 @@ def auto_cleanup_duplicates():
         SessionLocal = sessionmaker(bind=engine)
         
         with SessionLocal() as db:
-            # Check for duplicates
+            # Check for duplicates across all platforms
             check_query = text("""
-            SELECT COUNT(*) as duplicate_groups
+            SELECT target_platform, COUNT(*) as duplicate_groups
             FROM (
-                SELECT user_id, source_identifier, COUNT(*) as cnt
+                SELECT user_id, source_identifier, target_platform, COUNT(*) as cnt
                 FROM integration_mappings 
-                WHERE target_platform = 'github'
-                GROUP BY user_id, source_identifier 
+                WHERE target_platform IN ('github', 'slack')
+                GROUP BY user_id, source_identifier, target_platform 
                 HAVING COUNT(*) > 1
             ) duplicates
+            GROUP BY target_platform
             """)
             
-            duplicate_count = db.execute(check_query).fetchone()[0]
+            duplicates_by_platform = db.execute(check_query).fetchall()
             
-            if duplicate_count == 0:
-                logger.info("✅ No duplicate GitHub mappings found")
+            if not duplicates_by_platform:
+                logger.info("✅ No duplicate mappings found for GitHub or Slack")
                 return
             
-            logger.info(f"🧹 Found {duplicate_count} duplicate mapping groups, cleaning up...")
+            total_deleted = 0
             
-            # Clean up duplicates - keep most recent for each user-email combo
-            cleanup_query = text("""
-            DELETE FROM integration_mappings 
-            WHERE id NOT IN (
-                SELECT DISTINCT ON (user_id, source_identifier) id
-                FROM integration_mappings 
-                WHERE target_platform = 'github'
-                ORDER BY user_id, source_identifier, created_at DESC
-            )
-            AND target_platform = 'github'
-            """)
+            # Clean up duplicates for each platform
+            for platform, duplicate_count in duplicates_by_platform:
+                logger.info(f"🧹 Found {duplicate_count} duplicate {platform} mapping groups, cleaning up...")
+                
+                # Clean up duplicates - keep most recent for each user-email-platform combo
+                cleanup_query = text("""
+                DELETE FROM integration_mappings 
+                WHERE id NOT IN (
+                    SELECT DISTINCT ON (user_id, source_identifier, target_platform) id
+                    FROM integration_mappings 
+                    WHERE target_platform = :platform
+                    ORDER BY user_id, source_identifier, target_platform, created_at DESC
+                )
+                AND target_platform = :platform
+                """)
+                
+                result = db.execute(cleanup_query, {"platform": platform})
+                deleted_count = result.rowcount
+                total_deleted += deleted_count
+                
+                logger.info(f"🎉 {platform} cleanup complete: Removed {deleted_count} duplicate mappings")
             
-            result = db.execute(cleanup_query)
-            deleted_count = result.rowcount
             db.commit()
-            
-            logger.info(f"🎉 Auto-cleanup complete: Removed {deleted_count} duplicate mappings")
+            logger.info(f"🎉 Total auto-cleanup complete: Removed {total_deleted} duplicate mappings across all platforms")
             
     except Exception as e:
         logger.error(f"❌ Auto-cleanup failed: {e}")

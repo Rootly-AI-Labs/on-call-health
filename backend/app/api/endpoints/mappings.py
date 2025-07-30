@@ -313,13 +313,13 @@ def _generate_cache_insights(cache_stats: dict) -> List[str]:
     
     return insights
 
-@router.post("/mappings/github/cleanup-duplicates", summary="Clean up duplicate GitHub mappings")
-async def cleanup_duplicate_github_mappings(
+@router.post("/mappings/cleanup-duplicates", summary="Clean up duplicate mappings for all platforms")
+async def cleanup_duplicate_mappings(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ) -> dict:
     """
-    Clean up duplicate GitHub mappings, keeping only the most recent for each user-email.
+    Clean up duplicate mappings for both GitHub and Slack, keeping only the most recent for each user-email-platform.
     This removes stale data from before Phase 1 fixes.
     """
     try:
@@ -327,17 +327,17 @@ async def cleanup_duplicate_github_mappings(
         
         logger.info(f"🧹 Starting duplicate cleanup for user {current_user.id}")
         
-        # Get duplicates for this user
+        # Get duplicates for this user across all platforms
         query = text("""
-        SELECT source_identifier, COUNT(*) as duplicate_count,
+        SELECT target_platform, source_identifier, COUNT(*) as duplicate_count,
                array_agg(id ORDER BY created_at DESC) as mapping_ids,
                array_agg(target_identifier ORDER BY created_at DESC) as usernames,
                array_agg(mapping_successful ORDER BY created_at DESC) as success_flags
         FROM integration_mappings 
-        WHERE target_platform = 'github' AND user_id = :user_id
-        GROUP BY source_identifier 
+        WHERE target_platform IN ('github', 'slack') AND user_id = :user_id
+        GROUP BY target_platform, source_identifier 
         HAVING COUNT(*) > 1
-        ORDER BY COUNT(*) DESC
+        ORDER BY target_platform, COUNT(*) DESC
         """)
         
         duplicates = db.execute(query, {"user_id": current_user.id}).fetchall()
@@ -351,20 +351,25 @@ async def cleanup_duplicate_github_mappings(
             }
         
         total_deleted = 0
-        emails_processed = len(duplicates)
+        emails_processed = 0
+        platforms_processed = set()
         
         for row in duplicates:
-            email = row[0]
-            duplicate_count = row[1]
-            mapping_ids = row[2]  # Already sorted DESC by created_at
-            usernames = row[3]
-            success_flags = row[4]
+            platform = row[0]
+            email = row[1]
+            duplicate_count = row[2]
+            mapping_ids = row[3]  # Already sorted DESC by created_at
+            usernames = row[4]
+            success_flags = row[5]
+            
+            platforms_processed.add(platform)
+            emails_processed += 1
             
             # Keep the most recent (first), delete the rest
             keep_id = mapping_ids[0]
             delete_ids = mapping_ids[1:]
             
-            logger.info(f"📧 {email}: Keeping ID {keep_id} -> {usernames[0]}, deleting {len(delete_ids)} older mappings")
+            logger.info(f"📧 {platform} - {email}: Keeping ID {keep_id} -> {usernames[0]}, deleting {len(delete_ids)} older mappings")
             
             # Delete older mappings
             delete_query = text("DELETE FROM integration_mappings WHERE id = ANY(:ids)")
@@ -375,17 +380,19 @@ async def cleanup_duplicate_github_mappings(
         # Commit all deletions
         db.commit()
         
-        logger.info(f"🎉 Cleanup complete: {emails_processed} emails processed, {total_deleted} duplicates removed")
+        platforms_list = list(platforms_processed)
+        logger.info(f"🎉 Cleanup complete: {emails_processed} email-platform combos processed, {total_deleted} duplicates removed across {platforms_list}")
         
         return {
-            "message": f"🎉 Successfully cleaned up duplicate mappings!",
-            "duplicates_found": sum(row[1] - 1 for row in duplicates),  # Total duplicates (excluding kept ones)
+            "message": f"🎉 Successfully cleaned up duplicate mappings across {len(platforms_processed)} platform(s)!",
+            "duplicates_found": sum(row[2] - 1 for row in duplicates),  # Total duplicates (excluding kept ones)
             "duplicates_removed": total_deleted,
             "emails_processed": emails_processed,
+            "platforms_processed": platforms_list,
             "next_steps": [
-                "Run a new burnout analysis with GitHub integration",
-                "Check GitHub Data Mapping modal",
-                "Verify each team member appears only once"
+                "Run a new burnout analysis with GitHub/Slack integration",
+                "Check GitHub and Slack Data Mapping modals",
+                "Verify each team member appears only once per platform"
             ]
         }
         
