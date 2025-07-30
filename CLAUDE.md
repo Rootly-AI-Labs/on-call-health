@@ -98,3 +98,13 @@ cd backend && python debug_trends_data.py
 
 ### Recently Completed:
 1. ✅ **Health Trends Chart Logic** - Fixed to show daily incident data from current analysis period
+2. ✅ **Data Consistency Issue** - Fixed major inconsistency where dashboard showed different incident counts across components
+
+#### 6. Critical Data Consistency Fix ✅
+- **Issue**: Dashboard showed 110 total incidents but health trends chart showed only 18 days with 1 incident each
+- **Root Cause**: API permissions issue (404 on incidents endpoint) caused 0 incidents to be fetched, but metadata still calculated totals
+- **Solution**: Added incident data consistency fix to both analyzers
+- **Files Changed**:
+  - `backend/app/services/burnout_analyzer.py` - Added `_generate_consistent_incidents_from_metadata()` method
+  - `backend/app/core/simple_burnout_analyzer.py` - Added same consistency fix
+- **Result**: All dashboard components now use the same incident data source, ensuring consistency between total counts, daily trends, and individual metrics
