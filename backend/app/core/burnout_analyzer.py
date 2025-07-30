@@ -558,7 +558,7 @@ class BurnoutAnalyzer:
     
     def _calculate_complexity_handling_score(self, incidents: List[Dict[str, Any]]) -> float:
         """Score based on handling of complex/high-severity incidents."""
-        severity_scores = {"sev1": 10, "sev2": 7, "sev3": 4, "sev4": 2}
+        severity_scores = {"sev0": 15, "sev1": 10, "sev2": 7, "sev3": 4, "sev4": 2}
         
         if not incidents:
             return 5

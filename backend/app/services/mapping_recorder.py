@@ -204,3 +204,24 @@ class MappingRecorder:
         return self.db.query(IntegrationMapping).filter(
             IntegrationMapping.user_id == user_id
         ).order_by(IntegrationMapping.created_at.desc()).limit(limit).all()
+    
+    def clear_analysis_mappings(self, analysis_id: int) -> int:
+        """Clear all mappings for a specific analysis to prevent duplicates."""
+        deleted_count = self.db.query(IntegrationMapping).filter(
+            IntegrationMapping.analysis_id == analysis_id
+        ).delete()
+        self.db.commit()
+        logger.info(f"Cleared {deleted_count} existing mappings for analysis {analysis_id}")
+        return deleted_count
+    
+    def cleanup_stale_mappings(self, days_old: int = 30) -> int:
+        """Remove mappings older than specified days."""
+        from datetime import datetime, timedelta
+        cutoff_date = datetime.utcnow() - timedelta(days=days_old)
+        
+        deleted_count = self.db.query(IntegrationMapping).filter(
+            IntegrationMapping.created_at < cutoff_date
+        ).delete()
+        self.db.commit()
+        logger.info(f"Cleaned up {deleted_count} mappings older than {days_old} days")
+        return deleted_count

@@ -1653,11 +1653,15 @@ class UnifiedBurnoutAnalyzer:
                                     if isinstance(severity_data, dict) and "attributes" in severity_data:
                                         severity_attrs = severity_data["attributes"]
                                         severity_name = severity_attrs.get("name", "medium").lower()
-                                        if "critical" in severity_name or "sev1" in severity_name:
+                                        if "sev0" in severity_name:
+                                            severity_weight = 5.0
+                                            daily_data[date_str]["high_severity_count"] += 1
+                                        elif "critical" in severity_name or "sev1" in severity_name:
                                             severity_weight = 3.0
                                             daily_data[date_str]["high_severity_count"] += 1
                                         elif "high" in severity_name or "sev2" in severity_name:
                                             severity_weight = 2.0
+                                            daily_data[date_str]["high_severity_count"] += 1
                                         elif "medium" in severity_name or "sev3" in severity_name:
                                             severity_weight = 1.5
                             

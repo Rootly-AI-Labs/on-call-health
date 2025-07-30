@@ -979,9 +979,9 @@ class SimpleBurnoutAnalyzer:
                                 severity_weight = 1.0
                                 if isinstance(severity_info, dict) and "data" in severity_info:
                                     severity_name = severity_info.get("data", {}).get("attributes", {}).get("name", "sev4").lower()
-                                    severity_weights = {"sev1": 3.0, "sev2": 2.0, "sev3": 1.5, "sev4": 1.0}
+                                    severity_weights = {"sev0": 5.0, "sev1": 3.0, "sev2": 2.0, "sev3": 1.5, "sev4": 1.0}
                                     severity_weight = severity_weights.get(severity_name, 1.0)
-                                    if severity_name in ["sev1", "sev2"]:
+                                    if severity_name in ["sev0", "sev1", "sev2"]:
                                         daily_data[date_str]["high_severity_count"] += 1
                                 
                                 daily_data[date_str]["severity_weighted_count"] += severity_weight

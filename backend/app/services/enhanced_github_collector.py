@@ -21,12 +21,20 @@ async def collect_team_github_data_with_mapping(
     """
     recorder = MappingRecorder() if user_id else None
     
+    # Phase 1.3: Track processed emails to prevent duplicates within this analysis session
+    processed_emails = set()
+    
     # Call original function
     github_data = await original_collect_team_github_data(team_emails, days, github_token)
     
     # Record mapping attempts if we have user context
     if recorder and user_id:
         for email in team_emails:
+            # Phase 1.3: Skip if already processed in this session
+            if email in processed_emails:
+                logger.debug(f"Skipping {email} - already processed in this analysis session")
+                continue
+            processed_emails.add(email)
             if email in github_data:
                 # Successful mapping
                 data_points = 0

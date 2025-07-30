@@ -1,0 +1,4016 @@
+{
+  "analysis_results": {
+    "analysis_timestamp": "2025-07-15T15:41:18.273883",
+    "metadata": {
+      "timestamp": "2025-07-15T15:39:30.123743",
+      "days_analyzed": 30,
+      "total_users": 40,
+      "total_incidents": 2841,
+      "date_range": {
+        "start": "2025-06-15T15:39:30.123862",
+        "end": "2025-07-15T15:39:30.123902"
+      },
+      "include_weekends": true,
+      "include_github": true,
+      "include_slack": true
+    },
+    "data_sources": {
+      "incident_data": true,
+      "github_data": true,
+      "slack_data": true
+    },
+    "team_health": {
+      "overall_score": 8.19,
+      "risk_distribution": {
+        "low": 22,
+        "medium": 8,
+        "high": 10
+      },
+      "average_burnout_score": 2.42,
+      "health_status": "excellent",
+      "members_at_risk": 10
+    },
+    "team_analysis": {
+      "members": [
+        {
+          "user_id": "3779",
+          "user_name": "JJ Tang",
+          "user_email": "jj@rootly.com",
+          "burnout_score": 6.18,
+          "risk_level": "high",
+          "incident_count": 51,
+          "factors": {
+            "workload": 10,
+            "after_hours": 9.8,
+            "weekend_work": 1.47,
+            "incident_load": 10,
+            "response_time": 10
+          },
+          "maslach_dimensions": {
+            "emotional_exhaustion": 9.26,
+            "depersonalization": 2.0,
+            "personal_accomplishment": 3.75
+          },
+          "metrics": {
+            "incidents_per_week": 11.9,
+            "after_hours_percentage": 0.49,
+            "weekend_percentage": 0.059,
+            "avg_response_time_minutes": 274.7,
+            "severity_distribution": {
+              "unknown": 44,
+              "sev2": 2,
+              "sev1": 2,
+              "sev0": 2,
+              "sev3": 1
+            }
+          },
+          "github_activity": {
+            "commits_count": 0,
+            "pull_requests_count": 0,
+            "reviews_count": 0,
+            "after_hours_commits": 0,
+            "weekend_commits": 0,
+            "avg_pr_size": 0,
+            "burnout_indicators": {
+              "excessive_commits": false,
+              "late_night_activity": false,
+              "weekend_work": false,
+              "large_prs": false
+            }
+          },
+          "slack_activity": {
+            "messages_sent": 0,
+            "channels_active": 1,
+            "after_hours_messages": 0,
+            "weekend_messages": 0,
+            "avg_response_time_minutes": 0,
+            "sentiment_score": 0.0,
+            "negative_messages": 0,
+            "positive_messages": 0,
+            "neutral_messages": 0,
+            "stress_indicators": 0,
+            "burnout_indicators": {
+              "excessive_messaging": false,
+              "poor_sentiment": false,
+              "late_responses": false,
+              "after_hours_activity": false,
+              "stress_indicators": false
+            }
+          },
+          "ai_insights": {},
+          "ai_risk_assessment": {
+            "overall_risk_level": "unknown",
+            "risk_score": 0,
+            "risk_factors": [
+              "Analysis error occurred"
+            ],
+            "protective_factors": []
+          },
+          "ai_recommendations": [
+            {
+              "priority": "high",
+              "category": "system",
+              "title": "Analysis Error",
+              "description": "Could not complete AI analysis. Using fallback assessment.",
+              "actions": [
+                "Contact system administrator",
+                "Review data sources"
+              ]
+            }
+          ],
+          "recommendations": [
+            "[AI] Could not complete AI analysis. Using fallback assessment."
+          ],
+          "ai_confidence": 0.0,
+          "ai_analysis_timestamp": "2025-07-15T22:41:18.274533",
+          "ai_data_sources": []
+        },
+        {
+          "user_id": "29683",
+          "user_name": "Purvai Nanda",
+          "user_email": "purvai@rootly.com",
+          "burnout_score": 5.89,
+          "risk_level": "high",
+          "incident_count": 528,
+          "factors": {
+            "workload": 10,
+            "after_hours": 6.18,
+            "weekend_work": 0.05,
+            "incident_load": 10,
+            "response_time": 10
+          },
+          "maslach_dimensions": {
+            "emotional_exhaustion": 8.54,
+            "depersonalization": 2.0,
+            "personal_accomplishment": 3.75
+          },
+          "metrics": {
+            "incidents_per_week": 123.2,
+            "after_hours_percentage": 0.309,
+            "weekend_percentage": 0.002,
+            "avg_response_time_minutes": 229.1,
+            "severity_distribution": {
+              "unknown": 374,
+              "sev2": 102,
+              "sev1": 25,
+              "sev3": 19,
+              "sev0": 8
+            }
+          },
+          "github_activity": {
+            "commits_count": 0,
+            "pull_requests_count": 0,
+            "reviews_count": 0,
+            "after_hours_commits": 0,
+            "weekend_commits": 0,
+            "avg_pr_size": 0,
+            "burnout_indicators": {
+              "excessive_commits": false,
+              "late_night_activity": false,
+              "weekend_work": false,
+              "large_prs": false
+            }
+          },
+          "slack_activity": {
+            "messages_sent": 0,
+            "channels_active": 1,
+            "after_hours_messages": 0,
+            "weekend_messages": 0,
+            "avg_response_time_minutes": 0,
+            "sentiment_score": 0.0,
+            "negative_messages": 0,
+            "positive_messages": 0,
+            "neutral_messages": 0,
+            "stress_indicators": 0,
+            "burnout_indicators": {
+              "excessive_messaging": false,
+              "poor_sentiment": false,
+              "late_responses": false,
+              "after_hours_activity": false,
+              "stress_indicators": false
+            }
+          },
+          "ai_insights": {},
+          "ai_risk_assessment": {
+            "overall_risk_level": "unknown",
+            "risk_score": 0,
+            "risk_factors": [
+              "Analysis error occurred"
+            ],
+            "protective_factors": []
+          },
+          "ai_recommendations": [
+            {
+              "priority": "high",
+              "category": "system",
+              "title": "Analysis Error",
+              "description": "Could not complete AI analysis. Using fallback assessment.",
+              "actions": [
+                "Contact system administrator",
+                "Review data sources"
+              ]
+            }
+          ],
+          "recommendations": [
+            "[AI] Could not complete AI analysis. Using fallback assessment."
+          ],
+          "ai_confidence": 0.0,
+          "ai_analysis_timestamp": "2025-07-15T22:41:18.274831",
+          "ai_data_sources": []
+        },
+        {
+          "user_id": "62208",
+          "user_name": "Alex Conrad",
+          "user_email": "alex.conrad@rootly.com",
+          "burnout_score": 5.84,
+          "risk_level": "high",
+          "incident_count": 87,
+          "factors": {
+            "workload": 10,
+            "after_hours": 5.52,
+            "weekend_work": 0.0,
+            "incident_load": 10,
+            "response_time": 10
+          },
+          "maslach_dimensions": {
+            "emotional_exhaustion": 8.4,
+            "depersonalization": 2.0,
+            "personal_accomplishment": 3.75
+          },
+          "metrics": {
+            "incidents_per_week": 20.3,
+            "after_hours_percentage": 0.276,
+            "weekend_percentage": 0.0,
+            "avg_response_time_minutes": 1208.2,
+            "severity_distribution": {
+              "unknown": 33,
+              "sev1": 14,
+              "sev2": 32,
+              "sev0": 5,
+              "sev3": 3
+            }
+          },
+          "github_activity": {
+            "commits_count": 0,
+            "pull_requests_count": 0,
+            "reviews_count": 0,
+            "after_hours_commits": 0,
+            "weekend_commits": 0,
+            "avg_pr_size": 0,
+            "burnout_indicators": {
+              "excessive_commits": false,
+              "late_night_activity": false,
+              "weekend_work": false,
+              "large_prs": false
+            }
+          },
+          "slack_activity": {
+            "messages_sent": 0,
+            "channels_active": 1,
+            "after_hours_messages": 0,
+            "weekend_messages": 0,
+            "avg_response_time_minutes": 0,
+            "sentiment_score": 0.0,
+            "negative_messages": 0,
+            "positive_messages": 0,
+            "neutral_messages": 0,
+            "stress_indicators": 0,
+            "burnout_indicators": {
+              "excessive_messaging": false,
+              "poor_sentiment": false,
+              "late_responses": false,
+              "after_hours_activity": false,
+              "stress_indicators": false
+            }
+          },
+          "ai_insights": {},
+          "ai_risk_assessment": {
+            "overall_risk_level": "unknown",
+            "risk_score": 0,
+            "risk_factors": [
+              "Analysis error occurred"
+            ],
+            "protective_factors": []
+          },
+          "ai_recommendations": [
+            {
+              "priority": "high",
+              "category": "system",
+              "title": "Analysis Error",
+              "description": "Could not complete AI analysis. Using fallback assessment.",
+              "actions": [
+                "Contact system administrator",
+                "Review data sources"
+              ]
+            }
+          ],
+          "recommendations": [
+            "[AI] Could not complete AI analysis. Using fallback assessment."
+          ],
+          "ai_confidence": 0.0,
+          "ai_analysis_timestamp": "2025-07-15T22:41:18.275093",
+          "ai_data_sources": []
+        },
+        {
+          "user_id": "23421",
+          "user_name": "Ryan McDonald",
+          "user_email": "ryan@rootly.com",
+          "burnout_score": 5.76,
+          "risk_level": "high",
+          "incident_count": 25,
+          "factors": {
+            "workload": 7.83,
+            "after_hours": 10,
+            "weekend_work": 0.0,
+            "incident_load": 6.77,
+            "response_time": 10
+          },
+          "maslach_dimensions": {
+            "emotional_exhaustion": 8.21,
+            "depersonalization": 2.0,
+            "personal_accomplishment": 3.75
+          },
+          "metrics": {
+            "incidents_per_week": 5.83,
+            "after_hours_percentage": 0.52,
+            "weekend_percentage": 0.0,
+            "avg_response_time_minutes": 913.1,
+            "severity_distribution": {
+              "unknown": 16,
+              "sev2": 7,
+              "sev3": 1,
+              "sev1": 1
+            }
+          },
+          "github_activity": {
+            "commits_count": 0,
+            "pull_requests_count": 0,
+            "reviews_count": 0,
+            "after_hours_commits": 0,
+            "weekend_commits": 0,
+            "avg_pr_size": 0,
+            "burnout_indicators": {
+              "excessive_commits": false,
+              "late_night_activity": false,
+              "weekend_work": false,
+              "large_prs": false
+            }
+          },
+          "slack_activity": {
+            "messages_sent": 0,
+            "channels_active": 1,
+            "after_hours_messages": 0,
+            "weekend_messages": 0,
+            "avg_response_time_minutes": 0,
+            "sentiment_score": 0.0,
+            "negative_messages": 0,
+            "positive_messages": 0,
+            "neutral_messages": 0,
+            "stress_indicators": 0,
+            "burnout_indicators": {
+              "excessive_messaging": false,
+              "poor_sentiment": false,
+              "late_responses": false,
+              "after_hours_activity": false,
+              "stress_indicators": false
+            }
+          },
+          "ai_insights": {},
+          "ai_risk_assessment": {
+            "overall_risk_level": "unknown",
+            "risk_score": 0,
+            "risk_factors": [
+              "Analysis error occurred"
+            ],
+            "protective_factors": []
+          },
+          "ai_recommendations": [
+            {
+              "priority": "high",
+              "category": "system",
+              "title": "Analysis Error",
+              "description": "Could not complete AI analysis. Using fallback assessment.",
+              "actions": [
+                "Contact system administrator",
+                "Review data sources"
+              ]
+            }
+          ],
+          "recommendations": [
+            "[AI] Could not complete AI analysis. Using fallback assessment."
+          ],
+          "ai_confidence": 0.0,
+          "ai_analysis_timestamp": "2025-07-15T22:41:18.275234",
+          "ai_data_sources": []
+        },
+        {
+          "user_id": "87587",
+          "user_name": "Mark Grod",
+          "user_email": "mark@rootly.com",
+          "burnout_score": 5.39,
+          "risk_level": "high",
+          "incident_count": 95,
+          "factors": {
+            "workload": 10,
+            "after_hours": 10,
+            "weekend_work": 0.0,
+            "incident_load": 10,
+            "response_time": -0.0
+          },
+          "maslach_dimensions": {
+            "emotional_exhaustion": 7.3,
+            "depersonalization": 2.0,
+            "personal_accomplishment": 3.75
+          },
+          "metrics": {
+            "incidents_per_week": 22.17,
+            "after_hours_percentage": 0.505,
+            "weekend_percentage": 0.0,
+            "avg_response_time_minutes": -0.0,
+            "severity_distribution": {
+              "sev2": 83,
+              "sev3": 9,
+              "unknown": 3
+            }
+          },
+          "github_activity": {
+            "commits_count": 0,
+            "pull_requests_count": 0,
+            "reviews_count": 0,
+            "after_hours_commits": 0,
+            "weekend_commits": 0,
+            "avg_pr_size": 0,
+            "burnout_indicators": {
+              "excessive_commits": false,
+              "late_night_activity": false,
+              "weekend_work": false,
+              "large_prs": false
+            }
+          },
+          "slack_activity": {
+            "messages_sent": 0,
+            "channels_active": 1,
+            "after_hours_messages": 0,
+            "weekend_messages": 0,
+            "avg_response_time_minutes": 0,
+            "sentiment_score": 0.0,
+            "negative_messages": 0,
+            "positive_messages": 0,
+            "neutral_messages": 0,
+            "stress_indicators": 0,
+            "burnout_indicators": {
+              "excessive_messaging": false,
+              "poor_sentiment": false,
+              "late_responses": false,
+              "after_hours_activity": false,
+              "stress_indicators": false
+            }
+          },
+          "ai_insights": {},
+          "ai_risk_assessment": {
+            "overall_risk_level": "unknown",
+            "risk_score": 0,
+            "risk_factors": [
+              "Analysis error occurred"
+            ],
+            "protective_factors": []
+          },
+          "ai_recommendations": [
+            {
+              "priority": "high",
+              "category": "system",
+              "title": "Analysis Error",
+              "description": "Could not complete AI analysis. Using fallback assessment.",
+              "actions": [
+                "Contact system administrator",
+                "Review data sources"
+              ]
+            }
+          ],
+          "recommendations": [
+            "[AI] Could not complete AI analysis. Using fallback assessment."
+          ],
+          "ai_confidence": 0.0,
+          "ai_analysis_timestamp": "2025-07-15T22:41:18.275481",
+          "ai_data_sources": []
+        },
+        {
+          "user_id": "2381",
+          "user_name": "Quentin Rousseau",
+          "user_email": "quentin@rootly.com",
+          "burnout_score": 5.39,
+          "risk_level": "high",
+          "incident_count": 41,
+          "factors": {
+            "workload": 10,
+            "after_hours": 10,
+            "weekend_work": 0.6,
+            "incident_load": 9.68,
+            "response_time": 0.0
+          },
+          "maslach_dimensions": {
+            "emotional_exhaustion": 7.3,
+            "depersonalization": 2.0,
+            "personal_accomplishment": 3.75
+          },
+          "metrics": {
+            "incidents_per_week": 9.57,
+            "after_hours_percentage": 0.561,
+            "weekend_percentage": 0.024,
+            "avg_response_time_minutes": 0.0,
+            "severity_distribution": {
+              "unknown": 9,
+              "sev2": 3,
+              "sev0": 23,
+              "sev3": 5,
+              "sev1": 1
+            }
+          },
+          "github_activity": {
+            "commits_count": 417,
+            "pull_requests_count": 66,
+            "reviews_count": 99,
+            "after_hours_commits": 62,
+            "weekend_commits": 41,
+            "avg_pr_size": 6,
+            "burnout_indicators": {
+              "excessive_commits": true,
+              "late_night_activity": false,
+              "weekend_work": false,
+              "large_prs": false
+            }
+          },
+          "slack_activity": {
+            "messages_sent": 0,
+            "channels_active": 1,
+            "after_hours_messages": 0,
+            "weekend_messages": 0,
+            "avg_response_time_minutes": 0,
+            "sentiment_score": 0.0,
+            "negative_messages": 0,
+            "positive_messages": 0,
+            "neutral_messages": 0,
+            "stress_indicators": 0,
+            "burnout_indicators": {
+              "excessive_messaging": false,
+              "poor_sentiment": false,
+              "late_responses": false,
+              "after_hours_activity": false,
+              "stress_indicators": false
+            }
+          },
+          "ai_insights": {},
+          "ai_risk_assessment": {
+            "overall_risk_level": "unknown",
+            "risk_score": 0,
+            "risk_factors": [
+              "Analysis error occurred"
+            ],
+            "protective_factors": []
+          },
+          "ai_recommendations": [
+            {
+              "priority": "high",
+              "category": "system",
+              "title": "Analysis Error",
+              "description": "Could not complete AI analysis. Using fallback assessment.",
+              "actions": [
+                "Contact system administrator",
+                "Review data sources"
+              ]
+            }
+          ],
+          "recommendations": [
+            "[AI] Could not complete AI analysis. Using fallback assessment."
+          ],
+          "ai_confidence": 0.0,
+          "ai_analysis_timestamp": "2025-07-15T22:41:18.275689",
+          "ai_data_sources": []
+        },
+        {
+          "user_id": "9130",
+          "user_name": "Andre Yang",
+          "user_email": "andre.yang@rootly.com",
+          "burnout_score": 5.26,
+          "risk_level": "high",
+          "incident_count": 60,
+          "factors": {
+            "workload": 10,
+            "after_hours": 8.34,
+            "weekend_work": 0.0,
+            "incident_load": 10,
+            "response_time": 0.02
+          },
+          "maslach_dimensions": {
+            "emotional_exhaustion": 6.97,
+            "depersonalization": 2.0,
+            "personal_accomplishment": 3.75
+          },
+          "metrics": {
+            "incidents_per_week": 14.0,
+            "after_hours_percentage": 0.417,
+            "weekend_percentage": 0.0,
+            "avg_response_time_minutes": 0.1,
+            "severity_distribution": {
+              "unknown": 35,
+              "sev2": 15,
+              "sev1": 4,
+              "sev3": 5,
+              "sev0": 1
+            }
+          },
+          "github_activity": {
+            "commits_count": 0,
+            "pull_requests_count": 0,
+            "reviews_count": 0,
+            "after_hours_commits": 0,
+            "weekend_commits": 0,
+            "avg_pr_size": 0,
+            "burnout_indicators": {
+              "excessive_commits": false,
+              "late_night_activity": false,
+              "weekend_work": false,
+              "large_prs": false
+            }
+          },
+          "slack_activity": {
+            "messages_sent": 0,
+            "channels_active": 1,
+            "after_hours_messages": 0,
+            "weekend_messages": 0,
+            "avg_response_time_minutes": 0,
+            "sentiment_score": 0.0,
+            "negative_messages": 0,
+            "positive_messages": 0,
+            "neutral_messages": 0,
+            "stress_indicators": 0,
+            "burnout_indicators": {
+              "excessive_messaging": false,
+              "poor_sentiment": false,
+              "late_responses": false,
+              "after_hours_activity": false,
+              "stress_indicators": false
+            }
+          },
+          "ai_insights": {},
+          "ai_risk_assessment": {
+            "overall_risk_level": "unknown",
+            "risk_score": 0,
+            "risk_factors": [
+              "Analysis error occurred"
+            ],
+            "protective_factors": []
+          },
+          "ai_recommendations": [
+            {
+              "priority": "high",
+              "category": "system",
+              "title": "Analysis Error",
+              "description": "Could not complete AI analysis. Using fallback assessment.",
+              "actions": [
+                "Contact system administrator",
+                "Review data sources"
+              ]
+            }
+          ],
+          "recommendations": [
+            "[AI] Could not complete AI analysis. Using fallback assessment."
+          ],
+          "ai_confidence": 0.0,
+          "ai_analysis_timestamp": "2025-07-15T22:41:18.275932",
+          "ai_data_sources": []
+        },
+        {
+          "user_id": "38699",
+          "user_name": "Jamie Baker",
+          "user_email": "jamie@rootly.com",
+          "burnout_score": 5.24,
+          "risk_level": "high",
+          "incident_count": 451,
+          "factors": {
+            "workload": 10,
+            "after_hours": 7.98,
+            "weekend_work": 0.18,
+            "incident_load": 10,
+            "response_time": 0.0
+          },
+          "maslach_dimensions": {
+            "emotional_exhaustion": 6.9,
+            "depersonalization": 2.0,
+            "personal_accomplishment": 3.75
+          },
+          "metrics": {
+            "incidents_per_week": 105.23,
+            "after_hours_percentage": 0.399,
+            "weekend_percentage": 0.007,
+            "avg_response_time_minutes": 0.0,
+            "severity_distribution": {
+              "sev2": 283,
+              "unknown": 43,
+              "sev3": 65,
+              "sev4": 1,
+              "sev1": 29,
+              "sev0": 29,
+              "p1": 1
+            }
+          },
+          "github_activity": {
+            "commits_count": 0,
+            "pull_requests_count": 0,
+            "reviews_count": 0,
+            "after_hours_commits": 0,
+            "weekend_commits": 0,
+            "avg_pr_size": 0,
+            "burnout_indicators": {
+              "excessive_commits": false,
+              "late_night_activity": false,
+              "weekend_work": false,
+              "large_prs": false
+            }
+          },
+          "slack_activity": {
+            "messages_sent": 0,
+            "channels_active": 1,
+            "after_hours_messages": 0,
+            "weekend_messages": 0,
+            "avg_response_time_minutes": 0,
+            "sentiment_score": 0.0,
+            "negative_messages": 0,
+            "positive_messages": 0,
+            "neutral_messages": 0,
+            "stress_indicators": 0,
+            "burnout_indicators": {
+              "excessive_messaging": false,
+              "poor_sentiment": false,
+              "late_responses": false,
+              "after_hours_activity": false,
+              "stress_indicators": false
+            }
+          },
+          "ai_insights": {},
+          "ai_risk_assessment": {
+            "overall_risk_level": "unknown",
+            "risk_score": 0,
+            "risk_factors": [
+              "Analysis error occurred"
+            ],
+            "protective_factors": []
+          },
+          "ai_recommendations": [
+            {
+              "priority": "high",
+              "category": "system",
+              "title": "Analysis Error",
+              "description": "Could not complete AI analysis. Using fallback assessment.",
+              "actions": [
+                "Contact system administrator",
+                "Review data sources"
+              ]
+            }
+          ],
+          "recommendations": [
+            "[AI] Could not complete AI analysis. Using fallback assessment."
+          ],
+          "ai_confidence": 0.0,
+          "ai_analysis_timestamp": "2025-07-15T22:41:18.276176",
+          "ai_data_sources": []
+        },
+        {
+          "user_id": "3497",
+          "user_name": "JP Cheung",
+          "user_email": "jp@rootly.com",
+          "burnout_score": 5.24,
+          "risk_level": "high",
+          "incident_count": 769,
+          "factors": {
+            "workload": 10,
+            "after_hours": 7.68,
+            "weekend_work": 0.22,
+            "incident_load": 10,
+            "response_time": 0.32
+          },
+          "maslach_dimensions": {
+            "emotional_exhaustion": 6.9,
+            "depersonalization": 2.0,
+            "personal_accomplishment": 3.75
+          },
+          "metrics": {
+            "incidents_per_week": 179.43,
+            "after_hours_percentage": 0.384,
+            "weekend_percentage": 0.009,
+            "avg_response_time_minutes": 1.9,
+            "severity_distribution": {
+              "sev2": 287,
+              "unknown": 293,
+              "sev1": 133,
+              "sev0": 11,
+              "sev3": 36,
+              "major": 7,
+              "security": 2
+            }
+          },
+          "github_activity": {
+            "commits_count": 0,
+            "pull_requests_count": 0,
+            "reviews_count": 0,
+            "after_hours_commits": 0,
+            "weekend_commits": 0,
+            "avg_pr_size": 0,
+            "burnout_indicators": {
+              "excessive_commits": false,
+              "late_night_activity": false,
+              "weekend_work": false,
+              "large_prs": false
+            }
+          },
+          "slack_activity": {
+            "messages_sent": 0,
+            "channels_active": 1,
+            "after_hours_messages": 0,
+            "weekend_messages": 0,
+            "avg_response_time_minutes": 0,
+            "sentiment_score": 0.0,
+            "negative_messages": 0,
+            "positive_messages": 0,
+            "neutral_messages": 0,
+            "stress_indicators": 0,
+            "burnout_indicators": {
+              "excessive_messaging": false,
+              "poor_sentiment": false,
+              "late_responses": false,
+              "after_hours_activity": false,
+              "stress_indicators": false
+            }
+          },
+          "ai_insights": {},
+          "ai_risk_assessment": {
+            "overall_risk_level": "unknown",
+            "risk_score": 0,
+            "risk_factors": [
+              "Analysis error occurred"
+            ],
+            "protective_factors": []
+          },
+          "ai_recommendations": [
+            {
+              "priority": "high",
+              "category": "system",
+              "title": "Analysis Error",
+              "description": "Could not complete AI analysis. Using fallback assessment.",
+              "actions": [
+                "Contact system administrator",
+                "Review data sources"
+              ]
+            }
+          ],
+          "recommendations": [
+            "[AI] Could not complete AI analysis. Using fallback assessment."
+          ],
+          "ai_confidence": 0.0,
+          "ai_analysis_timestamp": "2025-07-15T22:41:18.276437",
+          "ai_data_sources": []
+        },
+        {
+          "user_id": "99334",
+          "user_name": "Kumbi Maposa",
+          "user_email": "kumbi@rootly.com",
+          "burnout_score": 5.2,
+          "risk_level": "high",
+          "incident_count": 71,
+          "factors": {
+            "workload": 10,
+            "after_hours": 7.6,
+            "weekend_work": 0.0,
+            "incident_load": 10,
+            "response_time": -0.0
+          },
+          "maslach_dimensions": {
+            "emotional_exhaustion": 6.82,
+            "depersonalization": 2.0,
+            "personal_accomplishment": 3.75
+          },
+          "metrics": {
+            "incidents_per_week": 16.57,
+            "after_hours_percentage": 0.38,
+            "weekend_percentage": 0.0,
+            "avg_response_time_minutes": -0.0,
+            "severity_distribution": {
+              "sev2": 59,
+              "unknown": 1,
+              "sev3": 11
+            }
+          },
+          "github_activity": {
+            "commits_count": 12,
+            "pull_requests_count": 0,
+            "reviews_count": 0,
+            "after_hours_commits": 1,
+            "weekend_commits": 1,
+            "avg_pr_size": 50,
+            "burnout_indicators": {
+              "excessive_commits": false,
+              "late_night_activity": false,
+              "weekend_work": false,
+              "large_prs": false
+            }
+          },
+          "slack_activity": {
+            "messages_sent": 0,
+            "channels_active": 1,
+            "after_hours_messages": 0,
+            "weekend_messages": 0,
+            "avg_response_time_minutes": 0,
+            "sentiment_score": 0.0,
+            "negative_messages": 0,
+            "positive_messages": 0,
+            "neutral_messages": 0,
+            "stress_indicators": 0,
+            "burnout_indicators": {
+              "excessive_messaging": false,
+              "poor_sentiment": false,
+              "late_responses": false,
+              "after_hours_activity": false,
+              "stress_indicators": false
+            }
+          },
+          "ai_insights": {},
+          "ai_risk_assessment": {
+            "overall_risk_level": "unknown",
+            "risk_score": 0,
+            "risk_factors": [
+              "Analysis error occurred"
+            ],
+            "protective_factors": []
+          },
+          "ai_recommendations": [
+            {
+              "priority": "high",
+              "category": "system",
+              "title": "Analysis Error",
+              "description": "Could not complete AI analysis. Using fallback assessment.",
+              "actions": [
+                "Contact system administrator",
+                "Review data sources"
+              ]
+            }
+          ],
+          "recommendations": [
+            "[AI] Could not complete AI analysis. Using fallback assessment."
+          ],
+          "ai_confidence": 0.0,
+          "ai_analysis_timestamp": "2025-07-15T22:41:18.276679",
+          "ai_data_sources": []
+        },
+        {
+          "user_id": "27965",
+          "user_name": "Alexandra Chapin",
+          "user_email": "alexandra@rootly.com",
+          "burnout_score": 4.66,
+          "risk_level": "medium",
+          "incident_count": 26,
+          "factors": {
+            "workload": 8.07,
+            "after_hours": 5.38,
+            "weekend_work": 0.0,
+            "incident_load": 7.05,
+            "response_time": 0.3
+          },
+          "maslach_dimensions": {
+            "emotional_exhaustion": 5.47,
+            "depersonalization": 2.0,
+            "personal_accomplishment": 3.75
+          },
+          "metrics": {
+            "incidents_per_week": 6.07,
+            "after_hours_percentage": 0.269,
+            "weekend_percentage": 0.0,
+            "avg_response_time_minutes": 1.8,
+            "severity_distribution": {
+              "sev1": 2,
+              "unknown": 10,
+              "sev2": 7,
+              "sev3": 7
+            }
+          },
+          "github_activity": {
+            "commits_count": 0,
+            "pull_requests_count": 0,
+            "reviews_count": 0,
+            "after_hours_commits": 0,
+            "weekend_commits": 0,
+            "avg_pr_size": 0,
+            "burnout_indicators": {
+              "excessive_commits": false,
+              "late_night_activity": false,
+              "weekend_work": false,
+              "large_prs": false
+            }
+          },
+          "slack_activity": {
+            "messages_sent": 0,
+            "channels_active": 1,
+            "after_hours_messages": 0,
+            "weekend_messages": 0,
+            "avg_response_time_minutes": 0,
+            "sentiment_score": 0.0,
+            "negative_messages": 0,
+            "positive_messages": 0,
+            "neutral_messages": 0,
+            "stress_indicators": 0,
+            "burnout_indicators": {
+              "excessive_messaging": false,
+              "poor_sentiment": false,
+              "late_responses": false,
+              "after_hours_activity": false,
+              "stress_indicators": false
+            }
+          },
+          "ai_insights": {},
+          "ai_risk_assessment": {
+            "overall_risk_level": "unknown",
+            "risk_score": 0,
+            "risk_factors": [
+              "Analysis error occurred"
+            ],
+            "protective_factors": []
+          },
+          "ai_recommendations": [
+            {
+              "priority": "high",
+              "category": "system",
+              "title": "Analysis Error",
+              "description": "Could not complete AI analysis. Using fallback assessment.",
+              "actions": [
+                "Contact system administrator",
+                "Review data sources"
+              ]
+            }
+          ],
+          "recommendations": [
+            "[AI] Could not complete AI analysis. Using fallback assessment."
+          ],
+          "ai_confidence": 0.0,
+          "ai_analysis_timestamp": "2025-07-15T22:41:18.276823",
+          "ai_data_sources": []
+        },
+        {
+          "user_id": "15741",
+          "user_name": "Dan Sadler",
+          "user_email": "dan@rootly.com",
+          "burnout_score": 4.62,
+          "risk_level": "medium",
+          "incident_count": 25,
+          "factors": {
+            "workload": 7.83,
+            "after_hours": 5.6,
+            "weekend_work": 0.0,
+            "incident_load": 6.77,
+            "response_time": 0.07
+          },
+          "maslach_dimensions": {
+            "emotional_exhaustion": 5.35,
+            "depersonalization": 2.0,
+            "personal_accomplishment": 3.75
+          },
+          "metrics": {
+            "incidents_per_week": 5.83,
+            "after_hours_percentage": 0.28,
+            "weekend_percentage": 0.0,
+            "avg_response_time_minutes": 0.4,
+            "severity_distribution": {
+              "sev0": 4,
+              "unknown": 20,
+              "sev2": 1
+            }
+          },
+          "github_activity": {
+            "commits_count": 0,
+            "pull_requests_count": 0,
+            "reviews_count": 0,
+            "after_hours_commits": 0,
+            "weekend_commits": 0,
+            "avg_pr_size": 50,
+            "burnout_indicators": {
+              "excessive_commits": false,
+              "late_night_activity": false,
+              "weekend_work": false,
+              "large_prs": false
+            }
+          },
+          "slack_activity": {
+            "messages_sent": 0,
+            "channels_active": 1,
+            "after_hours_messages": 0,
+            "weekend_messages": 0,
+            "avg_response_time_minutes": 0,
+            "sentiment_score": 0.0,
+            "negative_messages": 0,
+            "positive_messages": 0,
+            "neutral_messages": 0,
+            "stress_indicators": 0,
+            "burnout_indicators": {
+              "excessive_messaging": false,
+              "poor_sentiment": false,
+              "late_responses": false,
+              "after_hours_activity": false,
+              "stress_indicators": false
+            }
+          },
+          "ai_insights": {},
+          "ai_risk_assessment": {
+            "overall_risk_level": "unknown",
+            "risk_score": 0,
+            "risk_factors": [
+              "Analysis error occurred"
+            ],
+            "protective_factors": []
+          },
+          "ai_recommendations": [
+            {
+              "priority": "high",
+              "category": "system",
+              "title": "Analysis Error",
+              "description": "Could not complete AI analysis. Using fallback assessment.",
+              "actions": [
+                "Contact system administrator",
+                "Review data sources"
+              ]
+            }
+          ],
+          "recommendations": [
+            "[AI] Could not complete AI analysis. Using fallback assessment."
+          ],
+          "ai_confidence": 0.0,
+          "ai_analysis_timestamp": "2025-07-15T22:41:18.276961",
+          "ai_data_sources": []
+        },
+        {
+          "user_id": "25713",
+          "user_name": "Shadab Patel",
+          "user_email": "shadab@rootly.com",
+          "burnout_score": 4.39,
+          "risk_level": "medium",
+          "incident_count": 5,
+          "factors": {
+            "workload": 1.75,
+            "after_hours": 8.0,
+            "weekend_work": 0.0,
+            "incident_load": 1.17,
+            "response_time": 10
+          },
+          "maslach_dimensions": {
+            "emotional_exhaustion": 4.78,
+            "depersonalization": 2.0,
+            "personal_accomplishment": 3.75
+          },
+          "metrics": {
+            "incidents_per_week": 1.17,
+            "after_hours_percentage": 0.4,
+            "weekend_percentage": 0.0,
+            "avg_response_time_minutes": 1448.3,
+            "severity_distribution": {
+              "unknown": 4,
+              "sev2": 1
+            }
+          },
+          "github_activity": {
+            "commits_count": 0,
+            "pull_requests_count": 0,
+            "reviews_count": 0,
+            "after_hours_commits": 0,
+            "weekend_commits": 0,
+            "avg_pr_size": 0,
+            "burnout_indicators": {
+              "excessive_commits": false,
+              "late_night_activity": false,
+              "weekend_work": false,
+              "large_prs": false
+            }
+          },
+          "slack_activity": {
+            "messages_sent": 0,
+            "channels_active": 1,
+            "after_hours_messages": 0,
+            "weekend_messages": 0,
+            "avg_response_time_minutes": 0,
+            "sentiment_score": 0.0,
+            "negative_messages": 0,
+            "positive_messages": 0,
+            "neutral_messages": 0,
+            "stress_indicators": 0,
+            "burnout_indicators": {
+              "excessive_messaging": false,
+              "poor_sentiment": false,
+              "late_responses": false,
+              "after_hours_activity": false,
+              "stress_indicators": false
+            }
+          },
+          "ai_insights": {},
+          "ai_risk_assessment": {
+            "overall_risk_level": "unknown",
+            "risk_score": 0,
+            "risk_factors": [
+              "Analysis error occurred"
+            ],
+            "protective_factors": []
+          },
+          "ai_recommendations": [
+            {
+              "priority": "high",
+              "category": "system",
+              "title": "Analysis Error",
+              "description": "Could not complete AI analysis. Using fallback assessment.",
+              "actions": [
+                "Contact system administrator",
+                "Review data sources"
+              ]
+            }
+          ],
+          "recommendations": [
+            "[AI] Could not complete AI analysis. Using fallback assessment."
+          ],
+          "ai_confidence": 0.0,
+          "ai_analysis_timestamp": "2025-07-15T22:41:18.277012",
+          "ai_data_sources": []
+        },
+        {
+          "user_id": "62632",
+          "user_name": "Kayla Th",
+          "user_email": "kayla@rootly.com",
+          "burnout_score": 4.14,
+          "risk_level": "medium",
+          "incident_count": 3,
+          "factors": {
+            "workload": 1.05,
+            "after_hours": 6.66,
+            "weekend_work": 0.0,
+            "incident_load": 0.7,
+            "response_time": 10
+          },
+          "maslach_dimensions": {
+            "emotional_exhaustion": 4.16,
+            "depersonalization": 2.0,
+            "personal_accomplishment": 3.75
+          },
+          "metrics": {
+            "incidents_per_week": 0.7,
+            "after_hours_percentage": 0.333,
+            "weekend_percentage": 0.0,
+            "avg_response_time_minutes": 27053.7,
+            "severity_distribution": {
+              "unknown": 3
+            }
+          },
+          "github_activity": {
+            "commits_count": 0,
+            "pull_requests_count": 0,
+            "reviews_count": 0,
+            "after_hours_commits": 0,
+            "weekend_commits": 0,
+            "avg_pr_size": 0,
+            "burnout_indicators": {
+              "excessive_commits": false,
+              "late_night_activity": false,
+              "weekend_work": false,
+              "large_prs": false
+            }
+          },
+          "slack_activity": {
+            "messages_sent": 0,
+            "channels_active": 1,
+            "after_hours_messages": 0,
+            "weekend_messages": 0,
+            "avg_response_time_minutes": 0,
+            "sentiment_score": 0.0,
+            "negative_messages": 0,
+            "positive_messages": 0,
+            "neutral_messages": 0,
+            "stress_indicators": 0,
+            "burnout_indicators": {
+              "excessive_messaging": false,
+              "poor_sentiment": false,
+              "late_responses": false,
+              "after_hours_activity": false,
+              "stress_indicators": false
+            }
+          },
+          "ai_insights": {},
+          "ai_risk_assessment": {
+            "overall_risk_level": "unknown",
+            "risk_score": 0,
+            "risk_factors": [
+              "Analysis error occurred"
+            ],
+            "protective_factors": []
+          },
+          "ai_recommendations": [
+            {
+              "priority": "high",
+              "category": "system",
+              "title": "Analysis Error",
+              "description": "Could not complete AI analysis. Using fallback assessment.",
+              "actions": [
+                "Contact system administrator",
+                "Review data sources"
+              ]
+            }
+          ],
+          "recommendations": [
+            "[AI] Could not complete AI analysis. Using fallback assessment."
+          ],
+          "ai_confidence": 0.0,
+          "ai_analysis_timestamp": "2025-07-15T22:41:18.277052",
+          "ai_data_sources": []
+        },
+        {
+          "user_id": "23429",
+          "user_name": "Nicole Bodzewski",
+          "user_email": "nicole@rootly.com",
+          "burnout_score": 4.1,
+          "risk_level": "medium",
+          "incident_count": 14,
+          "factors": {
+            "workload": 4.69,
+            "after_hours": 7.14,
+            "weekend_work": 0.0,
+            "incident_load": 3.36,
+            "response_time": -0.0
+          },
+          "maslach_dimensions": {
+            "emotional_exhaustion": 4.07,
+            "depersonalization": 2.0,
+            "personal_accomplishment": 3.75
+          },
+          "metrics": {
+            "incidents_per_week": 3.27,
+            "after_hours_percentage": 0.357,
+            "weekend_percentage": 0.0,
+            "avg_response_time_minutes": -0.0,
+            "severity_distribution": {
+              "sev2": 6,
+              "unknown": 7,
+              "sev3": 1
+            }
+          },
+          "github_activity": {
+            "commits_count": 0,
+            "pull_requests_count": 0,
+            "reviews_count": 0,
+            "after_hours_commits": 0,
+            "weekend_commits": 0,
+            "avg_pr_size": 0,
+            "burnout_indicators": {
+              "excessive_commits": false,
+              "late_night_activity": false,
+              "weekend_work": false,
+              "large_prs": false
+            }
+          },
+          "slack_activity": {
+            "messages_sent": 0,
+            "channels_active": 1,
+            "after_hours_messages": 0,
+            "weekend_messages": 0,
+            "avg_response_time_minutes": 0,
+            "sentiment_score": 0.0,
+            "negative_messages": 0,
+            "positive_messages": 0,
+            "neutral_messages": 0,
+            "stress_indicators": 0,
+            "burnout_indicators": {
+              "excessive_messaging": false,
+              "poor_sentiment": false,
+              "late_responses": false,
+              "after_hours_activity": false,
+              "stress_indicators": false
+            }
+          },
+          "ai_insights": {},
+          "ai_risk_assessment": {
+            "overall_risk_level": "unknown",
+            "risk_score": 0,
+            "risk_factors": [
+              "Analysis error occurred"
+            ],
+            "protective_factors": []
+          },
+          "ai_recommendations": [
+            {
+              "priority": "high",
+              "category": "system",
+              "title": "Analysis Error",
+              "description": "Could not complete AI analysis. Using fallback assessment.",
+              "actions": [
+                "Contact system administrator",
+                "Review data sources"
+              ]
+            }
+          ],
+          "recommendations": [
+            "[AI] Could not complete AI analysis. Using fallback assessment."
+          ],
+          "ai_confidence": 0.0,
+          "ai_analysis_timestamp": "2025-07-15T22:41:18.277138",
+          "ai_data_sources": []
+        },
+        {
+          "user_id": "19241",
+          "user_name": "John (Ioannis) tzikas",
+          "user_email": "john@rootly.com",
+          "burnout_score": 3.68,
+          "risk_level": "medium",
+          "incident_count": 4,
+          "factors": {
+            "workload": 1.4,
+            "after_hours": 10,
+            "weekend_work": 0.0,
+            "incident_load": 0.93,
+            "response_time": -0.0
+          },
+          "maslach_dimensions": {
+            "emotional_exhaustion": 3.0,
+            "depersonalization": 2.0,
+            "personal_accomplishment": 3.75
+          },
+          "metrics": {
+            "incidents_per_week": 0.93,
+            "after_hours_percentage": 0.75,
+            "weekend_percentage": 0.0,
+            "avg_response_time_minutes": -0.0,
+            "severity_distribution": {
+              "sev0": 3,
+              "sev1": 1
+            }
+          },
+          "github_activity": {
+            "commits_count": 0,
+            "pull_requests_count": 0,
+            "reviews_count": 0,
+            "after_hours_commits": 0,
+            "weekend_commits": 0,
+            "avg_pr_size": 0,
+            "burnout_indicators": {
+              "excessive_commits": false,
+              "late_night_activity": false,
+              "weekend_work": false,
+              "large_prs": false
+            }
+          },
+          "slack_activity": {
+            "messages_sent": 0,
+            "channels_active": 1,
+            "after_hours_messages": 0,
+            "weekend_messages": 0,
+            "avg_response_time_minutes": 0,
+            "sentiment_score": 0.0,
+            "negative_messages": 0,
+            "positive_messages": 0,
+            "neutral_messages": 0,
+            "stress_indicators": 0,
+            "burnout_indicators": {
+              "excessive_messaging": false,
+              "poor_sentiment": false,
+              "late_responses": false,
+              "after_hours_activity": false,
+              "stress_indicators": false
+            }
+          },
+          "ai_insights": {},
+          "ai_risk_assessment": {
+            "overall_risk_level": "unknown",
+            "risk_score": 0,
+            "risk_factors": [
+              "Analysis error occurred"
+            ],
+            "protective_factors": []
+          },
+          "ai_recommendations": [
+            {
+              "priority": "high",
+              "category": "system",
+              "title": "Analysis Error",
+              "description": "Could not complete AI analysis. Using fallback assessment.",
+              "actions": [
+                "Contact system administrator",
+                "Review data sources"
+              ]
+            }
+          ],
+          "recommendations": [
+            "[AI] Could not complete AI analysis. Using fallback assessment."
+          ],
+          "ai_confidence": 0.0,
+          "ai_analysis_timestamp": "2025-07-15T22:41:18.277182",
+          "ai_data_sources": []
+        },
+        {
+          "user_id": "29995",
+          "user_name": "Katsiaryna Rabtsava",
+          "user_email": "kate@rootly.com",
+          "burnout_score": 3.59,
+          "risk_level": "medium",
+          "incident_count": 5,
+          "factors": {
+            "workload": 1.75,
+            "after_hours": 8.0,
+            "weekend_work": 0.0,
+            "incident_load": 1.17,
+            "response_time": -0.0
+          },
+          "maslach_dimensions": {
+            "emotional_exhaustion": 2.78,
+            "depersonalization": 2.0,
+            "personal_accomplishment": 3.75
+          },
+          "metrics": {
+            "incidents_per_week": 1.17,
+            "after_hours_percentage": 0.4,
+            "weekend_percentage": 0.0,
+            "avg_response_time_minutes": -0.0,
+            "severity_distribution": {
+              "unknown": 3,
+              "sev2": 2
+            }
+          },
+          "github_activity": {
+            "commits_count": 0,
+            "pull_requests_count": 0,
+            "reviews_count": 0,
+            "after_hours_commits": 0,
+            "weekend_commits": 0,
+            "avg_pr_size": 0,
+            "burnout_indicators": {
+              "excessive_commits": false,
+              "late_night_activity": false,
+              "weekend_work": false,
+              "large_prs": false
+            }
+          },
+          "slack_activity": {
+            "messages_sent": 0,
+            "channels_active": 1,
+            "after_hours_messages": 0,
+            "weekend_messages": 0,
+            "avg_response_time_minutes": 0,
+            "sentiment_score": 0.0,
+            "negative_messages": 0,
+            "positive_messages": 0,
+            "neutral_messages": 0,
+            "stress_indicators": 0,
+            "burnout_indicators": {
+              "excessive_messaging": false,
+              "poor_sentiment": false,
+              "late_responses": false,
+              "after_hours_activity": false,
+              "stress_indicators": false
+            }
+          },
+          "ai_insights": {},
+          "ai_risk_assessment": {
+            "overall_risk_level": "unknown",
+            "risk_score": 0,
+            "risk_factors": [
+              "Analysis error occurred"
+            ],
+            "protective_factors": []
+          },
+          "ai_recommendations": [
+            {
+              "priority": "high",
+              "category": "system",
+              "title": "Analysis Error",
+              "description": "Could not complete AI analysis. Using fallback assessment.",
+              "actions": [
+                "Contact system administrator",
+                "Review data sources"
+              ]
+            }
+          ],
+          "recommendations": [
+            "[AI] Could not complete AI analysis. Using fallback assessment."
+          ],
+          "ai_confidence": 0.0,
+          "ai_analysis_timestamp": "2025-07-15T22:41:18.277230",
+          "ai_data_sources": []
+        },
+        {
+          "user_id": "94178",
+          "user_name": "Gideon Lapshun",
+          "user_email": "gideon@rootly.com",
+          "burnout_score": 3.56,
+          "risk_level": "medium",
+          "incident_count": 8,
+          "factors": {
+            "workload": 2.81,
+            "after_hours": 5.0,
+            "weekend_work": 0.0,
+            "incident_load": 1.87,
+            "response_time": -0.0
+          },
+          "maslach_dimensions": {
+            "emotional_exhaustion": 2.7,
+            "depersonalization": 2.0,
+            "personal_accomplishment": 3.75
+          },
+          "metrics": {
+            "incidents_per_week": 1.87,
+            "after_hours_percentage": 0.25,
+            "weekend_percentage": 0.0,
+            "avg_response_time_minutes": -0.0,
+            "severity_distribution": {
+              "unknown": 8
+            }
+          },
+          "github_activity": {
+            "commits_count": 3,
+            "pull_requests_count": 3,
+            "reviews_count": 4,
+            "after_hours_commits": 0,
+            "weekend_commits": 0,
+            "avg_pr_size": 1,
+            "burnout_indicators": {
+              "excessive_commits": false,
+              "late_night_activity": false,
+              "weekend_work": false,
+              "large_prs": false
+            }
+          },
+          "slack_activity": {
+            "messages_sent": 0,
+            "channels_active": 1,
+            "after_hours_messages": 0,
+            "weekend_messages": 0,
+            "avg_response_time_minutes": 0,
+            "sentiment_score": 0.0,
+            "negative_messages": 0,
+            "positive_messages": 0,
+            "neutral_messages": 0,
+            "stress_indicators": 0,
+            "burnout_indicators": {
+              "excessive_messaging": false,
+              "poor_sentiment": false,
+              "late_responses": false,
+              "after_hours_activity": false,
+              "stress_indicators": false
+            }
+          },
+          "ai_insights": {},
+          "ai_risk_assessment": {
+            "overall_risk_level": "unknown",
+            "risk_score": 0,
+            "risk_factors": [
+              "Analysis error occurred"
+            ],
+            "protective_factors": []
+          },
+          "ai_recommendations": [
+            {
+              "priority": "high",
+              "category": "system",
+              "title": "Analysis Error",
+              "description": "Could not complete AI analysis. Using fallback assessment.",
+              "actions": [
+                "Contact system administrator",
+                "Review data sources"
+              ]
+            }
+          ],
+          "recommendations": [
+            "[AI] Could not complete AI analysis. Using fallback assessment."
+          ],
+          "ai_confidence": 0.0,
+          "ai_analysis_timestamp": "2025-07-15T22:41:18.277294",
+          "ai_data_sources": []
+        },
+        {
+          "user_id": "7341",
+          "user_name": "Weihan Li",
+          "user_email": "weihan@rootly.com",
+          "burnout_score": 3.22,
+          "risk_level": "low",
+          "incident_count": 9,
+          "factors": {
+            "workload": 3.13,
+            "after_hours": 0.0,
+            "weekend_work": 0.0,
+            "incident_load": 2.1,
+            "response_time": -0.0
+          },
+          "maslach_dimensions": {
+            "emotional_exhaustion": 1.87,
+            "depersonalization": 2.0,
+            "personal_accomplishment": 3.75
+          },
+          "metrics": {
+            "incidents_per_week": 2.1,
+            "after_hours_percentage": 0.0,
+            "weekend_percentage": 0.0,
+            "avg_response_time_minutes": -0.0,
+            "severity_distribution": {
+              "sev0": 5,
+              "sev1": 1,
+              "unknown": 3
+            }
+          },
+          "github_activity": {
+            "commits_count": 110,
+            "pull_requests_count": 35,
+            "reviews_count": 52,
+            "after_hours_commits": 16,
+            "weekend_commits": 11,
+            "avg_pr_size": 3,
+            "burnout_indicators": {
+              "excessive_commits": true,
+              "late_night_activity": false,
+              "weekend_work": false,
+              "large_prs": false
+            }
+          },
+          "slack_activity": {
+            "messages_sent": 2,
+            "channels_active": 1,
+            "after_hours_messages": 0,
+            "weekend_messages": 0,
+            "avg_response_time_minutes": 0,
+            "sentiment_score": 0.292,
+            "negative_messages": 0,
+            "positive_messages": 2,
+            "neutral_messages": 0,
+            "stress_indicators": 2,
+            "burnout_indicators": {
+              "excessive_messaging": false,
+              "poor_sentiment": false,
+              "late_responses": false,
+              "after_hours_activity": false,
+              "stress_indicators": true
+            }
+          },
+          "ai_insights": {},
+          "ai_risk_assessment": {
+            "overall_risk_level": "unknown",
+            "risk_score": 0,
+            "risk_factors": [
+              "Analysis error occurred"
+            ],
+            "protective_factors": []
+          },
+          "ai_recommendations": [
+            {
+              "priority": "high",
+              "category": "system",
+              "title": "Analysis Error",
+              "description": "Could not complete AI analysis. Using fallback assessment.",
+              "actions": [
+                "Contact system administrator",
+                "Review data sources"
+              ]
+            }
+          ],
+          "recommendations": [
+            "[AI] Could not complete AI analysis. Using fallback assessment."
+          ],
+          "ai_confidence": 0.0,
+          "ai_analysis_timestamp": "2025-07-15T22:41:18.277361",
+          "ai_data_sources": []
+        },
+        {
+          "user_id": "56653",
+          "user_name": "Darren Chu",
+          "user_email": "darren@rootly.com",
+          "burnout_score": 2.66,
+          "risk_level": "low",
+          "incident_count": 1,
+          "factors": {
+            "workload": 0.35,
+            "after_hours": 0.0,
+            "weekend_work": 0.0,
+            "incident_load": 0.23,
+            "response_time": -0.0
+          },
+          "maslach_dimensions": {
+            "emotional_exhaustion": 0.47,
+            "depersonalization": 2.0,
+            "personal_accomplishment": 3.75
+          },
+          "metrics": {
+            "incidents_per_week": 0.23,
+            "after_hours_percentage": 0.0,
+            "weekend_percentage": 0.0,
+            "avg_response_time_minutes": -0.0,
+            "severity_distribution": {
+              "sev1": 1
+            }
+          },
+          "github_activity": {
+            "commits_count": 0,
+            "pull_requests_count": 0,
+            "reviews_count": 0,
+            "after_hours_commits": 0,
+            "weekend_commits": 0,
+            "avg_pr_size": 0,
+            "burnout_indicators": {
+              "excessive_commits": false,
+              "late_night_activity": false,
+              "weekend_work": false,
+              "large_prs": false
+            }
+          },
+          "slack_activity": {
+            "messages_sent": 0,
+            "channels_active": 1,
+            "after_hours_messages": 0,
+            "weekend_messages": 0,
+            "avg_response_time_minutes": 0,
+            "sentiment_score": 0.0,
+            "negative_messages": 0,
+            "positive_messages": 0,
+            "neutral_messages": 0,
+            "stress_indicators": 0,
+            "burnout_indicators": {
+              "excessive_messaging": false,
+              "poor_sentiment": false,
+              "late_responses": false,
+              "after_hours_activity": false,
+              "stress_indicators": false
+            }
+          },
+          "ai_insights": {},
+          "ai_risk_assessment": {
+            "overall_risk_level": "unknown",
+            "risk_score": 0,
+            "risk_factors": [
+              "Analysis error occurred"
+            ],
+            "protective_factors": []
+          },
+          "ai_recommendations": [
+            {
+              "priority": "high",
+              "category": "system",
+              "title": "Analysis Error",
+              "description": "Could not complete AI analysis. Using fallback assessment.",
+              "actions": [
+                "Contact system administrator",
+                "Review data sources"
+              ]
+            }
+          ],
+          "recommendations": [
+            "[AI] Could not complete AI analysis. Using fallback assessment."
+          ],
+          "ai_confidence": 0.0,
+          "ai_analysis_timestamp": "2025-07-15T22:41:18.277393",
+          "ai_data_sources": []
+        },
+        {
+          "user_id": "39601",
+          "user_name": "Ibrahim El Chami",
+          "user_email": "ibrahim@rootly.com",
+          "burnout_score": 2.66,
+          "risk_level": "low",
+          "incident_count": 1,
+          "factors": {
+            "workload": 0.35,
+            "after_hours": 0.0,
+            "weekend_work": 0.0,
+            "incident_load": 0.23,
+            "response_time": -0.0
+          },
+          "maslach_dimensions": {
+            "emotional_exhaustion": 0.47,
+            "depersonalization": 2.0,
+            "personal_accomplishment": 3.75
+          },
+          "metrics": {
+            "incidents_per_week": 0.23,
+            "after_hours_percentage": 0.0,
+            "weekend_percentage": 0.0,
+            "avg_response_time_minutes": -0.0,
+            "severity_distribution": {
+              "unknown": 1
+            }
+          },
+          "github_activity": {
+            "commits_count": 0,
+            "pull_requests_count": 0,
+            "reviews_count": 0,
+            "after_hours_commits": 0,
+            "weekend_commits": 0,
+            "avg_pr_size": 50,
+            "burnout_indicators": {
+              "excessive_commits": false,
+              "late_night_activity": false,
+              "weekend_work": false,
+              "large_prs": false
+            }
+          },
+          "slack_activity": {
+            "messages_sent": 0,
+            "channels_active": 1,
+            "after_hours_messages": 0,
+            "weekend_messages": 0,
+            "avg_response_time_minutes": 0,
+            "sentiment_score": 0.0,
+            "negative_messages": 0,
+            "positive_messages": 0,
+            "neutral_messages": 0,
+            "stress_indicators": 0,
+            "burnout_indicators": {
+              "excessive_messaging": false,
+              "poor_sentiment": false,
+              "late_responses": false,
+              "after_hours_activity": false,
+              "stress_indicators": false
+            }
+          },
+          "ai_insights": {},
+          "ai_risk_assessment": {
+            "overall_risk_level": "unknown",
+            "risk_score": 0,
+            "risk_factors": [
+              "Analysis error occurred"
+            ],
+            "protective_factors": []
+          },
+          "ai_recommendations": [
+            {
+              "priority": "high",
+              "category": "system",
+              "title": "Analysis Error",
+              "description": "Could not complete AI analysis. Using fallback assessment.",
+              "actions": [
+                "Contact system administrator",
+                "Review data sources"
+              ]
+            }
+          ],
+          "recommendations": [
+            "[AI] Could not complete AI analysis. Using fallback assessment."
+          ],
+          "ai_confidence": 0.0,
+          "ai_analysis_timestamp": "2025-07-15T22:41:18.277423",
+          "ai_data_sources": []
+        },
+        {
+          "user_id": "110231",
+          "user_name": "Nick Meisenheimer",
+          "user_email": "nicholas@rootly.com",
+          "burnout_score": 0,
+          "risk_level": "low",
+          "incident_count": 0,
+          "factors": {
+            "workload": 0,
+            "after_hours": 0,
+            "weekend_work": 0,
+            "incident_load": 0,
+            "response_time": 0
+          },
+          "maslach_dimensions": {
+            "emotional_exhaustion": 0,
+            "depersonalization": 0,
+            "personal_accomplishment": 10
+          },
+          "metrics": {
+            "incidents_per_week": 0,
+            "after_hours_percentage": 0,
+            "weekend_percentage": 0,
+            "avg_response_time_minutes": 0,
+            "severity_distribution": {}
+          },
+          "ai_insights": {
+            "workload": {
+              "workload_status": "sustainable",
+              "intensity_score": 0.0,
+              "metrics": {
+                "incident_count": 0,
+                "incidents_per_day": 0,
+                "critical_incident_count": 0,
+                "critical_incident_rate": 0,
+                "avg_response_time": 0,
+                "response_pressure": "unknown",
+                "commit_count": 0,
+                "commits_per_day": 0,
+                "pr_count": 0,
+                "prs_per_week": 0,
+                "large_commit_rate": 0,
+                "large_pr_rate": 0,
+                "message_count": 0,
+                "messages_per_day": 0,
+                "after_hours_rate": 0,
+                "weekend_rate": 0,
+                "overall_intensity": 0.0
+              },
+              "sustainability_indicators": [],
+              "recommendations": [
+                "Workload appears sustainable - continue monitoring trends"
+              ],
+              "comparison_to_team": "No team data available"
+            },
+            "patterns": {},
+            "sentiment": {}
+          },
+          "ai_risk_assessment": {
+            "overall_risk_level": "low",
+            "risk_score": 0.0,
+            "risk_factors": [],
+            "protective_factors": [
+              "Sustainable workload levels"
+            ],
+            "data_sources_contributing": []
+          },
+          "ai_recommendations": [
+            {
+              "priority": "medium",
+              "category": "workload_management",
+              "title": "Workload Optimization",
+              "description": "Workload appears sustainable - continue monitoring trends",
+              "actions": [
+                "Review current workload distribution",
+                "Identify delegation opportunities",
+                "Prioritize high-impact activities"
+              ]
+            },
+            {
+              "priority": "low",
+              "category": "insights",
+              "title": "Multi-Source Analysis Available",
+              "description": "Comprehensive analysis across 2 data sources provides high-confidence insights",
+              "actions": [
+                "Leverage integrated insights for team planning",
+                "Use patterns for proactive burnout prevention",
+                "Consider this analysis model for other team members"
+              ]
+            }
+          ],
+          "ai_confidence": 0.6,
+          "ai_analysis_timestamp": "2025-07-15T22:41:18.277431",
+          "ai_data_sources": [
+            "github",
+            "slack"
+          ]
+        },
+        {
+          "user_id": "109673",
+          "user_name": "Spencer Cheng",
+          "user_email": "spencer.cheng@rootly.com",
+          "burnout_score": 0,
+          "risk_level": "low",
+          "incident_count": 0,
+          "factors": {
+            "workload": 0,
+            "after_hours": 0,
+            "weekend_work": 0,
+            "incident_load": 0,
+            "response_time": 0
+          },
+          "maslach_dimensions": {
+            "emotional_exhaustion": 0,
+            "depersonalization": 0,
+            "personal_accomplishment": 10
+          },
+          "metrics": {
+            "incidents_per_week": 0,
+            "after_hours_percentage": 0,
+            "weekend_percentage": 0,
+            "avg_response_time_minutes": 0,
+            "severity_distribution": {}
+          },
+          "ai_insights": {
+            "workload": {
+              "workload_status": "sustainable",
+              "intensity_score": 0.0,
+              "metrics": {
+                "incident_count": 0,
+                "incidents_per_day": 0,
+                "critical_incident_count": 0,
+                "critical_incident_rate": 0,
+                "avg_response_time": 0,
+                "response_pressure": "unknown",
+                "commit_count": 0,
+                "commits_per_day": 0,
+                "pr_count": 0,
+                "prs_per_week": 0,
+                "large_commit_rate": 0,
+                "large_pr_rate": 0,
+                "message_count": 0,
+                "messages_per_day": 0,
+                "after_hours_rate": 0,
+                "weekend_rate": 0,
+                "overall_intensity": 0.0
+              },
+              "sustainability_indicators": [],
+              "recommendations": [
+                "Workload appears sustainable - continue monitoring trends"
+              ],
+              "comparison_to_team": "No team data available"
+            },
+            "patterns": {},
+            "sentiment": {}
+          },
+          "ai_risk_assessment": {
+            "overall_risk_level": "low",
+            "risk_score": 0.0,
+            "risk_factors": [],
+            "protective_factors": [
+              "Sustainable workload levels"
+            ],
+            "data_sources_contributing": []
+          },
+          "ai_recommendations": [
+            {
+              "priority": "medium",
+              "category": "workload_management",
+              "title": "Workload Optimization",
+              "description": "Workload appears sustainable - continue monitoring trends",
+              "actions": [
+                "Review current workload distribution",
+                "Identify delegation opportunities",
+                "Prioritize high-impact activities"
+              ]
+            },
+            {
+              "priority": "low",
+              "category": "insights",
+              "title": "Multi-Source Analysis Available",
+              "description": "Comprehensive analysis across 2 data sources provides high-confidence insights",
+              "actions": [
+                "Leverage integrated insights for team planning",
+                "Use patterns for proactive burnout prevention",
+                "Consider this analysis model for other team members"
+              ]
+            }
+          ],
+          "ai_confidence": 0.6,
+          "ai_analysis_timestamp": "2025-07-15T22:41:18.277513",
+          "ai_data_sources": [
+            "github",
+            "slack"
+          ]
+        },
+        {
+          "user_id": "88090",
+          "user_name": "Sarah Crowe",
+          "user_email": "sarah@rootly.com",
+          "burnout_score": 0,
+          "risk_level": "low",
+          "incident_count": 0,
+          "factors": {
+            "workload": 0,
+            "after_hours": 0,
+            "weekend_work": 0,
+            "incident_load": 0,
+            "response_time": 0
+          },
+          "maslach_dimensions": {
+            "emotional_exhaustion": 0,
+            "depersonalization": 0,
+            "personal_accomplishment": 10
+          },
+          "metrics": {
+            "incidents_per_week": 0,
+            "after_hours_percentage": 0,
+            "weekend_percentage": 0,
+            "avg_response_time_minutes": 0,
+            "severity_distribution": {}
+          },
+          "ai_insights": {
+            "workload": {
+              "workload_status": "sustainable",
+              "intensity_score": 0.0,
+              "metrics": {
+                "incident_count": 0,
+                "incidents_per_day": 0,
+                "critical_incident_count": 0,
+                "critical_incident_rate": 0,
+                "avg_response_time": 0,
+                "response_pressure": "unknown",
+                "commit_count": 0,
+                "commits_per_day": 0,
+                "pr_count": 0,
+                "prs_per_week": 0,
+                "large_commit_rate": 0,
+                "large_pr_rate": 0,
+                "message_count": 0,
+                "messages_per_day": 0,
+                "after_hours_rate": 0,
+                "weekend_rate": 0,
+                "overall_intensity": 0.0
+              },
+              "sustainability_indicators": [],
+              "recommendations": [
+                "Workload appears sustainable - continue monitoring trends"
+              ],
+              "comparison_to_team": "No team data available"
+            },
+            "patterns": {},
+            "sentiment": {}
+          },
+          "ai_risk_assessment": {
+            "overall_risk_level": "low",
+            "risk_score": 0.0,
+            "risk_factors": [],
+            "protective_factors": [
+              "Sustainable workload levels"
+            ],
+            "data_sources_contributing": []
+          },
+          "ai_recommendations": [
+            {
+              "priority": "medium",
+              "category": "workload_management",
+              "title": "Workload Optimization",
+              "description": "Workload appears sustainable - continue monitoring trends",
+              "actions": [
+                "Review current workload distribution",
+                "Identify delegation opportunities",
+                "Prioritize high-impact activities"
+              ]
+            },
+            {
+              "priority": "low",
+              "category": "insights",
+              "title": "Multi-Source Analysis Available",
+              "description": "Comprehensive analysis across 2 data sources provides high-confidence insights",
+              "actions": [
+                "Leverage integrated insights for team planning",
+                "Use patterns for proactive burnout prevention",
+                "Consider this analysis model for other team members"
+              ]
+            }
+          ],
+          "ai_confidence": 0.6,
+          "ai_analysis_timestamp": "2025-07-15T22:41:18.277535",
+          "ai_data_sources": [
+            "github",
+            "slack"
+          ]
+        },
+        {
+          "user_id": "87194",
+          "user_name": "Jeba Singh Emmanuel",
+          "user_email": "jeba.emmanuel@rootly.com",
+          "burnout_score": 0,
+          "risk_level": "low",
+          "incident_count": 0,
+          "factors": {
+            "workload": 0,
+            "after_hours": 0,
+            "weekend_work": 0,
+            "incident_load": 0,
+            "response_time": 0
+          },
+          "maslach_dimensions": {
+            "emotional_exhaustion": 0,
+            "depersonalization": 0,
+            "personal_accomplishment": 10
+          },
+          "metrics": {
+            "incidents_per_week": 0,
+            "after_hours_percentage": 0,
+            "weekend_percentage": 0,
+            "avg_response_time_minutes": 0,
+            "severity_distribution": {}
+          },
+          "ai_insights": {
+            "workload": {
+              "workload_status": "sustainable",
+              "intensity_score": 0.0,
+              "metrics": {
+                "incident_count": 0,
+                "incidents_per_day": 0,
+                "critical_incident_count": 0,
+                "critical_incident_rate": 0,
+                "avg_response_time": 0,
+                "response_pressure": "unknown",
+                "commit_count": 0,
+                "commits_per_day": 0,
+                "pr_count": 0,
+                "prs_per_week": 0,
+                "large_commit_rate": 0,
+                "large_pr_rate": 0,
+                "message_count": 0,
+                "messages_per_day": 0,
+                "after_hours_rate": 0,
+                "weekend_rate": 0,
+                "overall_intensity": 0.0
+              },
+              "sustainability_indicators": [],
+              "recommendations": [
+                "Workload appears sustainable - continue monitoring trends"
+              ],
+              "comparison_to_team": "No team data available"
+            },
+            "patterns": {},
+            "sentiment": {}
+          },
+          "ai_risk_assessment": {
+            "overall_risk_level": "low",
+            "risk_score": 0.0,
+            "risk_factors": [],
+            "protective_factors": [
+              "Sustainable workload levels"
+            ],
+            "data_sources_contributing": []
+          },
+          "ai_recommendations": [
+            {
+              "priority": "medium",
+              "category": "workload_management",
+              "title": "Workload Optimization",
+              "description": "Workload appears sustainable - continue monitoring trends",
+              "actions": [
+                "Review current workload distribution",
+                "Identify delegation opportunities",
+                "Prioritize high-impact activities"
+              ]
+            },
+            {
+              "priority": "low",
+              "category": "insights",
+              "title": "Multi-Source Analysis Available",
+              "description": "Comprehensive analysis across 2 data sources provides high-confidence insights",
+              "actions": [
+                "Leverage integrated insights for team planning",
+                "Use patterns for proactive burnout prevention",
+                "Consider this analysis model for other team members"
+              ]
+            }
+          ],
+          "ai_confidence": 0.6,
+          "ai_analysis_timestamp": "2025-07-15T22:41:18.277554",
+          "ai_data_sources": [
+            "github",
+            "slack"
+          ]
+        },
+        {
+          "user_id": "83940",
+          "user_name": "Sylvain Kalache",
+          "user_email": "sylvain@rootly.com",
+          "burnout_score": 0,
+          "risk_level": "low",
+          "incident_count": 0,
+          "factors": {
+            "workload": 0,
+            "after_hours": 0,
+            "weekend_work": 0,
+            "incident_load": 0,
+            "response_time": 0
+          },
+          "maslach_dimensions": {
+            "emotional_exhaustion": 0,
+            "depersonalization": 0,
+            "personal_accomplishment": 10
+          },
+          "metrics": {
+            "incidents_per_week": 0,
+            "after_hours_percentage": 0,
+            "weekend_percentage": 0,
+            "avg_response_time_minutes": 0,
+            "severity_distribution": {}
+          },
+          "ai_insights": {
+            "workload": {
+              "workload_status": "sustainable",
+              "intensity_score": 0.0,
+              "metrics": {
+                "incident_count": 0,
+                "incidents_per_day": 0,
+                "critical_incident_count": 0,
+                "critical_incident_rate": 0,
+                "avg_response_time": 0,
+                "response_pressure": "unknown",
+                "commit_count": 0,
+                "commits_per_day": 0,
+                "pr_count": 0,
+                "prs_per_week": 0,
+                "large_commit_rate": 0,
+                "large_pr_rate": 0,
+                "message_count": 0,
+                "messages_per_day": 0,
+                "after_hours_rate": 0,
+                "weekend_rate": 0,
+                "overall_intensity": 0.0
+              },
+              "sustainability_indicators": [],
+              "recommendations": [
+                "Workload appears sustainable - continue monitoring trends"
+              ],
+              "comparison_to_team": "No team data available"
+            },
+            "patterns": {},
+            "sentiment": {}
+          },
+          "ai_risk_assessment": {
+            "overall_risk_level": "low",
+            "risk_score": 0.0,
+            "risk_factors": [],
+            "protective_factors": [
+              "Sustainable workload levels"
+            ],
+            "data_sources_contributing": []
+          },
+          "ai_recommendations": [
+            {
+              "priority": "medium",
+              "category": "workload_management",
+              "title": "Workload Optimization",
+              "description": "Workload appears sustainable - continue monitoring trends",
+              "actions": [
+                "Review current workload distribution",
+                "Identify delegation opportunities",
+                "Prioritize high-impact activities"
+              ]
+            },
+            {
+              "priority": "low",
+              "category": "insights",
+              "title": "Multi-Source Analysis Available",
+              "description": "Comprehensive analysis across 2 data sources provides high-confidence insights",
+              "actions": [
+                "Leverage integrated insights for team planning",
+                "Use patterns for proactive burnout prevention",
+                "Consider this analysis model for other team members"
+              ]
+            }
+          ],
+          "ai_confidence": 0.6,
+          "ai_analysis_timestamp": "2025-07-15T22:41:18.277570",
+          "ai_data_sources": [
+            "github",
+            "slack"
+          ]
+        },
+        {
+          "user_id": "80824",
+          "user_name": "Adrien Maret",
+          "user_email": "adrien@rootly.com",
+          "burnout_score": 0,
+          "risk_level": "low",
+          "incident_count": 0,
+          "factors": {
+            "workload": 0,
+            "after_hours": 0,
+            "weekend_work": 0,
+            "incident_load": 0,
+            "response_time": 0
+          },
+          "maslach_dimensions": {
+            "emotional_exhaustion": 0,
+            "depersonalization": 0,
+            "personal_accomplishment": 10
+          },
+          "metrics": {
+            "incidents_per_week": 0,
+            "after_hours_percentage": 0,
+            "weekend_percentage": 0,
+            "avg_response_time_minutes": 0,
+            "severity_distribution": {}
+          },
+          "ai_insights": {
+            "workload": {
+              "workload_status": "sustainable",
+              "intensity_score": 0.0,
+              "metrics": {
+                "incident_count": 0,
+                "incidents_per_day": 0,
+                "critical_incident_count": 0,
+                "critical_incident_rate": 0,
+                "avg_response_time": 0,
+                "response_pressure": "unknown",
+                "commit_count": 0,
+                "commits_per_day": 0,
+                "pr_count": 0,
+                "prs_per_week": 0,
+                "large_commit_rate": 0,
+                "large_pr_rate": 0,
+                "message_count": 0,
+                "messages_per_day": 0,
+                "after_hours_rate": 0,
+                "weekend_rate": 0,
+                "overall_intensity": 0.0
+              },
+              "sustainability_indicators": [],
+              "recommendations": [
+                "Workload appears sustainable - continue monitoring trends"
+              ],
+              "comparison_to_team": "No team data available"
+            },
+            "patterns": {},
+            "sentiment": {}
+          },
+          "ai_risk_assessment": {
+            "overall_risk_level": "low",
+            "risk_score": 0.0,
+            "risk_factors": [],
+            "protective_factors": [
+              "Sustainable workload levels"
+            ],
+            "data_sources_contributing": []
+          },
+          "ai_recommendations": [
+            {
+              "priority": "medium",
+              "category": "workload_management",
+              "title": "Workload Optimization",
+              "description": "Workload appears sustainable - continue monitoring trends",
+              "actions": [
+                "Review current workload distribution",
+                "Identify delegation opportunities",
+                "Prioritize high-impact activities"
+              ]
+            },
+            {
+              "priority": "low",
+              "category": "insights",
+              "title": "Multi-Source Analysis Available",
+              "description": "Comprehensive analysis across 2 data sources provides high-confidence insights",
+              "actions": [
+                "Leverage integrated insights for team planning",
+                "Use patterns for proactive burnout prevention",
+                "Consider this analysis model for other team members"
+              ]
+            }
+          ],
+          "ai_confidence": 0.6,
+          "ai_analysis_timestamp": "2025-07-15T22:41:18.277587",
+          "ai_data_sources": [
+            "github",
+            "slack"
+          ]
+        },
+        {
+          "user_id": "79674",
+          "user_name": "Ash Dehghan",
+          "user_email": "ash@rootly.com",
+          "burnout_score": 0,
+          "risk_level": "low",
+          "incident_count": 0,
+          "factors": {
+            "workload": 0,
+            "after_hours": 0,
+            "weekend_work": 0,
+            "incident_load": 0,
+            "response_time": 0
+          },
+          "maslach_dimensions": {
+            "emotional_exhaustion": 0,
+            "depersonalization": 0,
+            "personal_accomplishment": 10
+          },
+          "metrics": {
+            "incidents_per_week": 0,
+            "after_hours_percentage": 0,
+            "weekend_percentage": 0,
+            "avg_response_time_minutes": 0,
+            "severity_distribution": {}
+          },
+          "ai_insights": {
+            "workload": {
+              "workload_status": "sustainable",
+              "intensity_score": 0.0,
+              "metrics": {
+                "incident_count": 0,
+                "incidents_per_day": 0,
+                "critical_incident_count": 0,
+                "critical_incident_rate": 0,
+                "avg_response_time": 0,
+                "response_pressure": "unknown",
+                "commit_count": 0,
+                "commits_per_day": 0,
+                "pr_count": 0,
+                "prs_per_week": 0,
+                "large_commit_rate": 0,
+                "large_pr_rate": 0,
+                "message_count": 0,
+                "messages_per_day": 0,
+                "after_hours_rate": 0,
+                "weekend_rate": 0,
+                "overall_intensity": 0.0
+              },
+              "sustainability_indicators": [],
+              "recommendations": [
+                "Workload appears sustainable - continue monitoring trends"
+              ],
+              "comparison_to_team": "No team data available"
+            },
+            "patterns": {},
+            "sentiment": {}
+          },
+          "ai_risk_assessment": {
+            "overall_risk_level": "low",
+            "risk_score": 0.0,
+            "risk_factors": [],
+            "protective_factors": [
+              "Sustainable workload levels"
+            ],
+            "data_sources_contributing": []
+          },
+          "ai_recommendations": [
+            {
+              "priority": "medium",
+              "category": "workload_management",
+              "title": "Workload Optimization",
+              "description": "Workload appears sustainable - continue monitoring trends",
+              "actions": [
+                "Review current workload distribution",
+                "Identify delegation opportunities",
+                "Prioritize high-impact activities"
+              ]
+            },
+            {
+              "priority": "low",
+              "category": "insights",
+              "title": "Multi-Source Analysis Available",
+              "description": "Comprehensive analysis across 2 data sources provides high-confidence insights",
+              "actions": [
+                "Leverage integrated insights for team planning",
+                "Use patterns for proactive burnout prevention",
+                "Consider this analysis model for other team members"
+              ]
+            }
+          ],
+          "ai_confidence": 0.6,
+          "ai_analysis_timestamp": "2025-07-15T22:41:18.277604",
+          "ai_data_sources": [
+            "github",
+            "slack"
+          ]
+        },
+        {
+          "user_id": "62545",
+          "user_name": "Joel Andrews",
+          "user_email": "joel@rootly.com",
+          "burnout_score": 0,
+          "risk_level": "low",
+          "incident_count": 0,
+          "factors": {
+            "workload": 0,
+            "after_hours": 0,
+            "weekend_work": 0,
+            "incident_load": 0,
+            "response_time": 0
+          },
+          "maslach_dimensions": {
+            "emotional_exhaustion": 0,
+            "depersonalization": 0,
+            "personal_accomplishment": 10
+          },
+          "metrics": {
+            "incidents_per_week": 0,
+            "after_hours_percentage": 0,
+            "weekend_percentage": 0,
+            "avg_response_time_minutes": 0,
+            "severity_distribution": {}
+          },
+          "ai_insights": {
+            "workload": {
+              "workload_status": "sustainable",
+              "intensity_score": 0.0,
+              "metrics": {
+                "incident_count": 0,
+                "incidents_per_day": 0,
+                "critical_incident_count": 0,
+                "critical_incident_rate": 0,
+                "avg_response_time": 0,
+                "response_pressure": "unknown",
+                "commit_count": 0,
+                "commits_per_day": 0,
+                "pr_count": 0,
+                "prs_per_week": 0,
+                "large_commit_rate": 0,
+                "large_pr_rate": 0,
+                "message_count": 0,
+                "messages_per_day": 0,
+                "after_hours_rate": 0,
+                "weekend_rate": 0,
+                "overall_intensity": 0.0
+              },
+              "sustainability_indicators": [],
+              "recommendations": [
+                "Workload appears sustainable - continue monitoring trends"
+              ],
+              "comparison_to_team": "No team data available"
+            },
+            "patterns": {},
+            "sentiment": {}
+          },
+          "ai_risk_assessment": {
+            "overall_risk_level": "low",
+            "risk_score": 0.0,
+            "risk_factors": [],
+            "protective_factors": [
+              "Sustainable workload levels"
+            ],
+            "data_sources_contributing": []
+          },
+          "ai_recommendations": [
+            {
+              "priority": "medium",
+              "category": "workload_management",
+              "title": "Workload Optimization",
+              "description": "Workload appears sustainable - continue monitoring trends",
+              "actions": [
+                "Review current workload distribution",
+                "Identify delegation opportunities",
+                "Prioritize high-impact activities"
+              ]
+            },
+            {
+              "priority": "low",
+              "category": "insights",
+              "title": "Multi-Source Analysis Available",
+              "description": "Comprehensive analysis across 2 data sources provides high-confidence insights",
+              "actions": [
+                "Leverage integrated insights for team planning",
+                "Use patterns for proactive burnout prevention",
+                "Consider this analysis model for other team members"
+              ]
+            }
+          ],
+          "ai_confidence": 0.6,
+          "ai_analysis_timestamp": "2025-07-15T22:41:18.277620",
+          "ai_data_sources": [
+            "github",
+            "slack"
+          ]
+        },
+        {
+          "user_id": "39844",
+          "user_name": "Andre The Giant",
+          "user_email": "andre@rootly.tech",
+          "burnout_score": 0,
+          "risk_level": "low",
+          "incident_count": 0,
+          "factors": {
+            "workload": 0,
+            "after_hours": 0,
+            "weekend_work": 0,
+            "incident_load": 0,
+            "response_time": 0
+          },
+          "maslach_dimensions": {
+            "emotional_exhaustion": 0,
+            "depersonalization": 0,
+            "personal_accomplishment": 10
+          },
+          "metrics": {
+            "incidents_per_week": 0,
+            "after_hours_percentage": 0,
+            "weekend_percentage": 0,
+            "avg_response_time_minutes": 0,
+            "severity_distribution": {}
+          },
+          "ai_insights": {
+            "workload": {
+              "workload_status": "sustainable",
+              "intensity_score": 0.0,
+              "metrics": {
+                "incident_count": 0,
+                "incidents_per_day": 0,
+                "critical_incident_count": 0,
+                "critical_incident_rate": 0,
+                "avg_response_time": 0,
+                "response_pressure": "unknown",
+                "commit_count": 0,
+                "commits_per_day": 0,
+                "pr_count": 0,
+                "prs_per_week": 0,
+                "large_commit_rate": 0,
+                "large_pr_rate": 0,
+                "message_count": 0,
+                "messages_per_day": 0,
+                "after_hours_rate": 0,
+                "weekend_rate": 0,
+                "overall_intensity": 0.0
+              },
+              "sustainability_indicators": [],
+              "recommendations": [
+                "Workload appears sustainable - continue monitoring trends"
+              ],
+              "comparison_to_team": "No team data available"
+            },
+            "patterns": {},
+            "sentiment": {}
+          },
+          "ai_risk_assessment": {
+            "overall_risk_level": "low",
+            "risk_score": 0.0,
+            "risk_factors": [],
+            "protective_factors": [
+              "Sustainable workload levels"
+            ],
+            "data_sources_contributing": []
+          },
+          "ai_recommendations": [
+            {
+              "priority": "medium",
+              "category": "workload_management",
+              "title": "Workload Optimization",
+              "description": "Workload appears sustainable - continue monitoring trends",
+              "actions": [
+                "Review current workload distribution",
+                "Identify delegation opportunities",
+                "Prioritize high-impact activities"
+              ]
+            },
+            {
+              "priority": "low",
+              "category": "insights",
+              "title": "Multi-Source Analysis Available",
+              "description": "Comprehensive analysis across 2 data sources provides high-confidence insights",
+              "actions": [
+                "Leverage integrated insights for team planning",
+                "Use patterns for proactive burnout prevention",
+                "Consider this analysis model for other team members"
+              ]
+            }
+          ],
+          "ai_confidence": 0.6,
+          "ai_analysis_timestamp": "2025-07-15T22:41:18.277637",
+          "ai_data_sources": [
+            "github",
+            "slack"
+          ]
+        },
+        {
+          "user_id": "39108",
+          "user_name": "Angelo Tomasco",
+          "user_email": "angelo@rootly.com",
+          "burnout_score": 0,
+          "risk_level": "low",
+          "incident_count": 0,
+          "factors": {
+            "workload": 0,
+            "after_hours": 0,
+            "weekend_work": 0,
+            "incident_load": 0,
+            "response_time": 0
+          },
+          "maslach_dimensions": {
+            "emotional_exhaustion": 0,
+            "depersonalization": 0,
+            "personal_accomplishment": 10
+          },
+          "metrics": {
+            "incidents_per_week": 0,
+            "after_hours_percentage": 0,
+            "weekend_percentage": 0,
+            "avg_response_time_minutes": 0,
+            "severity_distribution": {}
+          },
+          "ai_insights": {
+            "workload": {
+              "workload_status": "sustainable",
+              "intensity_score": 0.0,
+              "metrics": {
+                "incident_count": 0,
+                "incidents_per_day": 0,
+                "critical_incident_count": 0,
+                "critical_incident_rate": 0,
+                "avg_response_time": 0,
+                "response_pressure": "unknown",
+                "commit_count": 0,
+                "commits_per_day": 0,
+                "pr_count": 0,
+                "prs_per_week": 0,
+                "large_commit_rate": 0,
+                "large_pr_rate": 0,
+                "message_count": 0,
+                "messages_per_day": 0,
+                "after_hours_rate": 0,
+                "weekend_rate": 0,
+                "overall_intensity": 0.0
+              },
+              "sustainability_indicators": [],
+              "recommendations": [
+                "Workload appears sustainable - continue monitoring trends"
+              ],
+              "comparison_to_team": "No team data available"
+            },
+            "patterns": {},
+            "sentiment": {}
+          },
+          "ai_risk_assessment": {
+            "overall_risk_level": "low",
+            "risk_score": 0.0,
+            "risk_factors": [],
+            "protective_factors": [
+              "Sustainable workload levels"
+            ],
+            "data_sources_contributing": []
+          },
+          "ai_recommendations": [
+            {
+              "priority": "medium",
+              "category": "workload_management",
+              "title": "Workload Optimization",
+              "description": "Workload appears sustainable - continue monitoring trends",
+              "actions": [
+                "Review current workload distribution",
+                "Identify delegation opportunities",
+                "Prioritize high-impact activities"
+              ]
+            },
+            {
+              "priority": "low",
+              "category": "insights",
+              "title": "Multi-Source Analysis Available",
+              "description": "Comprehensive analysis across 2 data sources provides high-confidence insights",
+              "actions": [
+                "Leverage integrated insights for team planning",
+                "Use patterns for proactive burnout prevention",
+                "Consider this analysis model for other team members"
+              ]
+            }
+          ],
+          "ai_confidence": 0.6,
+          "ai_analysis_timestamp": "2025-07-15T22:41:18.277653",
+          "ai_data_sources": [
+            "github",
+            "slack"
+          ]
+        },
+        {
+          "user_id": "29229",
+          "user_name": "Vishnu Mohanan",
+          "user_email": "vishnu.mohanan@bigbinary.com",
+          "burnout_score": 0,
+          "risk_level": "low",
+          "incident_count": 0,
+          "factors": {
+            "workload": 0,
+            "after_hours": 0,
+            "weekend_work": 0,
+            "incident_load": 0,
+            "response_time": 0
+          },
+          "maslach_dimensions": {
+            "emotional_exhaustion": 0,
+            "depersonalization": 0,
+            "personal_accomplishment": 10
+          },
+          "metrics": {
+            "incidents_per_week": 0,
+            "after_hours_percentage": 0,
+            "weekend_percentage": 0,
+            "avg_response_time_minutes": 0,
+            "severity_distribution": {}
+          },
+          "ai_insights": {
+            "workload": {
+              "workload_status": "sustainable",
+              "intensity_score": 0.0,
+              "metrics": {
+                "incident_count": 0,
+                "incidents_per_day": 0,
+                "critical_incident_count": 0,
+                "critical_incident_rate": 0,
+                "avg_response_time": 0,
+                "response_pressure": "unknown",
+                "commit_count": 0,
+                "commits_per_day": 0,
+                "pr_count": 0,
+                "prs_per_week": 0,
+                "large_commit_rate": 0,
+                "large_pr_rate": 0,
+                "message_count": 0,
+                "messages_per_day": 0,
+                "after_hours_rate": 0,
+                "weekend_rate": 0,
+                "overall_intensity": 0.0
+              },
+              "sustainability_indicators": [],
+              "recommendations": [
+                "Workload appears sustainable - continue monitoring trends"
+              ],
+              "comparison_to_team": "No team data available"
+            },
+            "patterns": {},
+            "sentiment": {}
+          },
+          "ai_risk_assessment": {
+            "overall_risk_level": "low",
+            "risk_score": 0.0,
+            "risk_factors": [],
+            "protective_factors": [
+              "Sustainable workload levels"
+            ],
+            "data_sources_contributing": []
+          },
+          "ai_recommendations": [
+            {
+              "priority": "medium",
+              "category": "workload_management",
+              "title": "Workload Optimization",
+              "description": "Workload appears sustainable - continue monitoring trends",
+              "actions": [
+                "Review current workload distribution",
+                "Identify delegation opportunities",
+                "Prioritize high-impact activities"
+              ]
+            },
+            {
+              "priority": "low",
+              "category": "insights",
+              "title": "Multi-Source Analysis Available",
+              "description": "Comprehensive analysis across 2 data sources provides high-confidence insights",
+              "actions": [
+                "Leverage integrated insights for team planning",
+                "Use patterns for proactive burnout prevention",
+                "Consider this analysis model for other team members"
+              ]
+            }
+          ],
+          "ai_confidence": 0.6,
+          "ai_analysis_timestamp": "2025-07-15T22:41:18.277670",
+          "ai_data_sources": [
+            "github",
+            "slack"
+          ]
+        },
+        {
+          "user_id": "28802",
+          "user_name": "Ahammed Nafih BK",
+          "user_email": "ahammed.bk@bigbinary.com",
+          "burnout_score": 0,
+          "risk_level": "low",
+          "incident_count": 0,
+          "factors": {
+            "workload": 0,
+            "after_hours": 0,
+            "weekend_work": 0,
+            "incident_load": 0,
+            "response_time": 0
+          },
+          "maslach_dimensions": {
+            "emotional_exhaustion": 0,
+            "depersonalization": 0,
+            "personal_accomplishment": 10
+          },
+          "metrics": {
+            "incidents_per_week": 0,
+            "after_hours_percentage": 0,
+            "weekend_percentage": 0,
+            "avg_response_time_minutes": 0,
+            "severity_distribution": {}
+          },
+          "ai_insights": {
+            "workload": {
+              "workload_status": "sustainable",
+              "intensity_score": 0.0,
+              "metrics": {
+                "incident_count": 0,
+                "incidents_per_day": 0,
+                "critical_incident_count": 0,
+                "critical_incident_rate": 0,
+                "avg_response_time": 0,
+                "response_pressure": "unknown",
+                "commit_count": 0,
+                "commits_per_day": 0,
+                "pr_count": 0,
+                "prs_per_week": 0,
+                "large_commit_rate": 0,
+                "large_pr_rate": 0,
+                "message_count": 0,
+                "messages_per_day": 0,
+                "after_hours_rate": 0,
+                "weekend_rate": 0,
+                "overall_intensity": 0.0
+              },
+              "sustainability_indicators": [],
+              "recommendations": [
+                "Workload appears sustainable - continue monitoring trends"
+              ],
+              "comparison_to_team": "No team data available"
+            },
+            "patterns": {},
+            "sentiment": {}
+          },
+          "ai_risk_assessment": {
+            "overall_risk_level": "low",
+            "risk_score": 0.0,
+            "risk_factors": [],
+            "protective_factors": [
+              "Sustainable workload levels"
+            ],
+            "data_sources_contributing": []
+          },
+          "ai_recommendations": [
+            {
+              "priority": "medium",
+              "category": "workload_management",
+              "title": "Workload Optimization",
+              "description": "Workload appears sustainable - continue monitoring trends",
+              "actions": [
+                "Review current workload distribution",
+                "Identify delegation opportunities",
+                "Prioritize high-impact activities"
+              ]
+            },
+            {
+              "priority": "low",
+              "category": "insights",
+              "title": "Multi-Source Analysis Available",
+              "description": "Comprehensive analysis across 2 data sources provides high-confidence insights",
+              "actions": [
+                "Leverage integrated insights for team planning",
+                "Use patterns for proactive burnout prevention",
+                "Consider this analysis model for other team members"
+              ]
+            }
+          ],
+          "ai_confidence": 0.6,
+          "ai_analysis_timestamp": "2025-07-15T22:41:18.277686",
+          "ai_data_sources": [
+            "github",
+            "slack"
+          ]
+        },
+        {
+          "user_id": "27854",
+          "user_name": "Ed Carrel",
+          "user_email": "ed@rootly.com",
+          "burnout_score": 0,
+          "risk_level": "low",
+          "incident_count": 0,
+          "factors": {
+            "workload": 0,
+            "after_hours": 0,
+            "weekend_work": 0,
+            "incident_load": 0,
+            "response_time": 0
+          },
+          "maslach_dimensions": {
+            "emotional_exhaustion": 0,
+            "depersonalization": 0,
+            "personal_accomplishment": 10
+          },
+          "metrics": {
+            "incidents_per_week": 0,
+            "after_hours_percentage": 0,
+            "weekend_percentage": 0,
+            "avg_response_time_minutes": 0,
+            "severity_distribution": {}
+          },
+          "ai_insights": {
+            "workload": {
+              "workload_status": "sustainable",
+              "intensity_score": 0.0,
+              "metrics": {
+                "incident_count": 0,
+                "incidents_per_day": 0,
+                "critical_incident_count": 0,
+                "critical_incident_rate": 0,
+                "avg_response_time": 0,
+                "response_pressure": "unknown",
+                "commit_count": 0,
+                "commits_per_day": 0,
+                "pr_count": 0,
+                "prs_per_week": 0,
+                "large_commit_rate": 0,
+                "large_pr_rate": 0,
+                "message_count": 0,
+                "messages_per_day": 0,
+                "after_hours_rate": 0,
+                "weekend_rate": 0,
+                "overall_intensity": 0.0
+              },
+              "sustainability_indicators": [],
+              "recommendations": [
+                "Workload appears sustainable - continue monitoring trends"
+              ],
+              "comparison_to_team": "No team data available"
+            },
+            "patterns": {},
+            "sentiment": {}
+          },
+          "ai_risk_assessment": {
+            "overall_risk_level": "low",
+            "risk_score": 0.0,
+            "risk_factors": [],
+            "protective_factors": [
+              "Sustainable workload levels"
+            ],
+            "data_sources_contributing": []
+          },
+          "ai_recommendations": [
+            {
+              "priority": "medium",
+              "category": "workload_management",
+              "title": "Workload Optimization",
+              "description": "Workload appears sustainable - continue monitoring trends",
+              "actions": [
+                "Review current workload distribution",
+                "Identify delegation opportunities",
+                "Prioritize high-impact activities"
+              ]
+            },
+            {
+              "priority": "low",
+              "category": "insights",
+              "title": "Multi-Source Analysis Available",
+              "description": "Comprehensive analysis across 2 data sources provides high-confidence insights",
+              "actions": [
+                "Leverage integrated insights for team planning",
+                "Use patterns for proactive burnout prevention",
+                "Consider this analysis model for other team members"
+              ]
+            }
+          ],
+          "ai_confidence": 0.6,
+          "ai_analysis_timestamp": "2025-07-15T22:41:18.277703",
+          "ai_data_sources": [
+            "github",
+            "slack"
+          ]
+        },
+        {
+          "user_id": "27845",
+          "user_name": "Abhishek P",
+          "user_email": "abhishek.p@bigbinary.com",
+          "burnout_score": 0,
+          "risk_level": "low",
+          "incident_count": 0,
+          "factors": {
+            "workload": 0,
+            "after_hours": 0,
+            "weekend_work": 0,
+            "incident_load": 0,
+            "response_time": 0
+          },
+          "maslach_dimensions": {
+            "emotional_exhaustion": 0,
+            "depersonalization": 0,
+            "personal_accomplishment": 10
+          },
+          "metrics": {
+            "incidents_per_week": 0,
+            "after_hours_percentage": 0,
+            "weekend_percentage": 0,
+            "avg_response_time_minutes": 0,
+            "severity_distribution": {}
+          },
+          "ai_insights": {
+            "workload": {
+              "workload_status": "sustainable",
+              "intensity_score": 0.0,
+              "metrics": {
+                "incident_count": 0,
+                "incidents_per_day": 0,
+                "critical_incident_count": 0,
+                "critical_incident_rate": 0,
+                "avg_response_time": 0,
+                "response_pressure": "unknown",
+                "commit_count": 0,
+                "commits_per_day": 0,
+                "pr_count": 0,
+                "prs_per_week": 0,
+                "large_commit_rate": 0,
+                "large_pr_rate": 0,
+                "message_count": 0,
+                "messages_per_day": 0,
+                "after_hours_rate": 0,
+                "weekend_rate": 0,
+                "overall_intensity": 0.0
+              },
+              "sustainability_indicators": [],
+              "recommendations": [
+                "Workload appears sustainable - continue monitoring trends"
+              ],
+              "comparison_to_team": "No team data available"
+            },
+            "patterns": {},
+            "sentiment": {}
+          },
+          "ai_risk_assessment": {
+            "overall_risk_level": "low",
+            "risk_score": 0.0,
+            "risk_factors": [],
+            "protective_factors": [
+              "Sustainable workload levels"
+            ],
+            "data_sources_contributing": []
+          },
+          "ai_recommendations": [
+            {
+              "priority": "medium",
+              "category": "workload_management",
+              "title": "Workload Optimization",
+              "description": "Workload appears sustainable - continue monitoring trends",
+              "actions": [
+                "Review current workload distribution",
+                "Identify delegation opportunities",
+                "Prioritize high-impact activities"
+              ]
+            },
+            {
+              "priority": "low",
+              "category": "insights",
+              "title": "Multi-Source Analysis Available",
+              "description": "Comprehensive analysis across 2 data sources provides high-confidence insights",
+              "actions": [
+                "Leverage integrated insights for team planning",
+                "Use patterns for proactive burnout prevention",
+                "Consider this analysis model for other team members"
+              ]
+            }
+          ],
+          "ai_confidence": 0.6,
+          "ai_analysis_timestamp": "2025-07-15T22:41:18.277719",
+          "ai_data_sources": [
+            "github",
+            "slack"
+          ]
+        },
+        {
+          "user_id": "27257",
+          "user_name": "Liza Dukhova",
+          "user_email": "liza@rootly.com",
+          "burnout_score": 0,
+          "risk_level": "low",
+          "incident_count": 0,
+          "factors": {
+            "workload": 0,
+            "after_hours": 0,
+            "weekend_work": 0,
+            "incident_load": 0,
+            "response_time": 0
+          },
+          "maslach_dimensions": {
+            "emotional_exhaustion": 0,
+            "depersonalization": 0,
+            "personal_accomplishment": 10
+          },
+          "metrics": {
+            "incidents_per_week": 0,
+            "after_hours_percentage": 0,
+            "weekend_percentage": 0,
+            "avg_response_time_minutes": 0,
+            "severity_distribution": {}
+          },
+          "ai_insights": {
+            "workload": {
+              "workload_status": "sustainable",
+              "intensity_score": 0.0,
+              "metrics": {
+                "incident_count": 0,
+                "incidents_per_day": 0,
+                "critical_incident_count": 0,
+                "critical_incident_rate": 0,
+                "avg_response_time": 0,
+                "response_pressure": "unknown",
+                "commit_count": 0,
+                "commits_per_day": 0,
+                "pr_count": 0,
+                "prs_per_week": 0,
+                "large_commit_rate": 0,
+                "large_pr_rate": 0,
+                "message_count": 0,
+                "messages_per_day": 0,
+                "after_hours_rate": 0,
+                "weekend_rate": 0,
+                "overall_intensity": 0.0
+              },
+              "sustainability_indicators": [],
+              "recommendations": [
+                "Workload appears sustainable - continue monitoring trends"
+              ],
+              "comparison_to_team": "No team data available"
+            },
+            "patterns": {},
+            "sentiment": {}
+          },
+          "ai_risk_assessment": {
+            "overall_risk_level": "low",
+            "risk_score": 0.0,
+            "risk_factors": [],
+            "protective_factors": [
+              "Sustainable workload levels"
+            ],
+            "data_sources_contributing": []
+          },
+          "ai_recommendations": [
+            {
+              "priority": "medium",
+              "category": "workload_management",
+              "title": "Workload Optimization",
+              "description": "Workload appears sustainable - continue monitoring trends",
+              "actions": [
+                "Review current workload distribution",
+                "Identify delegation opportunities",
+                "Prioritize high-impact activities"
+              ]
+            },
+            {
+              "priority": "low",
+              "category": "insights",
+              "title": "Multi-Source Analysis Available",
+              "description": "Comprehensive analysis across 2 data sources provides high-confidence insights",
+              "actions": [
+                "Leverage integrated insights for team planning",
+                "Use patterns for proactive burnout prevention",
+                "Consider this analysis model for other team members"
+              ]
+            }
+          ],
+          "ai_confidence": 0.6,
+          "ai_analysis_timestamp": "2025-07-15T22:41:18.277735",
+          "ai_data_sources": [
+            "github",
+            "slack"
+          ]
+        },
+        {
+          "user_id": "27251",
+          "user_name": "Dinesh Kumar Panda",
+          "user_email": "dinesh.panda@bigbinary.com",
+          "burnout_score": 0,
+          "risk_level": "low",
+          "incident_count": 0,
+          "factors": {
+            "workload": 0,
+            "after_hours": 0,
+            "weekend_work": 0,
+            "incident_load": 0,
+            "response_time": 0
+          },
+          "maslach_dimensions": {
+            "emotional_exhaustion": 0,
+            "depersonalization": 0,
+            "personal_accomplishment": 10
+          },
+          "metrics": {
+            "incidents_per_week": 0,
+            "after_hours_percentage": 0,
+            "weekend_percentage": 0,
+            "avg_response_time_minutes": 0,
+            "severity_distribution": {}
+          },
+          "ai_insights": {
+            "workload": {
+              "workload_status": "sustainable",
+              "intensity_score": 0.0,
+              "metrics": {
+                "incident_count": 0,
+                "incidents_per_day": 0,
+                "critical_incident_count": 0,
+                "critical_incident_rate": 0,
+                "avg_response_time": 0,
+                "response_pressure": "unknown",
+                "commit_count": 0,
+                "commits_per_day": 0,
+                "pr_count": 0,
+                "prs_per_week": 0,
+                "large_commit_rate": 0,
+                "large_pr_rate": 0,
+                "message_count": 0,
+                "messages_per_day": 0,
+                "after_hours_rate": 0,
+                "weekend_rate": 0,
+                "overall_intensity": 0.0
+              },
+              "sustainability_indicators": [],
+              "recommendations": [
+                "Workload appears sustainable - continue monitoring trends"
+              ],
+              "comparison_to_team": "No team data available"
+            },
+            "patterns": {},
+            "sentiment": {}
+          },
+          "ai_risk_assessment": {
+            "overall_risk_level": "low",
+            "risk_score": 0.0,
+            "risk_factors": [],
+            "protective_factors": [
+              "Sustainable workload levels"
+            ],
+            "data_sources_contributing": []
+          },
+          "ai_recommendations": [
+            {
+              "priority": "medium",
+              "category": "workload_management",
+              "title": "Workload Optimization",
+              "description": "Workload appears sustainable - continue monitoring trends",
+              "actions": [
+                "Review current workload distribution",
+                "Identify delegation opportunities",
+                "Prioritize high-impact activities"
+              ]
+            },
+            {
+              "priority": "low",
+              "category": "insights",
+              "title": "Multi-Source Analysis Available",
+              "description": "Comprehensive analysis across 2 data sources provides high-confidence insights",
+              "actions": [
+                "Leverage integrated insights for team planning",
+                "Use patterns for proactive burnout prevention",
+                "Consider this analysis model for other team members"
+              ]
+            }
+          ],
+          "ai_confidence": 0.6,
+          "ai_analysis_timestamp": "2025-07-15T22:41:18.277752",
+          "ai_data_sources": [
+            "github",
+            "slack"
+          ]
+        },
+        {
+          "user_id": "14047",
+          "user_name": "Peter Parker",
+          "user_email": "andre.yang@rootly.tech",
+          "burnout_score": 0,
+          "risk_level": "low",
+          "incident_count": 0,
+          "factors": {
+            "workload": 0,
+            "after_hours": 0,
+            "weekend_work": 0,
+            "incident_load": 0,
+            "response_time": 0
+          },
+          "maslach_dimensions": {
+            "emotional_exhaustion": 0,
+            "depersonalization": 0,
+            "personal_accomplishment": 10
+          },
+          "metrics": {
+            "incidents_per_week": 0,
+            "after_hours_percentage": 0,
+            "weekend_percentage": 0,
+            "avg_response_time_minutes": 0,
+            "severity_distribution": {}
+          },
+          "ai_insights": {
+            "workload": {
+              "workload_status": "sustainable",
+              "intensity_score": 0.0,
+              "metrics": {
+                "incident_count": 0,
+                "incidents_per_day": 0,
+                "critical_incident_count": 0,
+                "critical_incident_rate": 0,
+                "avg_response_time": 0,
+                "response_pressure": "unknown",
+                "commit_count": 0,
+                "commits_per_day": 0,
+                "pr_count": 0,
+                "prs_per_week": 0,
+                "large_commit_rate": 0,
+                "large_pr_rate": 0,
+                "message_count": 0,
+                "messages_per_day": 0,
+                "after_hours_rate": 0,
+                "weekend_rate": 0,
+                "overall_intensity": 0.0
+              },
+              "sustainability_indicators": [],
+              "recommendations": [
+                "Workload appears sustainable - continue monitoring trends"
+              ],
+              "comparison_to_team": "No team data available"
+            },
+            "patterns": {},
+            "sentiment": {}
+          },
+          "ai_risk_assessment": {
+            "overall_risk_level": "low",
+            "risk_score": 0.0,
+            "risk_factors": [],
+            "protective_factors": [
+              "Sustainable workload levels"
+            ],
+            "data_sources_contributing": []
+          },
+          "ai_recommendations": [
+            {
+              "priority": "medium",
+              "category": "workload_management",
+              "title": "Workload Optimization",
+              "description": "Workload appears sustainable - continue monitoring trends",
+              "actions": [
+                "Review current workload distribution",
+                "Identify delegation opportunities",
+                "Prioritize high-impact activities"
+              ]
+            },
+            {
+              "priority": "low",
+              "category": "insights",
+              "title": "Multi-Source Analysis Available",
+              "description": "Comprehensive analysis across 2 data sources provides high-confidence insights",
+              "actions": [
+                "Leverage integrated insights for team planning",
+                "Use patterns for proactive burnout prevention",
+                "Consider this analysis model for other team members"
+              ]
+            }
+          ],
+          "ai_confidence": 0.6,
+          "ai_analysis_timestamp": "2025-07-15T22:41:18.277769",
+          "ai_data_sources": [
+            "github",
+            "slack"
+          ]
+        },
+        {
+          "user_id": "4261",
+          "user_name": "Alex Mingoia",
+          "user_email": "alex.mingoia@rootly.com",
+          "burnout_score": 0,
+          "risk_level": "low",
+          "incident_count": 0,
+          "factors": {
+            "workload": 0,
+            "after_hours": 0,
+            "weekend_work": 0,
+            "incident_load": 0,
+            "response_time": 0
+          },
+          "maslach_dimensions": {
+            "emotional_exhaustion": 0,
+            "depersonalization": 0,
+            "personal_accomplishment": 10
+          },
+          "metrics": {
+            "incidents_per_week": 0,
+            "after_hours_percentage": 0,
+            "weekend_percentage": 0,
+            "avg_response_time_minutes": 0,
+            "severity_distribution": {}
+          },
+          "ai_insights": {
+            "workload": {
+              "workload_status": "sustainable",
+              "intensity_score": 0.0,
+              "metrics": {
+                "incident_count": 0,
+                "incidents_per_day": 0,
+                "critical_incident_count": 0,
+                "critical_incident_rate": 0,
+                "avg_response_time": 0,
+                "response_pressure": "unknown",
+                "commit_count": 0,
+                "commits_per_day": 0,
+                "pr_count": 0,
+                "prs_per_week": 0,
+                "large_commit_rate": 0,
+                "large_pr_rate": 0,
+                "message_count": 0,
+                "messages_per_day": 0,
+                "after_hours_rate": 0,
+                "weekend_rate": 0,
+                "overall_intensity": 0.0
+              },
+              "sustainability_indicators": [],
+              "recommendations": [
+                "Workload appears sustainable - continue monitoring trends"
+              ],
+              "comparison_to_team": "No team data available"
+            },
+            "patterns": {},
+            "sentiment": {}
+          },
+          "ai_risk_assessment": {
+            "overall_risk_level": "low",
+            "risk_score": 0.0,
+            "risk_factors": [],
+            "protective_factors": [
+              "Sustainable workload levels"
+            ],
+            "data_sources_contributing": []
+          },
+          "ai_recommendations": [
+            {
+              "priority": "medium",
+              "category": "workload_management",
+              "title": "Workload Optimization",
+              "description": "Workload appears sustainable - continue monitoring trends",
+              "actions": [
+                "Review current workload distribution",
+                "Identify delegation opportunities",
+                "Prioritize high-impact activities"
+              ]
+            },
+            {
+              "priority": "low",
+              "category": "insights",
+              "title": "Multi-Source Analysis Available",
+              "description": "Comprehensive analysis across 2 data sources provides high-confidence insights",
+              "actions": [
+                "Leverage integrated insights for team planning",
+                "Use patterns for proactive burnout prevention",
+                "Consider this analysis model for other team members"
+              ]
+            }
+          ],
+          "ai_confidence": 0.6,
+          "ai_analysis_timestamp": "2025-07-15T22:41:18.277785",
+          "ai_data_sources": [
+            "github",
+            "slack"
+          ]
+        },
+        {
+          "user_id": "3528",
+          "user_name": "Andre King",
+          "user_email": "andre@rootly.com",
+          "burnout_score": 0,
+          "risk_level": "low",
+          "incident_count": 412,
+          "factors": {
+            "workload": 10,
+            "after_hours": 8.34,
+            "weekend_work": 0.12,
+            "incident_load": 10,
+            "response_time": -252.52
+          },
+          "maslach_dimensions": {
+            "emotional_exhaustion": -43.54,
+            "depersonalization": 2.0,
+            "personal_accomplishment": 3.75
+          },
+          "metrics": {
+            "incidents_per_week": 96.13,
+            "after_hours_percentage": 0.417,
+            "weekend_percentage": 0.005,
+            "avg_response_time_minutes": -1515.1,
+            "severity_distribution": {
+              "unknown": 118,
+              "sev1": 6,
+              "sev3": 88,
+              "sev2": 186,
+              "sev4": 7,
+              "sev0": 6,
+              "major": 1
+            }
+          },
+          "github_activity": {
+            "commits_count": 0,
+            "pull_requests_count": 0,
+            "reviews_count": 0,
+            "after_hours_commits": 0,
+            "weekend_commits": 0,
+            "avg_pr_size": 0,
+            "burnout_indicators": {
+              "excessive_commits": false,
+              "late_night_activity": false,
+              "weekend_work": false,
+              "large_prs": false
+            }
+          },
+          "slack_activity": {
+            "messages_sent": 0,
+            "channels_active": 1,
+            "after_hours_messages": 0,
+            "weekend_messages": 0,
+            "avg_response_time_minutes": 0,
+            "sentiment_score": 0.0,
+            "negative_messages": 0,
+            "positive_messages": 0,
+            "neutral_messages": 0,
+            "stress_indicators": 0,
+            "burnout_indicators": {
+              "excessive_messaging": false,
+              "poor_sentiment": false,
+              "late_responses": false,
+              "after_hours_activity": false,
+              "stress_indicators": false
+            }
+          },
+          "ai_insights": {},
+          "ai_risk_assessment": {
+            "overall_risk_level": "unknown",
+            "risk_score": 0,
+            "risk_factors": [
+              "Analysis error occurred"
+            ],
+            "protective_factors": []
+          },
+          "ai_recommendations": [
+            {
+              "priority": "high",
+              "category": "system",
+              "title": "Analysis Error",
+              "description": "Could not complete AI analysis. Using fallback assessment.",
+              "actions": [
+                "Contact system administrator",
+                "Review data sources"
+              ]
+            }
+          ],
+          "recommendations": [
+            "[AI] Could not complete AI analysis. Using fallback assessment."
+          ],
+          "ai_confidence": 0.0,
+          "ai_analysis_timestamp": "2025-07-15T22:41:18.278047",
+          "ai_data_sources": []
+        }
+      ],
+      "total_members": 40,
+      "total_incidents": 2841
+    },
+    "insights": [
+      {
+        "type": "warning",
+        "category": "team",
+        "message": "10 team members are at high burnout risk",
+        "priority": "high"
+      },
+      {
+        "type": "pattern",
+        "category": "after_hours",
+        "message": "15 team members have >30% after-hours incidents",
+        "priority": "high"
+      },
+      {
+        "type": "metric",
+        "category": "response_time",
+        "message": "6 team members have average response times >45 minutes",
+        "priority": "medium"
+      }
+    ],
+    "recommendations": [
+      {
+        "type": "interpersonal",
+        "priority": "high",
+        "message": "Schedule 1-on-1s with the 10 team members at high risk"
+      },
+      {
+        "type": "depersonalization",
+        "priority": "medium",
+        "message": "Incident load is unevenly distributed - consider load balancing strategies"
+      },
+      {
+        "type": "personal_accomplishment",
+        "priority": "medium",
+        "message": "Review alerting and escalation procedures to improve response times"
+      },
+      {
+        "type": "personal_accomplishment",
+        "priority": "low",
+        "message": "Continue current practices and monitor for changes in team health metrics"
+      }
+    ],
+    "github_insights": {
+      "total_users_analyzed": 10,
+      "total_commits": 734,
+      "total_pull_requests": 180,
+      "total_reviews": 268,
+      "avg_commits_per_week": 17.13,
+      "avg_prs_per_week": 4.2,
+      "after_hours_activity_rate": 0.08,
+      "after_hours_activity_percentage": 8.0,
+      "weekend_activity_rate": 0.057,
+      "top_contributors": [
+        {
+          "email": "quentin@rootly.com",
+          "username": "kwent",
+          "commits_per_week": 97.3,
+          "total_commits": 417
+        },
+        {
+          "email": "weihan@rootly.com",
+          "username": "weihanli101",
+          "commits_per_week": 25.67,
+          "total_commits": 110
+        },
+        {
+          "email": "nicholas@rootly.com",
+          "username": "nronas",
+          "commits_per_week": 16.33,
+          "total_commits": 70
+        },
+        {
+          "email": "spencer.cheng@rootly.com",
+          "username": "spencerhcheng",
+          "commits_per_week": 16.1,
+          "total_commits": 69
+        },
+        {
+          "email": "alex.mingoia@rootly.com",
+          "username": "alexmingoia",
+          "commits_per_week": 11.9,
+          "total_commits": 51
+        }
+      ],
+      "burnout_indicators": {
+        "excessive_commits": 4,
+        "after_hours_coding": 0,
+        "weekend_work": 0,
+        "large_prs": 1,
+        "excessive_late_night_commits": 0,
+        "weekend_workers": 0,
+        "large_pr_pattern": 1
+      }
+    },
+    "slack_insights": {
+      "total_users_analyzed": 40,
+      "total_messages": 28,
+      "active_channels": 40,
+      "avg_messages_per_day": 0.0,
+      "avg_response_time_minutes": 0,
+      "after_hours_messaging_rate": 0.0,
+      "after_hours_activity_percentage": 0.0,
+      "weekend_messaging_rate": 0.0,
+      "avg_sentiment_score": 0.02,
+      "channels_analyzed": 40,
+      "sentiment_analysis": {
+        "overall_sentiment": "neutral",
+        "sentiment_score": 0.02,
+        "positive_ratio": 0.058,
+        "negative_ratio": 0.01
+      },
+      "burnout_indicators": {
+        "excessive_messaging": 0,
+        "poor_sentiment": 1,
+        "late_responses": 0,
+        "after_hours_activity": 0
+      }
+    },
+    "ai_team_insights": {
+      "available": true,
+      "insights": {
+        "analysis_timestamp": "2025-07-15T22:41:18.278057",
+        "team_size": 40,
+        "data_sources": [
+          "github",
+          "slack"
+        ],
+        "risk_distribution": {
+          "distribution": {
+            "low": 22,
+            "medium": 8,
+            "high": 10,
+            "critical": 0
+          },
+          "high_risk_percentage": 25.0,
+          "ai_escalations": 0,
+          "total_members": 40
+        },
+        "common_patterns": [],
+        "team_recommendations": [
+          {
+            "priority": "high",
+            "category": "team_health",
+            "title": "Team Burnout Prevention",
+            "description": "25.0% of team members show elevated burnout risk",
+            "actions": [
+              "Monitor team workload trends closely",
+              "Implement preventive measures",
+              "Improve team communication and support"
+            ]
+          }
+        ],
+        "workload_distribution": {
+          "available": true,
+          "average_intensity": 0.0,
+          "intensity_range": {
+            "min": 0.0,
+            "max": 0.0
+          },
+          "imbalances": [],
+          "distribution_health": "good"
+        }
+      }
+    },
+    "ai_enhanced": true,
+    "ai_enhancement_timestamp": "2025-07-15T22:41:18.278218"
+  },
+  "audit_summary": {
+    "metadata": {
+      "timestamp": "2025-07-15T15:39:30.123743",
+      "days_analyzed": 30,
+      "total_users": 40,
+      "total_incidents": 2841,
+      "date_range": {
+        "start": "2025-06-15T15:39:30.123862",
+        "end": "2025-07-15T15:39:30.123902"
+      },
+      "include_weekends": true,
+      "include_github": true,
+      "include_slack": true
+    },
+    "totals": {
+      "metadata": 2841,
+      "daily_trends": 0,
+      "team_analysis": 2691,
+      "severity_breakdown": 0
+    },
+    "inconsistencies": [
+      "daily_trends total (0) does not match expected (2841)",
+      "team_analysis total (2691) does not match expected (2841)",
+      "severity_breakdown total (0) does not match expected (2841)",
+      "Inconsistent totals across sources: {0, 2841, 2691}"
+    ],
+    "quality_issues": [],
+    "is_real_data": true,
+    "daily_trends_count": 0,
+    "member_count": 40
+  }
+}

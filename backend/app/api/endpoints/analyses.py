@@ -1281,6 +1281,13 @@ async def run_analysis_task(
         analysis.status = "running"
         db.commit()
         
+        # Phase 1.2: Clear any existing mappings for this analysis to prevent duplicates
+        if user_id and (include_github or include_slack):
+            from ...services.mapping_recorder import MappingRecorder
+            recorder = MappingRecorder(db)
+            cleared_count = recorder.clear_analysis_mappings(analysis_id)
+            logger.info(f"BACKGROUND_TASK: Cleared {cleared_count} existing mappings for analysis {analysis_id}")
+        
         # Fetch user-specific integration tokens if needed
         slack_token = None
         github_token = None
@@ -1355,7 +1362,8 @@ async def run_analysis_task(
         print(f"BACKGROUND_TASK: Final analyzer decision - use_ai_analyzer: {use_ai_analyzer}")
         
         # Check if we should use the new UnifiedBurnoutAnalyzer (feature flag)
-        use_unified_analyzer = os.getenv('USE_UNIFIED_ANALYZER', 'false').lower() == 'true'
+        # PRODUCTION CHANGE: Enable UnifiedBurnoutAnalyzer by default to fix GitHub mapping duplicates
+        use_unified_analyzer = os.getenv('USE_UNIFIED_ANALYZER', 'true').lower() == 'true'
         logger.info(f"BACKGROUND_TASK: Feature flag - USE_UNIFIED_ANALYZER: {use_unified_analyzer}")
         print(f"BACKGROUND_TASK: Feature flag - USE_UNIFIED_ANALYZER: {use_unified_analyzer}")
         
