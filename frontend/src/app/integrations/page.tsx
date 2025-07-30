@@ -1117,6 +1117,7 @@ export default function IntegrationsPage() {
 
   // Mapping data handlers
   const loadMappingData = async (platform: 'github' | 'slack') => {
+    console.log('🔴 loadMappingData called with platform:', platform)
     setLoadingMappingData(true)
     setSelectedMappingPlatform(platform)
     
@@ -3227,7 +3228,10 @@ export default function IntegrationsPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => selectedMappingPlatform && loadMappingData(selectedMappingPlatform)}
+                onClick={() => {
+                  console.log('🔴 REFRESH BUTTON CLICKED!', selectedMappingPlatform)
+                  selectedMappingPlatform && loadMappingData(selectedMappingPlatform)
+                }}
                 disabled={loadingMappingData}
                 className="h-8 w-8 p-0"
                 title="Refresh mapping data"
