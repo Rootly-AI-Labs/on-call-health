@@ -1128,6 +1128,12 @@ export default function IntegrationsPage() {
       }
 
       // Use the existing working endpoints
+      console.log(`🔍 DEBUG: Fetching mapping data for platform: ${platform}`)
+      console.log(`🔍 DEBUG: API URLs:`, {
+        mappings: `${API_BASE}/integrations/mappings/platform/${platform}`,
+        stats: `${API_BASE}/integrations/mappings/success-rate?platform=${platform}`
+      })
+      
       const [mappingsResponse, statsResponse] = await Promise.all([
         fetch(`${API_BASE}/integrations/mappings/platform/${platform}`, {
           headers: { 'Authorization': `Bearer ${authToken}` }
@@ -1140,6 +1146,12 @@ export default function IntegrationsPage() {
       if (mappingsResponse.ok && statsResponse.ok) {
         const mappings = await mappingsResponse.json()
         const stats = await statsResponse.json()
+        
+        console.log(`🔍 DEBUG: Received data for ${platform}:`, {
+          mappings: mappings.length,
+          stats: stats,
+          mappingData: mappings.slice(0, 3) // First 3 mappings for inspection
+        })
         
         setMappingData(mappings)
         setMappingStats(stats)

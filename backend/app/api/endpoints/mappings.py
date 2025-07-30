@@ -146,6 +146,8 @@ async def get_success_rates(
     """Get success rates broken down by platform combinations - now returns team member focused statistics.
     If platform is specified, returns statistics for that platform only."""
     try:
+        logger.info(f"🔍 DEBUG: Getting success rates for user {current_user.id}, platform: {platform}")
+        
         # Get mappings for this user, optionally filtered by platform
         query = db.query(IntegrationMapping).filter(
             IntegrationMapping.user_id == current_user.id
@@ -153,8 +155,10 @@ async def get_success_rates(
         
         if platform:
             query = query.filter(IntegrationMapping.target_platform == platform)
+            logger.info(f"🔍 DEBUG: Filtering by platform: {platform}")
             
         mappings = query.all()
+        logger.info(f"🔍 DEBUG: Found {len(mappings)} mappings for user {current_user.id}, platform: {platform}")
         
         if not mappings:
             return {
@@ -182,6 +186,10 @@ async def get_success_rates(
         total_team_members = len(unique_emails)
         total_successful = len(successful_emails)
         overall_success_rate = (total_successful / total_team_members * 100) if total_team_members > 0 else 0
+        
+        logger.info(f"🔍 DEBUG: Calculated stats - Total: {total_team_members}, Successful: {total_successful}, Success Rate: {overall_success_rate:.1f}%, With Data: {members_with_data}")
+        logger.info(f"🔍 DEBUG: Unique emails: {list(unique_emails)}")
+        logger.info(f"🔍 DEBUG: Successful emails: {list(successful_emails)}")
         
         # Create platform breakdown (even for single platform)
         platform_success_rates = {}
