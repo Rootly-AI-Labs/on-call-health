@@ -764,11 +764,6 @@ export default function Dashboard() {
         }
       } else {
         console.error('Failed to load analysis:', analysisId, 'Status:', response.status)
-        // Clear current analysis and trends when analysis not found
-        setCurrentAnalysis(null)
-        setHistoricalTrends(null)
-        // Remove invalid analysis ID from URL
-        updateURLWithAnalysis(null)
         
         // Show user-friendly error message and handle suggested redirect
         if (response.status === 404) {
@@ -783,7 +778,7 @@ export default function Dashboard() {
               const suggestedId = suggestionMatch[1]
               console.log(`Backend suggested redirecting to analysis: ${suggestedId}`)
               
-              // Set redirect state to show loader instead of error
+              // Set redirect state to show loader instead of error (don't clear analysis yet)
               setRedirectingToSuggested(true)
               
               // Auto-redirect to suggested analysis after a brief delay
@@ -793,10 +788,19 @@ export default function Dashboard() {
                 loadSpecificAnalysis(suggestedId)
                 setRedirectingToSuggested(false)
               }, 1000) // Reduced to 1 second since we're showing a loader
+              
+              return // Exit early to prevent clearing analysis state
             }
           } catch (parseError) {
             console.warn(`Analysis ${analysisId} not found. Please select a valid analysis from the history.`)
           }
+        }
+        
+        // Only clear analysis state if we couldn't auto-redirect
+        setCurrentAnalysis(null)
+        setHistoricalTrends(null)
+        // Remove invalid analysis ID from URL
+        updateURLWithAnalysis(null)
         }
       }
     } catch (error) {
@@ -3850,7 +3854,7 @@ export default function Dashboard() {
           )}
 
           {/* Analysis Not Found State or Auto-Redirect Loader */}
-          {!analysisRunning && !currentAnalysis && searchParams.get('analysis') && (
+          {!analysisRunning && searchParams.get('analysis') && (redirectingToSuggested || !currentAnalysis) && (
             <Card className={`text-center p-8 ${redirectingToSuggested ? 'border-blue-200 bg-blue-50' : 'border-red-200 bg-red-50'}`}>
               {redirectingToSuggested ? (
                 <>
