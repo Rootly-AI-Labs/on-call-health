@@ -1925,7 +1925,7 @@ export default function Dashboard() {
           <p className="text-gray-600">Loading dashboard...</p>
         </div>
       </div>
-    )
+    );
   }
 
   // Show main page loader while initial data loads (but not if we have cached data)
@@ -1939,7 +1939,7 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
-    )
+    );
   }
 
   return (
