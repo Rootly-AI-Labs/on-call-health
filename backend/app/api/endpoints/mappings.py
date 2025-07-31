@@ -170,13 +170,17 @@ async def get_success_rates(
             return {
                 "overall_success_rate": 0,
                 "total_attempts": 0,
-                "platform_breakdown": {}
+                "members_with_data": 0
             }
         
         # Calculate team member statistics (unique by email)
         unique_emails = set()
         successful_emails = set()
         members_with_data = 0
+        
+        # Debug: Show what platforms are actually in our filtered results
+        platforms_in_results = set(m.target_platform for m in mappings)
+        logger.info(f"🔍 DEBUG: Platforms in filtered results: {platforms_in_results}")
         
         for mapping in mappings:
             email = mapping.source_identifier
@@ -197,21 +201,10 @@ async def get_success_rates(
         logger.info(f"🔍 DEBUG: Unique emails: {list(unique_emails)}")
         logger.info(f"🔍 DEBUG: Successful emails: {list(successful_emails)}")
         
-        # Create platform breakdown (even for single platform)
-        platform_success_rates = {}
-        if platform and total_team_members > 0:
-            platform_success_rates[platform] = {
-                "total_attempts": total_team_members,
-                "successful": total_successful,
-                "failed": total_team_members - total_successful,
-                "success_rate": round(overall_success_rate, 1)
-            }
-        
         return {
             "overall_success_rate": round(overall_success_rate, 1),
             "total_attempts": total_team_members,
-            "members_with_data": members_with_data,
-            "platform_breakdown": platform_success_rates
+            "members_with_data": members_with_data
         }
     except Exception as e:
         logger.error(f"Error fetching success rates: {e}")
