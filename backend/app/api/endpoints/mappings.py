@@ -80,10 +80,15 @@ async def get_analysis_mappings(
         recorder = MappingRecorder(db)
         integration_mappings = recorder.get_analysis_mappings(analysis_id)
         
-        # Get manual mappings for this user
+        # Get all manual mappings for this user and target platform
+        # We'll filter them later to prioritize analysis-relevant ones
         manual_mappings = db.query(UserMapping).filter(
-            UserMapping.user_id == current_user.id
+            UserMapping.user_id == current_user.id,
+            UserMapping.target_platform.in_(["github", "slack"])  # Only include relevant platforms
         ).all()
+        
+        # Get emails from integration mappings for analysis context
+        integration_emails = set(m.source_identifier for m in integration_mappings)
         
         # Convert to common format and merge
         all_mappings = []
@@ -97,6 +102,9 @@ async def get_analysis_mappings(
         
         # Add manual mappings with source flag
         for manual_mapping in manual_mappings:
+            # Check if this manual mapping is relevant to current analysis
+            is_analysis_relevant = manual_mapping.source_identifier in integration_emails
+            
             # Convert UserMapping to IntegrationMapping-like format
             mapping_dict = {
                 "id": f"manual_{manual_mapping.id}",  # Prefix to avoid conflicts
@@ -113,7 +121,8 @@ async def get_analysis_mappings(
                 "mapping_type": manual_mapping.mapping_type,
                 "status": manual_mapping.status,
                 "confidence_score": manual_mapping.confidence_score,
-                "last_verified": manual_mapping.last_verified.isoformat() if manual_mapping.last_verified else None
+                "last_verified": manual_mapping.last_verified.isoformat() if manual_mapping.last_verified else None,
+                "is_analysis_relevant": is_analysis_relevant
             }
             all_mappings.append(mapping_dict)
         
@@ -164,17 +173,57 @@ async def get_platform_mappings(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ) -> List[dict]:
-    """Get recent integration mappings for a specific target platform."""
+    """Get recent integration mappings for a specific target platform, including manual mappings."""
     try:
-        # Get most recent mappings, limited to prevent UI overload
-        mappings = db.query(IntegrationMapping).filter(
+        from ...models import UserMapping
+        
+        # Get most recent integration mappings, limited to prevent UI overload
+        integration_mappings = db.query(IntegrationMapping).filter(
             IntegrationMapping.user_id == current_user.id,
             IntegrationMapping.target_platform == platform
         ).order_by(IntegrationMapping.created_at.desc()).limit(limit).all()
         
-        logger.info(f"🔍 DEBUG: Platform {platform} endpoint returning {len(mappings)} mappings (limit: {limit})")
+        # Get manual mappings for this platform
+        manual_mappings = db.query(UserMapping).filter(
+            UserMapping.user_id == current_user.id,
+            UserMapping.target_platform == platform
+        ).all()
         
-        return [mapping.to_dict() for mapping in mappings]
+        # Convert to common format and merge
+        all_mappings = []
+        
+        # Add integration mappings with source flag
+        for mapping in integration_mappings:
+            mapping_dict = mapping.to_dict()
+            mapping_dict["source"] = "integration"
+            mapping_dict["is_manual"] = False
+            all_mappings.append(mapping_dict)
+        
+        # Add manual mappings with source flag
+        for manual_mapping in manual_mappings:
+            mapping_dict = {
+                "id": f"manual_{manual_mapping.id}",  # Prefix to avoid conflicts
+                "source_identifier": manual_mapping.source_identifier,
+                "target_identifier": manual_mapping.target_identifier,
+                "target_platform": manual_mapping.target_platform,
+                "mapping_successful": True,  # Manual mappings are considered successful
+                "data_collected": False,  # Manual mappings don't have data collection status
+                "data_points_count": 0,
+                "created_at": manual_mapping.created_at.isoformat() if manual_mapping.created_at else None,
+                "updated_at": manual_mapping.updated_at.isoformat() if manual_mapping.updated_at else None,
+                "source": "manual",
+                "is_manual": True,
+                "mapping_type": manual_mapping.mapping_type,
+                "status": manual_mapping.status,
+                "confidence_score": manual_mapping.confidence_score,
+                "last_verified": manual_mapping.last_verified.isoformat() if manual_mapping.last_verified else None,
+                "mapping_method": "manual"  # Add this for the Method column
+            }
+            all_mappings.append(mapping_dict)
+        
+        logger.info(f"🔍 DEBUG: Platform {platform} endpoint returning {len(integration_mappings)} integration + {len(manual_mappings)} manual mappings")
+        
+        return all_mappings
     except Exception as e:
         logger.error(f"Error fetching platform mappings: {e}")
         raise HTTPException(status_code=500, detail="Failed to fetch platform mappings")
@@ -188,10 +237,10 @@ async def get_success_rates(
     """Get success rates broken down by platform combinations - now returns team member focused statistics.
     If platform is specified, returns statistics for that platform only."""
     try:
+        from ...models import UserMapping
         logger.info(f"🔍 DEBUG: Getting success rates for user {current_user.id}, platform: {platform}")
         
-        # Get mappings for this user, optionally filtered by platform
-        # Use same scope as platform mappings endpoint for consistency
+        # Get integration mappings for this user, optionally filtered by platform
         query = db.query(IntegrationMapping).filter(
             IntegrationMapping.user_id == current_user.id
         )
@@ -201,10 +250,19 @@ async def get_success_rates(
             logger.info(f"🔍 DEBUG: Filtering by platform: {platform}")
             
         # Apply same ordering and limit as platform endpoint to ensure consistency
-        mappings = query.order_by(IntegrationMapping.created_at.desc()).limit(50).all()
-        logger.info(f"🔍 DEBUG: Found {len(mappings)} mappings for user {current_user.id}, platform: {platform}")
+        integration_mappings = query.order_by(IntegrationMapping.created_at.desc()).limit(50).all()
         
-        if not mappings:
+        # Get manual mappings for this platform
+        manual_query = db.query(UserMapping).filter(
+            UserMapping.user_id == current_user.id
+        )
+        if platform:
+            manual_query = manual_query.filter(UserMapping.target_platform == platform)
+        manual_mappings = manual_query.all()
+        
+        logger.info(f"🔍 DEBUG: Found {len(integration_mappings)} integration + {len(manual_mappings)} manual mappings for user {current_user.id}, platform: {platform}")
+        
+        if not integration_mappings and not manual_mappings:
             return {
                 "overall_success_rate": 0,
                 "total_attempts": 0,
@@ -212,16 +270,13 @@ async def get_success_rates(
                 "members_with_data": 0
             }
         
-        # Calculate team member statistics (unique by email)
+        # Calculate team member statistics (unique by email) including both integration and manual mappings
         unique_emails = set()
         successful_emails = set()
         members_with_data = 0
         
-        # Debug: Show what platforms are actually in our filtered results
-        platforms_in_results = set(m.target_platform for m in mappings)
-        logger.info(f"🔍 DEBUG: Platforms in filtered results: {platforms_in_results}")
-        
-        for mapping in mappings:
+        # Process integration mappings
+        for mapping in integration_mappings:
             email = mapping.source_identifier
             unique_emails.add(email)
             
@@ -231,6 +286,13 @@ async def get_success_rates(
                 # Count members with actual data points
                 if mapping.data_collected and mapping.data_points_count and mapping.data_points_count > 0:
                     members_with_data += 1
+        
+        # Process manual mappings (all are considered successful)
+        for manual_mapping in manual_mappings:
+            email = manual_mapping.source_identifier
+            unique_emails.add(email)
+            successful_emails.add(email)  # Manual mappings are always successful
+            # Manual mappings don't have data collection
         
         total_team_members = len(unique_emails)
         total_successful = len(successful_emails)
@@ -244,7 +306,8 @@ async def get_success_rates(
             "overall_success_rate": round(overall_success_rate, 1),
             "total_attempts": total_team_members,
             "mapped_members": total_successful,
-            "members_with_data": members_with_data
+            "members_with_data": members_with_data,
+            "manual_mappings_count": len(manual_mappings)
         }
     except Exception as e:
         logger.error(f"Error fetching success rates: {e}")
