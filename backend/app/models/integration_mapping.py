@@ -1,7 +1,8 @@
 """
 Integration mapping model for tracking successful and failed user mapping attempts.
+Supports both automatic (AI-detected) and manual (user-created) mappings.
 """
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text, ForeignKey, Float
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from .base import Base
@@ -30,12 +31,19 @@ class IntegrationMapping(Base):
     data_collected = Column(Boolean, nullable=False, default=False)  # Whether we successfully collected data
     data_points_count = Column(Integer, nullable=True)  # Number of data points collected (commits, messages, etc.)
     
+    # Manual mapping support
+    mapping_source = Column(String(20), nullable=False, default='auto')  # 'auto', 'manual', 'verified'
+    created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # Who created manual mappings
+    confidence_score = Column(Float, nullable=True)  # For auto-detected mappings (0.0-1.0)
+    last_verified = Column(DateTime(timezone=True), nullable=True)  # When mapping was last verified
+    
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
     # Relationships
-    user = relationship("User", back_populates="integration_mappings")
+    user = relationship("User", foreign_keys=[user_id], back_populates="integration_mappings") 
     analysis = relationship("Analysis", back_populates="integration_mappings")
+    created_by = relationship("User", foreign_keys=[created_by_user_id], post_update=True)  # User who created manual mapping
     
     def __repr__(self):
         status = "✓" if self.mapping_successful else "✗"
@@ -51,6 +59,36 @@ class IntegrationMapping(Base):
         """Key for calculating success rates."""
         return f"{self.source_platform} -> {self.target_platform}"
     
+    @property
+    def is_manual(self) -> bool:
+        """Check if this is a manual mapping."""
+        return self.mapping_source == 'manual'
+    
+    @property
+    def is_verified(self) -> bool:
+        """Check if mapping has been verified recently (within 30 days)."""
+        if not self.last_verified:
+            return False
+        from datetime import datetime, timedelta
+        return self.last_verified > datetime.now() - timedelta(days=30)
+    
+    @property
+    def status(self) -> str:
+        """Get human-readable status."""
+        if self.mapping_source == "manual":
+            return "verified" if self.is_verified else "manual"
+        elif self.mapping_source == "verified":
+            return "verified"
+        elif self.mapping_successful:
+            if self.confidence_score and self.confidence_score > 0.8:
+                return "high_confidence"
+            elif self.confidence_score and self.confidence_score > 0.5:
+                return "medium_confidence"
+            else:
+                return "auto_detected"
+        else:
+            return "failed"
+    
     def to_dict(self) -> dict:
         """Convert to dictionary for API responses."""
         return {
@@ -65,5 +103,61 @@ class IntegrationMapping(Base):
             "data_collected": self.data_collected,
             "data_points_count": self.data_points_count,
             "created_at": self.created_at.isoformat() if self.created_at else None,
-            "mapping_key": self.mapping_key
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "mapping_key": self.mapping_key,
+            # New unified fields
+            "mapping_source": self.mapping_source,
+            "is_manual": self.is_manual,
+            "confidence_score": self.confidence_score,
+            "last_verified": self.last_verified.isoformat() if self.last_verified else None,
+            "status": self.status,
+            "is_verified": self.is_verified,
+            "created_by_user_id": self.created_by_user_id,
+            # Compatibility fields for frontend
+            "source": "manual" if self.is_manual else "integration"
         }
+    
+    @classmethod
+    def create_manual_mapping(
+        cls,
+        user_id: int,
+        source_platform: str,
+        source_identifier: str,
+        target_platform: str,
+        target_identifier: str,
+        created_by_user_id: int,
+        analysis_id: int = None
+    ):
+        """Create a new manual mapping."""
+        return cls(
+            user_id=user_id,
+            analysis_id=analysis_id,
+            source_platform=source_platform,
+            source_identifier=source_identifier,
+            target_platform=target_platform,
+            target_identifier=target_identifier,
+            mapping_successful=True,  # Manual mappings are successful by definition
+            mapping_method="manual",
+            mapping_source="manual",
+            created_by_user_id=created_by_user_id,
+            last_verified=func.now()  # Manual mappings are verified on creation
+        )
+    
+    def update_target_identifier(self, new_target_identifier: str, updated_by_user_id: int):
+        """Update the target identifier and convert to manual mapping (user has taken ownership)."""
+        old_source = self.mapping_source
+        
+        self.target_identifier = new_target_identifier
+        self.mapping_successful = True
+        self.mapping_source = 'manual'  # Convert to manual since user edited it
+        self.mapping_method = 'manual_edit'  # Track that this was edited
+        self.created_by_user_id = updated_by_user_id
+        self.last_verified = func.now()
+        self.updated_at = func.now()
+        # Clear any previous error messages
+        self.error_message = None
+        
+        # Log the conversion for debugging
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"🔄 Converting mapping from '{old_source}' to 'manual' after user edit: {self.source_identifier} -> {new_target_identifier}")
