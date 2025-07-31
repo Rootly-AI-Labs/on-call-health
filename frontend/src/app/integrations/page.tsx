@@ -3595,11 +3595,19 @@ export default function IntegrationsPage() {
                                 shouldShowPlusButton: !mapping.target_identifier && inlineEditingId !== mapping.id,
                                 mapping_successful: mapping.mapping_successful,
                                 error_message: mapping.error_message,
-                                full_mapping: mapping
+                                full_mapping: mapping,
+                                is_manual: mapping.is_manual
                               })
                               return mapping.target_identifier ? (
-                                // Show existing mapping
-                                <span>{mapping.target_identifier}</span>
+                                // Show existing mapping with manual indicator
+                                <div className="flex items-center gap-1">
+                                  <span>{mapping.target_identifier}</span>
+                                  {mapping.is_manual && (
+                                    <Badge variant="outline" className="ml-1 text-xs bg-blue-50 text-blue-700 border-blue-200">
+                                      Manual
+                                    </Badge>
+                                  )}
+                                </div>
                               ) : inlineEditingId === mapping.id ? (
                               // Show inline edit form
                               <div className="space-y-1">
@@ -3681,29 +3689,29 @@ export default function IntegrationsPage() {
                                 )}
                               </div>
                             ) : (
-                              // Show error message with edit button
-                              <div className="relative">
-                                <span className="text-gray-400 italic text-xs">
-                                  No data found
-                                </span>
-                                {(() => {
-                                  console.log('🔥 RENDERING + BUTTON for', mapping.source_identifier, 'shouldShow:', !mapping.target_identifier && inlineEditingId !== mapping.id)
-                                  return (
-                                    <button
-                                      onClick={() => startInlineEdit(mapping.id)}
-                                      className="ml-2 px-1.5 py-0.5 text-xs text-blue-600 hover:text-blue-700 border border-blue-300 rounded bg-blue-50 hover:bg-blue-100 font-medium inline-block"
-                                      title={`Add ${selectedMappingPlatform === 'github' ? 'GitHub' : 'Slack'} username`}
-                                    >
-                                      +
-                                    </button>
-                                  )
-                                })()}
-                              </div>
+                              // Show clickable "Add username" area
+                              <button
+                                onClick={() => startInlineEdit(mapping.id)}
+                                className="w-full text-left px-2 py-1 text-xs text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded border border-dashed border-gray-300 hover:border-blue-300 transition-colors flex items-center gap-2"
+                                title={`Click to add ${selectedMappingPlatform === 'github' ? 'GitHub' : 'Slack'} username`}
+                              >
+                                <Plus className="w-3 h-3 flex-shrink-0" />
+                                <span className="truncate">Click to add {selectedMappingPlatform === 'github' ? 'GitHub' : 'Slack'} username</span>
+                              </button>
                             )
                             })()}
                           </div>
                           <div className="text-gray-600">
-                            {mapping.mapping_method?.replace('_', ' ') || 'Unknown'}
+                            {mapping.is_manual ? (
+                              <div className="flex items-center gap-1">
+                                <span>Manual</span>
+                                <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                                  User Added
+                                </Badge>
+                              </div>
+                            ) : (
+                              mapping.mapping_method?.replace('_', ' ') || 'Auto-detected'
+                            )}
                           </div>
                         </div>
                       </div>
