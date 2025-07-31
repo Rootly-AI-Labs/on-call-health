@@ -179,9 +179,35 @@ async def get_platform_mappings(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ) -> List[dict]:
-    """Get recent integration mappings for a specific target platform, including manual mappings."""
+    """Get recent integration mappings for a specific target platform, including manual mappings and user names."""
     try:
-        from ...models import UserMapping
+        from ...models import UserMapping, Analysis
+        import json
+        
+        # Get user names from the most recent completed analysis
+        user_name_lookup = {}
+        recent_analysis = db.query(Analysis).filter(
+            Analysis.user_id == current_user.id,
+            Analysis.status == "completed",
+            Analysis.results.isnot(None)
+        ).order_by(Analysis.created_at.desc()).first()
+        
+        if recent_analysis and recent_analysis.results:
+            try:
+                results = json.loads(recent_analysis.results) if isinstance(recent_analysis.results, str) else recent_analysis.results
+                team_analysis = results.get("team_analysis", {})
+                members = team_analysis.get("members", []) if isinstance(team_analysis, dict) else team_analysis
+                
+                # Build email to name lookup
+                for member in members:
+                    email = member.get("user_email")
+                    name = member.get("user_name")
+                    if email and name:
+                        user_name_lookup[email.lower()] = name
+                        
+                logger.info(f"🔍 DEBUG: Loaded {len(user_name_lookup)} user names from analysis {recent_analysis.id}")
+            except Exception as e:
+                logger.warning(f"Could not extract user names from analysis: {e}")
         
         # Get most recent integration mappings, limited to prevent UI overload
         integration_mappings = db.query(IntegrationMapping).filter(
@@ -207,6 +233,7 @@ async def get_platform_mappings(
             mapping_dict = {
                 "id": f"manual_{manual_mapping.id}",  # Prefix to avoid conflicts
                 "source_identifier": manual_mapping.source_identifier,
+                "source_name": user_name_lookup.get(manual_mapping.source_identifier.lower(), ""),  # Add user name
                 "target_identifier": manual_mapping.target_identifier,
                 "target_platform": manual_mapping.target_platform,
                 "mapping_successful": True,  # Manual mappings are considered successful
@@ -231,6 +258,7 @@ async def get_platform_mappings(
                 mapping_dict = mapping.to_dict()
                 mapping_dict["source"] = "integration"
                 mapping_dict["is_manual"] = False
+                mapping_dict["source_name"] = user_name_lookup.get(email.lower(), "")  # Add user name
                 all_mappings.append(mapping_dict)
                 seen_emails.add(email)
         

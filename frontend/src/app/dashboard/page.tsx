@@ -709,6 +709,11 @@ export default function Dashboard() {
     }
   }, [currentAnalysis])
 
+  // Load platform mappings on component mount (same as integrations page)
+  useEffect(() => {
+    fetchPlatformMappings()
+  }, [])
+
   const loadPreviousAnalyses = async () => {
     try {
       const authToken = localStorage.getItem('auth_token')
@@ -744,8 +749,8 @@ export default function Dashboard() {
           const mostRecentAnalysis = data.analyses[0] // Analyses should be ordered by created_at desc
           console.log('Auto-loading most recent analysis:', mostRecentAnalysis.id)
           setCurrentAnalysis(mostRecentAnalysis)
-          // Fetch mappings for this analysis
-          fetchAnalysisMappings(mostRecentAnalysis.id)
+          // Fetch platform mappings (same as integrations page)
+          fetchPlatformMappings()
         }
       } else {
         console.error('Failed to load analyses, status:', response.status)
@@ -792,8 +797,8 @@ export default function Dashboard() {
         const analysis = await response.json()
         console.log('Loaded specific analysis from URL:', analysis.uuid || analysis.id)
         setCurrentAnalysis(analysis)
-        // Fetch mappings for this analysis
-        fetchAnalysisMappings(analysis.id)
+        // Fetch platform mappings (same as integrations page)
+        fetchPlatformMappings()
         // Turn off redirect loader since we successfully loaded the analysis
         setRedirectingToSuggested(false)
         // Update URL to use UUID if we loaded by integer ID
@@ -980,28 +985,44 @@ export default function Dashboard() {
     }
   }
 
-  // Function to fetch analysis mappings
-  const fetchAnalysisMappings = async (analysisId: string) => {
+  // Function to fetch platform mappings (same as integrations page)
+  const fetchPlatformMappings = async () => {
     try {
       const authToken = localStorage.getItem('auth_token')
       if (!authToken) return
       
-      const response = await fetch(`${API_BASE}/integrations/mappings/analysis/${analysisId}`, {
-        headers: { 'Authorization': `Bearer ${authToken}` }
-      })
+      // Fetch both GitHub and Slack mappings like the integrations page does
+      const [githubResponse, slackResponse] = await Promise.all([
+        fetch(`${API_BASE}/integrations/mappings/platform/github`, {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        }),
+        fetch(`${API_BASE}/integrations/mappings/platform/slack`, {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        })
+      ])
       
-      if (response.ok) {
-        const mappingsData = await response.json()
-        console.log('📊 Analysis mappings loaded:', mappingsData)
-        console.log('📊 GitHub mappings found:', mappingsData.mappings?.filter(m => m.target_platform === 'github'))
-        setAnalysisMappings(mappingsData)
+      let allMappings: any[] = []
+      
+      if (githubResponse.ok) {
+        const githubMappings = await githubResponse.json()
+        console.log('📊 GitHub mappings from platform endpoint:', githubMappings)
+        allMappings = allMappings.concat(githubMappings)
       }
+      
+      if (slackResponse.ok) {
+        const slackMappings = await slackResponse.json()
+        console.log('📊 Slack mappings from platform endpoint:', slackMappings)
+        allMappings = allMappings.concat(slackMappings)
+      }
+      
+      console.log('📊 All platform mappings loaded (same as integrations page):', allMappings)
+      setAnalysisMappings({ mappings: allMappings })
     } catch (error) {
-      console.error('Error fetching analysis mappings:', error)
+      console.error('Error fetching platform mappings:', error)
     }
   }
 
-  // Helper function to check if user has GitHub mapping (show all mapped users)
+  // Helper function to check if user has GitHub mapping (only if actually mapped)
   const hasGitHubMapping = (userEmail: string) => {
     if (!analysisMappings?.mappings) {
       console.log('🔍 No mappings data available yet for', userEmail)
@@ -1010,22 +1031,26 @@ export default function Dashboard() {
     
     const hasMapping = analysisMappings.mappings.some((mapping: any) => 
       mapping.source_identifier === userEmail && 
-      mapping.target_platform === "github"
-      // Removed mapping_successful check to show all mapped users
+      mapping.target_platform === "github" &&
+      mapping.target_identifier && // Must have a target identifier
+      mapping.target_identifier !== "unknown" && // Must not be "unknown"
+      mapping.target_identifier.trim() !== "" // Must not be empty
     )
     
     console.log(`🔍 GitHub mapping check for ${userEmail}:`, hasMapping)
     return hasMapping
   }
 
-  // Helper function to check if user has Slack mapping (show all mapped users)
+  // Helper function to check if user has Slack mapping (only if actually mapped)
   const hasSlackMapping = (userEmail: string) => {
     if (!analysisMappings?.mappings) return false
     
     return analysisMappings.mappings.some((mapping: any) => 
       mapping.source_identifier === userEmail && 
-      mapping.target_platform === "slack"
-      // Removed mapping_successful check to show all mapped users
+      mapping.target_platform === "slack" &&
+      mapping.target_identifier && // Must have a target identifier
+      mapping.target_identifier !== "unknown" && // Must not be "unknown"
+      mapping.target_identifier.trim() !== "" // Must not be empty
     )
   }
 

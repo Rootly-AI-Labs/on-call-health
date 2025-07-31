@@ -96,6 +96,7 @@ interface IntegrationMapping {
   id: number | string // Can be number or "manual_123" for manual mappings
   source_platform: string
   source_identifier: string
+  source_name?: string  // User's full name from analysis data
   target_platform: string
   target_identifier: string | null
   mapping_successful: boolean
@@ -3711,8 +3712,17 @@ export default function IntegrationsPage() {
                       return (
                       <div key={mapping.id} className="px-4 py-3">
                         <div className="grid grid-cols-4 gap-4 text-sm">
-                          <div className="font-medium truncate" title={mapping.source_identifier}>
-                            {mapping.source_identifier}
+                          <div className="font-medium" title={mapping.source_identifier}>
+                            <div className="truncate">
+                              {mapping.source_name ? (
+                                <>
+                                  <span className="font-semibold">{mapping.source_name}</span>
+                                  <div className="text-xs text-gray-500 truncate">{mapping.source_identifier}</div>
+                                </>
+                              ) : (
+                                mapping.source_identifier
+                              )}
+                            </div>
                           </div>
                           <div className="space-y-1">
                             {mapping.mapping_successful ? (
