@@ -170,6 +170,7 @@ async def get_success_rates(
             return {
                 "overall_success_rate": 0,
                 "total_attempts": 0,
+                "mapped_members": 0,
                 "members_with_data": 0
             }
         
@@ -204,6 +205,7 @@ async def get_success_rates(
         return {
             "overall_success_rate": round(overall_success_rate, 1),
             "total_attempts": total_team_members,
+            "mapped_members": total_successful,
             "members_with_data": members_with_data
         }
     except Exception as e:

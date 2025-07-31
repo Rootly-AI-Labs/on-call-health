@@ -3260,10 +3260,10 @@ export default function IntegrationsPage() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Card className="p-4">
                   <div className="flex items-center space-x-2">
-                    <Users2 className="w-4 h-4 text-blue-600" />
+                    <Users2 className="w-4 h-4 text-green-600" />
                     <div>
-                      <div className="text-2xl font-bold">{mappingStats.total_attempts}</div>
-                      <div className="text-sm text-gray-600">Team Members</div>
+                      <div className="text-2xl font-bold">{mappingStats.mapped_members || mappingStats.total_attempts}</div>
+                      <div className="text-sm text-gray-600">Mapped Members</div>
                     </div>
                   </div>
                 </Card>
