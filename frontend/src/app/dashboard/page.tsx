@@ -387,6 +387,7 @@ export default function Dashboard() {
   const [historicalTrends, setHistoricalTrends] = useState<any>(null)
   const [loadingTrends, setLoadingTrends] = useState(false)
   const [initialDataLoaded, setInitialDataLoaded] = useState(false)
+  const [analysisMappings, setAnalysisMappings] = useState<any>(null)
   const [hasDataFromCache, setHasDataFromCache] = useState(false)
   // Initialize redirectingToSuggested to true if there's an analysis ID in URL
   const [redirectingToSuggested, setRedirectingToSuggested] = useState(() => {
@@ -743,6 +744,8 @@ export default function Dashboard() {
           const mostRecentAnalysis = data.analyses[0] // Analyses should be ordered by created_at desc
           console.log('Auto-loading most recent analysis:', mostRecentAnalysis.id)
           setCurrentAnalysis(mostRecentAnalysis)
+          // Fetch mappings for this analysis
+          fetchAnalysisMappings(mostRecentAnalysis.id)
         }
       } else {
         console.error('Failed to load analyses, status:', response.status)
@@ -789,6 +792,8 @@ export default function Dashboard() {
         const analysis = await response.json()
         console.log('Loaded specific analysis from URL:', analysis.uuid || analysis.id)
         setCurrentAnalysis(analysis)
+        // Fetch mappings for this analysis
+        fetchAnalysisMappings(analysis.id)
         // Turn off redirect loader since we successfully loaded the analysis
         setRedirectingToSuggested(false)
         // Update URL to use UUID if we loaded by integer ID
@@ -973,6 +978,47 @@ export default function Dashboard() {
       setDeleteDialogOpen(false)
       setAnalysisToDelete(null)
     }
+  }
+
+  // Function to fetch analysis mappings
+  const fetchAnalysisMappings = async (analysisId: string) => {
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) return
+      
+      const response = await fetch(`${API_BASE}/integrations/mappings/analysis/${analysisId}`, {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      })
+      
+      if (response.ok) {
+        const mappingsData = await response.json()
+        setAnalysisMappings(mappingsData)
+      }
+    } catch (error) {
+      console.error('Error fetching analysis mappings:', error)
+    }
+  }
+
+  // Helper function to check if user has GitHub mapping
+  const hasGitHubMapping = (userEmail: string) => {
+    if (!analysisMappings?.mappings) return false
+    
+    return analysisMappings.mappings.some((mapping: any) => 
+      mapping.source_identifier === userEmail && 
+      mapping.target_platform === "github" && 
+      mapping.mapping_successful
+    )
+  }
+
+  // Helper function to check if user has Slack mapping
+  const hasSlackMapping = (userEmail: string) => {
+    if (!analysisMappings?.mappings) return false
+    
+    return analysisMappings.mappings.some((mapping: any) => 
+      mapping.source_identifier === userEmail && 
+      mapping.target_platform === "slack" && 
+      mapping.mapping_successful
+    )
   }
 
   const loadIntegrations = async (forceRefresh = false, showGlobalLoading = true) => {
@@ -4060,8 +4106,8 @@ export default function Dashboard() {
                               />
                             </div>
                             
-                            {/* GitHub - code repository - show if user has GitHub activity data */}
-                            {member.github_activity && (
+                            {/* GitHub - code repository - show if user has GitHub mapping */}
+                            {hasGitHubMapping(member.user_email) && (
                               <div className="flex items-center justify-center w-6 h-6 bg-gray-100 rounded-full border border-gray-200" title="GitHub">
                                 <svg className="w-3.5 h-3.5 text-gray-700" fill="currentColor" viewBox="0 0 24 24">
                                   <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/>
@@ -4069,8 +4115,8 @@ export default function Dashboard() {
                               </div>
                             )}
                             
-                            {/* Slack - communication - show if user has Slack activity data */}
-                            {member.slack_activity && (
+                            {/* Slack - communication - show if user has Slack mapping */}
+                            {hasSlackMapping(member.user_email) && (
                               <div className="flex items-center justify-center w-6 h-6 bg-white rounded-full border border-gray-200" title="Slack">
                                 <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
                                   {/* Official Slack logo pattern */}
