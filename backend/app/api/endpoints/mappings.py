@@ -65,10 +65,10 @@ async def get_analysis_mappings(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ) -> dict:
-    """Get all integration mappings for a specific analysis with proper team member statistics."""
+    """Get all integration mappings for a specific analysis with proper team member statistics, including manual mappings."""
     try:
         # Verify the analysis belongs to the current user
-        from ...models import Analysis
+        from ...models import Analysis, UserMapping
         analysis = db.query(Analysis).filter(
             Analysis.id == analysis_id,
             Analysis.user_id == current_user.id
@@ -78,13 +78,50 @@ async def get_analysis_mappings(
             raise HTTPException(status_code=404, detail="Analysis not found")
         
         recorder = MappingRecorder(db)
-        mappings = recorder.get_analysis_mappings(analysis_id)
+        integration_mappings = recorder.get_analysis_mappings(analysis_id)
         
-        # Calculate proper team member statistics
-        github_mappings = [m for m in mappings if m.target_platform == "github"]
+        # Get manual mappings for this user
+        manual_mappings = db.query(UserMapping).filter(
+            UserMapping.user_id == current_user.id
+        ).all()
+        
+        # Convert to common format and merge
+        all_mappings = []
+        
+        # Add integration mappings with source flag
+        for mapping in integration_mappings:
+            mapping_dict = mapping.to_dict()
+            mapping_dict["source"] = "integration"
+            mapping_dict["is_manual"] = False
+            all_mappings.append(mapping_dict)
+        
+        # Add manual mappings with source flag
+        for manual_mapping in manual_mappings:
+            # Convert UserMapping to IntegrationMapping-like format
+            mapping_dict = {
+                "id": f"manual_{manual_mapping.id}",  # Prefix to avoid conflicts
+                "source_identifier": manual_mapping.source_identifier,
+                "target_identifier": manual_mapping.target_identifier,
+                "target_platform": manual_mapping.target_platform,
+                "mapping_successful": True,  # Manual mappings are considered successful
+                "data_collected": False,  # Manual mappings don't have data collection status
+                "data_points_count": 0,
+                "created_at": manual_mapping.created_at.isoformat() if manual_mapping.created_at else None,
+                "updated_at": manual_mapping.updated_at.isoformat() if manual_mapping.updated_at else None,
+                "source": "manual",
+                "is_manual": True,
+                "mapping_type": manual_mapping.mapping_type,
+                "status": manual_mapping.status,
+                "confidence_score": manual_mapping.confidence_score,
+                "last_verified": manual_mapping.last_verified.isoformat() if manual_mapping.last_verified else None
+            }
+            all_mappings.append(mapping_dict)
+        
+        # Calculate proper team member statistics (including manual mappings)
+        github_mappings = [m for m in all_mappings if m["target_platform"] == "github"]
         
         # Get unique team members (by email)
-        unique_emails = set(m.source_identifier for m in github_mappings)
+        unique_emails = set(m["source_identifier"] for m in github_mappings)
         total_team_members = len(unique_emails)
         
         # Count successful mappings (unique emails with successful mapping)
@@ -92,9 +129,9 @@ async def get_analysis_mappings(
         members_with_data = 0
         
         for mapping in github_mappings:
-            if mapping.mapping_successful and mapping.target_identifier != "unknown":
-                successful_emails.add(mapping.source_identifier)
-                if mapping.data_points_count and mapping.data_points_count > 0:
+            if mapping["mapping_successful"] and mapping["target_identifier"] != "unknown":
+                successful_emails.add(mapping["source_identifier"])
+                if mapping.get("data_points_count") and mapping["data_points_count"] > 0:
                     members_with_data += 1
         
         successful_mappings = len(successful_emails)
@@ -103,13 +140,14 @@ async def get_analysis_mappings(
         success_rate = (successful_mappings / total_team_members * 100) if total_team_members > 0 else 0
         
         return {
-            "mappings": [mapping.to_dict() for mapping in mappings],
+            "mappings": all_mappings,
             "statistics": {
                 "total_team_members": total_team_members,
                 "successful_mappings": successful_mappings,
                 "members_with_data": members_with_data,
                 "success_rate": round(success_rate, 1),
-                "failed_mappings": total_team_members - successful_mappings
+                "failed_mappings": total_team_members - successful_mappings,
+                "manual_mappings_count": len([m for m in all_mappings if m["is_manual"]])
             },
             "analysis_id": analysis_id
         }
