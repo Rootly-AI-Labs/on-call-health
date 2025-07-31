@@ -1324,6 +1324,90 @@ export default function IntegrationsPage() {
     setInlineEditingValue('')
     setGithubValidation(null)
   }
+
+  const startEditExisting = (mappingId: number | string, currentValue: string) => {
+    setInlineEditingId(mappingId)
+    setInlineEditingValue(currentValue)
+    setGithubValidation(null)
+  }
+
+  const saveEditedMapping = async (mappingId: number | string, email: string) => {
+    if (!inlineEditingValue.trim()) {
+      toast.error('Please enter a valid username')
+      return
+    }
+    
+    // Skip manual mappings with string IDs - they should use the regular edit endpoint
+    if (typeof mappingId === 'string' && mappingId.startsWith('manual_')) {
+      toast.error('Cannot edit manual mappings this way')
+      return
+    }
+    
+    // Validate GitHub username first
+    if (selectedMappingPlatform === 'github') {
+      if (!githubValidation || githubValidation.valid !== true) {
+        const isValid = await validateGithubUsername(inlineEditingValue)
+        if (!isValid) {
+          toast.error(`Invalid GitHub username: ${githubValidation?.message || 'User not found'}`, {
+            duration: 4000
+          })
+          return
+        }
+      }
+    }
+
+    setSavingInlineMapping(true)
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) {
+        toast.error('Please log in to edit mappings')
+        return
+      }
+
+      const response = await fetch(`${API_BASE}/integrations/mappings/${mappingId}/edit?new_target_identifier=${encodeURIComponent(inlineEditingValue.trim())}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        toast.success(result.message || `Successfully updated mapping to '${inlineEditingValue}'`)
+        
+        // Update the local mapping data
+        setMappingData(prevData => 
+          prevData.map(m => 
+            m.id === mappingId 
+              ? { 
+                  ...m, 
+                  target_identifier: inlineEditingValue.trim(),
+                  mapping_successful: true,
+                  is_manual: true,  // It becomes manual after editing
+                  source: 'manual',
+                  mapping_method: 'manual_edit',
+                  last_updated: new Date().toISOString()
+                } 
+              : m
+          )
+        )
+        
+        // Clear editing state
+        setInlineEditingId(null)
+        setInlineEditingValue('')
+        setGithubValidation(null)
+      } else {
+        const errorData = await response.json()
+        toast.error(errorData.message || 'Failed to update mapping')
+      }
+    } catch (error) {
+      console.error('Error updating mapping:', error)
+      toast.error('Failed to update mapping')
+    } finally {
+      setSavingInlineMapping(false)
+    }
+  }
   
   // Handle inline value change with debounced validation
   const handleInlineValueChange = (value: string) => {
@@ -3617,15 +3701,100 @@ export default function IntegrationsPage() {
                                 is_manual: mapping.is_manual
                               })
                               return mapping.target_identifier ? (
-                                // Show existing mapping with manual indicator
-                                <div className="flex items-center gap-1">
-                                  <span>{mapping.target_identifier}</span>
-                                  {mapping.is_manual && (
-                                    <Badge variant="outline" className="ml-1 text-xs bg-blue-50 text-blue-700 border-blue-200">
-                                      Manual
-                                    </Badge>
-                                  )}
-                                </div>
+                                inlineEditingId === mapping.id ? (
+                                  // Show edit form for existing mapping
+                                  <div className="space-y-1">
+                                    <div className="flex items-center space-x-2">
+                                      <input
+                                        type="text"
+                                        value={inlineEditingValue}
+                                        onChange={(e) => handleInlineValueChange(e.target.value)}
+                                        placeholder={`Edit ${selectedMappingPlatform === 'github' ? 'GitHub' : 'Slack'} username`}
+                                        className={`flex-1 px-2 py-1 text-xs border rounded focus:outline-none focus:ring-1 ${
+                                          githubValidation?.valid === false 
+                                            ? 'border-red-300 focus:ring-red-500' 
+                                            : githubValidation?.valid === true
+                                            ? 'border-green-300 focus:ring-green-500'
+                                            : 'border-gray-300 focus:ring-blue-500'
+                                        }`}
+                                        autoFocus
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') {
+                                            saveEditedMapping(mapping.id, mapping.source_identifier)
+                                          } else if (e.key === 'Escape') {
+                                            cancelInlineEdit()
+                                          }
+                                        }}
+                                      />
+                                      <button
+                                        onClick={() => {
+                                          if (selectedMappingPlatform === 'github' && githubValidation?.valid !== true) {
+                                            toast.error(`Cannot save invalid username: ${githubValidation?.message || 'Please enter a valid GitHub username'}`, {
+                                              duration: 4000
+                                            })
+                                            return
+                                          }
+                                          saveEditedMapping(mapping.id, mapping.source_identifier)
+                                        }}
+                                        disabled={savingInlineMapping || validatingGithub}
+                                        className={`p-1 hover:opacity-80 disabled:opacity-50 ${
+                                          selectedMappingPlatform === 'github' && githubValidation?.valid !== true
+                                            ? 'text-gray-400 cursor-not-allowed'
+                                            : 'text-green-600 hover:text-green-700'
+                                        }`}
+                                        title="Save changes"
+                                      >
+                                        <CheckCircle className="w-4 h-4" />
+                                      </button>
+                                      <button
+                                        onClick={cancelInlineEdit}
+                                        disabled={savingInlineMapping}
+                                        className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-50"
+                                        title="Cancel"
+                                      >
+                                        <X className="w-4 h-4" />
+                                      </button>
+                                    </div>
+                                    {/* Validation feedback */}
+                                    {(validatingGithub || githubValidation) && (
+                                      <div className="flex items-center gap-1 text-xs">
+                                        {validatingGithub ? (
+                                          <>
+                                            <Loader2 className="w-3 h-3 animate-spin" />
+                                            <span className="text-gray-500">Validating...</span>
+                                          </>
+                                        ) : githubValidation?.valid ? (
+                                          <>
+                                            <CheckCircle className="w-3 h-3 text-green-600" />
+                                            <span className="text-green-600">{githubValidation.message}</span>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <AlertCircle className="w-3 h-3 text-red-600" />
+                                            <span className="text-red-600">{githubValidation?.message}</span>
+                                          </>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  // Show existing mapping with manual indicator and edit button
+                                  <div className="flex items-center gap-1 group">
+                                    <span>{mapping.target_identifier}</span>
+                                    {mapping.is_manual && (
+                                      <Badge variant="outline" className="ml-1 text-xs bg-blue-50 text-blue-700 border-blue-200">
+                                        Manual
+                                      </Badge>
+                                    )}
+                                    <button
+                                      onClick={() => startEditExisting(mapping.id, mapping.target_identifier)}
+                                      className="ml-1 p-1 opacity-0 group-hover:opacity-100 text-gray-400 hover:text-blue-600 transition-opacity"
+                                      title="Edit mapping"
+                                    >
+                                      <Edit3 className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                )
                               ) : inlineEditingId === mapping.id ? (
                               // Show inline edit form
                               <div className="space-y-1">
