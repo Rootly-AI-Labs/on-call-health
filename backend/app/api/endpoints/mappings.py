@@ -195,12 +195,44 @@ async def get_platform_mappings(
             UserMapping.target_platform == platform
         ).all()
         
-        # With unified table, we just need to get all mappings and let the model handle the logic
+        # Revert to working dual-table approach temporarily
         all_mappings = []
+        seen_emails = set()
         
-        # Get all integration mappings for this platform (includes both auto and manual)
+        # First, add manual mappings (they take priority)
+        for manual_mapping in manual_mappings:
+            email = manual_mapping.source_identifier
+            seen_emails.add(email)
+            
+            mapping_dict = {
+                "id": f"manual_{manual_mapping.id}",  # Prefix to avoid conflicts
+                "source_identifier": manual_mapping.source_identifier,
+                "target_identifier": manual_mapping.target_identifier,
+                "target_platform": manual_mapping.target_platform,
+                "mapping_successful": True,  # Manual mappings are considered successful
+                "data_collected": False,  # Manual mappings don't have data collection status
+                "data_points_count": 0,
+                "created_at": manual_mapping.created_at.isoformat() if manual_mapping.created_at else None,
+                "updated_at": manual_mapping.updated_at.isoformat() if manual_mapping.updated_at else None,
+                "source": "manual",
+                "is_manual": True,
+                "mapping_type": manual_mapping.mapping_type,
+                "status": manual_mapping.status,
+                "confidence_score": manual_mapping.confidence_score,
+                "last_verified": manual_mapping.last_verified.isoformat() if manual_mapping.last_verified else None,
+                "mapping_method": "manual"  # Add this for the Method column
+            }
+            all_mappings.append(mapping_dict)
+        
+        # Then add integration mappings, but skip emails that already have manual mappings
         for mapping in integration_mappings:
-            all_mappings.append(mapping.to_dict())
+            email = mapping.source_identifier
+            if email not in seen_emails:  # Only add if no manual mapping exists for this email
+                mapping_dict = mapping.to_dict()
+                mapping_dict["source"] = "integration"
+                mapping_dict["is_manual"] = False
+                all_mappings.append(mapping_dict)
+                seen_emails.add(email)
         
         logger.info(f"🔍 DEBUG: Platform {platform} endpoint returning {len(integration_mappings)} integration + {len(manual_mappings)} manual mappings")
         
@@ -470,70 +502,12 @@ async def edit_mapping(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ) -> dict:
-    """Edit any mapping's target identifier (works for both auto and manual mappings)."""
-    try:
-        # Find the mapping
-        mapping = db.query(IntegrationMapping).filter(
-            IntegrationMapping.id == mapping_id,
-            IntegrationMapping.user_id == current_user.id
-        ).first()
-        
-        if not mapping:
-            raise HTTPException(status_code=404, detail="Mapping not found")
-        
-        # Validate the new target identifier if it's for GitHub
-        if mapping.target_platform == "github":
-            from ...models import GitHubIntegration
-            
-            # Get GitHub integration for validation
-            integration = db.query(GitHubIntegration).filter(
-                GitHubIntegration.user_id == current_user.id,
-                GitHubIntegration.github_token.isnot(None)
-            ).first()
-            
-            if integration and integration.has_token:
-                from ...services.github_api_manager import github_api_manager
-                from ...api.endpoints.github import decrypt_token
-                
-                try:
-                    decrypted_token = decrypt_token(integration.github_token)
-                    user_info = await github_api_manager.fetch_user_info(
-                        username=new_target_identifier,
-                        token=decrypted_token
-                    )
-                    
-                    if not user_info or user_info.get("error"):
-                        return {
-                            "success": False,
-                            "error": "Invalid username",
-                            "message": f"GitHub user '{new_target_identifier}' not found or not accessible"
-                        }
-                except Exception as e:
-                    logger.warning(f"Could not validate GitHub username {new_target_identifier}: {e}")
-                    # Continue anyway - validation is optional
-        
-        # Store old value for response
-        old_target_identifier = mapping.target_identifier
-        
-        # Update the mapping
-        mapping.update_target_identifier(new_target_identifier, current_user.id)
-        
-        db.commit()
-        db.refresh(mapping)
-        
-        logger.info(f"✅ Updated mapping {mapping_id}: {mapping.source_identifier} -> {old_target_identifier} → {new_target_identifier}")
-        
-        return {
-            "success": True,
-            "message": f"Successfully updated mapping from '{old_target_identifier}' to '{new_target_identifier}'",
-            "mapping": mapping.to_dict()
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error editing mapping {mapping_id}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to edit mapping")
+    """Edit any mapping's target identifier (temporarily disabled during migration)."""
+    return {
+        "success": False,
+        "error": "Feature temporarily disabled",
+        "message": "Mapping editing is temporarily disabled during database migration. Please try again later."
+    }
 
 @router.post("/mappings/cleanup-duplicates", summary="Clean up duplicate mappings for all platforms")
 async def cleanup_duplicate_mappings(
