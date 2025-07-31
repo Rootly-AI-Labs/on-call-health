@@ -264,9 +264,9 @@ export default function IntegrationsPage() {
   const [analysisMappingStats, setAnalysisMappingStats] = useState<AnalysisMappingStatistics | null>(null)
   const [currentAnalysisId, setCurrentAnalysisId] = useState<number | null>(null)
   const [loadingMappingData, setLoadingMappingData] = useState(false)
-  const [editingMapping, setEditingMapping] = useState<number | null>(null)
-  const [editingValue, setEditingValue] = useState('')
-  const [savingMapping, setSavingMapping] = useState(false)
+  const [inlineEditingId, setInlineEditingId] = useState<number | null>(null)
+  const [inlineEditingValue, setInlineEditingValue] = useState('')
+  const [savingInlineMapping, setSavingInlineMapping] = useState(false)
   
   // Manual mapping state
   const [showManualMappingDialog, setShowManualMappingDialog] = useState(false)
@@ -1179,23 +1179,23 @@ export default function IntegrationsPage() {
   }
 
   // Inline mapping edit handlers
-  const startEditMapping = (mappingId: number, currentValue: string = '') => {
-    setEditingMapping(mappingId)
-    setEditingValue(currentValue)
+  const startInlineEdit = (mappingId: number, currentValue: string = '') => {
+    setInlineEditingId(mappingId)
+    setInlineEditingValue(currentValue)
   }
 
-  const cancelEditMapping = () => {
-    setEditingMapping(null)
-    setEditingValue('')
+  const cancelInlineEdit = () => {
+    setInlineEditingId(null)
+    setInlineEditingValue('')
   }
 
   const saveInlineMapping = async (mappingId: number, email: string) => {
-    if (!editingValue.trim()) {
+    if (!inlineEditingValue.trim()) {
       toast.error('Please enter a GitHub username')
       return
     }
 
-    setSavingMapping(true)
+    setSavingInlineMapping(true)
     try {
       const authToken = localStorage.getItem('auth_token')
       if (!authToken) {
@@ -1213,14 +1213,14 @@ export default function IntegrationsPage() {
           source_platform: 'rootly',
           source_identifier: email,
           target_platform: selectedMappingPlatform,
-          target_identifier: editingValue.trim()
+          target_identifier: inlineEditingValue.trim()
         })
       })
 
       if (response.ok) {
-        toast.success(`Manual mapping saved: ${email} → ${editingValue}`)
-        setEditingMapping(null)
-        setEditingValue('')
+        toast.success(`Manual mapping saved: ${email} → ${inlineEditingValue}`)
+        setInlineEditingId(null)
+        setInlineEditingValue('')
         // Refresh the mapping data to show the updated mapping
         if (selectedMappingPlatform) {
           await loadMappingData(selectedMappingPlatform)
@@ -1233,7 +1233,7 @@ export default function IntegrationsPage() {
       console.error('Error saving manual mapping:', error)
       toast.error('Failed to save mapping')
     } finally {
-      setSavingMapping(false)
+      setSavingInlineMapping(false)
     }
   }
 
@@ -3392,13 +3392,13 @@ export default function IntegrationsPage() {
                             {mapping.target_identifier ? (
                               // Show existing mapping
                               <span>{mapping.target_identifier}</span>
-                            ) : editingMapping === mapping.id ? (
+                            ) : inlineEditingId === mapping.id ? (
                               // Show inline edit form
                               <div className="flex items-center space-x-2">
                                 <input
                                   type="text"
-                                  value={editingValue}
-                                  onChange={(e) => setEditingValue(e.target.value)}
+                                  value={inlineEditingValue}
+                                  onChange={(e) => setInlineEditingValue(e.target.value)}
                                   placeholder={`Enter ${selectedMappingPlatform === 'github' ? 'GitHub' : 'Slack'} username`}
                                   className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                                   autoFocus
@@ -3406,21 +3406,21 @@ export default function IntegrationsPage() {
                                     if (e.key === 'Enter') {
                                       saveInlineMapping(mapping.id, mapping.source_identifier)
                                     } else if (e.key === 'Escape') {
-                                      cancelEditMapping()
+                                      cancelInlineEdit()
                                     }
                                   }}
                                 />
                                 <button
                                   onClick={() => saveInlineMapping(mapping.id, mapping.source_identifier)}
-                                  disabled={savingMapping}
+                                  disabled={savingInlineMapping}
                                   className="p-1 text-green-600 hover:text-green-700 disabled:opacity-50"
                                   title="Save"
                                 >
                                   <CheckCircle className="w-4 h-4" />
                                 </button>
                                 <button
-                                  onClick={cancelEditMapping}
-                                  disabled={savingMapping}
+                                  onClick={cancelInlineEdit}
+                                  disabled={savingInlineMapping}
                                   className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-50"
                                   title="Cancel"
                                 >
@@ -3434,7 +3434,7 @@ export default function IntegrationsPage() {
                                   {mapping.error_message || 'No data found'}
                                 </span>
                                 <button
-                                  onClick={() => startEditMapping(mapping.id)}
+                                  onClick={() => startInlineEdit(mapping.id)}
                                   className="p-1 text-blue-600 hover:text-blue-700"
                                   title={`Add ${selectedMappingPlatform === 'github' ? 'GitHub' : 'Slack'} username`}
                                 >
