@@ -992,6 +992,8 @@ export default function Dashboard() {
       
       if (response.ok) {
         const mappingsData = await response.json()
+        console.log('📊 Analysis mappings loaded:', mappingsData)
+        console.log('📊 GitHub mappings found:', mappingsData.mappings?.filter(m => m.target_platform === 'github'))
         setAnalysisMappings(mappingsData)
       }
     } catch (error) {
@@ -999,25 +1001,31 @@ export default function Dashboard() {
     }
   }
 
-  // Helper function to check if user has GitHub mapping
+  // Helper function to check if user has GitHub mapping (show all mapped users)
   const hasGitHubMapping = (userEmail: string) => {
-    if (!analysisMappings?.mappings) return false
+    if (!analysisMappings?.mappings) {
+      console.log('🔍 No mappings data available yet for', userEmail)
+      return false
+    }
     
-    return analysisMappings.mappings.some((mapping: any) => 
+    const hasMapping = analysisMappings.mappings.some((mapping: any) => 
       mapping.source_identifier === userEmail && 
-      mapping.target_platform === "github" && 
-      mapping.mapping_successful
+      mapping.target_platform === "github"
+      // Removed mapping_successful check to show all mapped users
     )
+    
+    console.log(`🔍 GitHub mapping check for ${userEmail}:`, hasMapping)
+    return hasMapping
   }
 
-  // Helper function to check if user has Slack mapping
+  // Helper function to check if user has Slack mapping (show all mapped users)
   const hasSlackMapping = (userEmail: string) => {
     if (!analysisMappings?.mappings) return false
     
     return analysisMappings.mappings.some((mapping: any) => 
       mapping.source_identifier === userEmail && 
-      mapping.target_platform === "slack" && 
-      mapping.mapping_successful
+      mapping.target_platform === "slack"
+      // Removed mapping_successful check to show all mapped users
     )
   }
 
