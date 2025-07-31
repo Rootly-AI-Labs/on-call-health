@@ -122,15 +122,19 @@ async def get_analysis_mappings(
 @router.get("/mappings/platform/{platform}", summary="Get mappings for specific platform")
 async def get_platform_mappings(
     platform: str,
+    limit: int = 50,  # Default limit to prevent overwhelming UI
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ) -> List[dict]:
-    """Get all integration mappings for a specific target platform."""
+    """Get recent integration mappings for a specific target platform."""
     try:
+        # Get most recent mappings, limited to prevent UI overload
         mappings = db.query(IntegrationMapping).filter(
             IntegrationMapping.user_id == current_user.id,
             IntegrationMapping.target_platform == platform
-        ).order_by(IntegrationMapping.created_at.desc()).all()
+        ).order_by(IntegrationMapping.created_at.desc()).limit(limit).all()
+        
+        logger.info(f"🔍 DEBUG: Platform {platform} endpoint returning {len(mappings)} mappings (limit: {limit})")
         
         return [mapping.to_dict() for mapping in mappings]
     except Exception as e:
@@ -149,6 +153,7 @@ async def get_success_rates(
         logger.info(f"🔍 DEBUG: Getting success rates for user {current_user.id}, platform: {platform}")
         
         # Get mappings for this user, optionally filtered by platform
+        # Use same scope as platform mappings endpoint for consistency
         query = db.query(IntegrationMapping).filter(
             IntegrationMapping.user_id == current_user.id
         )
@@ -157,7 +162,8 @@ async def get_success_rates(
             query = query.filter(IntegrationMapping.target_platform == platform)
             logger.info(f"🔍 DEBUG: Filtering by platform: {platform}")
             
-        mappings = query.all()
+        # Apply same ordering and limit as platform endpoint to ensure consistency
+        mappings = query.order_by(IntegrationMapping.created_at.desc()).limit(50).all()
         logger.info(f"🔍 DEBUG: Found {len(mappings)} mappings for user {current_user.id}, platform: {platform}")
         
         if not mappings:
