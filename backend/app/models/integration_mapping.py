@@ -31,8 +31,8 @@ class IntegrationMapping(Base):
     data_collected = Column(Boolean, nullable=False, default=False)  # Whether we successfully collected data
     data_points_count = Column(Integer, nullable=True)  # Number of data points collected (commits, messages, etc.)
     
-    # Manual mapping support
-    mapping_source = Column(String(20), nullable=False, default='auto')  # 'auto', 'manual', 'verified'
+    # Manual mapping support (nullable until migration is complete)
+    mapping_source = Column(String(20), nullable=True, default='auto')  # 'auto', 'manual', 'verified'
     created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # Who created manual mappings
     confidence_score = Column(Float, nullable=True)  # For auto-detected mappings (0.0-1.0)
     last_verified = Column(DateTime(timezone=True), nullable=True)  # When mapping was last verified
@@ -62,7 +62,7 @@ class IntegrationMapping(Base):
     @property
     def is_manual(self) -> bool:
         """Check if this is a manual mapping."""
-        return self.mapping_source == 'manual'
+        return self.mapping_source == 'manual' if self.mapping_source else False
     
     @property
     def is_verified(self) -> bool:
@@ -105,8 +105,8 @@ class IntegrationMapping(Base):
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "mapping_key": self.mapping_key,
-            # New unified fields
-            "mapping_source": self.mapping_source,
+            # New unified fields (safe for migration period)
+            "mapping_source": self.mapping_source or 'auto',
             "is_manual": self.is_manual,
             "confidence_score": self.confidence_score,
             "last_verified": self.last_verified.isoformat() if self.last_verified else None,
