@@ -37,7 +37,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form"
-import { Tooltip } from "@/components/ui/tooltip"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import {
   Select,
   SelectContent,
@@ -3828,9 +3828,18 @@ export default function IntegrationsPage() {
                                   <div className="flex items-center gap-1 group">
                                     <span>{mapping.target_identifier}</span>
                                     {mapping.is_manual && (
-                                      <Badge variant="outline" className="ml-1 text-xs bg-blue-50 text-blue-700 border-blue-200">
-                                        Manual
-                                      </Badge>
+                                      <TooltipProvider>
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <Badge variant="outline" className="ml-1 text-xs bg-blue-50 text-blue-700 border-blue-200 cursor-help">
+                                              Manual
+                                            </Badge>
+                                          </TooltipTrigger>
+                                          <TooltipContent>
+                                            <p>Manual mapping - will show data collection status after running an analysis</p>
+                                          </TooltipContent>
+                                        </Tooltip>
+                                      </TooltipProvider>
                                     )}
                                     <button
                                       onClick={() => startEditExisting(mapping.id, mapping.target_identifier)}
@@ -3937,7 +3946,16 @@ export default function IntegrationsPage() {
                           <div className="text-gray-600">
                             {mapping.is_manual ? (
                               <div className="flex items-center gap-1">
-                                <span>Manual</span>
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className="cursor-help">Manual</span>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Manual mapping - will show data collection status after running an analysis</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
                                 <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
                                   User Added
                                 </Badge>
