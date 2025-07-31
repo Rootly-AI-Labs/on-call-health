@@ -272,6 +272,38 @@ class GitHubAPIManager:
             "average_response_time": 0.0,
             "last_reset": datetime.utcnow()
         }
+    
+    async def fetch_user_info(self, username: str, token: str) -> Optional[Dict[str, Any]]:
+        """Fetch GitHub user information."""
+        async def api_call():
+            async with aiohttp.ClientSession() as session:
+                headers = {
+                    'Authorization': f'token {token}',
+                    'Accept': 'application/vnd.github.v3+json',
+                    'User-Agent': 'Rootly-Burnout-Detector'
+                }
+                
+                url = f'https://api.github.com/users/{username}'
+                logger.info(f"🔍 Validating GitHub user: {username}")
+                
+                async with session.get(url, headers=headers) as response:
+                    if response.status == 200:
+                        user_data = await response.json()
+                        logger.info(f"✅ Found GitHub user: {user_data.get('login')} ({user_data.get('name', 'No name')})")
+                        return user_data
+                    elif response.status == 404:
+                        logger.warning(f"❌ GitHub user not found: {username}")
+                        return {"error": "User not found", "status": 404}
+                    else:
+                        logger.error(f"❌ GitHub API error for {username}: {response.status}")
+                        return {"error": f"API error: {response.status}", "status": response.status}
+        
+        try:
+            result = await self.safe_api_call(api_call, operation="fetch_user_info")
+            return result
+        except Exception as e:
+            logger.error(f"Error fetching user info for {username}: {e}")
+            return {"error": str(e)}
 
 
 # Global instance for the application

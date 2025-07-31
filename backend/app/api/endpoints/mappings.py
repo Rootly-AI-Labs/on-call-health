@@ -312,6 +312,64 @@ def _generate_cache_insights(cache_stats: dict) -> List[str]:
     
     return insights
 
+@router.get("/mappings/github/validate/{username}", summary="Validate GitHub username")
+async def validate_github_username(
+    username: str,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+) -> dict:
+    """Validate if a GitHub username exists and is accessible."""
+    try:
+        from ...models import Integration
+        
+        # Get GitHub integration for auth
+        integration = db.query(Integration).filter(
+            Integration.user_id == current_user.id,
+            Integration.platform == "github",
+            Integration.is_active == True
+        ).first()
+        
+        if not integration:
+            return {
+                "valid": False,
+                "error": "No GitHub integration found",
+                "message": "Please connect GitHub integration first"
+            }
+        
+        from ...services.github_api_manager import github_api_manager
+        
+        # Check if user exists
+        user_info = await github_api_manager.fetch_user_info(
+            username=username,
+            token=integration.access_token
+        )
+        
+        if user_info and not user_info.get("error"):
+            return {
+                "valid": True,
+                "username": user_info.get("login"),
+                "name": user_info.get("name"),
+                "avatar_url": user_info.get("avatar_url"),
+                "company": user_info.get("company"),
+                "bio": user_info.get("bio"),
+                "public_repos": user_info.get("public_repos"),
+                "created_at": user_info.get("created_at")
+            }
+        else:
+            return {
+                "valid": False,
+                "error": "User not found",
+                "message": f"GitHub user '{username}' not found or not accessible"
+            }
+            
+    except Exception as e:
+        logger.error(f"Error validating GitHub username {username}: {e}")
+        return {
+            "valid": False,
+            "error": "Validation failed", 
+            "message": "Unable to validate GitHub username at this time"
+        }
+
 @router.post("/mappings/cleanup-duplicates", summary="Clean up duplicate mappings for all platforms")
 async def cleanup_duplicate_mappings(
     current_user: User = Depends(get_current_active_user),

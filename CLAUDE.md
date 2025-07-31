@@ -351,6 +351,241 @@ def test_analysis_data_consistency():
 5. **Day 3**: Implement data consistency checks (Issue #5)
 6. **Day 3**: Deploy verification system
 
+## NEW FEATURE IMPLEMENTATION PLAN: Manual User Mapping UI/UX
+
+### Objective: Create Frontend Interface for User Platform Mapping Management
+
+**Problem**: Currently, platform mappings (Rootly/PagerDuty → GitHub) are hardcoded in Python files. Users cannot manage these mappings without code changes.
+
+**Solution**: Build a user-friendly frontend interface that leverages the existing comprehensive mapping API backend.
+
+### Key Architecture Decisions
+
+#### 1. Slack Mappings NOT Needed ✅
+- **Rationale**: Slack users authenticate with company email addresses
+- **Solution**: Use Slack API to fetch user emails directly
+- **Implementation**: `users.info` API endpoint provides email field
+- **Result**: Automatic email-based correlation, no manual mapping required
+
+#### 2. Integration-Scoped Mappings ✅
+- **Problem**: Different Rootly/PagerDuty integrations = different organizations/teams
+- **Solution**: Mappings tied to specific integration_id, not global
+- **Database**: Add `integration_id` foreign key to UserMapping table
+- **UI**: Show mappings per integration, not globally
+
+#### 3. Simplified Mapping Flow ✅
+**What we're mapping**: 
+- Rootly/PagerDuty email/user_id → GitHub username
+- That's it! Slack correlation happens automatically via email
+
+### Summary of Changes from Original Plan
+
+1. **Removed Slack from manual mapping** - Auto-correlation via email
+2. **Integration-scoped mappings** - Each Rootly/PD integration has its own mappings
+3. **Simplified UI** - Only map to GitHub, not multiple platforms
+4. **Integration page links** - Add "Manage GitHub Mappings" to each integration card
+5. **Automatic Slack correlation** - Backend fetches Slack emails and matches automatically
+
+### Updated Implementation Plan
+
+#### Phase 1: Integration Page Updates (Day 1)
+
+**1.1 Add Mapping Links to Integration Cards**
+- **Location**: Each Rootly/PagerDuty integration card
+- **UI**: "Manage GitHub Mappings" link/button
+- **File**: `frontend/src/app/integrations/page.tsx`
+- **Action**: Opens drawer with mappings for THAT specific integration
+
+**1.2 Update Database Schema**
+```sql
+ALTER TABLE user_mappings 
+ADD COLUMN integration_id INTEGER REFERENCES integrations(id);
+-- Mappings are now scoped to specific integrations
+```
+
+**1.3 Simplified Mapping Flow**
+- User clicks "Manage GitHub Mappings" on a Rootly integration
+- Drawer opens showing ONLY users from that Rootly org
+- Map each Rootly user email → GitHub username
+- Slack correlation happens automatically via email matching
+
+#### Phase 2: Mapping Drawer Component (Day 2)
+
+**2.1 Create Integration-Scoped Mapping Drawer**
+- **Component**: `components/GitHubMappingDrawer.tsx`
+- **Props**: `integrationId`, `integrationType` (rootly/pagerduty)
+- **Features**:
+  - Fetch users from specific integration
+  - Show existing GitHub mappings
+  - Add/edit/delete mappings
+  - Real-time GitHub username validation
+
+**2.2 Simplified Mapping Table**
+- **Columns**: 
+  - Team Member (from Rootly/PD)
+  - Email
+  - GitHub Username
+  - Status (mapped/unmapped)
+  - Actions (add/edit/remove)
+
+#### Phase 2: Advanced Features (Day 3-4)
+
+**2.1 Smart Suggestions**
+- Integrate with `/api/manual-mappings/suggestions` endpoint
+- Show suggested GitHub usernames based on email patterns
+- Auto-complete functionality
+
+**2.2 Bulk Operations**
+- CSV import/export functionality
+- Bulk validation of mappings
+- Batch creation from team member list
+
+**2.3 Mapping Analytics**
+- Success rate dashboard
+- Platform coverage statistics  
+- Unmapped users identification
+
+#### Phase 3: Integration & Polish (Day 5)
+
+**3.1 Dashboard Integration**
+- Show mapping coverage in Data Sources card
+- Display unmapped user warnings
+- Link to mapping management from dashboard
+
+**3.2 Real-time Validation**
+- Validate GitHub usernames against GitHub API
+- Check Slack user IDs for existence
+- Show mapping health status
+
+**3.3 User Experience Polish**
+- Loading states and error handling
+- Confirmation dialogs for destructive actions
+- Toast notifications for success/failure
+
+### Technical Implementation Details
+
+#### 3.1 API Integration
+**Updated Endpoints (Integration-Scoped)**:
+- `GET /api/integrations/{id}/users` - Fetch users from Rootly/PD integration
+- `GET /api/integrations/{id}/mappings` - Fetch GitHub mappings for this integration
+- `POST /api/integrations/{id}/mappings` - Create new mapping
+- `PUT /api/integrations/{id}/mappings/{mapping_id}` - Update mapping
+- `DELETE /api/integrations/{id}/mappings/{mapping_id}` - Delete mapping
+- `GET /api/integrations/{id}/mappings/suggestions` - Get GitHub username suggestions
+- `POST /api/integrations/{id}/mappings/validate` - Validate GitHub username
+- `GET /api/integrations/{id}/mappings/statistics` - Get mapping coverage stats
+
+**Slack Email Fetching**:
+- `GET /api/slack/users` - Fetch all Slack users with emails
+- Backend automatically correlates by email during analysis
+
+#### 3.2 Component Structure
+```
+components/
+├── UserMappingDrawer.tsx          # Main drawer component
+├── MappingTable.tsx               # Table with mappings
+├── AddMappingModal.tsx            # Add/edit mapping form
+├── MappingValidation.tsx          # Real-time validation
+├── BulkMappingImport.tsx          # CSV import functionality
+└── MappingStatistics.tsx          # Analytics dashboard
+```
+
+#### 3.3 Data Flow
+1. **Load Mappings**: Fetch from API on drawer open
+2. **Create Mapping**: Form validation → API call → Refresh table
+3. **Edit Mapping**: Inline editing → Validation → API update
+4. **Delete Mapping**: Confirmation → API delete → Remove from table
+5. **Suggestions**: Type email → API suggestions → Show options
+
+#### 3.4 UI/UX Design
+
+**Integration Card Update**:
+```
+┌─ Rootly Connected ─────────────────────────────────────┐
+│ ✅ acme-corp.rootly.com                                │
+│ Organization: Acme Corp                                │
+│ Team Members: 15                                       │
+│                                                        │
+│ [🔧 Test] [👥 Manage GitHub Mappings] [⚙️ Settings]    │
+└────────────────────────────────────────────────────────┘
+```
+
+**GitHub Mapping Drawer**:
+```
+┌─ GitHub Mappings - Acme Corp (Rootly) ─────────────────┐
+│ 📊 Coverage: 12/15 users mapped (80%)                 │
+│ 🔄 Last sync: 2 hours ago                             │
+│                                                        │
+│ [🔍 Search] [+ Add Mapping] [Import CSV]              │
+│                                                        │
+│ ┌────────────────────────────────────────────────────┐ │
+│ │ Team Member         │ Email           │ GitHub   │ │
+│ ├────────────────────────────────────────────────────┤ │
+│ │ Spencer Cheng       │ spencer@acme... │ ✅ spen… │ │
+│ │                     │                 │ [Edit]   │ │
+│ ├────────────────────────────────────────────────────┤ │
+│ │ John Doe           │ john@acme.com   │ ❌ Not   │ │
+│ │                     │                 │ [Add]    │ │
+│ ├────────────────────────────────────────────────────┤ │
+│ │ Jane Smith         │ jane@acme.com   │ ⚠️ jane  │ │
+│ │                     │                 │ [Verify] │ │
+│ └────────────────────────────────────────────────────┘ │
+│                                                        │
+│ ℹ️ Slack users are automatically matched by email      │
+│                                                        │
+│ [Close]                                                │
+└────────────────────────────────────────────────────────┘
+```
+
+**Add/Edit GitHub Mapping Modal**:
+```
+┌─ Map GitHub Account ───────────────────────────────────┐
+│                                                        │
+│ 👤 Team Member: John Doe                               │
+│ 📧 Email: john@acme.com                                │
+│                                                        │
+│ 🐙 GitHub Username                                     │
+│ [@_____________johndoe] [🔍 Verify]                    │
+│                                                        │
+│ 💡 Suggestions based on email:                         │
+│ • johndoe (90% match)                                  │
+│ • john-doe-acme (75% match)                            │
+│ • jdoe123 (60% match)                                  │
+│                                                        │
+│ ✅ Validation: Username exists and has recent activity  │
+│                                                        │
+│ [Cancel] [Save Mapping]                                │
+└────────────────────────────────────────────────────────┘
+```
+
+### Files to Create/Modify
+
+#### New Files:
+- `frontend/src/components/GitHubMappingDrawer.tsx` - Main drawer for GitHub mappings
+- `frontend/src/components/GitHubMappingTable.tsx` - Table showing user→GitHub mappings
+- `frontend/src/components/AddGitHubMappingModal.tsx` - Modal to add/edit mappings
+- `frontend/src/hooks/useIntegrationMappings.ts` - Hook for integration-scoped mappings
+- `frontend/src/types/mapping.ts` - TypeScript types
+
+#### Modified Files:
+- `frontend/src/app/integrations/page.tsx` - Add "Manage GitHub Mappings" to each integration
+- `backend/app/models/user_mapping.py` - Add integration_id column
+- `backend/app/api/endpoints/integrations.py` - Add mapping endpoints
+- `backend/app/services/slack_collector.py` - Fetch and use email from Slack API
+- `backend/app/services/github_collector.py` - Use database mappings instead of hardcoded
+
+### Success Metrics
+- **Mapping Coverage**: Increase from ~70% to 95%+ team coverage
+- **User Adoption**: 90% of admin users utilize mapping interface
+- **Data Quality**: Reduce "no GitHub/Slack data" incidents by 80%
+- **Maintenance**: Eliminate developer time spent on mapping updates
+
+### Migration Strategy
+1. **Phase 1**: Build UI alongside existing hardcoded mappings
+2. **Phase 2**: Migrate hardcoded mappings to database
+3. **Phase 3**: Remove hardcoded mappings, use database as single source
+4. **Phase 4**: Add advanced features (auto-detection, suggestions)
+
 ### Outstanding Issues:
 1. Slack channel access errors (bot not in channels) - Low priority
 2. Invalid Anthropic API key for AI narratives - User configuration issue
