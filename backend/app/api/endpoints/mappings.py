@@ -90,20 +90,16 @@ async def get_analysis_mappings(
         # Get emails from integration mappings for analysis context
         integration_emails = set(m.source_identifier for m in integration_mappings)
         
-        # Convert to common format and merge
+        # Convert to common format and merge, with deduplication
         all_mappings = []
+        seen_emails = set()
         
-        # Add integration mappings with source flag
-        for mapping in integration_mappings:
-            mapping_dict = mapping.to_dict()
-            mapping_dict["source"] = "integration"
-            mapping_dict["is_manual"] = False
-            all_mappings.append(mapping_dict)
-        
-        # Add manual mappings with source flag
+        # First, add manual mappings (they take priority)
         for manual_mapping in manual_mappings:
             # Check if this manual mapping is relevant to current analysis
             is_analysis_relevant = manual_mapping.source_identifier in integration_emails
+            email = manual_mapping.source_identifier
+            seen_emails.add(email)
             
             # Convert UserMapping to IntegrationMapping-like format
             mapping_dict = {
@@ -125,6 +121,16 @@ async def get_analysis_mappings(
                 "is_analysis_relevant": is_analysis_relevant
             }
             all_mappings.append(mapping_dict)
+        
+        # Then add integration mappings, but skip emails that already have manual mappings
+        for mapping in integration_mappings:
+            email = mapping.source_identifier
+            if email not in seen_emails:  # Only add if no manual mapping exists for this email
+                mapping_dict = mapping.to_dict()
+                mapping_dict["source"] = "integration"
+                mapping_dict["is_manual"] = False
+                all_mappings.append(mapping_dict)
+                seen_emails.add(email)
         
         # Calculate proper team member statistics (including manual mappings)
         github_mappings = [m for m in all_mappings if m["target_platform"] == "github"]
@@ -189,18 +195,15 @@ async def get_platform_mappings(
             UserMapping.target_platform == platform
         ).all()
         
-        # Convert to common format and merge
+        # Convert to common format and merge, with deduplication
         all_mappings = []
+        seen_emails = set()
         
-        # Add integration mappings with source flag
-        for mapping in integration_mappings:
-            mapping_dict = mapping.to_dict()
-            mapping_dict["source"] = "integration"
-            mapping_dict["is_manual"] = False
-            all_mappings.append(mapping_dict)
-        
-        # Add manual mappings with source flag
+        # First, add manual mappings (they take priority)
         for manual_mapping in manual_mappings:
+            email = manual_mapping.source_identifier
+            seen_emails.add(email)
+            
             mapping_dict = {
                 "id": f"manual_{manual_mapping.id}",  # Prefix to avoid conflicts
                 "source_identifier": manual_mapping.source_identifier,
@@ -220,6 +223,16 @@ async def get_platform_mappings(
                 "mapping_method": "manual"  # Add this for the Method column
             }
             all_mappings.append(mapping_dict)
+        
+        # Then add integration mappings, but skip emails that already have manual mappings
+        for mapping in integration_mappings:
+            email = mapping.source_identifier
+            if email not in seen_emails:  # Only add if no manual mapping exists for this email
+                mapping_dict = mapping.to_dict()
+                mapping_dict["source"] = "integration"
+                mapping_dict["is_manual"] = False
+                all_mappings.append(mapping_dict)
+                seen_emails.add(email)
         
         logger.info(f"🔍 DEBUG: Platform {platform} endpoint returning {len(integration_mappings)} integration + {len(manual_mappings)} manual mappings")
         
