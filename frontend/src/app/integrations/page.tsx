@@ -93,7 +93,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 
 interface IntegrationMapping {
-  id: number
+  id: number | string // Can be number or "manual_123" for manual mappings
   source_platform: string
   source_identifier: string
   target_platform: string
@@ -105,6 +105,13 @@ interface IntegrationMapping {
   data_points_count: number | null
   created_at: string
   mapping_key: string
+  // New properties for manual mappings
+  is_manual?: boolean
+  source?: 'integration' | 'manual'
+  mapping_type?: string
+  status?: string
+  confidence_score?: number
+  last_verified?: string
 }
 
 interface MappingStatistics {
@@ -112,6 +119,7 @@ interface MappingStatistics {
   total_attempts: number
   mapped_members?: number
   members_with_data?: number
+  manual_mappings_count?: number
   platform_breakdown: {
     [key: string]: {
       total_attempts: number
@@ -277,7 +285,7 @@ export default function IntegrationsPage() {
   const [analysisMappingStats, setAnalysisMappingStats] = useState<AnalysisMappingStatistics | null>(null)
   const [currentAnalysisId, setCurrentAnalysisId] = useState<number | null>(null)
   const [loadingMappingData, setLoadingMappingData] = useState(false)
-  const [inlineEditingId, setInlineEditingId] = useState<number | null>(null)
+  const [inlineEditingId, setInlineEditingId] = useState<number | string | null>(null)
   const [inlineEditingValue, setInlineEditingValue] = useState('')
   const [savingInlineMapping, setSavingInlineMapping] = useState(false)
   const [validatingGithub, setValidatingGithub] = useState(false)
@@ -1214,7 +1222,12 @@ export default function IntegrationsPage() {
   }
 
   // Inline mapping edit handlers
-  const startInlineEdit = (mappingId: number, currentValue: string = '') => {
+  const startInlineEdit = (mappingId: number | string, currentValue: string = '') => {
+    // Don't allow editing of manual mappings inline since they already exist
+    if (typeof mappingId === 'string' && mappingId.startsWith('manual_')) {
+      toast.error('Manual mappings cannot be edited. They are already mapped.')
+      return
+    }
     setInlineEditingId(mappingId)
     setInlineEditingValue(currentValue)
     setGithubValidation(null)
@@ -1327,7 +1340,12 @@ export default function IntegrationsPage() {
     }
   }
 
-  const saveInlineMapping = async (mappingId: number, email: string) => {
+  const saveInlineMapping = async (mappingId: number | string, email: string) => {
+    // Skip manual mappings - they can't be edited inline as they already exist
+    if (typeof mappingId === 'string' && mappingId.startsWith('manual_')) {
+      toast.error('Manual mappings cannot be edited inline')
+      return
+    }
     if (!inlineEditingValue.trim()) {
       toast.error('Please enter a GitHub username')
       return
