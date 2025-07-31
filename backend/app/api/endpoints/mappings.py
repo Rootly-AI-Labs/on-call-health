@@ -320,16 +320,15 @@ async def validate_github_username(
 ) -> dict:
     """Validate if a GitHub username exists and is accessible."""
     try:
-        from ...models import Integration
+        from ...models import GitHubIntegration
         
         # Get GitHub integration for auth
-        integration = db.query(Integration).filter(
-            Integration.user_id == current_user.id,
-            Integration.platform == "github",
-            Integration.is_active == True
+        integration = db.query(GitHubIntegration).filter(
+            GitHubIntegration.user_id == current_user.id,
+            GitHubIntegration.github_token.isnot(None)
         ).first()
         
-        if not integration:
+        if not integration or not integration.has_token:
             return {
                 "valid": False,
                 "error": "No GitHub integration found",
@@ -341,7 +340,7 @@ async def validate_github_username(
         # Check if user exists
         user_info = await github_api_manager.fetch_user_info(
             username=username,
-            token=integration.access_token
+            token=integration.github_token
         )
         
         if user_info and not user_info.get("error"):
