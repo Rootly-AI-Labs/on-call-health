@@ -299,7 +299,7 @@ class GitHubAPIManager:
                         return {"error": f"API error: {response.status}", "status": response.status}
         
         try:
-            result = await self.safe_api_call(api_call, operation="fetch_user_info")
+            result = await self.safe_api_call(api_call)
             return result
         except Exception as e:
             logger.error(f"Error fetching user info for {username}: {e}")
