@@ -337,10 +337,22 @@ async def validate_github_username(
         
         from ...services.github_api_manager import github_api_manager
         
+        # Decrypt the GitHub token
+        try:
+            from ...api.endpoints.github import decrypt_token
+            decrypted_token = decrypt_token(integration.github_token)
+        except Exception as e:
+            logger.error(f"Failed to decrypt GitHub token: {e}")
+            return {
+                "valid": False,
+                "error": "Token decryption failed",
+                "message": "Unable to decrypt GitHub token"
+            }
+        
         # Check if user exists
         user_info = await github_api_manager.fetch_user_info(
             username=username,
-            token=integration.github_token
+            token=decrypted_token
         )
         
         if user_info and not user_info.get("error"):
