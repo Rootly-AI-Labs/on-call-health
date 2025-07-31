@@ -1337,13 +1337,13 @@ export default function IntegrationsPage() {
       return
     }
     
-    // Skip manual mappings with string IDs - they should use the regular edit endpoint
-    if (typeof mappingId === 'string' && mappingId.startsWith('manual_')) {
-      toast.error('Cannot edit manual mappings this way')
+    const authToken = localStorage.getItem('auth_token')
+    if (!authToken) {
+      toast.error('Please log in to edit mappings')
       return
     }
     
-    // Validate GitHub username first
+    // Validate GitHub username first (for both manual and auto mappings)
     if (selectedMappingPlatform === 'github') {
       if (!githubValidation || githubValidation.valid !== true) {
         const isValid = await validateGithubUsername(inlineEditingValue)
@@ -1355,14 +1355,60 @@ export default function IntegrationsPage() {
         }
       }
     }
+    
+    // Handle manual mappings differently (use UserMapping endpoint during migration period)
+    if (typeof mappingId === 'string' && mappingId.startsWith('manual_')) {
+      // Extract the numeric ID from "manual_123" format
+      const numericId = parseInt(mappingId.replace('manual_', ''))
+      
+      setSavingInlineMapping(true)
+      try {
+        // Use the manual mappings endpoint instead
+        const response = await fetch(`${API_BASE}/integrations/manual-mappings/${numericId}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${authToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            target_identifier: inlineEditingValue.trim()
+          })
+        })
+
+        if (response.ok) {
+          const result = await response.json()
+          toast.success(`Successfully updated manual mapping to '${inlineEditingValue}'`)
+          
+          // Update the local mapping data
+          setMappingData(prevData => 
+            prevData.map(m => 
+              m.id === mappingId 
+                ? { ...m, target_identifier: inlineEditingValue.trim(), mapping_successful: true }
+                : m
+            )
+          )
+          
+          // Clear editing state
+          setInlineEditingId(null)
+          setInlineEditingValue('')
+          setGithubValidation(null)
+          return
+        } else {
+          const errorData = await response.json()
+          toast.error(errorData.detail || 'Failed to update manual mapping')
+          return
+        }
+      } catch (error) {
+        console.error('Manual mapping edit error:', error)
+        toast.error('Failed to update manual mapping')
+        return
+      } finally {
+        setSavingInlineMapping(false)
+      }
+    }
 
     setSavingInlineMapping(true)
     try {
-      const authToken = localStorage.getItem('auth_token')
-      if (!authToken) {
-        toast.error('Please log in to edit mappings')
-        return
-      }
 
       const response = await fetch(`${API_BASE}/integrations/mappings/${mappingId}/edit?new_target_identifier=${encodeURIComponent(inlineEditingValue.trim())}`, {
         method: 'PUT',
