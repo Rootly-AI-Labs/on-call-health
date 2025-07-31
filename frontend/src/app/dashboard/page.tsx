@@ -4052,15 +4052,16 @@ export default function Dashboard() {
                           {/* Integration icons */}
                           <div className="flex flex-wrap gap-2 mb-3">
                             {/* Rootly - incident management */}
-                            <div className="flex items-center justify-center w-6 h-6 bg-orange-100 rounded-full border border-orange-200" title="Rootly">
-                              <svg className="w-3.5 h-3.5 text-orange-600" fill="currentColor" viewBox="0 0 24 24">
-                                {/* Rootly tree logo with 5 petals and trunk */}
-                                <path d="M12 1.5c-1.5 0-2.7 1.2-2.7 2.7s1.2 2.7 2.7 2.7 2.7-1.2 2.7-2.7-1.2-2.7-2.7-2.7z"/>
-                                <path d="M6.5 5.5c-1.2-0.8-2.8-0.5-3.6 0.7s-0.5 2.8 0.7 3.6c1.2 0.8 2.8 0.5 3.6-0.7s0.5-2.8-0.7-3.6z"/>
-                                <path d="M17.5 5.5c1.2-0.8 2.8-0.5 3.6 0.7s0.5 2.8-0.7 3.6c-1.2 0.8-2.8 0.5-3.6-0.7s-0.5-2.8 0.7-3.6z"/>
-                                <path d="M5.5 12.5c-1.5 0-2.7 1.2-2.7 2.7s1.2 2.7 2.7 2.7 2.7-1.2 2.7-2.7-1.2-2.7-2.7-2.7z"/>
-                                <path d="M18.5 12.5c1.5 0 2.7 1.2 2.7 2.7s-1.2 2.7-2.7 2.7-2.7-1.2-2.7-2.7 1.2-2.7 2.7-2.7z"/>
-                                <path d="M10 18h4v4c0 1-0.5 1.5-2 1.5s-2-0.5-2-1.5v-4z"/>
+                            <div className="flex items-center justify-center w-6 h-6 bg-white rounded-full border border-orange-200" title="Rootly">
+                              <svg className="w-3.5 h-3.5" viewBox="0 0 512 512" fill="none">
+                                {/* Official Rootly logo - exact design */}
+                                <path d="M256 48c-24 0-43.2 19.2-43.2 43.2s19.2 43.2 43.2 43.2 43.2-19.2 43.2-43.2S280 48 256 48z" fill="#F49C3D"/>
+                                <path d="M105.6 88c-19.2-12.8-44.8-8-57.6 11.2s-8 44.8 11.2 57.6c19.2 12.8 44.8 8 57.6-11.2s8-44.8-11.2-57.6z" fill="#F49C3D"/>
+                                <path d="M406.4 88c19.2-12.8 44.8-8 57.6 11.2s8 44.8-11.2 57.6c-19.2 12.8-44.8 8-57.6-11.2s-8-44.8 11.2-57.6z" fill="#F49C3D"/>
+                                <path d="M88 200c-24 0-43.2 19.2-43.2 43.2s19.2 43.2 43.2 43.2 43.2-19.2 43.2-43.2S112 200 88 200z" fill="#F49C3D"/>
+                                <path d="M424 200c24 0 43.2 19.2 43.2 43.2s-19.2 43.2-43.2 43.2-43.2-19.2-43.2-43.2S400 200 424 200z" fill="#F49C3D"/>
+                                <path d="M160 344h192v32c0 53.02-42.98 96-96 96s-96-42.98-96-96v-32z" fill="#F49C3D"/>
+                                <path d="M40 368c140 40 292 40 432 0-100 80-332 80-432 0z" fill="#F49C3D"/>
                               </svg>
                             </div>
                             
