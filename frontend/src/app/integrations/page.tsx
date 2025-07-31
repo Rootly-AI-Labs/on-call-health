@@ -264,6 +264,9 @@ export default function IntegrationsPage() {
   const [analysisMappingStats, setAnalysisMappingStats] = useState<AnalysisMappingStatistics | null>(null)
   const [currentAnalysisId, setCurrentAnalysisId] = useState<number | null>(null)
   const [loadingMappingData, setLoadingMappingData] = useState(false)
+  const [editingMapping, setEditingMapping] = useState<number | null>(null)
+  const [editingValue, setEditingValue] = useState('')
+  const [savingMapping, setSavingMapping] = useState(false)
   
   // Manual mapping state
   const [showManualMappingDialog, setShowManualMappingDialog] = useState(false)
@@ -1172,6 +1175,65 @@ export default function IntegrationsPage() {
       toast.error('Failed to load mapping data')
     } finally {
       setLoadingMappingData(false)
+    }
+  }
+
+  // Inline mapping edit handlers
+  const startEditMapping = (mappingId: number, currentValue: string = '') => {
+    setEditingMapping(mappingId)
+    setEditingValue(currentValue)
+  }
+
+  const cancelEditMapping = () => {
+    setEditingMapping(null)
+    setEditingValue('')
+  }
+
+  const saveInlineMapping = async (mappingId: number, email: string) => {
+    if (!editingValue.trim()) {
+      toast.error('Please enter a GitHub username')
+      return
+    }
+
+    setSavingMapping(true)
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) {
+        toast.error('Please log in to save mappings')
+        return
+      }
+
+      const response = await fetch(`${API_BASE}/integrations/manual-mappings`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          source_platform: 'rootly',
+          source_identifier: email,
+          target_platform: selectedMappingPlatform,
+          target_identifier: editingValue.trim()
+        })
+      })
+
+      if (response.ok) {
+        toast.success(`Manual mapping saved: ${email} → ${editingValue}`)
+        setEditingMapping(null)
+        setEditingValue('')
+        // Refresh the mapping data to show the updated mapping
+        if (selectedMappingPlatform) {
+          await loadMappingData(selectedMappingPlatform)
+        }
+      } else {
+        const error = await response.json()
+        toast.error(`Failed to save mapping: ${error.detail || 'Unknown error'}`)
+      }
+    } catch (error) {
+      console.error('Error saving manual mapping:', error)
+      toast.error('Failed to save mapping')
+    } finally {
+      setSavingMapping(false)
     }
   }
 
@@ -3299,7 +3361,9 @@ export default function IntegrationsPage() {
                     <div className="grid grid-cols-5 gap-4 text-sm font-medium text-gray-600">
                       <div>Team Member</div>
                       <div>Status</div>
-                      <div>{selectedMappingPlatform === 'github' ? 'GitHub User' : 'Slack User'}</div>
+                      <div>{selectedMappingPlatform === 'github' ? 'GitHub User' : 'Slack User'} 
+                        <span className="text-xs text-gray-500 block">Click + to add missing</span>
+                      </div>
                       <div>Data Points</div>
                       <div>Method</div>
                     </div>
@@ -3325,10 +3389,58 @@ export default function IntegrationsPage() {
                             )}
                           </div>
                           <div className="truncate" title={mapping.target_identifier || mapping.error_message || ''}>
-                            {mapping.target_identifier || (
-                              <span className="text-gray-400 italic">
-                                {mapping.error_message || 'No data found'}
-                              </span>
+                            {mapping.target_identifier ? (
+                              // Show existing mapping
+                              <span>{mapping.target_identifier}</span>
+                            ) : editingMapping === mapping.id ? (
+                              // Show inline edit form
+                              <div className="flex items-center space-x-2">
+                                <input
+                                  type="text"
+                                  value={editingValue}
+                                  onChange={(e) => setEditingValue(e.target.value)}
+                                  placeholder={`Enter ${selectedMappingPlatform === 'github' ? 'GitHub' : 'Slack'} username`}
+                                  className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                  autoFocus
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      saveInlineMapping(mapping.id, mapping.source_identifier)
+                                    } else if (e.key === 'Escape') {
+                                      cancelEditMapping()
+                                    }
+                                  }}
+                                />
+                                <button
+                                  onClick={() => saveInlineMapping(mapping.id, mapping.source_identifier)}
+                                  disabled={savingMapping}
+                                  className="p-1 text-green-600 hover:text-green-700 disabled:opacity-50"
+                                  title="Save"
+                                >
+                                  <CheckCircle className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={cancelEditMapping}
+                                  disabled={savingMapping}
+                                  className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-50"
+                                  title="Cancel"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </div>
+                            ) : (
+                              // Show error message with edit button
+                              <div className="flex items-center space-x-2">
+                                <span className="text-gray-400 italic flex-1">
+                                  {mapping.error_message || 'No data found'}
+                                </span>
+                                <button
+                                  onClick={() => startEditMapping(mapping.id)}
+                                  className="p-1 text-blue-600 hover:text-blue-700"
+                                  title={`Add ${selectedMappingPlatform === 'github' ? 'GitHub' : 'Slack'} username`}
+                                >
+                                  <Plus className="w-4 h-4" />
+                                </button>
+                              </div>
                             )}
                           </div>
                           <div>
