@@ -4048,6 +4048,28 @@ export default function Dashboard() {
                               <Badge className={getRiskColor(member.risk_level)}>{member.risk_level.toUpperCase()}</Badge>
                             </div>
                           </div>
+                          
+                          {/* Integration badges */}
+                          <div className="flex flex-wrap gap-1 mb-3">
+                            <Badge variant="outline" className="text-xs bg-orange-50 text-orange-700 border-orange-200">
+                              Rootly
+                            </Badge>
+                            {member.github_activity && (
+                              <Badge variant="outline" className="text-xs bg-gray-50 text-gray-700 border-gray-200">
+                                GitHub
+                              </Badge>
+                            )}
+                            {member.slack_activity && (
+                              <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
+                                Slack
+                              </Badge>
+                            )}
+                            {member.pagerduty_activity && (
+                              <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                                PagerDuty
+                              </Badge>
+                            )}
+                          </div>
                           <div className="space-y-2">
                             <div className="flex justify-between text-sm">
                               <span>Burnout Score</span>
