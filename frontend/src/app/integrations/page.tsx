@@ -110,6 +110,8 @@ interface IntegrationMapping {
 interface MappingStatistics {
   overall_success_rate: number
   total_attempts: number
+  mapped_members?: number
+  members_with_data?: number
   platform_breakdown: {
     [key: string]: {
       total_attempts: number
@@ -1238,13 +1240,19 @@ export default function IntegrationsPage() {
       })
       
       const data = await response.json()
-      console.log('🔍 GitHub validation response:', data)
+      console.log('🔍 GitHub validation response:', {
+        status: response.status,
+        data: data,
+        url: response.url
+      })
       
-      if (data.valid) {
+      if (response.ok && data.valid) {
         setGithubValidation({ valid: true, message: `Found: ${data.name || data.username}` })
         return true
       } else {
-        setGithubValidation({ valid: false, message: data.message || 'User not found' })
+        const errorMsg = data.message || data.error || `API Error (${response.status})`
+        setGithubValidation({ valid: false, message: errorMsg })
+        console.error('❌ GitHub validation failed:', errorMsg)
         return false
       }
     } catch (error) {
@@ -3459,7 +3467,7 @@ export default function IntegrationsPage() {
                   <div className="flex items-center space-x-2">
                     <Users2 className="w-4 h-4 text-green-600" />
                     <div>
-                      <div className="text-2xl font-bold">{mappingStats.mapped_members || mappingStats.total_attempts}</div>
+                      <div className="text-2xl font-bold">{(mappingStats as any).mapped_members || mappingStats.total_attempts}</div>
                       <div className="text-sm text-gray-600">Mapped Members</div>
                     </div>
                   </div>
@@ -3480,7 +3488,7 @@ export default function IntegrationsPage() {
                     <Database className="w-4 h-4 text-purple-600" />
                     <div>
                       <div className="text-2xl font-bold">
-                        {mappingStats.members_with_data || mappingData.filter(m => m.data_collected && m.mapping_successful).length}
+                        {(mappingStats as any).members_with_data || mappingData.filter(m => m.data_collected && m.mapping_successful).length}
                       </div>
                       <div className="text-sm text-gray-600">With Data</div>
                     </div>
