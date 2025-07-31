@@ -4054,7 +4054,13 @@ export default function Dashboard() {
                             {/* Rootly - incident management */}
                             <div className="flex items-center justify-center w-6 h-6 bg-orange-100 rounded-full border border-orange-200" title="Rootly">
                               <svg className="w-3.5 h-3.5 text-orange-600" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                                {/* Rootly tree logo with 5 petals and trunk */}
+                                <path d="M12 1.5c-1.5 0-2.7 1.2-2.7 2.7s1.2 2.7 2.7 2.7 2.7-1.2 2.7-2.7-1.2-2.7-2.7-2.7z"/>
+                                <path d="M6.5 5.5c-1.2-0.8-2.8-0.5-3.6 0.7s-0.5 2.8 0.7 3.6c1.2 0.8 2.8 0.5 3.6-0.7s0.5-2.8-0.7-3.6z"/>
+                                <path d="M17.5 5.5c1.2-0.8 2.8-0.5 3.6 0.7s0.5 2.8-0.7 3.6c-1.2 0.8-2.8 0.5-3.6-0.7s-0.5-2.8 0.7-3.6z"/>
+                                <path d="M5.5 12.5c-1.5 0-2.7 1.2-2.7 2.7s1.2 2.7 2.7 2.7 2.7-1.2 2.7-2.7-1.2-2.7-2.7-2.7z"/>
+                                <path d="M18.5 12.5c1.5 0 2.7 1.2 2.7 2.7s-1.2 2.7-2.7 2.7-2.7-1.2-2.7-2.7 1.2-2.7 2.7-2.7z"/>
+                                <path d="M10 18h4v4c0 1-0.5 1.5-2 1.5s-2-0.5-2-1.5v-4z"/>
                               </svg>
                             </div>
                             
