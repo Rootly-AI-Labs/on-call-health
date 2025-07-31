@@ -4049,25 +4049,40 @@ export default function Dashboard() {
                             </div>
                           </div>
                           
-                          {/* Integration badges */}
-                          <div className="flex flex-wrap gap-1 mb-3">
-                            <Badge variant="outline" className="text-xs bg-orange-50 text-orange-700 border-orange-200">
-                              Rootly
-                            </Badge>
+                          {/* Integration icons */}
+                          <div className="flex flex-wrap gap-2 mb-3">
+                            {/* Rootly - incident management */}
+                            <div className="flex items-center justify-center w-6 h-6 bg-orange-100 rounded-full border border-orange-200" title="Rootly">
+                              <svg className="w-3.5 h-3.5 text-orange-600" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                              </svg>
+                            </div>
+                            
+                            {/* GitHub - code repository */}
                             {member.github_activity && (
-                              <Badge variant="outline" className="text-xs bg-gray-50 text-gray-700 border-gray-200">
-                                GitHub
-                              </Badge>
+                              <div className="flex items-center justify-center w-6 h-6 bg-gray-100 rounded-full border border-gray-200" title="GitHub">
+                                <svg className="w-3.5 h-3.5 text-gray-700" fill="currentColor" viewBox="0 0 24 24">
+                                  <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/>
+                                </svg>
+                              </div>
                             )}
+                            
+                            {/* Slack - communication */}
                             {member.slack_activity && (
-                              <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
-                                Slack
-                              </Badge>
+                              <div className="flex items-center justify-center w-6 h-6 bg-purple-100 rounded-full border border-purple-200" title="Slack">
+                                <svg className="w-3.5 h-3.5 text-purple-600" fill="currentColor" viewBox="0 0 24 24">
+                                  <path d="M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m9 9a9 9 0 0 1-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 0 1 9-9"/>
+                                </svg>
+                              </div>
                             )}
+                            
+                            {/* PagerDuty - incident response */}
                             {member.pagerduty_activity && (
-                              <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
-                                PagerDuty
-                              </Badge>
+                              <div className="flex items-center justify-center w-6 h-6 bg-green-100 rounded-full border border-green-200" title="PagerDuty">
+                                <svg className="w-3.5 h-3.5 text-green-600" fill="currentColor" viewBox="0 0 24 24">
+                                  <path d="M12 2l2 7h7l-5.5 4 2 7L12 16l-5.5 4 2-7L3 9h7l2-7z"/>
+                                </svg>
+                              </div>
                             )}
                           </div>
                           <div className="space-y-2">
