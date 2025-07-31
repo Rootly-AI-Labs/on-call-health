@@ -3836,7 +3836,7 @@ export default function IntegrationsPage() {
                                     )}
                                     <button
                                       onClick={() => startEditExisting(mapping.id, mapping.target_identifier)}
-                                      className="ml-1 p-1 opacity-0 group-hover:opacity-100 text-gray-400 hover:text-blue-600 transition-opacity"
+                                      className="ml-1 p-1 text-gray-400 hover:text-blue-600 transition-colors"
                                       title="Edit mapping"
                                     >
                                       <Edit3 className="w-3 h-3" />
