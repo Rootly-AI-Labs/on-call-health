@@ -4180,37 +4180,39 @@ export default function Dashboard() {
                                           </span>
                                           <span className="text-xs text-blue-600">
                                             ({slack.sentiment_analysis.avg_sentiment.toFixed(2)})
-                                      </span>
+                                          </span>
+                                        </div>
+                                      </div>
                                     </div>
-                                  </div>
-                                </div>
-                              )}
+                                  )}
 
-                              {/* Burnout Indicators */}
-                              {(slackMetrics as any).burnout_indicators && (
-                                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                                  <h4 className="text-sm font-semibold text-red-800 mb-2">Communication Risk Indicators</h4>
-                                  <div className="space-y-1 text-xs">
-                                    {(slackMetrics as any).burnout_indicators.excessive_messaging > 0 && (
-                                      <div className="flex items-center space-x-2">
-                                        <AlertTriangle className="w-3 h-3 text-red-600" />
-                                        <span className="text-red-700">{(slackMetrics as any).burnout_indicators.excessive_messaging} members with excessive messaging</span>
+                                  {/* Burnout Indicators */}
+                                  {slack?.burnout_indicators && (
+                                    <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                                      <h4 className="text-sm font-semibold text-red-800 mb-2">Communication Risk Indicators</h4>
+                                      <div className="space-y-1 text-xs">
+                                        {slack.burnout_indicators.excessive_messaging > 0 && (
+                                          <div className="flex items-center space-x-2">
+                                            <AlertTriangle className="w-3 h-3 text-red-600" />
+                                            <span className="text-red-700">{slack.burnout_indicators.excessive_messaging} members with excessive messaging</span>
+                                          </div>
+                                        )}
+                                        {slack.burnout_indicators.poor_sentiment_users > 0 && (
+                                          <div className="flex items-center space-x-2">
+                                            <AlertTriangle className="w-3 h-3 text-red-600" />
+                                            <span className="text-red-700">{slack.burnout_indicators.poor_sentiment_users} members with poor sentiment</span>
+                                          </div>
+                                        )}
+                                        {slack.burnout_indicators.after_hours_communicators > 0 && (
+                                          <div className="flex items-center space-x-2">
+                                            <AlertTriangle className="w-3 h-3 text-red-600" />
+                                            <span className="text-red-700">{slack.burnout_indicators.after_hours_communicators} members communicating after hours</span>
+                                          </div>
+                                        )}
                                       </div>
-                                    )}
-                                    {(slackMetrics as any).burnout_indicators.poor_sentiment_users > 0 && (
-                                      <div className="flex items-center space-x-2">
-                                        <AlertTriangle className="w-3 h-3 text-red-600" />
-                                        <span className="text-red-700">{(slackMetrics as any).burnout_indicators.poor_sentiment_users} members with poor sentiment</span>
-                                      </div>
-                                    )}
-                                    {(slackMetrics as any).burnout_indicators.after_hours_communicators > 0 && (
-                                      <div className="flex items-center space-x-2">
-                                        <AlertTriangle className="w-3 h-3 text-red-600" />
-                                        <span className="text-red-700">{(slackMetrics as any).burnout_indicators.after_hours_communicators} members communicating after hours</span>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
+                                    </div>
+                                  )}
+                                </>
                               )}
                             </>
                           )
