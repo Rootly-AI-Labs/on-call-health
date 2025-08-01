@@ -228,6 +228,10 @@ class GitHubCollector:
                     async with session.get(commits_url, headers=headers) as resp:
                         if resp.status == 200:
                             return await resp.json()
+                        elif resp.status == 401:
+                            raise aiohttp.ClientError(f"GitHub API authentication failed (401) - token may be expired or invalid")
+                        elif resp.status == 403:
+                            raise aiohttp.ClientError(f"GitHub API forbidden (403) - token needs 'repo' permission for private repos")
                         else:
                             raise aiohttp.ClientError(f"GitHub API error for commits: {resp.status}")
             
@@ -237,6 +241,10 @@ class GitHubCollector:
                     async with session.get(prs_url, headers=headers) as resp:
                         if resp.status == 200:
                             return await resp.json()
+                        elif resp.status == 401:
+                            raise aiohttp.ClientError(f"GitHub API authentication failed (401) - token may be expired or invalid")
+                        elif resp.status == 403:
+                            raise aiohttp.ClientError(f"GitHub API forbidden (403) - token needs 'repo' permission for private repos") 
                         else:
                             raise aiohttp.ClientError(f"GitHub API error for PRs: {resp.status}")
             
@@ -305,8 +313,8 @@ class GitHubCollector:
             
         except Exception as e:
             logger.error(f"Error fetching real GitHub data for {username}: {e}")
-            # Fall back to mock data
-            return self._generate_mock_github_data(username, email, start_date, end_date)
+            # Don't fall back to mock data - return None to indicate failure
+            return None
         
     async def collect_github_data_for_user(self, user_email: str, days: int = 30, github_token: str = None) -> Optional[Dict]:
         """
@@ -338,9 +346,9 @@ class GitHubCollector:
             logger.info(f"Using real GitHub API for {github_username} with token: {github_token[:10]}...")
             return await self._fetch_real_github_data(github_username, user_email, start_date, end_date, github_token)
         else:
-            # Fall back to mock data for testing
-            logger.warning(f"No GitHub token, using mock data for {github_username}")
-            return self._generate_mock_github_data(github_username, user_email, start_date, end_date)
+            # No GitHub token available
+            logger.warning(f"No GitHub token available for {github_username}")
+            return None
     
     def _generate_mock_github_data(self, username: str, email: str, start_date: datetime, end_date: datetime) -> Dict:
         """Generate realistic mock GitHub data for testing."""
