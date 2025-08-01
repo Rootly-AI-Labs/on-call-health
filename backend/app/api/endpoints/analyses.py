@@ -1359,6 +1359,187 @@ async def get_user_github_daily_commits(
     }
 
 
+@router.get("/{analysis_id}/github-commits-timeline")
+async def get_analysis_github_commits_timeline(
+    analysis_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get aggregated daily GitHub commit data for all team members in an analysis.
+    
+    This endpoint returns commit data suitable for displaying a timeline chart,
+    similar to the incidents health trends chart.
+    """
+    # Get the analysis
+    analysis = db.query(Analysis).filter(
+        Analysis.id == analysis_id,
+        Analysis.user_id == current_user.id
+    ).first()
+    
+    if not analysis:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    
+    if analysis.status != 'completed':
+        return {
+            "status": "error",
+            "message": "Analysis not completed yet",
+            "data": None
+        }
+    
+    # Extract team members with GitHub data from analysis results
+    if not analysis.results or not isinstance(analysis.results, dict):
+        return {
+            "status": "error",
+            "message": "Analysis results not available",
+            "data": None
+        }
+    
+    team_analysis = analysis.results.get("team_analysis", {})
+    members = team_analysis.get("members", [])
+    if isinstance(team_analysis, list):
+        members = team_analysis
+    
+    # Filter members who have GitHub activity
+    github_members = []
+    for member in members:
+        if isinstance(member, dict):
+            github_activity = member.get("github_activity", {})
+            if github_activity and github_activity.get("commits_count", 0) > 0:
+                github_members.append({
+                    "email": member.get("user_email", ""),
+                    "username": github_activity.get("username", ""),
+                    "commits_count": github_activity.get("commits_count", 0)
+                })
+    
+    if not github_members:
+        return {
+            "status": "success",
+            "message": "No GitHub activity found for team members",
+            "data": {
+                "daily_commits": [],
+                "summary": {
+                    "total_commits": 0,
+                    "total_members": 0,
+                    "days_with_activity": 0
+                }
+            }
+        }
+    
+    # Get GitHub integration token
+    github_integration = db.query(GitHubIntegration).filter(
+        GitHubIntegration.user_id == current_user.id
+    ).first()
+    
+    if not github_integration or not github_integration.github_token:
+        return {
+            "status": "error",
+            "message": "GitHub integration not configured",
+            "data": None
+        }
+    
+    # Decrypt the GitHub token
+    from ...api.endpoints.github import decrypt_token as decrypt_github_token
+    github_token = decrypt_github_token(github_integration.github_token)
+    
+    # Initialize GitHub collector
+    from ...services.github_collector import GitHubCollector
+    collector = GitHubCollector()
+    
+    # Determine date range from analysis
+    from datetime import datetime, timedelta
+    import asyncio
+    
+    # Get dates from analysis metadata
+    metadata = analysis.results.get("metadata", {})
+    start_date_str = metadata.get("start_date")
+    end_date_str = metadata.get("end_date")
+    
+    if start_date_str and end_date_str:
+        start_date = datetime.fromisoformat(start_date_str.replace('Z', '+00:00'))
+        end_date = datetime.fromisoformat(end_date_str.replace('Z', '+00:00'))
+    else:
+        # Fallback to analysis time range
+        end_date = analysis.created_at
+        start_date = end_date - timedelta(days=analysis.time_range or 30)
+    
+    # Fetch daily commit data for each member
+    all_daily_data = {}
+    tasks = []
+    
+    for member in github_members[:5]:  # Limit to top 5 contributors to avoid rate limits
+        if member["username"]:
+            task = collector.fetch_daily_commit_data(
+                username=member["username"],
+                start_date=start_date,
+                end_date=end_date,
+                github_token=github_token
+            )
+            tasks.append((member["username"], task))
+    
+    # Execute all tasks concurrently
+    results = await asyncio.gather(*[task for _, task in tasks], return_exceptions=True)
+    
+    # Process results
+    for i, (username, result) in enumerate(zip([t[0] for t in tasks], results)):
+        if isinstance(result, Exception):
+            logger.warning(f"Failed to fetch data for {username}: {result}")
+            continue
+        
+        if result:
+            for day_data in result:
+                date = day_data['date']
+                if date not in all_daily_data:
+                    all_daily_data[date] = {
+                        'date': date,
+                        'commits': 0,
+                        'after_hours_commits': 0,
+                        'weekend_commits': 0,
+                        'contributors': set()
+                    }
+                
+                all_daily_data[date]['commits'] += day_data['commits']
+                all_daily_data[date]['after_hours_commits'] += day_data['after_hours_commits']
+                all_daily_data[date]['weekend_commits'] += day_data['weekend_commits']
+                if day_data['commits'] > 0:
+                    all_daily_data[date]['contributors'].add(username)
+    
+    # Convert to sorted list and calculate contributor counts
+    daily_timeline = []
+    for date in sorted(all_daily_data.keys()):
+        day = all_daily_data[date]
+        daily_timeline.append({
+            'date': date,
+            'commits': day['commits'],
+            'after_hours_commits': day['after_hours_commits'],
+            'weekend_commits': day['weekend_commits'],
+            'unique_contributors': len(day['contributors'])
+        })
+    
+    # Calculate summary statistics
+    total_commits = sum(day['commits'] for day in daily_timeline)
+    days_with_activity = len([day for day in daily_timeline if day['commits'] > 0])
+    
+    return {
+        "status": "success",
+        "data": {
+            "daily_commits": daily_timeline,
+            "summary": {
+                "total_commits": total_commits,
+                "total_members": len(github_members),
+                "members_fetched": len(tasks),
+                "days_with_activity": days_with_activity,
+                "total_days": len(daily_timeline),
+                "average_commits_per_day": round(total_commits / max(len(daily_timeline), 1), 1)
+            },
+            "date_range": {
+                "start": start_date.isoformat(),
+                "end": end_date.isoformat()
+            }
+        }
+    }
+
+
 async def run_analysis_task(
     analysis_id: int,
     integration_id: int,
