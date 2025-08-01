@@ -11,6 +11,9 @@ from collections import defaultdict
 from ..core.rootly_client import RootlyAPIClient
 from ..core.pagerduty_client import PagerDutyAPIClient
 from .ai_burnout_analyzer import get_ai_burnout_analyzer
+from .github_correlation_service import GitHubCorrelationService
+from ..database import get_db
+from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +34,8 @@ class UnifiedBurnoutAnalyzer:
         platform: str = "rootly",
         enable_ai: bool = False,
         github_token: Optional[str] = None,
-        slack_token: Optional[str] = None
+        slack_token: Optional[str] = None,
+        db_session: Optional[Session] = None
     ):
         # Use the appropriate client based on platform
         if platform == "pagerduty":
@@ -44,6 +48,7 @@ class UnifiedBurnoutAnalyzer:
         self.enable_ai = enable_ai
         self.github_token = github_token
         self.slack_token = slack_token
+        self.db_session = db_session
         
         # Determine which features are enabled
         self.features = {
@@ -260,6 +265,34 @@ class UnifiedBurnoutAnalyzer:
             if self.features['slack']:
                 logger.info(f"🔍 UNIFIED ANALYZER: Calculating Slack insights")
                 slack_insights = self._calculate_slack_insights(slack_data)
+
+            # GITHUB CORRELATION: Match GitHub contributors to team members
+            if self.features['github'] and github_insights:
+                logger.info(f"🔗 GITHUB CORRELATION: Correlating GitHub data with team members")
+                # Get current user ID (assuming it's passed in somehow - for now use 1 as default)
+                current_user_id = getattr(self, 'current_user_id', 1)  # Default to user 1 (Spencer)
+                correlation_service = GitHubCorrelationService(current_user_id=current_user_id)
+                
+                # Get original team members before correlation
+                original_members = team_analysis["members"].copy()
+                
+                # Correlate GitHub data with team members
+                correlated_members = correlation_service.correlate_github_data(
+                    team_members=original_members,
+                    github_insights=github_insights
+                )
+                
+                # Update team_analysis with correlated data
+                team_analysis["members"] = correlated_members
+                
+                # Get correlation statistics
+                correlation_stats = correlation_service.get_correlation_stats(
+                    team_members=correlated_members,
+                    github_insights=github_insights
+                )
+                
+                logger.info(f"🔗 GITHUB CORRELATION: Correlated {correlation_stats['team_members_with_github_data']}/{correlation_stats['total_team_members']} members ({correlation_stats['correlation_rate']:.1f}%)")
+                logger.info(f"🔗 GITHUB CORRELATION: Total commits correlated: {correlation_stats['total_commits_correlated']}")
 
             # Calculate period summary for consistent UI display
             team_overall_score = team_health.get("overall_score", 0.0)  # This is already health scale 0-10
