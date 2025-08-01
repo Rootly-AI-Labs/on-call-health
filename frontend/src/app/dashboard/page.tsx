@@ -4298,9 +4298,11 @@ export default function Dashboard() {
                             </div>
                             <div className="text-sm text-gray-600">
                               <div>{factor.metrics}</div>
-                              <div className="mt-1 text-blue-600">
-                                <strong>Action:</strong> {factor.recommendation}
-                              </div>
+                              {factor.value >= 5 && (
+                                <div className="mt-1 text-blue-600">
+                                  <strong>Action:</strong> {factor.recommendation}
+                                </div>
+                              )}
                             </div>
                           </div>
                         ))}
