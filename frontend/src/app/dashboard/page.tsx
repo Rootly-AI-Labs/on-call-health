@@ -2418,50 +2418,41 @@ export default function Dashboard() {
       metrics: `Incident response time pressure enhanced by development review load from ${membersWithIncidents.length} team members`
     },
     { 
-      factor: "Work-Life Balance", 
+      factor: "Severity Impact", 
       value: (() => {
-        if (allActiveMembers.length === 0) return null;
+        if (membersWithIncidents.length === 0) return null;
         
-        const balanceScores = allActiveMembers.map((m: any) => {
-          let balanceScore = 0;
+        const severityScores = membersWithIncidents.map((m: any) => {
+          let score = 0;
+          const metrics = m.key_metrics || {};
           
-          // Combined after-hours impact
-          let afterHoursImpact = 0;
-          if (m?.incident_count > 0 && m?.metrics?.after_hours_percentage) {
-            afterHoursImpact += m.metrics.after_hours_percentage / 20;
-          }
-          if (m?.github_activity) {
-            const githubAfterHoursRatio = (m.github_activity.after_hours_commits || 0) / Math.max(m.github_activity.commits_count || 1, 1);
-            afterHoursImpact += githubAfterHoursRatio * 5;
-          }
+          // Severity-weighted incidents per week (key metric)
+          const severityWeighted = metrics.severity_weighted_per_week || 0;
           
-          // Combined weekend impact
-          let weekendImpact = 0;
-          if (m?.incident_count > 0 && m?.metrics?.weekend_percentage) {
-            weekendImpact += m.metrics.weekend_percentage / 20;
-          }
-          if (m?.github_activity) {
-            const githubWeekendRatio = (m.github_activity.weekend_commits || 0) / Math.max(m.github_activity.commits_count || 1, 1);
-            weekendImpact += githubWeekendRatio * 5;
-          }
+          // Calculate high severity ratio
+          const totalIncidents = m.incident_count || 0;
+          const sev0Count = m.severity_breakdown?.SEV0 || 0;
+          const sev1Count = m.severity_breakdown?.SEV1 || 0;
+          const highSeverityCount = sev0Count + sev1Count;
+          const highSeverityRatio = totalIncidents > 0 ? highSeverityCount / totalIncidents : 0;
           
-          // High-intensity work patterns
-          let intensityImpact = 0;
-          if (m?.github_activity && (m.github_activity.commits_per_week || 0) > 50) {
-            intensityImpact += 2;
-          }
-          if (m?.incident_count > 10) {
-            intensityImpact += 2;
-          }
+          // Score based on severity-weighted incidents (0-7 points)
+          // Threshold: 3+ severity-weighted incidents per week is high stress
+          score += Math.min(7, (severityWeighted / 3) * 7);
           
-          balanceScore = afterHoursImpact + weekendImpact + intensityImpact;
-          return Math.min(balanceScore, 10);
-        });
+          // Additional score for high severity ratio (0-3 points)
+          // If >30% of incidents are SEV0/SEV1, that's high stress
+          score += Math.min(3, (highSeverityRatio / 0.3) * 3);
+          
+          return Math.min(10, score);
+        }).filter((s: number) => s > 0);
         
-        const sum = balanceScores.reduce((total, score) => total + score, 0);
-        return Number((sum / balanceScores.length).toFixed(1));
+        if (severityScores.length === 0) return null;
+        
+        const sum = severityScores.reduce((a: number, b: number) => a + b, 0);
+        return Number((sum / severityScores.length).toFixed(1));
       })(),
-      metrics: `Overall work-life balance disruption from incident response + development intensity across ${allActiveMembers.length} team members`
+      metrics: `High-severity incident impact (SEV0/SEV1) across ${membersWithIncidents.length} responders`
     },
   ].filter(factor => factor.value !== null) // Remove factors with no real data
    .map(factor => ({
@@ -5574,43 +5565,31 @@ export default function Dashboard() {
                 color: '#96CEB4'
               },
               {
-                factor: 'Work-Life Balance',
+                factor: 'Severity Impact',
                 value: (() => {
-                  // Overall work-life balance disruption score
-                  let balanceScore = 0;
+                  // Severity impact score
+                  let severityScore = 0;
                   
-                  // Calculate combined after-hours impact
-                  let afterHoursImpact = 0;
                   if (hasIncidentData) {
-                    afterHoursImpact += (m?.metrics?.after_hours_percentage || 0) / 20; // Scale down
-                  }
-                  if (hasGitHubData) {
-                    const githubAfterHoursRatio = (m.github_activity.after_hours_commits || 0) / Math.max(m.github_activity.commits_count || 1, 1);
-                    afterHoursImpact += githubAfterHoursRatio * 5; // Scale to 0-5
-                  }
-                  
-                  // Calculate combined weekend impact
-                  let weekendImpact = 0;
-                  if (hasIncidentData) {
-                    weekendImpact += (m?.metrics?.weekend_percentage || 0) / 20; // Scale down
-                  }
-                  if (hasGitHubData) {
-                    const githubWeekendRatio = (m.github_activity.weekend_commits || 0) / Math.max(m.github_activity.commits_count || 1, 1);
-                    weekendImpact += githubWeekendRatio * 5; // Scale to 0-5
-                  }
-                  
-                  // High-intensity work patterns
-                  let intensityImpact = 0;
-                  if (hasGitHubData && (m.github_activity.commits_per_week || 0) > 50) {
-                    intensityImpact += 2; // High-intensity development
-                  }
-                  if (hasIncidentData && (m?.incident_count || 0) > 10) {
-                    intensityImpact += 2; // High incident load
+                    // Severity-weighted incidents per week
+                    const severityWeighted = (m as any)?.key_metrics?.severity_weighted_per_week || 0;
+                    
+                    // Calculate high severity ratio
+                    const totalIncidents = m?.incident_count || 0;
+                    const sev0Count = (m as any)?.severity_breakdown?.SEV0 || 0;
+                    const sev1Count = (m as any)?.severity_breakdown?.SEV1 || 0;
+                    const highSeverityCount = sev0Count + sev1Count;
+                    const highSeverityRatio = totalIncidents > 0 ? highSeverityCount / totalIncidents : 0;
+                    
+                    // Score based on severity-weighted incidents (0-7 points)
+                    severityScore += Math.min(7, (severityWeighted / 3) * 7);
+                    
+                    // Additional score for high severity ratio (0-3 points)
+                    severityScore += Math.min(3, (highSeverityRatio / 0.3) * 3);
                   }
                   
-                  balanceScore = afterHoursImpact + weekendImpact + intensityImpact;
-                  return Math.min(balanceScore, 10);
-                })() || (m?.factors?.schedule_disruption ?? 0.1),
+                  return Math.min(severityScore, 10);
+                })() || 0.1,
                 color: '#FECA57'
               }
             ];
@@ -5940,7 +5919,7 @@ export default function Dashboard() {
                           </div>
                         </div>
                         <div className="bg-white p-2 rounded">
-                          <span className="text-xs text-blue-700">Work-Life Balance</span>
+                          <span className="text-xs text-blue-700">Severity Impact</span>
                           <div className="flex items-center space-x-2">
                             <span className={`text-lg font-bold ${
                               ((memberData.github_activity?.after_hours_commits || 0) + (memberData.github_activity?.weekend_commits || 0)) / Math.max(memberData.github_activity?.commits_count || 1, 1) > 0.3 ? 'text-red-600' :

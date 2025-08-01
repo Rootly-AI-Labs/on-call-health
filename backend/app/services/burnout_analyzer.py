@@ -1341,6 +1341,8 @@ class BurnoutAnalyzerService:
             "after_hours_activity_rate": round(avg_after_hours_rate, 3),
             "after_hours_activity_percentage": round(avg_after_hours_rate * 100, 1),  # Frontend expects percentage
             "weekend_activity_rate": round(avg_weekend_rate, 3),
+            "weekend_activity_percentage": round(avg_weekend_rate * 100, 1),  # Frontend expects percentage
+            "weekend_commit_percentage": round(avg_weekend_rate * 100, 1),  # Alternative field name for frontend
             "top_contributors": top_contributors,
             "burnout_indicators": {
                 "excessive_commits": burnout_counts.get("excessive_commits", 0),
