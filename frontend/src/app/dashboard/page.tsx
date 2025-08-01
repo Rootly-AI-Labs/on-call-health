@@ -4271,8 +4271,12 @@ export default function Dashboard() {
                                     const avgWeekdayCommits = weekdayCommits / 5
                                     const avgWeekendCommits = weekendCommits / 2
                                     const dayCommits = isWeekend ? avgWeekendCommits : avgWeekdayCommits
-                                    const maxDayCommits = Math.max(avgWeekdayCommits, avgWeekendCommits)
-                                    const heightPercent = maxDayCommits > 0 ? (dayCommits / maxDayCommits) * 100 : 0
+                                    // Find the maximum for proper scaling
+                                    const maxDayCommits = Math.max(avgWeekdayCommits, avgWeekendCommits, 1) // Avoid division by zero
+                                    const heightPercent = maxDayCommits > 0 ? Math.min((dayCommits / maxDayCommits) * 100, 100) : 0
+                                    
+                                    // Ensure minimum visible height for non-zero values
+                                    const displayHeight = dayCommits > 0 && heightPercent < 10 ? 10 : heightPercent
                                     
                                     return (
                                       <div key={day} className="text-center">
@@ -4282,7 +4286,7 @@ export default function Dashboard() {
                                             className={`absolute bottom-0 w-full rounded transition-all ${
                                               isWeekend ? 'bg-orange-400' : 'bg-blue-400'
                                             }`}
-                                            style={{ height: `${heightPercent}%` }}
+                                            style={{ height: `${displayHeight}%` }}
                                             title={`~${Math.round(dayCommits)} commits`}
                                           />
                                         </div>
