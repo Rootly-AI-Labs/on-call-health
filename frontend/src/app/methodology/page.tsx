@@ -113,7 +113,7 @@ export default function MethodologyPage() {
                     <div className="w-2 h-2 bg-red-500 rounded-full mt-1.5"></div>
                     <div>
                       <strong className="text-sm">GitHub Activity Patterns</strong>
-                      <p className="text-sm text-gray-600">High commit frequency (>25/week), late-night commits (>30% after hours), and weekend coding activity (>25%)</p>
+                      <p className="text-sm text-gray-600">High commit frequency (&gt;25/week), late-night commits (&gt;30% after hours), and weekend coding activity (&gt;25%)</p>
                     </div>
                   </div>
                   <div className="flex items-start space-x-3">
@@ -166,7 +166,7 @@ export default function MethodologyPage() {
                     <div className="w-2 h-2 bg-yellow-500 rounded-full mt-1.5"></div>
                     <div>
                       <strong className="text-sm">Code Collaboration Decline</strong>
-                      <p className="text-sm text-gray-600">Large, infrequent PRs (>1000 lines), declining code review participation (<50%), and shorter commit messages (<20 chars)</p>
+                      <p className="text-sm text-gray-600">Large, infrequent PRs (&gt;1000 lines), declining code review participation (&lt;50%), and shorter commit messages (&lt;20 chars)</p>
                     </div>
                   </div>
                   <div className="flex items-start space-x-3">
@@ -223,7 +223,7 @@ export default function MethodologyPage() {
                     <div className="w-2 h-2 bg-green-500 rounded-full mt-1.5"></div>
                     <div>
                       <strong className="text-sm">Code Quality & Collaboration</strong>
-                      <p className="text-sm text-gray-600">PR merge success rate (>80%), constructive code review quality, and knowledge sharing through documentation</p>
+                      <p className="text-sm text-gray-600">PR merge success rate (&gt;80%), constructive code review quality, and knowledge sharing through documentation</p>
                     </div>
                   </div>
                   <div className="flex items-start space-x-3">
