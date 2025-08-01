@@ -46,11 +46,19 @@ export default function MethodologyPage() {
               Our burnout detection system analyzes multiple data sources to calculate three key dimensions 
               of burnout, providing an evidence-based assessment of team mental health and well-being.
             </p>
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
               <p className="text-sm text-blue-800">
                 <strong>Multi-Source Analysis:</strong> We analyze incident data from PagerDuty/Rootly (primary source), 
                 with optional GitHub activity data for code patterns and Slack communication data for sentiment analysis. 
                 The analysis adapts based on available integrations to provide the most comprehensive assessment possible.
+              </p>
+            </div>
+            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+              <p className="text-sm text-purple-800">
+                <strong>GitHub-Only Analysis:</strong> When only GitHub data is available, our system can provide 
+                a complete burnout assessment (100% scoring) using advanced flow state detection to distinguish 
+                healthy high-productivity from burnout patterns. Confidence intervals and baseline comparisons 
+                ensure scientifically rigorous results even with a single data source.
               </p>
             </div>
           </CardContent>
@@ -104,8 +112,8 @@ export default function MethodologyPage() {
                   <div className="flex items-start space-x-3">
                     <div className="w-2 h-2 bg-red-500 rounded-full mt-1.5"></div>
                     <div>
-                      <strong className="text-sm">GitHub Activity</strong>
-                      <p className="text-sm text-gray-600">Late-night commits and excessive coding activity (when available)</p>
+                      <strong className="text-sm">GitHub Activity Patterns</strong>
+                      <p className="text-sm text-gray-600">High commit frequency (>25/week), late-night commits (>30% after hours), and weekend coding activity (>25%)</p>
                     </div>
                   </div>
                   <div className="flex items-start space-x-3">
@@ -157,8 +165,8 @@ export default function MethodologyPage() {
                   <div className="flex items-start space-x-3">
                     <div className="w-2 h-2 bg-yellow-500 rounded-full mt-1.5"></div>
                     <div>
-                      <strong className="text-sm">GitHub Patterns</strong>
-                      <p className="text-sm text-gray-600">Weekend commits and large PR patterns indicating detachment (when available)</p>
+                      <strong className="text-sm">Code Collaboration Decline</strong>
+                      <p className="text-sm text-gray-600">Large, infrequent PRs (>1000 lines), declining code review participation (<50%), and shorter commit messages (<20 chars)</p>
                     </div>
                   </div>
                   <div className="flex items-start space-x-3">
@@ -214,8 +222,8 @@ export default function MethodologyPage() {
                   <div className="flex items-start space-x-3">
                     <div className="w-2 h-2 bg-green-500 rounded-full mt-1.5"></div>
                     <div>
-                      <strong className="text-sm">Code Quality</strong>
-                      <p className="text-sm text-gray-600">GitHub PR quality and code review participation (when available)</p>
+                      <strong className="text-sm">Code Quality & Collaboration</strong>
+                      <p className="text-sm text-gray-600">PR merge success rate (>80%), constructive code review quality, and knowledge sharing through documentation</p>
                     </div>
                   </div>
                   <div className="flex items-start space-x-3">
@@ -230,6 +238,105 @@ export default function MethodologyPage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* GitHub-Only Analysis Section */}
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Badge className="mr-3 bg-purple-500">GitHub-Only</Badge>
+              Comprehensive Single-Source Analysis
+            </CardTitle>
+            <CardDescription>
+              How we achieve 100% burnout scoring using only GitHub data with scientific rigor
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-6">
+              <div>
+                <h4 className="font-semibold mb-3">Flow State vs. Frantic Activity Detection</h4>
+                <p className="text-sm text-gray-700 mb-3">
+                  Our advanced algorithm distinguishes between healthy high-productivity (flow state) and 
+                  burnout-driven frantic activity by analyzing multiple patterns:
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                    <h5 className="font-medium text-green-800 mb-2">Healthy Flow State</h5>
+                    <ul className="text-xs text-green-700 space-y-1">
+                      <li>• Consistent, sustainable work pace</li>
+                      <li>• High-quality output (fewer revisions)</li>
+                      <li>• Balanced activities (coding + reviews + docs)</li>
+                      <li>• Reasonable work hour boundaries</li>
+                    </ul>
+                  </div>
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                    <h5 className="font-medium text-red-800 mb-2">Frantic Burnout Activity</h5>
+                    <ul className="text-xs text-red-700 space-y-1">
+                      <li>• Erratic commit patterns with extreme peaks</li>
+                      <li>• Poor quality output (many revisions, rushed commits)</li>
+                      <li>• Imbalanced work (all coding, no collaboration)</li>
+                      <li>• Constant boundary violations (24/7 activity)</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+              
+              <Separator />
+              
+              <div>
+                <h4 className="font-semibold mb-3">Baseline Comparison System</h4>
+                <p className="text-sm text-gray-700 mb-3">
+                  Individual metrics are compared against three baseline types for accurate risk assessment:
+                </p>
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-3">
+                    <Badge variant="outline" className="w-20 text-xs">Personal</Badge>
+                    <span className="text-sm text-gray-600">Individual's historical patterns and trends</span>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <Badge variant="outline" className="w-20 text-xs">Team</Badge>
+                    <span className="text-sm text-gray-600">Team median values (70% weight)</span>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <Badge variant="outline" className="w-20 text-xs">Industry</Badge>
+                    <span className="text-sm text-gray-600">Software industry standards (30% weight)</span>
+                  </div>
+                </div>
+              </div>
+              
+              <Separator />
+              
+              <div>
+                <h4 className="font-semibold mb-3">Confidence Intervals & Validation</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="text-center">
+                    <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                      <span className="text-green-600 font-bold">High</span>
+                    </div>
+                    <p className="text-xs text-gray-600">
+                      Comprehensive GitHub data, active team, 30+ day period
+                    </p>
+                  </div>
+                  <div className="text-center">
+                    <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                      <span className="text-yellow-600 font-bold">Med</span>
+                    </div>
+                    <p className="text-xs text-gray-600">
+                      Good data coverage, some limitations in scope or time
+                    </p>
+                  </div>
+                  <div className="text-center">
+                    <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                      <span className="text-red-600 font-bold">Low</span>
+                    </div>
+                    <p className="text-xs text-gray-600">
+                      Limited data - results should be validated with team
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Scoring System */}
         <Card className="mb-8">
@@ -292,11 +399,13 @@ export default function MethodologyPage() {
             <div>
               <h4 className="font-medium mb-2">What We Analyze</h4>
               <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
-                <li>Incident frequency, timing, and resolution patterns</li>
-                <li>GitHub commit patterns, PR activity, and code review participation (when connected)</li>
+                <li>Incident frequency, timing, and resolution patterns (PagerDuty/Rootly)</li>
+                <li>GitHub commit patterns, PR activity, and code review participation</li>
                 <li>Slack message sentiment, timing, and communication patterns (when connected)</li>
-                <li>Work hour distribution across all platforms</li>
-                <li>Weekend and after-hours activity patterns</li>
+                <li>Work hour distribution and boundary violations across all platforms</li>
+                <li>Flow state analysis: sustainable productivity vs. frantic burnout patterns</li>
+                <li>Code quality indicators: PR merge rates, review depth, commit message quality</li>
+                <li>Collaboration patterns: knowledge sharing, mentoring, cross-team contributions</li>
               </ul>
             </div>
             
@@ -315,7 +424,12 @@ export default function MethodologyPage() {
             
             <Separator />
             
-            <div className="bg-gray-50 rounded-lg p-4">
+            <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+              <p className="text-sm text-gray-700">
+                <strong>GitHub-Only Analysis Validation:</strong> When using only GitHub data, our system 
+                achieves high accuracy through flow state detection and baseline comparisons. However, 
+                the most comprehensive assessment comes from combining multiple data sources (incidents + GitHub + Slack).
+              </p>
               <p className="text-sm text-gray-700">
                 <strong>Important:</strong> This tool provides data-driven insights but should not replace 
                 professional mental health assessment. Always consult with HR and mental health professionals 

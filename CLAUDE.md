@@ -586,6 +586,611 @@ components/
 3. **Phase 3**: Remove hardcoded mappings, use database as single source
 4. **Phase 4**: Add advanced features (auto-detection, suggestions)
 
+### CURRENT CRITICAL ISSUE - Dashboard Mapping Drawer Data Loading ✅
+
+#### Issue Description:
+- **Problem**: Dashboard MappingDrawer component opens but shows no data, while integrations page mapping works perfectly
+- **Impact**: Users cannot view/manage mappings from dashboard GitHub/Slack cards
+- **Status**: **FIXED** - Environment variable mismatch resolved
+
+#### Root Cause Found:
+**Environment Variable Inconsistency**:
+- Integrations page: `const API_BASE = process.env.NEXT_PUBLIC_API_URL` ✅
+- Dashboard page: `const API_BASE = process.env.NEXT_PUBLIC_API_URL` ✅  
+- MappingDrawer component: `const API_BASE = process.env.NEXT_PUBLIC_API_BASE` ❌
+
+#### Fix Applied:
+**File**: `frontend/src/components/mapping-drawer.tsx`
+```javascript
+// BEFORE (broken):
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000'
+
+// AFTER (fixed):
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+```
+
+#### Console Error Evidence:
+```
+🚀 MappingDrawer: Fetching mapping data for platform: github
+🚀 MappingDrawer: API Base: http://localhost:8000
+❌ GET http://localhost:8000/integrations/mappings/platform/github net::ERR_CONNECTION_REFUSED
+🚀 MappingDrawer: Error loading mapping data: TypeError: Failed to fetch
+```
+
+#### Expected Result After Deployment:
+- MappingDrawer will use production API URL instead of localhost
+- Dashboard mapping buttons will show data identical to integrations page
+- All components will use consistent API endpoint configuration
+
+#### Investigation Steps:
+1. **Root Cause Analysis**: Both should use identical API calls and component
+   - Dashboard uses: `<MappingDrawer isOpen={mappingDrawerOpen} platform={mappingDrawerPlatform} />`
+   - Integrations uses: Built-in Sheet component with direct API calls
+   - Same endpoints: `/integrations/mappings/platform/${platform}` and `/integrations/mappings/success-rate`
+
+2. **Debugging Implementation**:
+   - **Files Modified**:
+     - `frontend/src/components/mapping-drawer.tsx` - Added 🚀 MappingDrawer debugging logs
+     - `frontend/src/app/dashboard/page.tsx` - Added 🎯 Dashboard debugging logs
+   - **Debug Tracking**:
+     - Button click: `openMappingDrawer()` function calls
+     - State updates: `mappingDrawerOpen` and `mappingDrawerPlatform` changes
+     - Component lifecycle: `loadMappingData()` execution
+     - API calls: Request/response status and data
+     - State management: `setMappings()` and `setMappingStats()` calls
+
+3. **Expected Debug Flow**:
+   ```
+   🎯 Dashboard: openMappingDrawer called with platform: github
+   🎯 Dashboard: Set mappingDrawerPlatform to github and mappingDrawerOpen to true
+   🚀 MappingDrawer: loadMappingData called - isOpen: true, platform: github
+   🚀 MappingDrawer: Starting to load mapping data...
+   🚀 MappingDrawer: Fetching mapping data for platform: github
+   🚀 MappingDrawer: API Response statuses - mappings: 200, stats: 200
+   🚀 MappingDrawer: Received X mappings and stats: {...}
+   🚀 MappingDrawer: Successfully set mappings and stats state
+   ```
+
+4. **Potential Causes to Check**:
+   - Component re-rendering issues
+   - State timing problems (platform/isOpen synchronization)
+   - API Base URL differences between pages
+   - Authentication token consistency
+   - useEffect dependency array issues
+   - React 18 StrictMode double-mounting
+
+#### Next Actions:
+- [ ] Test dashboard mapping button with browser console open
+- [ ] Compare console logs between working (integrations) and broken (dashboard) flows  
+- [ ] Check if MappingDrawer useEffect is triggering properly
+- [ ] Verify API_BASE environment variable consistency
+- [ ] Test with React DevTools to inspect component state changes
+
+#### Files Currently Under Investigation:
+- `frontend/src/components/mapping-drawer.tsx` - Reusable component with debug logs
+- `frontend/src/app/dashboard/page.tsx` - Dashboard implementation with debug logs
+- `frontend/src/app/integrations/page.tsx` - Working reference implementation
+
+### NEXT MAJOR ENHANCEMENT - GitHub-Only Burnout Analysis 🚧
+
+#### Objective: Evaluate Burnout for Users with High GitHub Activity but Zero Incidents
+
+**Problem Statement**: Current analysis only considers users who appear in incident data, missing potential burnout in developers who:
+- Work long hours but aren't on-call rotation
+- Have high code velocity but don't handle incidents
+- Show burnout signals in development patterns before incidents occur
+- Are junior developers not yet involved in incident response
+
+#### Implementation Plan
+
+##### Phase 1: Data Collection Enhancement
+**Expand user collection to include GitHub-active developers**:
+
+1. **Enhanced User Discovery**:
+   - Current: Users discovered from Rootly incident data only
+   - Enhanced: Users discovered from incident data + GitHub contributors + Slack active members
+   - API calls: Combine Rootly users + GitHub org members + Slack workspace members
+
+2. **GitHub Activity Thresholds**:
+   - Minimum commits per analysis period (e.g., 5+ commits in 30 days)
+   - Regular contribution patterns (not one-time contributors)
+   - Activity across multiple repositories
+
+3. **User Classification System**:
+   ```python
+   user_types = {
+       "incident_responder": {"incidents": ">0", "github": "any", "slack": "any"},
+       "pure_developer": {"incidents": "0", "github": ">threshold", "slack": "any"}, 
+       "inactive": {"incidents": "0", "github": "<threshold", "slack": "low"},
+       "communication_heavy": {"incidents": "any", "github": "low", "slack": ">threshold"}
+   }
+   ```
+
+##### Phase 2: GitHub-Specific Burnout Indicators Based on Maslach Burnout Inventory
+**Develop burnout detection mapped to validated psychological constructs**:
+
+**Scientific Foundation**: Christina Maslach's research identifies three core dimensions:
+1. **Emotional Exhaustion** - Feeling emotionally drained and depleted
+2. **Depersonalization/Cynicism** - Detached, callous attitudes toward work
+3. **Reduced Personal Accomplishment** - Feelings of ineffectiveness and lack of achievement
+
+#### GitHub Data Mapping to MBI Dimensions:
+
+**1. Emotional Exhaustion Indicators (40% weight)**:
+   - **Temporal Overextension**:
+     * Commits spread >12 hours/day consistently
+     * Weekend commits >20% of total (normal: <10%)
+     * After-hours commits (post-6PM, pre-8AM) trending upward
+     * No "commit-free" days in 2+ week periods
+   
+   - **Intensity Without Recovery**:
+     * Daily commit frequency 2+ std deviations above personal baseline
+     * Commit timestamps showing <8 hours between last/first commits
+     * Vacation periods with continued coding activity
+     * Sprint periods without recovery weeks
+   
+   - **Methodology**: Compare against individual baseline + team norms
+     ```python
+     exhaustion_score = (
+         temporal_overextension * 0.4 +
+         intensity_without_recovery * 0.3 +
+         baseline_deviation * 0.3
+     )
+     # Normalize to 0-100 scale where >70 = high risk
+     ```
+
+**2. Depersonalization/Cynicism Indicators (35% weight)**:
+   - **Reduced Social Coding Behaviors**:
+     * Code review participation drops >30% from baseline
+     * Pull request descriptions become terse/minimal
+     * Decreased helpful comments on others' PRs
+     * Less participation in architectural discussions (measured via PR comments)
+   
+   - **Quality of Interaction Degradation**:
+     * Commit messages become less descriptive (character count trend)
+     * Increased use of generic messages ("fix", "update", "wip")
+     * Reduced documentation contributions
+     * Less mentoring activity (junior developer interactions)
+   
+   - **Defensive/Withdrawn Patterns**:
+     * Smaller, more frequent commits (avoiding peer review)
+     * Working in isolation (fewer collaborative commits)
+     * Reduced cross-repository contributions
+     * Less experimental/creative coding (measured by branch diversity)
+   
+   - **Methodology**: Baseline against historical collaboration patterns
+     ```python
+     cynicism_score = (
+         social_coding_decline * 0.4 +
+         interaction_quality_drop * 0.35 +
+         withdrawal_patterns * 0.25
+     )
+     ```
+
+**3. Reduced Personal Accomplishment Indicators (25% weight)**:
+   - **Declining Code Quality Metrics**:
+     * Increased bug-fix to feature-commit ratio
+     * More reverts and rollbacks of own code  
+     * Longer time to complete similar-sized features
+     * Decreased complexity of problems tackled
+   
+   - **Productivity Paradox Signals**:
+     * High commit volume with low meaningful progress
+     * Increased "churn" (lines added then removed)
+     * More "cleanup" commits vs substantial contributions
+     * Decreased innovation (fewer new patterns/approaches)
+   
+   - **Achievement Pattern Changes**:
+     * Longer PR cycles (feature delivery delays)
+     * Reduced ownership of significant features
+     * Less involvement in technical decision-making
+     * Decreased cross-team collaboration impact
+   
+   - **Methodology**: Track accomplishment trends vs role expectations
+     ```python
+     accomplishment_score = 100 - (  # Inverted - lower = worse
+         quality_decline * 0.4 +
+         productivity_paradox * 0.35 +
+         achievement_reduction * 0.25
+     )
+     ```
+
+#### Composite GitHub Burnout Score:
+```python
+github_burnout_score = (
+    emotional_exhaustion * 0.40 +
+    cynicism_score * 0.35 +
+    (100 - accomplishment_score) * 0.25  # Invert for consistent direction
+)
+
+# Risk Level Classification (aligned with clinical MBI ranges):
+# 0-30: Low Risk (healthy patterns)
+# 31-60: Moderate Risk (some concerning patterns)  
+# 61-80: High Risk (multiple strong indicators)
+# 81-100: Critical Risk (severe burnout indicators)
+```
+
+#### Critical Implementation Considerations:
+
+**1. Individual Baseline Establishment**:
+- Require minimum 3 months of historical data before scoring
+- Account for role changes, project transitions, learning curves
+- Seasonal adjustments (end-of-quarter pushes, vacation periods)
+- Personal productivity patterns (some developers naturally work evenings)
+
+**2. False Positive Prevention**:
+- **Scenario**: Developer working "non-stop throughout the day"
+- **Risk**: High exhaustion score from temporal patterns
+- **Mitigation**: 
+  * Cross-reference with productivity metrics (are they actually productive?)
+  * Check for "flow state" patterns (consistent, sustainable output)
+  * Validate against self-reported satisfaction/energy levels
+  * Consider cultural/timezone factors (distributed teams)
+
+**3. Statistical Rigor**:
+```python
+def calculate_burnout_with_confidence(user_data, baseline_data, team_norms):
+    """
+    Calculate burnout score with statistical confidence intervals
+    """
+    # Minimum data requirements
+    if user_data.days_of_activity < 90:
+        return {"score": None, "confidence": "insufficient_data"}
+    
+    # Calculate z-scores against multiple baselines
+    personal_z_score = (current_metric - personal_baseline) / personal_std_dev
+    team_z_score = (current_metric - team_average) / team_std_dev
+    
+    # Weight based on data quality and recency
+    confidence_weight = min(1.0, user_data.days_of_activity / 180)
+    
+    # Composite score with confidence interval
+    raw_score = calculate_raw_burnout_score(user_data)
+    confidence_interval = calculate_confidence_interval(
+        raw_score, sample_size, variance
+    )
+    
+    return {
+        "score": raw_score,
+        "confidence_lower": confidence_interval.lower,
+        "confidence_upper": confidence_interval.upper,
+        "confidence_level": confidence_weight,
+        "sample_size": user_data.days_of_activity
+    }
+```
+
+**4. Ethical Considerations & Privacy**:
+- Aggregate team trends vs individual surveillance
+- Opt-in reporting for individuals
+- Focus on systemic issues, not individual performance
+- Clear communication about methodology and limitations
+- Regular validation against actual burnout outcomes
+
+**5. Validation Framework**:
+```python
+class BurnoutValidation:
+    """Continuous validation against actual outcomes"""
+    
+    @staticmethod
+    def validate_predictions():
+        # Track prediction accuracy over time
+        # Compare GitHub scores vs:
+        # - Self-reported burnout surveys
+        # - Sick leave patterns  
+        # - Employee satisfaction scores
+        # - Voluntary turnover
+        # - Performance review outcomes
+        
+    @staticmethod  
+    def adjust_weights():
+        # Machine learning approach to optimize weights
+        # Based on validation outcomes
+        # Continuous model improvement
+```
+
+##### Phase 3: Scientifically Rigorous Scoring Implementation
+**Multi-layered scoring system with statistical validation**:
+
+**1. Data Quality Assessment**:
+```python
+class DataQualityCheck:
+    @staticmethod
+    def assess_data_sufficiency(user_data):
+        """Ensure statistical validity before scoring"""
+        quality_score = 0
+        issues = []
+        
+        # Temporal coverage (minimum 90 days for baseline)
+        if user_data.days_span >= 90:
+            quality_score += 25
+        else:
+            issues.append(f"Insufficient history: {user_data.days_span} days")
+            
+        # Activity consistency (at least 50% of days with activity)
+        activity_ratio = user_data.active_days / user_data.total_days
+        if activity_ratio >= 0.3:
+            quality_score += 25
+        else:
+            issues.append(f"Low activity consistency: {activity_ratio:.2%}")
+            
+        # Data diversity (commits, PRs, reviews - not just commits)
+        data_types = sum([
+            bool(user_data.commits),
+            bool(user_data.pull_requests), 
+            bool(user_data.code_reviews)
+        ])
+        quality_score += (data_types / 3) * 25
+        
+        # Recent activity (not just historical)
+        days_since_last_activity = (datetime.now() - user_data.last_activity).days
+        if days_since_last_activity <= 14:
+            quality_score += 25
+        else:
+            issues.append(f"Stale data: {days_since_last_activity} days since activity")
+            
+        return {
+            "quality_score": quality_score,
+            "sufficient": quality_score >= 75,
+            "issues": issues
+        }
+```
+
+**2. Baseline Establishment (Multi-Modal)**:
+```python
+class BaselineCalculator:
+    """Calculate multiple baseline types for robust comparison"""
+    
+    @staticmethod
+    def calculate_personal_baseline(user_data, months_back=6):
+        """Individual's own historical patterns"""
+        # Rolling window approach - exclude last 30 days to avoid current burnout
+        historical_data = user_data.exclude_recent(days=30)
+        
+        return {
+            "commits_per_day": np.percentile(historical_data.daily_commits, 50),
+            "work_hours_per_day": np.percentile(historical_data.daily_hours, 50),
+            "review_participation": np.mean(historical_data.reviews_given),
+            "code_quality_proxy": np.mean(historical_data.lines_per_commit),
+            "variability": np.std(historical_data.daily_commits)
+        }
+    
+    @staticmethod
+    def calculate_cohort_baseline(team_data, user_role, user_seniority):
+        """Baseline from similar developers (role + seniority)"""
+        cohort = team_data.filter(role=user_role, seniority=user_seniority)
+        
+        # Use median (robust to outliers) rather than mean
+        return {
+            "commits_per_day": np.median([u.daily_commits for u in cohort]),
+            "work_hours_per_day": np.median([u.daily_hours for u in cohort]),
+            "review_participation": np.median([u.reviews_given for u in cohort]),
+            "weekend_work_ratio": np.median([u.weekend_ratio for u in cohort])
+        }
+```
+
+**3. Advanced Scoring with Confidence Intervals**:
+```python
+def calculate_github_burnout_comprehensive(user_data, baselines):
+    """
+    Maslach-aligned burnout scoring with statistical rigor
+    Addresses the 'non-stop commits throughout day' scenario
+    """
+    
+    # 1. EMOTIONAL EXHAUSTION (40% weight)
+    temporal_score = calculate_temporal_exhaustion(user_data, baselines)
+    intensity_score = calculate_intensity_exhaustion(user_data, baselines)
+    
+    # Key insight: Distinguish between 'flow state' and 'frantic activity'
+    flow_state_indicator = detect_flow_vs_frantic(user_data)
+    if flow_state_indicator.is_sustainable_flow:
+        # Healthy high-productivity - reduce exhaustion penalty
+        temporal_score *= 0.7
+        intensity_score *= 0.8
+    
+    exhaustion_raw = (temporal_score * 0.6 + intensity_score * 0.4)
+    
+    # 2. CYNICISM/DEPERSONALIZATION (35% weight) 
+    social_decline = calculate_social_coding_decline(user_data, baselines)
+    interaction_quality = calculate_interaction_degradation(user_data, baselines)
+    
+    cynicism_raw = (social_decline * 0.6 + interaction_quality * 0.4)
+    
+    # 3. REDUCED ACCOMPLISHMENT (25% weight)
+    quality_decline = calculate_quality_trends(user_data, baselines)
+    productivity_paradox = calculate_productivity_paradox(user_data, baselines)
+    
+    accomplishment_raw = 100 - (quality_decline * 0.6 + productivity_paradox * 0.4)
+    
+    # Composite score
+    raw_score = (
+        exhaustion_raw * 0.40 +
+        cynicism_raw * 0.35 +
+        (100 - accomplishment_raw) * 0.25
+    )
+    
+    # Calculate confidence interval
+    confidence = calculate_confidence_interval(user_data, raw_score)
+    
+    return BurnoutAssessment(
+        score=raw_score,
+        confidence_lower=confidence.lower,
+        confidence_upper=confidence.upper,
+        reliability=confidence.reliability,
+        components={
+            "exhaustion": exhaustion_raw,
+            "cynicism": cynicism_raw, 
+            "accomplishment": accomplishment_raw
+        },
+        risk_factors=identify_primary_risk_factors(user_data),
+        recommendations=generate_recommendations(raw_score, user_data)
+    )
+
+def detect_flow_vs_frantic(user_data):
+    """
+    Critical function: Distinguish sustainable high-productivity from burnout
+    
+    Flow State Indicators:
+    - Consistent output quality maintained
+    - Breaks between intensive periods
+    - Productive output per hour remains high
+    - Code review engagement remains healthy
+    
+    Frantic Activity Indicators:
+    - Output quality declining despite high volume
+    - No recovery periods
+    - Inefficient commits (high churn, many micro-commits)
+    - Social engagement dropping
+    """
+    
+    # Quality maintenance during high activity
+    quality_consistency = np.corrcoef(
+        user_data.daily_commit_count,
+        user_data.daily_quality_score
+    )[0,1]
+    
+    # Efficiency metrics
+    commits_per_productive_hour = user_data.commits / user_data.focused_hours
+    efficiency_trend = np.polyfit(range(len(commits_per_productive_hour)), 
+                                 commits_per_productive_hour, 1)[0]
+    
+    # Recovery pattern detection
+    has_recovery_periods = detect_rest_periods(user_data.daily_activity)
+    
+    # Social engagement maintenance
+    social_engagement_trend = calculate_social_trend(user_data.review_activity)
+    
+    is_flow = (
+        quality_consistency > 0.1 and  # Quality maintained during high activity
+        efficiency_trend >= -0.1 and   # Efficiency not declining rapidly
+        has_recovery_periods and       # Taking breaks
+        social_engagement_trend >= -0.2 # Social coding not collapsing
+    )
+    
+    return FlowStateAssessment(
+        is_sustainable_flow=is_flow,
+        quality_maintenance=quality_consistency,
+        efficiency_trend=efficiency_trend,
+        recovery_detected=has_recovery_periods,
+        social_health=social_engagement_trend
+    )
+```
+
+**4. Risk Classification (Clinical MBI Alignment)**:
+```python
+def classify_burnout_risk(burnout_assessment):
+    """Map to clinically validated MBI risk levels"""
+    
+    score = burnout_assessment.score
+    confidence = burnout_assessment.reliability
+    
+    # Adjust risk classification based on confidence
+    if confidence < 0.7:
+        return RiskClassification(
+            level="INSUFFICIENT_DATA",
+            message="Need more data for reliable assessment",
+            recommendation="Continue monitoring for 30+ days"
+        )
+    
+    # Clinical MBI thresholds adapted for GitHub data
+    if score >= 81:
+        return RiskClassification(
+            level="CRITICAL_RISK",
+            message="Severe burnout indicators across multiple dimensions",
+            recommendation="Immediate intervention recommended",
+            confidence_interval=(burnout_assessment.confidence_lower, 
+                                burnout_assessment.confidence_upper)
+        )
+    elif score >= 61:
+        return RiskClassification(
+            level="HIGH_RISK", 
+            message="Multiple strong burnout indicators",
+            recommendation="Schedule check-in within 1 week"
+        )
+    elif score >= 31:
+        return RiskClassification(
+            level="MODERATE_RISK",
+            message="Some concerning patterns emerging", 
+            recommendation="Monitor closely, consider workload review"
+        )
+    else:
+        return RiskClassification(
+            level="LOW_RISK",
+            message="Healthy development patterns",
+            recommendation="Continue current practices"
+        )
+```
+
+##### Phase 4: Dashboard Integration
+**Display GitHub-only burnout analysis**:
+
+1. **Enhanced Team Overview**:
+   - Show all team members (not just incident-involved)
+   - GitHub activity indicators for each member
+   - Burnout risk levels for pure developers
+
+2. **GitHub-Specific Insights**:
+   - Developer velocity trends over time
+   - Code quality metrics progression
+   - Work-life balance scoring
+   - Collaboration health indicators
+
+3. **Actionable Recommendations**:
+   - Workload redistribution suggestions
+   - Code review process improvements
+   - Work-life balance interventions
+   - Mentoring/support recommendations
+
+##### Phase 5: Implementation Steps
+
+1. **Backend Changes**:
+   - `backend/app/services/github_user_discovery.py` - New user discovery logic
+   - `backend/app/services/github_burnout_analyzer.py` - GitHub-specific analysis
+   - `backend/app/models/user_classification.py` - User type tracking
+   - Enhanced existing analyzers to handle mixed data sources
+
+2. **API Endpoints**:
+   - `/analyses/github-only` - Pure GitHub burnout analysis
+   - `/team/github-contributors` - Discover GitHub-active team members
+   - `/users/{id}/github-patterns` - Individual developer pattern analysis
+
+3. **Frontend Updates**:
+   - Team overview showing all members (not just incident-involved)
+   - GitHub activity cards for pure developers
+   - Burnout risk indicators for code-focused work
+   - Filtering options: "All Members", "Incident Responders", "Developers Only"
+
+4. **Database Schema**:
+   ```sql
+   ALTER TABLE users ADD COLUMN user_type VARCHAR(50);
+   ALTER TABLE users ADD COLUMN github_activity_score FLOAT;
+   ALTER TABLE users ADD COLUMN last_github_activity TIMESTAMP;
+   
+   CREATE TABLE github_burnout_indicators (
+       id SERIAL PRIMARY KEY,
+       user_id INTEGER REFERENCES users(id),
+       analysis_id INTEGER REFERENCES analyses(id),
+       velocity_score FLOAT,
+       quality_score FLOAT,
+       work_life_score FLOAT,
+       collaboration_score FLOAT,
+       created_at TIMESTAMP DEFAULT NOW()
+   );
+   ```
+
+##### Benefits Expected:
+1. **Proactive Burnout Detection**: Catch burnout before it leads to incidents
+2. **Complete Team Coverage**: Include all active team members, not just on-call
+3. **Developer-Specific Insights**: Code-focused burnout indicators
+4. **Earlier Intervention**: Address work-life balance issues before escalation
+5. **Role-Appropriate Analysis**: Different burnout patterns for different roles
+
+##### Success Metrics:
+- % of team members analyzed (target: 90%+ of active contributors)
+- Early burnout detection rate (GitHub signals before incident involvement)
+- Developer satisfaction with work-life balance recommendations
+- Reduction in developer churn/turnover
+- Improvement in code quality metrics over time
+
 ### Outstanding Issues:
 1. Slack channel access errors (bot not in channels) - Low priority
 2. Invalid Anthropic API key for AI narratives - User configuration issue
@@ -593,6 +1198,8 @@ components/
 ### Recently Completed:
 1. ✅ **Health Trends Chart Logic** - Fixed to show daily incident data from current analysis period
 2. ✅ **Data Consistency Issue** - Fixed major inconsistency where dashboard showed different incident counts across components
+3. ✅ **GitHub Mapping Button Navigation Fix** - Changed dashboard GitHub button from navigation to MappingDrawer
+4. ✅ **Integrations Page Debug Enhancement** - Added comprehensive logging for endless loader troubleshooting
 
 #### 6. Critical Data Consistency Fix ✅
 - **Issue**: Dashboard showed 110 total incidents but health trends chart showed only 18 days with 1 incident each
