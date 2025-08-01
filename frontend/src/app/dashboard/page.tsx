@@ -1938,66 +1938,171 @@ export default function Dashboard() {
       (m.factors.response_time !== undefined && m.factors.response_time !== null)
     ));
   
-  const burnoutFactors = hasRealFactorsData ? [
+  // Holistic burnout factors combining incident patterns + GitHub activity patterns
+  const membersWithGitHubData = members.filter((m: any) => 
+    m?.github_activity && (m.github_activity.commits_count > 0 || m.github_activity.commits_per_week > 0));
+  const allActiveMembers = [...new Set([...membersWithIncidents, ...membersWithGitHubData])]; // Unique members with any activity
+
+  const burnoutFactors = (hasRealFactorsData || membersWithGitHubData.length > 0) ? [
     { 
-      factor: "After Hours", 
+      factor: "Workload Intensity", 
       value: (() => {
-        const membersWithData = membersWithIncidents.filter((m: any) => 
-          m?.factors?.after_hours !== undefined && m.factors.after_hours !== null);
-        if (membersWithData.length === 0) return null;
+        if (allActiveMembers.length === 0) return null;
         
-        const sum = membersWithData.reduce((avg: number, m: any) => {
-          console.log(`RADAR: Member ${m?.user_name}: after_hours = ${m.factors.after_hours} (real API data)`);
-          return avg + m.factors.after_hours;
-        }, 0);
-        return Number((sum / membersWithData.length).toFixed(1));
+        const workloadScores = allActiveMembers.map((m: any) => {
+          let workloadScore = 0;
+          
+          // Incident workload component
+          if (m?.incident_count > 0) {
+            const incidentsPerWeek = (m.incident_count || 0) / 4.3;
+            workloadScore += Math.min(incidentsPerWeek * 0.4, 5);
+          }
+          
+          // GitHub workload component
+          if (m?.github_activity) {
+            const commitsPerWeek = m.github_activity.commits_per_week || 0;
+            if (commitsPerWeek >= 80) workloadScore += 5;
+            else if (commitsPerWeek >= 50) workloadScore += 4;
+            else if (commitsPerWeek >= 25) workloadScore += 2.5;
+            else if (commitsPerWeek >= 15) workloadScore += 1.5;
+          }
+          
+          return Math.min(workloadScore, 10);
+        });
+        
+        const sum = workloadScores.reduce((total, score) => total + score, 0);
+        return Number((sum / workloadScores.length).toFixed(1));
       })(),
-      metrics: `Based on real after-hours incident patterns from ${membersWithIncidents.filter(m => m?.factors?.after_hours !== undefined).length} team members`
+      metrics: `Combined incident load + development activity from ${allActiveMembers.length} active team members`
+    },
+    { 
+      factor: "After Hours Activity", 
+      value: (() => {
+        if (allActiveMembers.length === 0) return null;
+        
+        const afterHoursScores = allActiveMembers.map((m: any) => {
+          let afterHoursScore = 0;
+          
+          // Incident after-hours component  
+          if (m?.incident_count > 0 && m?.metrics?.after_hours_percentage) {
+            afterHoursScore += Math.min(m.metrics.after_hours_percentage / 10, 5);
+          }
+          
+          // GitHub after-hours component
+          if (m?.github_activity) {
+            const githubAfterHoursRatio = (m.github_activity.after_hours_commits || 0) / Math.max(m.github_activity.commits_count || 1, 1);
+            if (githubAfterHoursRatio > 0.30) afterHoursScore += 4;
+            else if (githubAfterHoursRatio > 0.15) afterHoursScore += 2.5;
+            else if (githubAfterHoursRatio > 0.05) afterHoursScore += 1;
+          }
+          
+          return Math.min(afterHoursScore, 10);
+        });
+        
+        const sum = afterHoursScores.reduce((total, score) => total + score, 0);
+        return Number((sum / afterHoursScores.length).toFixed(1));
+      })(),
+      metrics: `Combined incident response + development work after normal hours from ${allActiveMembers.length} team members`
     },
     { 
       factor: "Weekend Work", 
       value: (() => {
-        const membersWithData = membersWithIncidents.filter((m: any) => 
-          m?.factors?.weekend_work !== undefined && m.factors.weekend_work !== null);
-        if (membersWithData.length === 0) return null;
+        if (allActiveMembers.length === 0) return null;
         
-        const sum = membersWithData.reduce((avg: number, m: any) => {
-          console.log(`RADAR: Member ${m?.user_name}: weekend_work = ${m.factors.weekend_work} (real API data)`);
-          return avg + m.factors.weekend_work;
-        }, 0);
-        return Number((sum / membersWithData.length).toFixed(1));
+        const weekendScores = allActiveMembers.map((m: any) => {
+          let weekendScore = 0;
+          
+          // Incident weekend work component
+          if (m?.incident_count > 0 && m?.metrics?.weekend_percentage) {
+            weekendScore += Math.min(m.metrics.weekend_percentage / 10, 5);
+          }
+          
+          // GitHub weekend commits component
+          if (m?.github_activity) {
+            const githubWeekendRatio = (m.github_activity.weekend_commits || 0) / Math.max(m.github_activity.commits_count || 1, 1);
+            if (githubWeekendRatio > 0.25) weekendScore += 3;
+            else if (githubWeekendRatio > 0.10) weekendScore += 1.5;
+            else if (githubWeekendRatio > 0.05) weekendScore += 0.5;
+          }
+          
+          return Math.min(weekendScore, 10);
+        });
+        
+        const sum = weekendScores.reduce((total, score) => total + score, 0);
+        return Number((sum / weekendScores.length).toFixed(1));
       })(),
-      metrics: `Based on real weekend incident patterns from ${membersWithIncidents.filter(m => m?.factors?.weekend_work !== undefined).length} team members`
+      metrics: `Combined incident handling + development work on weekends from ${allActiveMembers.length} team members`
     },
     { 
-      factor: "Incident Volume", 
+      factor: "Response Pressure", 
       value: (() => {
-        const membersWithData = membersWithIncidents.filter((m: any) => 
-          m?.factors?.incident_load !== undefined && m.factors.incident_load !== null);
-        if (membersWithData.length === 0) return null;
-        
-        const sum = membersWithData.reduce((avg: number, m: any) => {
-          console.log(`RADAR: Member ${m?.user_name}: incident_load = ${m.factors.incident_load} (real API data)`);
-          return avg + m.factors.incident_load;
-        }, 0);
-        return Number((sum / membersWithData.length).toFixed(1));
-      })(),
-      metrics: `Based on real incident volume and severity from ${membersWithIncidents.filter(m => m?.factors?.incident_load !== undefined).length} team members`
-    },
-    { 
-      factor: "Resolution Time", 
-      value: (() => {
-        const membersWithData = membersWithIncidents.filter((m: any) => 
+        const membersWithResponseData = membersWithIncidents.filter((m: any) => 
           m?.factors?.response_time !== undefined && m.factors.response_time !== null);
-        if (membersWithData.length === 0) return null;
+        if (membersWithResponseData.length === 0) return null;
         
-        const sum = membersWithData.reduce((avg: number, m: any) => {
-          console.log(`RADAR: Member ${m?.user_name}: response_time = ${m.factors.response_time} (real API data)`);
-          return avg + m.factors.response_time;
-        }, 0);
-        return Number((sum / membersWithData.length).toFixed(1));
+        const responseScores = membersWithResponseData.map((m: any) => {
+          let responseScore = m.factors.response_time;
+          
+          // Add GitHub code review pressure
+          if (m?.github_activity) {
+            const commitsPerWeek = m.github_activity.commits_per_week || 0;
+            if (commitsPerWeek >= 60) responseScore += 2;
+            else if (commitsPerWeek >= 30) responseScore += 1;
+          }
+          
+          return Math.min(responseScore, 10);
+        });
+        
+        const sum = responseScores.reduce((total, score) => total + score, 0);
+        return Number((sum / responseScores.length).toFixed(1));
       })(),
-      metrics: `Based on real response time data from ${membersWithIncidents.filter(m => m?.factors?.response_time !== undefined).length} team members`
+      metrics: `Incident response time pressure enhanced by development review load from ${membersWithIncidents.length} team members`
+    },
+    { 
+      factor: "Work-Life Balance", 
+      value: (() => {
+        if (allActiveMembers.length === 0) return null;
+        
+        const balanceScores = allActiveMembers.map((m: any) => {
+          let balanceScore = 0;
+          
+          // Combined after-hours impact
+          let afterHoursImpact = 0;
+          if (m?.incident_count > 0 && m?.metrics?.after_hours_percentage) {
+            afterHoursImpact += m.metrics.after_hours_percentage / 20;
+          }
+          if (m?.github_activity) {
+            const githubAfterHoursRatio = (m.github_activity.after_hours_commits || 0) / Math.max(m.github_activity.commits_count || 1, 1);
+            afterHoursImpact += githubAfterHoursRatio * 5;
+          }
+          
+          // Combined weekend impact
+          let weekendImpact = 0;
+          if (m?.incident_count > 0 && m?.metrics?.weekend_percentage) {
+            weekendImpact += m.metrics.weekend_percentage / 20;
+          }
+          if (m?.github_activity) {
+            const githubWeekendRatio = (m.github_activity.weekend_commits || 0) / Math.max(m.github_activity.commits_count || 1, 1);
+            weekendImpact += githubWeekendRatio * 5;
+          }
+          
+          // High-intensity work patterns
+          let intensityImpact = 0;
+          if (m?.github_activity && (m.github_activity.commits_per_week || 0) > 50) {
+            intensityImpact += 2;
+          }
+          if (m?.incident_count > 10) {
+            intensityImpact += 2;
+          }
+          
+          balanceScore = afterHoursImpact + weekendImpact + intensityImpact;
+          return Math.min(balanceScore, 10);
+        });
+        
+        const sum = balanceScores.reduce((total, score) => total + score, 0);
+        return Number((sum / balanceScores.length).toFixed(1));
+      })(),
+      metrics: `Overall work-life balance disruption from incident response + development intensity across ${allActiveMembers.length} team members`
     },
   ].filter(factor => factor.value !== null) // Remove factors with no real data
    .map(factor => ({
@@ -4172,14 +4277,14 @@ export default function Dashboard() {
                                         <span className="text-xs text-blue-700">Average Sentiment</span>
                                         <div className="flex items-center space-x-2">
                                           <span className={`text-lg font-bold ${
-                                            slack.sentiment_analysis.avg_sentiment > 0.1 ? 'text-green-600' :
-                                            slack.sentiment_analysis.avg_sentiment < -0.1 ? 'text-red-600' : 'text-yellow-600'
+                                            (slack.sentiment_analysis.avg_sentiment || 0) > 0.1 ? 'text-green-600' :
+                                            (slack.sentiment_analysis.avg_sentiment || 0) < -0.1 ? 'text-red-600' : 'text-yellow-600'
                                           }`}>
-                                            {slack.sentiment_analysis.avg_sentiment > 0.1 ? 'Positive' :
-                                             slack.sentiment_analysis.avg_sentiment < -0.1 ? 'Negative' : 'Neutral'}
+                                            {(slack.sentiment_analysis.avg_sentiment || 0) > 0.1 ? 'Positive' :
+                                             (slack.sentiment_analysis.avg_sentiment || 0) < -0.1 ? 'Negative' : 'Neutral'}
                                           </span>
                                           <span className="text-xs text-blue-600">
-                                            ({slack.sentiment_analysis.avg_sentiment.toFixed(2)})
+                                            ({slack.sentiment_analysis.avg_sentiment?.toFixed(2) || 'N/A'})
                                           </span>
                                         </div>
                                       </div>
@@ -4956,52 +5061,151 @@ export default function Dashboard() {
             // Temporary: Keep memberHighRisk for old code that hasn't been replaced yet
             const memberHighRisk = []; // Will be removed when modal redesign is complete
             
-            // Calculate member factors for radar chart
+            // Calculate holistic member factors for radar chart (GitHub + Incident patterns)
             const m = memberData;
+            const hasGitHubData = m?.github_activity && (m.github_activity.commits_count > 0 || m.github_activity.commits_per_week > 0);
+            const hasIncidentData = (m?.incident_count || 0) > 0;
+            
             const memberFactors = [
               {
-                factor: 'Incident Volume',
-                value: m?.factors?.workload ?? ((() => {
-                  const incidentsCount = m?.incident_count || m?.metrics?.total_incidents || 0;
-                  const incidentsPerWeek = incidentsCount / 4.3;
-                  // More incidents = higher burnout risk (0-10 scale)
-                  return Math.min(incidentsPerWeek * 0.5, 10);
-                })()),
+                factor: 'Workload Intensity',
+                value: (() => {
+                  // Combine incident volume + GitHub commit volume
+                  let workloadScore = 0;
+                  
+                  // Incident workload component (0-5 scale)
+                  if (hasIncidentData) {
+                    const incidentsCount = m?.incident_count || 0;
+                    const incidentsPerWeek = incidentsCount / 4.3;
+                    workloadScore += Math.min(incidentsPerWeek * 0.4, 5); // Cap at 5 for incidents
+                  }
+                  
+                  // GitHub workload component (0-5 scale)  
+                  if (hasGitHubData) {
+                    const commitsPerWeek = m.github_activity.commits_per_week || 0;
+                    if (commitsPerWeek >= 80) workloadScore += 5;
+                    else if (commitsPerWeek >= 50) workloadScore += 4;
+                    else if (commitsPerWeek >= 25) workloadScore += 2.5;
+                    else if (commitsPerWeek >= 15) workloadScore += 1.5;
+                  }
+                  
+                  return Math.min(workloadScore, 10);
+                })() || (m?.factors?.workload ?? 0.1),
                 color: '#FF6B6B'
               },
               {
-                factor: 'After Hours',
-                value: m?.factors?.after_hours ?? Math.min(((m?.metrics?.after_hours_percentage || 0) / 10), 10),
+                factor: 'After Hours Activity',
+                value: (() => {
+                  // Combine incident after-hours + GitHub after-hours
+                  let afterHoursScore = 0;
+                  
+                  // Incident after-hours component
+                  if (hasIncidentData) {
+                    const incidentAfterHours = m?.metrics?.after_hours_percentage || 0;
+                    afterHoursScore += Math.min(incidentAfterHours / 10, 5); // Cap at 5
+                  }
+                  
+                  // GitHub after-hours component
+                  if (hasGitHubData) {
+                    const githubAfterHoursRatio = (m.github_activity.after_hours_commits || 0) / Math.max(m.github_activity.commits_count || 1, 1);
+                    if (githubAfterHoursRatio > 0.30) afterHoursScore += 4;
+                    else if (githubAfterHoursRatio > 0.15) afterHoursScore += 2.5;
+                    else if (githubAfterHoursRatio > 0.05) afterHoursScore += 1;
+                  }
+                  
+                  return Math.min(afterHoursScore, 10);
+                })() || (m?.factors?.after_hours ?? 0.1),
                 color: '#4ECDC4'
               },
               {
                 factor: 'Response Pressure',
-                value: m?.factors?.response_time ?? ((() => {
-                  const responseMinutes = m?.metrics?.avg_response_time_minutes || 0;
-                  // Industry standard: <30 min = excellent (2), <60 min = good (4), <120 min = acceptable (6), >240 min = critical (9+)
-                  if (responseMinutes <= 30) return 2.0;      // Excellent
-                  if (responseMinutes <= 60) return 4.0;      // Good
-                  if (responseMinutes <= 120) return 6.0;     // Acceptable
-                  if (responseMinutes <= 240) return 8.0;     // Poor
-                  if (responseMinutes <= 480) return 9.0;     // Very Poor
-                  return 10.0;  // Critical (>8 hours)
-                })()),
+                value: (() => {
+                  // Primarily incident-based but consider GitHub PR review pressure
+                  let responseScore = 0;
+                  
+                  // Incident response pressure (primary component)
+                  if (hasIncidentData) {
+                    const responseMinutes = m?.metrics?.avg_response_time_minutes || 0;
+                    if (responseMinutes <= 30) responseScore += 2.0;      // Excellent
+                    else if (responseMinutes <= 60) responseScore += 4.0; // Good
+                    else if (responseMinutes <= 120) responseScore += 6.0; // Acceptable
+                    else if (responseMinutes <= 240) responseScore += 8.0; // Poor
+                    else responseScore += 10.0; // Critical
+                  }
+                  
+                  // GitHub review pressure (supplementary)
+                  if (hasGitHubData) {
+                    const commitsPerWeek = m.github_activity.commits_per_week || 0;
+                    if (commitsPerWeek >= 60) responseScore += 2; // High code review pressure
+                    else if (commitsPerWeek >= 30) responseScore += 1;
+                  }
+                  
+                  return Math.min(responseScore, 10);
+                })() || (m?.factors?.response_time ?? 0.1),
                 color: '#45B7D1'
               },
               {
                 factor: 'Weekend Work',
-                value: m?.factors?.weekend_work ?? Math.max(((m?.metrics?.weekend_percentage || 0) / 10), 0.1),
+                value: (() => {
+                  // Combine incident weekend work + GitHub weekend commits
+                  let weekendScore = 0;
+                  
+                  // Incident weekend work component
+                  if (hasIncidentData) {
+                    const incidentWeekend = m?.metrics?.weekend_percentage || 0;
+                    weekendScore += Math.min(incidentWeekend / 10, 5); // Cap at 5
+                  }
+                  
+                  // GitHub weekend commits component
+                  if (hasGitHubData) {
+                    const githubWeekendRatio = (m.github_activity.weekend_commits || 0) / Math.max(m.github_activity.commits_count || 1, 1);
+                    if (githubWeekendRatio > 0.25) weekendScore += 3;
+                    else if (githubWeekendRatio > 0.10) weekendScore += 1.5;
+                    else if (githubWeekendRatio > 0.05) weekendScore += 0.5;
+                  }
+                  
+                  return Math.min(weekendScore, 10);
+                })() || (m?.factors?.weekend_work ?? 0.1),
                 color: '#96CEB4'
               },
               {
-                factor: 'Schedule Disruption',
-                value: m?.factors?.schedule_disruption ?? ((() => {
-                  // Calculate schedule disruption from after-hours + weekend + response pressure
-                  const afterHoursImpact = ((m?.metrics?.after_hours_percentage || 0) / 10) * 0.4;
-                  const weekendImpact = ((m?.metrics?.weekend_percentage || 0) / 10) * 0.3;
-                  const responseImpact = (m?.metrics?.avg_response_time_minutes || 0) > 60 ? 3 : 1;
-                  return Math.max(Math.min(afterHoursImpact + weekendImpact + responseImpact, 10), 0.1);
-                })()),
+                factor: 'Work-Life Balance',
+                value: (() => {
+                  // Overall work-life balance disruption score
+                  let balanceScore = 0;
+                  
+                  // Calculate combined after-hours impact
+                  let afterHoursImpact = 0;
+                  if (hasIncidentData) {
+                    afterHoursImpact += (m?.metrics?.after_hours_percentage || 0) / 20; // Scale down
+                  }
+                  if (hasGitHubData) {
+                    const githubAfterHoursRatio = (m.github_activity.after_hours_commits || 0) / Math.max(m.github_activity.commits_count || 1, 1);
+                    afterHoursImpact += githubAfterHoursRatio * 5; // Scale to 0-5
+                  }
+                  
+                  // Calculate combined weekend impact
+                  let weekendImpact = 0;
+                  if (hasIncidentData) {
+                    weekendImpact += (m?.metrics?.weekend_percentage || 0) / 20; // Scale down
+                  }
+                  if (hasGitHubData) {
+                    const githubWeekendRatio = (m.github_activity.weekend_commits || 0) / Math.max(m.github_activity.commits_count || 1, 1);
+                    weekendImpact += githubWeekendRatio * 5; // Scale to 0-5
+                  }
+                  
+                  // High-intensity work patterns
+                  let intensityImpact = 0;
+                  if (hasGitHubData && (m.github_activity.commits_per_week || 0) > 50) {
+                    intensityImpact += 2; // High-intensity development
+                  }
+                  if (hasIncidentData && (m?.incident_count || 0) > 10) {
+                    intensityImpact += 2; // High incident load
+                  }
+                  
+                  balanceScore = afterHoursImpact + weekendImpact + intensityImpact;
+                  return Math.min(balanceScore, 10);
+                })() || (m?.factors?.schedule_disruption ?? 0.1),
                 color: '#FECA57'
               }
             ];
@@ -5283,6 +5487,132 @@ export default function Dashboard() {
                               <span className="text-red-700">After-hours communication</span>
                             </div>
                           )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* GitHub Activity */}
+                {memberData?.github_activity && (memberData.github_activity.commits_count > 0 || memberData.github_activity.commits_per_week > 0) && (
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <h3 className="font-semibold mb-3 text-gray-900">🐙 GitHub Development Activity</h3>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="bg-white p-3 rounded-lg">
+                        <div className="text-xl font-bold text-gray-900">{memberData.github_activity?.commits_count || 0}</div>
+                        <p className="text-xs text-gray-600 font-medium">Total Commits</p>
+                      </div>
+                      <div className="bg-white p-3 rounded-lg">
+                        <div className="text-xl font-bold text-gray-900">{memberData.github_activity?.commits_per_week?.toFixed(1) || '0.0'}</div>
+                        <p className="text-xs text-gray-600 font-medium">Commits/Week</p>
+                      </div>
+                      <div className="bg-white p-3 rounded-lg">
+                        <div className="text-xl font-bold text-gray-900">{memberData.github_activity ? (((memberData.github_activity.after_hours_commits || 0) / Math.max(memberData.github_activity.commits_count || 1, 1)) * 100).toFixed(1) : '0.0'}%</div>
+                        <p className="text-xs text-gray-600 font-medium">After Hours</p>
+                      </div>
+                      <div className="bg-white p-3 rounded-lg">
+                        <div className="text-xl font-bold text-gray-900">{memberData.github_activity ? (((memberData.github_activity.weekend_commits || 0) / Math.max(memberData.github_activity.commits_count || 1, 1)) * 100).toFixed(1) : '0.0'}%</div>
+                        <p className="text-xs text-gray-600 font-medium">Weekend Commits</p>
+                      </div>
+                    </div>
+                    
+                    {/* GitHub Activity Health */}
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-3">
+                      <h4 className="text-sm font-semibold text-blue-800 mb-2">Development Health</h4>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-white p-2 rounded">
+                          <span className="text-xs text-blue-700">Activity Level</span>
+                          <div className="flex items-center space-x-2">
+                            <span className={`text-lg font-bold ${
+                              (memberData.github_activity?.commits_per_week || 0) > 50 ? 'text-red-600' :
+                              (memberData.github_activity?.commits_per_week || 0) > 25 ? 'text-orange-600' :
+                              (memberData.github_activity?.commits_per_week || 0) > 10 ? 'text-green-600' : 'text-blue-600'
+                            }`}>
+                              {(memberData.github_activity?.commits_per_week || 0) > 50 ? 'Very High' :
+                               (memberData.github_activity?.commits_per_week || 0) > 25 ? 'High' :
+                               (memberData.github_activity?.commits_per_week || 0) > 10 ? 'Moderate' : 'Low'}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="bg-white p-2 rounded">
+                          <span className="text-xs text-blue-700">Work-Life Balance</span>
+                          <div className="flex items-center space-x-2">
+                            <span className={`text-lg font-bold ${
+                              ((memberData.github_activity?.after_hours_commits || 0) + (memberData.github_activity?.weekend_commits || 0)) / Math.max(memberData.github_activity?.commits_count || 1, 1) > 0.3 ? 'text-red-600' :
+                              ((memberData.github_activity?.after_hours_commits || 0) + (memberData.github_activity?.weekend_commits || 0)) / Math.max(memberData.github_activity?.commits_count || 1, 1) > 0.15 ? 'text-orange-600' : 'text-green-600'
+                            }`}>
+                              {((memberData.github_activity?.after_hours_commits || 0) + (memberData.github_activity?.weekend_commits || 0)) / Math.max(memberData.github_activity?.commits_count || 1, 1) > 0.3 ? 'Poor' :
+                               ((memberData.github_activity?.after_hours_commits || 0) + (memberData.github_activity?.weekend_commits || 0)) / Math.max(memberData.github_activity?.commits_count || 1, 1) > 0.15 ? 'Fair' : 'Good'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* GitHub Burnout Indicators */}
+                    {memberData.github_activity?.burnout_indicators && Object.values(memberData.github_activity.burnout_indicators).some(indicator => indicator) && (
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-3 mt-3">
+                        <h4 className="text-sm font-semibold text-red-800 mb-2">Development Risk Indicators</h4>
+                        <div className="space-y-1 text-xs">
+                          {memberData.github_activity?.burnout_indicators?.excessive_commits && (
+                            <div className="flex items-center space-x-2">
+                              <div className="w-1 h-1 bg-red-600 rounded-full"></div>
+                              <span className="text-red-700">Excessive commit frequency detected</span>
+                            </div>
+                          )}
+                          {memberData.github_activity?.burnout_indicators?.late_night_activity && (
+                            <div className="flex items-center space-x-2">
+                              <div className="w-1 h-1 bg-red-600 rounded-full"></div>
+                              <span className="text-red-700">Late-night coding patterns</span>
+                            </div>
+                          )}
+                          {memberData.github_activity?.burnout_indicators?.weekend_work && (
+                            <div className="flex items-center space-x-2">
+                              <div className="w-1 h-1 bg-red-600 rounded-full"></div>
+                              <span className="text-red-700">Weekend development work</span>
+                            </div>
+                          )}
+                          {memberData.github_activity?.burnout_indicators?.large_prs && (
+                            <div className="flex items-center space-x-2">
+                              <div className="w-1 h-1 bg-red-600 rounded-full"></div>
+                              <span className="text-red-700">Large pull request patterns</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* GitHub Burnout Score Breakdown (if using GitHub-based scoring) */}
+                    {memberData?.github_burnout_breakdown && (
+                      <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mt-3">
+                        <h4 className="text-sm font-semibold text-orange-800 mb-2">GitHub Burnout Analysis</h4>
+                        <div className="space-y-2">
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs text-orange-700">Score Source:</span>
+                            <span className={`text-xs font-semibold px-2 py-1 rounded ${
+                              memberData.github_burnout_breakdown.score_source === 'github_based' ? 'bg-blue-100 text-blue-800' :
+                              memberData.github_burnout_breakdown.score_source === 'hybrid' ? 'bg-purple-100 text-purple-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {memberData.github_burnout_breakdown.score_source === 'github_based' ? 'GitHub Activity Only' :
+                               memberData.github_burnout_breakdown.score_source === 'hybrid' ? 'GitHub + Incidents Combined' :
+                               'Incident-Based Only'}
+                            </span>
+                          </div>
+                          {memberData.github_burnout_breakdown.github_score > 0 && (
+                            <div className="flex justify-between items-center">
+                              <span className="text-xs text-orange-700">GitHub Burnout Score:</span>
+                              <span className="text-xs font-bold text-orange-900">
+                                {memberData.github_burnout_breakdown.github_score}/10
+                              </span>
+                            </div>
+                          )}
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs text-orange-700">Final Burnout Score:</span>
+                            <span className="text-xs font-bold text-orange-900">
+                              {memberData.github_burnout_breakdown.final_score}/10
+                            </span>
+                          </div>
                         </div>
                       </div>
                     )}
