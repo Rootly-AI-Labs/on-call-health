@@ -125,8 +125,8 @@ class GitHubCorrelationService:
         Fetch successful GitHub mappings from integration_mappings table
         """
         try:
-            # Use Railway public database connection (hardcoded for testing)
-            database_url = 'postgresql://postgres:SJANsAgrQqHJWcPrhoGJcRtsPlyXzRNd@turntable.proxy.rlwy.net:27775/railway'
+            # Use DATABASE_URL environment variable, fallback to Railway public connection
+            database_url = os.getenv('DATABASE_URL', 'postgresql://postgres:SJANsAgrQqHJWcPrhoGJcRtsPlyXzRNd@turntable.proxy.rlwy.net:27775/railway')
             
             conn = psycopg2.connect(database_url)
             cursor = conn.cursor()

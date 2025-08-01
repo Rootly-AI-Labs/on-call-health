@@ -12,8 +12,6 @@ from ..core.rootly_client import RootlyAPIClient
 from ..core.pagerduty_client import PagerDutyAPIClient
 from .ai_burnout_analyzer import get_ai_burnout_analyzer
 from .github_correlation_service import GitHubCorrelationService
-from ..database import get_db
-from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
@@ -34,8 +32,7 @@ class UnifiedBurnoutAnalyzer:
         platform: str = "rootly",
         enable_ai: bool = False,
         github_token: Optional[str] = None,
-        slack_token: Optional[str] = None,
-        db_session: Optional[Session] = None
+        slack_token: Optional[str] = None
     ):
         # Use the appropriate client based on platform
         if platform == "pagerduty":
@@ -48,7 +45,6 @@ class UnifiedBurnoutAnalyzer:
         self.enable_ai = enable_ai
         self.github_token = github_token
         self.slack_token = slack_token
-        self.db_session = db_session
         
         # Determine which features are enabled
         self.features = {
