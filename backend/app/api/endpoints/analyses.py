@@ -1246,7 +1246,7 @@ async def get_analysis_daily_trends(
 async def get_user_github_daily_commits(
     user_email: str,
     analysis_id: int = Query(..., description="Analysis ID to get date range from"),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """
