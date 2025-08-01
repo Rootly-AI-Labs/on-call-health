@@ -6,7 +6,7 @@ import os
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
 from collections import defaultdict
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
