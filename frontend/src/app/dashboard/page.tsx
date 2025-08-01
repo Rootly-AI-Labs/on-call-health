@@ -2972,7 +2972,7 @@ export default function Dashboard() {
                           <div>
                             <h4 className="font-semibold text-gray-900 mb-2">Summary</h4>
                             <p className="leading-relaxed">
-                              The team has {members.length} members total, with {membersWithIncidentsForInsights.length} handling incidents. Among active incident responders, the average burnout score is {avgBurnoutScore.toFixed(0)}%. 
+                              The team has {members.length} members total, with {membersWithIncidentsForInsights.length} handling incidents. Among active incident responders, the average burnout score is {(avgBurnoutScore || 0).toFixed(0)}%. 
                               {highRiskCount > 0 ? (
                                 <> Currently, <span className="font-semibold text-red-600">{highRiskCount} member{highRiskCount > 1 ? 's are' : ' is'} at high risk</span> of burnout, requiring immediate attention. </>
                               ) : mediumRiskCount > 0 ? (
@@ -2980,7 +2980,7 @@ export default function Dashboard() {
                               ) : (
                                 <> The team is in <span className="font-semibold text-green-600">good health</span> with no members currently at high risk. </>
                               )}
-                              {topBurnoutFactor && topBurnoutFactor.average > 0.4 && (
+                              {topBurnoutFactor && topBurnoutFactor.average && topBurnoutFactor.average > 0.4 && (
                                 <> The primary burnout driver is <span className="font-semibold text-red-600">{topBurnoutFactor.displayName.toLowerCase()}</span> (impact: {Math.min(topBurnoutFactor.average * 10, 10).toFixed(1)}/10){secondaryFactors.length > 0 && (
                                   <>, with secondary stress from {secondaryFactors.map(f => f.displayName.toLowerCase()).join(' and ')}</>
                                 )}. </>
@@ -2992,7 +2992,7 @@ export default function Dashboard() {
                           </div>
 
                           {/* Standouts Paragraph */}
-                          {(highRiskMembers.length > 0 || hasPatterns || (topBurnoutFactor && topBurnoutFactor.average > 0.3)) && (
+                          {(highRiskMembers.length > 0 || hasPatterns || (topBurnoutFactor && topBurnoutFactor.average && topBurnoutFactor.average > 0.3)) && (
                             <div>
                               <h4 className="font-semibold text-gray-900 mb-2">Key Observations</h4>
                               <p className="leading-relaxed">
@@ -3015,7 +3015,7 @@ export default function Dashboard() {
                                     )}
                                   </>
                                 )}
-                                {topBurnoutFactor && topBurnoutFactor.average > 0.3 && !highRiskMembers.length && (
+                                {topBurnoutFactor && topBurnoutFactor.average && topBurnoutFactor.average > 0.3 && !highRiskMembers.length && (
                                   <>Across the team, <span className="font-semibold text-amber-600">{topBurnoutFactor.displayName.toLowerCase()}</span> is the most significant stress factor, 
                                   affecting team members with an average impact of {Math.min(topBurnoutFactor.average * 10, 10).toFixed(1)}/10. </>
                                 )}
