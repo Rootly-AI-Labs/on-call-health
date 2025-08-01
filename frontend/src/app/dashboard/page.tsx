@@ -4343,10 +4343,10 @@ export default function Dashboard() {
                                 </div>
                                 <div className="mt-2 flex items-center justify-between text-xs text-gray-600">
                                   <span>
-                                    Total: <strong>{github.total_commits.toLocaleString()}</strong> commits
+                                    Total: <strong>{(github.total_commits || 0).toLocaleString()}</strong> commits
                                   </span>
                                   <span>
-                                    Weekend: <strong>{github.weekend_activity_percentage.toFixed(1)}%</strong>
+                                    Weekend: <strong>{github.weekend_activity_percentage !== undefined ? `${github.weekend_activity_percentage.toFixed(1)}%` : 'N/A'}</strong>
                                   </span>
                                 </div>
                               </div>
