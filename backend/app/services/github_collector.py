@@ -316,6 +316,123 @@ class GitHubCollector:
             # Don't fall back to mock data - return None to indicate failure
             return None
         
+    async def fetch_daily_commit_data(self, username: str, start_date: datetime, end_date: datetime, github_token: str) -> Optional[List[Dict]]:
+        """
+        Fetch daily commit data for a GitHub user over a specified period.
+        
+        Args:
+            username: GitHub username
+            start_date: Start date for the analysis period
+            end_date: End date for the analysis period
+            github_token: GitHub API token
+            
+        Returns:
+            List of daily commit data or None if error
+        """
+        headers = {
+            'Authorization': f'token {github_token}',
+            'Accept': 'application/vnd.github.v3+json',
+            'User-Agent': 'Rootly-Burnout-Detector'
+        }
+        
+        try:
+            import aiohttp
+            async with aiohttp.ClientSession() as session:
+                # Initialize daily data structure
+                daily_commits = {}
+                current_date = start_date
+                
+                while current_date <= end_date:
+                    date_str = current_date.strftime('%Y-%m-%d')
+                    daily_commits[date_str] = {
+                        'date': date_str,
+                        'commits': 0,
+                        'after_hours_commits': 0,
+                        'weekend_commits': 0
+                    }
+                    current_date += timedelta(days=1)
+                
+                # Fetch commits using search API
+                search_url = f"https://api.github.com/search/commits"
+                query = f"author:{username} author-date:{start_date.strftime('%Y-%m-%d')}..{end_date.strftime('%Y-%m-%d')}"
+                
+                page = 1
+                per_page = 100
+                total_fetched = 0
+                
+                while True:
+                    params = {
+                        'q': query,
+                        'sort': 'author-date',
+                        'order': 'asc',
+                        'page': page,
+                        'per_page': per_page
+                    }
+                    
+                    async with session.get(search_url, headers=headers, params=params) as resp:
+                        if resp.status == 200:
+                            data = await resp.json()
+                            items = data.get('items', [])
+                            
+                            if not items:
+                                break
+                                
+                            # Process each commit
+                            for commit_item in items:
+                                commit = commit_item.get('commit', {})
+                                author = commit.get('author', {})
+                                date_str = author.get('date', '')
+                                
+                                if date_str:
+                                    # Parse commit datetime
+                                    commit_dt = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                                    commit_date = commit_dt.strftime('%Y-%m-%d')
+                                    
+                                    if commit_date in daily_commits:
+                                        daily_commits[commit_date]['commits'] += 1
+                                        
+                                        # Check if after hours (before 9am or after 5pm local time)
+                                        hour = commit_dt.hour
+                                        if hour < 9 or hour >= 17:
+                                            daily_commits[commit_date]['after_hours_commits'] += 1
+                                            
+                                        # Check if weekend
+                                        if commit_dt.weekday() >= 5:  # Saturday = 5, Sunday = 6
+                                            daily_commits[commit_date]['weekend_commits'] += 1
+                            
+                            total_fetched += len(items)
+                            
+                            # Check if we've fetched all results
+                            if total_fetched >= data.get('total_count', 0):
+                                break
+                                
+                            page += 1
+                            
+                            # GitHub search API has a limit of 1000 results
+                            if total_fetched >= 1000:
+                                logger.warning(f"Reached GitHub search API limit of 1000 results for {username}")
+                                break
+                                
+                        elif resp.status == 401:
+                            logger.error("GitHub API authentication failed")
+                            return None
+                        elif resp.status == 403:
+                            logger.error("GitHub API rate limit exceeded or forbidden")
+                            return None
+                        else:
+                            logger.error(f"GitHub API error: {resp.status}")
+                            return None
+                
+                # Convert to list sorted by date
+                daily_data = sorted(daily_commits.values(), key=lambda x: x['date'])
+                
+                logger.info(f"Fetched {total_fetched} commits for {username} from {start_date} to {end_date}")
+                return daily_data
+                
+        except Exception as e:
+            logger.error(f"Error fetching daily commit data for {username}: {e}")
+            return None
+    
     async def collect_github_data_for_user(self, user_email: str, days: int = 30, github_token: str = None) -> Optional[Dict]:
         """
         Collect GitHub activity data for a single user using email correlation.

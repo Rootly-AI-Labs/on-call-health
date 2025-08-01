@@ -1242,6 +1242,123 @@ async def get_analysis_daily_trends(
     )
 
 
+@router.get("/users/{user_email}/github-daily-commits")
+async def get_user_github_daily_commits(
+    user_email: str,
+    analysis_id: int = Query(..., description="Analysis ID to get date range from"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get daily GitHub commit data for a specific user during an analysis period.
+    
+    This endpoint fetches real-time GitHub commit data aggregated by day.
+    """
+    # Get the analysis to determine the date range
+    analysis = db.query(Analysis).filter(
+        Analysis.id == analysis_id,
+        Analysis.user_id == current_user.id
+    ).first()
+    
+    if not analysis:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    
+    # Get the user's GitHub integration token
+    github_integration = db.query(GitHubIntegration).filter(
+        GitHubIntegration.user_id == current_user.id
+    ).first()
+    
+    if not github_integration or not github_integration.github_token:
+        return {
+            "status": "error",
+            "message": "GitHub integration not found",
+            "data": None
+        }
+    
+    # Decrypt the GitHub token
+    from ...api.endpoints.github import decrypt_token as decrypt_github_token
+    github_token = decrypt_github_token(github_integration.github_token)
+    
+    # Initialize GitHub collector
+    from ...services.github_collector import GitHubCollector
+    collector = GitHubCollector()
+    
+    # Get GitHub username from email
+    github_username = await collector._correlate_email_to_github(user_email, github_token)
+    
+    if not github_username:
+        return {
+            "status": "error", 
+            "message": "No GitHub username found for this email",
+            "data": None
+        }
+    
+    # Determine date range from analysis
+    from datetime import datetime, timedelta
+    
+    # Try to get dates from analysis results metadata
+    if analysis.results and isinstance(analysis.results, dict):
+        metadata = analysis.results.get("metadata", {})
+        start_date_str = metadata.get("start_date")
+        end_date_str = metadata.get("end_date")
+        
+        if start_date_str and end_date_str:
+            start_date = datetime.fromisoformat(start_date_str.replace('Z', '+00:00'))
+            end_date = datetime.fromisoformat(end_date_str.replace('Z', '+00:00'))
+        else:
+            # Fallback to analysis time range
+            end_date = analysis.created_at
+            start_date = end_date - timedelta(days=analysis.time_range or 30)
+    else:
+        # Fallback to analysis time range
+        end_date = analysis.created_at
+        start_date = end_date - timedelta(days=analysis.time_range or 30)
+    
+    # Fetch daily commit data
+    daily_commits = await collector.fetch_daily_commit_data(
+        username=github_username,
+        start_date=start_date,
+        end_date=end_date,
+        github_token=github_token
+    )
+    
+    if daily_commits is None:
+        return {
+            "status": "error",
+            "message": "Failed to fetch GitHub data",
+            "data": None
+        }
+    
+    # Calculate summary statistics
+    total_commits = sum(day['commits'] for day in daily_commits)
+    total_after_hours = sum(day['after_hours_commits'] for day in daily_commits)
+    total_weekend = sum(day['weekend_commits'] for day in daily_commits)
+    
+    days_with_commits = len([day for day in daily_commits if day['commits'] > 0])
+    commits_per_week = (total_commits / max(len(daily_commits), 1)) * 7
+    
+    return {
+        "status": "success",
+        "data": {
+            "user_email": user_email,
+            "github_username": github_username,
+            "daily_commits": daily_commits,
+            "summary": {
+                "total_commits": total_commits,
+                "commits_per_week": round(commits_per_week, 1),
+                "after_hours_percentage": round((total_after_hours / total_commits * 100) if total_commits > 0 else 0, 1),
+                "weekend_percentage": round((total_weekend / total_commits * 100) if total_commits > 0 else 0, 1),
+                "days_with_commits": days_with_commits,
+                "total_days": len(daily_commits)
+            },
+            "date_range": {
+                "start": start_date.isoformat(),
+                "end": end_date.isoformat()
+            }
+        }
+    }
+
+
 async def run_analysis_task(
     analysis_id: int,
     integration_id: int,

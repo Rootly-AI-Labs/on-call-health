@@ -166,6 +166,12 @@ interface OrganizationMember {
       after_hours_activity: boolean
     }
   }
+  github_burnout_breakdown?: {
+    exhaustion_score: number
+    depersonalization_score: number
+    accomplishment_score: number
+    final_score: number
+  }
   // Additional fields from API response
   user_id?: string
   user_name?: string
@@ -365,6 +371,177 @@ type AnalysisStage = "loading" | "connecting" | "fetching_users" | "fetching" | 
 
 // Mock data generator function removed - following "NO FALLBACK DATA" principle
 // All dashboard components now only display real analysis data from the API
+
+// Component to fetch and display real GitHub daily commit data
+function GitHubActivityChart({ userEmail, analysisId, memberData }: { 
+  userEmail: string, 
+  analysisId: number, 
+  memberData: any 
+}) {
+  const [loading, setLoading] = useState(true)
+  const [dailyData, setDailyData] = useState<any[]>([])
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const fetchDailyCommits = async () => {
+      if (!userEmail || !analysisId) return
+
+      setLoading(true)
+      setError(null)
+
+      try {
+        const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+        const response = await fetch(
+          `${API_BASE}/analyses/users/${encodeURIComponent(userEmail)}/github-daily-commits?analysis_id=${analysisId}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        )
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch GitHub daily data')
+        }
+
+        const result = await response.json()
+        
+        if (result.status === 'success' && result.data?.daily_commits) {
+          setDailyData(result.data.daily_commits)
+        } else if (result.status === 'error') {
+          setError(result.message || 'Failed to fetch data')
+        }
+      } catch (err) {
+        console.error('Error fetching GitHub daily commits:', err)
+        setError('Unable to load daily commit data')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchDailyCommits()
+  }, [userEmail, analysisId])
+
+  if (loading) {
+    return (
+      <div className="h-48 flex items-center justify-center">
+        <div className="text-center">
+          <RefreshCw className="h-8 w-8 animate-spin text-indigo-600 mx-auto mb-2" />
+          <p className="text-sm text-gray-600">Loading daily commit data...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="h-48 flex items-center justify-center bg-white rounded-lg border-2 border-dashed border-indigo-200">
+        <div className="text-center">
+          <AlertTriangle className="mx-auto h-12 w-12 text-yellow-400" />
+          <h3 className="mt-2 text-sm font-medium text-gray-900">{error}</h3>
+          <p className="mt-1 text-xs text-gray-500 max-w-xs mx-auto">
+            {error === 'GitHub integration not found' 
+              ? 'Please connect your GitHub account in Settings to see activity data'
+              : 'Unable to retrieve daily activity data at this time'}
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!dailyData || dailyData.length === 0) {
+    return (
+      <div className="h-48 flex items-center justify-center bg-white rounded-lg border-2 border-dashed border-indigo-200">
+        <div className="text-center">
+          <svg className="mx-auto h-12 w-12 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+          <h3 className="mt-2 text-sm font-medium text-gray-900">No Commit Activity</h3>
+          <p className="mt-1 text-xs text-gray-500 max-w-xs mx-auto">
+            No commits found during this analysis period
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  // Transform data for the chart
+  const chartData = dailyData.map(day => ({
+    date: new Date(day.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+    commits: day.commits,
+    isWeekend: new Date(day.date).getDay() === 0 || new Date(day.date).getDay() === 6,
+    afterHours: day.after_hours_commits,
+    weekend: day.weekend_commits
+  }))
+
+  return (
+    <>
+      <div className="h-48">
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart 
+            data={chartData}
+            margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+          >
+            <defs>
+              <linearGradient id="colorCommits" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#6366F1" stopOpacity={0.8}/>
+                <stop offset="95%" stopColor="#6366F1" stopOpacity={0.1}/>
+              </linearGradient>
+            </defs>
+            <XAxis 
+              dataKey="date" 
+              tick={{ fontSize: 10 }}
+              interval={Math.floor(chartData.length / 7)}
+            />
+            <YAxis 
+              tick={{ fontSize: 10 }}
+              domain={[0, 'dataMax']}
+            />
+            <Tooltip 
+              content={({ payload, label }) => {
+                if (payload && payload.length > 0) {
+                  const data = payload[0].payload;
+                  return (
+                    <div className="bg-white p-2 border border-gray-200 rounded-lg shadow-lg">
+                      <p className="text-xs font-semibold text-gray-900">{label}</p>
+                      <p className="text-xs text-indigo-600">
+                        {data.commits} commits
+                        {data.isWeekend && <span className="text-gray-500 ml-1">(Weekend)</span>}
+                      </p>
+                      {data.afterHours > 0 && (
+                        <p className="text-xs text-gray-500">
+                          {data.afterHours} after hours
+                        </p>
+                      )}
+                    </div>
+                  );
+                }
+                return null;
+              }}
+            />
+            <Area 
+              type="monotone" 
+              dataKey="commits" 
+              stroke="#6366F1" 
+              strokeWidth={2}
+              fillOpacity={1} 
+              fill="url(#colorCommits)" 
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="mt-2 text-xs text-indigo-600 text-center">
+        Average: {memberData.github_activity.commits_per_week?.toFixed(1) || '0'} commits/week
+        {memberData.github_activity.after_hours_commits > 0 && (
+          <span className="ml-2">
+            • {((memberData.github_activity.after_hours_commits / memberData.github_activity.commits_count) * 100).toFixed(0)}% after hours
+          </span>
+        )}
+      </div>
+    </>
+  )
+}
 
 export default function Dashboard() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -1941,7 +2118,7 @@ export default function Dashboard() {
   // Holistic burnout factors combining incident patterns + GitHub activity patterns
   const membersWithGitHubData = members.filter((m: any) => 
     m?.github_activity && (m.github_activity.commits_count > 0 || m.github_activity.commits_per_week > 0));
-  const allActiveMembers = [...new Set([...membersWithIncidents, ...membersWithGitHubData])]; // Unique members with any activity
+  const allActiveMembers = Array.from(new Set([...membersWithIncidents, ...membersWithGitHubData])); // Unique members with any activity
 
   const burnoutFactors = (hasRealFactorsData || membersWithGitHubData.length > 0) ? [
     { 
@@ -5611,34 +5788,34 @@ export default function Dashboard() {
                     )}
 
                     {/* GitHub Burnout Score Breakdown (if using GitHub-based scoring) */}
-                    {memberData?.github_burnout_breakdown && (
+                    {memberData && 'github_burnout_breakdown' in memberData && memberData.github_burnout_breakdown && (
                       <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mt-3">
                         <h4 className="text-sm font-semibold text-orange-800 mb-2">GitHub Burnout Analysis</h4>
                         <div className="space-y-2">
                           <div className="flex justify-between items-center">
                             <span className="text-xs text-orange-700">Score Source:</span>
                             <span className={`text-xs font-semibold px-2 py-1 rounded ${
-                              memberData.github_burnout_breakdown.score_source === 'github_based' ? 'bg-blue-100 text-blue-800' :
-                              memberData.github_burnout_breakdown.score_source === 'hybrid' ? 'bg-purple-100 text-purple-800' :
+                              (memberData.github_burnout_breakdown as any).score_source === 'github_based' ? 'bg-blue-100 text-blue-800' :
+                              (memberData.github_burnout_breakdown as any).score_source === 'hybrid' ? 'bg-purple-100 text-purple-800' :
                               'bg-gray-100 text-gray-800'
                             }`}>
-                              {memberData.github_burnout_breakdown.score_source === 'github_based' ? 'GitHub Activity Only' :
-                               memberData.github_burnout_breakdown.score_source === 'hybrid' ? 'GitHub + Incidents Combined' :
+                              {(memberData.github_burnout_breakdown as any).score_source === 'github_based' ? 'GitHub Activity Only' :
+                               (memberData.github_burnout_breakdown as any).score_source === 'hybrid' ? 'GitHub + Incidents Combined' :
                                'Incident-Based Only'}
                             </span>
                           </div>
-                          {memberData.github_burnout_breakdown.github_score > 0 && (
+                          {(memberData.github_burnout_breakdown as any).github_score > 0 && (
                             <div className="flex justify-between items-center">
                               <span className="text-xs text-orange-700">GitHub Burnout Score:</span>
                               <span className="text-xs font-bold text-orange-900">
-                                {memberData.github_burnout_breakdown.github_score}/10
+                                {(memberData.github_burnout_breakdown as any).github_score}/10
                               </span>
                             </div>
                           )}
                           <div className="flex justify-between items-center">
                             <span className="text-xs text-orange-700">Final Burnout Score:</span>
                             <span className="text-xs font-bold text-orange-900">
-                              {memberData.github_burnout_breakdown.final_score}/10
+                              {(memberData.github_burnout_breakdown as any).final_score}/10
                             </span>
                           </div>
                         </div>
@@ -5646,108 +5823,14 @@ export default function Dashboard() {
                     )}
 
                     {/* GitHub Activity Trends Chart */}
-                    {memberData.github_activity?.commits_count > 0 && (
+                    {memberData && memberData.github_activity?.commits_count > 0 && (
                       <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3 mt-3">
                         <h4 className="text-sm font-semibold text-indigo-800 mb-3">Development Activity Trends</h4>
-                        <div className="h-48">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart 
-                              data={(() => {
-                                // Generate simulated daily commit data based on weekly average
-                                // In production, this should come from actual daily GitHub data
-                                const daysInPeriod = currentAnalysis?.analysis_data?.metadata?.days_analyzed || 30;
-                                const avgCommitsPerDay = (memberData.github_activity.commits_count || 0) / daysInPeriod;
-                                const commitsPerWeek = memberData.github_activity.commits_per_week || 0;
-                                
-                                // Generate daily data with some variation
-                                const dailyData = [];
-                                const startDate = new Date();
-                                startDate.setDate(startDate.getDate() - daysInPeriod);
-                                
-                                for (let i = 0; i < daysInPeriod; i++) {
-                                  const date = new Date(startDate);
-                                  date.setDate(date.getDate() + i);
-                                  
-                                  // Add variation to simulate real patterns
-                                  const dayOfWeek = date.getDay();
-                                  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-                                  
-                                  // Base commits with variation
-                                  let dayCommits = avgCommitsPerDay;
-                                  
-                                  // Reduce weekend commits
-                                  if (isWeekend) {
-                                    dayCommits *= 0.3; // 30% of normal on weekends
-                                  }
-                                  
-                                  // Add some randomness (+/- 50%)
-                                  dayCommits *= (0.5 + Math.random());
-                                  
-                                  // Ensure non-negative
-                                  dayCommits = Math.max(0, Math.round(dayCommits));
-                                  
-                                  dailyData.push({
-                                    date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-                                    commits: dayCommits,
-                                    isWeekend: isWeekend
-                                  });
-                                }
-                                
-                                return dailyData;
-                              })()}
-                              margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
-                            >
-                              <defs>
-                                <linearGradient id="colorCommits" x1="0" y1="0" x2="0" y2="1">
-                                  <stop offset="5%" stopColor="#6366F1" stopOpacity={0.8}/>
-                                  <stop offset="95%" stopColor="#6366F1" stopOpacity={0.1}/>
-                                </linearGradient>
-                              </defs>
-                              <XAxis 
-                                dataKey="date" 
-                                tick={{ fontSize: 10 }}
-                                interval={Math.floor((currentAnalysis?.analysis_data?.metadata?.days_analyzed || 30) / 7)} // Show ~7 labels
-                              />
-                              <YAxis 
-                                tick={{ fontSize: 10 }}
-                                domain={[0, 'dataMax']}
-                              />
-                              <Tooltip 
-                                content={({ payload, label }) => {
-                                  if (payload && payload.length > 0) {
-                                    const data = payload[0].payload;
-                                    return (
-                                      <div className="bg-white p-2 border border-gray-200 rounded-lg shadow-lg">
-                                        <p className="text-xs font-semibold text-gray-900">{label}</p>
-                                        <p className="text-xs text-indigo-600">
-                                          {payload[0].value} commits
-                                          {data.isWeekend && <span className="text-gray-500 ml-1">(Weekend)</span>}
-                                        </p>
-                                      </div>
-                                    );
-                                  }
-                                  return null;
-                                }}
-                              />
-                              <Area 
-                                type="monotone" 
-                                dataKey="commits" 
-                                stroke="#6366F1" 
-                                strokeWidth={2}
-                                fillOpacity={1} 
-                                fill="url(#colorCommits)" 
-                              />
-                            </AreaChart>
-                          </ResponsiveContainer>
-                        </div>
-                        <div className="mt-2 text-xs text-indigo-600 text-center">
-                          Average: {memberData.github_activity.commits_per_week?.toFixed(1) || '0'} commits/week
-                          {memberData.github_activity.after_hours_commits > 0 && (
-                            <span className="ml-2">
-                              • {((memberData.github_activity.after_hours_commits / memberData.github_activity.commits_count) * 100).toFixed(0)}% after hours
-                            </span>
-                          )}
-                        </div>
+                        <GitHubActivityChart 
+                          userEmail={selectedMember.email}
+                          analysisId={currentAnalysis?.id ? parseInt(currentAnalysis.id) : 0}
+                          memberData={memberData}
+                        />
                       </div>
                     )}
                   </div>
