@@ -4465,7 +4465,16 @@ export default function Dashboard() {
                             </div>
                             <div className="flex justify-between text-xs text-gray-500">
                               <span>{member.incident_count} incidents</span>
-                              <span>{Math.round(member.metrics?.avg_response_time_minutes || (member.key_metrics?.avg_resolution_hours ? member.key_metrics.avg_resolution_hours * 60 : 0))}m avg response</span>
+                              <span>
+                                {member.github_activity?.commits_count ? (
+                                  <>
+                                    {member.github_activity.commits_count} commits
+                                    {member.github_activity.commits_per_week && ` (${member.github_activity.commits_per_week.toFixed(1)}/week)`}
+                                  </>
+                                ) : (
+                                  'No GitHub data'
+                                )}
+                              </span>
                             </div>
                           </div>
                         </CardContent>
