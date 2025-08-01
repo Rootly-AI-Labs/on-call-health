@@ -3810,7 +3810,7 @@ export default function Dashboard() {
                 <Card>
                   <CardHeader>
                     <div className="flex items-center justify-between">
-                      <CardTitle>Risk Factors</CardTitle>
+                      <CardTitle>Team Burnout Risk Factors</CardTitle>
                       {highRiskFactors.length > 0 && (
                         <div className="flex items-center space-x-2">
                           <AlertTriangle className="w-4 h-4 text-red-500" />
@@ -3820,6 +3820,22 @@ export default function Dashboard() {
                         </div>
                       )}
                     </div>
+                    <CardDescription>
+                      {(() => {
+                        const hasGitHubMembers = membersWithGitHubData.length > 0;
+                        const hasIncidentMembers = membersWithIncidents.length > 0;
+                        
+                        if (hasGitHubMembers && hasIncidentMembers) {
+                          return `Holistic burnout analysis combining incident response patterns and development activity across ${allActiveMembers.length} team members`;
+                        } else if (hasGitHubMembers && !hasIncidentMembers) {
+                          return `Development-focused burnout analysis based on GitHub activity patterns from ${membersWithGitHubData.length} active developers`;
+                        } else if (!hasGitHubMembers && hasIncidentMembers) {
+                          return `Incident response burnout analysis from ${membersWithIncidents.length} team members handling incidents`;
+                        } else {
+                          return "Team burnout risk assessment based on available activity data";
+                        }
+                      })()}
+                    </CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="h-[450px] p-4">
@@ -3879,6 +3895,9 @@ export default function Dashboard() {
                         <AlertTriangle className="w-5 h-5 text-red-500" />
                         <span>Critical Risks</span>
                       </CardTitle>
+                      <CardDescription>
+                        Risk factors requiring immediate attention based on combined incident response and development activity patterns
+                      </CardDescription>
                     </CardHeader>
                     
                     <CardContent>
