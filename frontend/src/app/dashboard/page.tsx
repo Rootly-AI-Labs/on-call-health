@@ -4252,14 +4252,6 @@ export default function Dashboard() {
                                     <p className="text-lg font-bold text-gray-400 italic">No data</p>
                                   )}
                                 </div>
-                                <div className="bg-gray-50 rounded-lg p-3">
-                                  <p className="text-xs text-gray-600 font-medium">Avg PR Size</p>
-                                  {(github as any).avg_pr_size ? (
-                                    <p className="text-lg font-bold text-gray-900">{(github as any).avg_pr_size.toFixed(0)} lines</p>
-                                  ) : (
-                                    <p className="text-lg font-bold text-gray-400 italic">No data</p>
-                                  )}
-                                </div>
                               </div>
 
                               {/* Commit Activity Timeline */}
