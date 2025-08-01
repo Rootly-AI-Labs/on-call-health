@@ -1156,6 +1156,7 @@ export default function IntegrationsPage() {
     try {
       const authToken = localStorage.getItem('auth_token')
       if (!authToken) {
+        console.error('🔴 No auth token found')
         toast.error('Please log in to view mapping data')
         return
       }
@@ -1175,6 +1176,11 @@ export default function IntegrationsPage() {
           headers: { 'Authorization': `Bearer ${authToken}` }
         })
       ])
+
+      console.log('🔍 API Response statuses:', {
+        mappings: mappingsResponse.status,
+        stats: statsResponse.status
+      })
 
       if (mappingsResponse.ok && statsResponse.ok) {
         const mappings = await mappingsResponse.json()
@@ -1207,17 +1213,26 @@ export default function IntegrationsPage() {
         setCurrentAnalysisId(null)
         setShowMappingDialog(true)
         
+        console.log('🔍 Successfully set all state, opening dialog')
+        
         // Show success message only if dialog is already open (refresh action)
         if (showMappingDialog) {
           toast.success(`${platform === 'github' ? 'GitHub' : 'Slack'} mapping data refreshed successfully`)
         }
       } else {
-        throw new Error('Failed to fetch mapping data')
+        console.error('🔴 API responses not OK:', {
+          mappingsStatus: mappingsResponse.status,
+          statsStatus: statsResponse.status,
+          mappingsText: await mappingsResponse.text().catch(() => 'Could not read response'),
+          statsText: await statsResponse.text().catch(() => 'Could not read response')
+        })
+        throw new Error(`Failed to fetch mapping data - Mappings: ${mappingsResponse.status}, Stats: ${statsResponse.status}`)
       }
     } catch (error) {
-      console.error('Error loading mapping data:', error)
-      toast.error('Failed to load mapping data')
+      console.error('🔴 Error loading mapping data:', error)
+      toast.error(`Failed to load mapping data: ${error.message}`)
     } finally {
+      console.log('🔍 Setting loadingMappingData to false')
       setLoadingMappingData(false)
     }
   }
@@ -3134,16 +3149,22 @@ export default function IntegrationsPage() {
                     <div className="flex items-center space-x-2">
                       <Button
                         size="sm"
-                        variant="ghost"
+                        variant="outline"
                         onClick={() => loadMappingData('github')}
                         disabled={loadingMappingData}
-                        className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                        title="View Data Mapping"
+                        className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 hover:text-blue-800 hover:border-blue-300"
+                        title="View and manage GitHub user mappings"
                       >
                         {loadingMappingData && selectedMappingPlatform === 'github' ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Loading...
+                          </>
                         ) : (
-                          <BarChart3 className="w-4 h-4" />
+                          <>
+                            <Users className="w-4 h-4 mr-2" />
+                            View Mappings
+                          </>
                         )}
                       </Button>
                       <Button
@@ -3219,16 +3240,22 @@ export default function IntegrationsPage() {
                     <div className="flex items-center space-x-2">
                       <Button
                         size="sm"
-                        variant="ghost"
+                        variant="outline"
                         onClick={() => loadMappingData('slack')}
                         disabled={loadingMappingData}
-                        className="h-8 w-8 p-0 text-purple-600 hover:text-purple-700 hover:bg-purple-50"
-                        title="View Data Mapping"
+                        className="bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100 hover:text-purple-800 hover:border-purple-300"
+                        title="View and manage Slack user mappings"
                       >
                         {loadingMappingData && selectedMappingPlatform === 'slack' ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Loading...
+                          </>
                         ) : (
-                          <BarChart3 className="w-4 h-4" />
+                          <>
+                            <Users className="w-4 h-4 mr-2" />
+                            View Mappings
+                          </>
                         )}
                       </Button>
                       <Button
@@ -3611,8 +3638,8 @@ export default function IntegrationsPage() {
               )}
               
               {/* Overall Statistics */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card className="p-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+                <Card className="p-4 border-purple-200">
                   <div className="flex items-center space-x-2">
                     <Users2 className="w-4 h-4 text-green-600" />
                     <div>
@@ -3621,7 +3648,7 @@ export default function IntegrationsPage() {
                     </div>
                   </div>
                 </Card>
-                <Card className="p-4">
+                <Card className="p-4 border-purple-200">
                   <div className="flex items-center space-x-2">
                     <CheckCircle className="w-4 h-4 text-green-600" />
                     <div>
@@ -3632,7 +3659,7 @@ export default function IntegrationsPage() {
                     </div>
                   </div>
                 </Card>
-                <Card className="p-4">
+                <Card className="p-4 border-purple-200">
                   <div className="flex items-center space-x-2">
                     <Database className="w-4 h-4 text-purple-600" />
                     <div>
