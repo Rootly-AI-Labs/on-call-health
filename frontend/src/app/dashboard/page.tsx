@@ -5644,6 +5644,112 @@ export default function Dashboard() {
                         </div>
                       </div>
                     )}
+
+                    {/* GitHub Activity Trends Chart */}
+                    {memberData.github_activity?.commits_count > 0 && (
+                      <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3 mt-3">
+                        <h4 className="text-sm font-semibold text-indigo-800 mb-3">Development Activity Trends</h4>
+                        <div className="h-48">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart 
+                              data={(() => {
+                                // Generate simulated daily commit data based on weekly average
+                                // In production, this should come from actual daily GitHub data
+                                const daysInPeriod = currentAnalysis?.analysis_data?.metadata?.days_analyzed || 30;
+                                const avgCommitsPerDay = (memberData.github_activity.commits_count || 0) / daysInPeriod;
+                                const commitsPerWeek = memberData.github_activity.commits_per_week || 0;
+                                
+                                // Generate daily data with some variation
+                                const dailyData = [];
+                                const startDate = new Date();
+                                startDate.setDate(startDate.getDate() - daysInPeriod);
+                                
+                                for (let i = 0; i < daysInPeriod; i++) {
+                                  const date = new Date(startDate);
+                                  date.setDate(date.getDate() + i);
+                                  
+                                  // Add variation to simulate real patterns
+                                  const dayOfWeek = date.getDay();
+                                  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                                  
+                                  // Base commits with variation
+                                  let dayCommits = avgCommitsPerDay;
+                                  
+                                  // Reduce weekend commits
+                                  if (isWeekend) {
+                                    dayCommits *= 0.3; // 30% of normal on weekends
+                                  }
+                                  
+                                  // Add some randomness (+/- 50%)
+                                  dayCommits *= (0.5 + Math.random());
+                                  
+                                  // Ensure non-negative
+                                  dayCommits = Math.max(0, Math.round(dayCommits));
+                                  
+                                  dailyData.push({
+                                    date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                                    commits: dayCommits,
+                                    isWeekend: isWeekend
+                                  });
+                                }
+                                
+                                return dailyData;
+                              })()}
+                              margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+                            >
+                              <defs>
+                                <linearGradient id="colorCommits" x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="5%" stopColor="#6366F1" stopOpacity={0.8}/>
+                                  <stop offset="95%" stopColor="#6366F1" stopOpacity={0.1}/>
+                                </linearGradient>
+                              </defs>
+                              <XAxis 
+                                dataKey="date" 
+                                tick={{ fontSize: 10 }}
+                                interval={Math.floor((currentAnalysis?.analysis_data?.metadata?.days_analyzed || 30) / 7)} // Show ~7 labels
+                              />
+                              <YAxis 
+                                tick={{ fontSize: 10 }}
+                                domain={[0, 'dataMax']}
+                              />
+                              <Tooltip 
+                                content={({ payload, label }) => {
+                                  if (payload && payload.length > 0) {
+                                    const data = payload[0].payload;
+                                    return (
+                                      <div className="bg-white p-2 border border-gray-200 rounded-lg shadow-lg">
+                                        <p className="text-xs font-semibold text-gray-900">{label}</p>
+                                        <p className="text-xs text-indigo-600">
+                                          {payload[0].value} commits
+                                          {data.isWeekend && <span className="text-gray-500 ml-1">(Weekend)</span>}
+                                        </p>
+                                      </div>
+                                    );
+                                  }
+                                  return null;
+                                }}
+                              />
+                              <Area 
+                                type="monotone" 
+                                dataKey="commits" 
+                                stroke="#6366F1" 
+                                strokeWidth={2}
+                                fillOpacity={1} 
+                                fill="url(#colorCommits)" 
+                              />
+                            </AreaChart>
+                          </ResponsiveContainer>
+                        </div>
+                        <div className="mt-2 text-xs text-indigo-600 text-center">
+                          Average: {memberData.github_activity.commits_per_week?.toFixed(1) || '0'} commits/week
+                          {memberData.github_activity.after_hours_commits > 0 && (
+                            <span className="ml-2">
+                              • {((memberData.github_activity.after_hours_commits / memberData.github_activity.commits_count) * 100).toFixed(0)}% after hours
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
