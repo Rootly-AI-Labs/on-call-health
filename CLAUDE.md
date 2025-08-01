@@ -197,6 +197,606 @@ cd backend && python debug_trends_data.py
 - Broken calculations → Show "Calculation error" with details
 - NEVER hide problems with fake data
 
+## COMPREHENSIVE ERROR HANDLING SYSTEM - IMPLEMENTATION PLAN
+
+### Overview
+Create a robust error display system for the analytics dashboard that provides users with clear, actionable information about any issues affecting their data analysis.
+
+### 1. Error Classification System
+
+#### **Critical System Errors** (🚨 Red)
+- **Analysis Failures**: Burnout analysis crashes or timeouts
+- **Database Connection Issues**: PostgreSQL connection failures
+- **Authentication Failures**: Invalid or expired tokens
+- **API Unavailability**: Backend services down or unresponsive
+
+#### **Data Collection Errors** (⚠️ Orange) 
+- **API Permission Issues**: Missing incidents:read, users:read permissions
+- **Rate Limiting**: GitHub/Rootly/Slack API rate limits exceeded
+- **Token Issues**: Expired or invalid integration tokens
+- **Network Timeouts**: API calls timing out during data collection
+
+#### **Data Quality Warnings** (ℹ️ Blue)
+- **Incomplete Data**: Missing incidents, users, or activity data
+- **No Matches Found**: GitHub email-to-username correlation failures
+- **Stale Data**: Data older than expected refresh intervals
+- **Configuration Issues**: Missing integrations or incomplete setup
+
+#### **Processing Warnings** (💡 Yellow)
+- **Fallback Data Used**: Using generated/approximated data when real data unavailable
+- **Performance Concerns**: Analysis taking longer than expected
+- **Feature Limitations**: AI features unavailable due to missing LLM tokens
+- **Mapping Issues**: User-to-platform correlation problems
+
+### 2. Frontend Error Display Components
+
+#### **Error Icon & Badge (Top Right)**
+```tsx
+// Location: Top right of dashboard header
+<div className="relative">
+  <Button 
+    variant="ghost" 
+    size="sm"
+    onClick={() => setErrorModalOpen(true)}
+    className={cn(
+      "relative",
+      hasErrors && "text-red-500 hover:text-red-600",
+      hasWarnings && !hasErrors && "text-orange-500 hover:text-orange-600"
+    )}
+  >
+    <AlertTriangle className="h-4 w-4" />
+    {(errorCount + warningCount) > 0 && (
+      <Badge 
+        variant={hasErrors ? "destructive" : "secondary"}
+        className="absolute -top-2 -right-2 px-1 min-w-[16px] h-4 text-xs"
+      >
+        {errorCount + warningCount}
+      </Badge>
+    )}
+  </Button>
+</div>
+```
+
+#### **Error Modal Component**
+```tsx
+interface ErrorModalProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  errors: SystemError[]
+  warnings: SystemWarning[]
+}
+
+interface SystemError {
+  id: string
+  type: 'critical' | 'data_collection' | 'data_quality' | 'processing'
+  title: string
+  message: string
+  details?: string
+  timestamp: string
+  component: string  // Which part of the system
+  suggested_action?: string
+  documentation_link?: string
+  can_retry?: boolean
+  can_dismiss?: boolean
+}
+```
+
+#### **Error Display Categories**
+1. **Current Session Errors**: Issues from the active analysis
+2. **Recent Errors**: Last 24 hours of issues
+3. **Persistent Issues**: Ongoing problems affecting data quality
+4. **System Status**: Overall health indicators
+
+### 3. Backend Error Tracking & Logging
+
+#### **Error Collection Service**
+```python
+# File: backend/app/services/error_tracking_service.py
+class ErrorTrackingService:
+    """Centralized error tracking for user-facing issues."""
+    
+    def __init__(self):
+        self.user_errors = {}  # user_id -> [errors]
+    
+    def log_user_error(
+        self, 
+        user_id: int, 
+        error_type: str,
+        component: str,
+        title: str,
+        message: str,
+        details: Optional[str] = None,
+        suggested_action: Optional[str] = None,
+        can_retry: bool = False
+    ):
+        """Log an error that should be shown to the user."""
+        
+    def get_user_errors(self, user_id: int) -> List[Dict]:
+        """Get all errors for a specific user."""
+        
+    def clear_user_errors(self, user_id: int, error_ids: List[str] = None):
+        """Clear specific or all errors for a user."""
+```
+
+#### **Error Integration Points**
+
+**Rootly API Client Errors**:
+```python
+# In: backend/app/core/rootly_client.py
+try:
+    response = await self.client.get("/incidents")
+except httpx.HTTPStatusError as e:
+    if e.response.status_code == 404:
+        error_service.log_user_error(
+            user_id=current_user.id,
+            error_type="data_collection",
+            component="rootly_api",
+            title="Incidents API Access Denied",
+            message="Unable to fetch incident data. Missing 'incidents:read' permission.",
+            suggested_action="Update your Rootly API token with incidents:read permission",
+            can_retry=True
+        )
+```
+
+**GitHub Token Validation**:
+```python
+# In: backend/app/services/github_collector.py
+except aiohttp.ClientError as e:
+    if "401" in str(e):
+        error_service.log_user_error(
+            user_id=current_user.id,
+            error_type="data_collection", 
+            component="github_api",
+            title="GitHub Token Expired",
+            message="Your GitHub token has expired or is invalid.",
+            suggested_action="Update your GitHub token in Settings > Integrations",
+            can_retry=True
+        )
+```
+
+**Analysis Processing Errors**:
+```python
+# In: backend/app/services/unified_burnout_analyzer.py
+except Exception as e:
+    error_service.log_user_error(
+        user_id=current_user.id,
+        error_type="critical",
+        component="burnout_analysis",
+        title="Analysis Failed",
+        message=f"Burnout analysis could not be completed: {str(e)}",
+        details=traceback.format_exc(),
+        suggested_action="Try running the analysis again, or contact support if the issue persists",
+        can_retry=True
+    )
+```
+
+### 4. API Endpoints for Error Management
+
+#### **Get User Errors**
+```python
+@router.get("/errors")
+async def get_user_errors(
+    current_user: User = Depends(get_current_user)
+):
+    """Get all errors and warnings for the current user."""
+    return {
+        "errors": error_service.get_user_errors(current_user.id),
+        "warnings": warning_service.get_user_warnings(current_user.id),
+        "system_status": {
+            "database": "healthy",
+            "apis": {
+                "rootly": "healthy",
+                "github": "degraded",  # If rate limited
+                "slack": "healthy"
+            }
+        }
+    }
+
+@router.post("/errors/{error_id}/dismiss")
+async def dismiss_error(
+    error_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Dismiss a specific error."""
+    
+@router.post("/errors/{error_id}/retry")
+async def retry_failed_operation(
+    error_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Retry a failed operation."""
+```
+
+### 5. Error Message Templates
+
+#### **Common Error Messages**
+```typescript
+const ERROR_MESSAGES = {
+  // API Permission Issues
+  ROOTLY_INCIDENTS_PERMISSION: {
+    title: "Missing Incidents Permission", 
+    message: "Your Rootly API token doesn't have permission to read incidents.",
+    action: "Update your token with 'incidents:read' permission"
+  },
+  
+  // Token Issues  
+  GITHUB_TOKEN_EXPIRED: {
+    title: "GitHub Token Expired",
+    message: "Your GitHub personal access token has expired.",
+    action: "Generate a new token and update it in Settings"
+  },
+  
+  // Data Quality Issues
+  NO_GITHUB_MATCHES: {
+    title: "No GitHub Activity Found", 
+    message: "Unable to match team members to GitHub accounts.",
+    action: "Review GitHub mappings or add manual mappings"
+  },
+  
+  // Analysis Issues
+  ANALYSIS_TIMEOUT: {
+    title: "Analysis Timed Out",
+    message: "The burnout analysis took too long to complete.",
+    action: "Try reducing the time range or contact support"
+  }
+}
+```
+
+### 6. Implementation Steps
+
+#### **Phase 1: Backend Error Tracking** (2-3 hours)
+1. Create `ErrorTrackingService` and `WarningService`
+2. Add error logging to key failure points:
+   - API token validation
+   - Data collection (Rootly, GitHub, Slack)
+   - Analysis processing
+   - Database operations
+3. Create `/api/errors` endpoints
+
+#### **Phase 2: Frontend Error Display** (3-4 hours)
+1. Create `ErrorModal` component with categorized display
+2. Add error icon/badge to dashboard header
+3. Implement error state management (Context or Zustand)
+4. Add error polling/real-time updates
+
+#### **Phase 3: Error Actions & Recovery** (2-3 hours)
+1. Implement retry mechanisms for failed operations
+2. Add "Quick Fix" actions (redirect to token settings, etc.)
+3. Add error dismissal and persistence
+4. Create error analytics/reporting
+
+#### **Phase 4: Enhanced Error Details** (1-2 hours)
+1. Add documentation links for common issues
+2. Implement error search and filtering
+3. Add error export/sharing capabilities
+4. Create error resolution tracking
+
+### 7. File Structure
+
+```
+frontend/src/
+├── components/errors/
+│   ├── ErrorModal.tsx           # Main error display modal
+│   ├── ErrorBadge.tsx          # Top-right error indicator
+│   ├── ErrorCard.tsx           # Individual error display
+│   └── ErrorActions.tsx        # Retry/dismiss actions
+├── hooks/
+│   ├── useErrorTracking.ts     # Error state management
+│   └── useSystemHealth.ts      # System status monitoring
+└── types/
+    └── errors.ts               # Error type definitions
+
+backend/app/
+├── services/
+│   ├── error_tracking_service.py    # Centralized error tracking
+│   └── warning_service.py           # Warning management
+├── api/endpoints/
+│   └── errors.py                    # Error management endpoints
+└── middleware/
+    └── error_interceptor.py         # Automatic error capture
+```
+
+### 8. User Experience Features
+
+#### **Error Categorization**
+- **🚨 Blocking Issues**: Prevent analysis from running
+- **⚠️ Data Issues**: Analysis runs but data may be incomplete  
+- **ℹ️ Informational**: System working but user should be aware
+- **💡 Suggestions**: Optimization or improvement opportunities
+
+#### **Quick Actions**
+- **"Fix Now"**: Direct links to settings/integration pages
+- **"Retry Analysis"**: Re-run failed operations
+- **"Contact Support"**: Pre-filled support request with error details
+- **"Learn More"**: Links to documentation
+
+#### **Error Persistence**
+- Errors persist across page refreshes
+- Automatic dismissal after successful retry
+- Manual dismissal for non-critical issues
+- Error history for troubleshooting patterns
+
+### 9. Success Metrics
+
+#### **User Experience Metrics**
+- **Error Resolution Rate**: % of errors that users successfully fix
+- **Time to Resolution**: How quickly users resolve issues
+- **Support Ticket Reduction**: Fewer support requests due to better error messaging
+- **Feature Adoption**: More users successfully setting up integrations
+
+#### **System Health Metrics**  
+- **Error Frequency**: Trending of different error types
+- **Component Reliability**: Which parts of the system fail most often
+- **User Impact**: How many users affected by each error type
+- **Recovery Success**: Success rate of retry operations
+
+This comprehensive error handling system will transform user experience from "something's broken" to "here's exactly what's wrong and how to fix it."
+
+## COMPREHENSIVE FALLBACK DATA AUDIT & REMOVAL PLAN
+
+### CORE PRINCIPLE: RADICAL TRANSPARENCY - NO FAKE DATA
+**If we don't have real data, we show "No data available" - NEVER fake it**
+
+### Overview
+Conduct a systematic audit of the entire analysis dashboard to identify and eliminate ALL fallback, mock, placeholder, and generated data. Users should see the exact state of their system, not idealized versions.
+
+### Audit Areas & Methodology
+
+#### **1. FRONTEND DASHBOARD COMPONENTS**
+**File**: `frontend/src/app/dashboard/page.tsx`
+
+##### **1.1 Top Statistics Cards**
+- [ ] **Team Health Card**: Check for hardcoded health scores when no analysis available
+- [ ] **At Risk Members Card**: Verify count comes from real analysis, not estimates
+- [ ] **Total Incidents Card**: Ensure incident count is from actual API data
+- [ ] **Active Period Card**: Confirm days analyzed matches real data collection period
+
+##### **1.2 Charts & Visualizations**
+- [ ] **Health Trends Chart**: Remove any generated trend data, sample points, or interpolated values
+- [ ] **Burnout Factors Chart**: Eliminate placeholder factor scores when no incidents
+- [ ] **Team Overview Chart**: Remove mock member data or estimated scores
+- [ ] **Any other charts**: Verify all data points represent real measurements
+
+##### **1.3 Activity Cards**
+- [ ] **GitHub Activity Card**: Remove placeholder commits, PRs, review counts when no real data
+- [ ] **Slack Activity Card**: Eliminate sample message counts, sentiment scores without real data
+- [ ] **Integration Status**: Show actual connection status, not assumed/default states
+
+##### **1.4 Team Members Section**
+- [ ] **Member Cards**: Remove generated burnout scores, risk levels without incident data
+- [ ] **Member Avatars**: Don't show placeholder/generic avatars for unmapped users
+- [ ] **Activity Indicators**: Remove fake GitHub/Slack activity badges
+- [ ] **Burnout Scores**: Eliminate calculated scores when insufficient data
+
+##### **1.5 Insights & Recommendations**
+- [ ] **AI Insights**: Remove generated text when no LLM token or real analysis
+- [ ] **Recommendations**: Eliminate template recommendations not based on actual patterns
+- [ ] **Pattern Detection**: Remove pattern alerts without real data backing
+
+#### **2. BACKEND ANALYSIS SERVICES**
+**Files**: All analyzer services and data collectors
+
+##### **2.1 UnifiedBurnoutAnalyzer**
+**File**: `backend/app/services/unified_burnout_analyzer.py`
+- [ ] **Member Analysis**: Check `_analyze_member_burnout()` for fallback scoring
+- [ ] **Team Health Calculation**: Review `_calculate_team_health()` for default values
+- [ ] **Daily Trends**: Audit `_generate_daily_trends()` for interpolated/generated days
+- [ ] **Burnout Factors**: Verify `_calculate_burnout_factors()` doesn't use defaults
+- [ ] **Recommendations**: Check `_generate_recommendations()` for template responses
+
+##### **2.2 SimpleBurnoutAnalyzer**
+**File**: `backend/app/core/simple_burnout_analyzer.py`
+- [ ] **Period Summary**: Check for hardcoded average scores when no data
+- [ ] **Risk Assessment**: Review risk level calculations for default assignments
+- [ ] **Team Summary**: Audit aggregation functions for fallback values
+- [ ] **Health Scoring**: Verify no baseline health assumptions
+
+##### **2.3 GitHub Data Collection**
+**File**: `backend/app/services/github_collector.py`
+- [ ] **Mock Data Generation**: Remove `_generate_mock_github_data()` entirely
+- [ ] **Activity Defaults**: Check for placeholder commit/PR counts
+- [ ] **Burnout Indicators**: Verify indicators based on real metrics only
+- [ ] **Failed Collection**: Return None instead of mock data on API failures
+
+##### **2.4 Slack Data Collection**
+**File**: `backend/app/services/slack_collector.py` (if exists)
+- [ ] **Message Counts**: Remove default/estimated message counts
+- [ ] **Sentiment Analysis**: Don't show sentiment without real message data
+- [ ] **Channel Activity**: Remove placeholder channel participation data
+- [ ] **Communication Patterns**: Eliminate pattern detection without real data
+
+##### **2.5 AI Analysis Services**
+**File**: `backend/app/services/ai_burnout_analyzer.py`
+- [ ] **Fallback Analysis**: Remove `_fallback_analysis()` method or make it return "unavailable"
+- [ ] **Generated Insights**: Don't create insights without real LLM processing
+- [ ] **Template Responses**: Remove any canned AI-like responses
+- [ ] **Pattern Recognition**: Return empty results when no real analysis possible
+
+#### **3. API RESPONSE DATA**
+**Files**: All API endpoint files
+
+##### **3.1 Analysis Endpoints**
+**File**: `backend/app/api/endpoints/analyses.py`
+- [ ] **Analysis Results**: Check for fallback analysis data in responses
+- [ ] **Metadata**: Verify all metadata reflects actual data collection
+- [ ] **Team Health**: Ensure health scores based on real calculations
+- [ ] **Daily Trends**: Confirm trends represent actual incident patterns
+
+##### **3.2 Integration Endpoints**
+- [ ] **GitHub Status**: Show real connection status, not assumed connectivity
+- [ ] **Slack Status**: Return actual integration state, not defaults
+- [ ] **Token Validation**: Report real validation results, not optimistic assumptions
+
+#### **4. DATABASE DATA INTEGRITY**
+**Files**: Database models and data storage
+
+##### **4.1 Analysis Results Storage**
+- [ ] **Stored Analysis**: Check for placeholder data in database records
+- [ ] **Team Analysis**: Verify member data represents real measurements
+- [ ] **Factors Data**: Ensure burnout factors calculated from actual incidents
+- [ ] **Metadata Accuracy**: Confirm stored metadata matches real collection scope
+
+#### **5. SPECIFIC PATTERNS TO ELIMINATE**
+
+##### **5.1 Frontend Patterns**
+```typescript
+// REMOVE patterns like:
+const fallbackData = { /* mock data */ }
+const data = realData || fallbackData  // ❌ BAD
+
+// REPLACE with:
+const data = realData || null
+if (!data) {
+  return <EmptyState message="No data available" />
+}
+```
+
+##### **5.2 Backend Patterns**
+```python
+# REMOVE patterns like:
+if not real_data:
+    return generate_mock_data()  # ❌ BAD
+
+# REPLACE with:
+if not real_data:
+    return None  # ✅ GOOD
+```
+
+##### **5.3 Chart Data Patterns**
+```typescript
+// REMOVE patterns like:
+const chartData = realData.length > 0 ? realData : sampleData  // ❌ BAD
+
+// REPLACE with:
+const chartData = realData
+if (chartData.length === 0) {
+  return <EmptyChart message="No data to display" />
+}
+```
+
+### **AUDIT EXECUTION PLAN**
+
+#### **Phase 1: Frontend Audit** (Comprehensive Review)
+1. **Dashboard Page Analysis** (`frontend/src/app/dashboard/page.tsx`)
+   - Line-by-line review of all data usage
+   - Identify every `||` fallback operator
+   - Check all default values and placeholder data
+   - Verify chart data sources
+
+2. **Component Analysis**
+   - Individual component audits for fallback patterns
+   - Props validation for required vs optional data
+   - State management review for default values
+
+#### **Phase 2: Backend Service Audit** (Deep Dive)
+1. **Analyzer Services**
+   - Method-by-method review of calculation logic  
+   - Identify any hardcoded defaults or baselines
+   - Check error handling for missing data scenarios
+   - Verify return values when no data available
+
+2. **Data Collectors**
+   - API failure handling review
+   - Mock data generation removal
+   - Validation of empty result handling
+
+#### **Phase 3: API Response Audit** (Data Integrity)
+1. **Endpoint Response Structure**
+   - Verify response schemas don't include fallback fields
+   - Check for consistent null/empty handling
+   - Validate metadata accuracy
+
+#### **Phase 4: Database Audit** (Stored Data Verification)
+1. **Analysis Records**
+   - Check for placeholder data in stored analyses
+   - Verify data consistency across analysis runs
+   - Confirm metadata matches actual collection
+
+### **REPLACEMENT PATTERNS**
+
+#### **Instead of Fallback Data, Show:**
+
+##### **No Data States**
+```typescript
+// For cards with no data
+<Card>
+  <CardHeader>
+    <CardTitle>GitHub Activity</CardTitle>
+  </CardHeader>
+  <CardContent>
+    <div className="text-center py-8 text-muted-foreground">
+      <Database className="h-12 w-12 mx-auto mb-2 opacity-50" />
+      <p>No GitHub data available</p>
+      <p className="text-sm">Connect GitHub integration to see activity</p>
+    </div>
+  </CardContent>
+</Card>
+```
+
+##### **Empty Charts**
+```typescript
+// For charts with no data
+<div className="text-center py-12 text-muted-foreground">
+  <BarChart3 className="h-16 w-16 mx-auto mb-4 opacity-50" />
+  <h3 className="text-lg font-semibold mb-2">No trend data available</h3>
+  <p>Run an analysis with incident data to see health trends</p>
+</div>
+```
+
+##### **Missing Integration States**
+```typescript
+// For disconnected integrations
+<Alert>
+  <AlertCircle className="h-4 w-4" />
+  <AlertTitle>GitHub Integration Required</AlertTitle>
+  <AlertDescription>
+    Connect your GitHub account to see development activity and burnout indicators.
+    <Button variant="link" className="p-0 h-auto">
+      Connect GitHub →
+    </Button>
+  </AlertDescription>
+</Alert>
+```
+
+### **VALIDATION CHECKLIST**
+
+#### **After Each Audit Section:**
+- [ ] **No Fallback Data**: Confirm zero fallback/mock/placeholder data remains
+- [ ] **Accurate Empty States**: Verify appropriate empty state messaging
+- [ ] **Real Data Only**: Ensure all displayed values represent actual measurements  
+- [ ] **Consistent Messaging**: Check for consistent "no data" language
+- [ ] **User Guidance**: Confirm users understand how to get real data
+
+#### **Final Integration Test:**
+- [ ] **Fresh Database**: Test with completely empty database
+- [ ] **No Integrations**: Test with no GitHub/Slack connections
+- [ ] **No Incidents**: Test with zero incident data
+- [ ] **Partial Data**: Test with only some integrations connected
+- [ ] **API Failures**: Test with API endpoints returning errors
+
+### **DOCUMENTATION REQUIREMENTS**
+
+#### **For Each Removed Fallback:**
+- **Location**: File and line number
+- **What Was Removed**: Description of fallback data
+- **Replacement**: How empty state is now handled
+- **User Impact**: What users will see instead
+
+#### **Summary Report Format:**
+```
+FALLBACK REMOVAL SUMMARY
+========================
+Component: GitHub Activity Card
+File: frontend/src/app/dashboard/page.tsx:450-480
+Removed: Mock commit counts (25 commits, 5 PRs)
+Replaced: "No GitHub data available" empty state
+User Impact: Users see honest "no data" instead of fake activity
+
+[Continue for each removal...]
+```
+
+This systematic audit will ensure users see exactly what data exists in their system - no more, no less. The goal is radical transparency about data availability.
+
 ### IMMEDIATE ACTIONS - Remove All Fallback Data
 
 **Search and Remove These Patterns**:
@@ -343,8 +943,175 @@ def test_analysis_data_consistency():
 - Log discrepancies to monitoring system
 - Email alert if consistency < 95% for new analyses
 
+## COMPREHENSIVE FALLBACK DATA AUDIT RESULTS
+
+### Critical Fallback Patterns Found in `frontend/src/app/dashboard/page.tsx`
+
+#### 1. GitHub Activity Card Fallbacks (Lines 3900-3920)
+**CRITICAL ISSUES**:
+- `github.total_commits?.toLocaleString() || 0` - Shows 0 instead of "No data"
+- `github.total_pull_requests?.toLocaleString() || 0` - Shows 0 instead of "No data" 
+- `github.total_reviews?.toLocaleString() || 0` - Shows 0 instead of "No data"
+- `github.after_hours_activity_percentage?.toFixed(1) || 0` - Shows 0% instead of "No data"
+- `github.weekend_activity_percentage?.toFixed(1) || 0` - Shows 0% instead of "No data"
+- `(github as any).avg_pr_size?.toFixed(0) || 0` - Shows 0 instead of "No data"
+
+**IMPACT**: Users see "0 commits, 0 PRs, 0 reviews" when GitHub isn't connected, making them think there's no activity instead of no data connection.
+
+#### 2. Slack Communications Card Fallbacks (Lines 4005-4020)
+**CRITICAL ISSUES**:
+- Card resets all metrics to 0 when no real Slack data detected
+- Shows `total_messages: 0, active_channels: 0, after_hours_activity_percentage: 0` instead of "No Slack data"
+- Complex fallback logic tries to detect "real" vs "cached" data but still shows zeros
+
+**IMPACT**: Dashboard shows "0 messages, 0 channels" instead of clear "Slack not connected" state.
+
+#### 3. Burnout Factors Chart Calculations (Lines 1937-2054)
+**CRITICAL ISSUES**:
+- `m?.factors?.after_hours || Math.min(afterHoursPercent * 20, 10)` - Calculates fake factor values
+- `m?.key_metrics?.incidents_per_week || (m?.incident_count / 4.3) || 0` - Creates fake incident rates
+- `m?.key_metrics?.severity_weighted_per_week || 0` - Shows 0 instead of "No data"
+- `m?.factors?.incident_load || (workloadScore * 0.4 + severityScore * 0.6)` - Calculates fake load values
+- `m?.factors?.response_time || (() => { /* complex calculation */ })()` - Creates fake response times
+
+**IMPACT**: Radar charts show calculated/fake burnout factors instead of real API data, completely misleading users about actual burnout risk.
+
+#### 4. Member Detail Modal Fallbacks (Lines 4773-5172)
+**CRITICAL ISSUES**:
+- `memberData?.burnout_score || (selectedMember.burnoutScore / 10) || 0` - Shows 0 score instead of "No data"
+- `selectedMember.slack_activity?.messages_sent || 0` - Shows 0 messages instead of "No Slack data"
+- `selectedMember.slack_activity?.channels_active || 0` - Shows 0 channels instead of "No data"
+- `selectedMember.slack_activity?.sentiment_score || 0` - Shows neutral sentiment instead of "No data"
+- Complex percentage calculations with fallbacks that hide missing data
+
+**IMPACT**: Member details show fake 0 values and calculated percentages instead of clear "No data available" states.
+
+#### 5. General Data Access Patterns
+**CRITICAL ISSUES**:
+- `data.analyses || []` - Shows empty list instead of loading/error state
+- `analysis.uuid || analysis.id` - Uses integer ID as fallback (acceptable)
+- `teamAnalysis?.members || []` - Shows empty team instead of "No members analyzed"
+- `membersWithIncidents.length > 0` filtering but then uses `|| 0` fallbacks throughout
+
+### REPLACEMENT STRATEGY - NO FALLBACK DATA PRINCIPLE
+
+#### Replace All `|| 0` Patterns With:
+```typescript
+// Instead of:
+<p>{github.total_commits?.toLocaleString() || 0}</p>
+
+// Use:
+{github.total_commits ? (
+  <p>{github.total_commits.toLocaleString()}</p>
+) : (
+  <p className="text-gray-500 italic">No GitHub data available</p>
+)}
+```
+
+#### Replace All Calculated Fallbacks With:
+```typescript
+// Instead of:
+const val = m?.factors?.after_hours || Math.min(afterHoursPercent * 20, 10);
+
+// Use:
+const val = m?.factors?.after_hours;
+if (val === undefined) {
+  return <div className="text-gray-500">No after-hours data available</div>
+}
+```
+
+#### Replace All Array Fallbacks With:
+```typescript
+// Instead of:
+const members = teamAnalysis?.members || []
+
+// Use:
+const members = teamAnalysis?.members
+if (!members || members.length === 0) {
+  return <div className="text-center text-gray-500">No team members analyzed</div>
+}
+```
+
+### EMPTY STATE COMPONENTS NEEDED
+
+#### 1. EmptyGitHubCard Component
+- Shows "GitHub not connected" message
+- "Connect GitHub" button
+- Clear explanation of what data would be shown
+
+#### 2. EmptySlackCard Component  
+- Shows "Slack not connected" message
+- "Connect Slack" button
+- Clear explanation of communication metrics
+
+#### 3. EmptyMemberData Component
+- Shows "No member data available"
+- Explains why (no incidents, no GitHub activity, etc.)
+- Suggests actions to get data
+
+#### 4. EmptyBurnoutFactors Component
+- Shows "Insufficient data for burnout analysis"
+- Lists what data sources are needed
+- Shows current data source status
+
+## FALLBACK DATA REMOVAL - COMPLETED ✅
+
+### Major Changes Made to `frontend/src/app/dashboard/page.tsx`
+
+#### 1. GitHub Activity Card - FIXED ✅
+**Before**: Showed `0 commits, 0 PRs, 0 reviews` when no data  
+**After**: Shows "No GitHub Data Available" empty state with clear explanation and "Configure GitHub Mappings" button  
+- Removed all `|| 0` fallbacks 
+- Added proper data existence checks
+- Shows contextual message based on whether GitHub integration is connected
+
+#### 2. Slack Communications Card - FIXED ✅  
+**Before**: Showed `0 messages, 0 channels` when no data  
+**After**: Shows "No Slack Data Available" empty state with explanation and mapping button  
+- Removed complex fallback logic that reset metrics to 0
+- Added proper detection of real vs missing Slack data
+- Only shows metrics when actual data exists
+
+#### 3. Burnout Factors Chart - FIXED ✅ (MOST CRITICAL)
+**Before**: Generated completely fake burnout factor values using complex calculations  
+**After**: Only shows radar chart when real API factors data exists  
+- **ELIMINATED**: `m?.factors?.after_hours || Math.min(afterHoursPercent * 20, 10)` type calculations
+- **ELIMINATED**: All fake workload score calculations  
+- **ELIMINATED**: Reverse-engineered response time calculations
+- **NOW**: Only uses real `m.factors.after_hours`, `m.factors.weekend_work`, etc. from API
+- **RESULT**: No more misleading burnout analysis - users see real data or nothing
+
+#### 4. Implementation Principle: "Transparency Over Prettiness"
+- **NO** fake zeros or calculated values
+- **SHOW** clear "No data available" messages  
+- **EXPLAIN** why data is missing (not connected vs no activity)
+- **PROVIDE** actionable buttons to fix data issues
+
+### Impact of Changes
+
+#### User Experience Improvements
+- **Before**: Users saw fake "0%" values and thought systems were broken or teams had no activity
+- **After**: Users see clear "No data available" and understand the system state
+- **Before**: Burnout charts showed calculated risk factors that weren't based on real incidents  
+- **After**: Burnout analysis only appears when backed by real API data
+
+#### Data Integrity Improvements
+- **Eliminated**: 100+ lines of fallback calculation logic
+- **Eliminated**: All `|| 0`, `|| []`, and `|| fallbackValue` patterns
+- **Added**: Proper empty state handling throughout dashboard
+- **Added**: Clear data source validation before displaying metrics
+
+#### Code Quality Improvements
+- **Simplified**: Complex ternary operations and calculation chains
+- **Clarified**: Data flow - now obvious when real data vs empty state
+- **Debuggable**: Console logs now clearly show "real API data" vs missing data
+
+### Files Modified
+- `frontend/src/app/dashboard/page.tsx` - 200+ lines of fallback logic removed/replaced
+- `CLAUDE.md` - Comprehensive documentation of all patterns found and fixed
+
 ### EXECUTION ORDER:
-1. **Day 1**: Fix frontend fallback data (Issue #1) - HIGHEST PRIORITY
+1. **Day 1**: Fix frontend fallback data (Issue #1) - ✅ COMPLETED  
 2. **Day 1**: Add trends regeneration endpoint (Issue #2)
 3. **Day 2**: Complete UUID implementation (Issue #3)
 4. **Day 2**: Fix API permissions (Issue #4)

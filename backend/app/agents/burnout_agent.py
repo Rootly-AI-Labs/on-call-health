@@ -28,12 +28,13 @@ class BurnoutDetectionAgent:
     adaptive analysis of burnout risk factors across multiple data sources.
     """
     
-    def __init__(self, model_name: str = "gpt-4o-mini"):
+    def __init__(self, model_name: str = "gpt-4o-mini", api_key: Optional[str] = None):
         """
         Initialize the burnout detection agent.
         
         Args:
             model_name: Name of the language model to use
+            api_key: Optional API key for LLM access
         """
         self.logger = logging.getLogger(__name__)
         
@@ -46,7 +47,7 @@ class BurnoutDetectionAgent:
         self.agent = None
         self.agent_available = False
         
-        if CodeAgent:
+        if CodeAgent and api_key:
             try:
                 # Try to initialize with LLM (requires API key)
                 from smolagents import LiteLLMModel
@@ -58,6 +59,10 @@ class BurnoutDetectionAgent:
                 ]
                 
                 # Create the actual smolagents agent with reasoning capabilities
+                # Configure the model with the API key
+                import os
+                os.environ["ANTHROPIC_API_KEY"] = api_key  # Set for LiteLLM
+                
                 self.agent = CodeAgent(
                     tools=self.tools,
                     model=LiteLLMModel(model_name),
@@ -71,6 +76,9 @@ class BurnoutDetectionAgent:
                 self.logger.warning(f"Could not initialize smolagents with LLM: {e}")
                 self.logger.info("Falling back to direct tool usage")
                 self.agent_available = False
+        elif CodeAgent and not api_key:
+            self.logger.info("No API key provided - using direct tool analysis instead of LLM reasoning")
+            self.agent_available = False
         else:
             self.logger.warning("smolagents not available - using direct tool analysis")
             self.agent_available = False
@@ -715,14 +723,15 @@ Please analyze {member_name}'s burnout risk now.
         }
 
 
-def create_burnout_agent(model_name: str = "gpt-4o-mini") -> BurnoutDetectionAgent:
+def create_burnout_agent(model_name: str = "gpt-4o-mini", api_key: Optional[str] = None) -> BurnoutDetectionAgent:
     """
     Factory function to create a burnout detection agent.
     
     Args:
         model_name: Name of the language model to use
+        api_key: Optional API key for LLM access
         
     Returns:
         Configured BurnoutDetectionAgent instance
     """
-    return BurnoutDetectionAgent(model_name)
+    return BurnoutDetectionAgent(model_name, api_key)

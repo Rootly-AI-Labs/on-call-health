@@ -947,7 +947,7 @@ export default function IntegrationsPage() {
       
       setGithubToken('')
       setActiveEnhancementTab(null)
-      loadAllIntegrations()
+      loadAllIntegrations(true) // Force refresh to update cache
     } catch (error) {
       console.error('Error connecting GitHub:', error)
       toast.error(error instanceof Error ? error.message : "An unexpected error occurred.")

@@ -1459,7 +1459,16 @@ class BurnoutAnalyzerService:
             Enhanced analysis with AI insights
         """
         try:
-            ai_analyzer = get_ai_burnout_analyzer()
+            # Get user's LLM token from context
+            from .ai_burnout_analyzer import get_user_context
+            from ..api.endpoints.llm import get_user_llm_token
+            
+            current_user = get_user_context()
+            user_llm_token = None
+            if current_user:
+                user_llm_token = get_user_llm_token(current_user)
+            
+            ai_analyzer = get_ai_burnout_analyzer(api_key=user_llm_token)
             
             # Enhance each member analysis with null safety
             enhanced_members = []

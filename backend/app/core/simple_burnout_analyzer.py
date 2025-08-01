@@ -278,7 +278,7 @@ class SimpleBurnoutAnalyzer:
             # Calculate period average from daily trends if available
             if daily_trends and len(daily_trends) > 0:
                 daily_scores = [day["overall_score"] for day in daily_trends]
-                period_average_score = (sum(daily_scores) / len(daily_scores)) * 10  # Convert to percentage scale (0-100)
+                period_average_score = (sum(daily_scores) / len(daily_scores)) * 10 if daily_scores and len(daily_scores) > 0 else 0  # Convert to percentage scale (0-100)
                 logger.info(f"Period average from daily trends: {period_average_score}% (from {len(daily_scores)} days)")
             else:
                 logger.info(f"No daily trends generated, using fallback period average: {period_average_score}%")
@@ -384,11 +384,11 @@ class SimpleBurnoutAnalyzer:
             metadata = metadata or {}
             days_analyzed = metadata.get("days_analyzed", 30) if isinstance(metadata, dict) else 30
             incidents_count = len(user_incidents) if user_incidents else 0
-            incidents_per_week = (incidents_count / days_analyzed) * 7 if days_analyzed > 0 else 0
+            incidents_per_week = (incidents_count / days_analyzed) * 7 if days_analyzed and days_analyzed > 0 else 0
             
             # Calculate severity-weighted incident load
             severity_weighted_load = self._calculate_severity_weighted_load(user_incidents)
-            severity_weighted_per_week = (severity_weighted_load / days_analyzed) * 7 if days_analyzed > 0 else 0
+            severity_weighted_per_week = (severity_weighted_load / days_analyzed) * 7 if days_analyzed and days_analyzed > 0 else 0
             
             # Calculate after-hours and weekend percentages with comprehensive error handling
             after_hours_count = 0
@@ -400,8 +400,8 @@ class SimpleBurnoutAnalyzer:
                 after_hours_count = 0
                 weekend_count = 0
                 
-            after_hours_percentage = after_hours_count / incidents_count if incidents_count > 0 else 0
-            weekend_percentage = weekend_count / incidents_count if incidents_count > 0 else 0
+            after_hours_percentage = after_hours_count / incidents_count if incidents_count and incidents_count > 0 else 0
+            weekend_percentage = weekend_count / incidents_count if incidents_count and incidents_count > 0 else 0
             
             # Calculate average resolution time with error handling
             resolution_times = []
@@ -417,7 +417,7 @@ class SimpleBurnoutAnalyzer:
             
             avg_resolution_hours = (
                 sum(resolution_times) / len(resolution_times) / 60 
-                if resolution_times else 0
+                if resolution_times and len(resolution_times) > 0 else 0
             )
         except Exception as e:
             logger.warning(f"Error calculating metrics for user {user_id}: {e}")
@@ -435,10 +435,10 @@ class SimpleBurnoutAnalyzer:
             after_hours_threshold = thresholds.get("after_hours_percentage_high", 0.3)
             duration_threshold = thresholds.get("avg_resolution_hours_high", 6)
             
-            frequency_score = min(10, (incidents_per_week / frequency_threshold) * 10) if frequency_threshold > 0 else 0
-            severity_score = min(10, (severity_weighted_per_week / severity_threshold) * 10) if severity_threshold > 0 else 0
-            after_hours_score = min(10, (after_hours_percentage / after_hours_threshold) * 10) if after_hours_threshold > 0 else 0
-            duration_score = min(10, (avg_resolution_hours / duration_threshold) * 10) if duration_threshold > 0 else 0
+            frequency_score = min(10, (incidents_per_week / frequency_threshold) * 10) if frequency_threshold and frequency_threshold > 0 else 0
+            severity_score = min(10, (severity_weighted_per_week / severity_threshold) * 10) if severity_threshold and severity_threshold > 0 else 0
+            after_hours_score = min(10, (after_hours_percentage / after_hours_threshold) * 10) if after_hours_threshold and after_hours_threshold > 0 else 0
+            duration_score = min(10, (avg_resolution_hours / duration_threshold) * 10) if duration_threshold and duration_threshold > 0 else 0
             
             # Weight the scores (severity-weighted frequency is higher priority than raw frequency)
             burnout_score = (severity_score * 0.4) + (frequency_score * 0.3) + (after_hours_score * 0.2) + (duration_score * 0.1)
@@ -834,7 +834,7 @@ class SimpleBurnoutAnalyzer:
         return {
             "total_users": len(team_analysis),
             "users_with_incidents": len(users_with_incidents),
-            "average_score": round(sum(health_scores) / len(health_scores), 2),  # Now health score (0-10, higher=better)
+            "average_score": round(sum(health_scores) / len(health_scores), 2) if health_scores and len(health_scores) > 0 else 0,  # Now health score (0-10, higher=better)
             "highest_score": max(health_scores),  # Highest health score  
             "lowest_score": min(health_scores),   # Add lowest health score for completeness
             "risk_distribution": risk_counts,
@@ -856,7 +856,7 @@ class SimpleBurnoutAnalyzer:
         if high_risk_count > 0:
             recommendations.append(f"🚨 {high_risk_count} team members at high burnout risk - immediate attention needed")
         
-        if total_users > 0 and (high_risk_count + medium_risk_count) / total_users > 0.5:
+        if total_users and total_users > 0 and (high_risk_count + medium_risk_count) / total_users > 0.5:
             recommendations.append("📋 Consider team workload redistribution and process improvements")
         
         # team_summary.average_score is now health score (0-10, higher = better)
@@ -1009,9 +1009,9 @@ class SimpleBurnoutAnalyzer:
             
             for date_str, data in sorted(daily_data.items()):
                 # Calculate daily burnout score based on incident patterns
-                daily_incident_rate = data["incident_count"] / total_users if total_users > 0 else 0
-                daily_severity_rate = data["severity_weighted_count"] / total_users if total_users > 0 else 0
-                after_hours_ratio = data["after_hours_count"] / data["incident_count"] if data["incident_count"] > 0 else 0
+                daily_incident_rate = data["incident_count"] / total_users if total_users and total_users > 0 else 0
+                daily_severity_rate = data["severity_weighted_count"] / total_users if total_users and total_users > 0 else 0
+                after_hours_ratio = data["after_hours_count"] / data["incident_count"] if data["incident_count"] and data["incident_count"] > 0 else 0
                 
                 # Skip days with zero incidents - only include meaningful data points
                 if data["incident_count"] == 0:

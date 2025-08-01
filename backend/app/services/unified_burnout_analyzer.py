@@ -795,11 +795,11 @@ class UnifiedBurnoutAnalyzer:
             # Count severity
             severity_counts[severity] += 1
         
-        # Calculate averages and percentages
-        incidents_per_week = (len(incidents) / days_analyzed) * 7
-        after_hours_percentage = after_hours_count / len(incidents) if incidents else 0
-        weekend_percentage = weekend_count / len(incidents) if incidents else 0
-        avg_response_time = sum(response_times) / len(response_times) if response_times else 0
+        # Calculate averages and percentages with comprehensive None safety
+        incidents_per_week = (len(incidents) / max(days_analyzed, 1)) * 7 if days_analyzed and days_analyzed > 0 else 0
+        after_hours_percentage = after_hours_count / len(incidents) if incidents and len(incidents) > 0 else 0
+        weekend_percentage = weekend_count / len(incidents) if incidents and len(incidents) > 0 else 0
+        avg_response_time = sum(response_times) / len(response_times) if response_times and len(response_times) > 0 else 0
         
         return {
             "incidents_per_week": round(incidents_per_week, 2),
@@ -833,7 +833,7 @@ class UnifiedBurnoutAnalyzer:
     def _calculate_emotional_exhaustion_incident(self, metrics: Dict[str, Any]) -> float:
         """Calculate Emotional Exhaustion from incident data (0-10 scale)."""
         # Incident frequency score - more realistic thresholds
-        ipw = metrics["incidents_per_week"]
+        ipw = metrics.get("incidents_per_week", 0) or 0
         # Scale: 0-2 incidents/week = 0-3, 2-5 = 3-7, 5-8 = 7-10, 8+ = 10
         if ipw <= 2:
             incident_frequency_score = ipw * 1.5  # 0-3 range
@@ -845,11 +845,11 @@ class UnifiedBurnoutAnalyzer:
             incident_frequency_score = 10  # 8+ incidents per week = maximum burnout
         
         # After hours score
-        ahp = metrics["after_hours_percentage"]
+        ahp = metrics.get("after_hours_percentage", 0) or 0
         after_hours_score = min(10, ahp * 20)
         
         # Resolution time score (using response time as proxy)
-        art = metrics["avg_response_time_minutes"]
+        art = metrics.get("avg_response_time_minutes", 0)
         resolution_time_score = min(10, (art / 60) * 10) if art is not None and art > 0 else 0  # Normalize to hours
         
         # Clustering score (simplified - assume 20% clustering for now)
@@ -861,10 +861,10 @@ class UnifiedBurnoutAnalyzer:
     def _calculate_depersonalization_incident(self, metrics: Dict[str, Any]) -> float:
         """Calculate Depersonalization from incident data (0-10 scale)."""
         # Escalation score (using severity as proxy)
-        severity_dist = metrics["severity_distribution"]
+        severity_dist = metrics.get("severity_distribution", {}) or {}
         high_severity_count = severity_dist.get("high", 0) + severity_dist.get("critical", 0)
         total_incidents = sum(severity_dist.values()) if severity_dist else 1
-        escalation_rate = high_severity_count / total_incidents if total_incidents > 0 else 0
+        escalation_rate = high_severity_count / max(total_incidents, 1)
         escalation_score = min(10, escalation_rate * 10)
         
         # Solo work score (assume 30% solo work for now)
@@ -888,10 +888,10 @@ class UnifiedBurnoutAnalyzer:
         improvement_score = 5.0  # Placeholder
         
         # Complexity score (using severity distribution)
-        severity_dist = metrics["severity_distribution"]
+        severity_dist = metrics.get("severity_distribution", {}) or {}
         high_severity_count = severity_dist.get("high", 0) + severity_dist.get("critical", 0)
         total_incidents = sum(severity_dist.values()) if severity_dist else 1
-        high_severity_rate = high_severity_count / total_incidents if total_incidents > 0 else 0
+        high_severity_rate = high_severity_count / max(total_incidents, 1)
         complexity_score = high_severity_rate * 10
         
         # Knowledge sharing score (assume minimal for now)
@@ -903,7 +903,7 @@ class UnifiedBurnoutAnalyzer:
     def _calculate_burnout_factors(self, metrics: Dict[str, Any]) -> Dict[str, float]:
         """Calculate individual burnout factors for UI display."""
         # Calculate factors that properly reflect incident load
-        incidents_per_week = metrics.get("incidents_per_week", 0)
+        incidents_per_week = metrics.get("incidents_per_week", 0) or 0
         
         # Workload factor based on incident frequency (more direct)
         # Scale: 0-2 incidents/week = 0-3, 2-5 = 3-7, 5-8 = 7-10, 8+ = 10
@@ -917,10 +917,10 @@ class UnifiedBurnoutAnalyzer:
             workload = 10
         
         # After hours factor 
-        after_hours = min(10, metrics["after_hours_percentage"] * 20)
+        after_hours = min(10, (metrics.get("after_hours_percentage", 0) or 0) * 20)
         
         # Weekend work factor
-        weekend_work = min(10, metrics["weekend_percentage"] * 25)
+        weekend_work = min(10, (metrics.get("weekend_percentage", 0) or 0) * 25)
         
         # Incident load factor (direct calculation based on weekly incident rate)
         # Scale: 0-3 incidents/week = 0-3, 3-6 = 3-7, 6-10 = 7-10, 10+ = 10
@@ -934,7 +934,7 @@ class UnifiedBurnoutAnalyzer:
             incident_load = 10
         
         # Response time factor
-        response_time = min(10, metrics["avg_response_time_minutes"] / 6)
+        response_time = min(10, (metrics.get("avg_response_time_minutes", 0) or 0) / 6)
         
         factors = {
             "workload": workload,
@@ -999,8 +999,8 @@ class UnifiedBurnoutAnalyzer:
         
         # Calculate averages and distributions with null safety - only include users with incidents
         members_with_incidents = [m for m in member_analyses if m and isinstance(m, dict) and m.get("incident_count", 0) > 0]
-        burnout_scores = [m.get("burnout_score", 0) for m in members_with_incidents]
-        avg_burnout = sum(burnout_scores) / len(burnout_scores) if burnout_scores else 0
+        burnout_scores = [m.get("burnout_score", 0) for m in members_with_incidents if m and isinstance(m, dict)]
+        avg_burnout = sum(burnout_scores) / len(burnout_scores) if burnout_scores and len(burnout_scores) > 0 else 0
         
         # Count risk levels (updated for 3-tier system) - only include users with incidents
         risk_dist = {"low": 0, "medium": 0, "high": 0}
@@ -1160,7 +1160,7 @@ class UnifiedBurnoutAnalyzer:
             except Exception as e:
                 logger.warning(f"Error processing after_hours patterns: {e}")
                 after_hours_values = []
-            avg_after_hours = sum(after_hours_values) / len(after_hours_values) if after_hours_values else 0
+            avg_after_hours = sum(after_hours_values) / len(after_hours_values) if after_hours_values and len(after_hours_values) > 0 else 0
             if avg_after_hours > 0.25:
                 recommendations.append({
                     "type": "emotional_exhaustion",
@@ -1185,7 +1185,7 @@ class UnifiedBurnoutAnalyzer:
             except Exception as e:
                 logger.warning(f"Error processing weekend patterns: {e}")
                 weekend_values = []
-            avg_weekend = sum(weekend_values) / len(weekend_values) if weekend_values else 0
+            avg_weekend = sum(weekend_values) / len(weekend_values) if weekend_values and len(weekend_values) > 0 else 0
             if avg_weekend > 0.15:
                 recommendations.append({
                     "type": "emotional_exhaustion", 
@@ -1219,7 +1219,7 @@ class UnifiedBurnoutAnalyzer:
             except Exception as e:
                 logger.warning(f"Error processing response time patterns: {e}")
                 response_values = []
-            avg_response = sum(response_values) / len(response_values) if response_values else 0
+            avg_response = sum(response_values) / len(response_values) if response_values and len(response_values) > 0 else 0
             if avg_response > 30:
                 recommendations.append({
                     "type": "personal_accomplishment",
@@ -1246,7 +1246,7 @@ class UnifiedBurnoutAnalyzer:
                 })
                 
         # Add organizational support recommendations
-        if members_at_risk > len(members) * 0.3:  # If more than 30% are at risk
+        if members and len(members) > 0 and members_at_risk > len(members) * 0.3:  # If more than 30% are at risk
             recommendations.append({
                 "type": "organizational",
                 "priority": "high", 
@@ -1280,11 +1280,11 @@ class UnifiedBurnoutAnalyzer:
         if not incident_counts:
             return 0
         
-        mean = sum(incident_counts) / len(incident_counts)
-        variance = sum((x - mean) ** 2 for x in incident_counts) / len(incident_counts)
+        mean = sum(incident_counts) / len(incident_counts) if incident_counts and len(incident_counts) > 0 else 0
+        variance = sum((x - mean) ** 2 for x in incident_counts) / len(incident_counts) if incident_counts and len(incident_counts) > 0 else 0
         
         # Normalize by mean to get coefficient of variation
-        return variance / mean if mean > 0 else 0
+        return variance / mean if mean and mean > 0 else 0
     
     def _calculate_github_insights(self, github_data: Dict[str, Dict]) -> Dict[str, Any]:
         """Calculate aggregated GitHub insights from team data."""
@@ -1311,15 +1311,15 @@ class UnifiedBurnoutAnalyzer:
         total_commits_per_week = sum(m.get("commits_per_week", 0) for m in all_metrics)
         total_prs_per_week = sum(m.get("prs_per_week", 0) for m in all_metrics)
         
-        avg_commits_per_week = total_commits_per_week / users_with_data if users_with_data > 0 else 0
-        avg_prs_per_week = total_prs_per_week / users_with_data if users_with_data > 0 else 0
+        avg_commits_per_week = total_commits_per_week / users_with_data if users_with_data and users_with_data > 0 else 0
+        avg_prs_per_week = total_prs_per_week / users_with_data if users_with_data and users_with_data > 0 else 0
         
         # Calculate after-hours and weekend rates
         after_hours_rates = [m.get("after_hours_commit_percentage", 0) for m in all_metrics]
         weekend_rates = [m.get("weekend_commit_percentage", 0) for m in all_metrics]
         
-        avg_after_hours_rate = sum(after_hours_rates) / len(after_hours_rates) if after_hours_rates else 0
-        avg_weekend_rate = sum(weekend_rates) / len(weekend_rates) if weekend_rates else 0
+        avg_after_hours_rate = sum(after_hours_rates) / len(after_hours_rates) if after_hours_rates and len(after_hours_rates) > 0 else 0
+        avg_weekend_rate = sum(weekend_rates) / len(weekend_rates) if weekend_rates and len(weekend_rates) > 0 else 0
         
         # Count burnout indicators
         burnout_counts = {
@@ -1402,17 +1402,17 @@ class UnifiedBurnoutAnalyzer:
         total_messages_per_day = sum(m.get("messages_per_day", 0) for m in all_metrics)
         total_response_times = [m.get("avg_response_time_minutes", 0) for m in all_metrics if m.get("avg_response_time_minutes", 0) > 0]
         
-        avg_messages_per_day = total_messages_per_day / users_with_data if users_with_data > 0 else 0
-        avg_response_time = sum(total_response_times) / len(total_response_times) if total_response_times else 0
+        avg_messages_per_day = total_messages_per_day / users_with_data if users_with_data and users_with_data > 0 else 0
+        avg_response_time = sum(total_response_times) / len(total_response_times) if total_response_times and len(total_response_times) > 0 else 0
         
         # Calculate after-hours and weekend rates
         after_hours_rates = [m.get("after_hours_percentage", 0) for m in all_metrics]
         weekend_rates = [m.get("weekend_percentage", 0) for m in all_metrics]
         sentiment_scores = [m.get("avg_sentiment", 0) for m in all_metrics]
         
-        avg_after_hours_rate = sum(after_hours_rates) / len(after_hours_rates) if after_hours_rates else 0
-        avg_weekend_rate = sum(weekend_rates) / len(weekend_rates) if weekend_rates else 0
-        avg_sentiment = sum(sentiment_scores) / len(sentiment_scores) if sentiment_scores else 0
+        avg_after_hours_rate = sum(after_hours_rates) / len(after_hours_rates) if after_hours_rates and len(after_hours_rates) > 0 else 0
+        avg_weekend_rate = sum(weekend_rates) / len(weekend_rates) if weekend_rates and len(weekend_rates) > 0 else 0
+        avg_sentiment = sum(sentiment_scores) / len(sentiment_scores) if sentiment_scores and len(sentiment_scores) > 0 else 0
         
         # Count unique channels
         all_channels = set()
@@ -1454,8 +1454,8 @@ class UnifiedBurnoutAnalyzer:
             "sentiment_analysis": {
                 "overall_sentiment": "positive" if avg_sentiment > 0.1 else "neutral" if avg_sentiment > -0.1 else "negative",
                 "sentiment_score": round(avg_sentiment, 3),
-                "positive_ratio": round(sum(m.get("positive_sentiment_ratio", 0) for m in all_metrics) / users_with_data, 3) if users_with_data > 0 else 0,
-                "negative_ratio": round(sum(m.get("negative_sentiment_ratio", 0) for m in all_metrics) / users_with_data, 3) if users_with_data > 0 else 0
+                "positive_ratio": round(sum(m.get("positive_sentiment_ratio", 0) for m in all_metrics) / users_with_data, 3) if users_with_data and users_with_data > 0 else 0,
+                "negative_ratio": round(sum(m.get("negative_sentiment_ratio", 0) for m in all_metrics) / users_with_data, 3) if users_with_data and users_with_data > 0 else 0
             },
             "burnout_indicators": {
                 "excessive_messaging": burnout_counts.get("excessive_messaging", 0),
@@ -1481,7 +1481,16 @@ class UnifiedBurnoutAnalyzer:
             Enhanced analysis with AI insights
         """
         try:
-            ai_analyzer = get_ai_burnout_analyzer()
+            # Get user's LLM token from context
+            from .ai_burnout_analyzer import get_user_context
+            from ..api.endpoints.llm import get_user_llm_token
+            
+            current_user = get_user_context()
+            user_llm_token = None
+            if current_user:
+                user_llm_token = get_user_llm_token(current_user)
+            
+            ai_analyzer = get_ai_burnout_analyzer(api_key=user_llm_token)
             
             # Enhance each member analysis with null safety
             enhanced_members = []
@@ -1720,8 +1729,8 @@ class UnifiedBurnoutAnalyzer:
                 total_team_size = len(team_analysis) if team_analysis else 1
                 
                 # Calculate proportional rates based on team size (normalized to team size)
-                daily_incident_rate = incident_count / max(total_team_size, 1)
-                daily_severity_rate = severity_weighted / max(total_team_size, 1)
+                daily_incident_rate = incident_count / max(total_team_size, 1) if total_team_size and total_team_size > 0 else 0
+                daily_severity_rate = severity_weighted / max(total_team_size, 1) if total_team_size and total_team_size > 0 else 0
                 
                 # Apply targeted penalties with team-size normalization
                 # Base incident load penalty (proportional to team size)
@@ -1741,8 +1750,8 @@ class UnifiedBurnoutAnalyzer:
                     daily_score -= critical_penalty
                 
                 # Concentration penalty - if too few people handling too many incidents
-                if users_involved_count > 0 and users_involved_count < total_team_size * 0.3:
-                    concentration_ratio = incident_count / users_involved_count
+                if users_involved_count > 0 and total_team_size and total_team_size > 0 and users_involved_count < total_team_size * 0.3:
+                    concentration_ratio = incident_count / users_involved_count if users_involved_count > 0 else 0
                     if concentration_ratio > 2:
                         concentration_penalty = min((concentration_ratio - 2) * 0.3, 1.0)
                         daily_score -= concentration_penalty
@@ -1756,7 +1765,7 @@ class UnifiedBurnoutAnalyzer:
                 
                 if users_involved_count > 0:
                     # Risk assessment based on daily load per person
-                    avg_incidents_per_person = incident_count / users_involved_count
+                    avg_incidents_per_person = incident_count / users_involved_count if users_involved_count > 0 else 0
                     if avg_incidents_per_person > 3:
                         members_at_risk = max(1, int(users_involved_count * 0.8))
                     elif avg_incidents_per_person > 2:

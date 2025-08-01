@@ -1925,123 +1925,86 @@ export default function Dashboard() {
     }
   }
   
-  // Calculate burnout factors with color coding - Backend returns 0-10 scale
-  // Filter to only include members with at least one incident
+  // NO FALLBACK DATA: Only show burnout factors if we have REAL API data
+  // Filter to only include members with incidents (this is acceptable - members without incidents shouldn't contribute to burnout analysis)
   const membersWithIncidents = members.filter((m: any) => (m?.incident_count || 0) > 0);
   
-  const burnoutFactors = membersWithIncidents.length > 0 ? [
+  // Check if we have any real factors data from the API (not calculated/fake values)
+  const hasRealFactorsData = membersWithIncidents.length > 0 && 
+    membersWithIncidents.some((m: any) => m?.factors && (
+      (m.factors.after_hours !== undefined && m.factors.after_hours !== null) ||
+      (m.factors.weekend_work !== undefined && m.factors.weekend_work !== null) ||
+      (m.factors.incident_load !== undefined && m.factors.incident_load !== null) ||
+      (m.factors.response_time !== undefined && m.factors.response_time !== null)
+    ));
+  
+  const burnoutFactors = hasRealFactorsData ? [
     { 
       factor: "After Hours", 
-      value: Number(((membersWithIncidents as any[]).reduce((avg: number, m: any) => {
-        // Use consistent after-hours percentage data
-        const afterHoursPercent = m?.metrics?.after_hours_percentage || m?.key_metrics?.after_hours_percentage || 0;
-        // Convert percentage to factor scale using backend logic: percentage * 20
-        const val = m?.factors?.after_hours || Math.min(afterHoursPercent * 20, 10); // 39% = 7.8 factor
-        console.log(`RADAR: Member ${m?.user_name}: after_hours = ${val} (factors: ${m?.factors?.after_hours}, after_hours_percentage: ${afterHoursPercent}%)`);
-        return avg + val;
-      }, 0) / membersWithIncidents.length).toFixed(1)),
-      metrics: `Avg after-hours: ${Math.round((Number(((membersWithIncidents as any[]).reduce((avg: number, m: any) => {
-        const afterHoursPercent = m?.metrics?.after_hours_percentage || m?.key_metrics?.after_hours_percentage || 0;
-        const val = m?.factors?.after_hours || Math.min(afterHoursPercent * 20, 10);
-        return avg + val;
-      }, 0) / membersWithIncidents.length).toFixed(1)) / 20) * 100)}%`
+      value: (() => {
+        const membersWithData = membersWithIncidents.filter((m: any) => 
+          m?.factors?.after_hours !== undefined && m.factors.after_hours !== null);
+        if (membersWithData.length === 0) return null;
+        
+        const sum = membersWithData.reduce((avg: number, m: any) => {
+          console.log(`RADAR: Member ${m?.user_name}: after_hours = ${m.factors.after_hours} (real API data)`);
+          return avg + m.factors.after_hours;
+        }, 0);
+        return Number((sum / membersWithData.length).toFixed(1));
+      })(),
+      metrics: `Based on real after-hours incident patterns from ${membersWithIncidents.filter(m => m?.factors?.after_hours !== undefined).length} team members`
     },
     { 
       factor: "Weekend Work", 
-      value: Number(((membersWithIncidents as any[]).reduce((avg: number, m: any) => {
-        // Use authoritative weekend percentage data first, fallback to factors only if needed
-        const weekendPercent = m?.metrics?.weekend_percentage ?? m?.key_metrics?.weekend_percentage ?? null;
-        let val;
+      value: (() => {
+        const membersWithData = membersWithIncidents.filter((m: any) => 
+          m?.factors?.weekend_work !== undefined && m.factors.weekend_work !== null);
+        if (membersWithData.length === 0) return null;
         
-        if (weekendPercent !== null) {
-          // Use actual weekend incident percentage (authoritative source)
-          val = Math.min(weekendPercent * 0.25, 10); // Backend uses weekend_percentage * 25 scaling
-          console.log(`RADAR: Member ${m?.user_name}: Using weekend_percentage = ${weekendPercent}% -> factor = ${val}`);
-        } else if (m?.factors?.weekend_work !== undefined) {
-          // Fallback to pre-calculated factor
-          val = m.factors.weekend_work;
-          console.log(`RADAR: Member ${m?.user_name}: Using factors.weekend_work = ${val}`);
-        } else {
-          // No weekend data available
-          val = 0;
-          console.log(`RADAR: Member ${m?.user_name}: No weekend work data available, using 0`);
-        }
-        
-        console.log(`  - Final weekend_work value: ${val}`);
-        console.log(`  - Available data: weekend_percentage=${m?.metrics?.weekend_percentage}, factors.weekend_work=${m?.factors?.weekend_work}`);
-        return avg + val;
-      }, 0) / membersWithIncidents.length).toFixed(1)),
-      metrics: `Avg weekend work: ${Math.round((Number(((membersWithIncidents as any[]).reduce((avg: number, m: any) => {
-        const weekendPercent = m?.metrics?.weekend_percentage ?? m?.key_metrics?.weekend_percentage ?? null;
-        let val;
-        if (weekendPercent !== null) {
-          val = Math.min(weekendPercent * 0.25, 10);
-        } else if (m?.factors?.weekend_work !== undefined) {
-          val = m.factors.weekend_work;
-        } else {
-          val = 0;
-        }
-        return avg + val;
-      }, 0) / membersWithIncidents.length).toFixed(1)) / 0.25))}%`
+        const sum = membersWithData.reduce((avg: number, m: any) => {
+          console.log(`RADAR: Member ${m?.user_name}: weekend_work = ${m.factors.weekend_work} (real API data)`);
+          return avg + m.factors.weekend_work;
+        }, 0);
+        return Number((sum / membersWithData.length).toFixed(1));
+      })(),
+      metrics: `Based on real weekend incident patterns from ${membersWithIncidents.filter(m => m?.factors?.weekend_work !== undefined).length} team members`
     },
     { 
       factor: "Incident Volume", 
-      value: Number(((membersWithIncidents as any[]).reduce((avg: number, m: any) => {
-        // Combine workload and incident severity into one metric
-        const incidentsPerWeek = m?.key_metrics?.incidents_per_week || (m?.incident_count / 4.3) || 0;
-        const severityWeighted = m?.key_metrics?.severity_weighted_per_week || 0;
+      value: (() => {
+        const membersWithData = membersWithIncidents.filter((m: any) => 
+          m?.factors?.incident_load !== undefined && m.factors.incident_load !== null);
+        if (membersWithData.length === 0) return null;
         
-        // Calculate workload component (40% weight)
-        let workloadScore = 0;
-        if (incidentsPerWeek <= 2) {
-          workloadScore = incidentsPerWeek * 1.5;
-        } else if (incidentsPerWeek <= 5) {
-          workloadScore = 3 + ((incidentsPerWeek - 2) / 3) * 4;
-        } else if (incidentsPerWeek <= 8) {
-          workloadScore = 7 + ((incidentsPerWeek - 5) / 3) * 3;
-        } else {
-          workloadScore = 10;
-        }
-        
-        // Calculate severity component (60% weight)
-        const severityScore = Math.min(severityWeighted * 1.5, 10);
-        
-        // Combined score
-        const val = m?.factors?.incident_load || (workloadScore * 0.4 + severityScore * 0.6);
-        console.log(`RADAR: Member ${m?.user_name}: incident_load = ${val} (workload: ${workloadScore}, severity: ${severityScore})`);
-        return avg + val;
-      }, 0) / membersWithIncidents.length).toFixed(1)),
-      metrics: `Total: ${(membersWithIncidents as any[]).reduce((total: number, m: any) => total + (m?.incident_count || 0), 0)} incidents (avg ${Math.round((membersWithIncidents as any[]).reduce((avg: number, m: any) => avg + (m?.key_metrics?.incidents_per_week || m?.incident_count / 4.3 || 0), 0) / membersWithIncidents.length)}/week per responder)`
+        const sum = membersWithData.reduce((avg: number, m: any) => {
+          console.log(`RADAR: Member ${m?.user_name}: incident_load = ${m.factors.incident_load} (real API data)`);
+          return avg + m.factors.incident_load;
+        }, 0);
+        return Number((sum / membersWithData.length).toFixed(1));
+      })(),
+      metrics: `Based on real incident volume and severity from ${membersWithIncidents.filter(m => m?.factors?.incident_load !== undefined).length} team members`
     },
     { 
       factor: "Resolution Time", 
-      value: Number(((membersWithIncidents as any[]).reduce((avg: number, m: any) => {
-        // Try factors first, fallback using backend logic: avg_response_time_minutes / 6
-        const responseTimeMinutes = m?.metrics?.avg_response_time_minutes || (m?.key_metrics?.avg_resolution_hours ? m.key_metrics.avg_resolution_hours * 60 : 0);
-        // Industry standard: <30 min = excellent (2), <60 min = good (4), <120 min = acceptable (6), >240 min = critical (9+)
-        const val = m?.factors?.response_time || (() => {
-          if (responseTimeMinutes <= 30) return 2.0;      // Excellent
-          if (responseTimeMinutes <= 60) return 4.0;      // Good
-          if (responseTimeMinutes <= 120) return 6.0;     // Acceptable
-          if (responseTimeMinutes <= 240) return 8.0;     // Poor
-          if (responseTimeMinutes <= 480) return 9.0;     // Very Poor
-          return 10.0;  // Critical (>8 hours)
-        })();
-        console.log(`RADAR: Member ${m?.user_name}: response_time = ${val} (factors: ${m?.factors?.response_time}, key_metrics: ${m?.key_metrics?.avg_resolution_hours})`);
-        return avg + val;
-      }, 0) / membersWithIncidents.length).toFixed(1)),
-      metrics: `Avg resolution: ${Math.round((membersWithIncidents as any[]).reduce((sum: number, m: any) => {
-        const responseTimeMinutes = m?.metrics?.avg_response_time_minutes || 
-                                   (m?.key_metrics?.avg_resolution_hours ? m.key_metrics.avg_resolution_hours * 60 : 0) ||
-                                   (m?.factors?.response_time ? m.factors.response_time * 6 : 0); // Fallback: reverse engineer from factor
-        return sum + responseTimeMinutes;
-      }, 0) / membersWithIncidents.length)} min`
+      value: (() => {
+        const membersWithData = membersWithIncidents.filter((m: any) => 
+          m?.factors?.response_time !== undefined && m.factors.response_time !== null);
+        if (membersWithData.length === 0) return null;
+        
+        const sum = membersWithData.reduce((avg: number, m: any) => {
+          console.log(`RADAR: Member ${m?.user_name}: response_time = ${m.factors.response_time} (real API data)`);
+          return avg + m.factors.response_time;
+        }, 0);
+        return Number((sum / membersWithData.length).toFixed(1));
+      })(),
+      metrics: `Based on real response time data from ${membersWithIncidents.filter(m => m?.factors?.response_time !== undefined).length} team members`
     },
-  ].map(factor => ({
+  ].filter(factor => factor.value !== null) // Remove factors with no real data
+   .map(factor => ({
     ...factor,
-    color: getFactorColor(factor.value),
+    color: getFactorColor(factor.value!),
     recommendation: getRecommendation(factor.factor),
-    severity: factor.value >= 7 ? 'Critical' : factor.value >= 5 ? 'Warning' : factor.value >= 3 ? 'Good' : 'Low Risk'
+    severity: factor.value! >= 7 ? 'Critical' : factor.value! >= 5 ? 'Warning' : factor.value! >= 3 ? 'Good' : 'Low Risk'
   })) : [];
   
   // Get high-risk factors for emphasis (temporarily lowered threshold to test)
@@ -3891,33 +3854,93 @@ export default function Dashboard() {
                       <CardContent className="space-y-4">
                         {(() => {
                           const github = currentAnalysis.analysis_data.github_insights
+                          
+                          // Check if we have any real GitHub data
+                          const hasGitHubData = github && (
+                            (github.total_commits && github.total_commits > 0) ||
+                            (github.total_pull_requests && github.total_pull_requests > 0) ||
+                            (github.total_reviews && github.total_reviews > 0)
+                          )
+                          
+                          if (!hasGitHubData) {
+                            return (
+                              <div className="text-center py-8">
+                                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                  <svg className="w-8 h-8 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M10 0C4.477 0 0 4.484 0 10.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0110 4.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.203 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.942.359.31.678.921.678 1.856 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0020 10.017C20 4.484 15.522 0 10 0z" clipRule="evenodd" />
+                                  </svg>
+                                </div>
+                                <h3 className="text-lg font-medium text-gray-900 mb-2">No GitHub Data Available</h3>
+                                <p className="text-sm text-gray-500 mb-4">
+                                  {currentAnalysis?.analysis_data?.data_sources?.github_data 
+                                    ? "No GitHub activity found for team members in this analysis period"
+                                    : "GitHub integration not connected or no team members mapped to GitHub accounts"
+                                  }
+                                </p>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => openMappingDrawer('github')}
+                                  className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+                                >
+                                  <Users className="w-4 h-4 mr-2" />
+                                  Configure GitHub Mappings
+                                </Button>
+                              </div>
+                            )
+                          }
+                          
                           return (
                             <>
                               {/* GitHub Metrics Grid */}
                               <div className="grid grid-cols-2 gap-4">
                                 <div className="bg-gray-50 rounded-lg p-3">
                                   <p className="text-xs text-gray-600 font-medium">Total Commits</p>
-                                  <p className="text-lg font-bold text-gray-900">{github.total_commits?.toLocaleString() || 0}</p>
+                                  {github.total_commits ? (
+                                    <p className="text-lg font-bold text-gray-900">{github.total_commits.toLocaleString()}</p>
+                                  ) : (
+                                    <p className="text-lg font-bold text-gray-400 italic">No data</p>
+                                  )}
                                 </div>
                                 <div className="bg-gray-50 rounded-lg p-3">
                                   <p className="text-xs text-gray-600 font-medium">Pull Requests</p>
-                                  <p className="text-lg font-bold text-gray-900">{github.total_pull_requests?.toLocaleString() || 0}</p>
+                                  {github.total_pull_requests ? (
+                                    <p className="text-lg font-bold text-gray-900">{github.total_pull_requests.toLocaleString()}</p>
+                                  ) : (
+                                    <p className="text-lg font-bold text-gray-400 italic">No data</p>
+                                  )}
                                 </div>
                                 <div className="bg-gray-50 rounded-lg p-3">
                                   <p className="text-xs text-gray-600 font-medium">Code Reviews</p>
-                                  <p className="text-lg font-bold text-gray-900">{github.total_reviews?.toLocaleString() || 0}</p>
+                                  {github.total_reviews ? (
+                                    <p className="text-lg font-bold text-gray-900">{github.total_reviews.toLocaleString()}</p>
+                                  ) : (
+                                    <p className="text-lg font-bold text-gray-400 italic">No data</p>
+                                  )}
                                 </div>
                                 <div className="bg-gray-50 rounded-lg p-3">
                                   <p className="text-xs text-gray-600 font-medium">After Hours</p>
-                                  <p className="text-lg font-bold text-gray-900">{github.after_hours_activity_percentage?.toFixed(1) || 0}%</p>
+                                  {github.after_hours_activity_percentage !== undefined && github.after_hours_activity_percentage !== null ? (
+                                    <p className="text-lg font-bold text-gray-900">{github.after_hours_activity_percentage.toFixed(1)}%</p>
+                                  ) : (
+                                    <p className="text-lg font-bold text-gray-400 italic">No data</p>
+                                  )}
                                 </div>
                                 <div className="bg-gray-50 rounded-lg p-3">
                                   <p className="text-xs text-gray-600 font-medium">Weekend Commits</p>
-                                  <p className="text-lg font-bold text-gray-900">{github.weekend_activity_percentage?.toFixed(1) || 0}%</p>
+                                  {github.weekend_activity_percentage !== undefined && github.weekend_activity_percentage !== null ? (
+                                    <p className="text-lg font-bold text-gray-900">{github.weekend_activity_percentage.toFixed(1)}%</p>
+                                  ) : (
+                                    <p className="text-lg font-bold text-gray-400 italic">No data</p>
+                                  )}
                                 </div>
                                 <div className="bg-gray-50 rounded-lg p-3">
                                   <p className="text-xs text-gray-600 font-medium">Avg PR Size</p>
-                                  <p className="text-lg font-bold text-gray-900">{(github as any).avg_pr_size?.toFixed(0) || 0} lines</p>
+                                  {(github as any).avg_pr_size ? (
+                                    <p className="text-lg font-bold text-gray-900">{(github as any).avg_pr_size.toFixed(0)} lines</p>
+                                  ) : (
+                                    <p className="text-lg font-bold text-gray-400 italic">No data</p>
+                                  )}
                                 </div>
                               </div>
 
@@ -4002,10 +4025,9 @@ export default function Dashboard() {
                       </CardHeader>
                       <CardContent className="space-y-4">
                         {(() => {
-                          const slack = currentAnalysis.analysis_data.slack_insights || { errors: {} }
+                          const slack = currentAnalysis.analysis_data.slack_insights
                           
                           // Check if this analysis actually has valid Slack data
-                          // If no team members have slack_activity, don't show cached/stale data
                           const teamAnalysis = currentAnalysis.analysis_data.team_analysis
                           const teamMembers = Array.isArray(teamAnalysis) ? teamAnalysis : (teamAnalysis?.members || [])
                           const hasRealSlackData = teamMembers.some(member => 
@@ -4013,17 +4035,41 @@ export default function Dashboard() {
                             (member.slack_activity.messages_sent > 0 || member.slack_activity.channels_active > 0)
                           )
                           
-                          // If no real Slack data, reset metrics to 0
-                          const slackMetrics = hasRealSlackData ? slack : {
-                            total_messages: 0,
-                            active_channels: 0,
-                            after_hours_activity_percentage: 0,
-                            weekend_activity_percentage: 0,
-                            sentiment_analysis: { avg_sentiment: null, overall_sentiment: 'Neutral' }
-                          }
+                          // Check for API errors
+                          const hasRateLimitErrors = (slack as any)?.errors?.rate_limited_channels?.length > 0
+                          const hasOtherErrors = (slack as any)?.errors?.other_errors?.length > 0
                           
-                          const hasRateLimitErrors = (slack as any).errors?.rate_limited_channels?.length > 0
-                          const hasOtherErrors = (slack as any).errors?.other_errors?.length > 0
+                          // If no real Slack data, show empty state
+                          if (!hasRealSlackData && !hasRateLimitErrors && !hasOtherErrors) {
+                            return (
+                              <div className="text-center py-8">
+                                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                  <svg className="w-8 h-8 text-gray-400" viewBox="0 0 124 124" fill="currentColor">
+                                    <path d="M26.3996 78.2003C26.3996 84.7003 21.2996 89.8003 14.7996 89.8003C8.29961 89.8003 3.19961 84.7003 3.19961 78.2003C3.19961 71.7003 8.29961 66.6003 14.7996 66.6003H26.3996V78.2003Z" />
+                                    <path d="M32.2996 78.2003C32.2996 71.7003 37.3996 66.6003 43.8996 66.6003C50.3996 66.6003 55.4996 71.7003 55.4996 78.2003V109.2C55.4996 115.7 50.3996 120.8 43.8996 120.8C37.3996 120.8 32.2996 115.7 32.2996 109.2V78.2003Z" />
+                                    <path d="M43.8996 26.4003C37.3996 26.4003 32.2996 21.3003 32.2996 14.8003C32.2996 8.30026 37.3996 3.20026 43.8996 3.20026C50.3996 3.20026 55.4996 8.30026 55.4996 14.8003V26.4003H43.8996Z" />
+                                    <path d="M43.8996 32.3003C50.3996 32.3003 55.4996 37.4003 55.4996 43.9003C55.4996 50.4003 50.3996 55.5003 43.8996 55.5003H12.8996C6.39961 55.5003 1.29961 50.4003 1.29961 43.9003C1.29961 37.4003 6.39961 32.3003 12.8996 32.3003H43.8996Z" />
+                                  </svg>
+                                </div>
+                                <h3 className="text-lg font-medium text-gray-900 mb-2">No Slack Data Available</h3>
+                                <p className="text-sm text-gray-500 mb-4">
+                                  {currentAnalysis?.analysis_data?.data_sources?.slack_data 
+                                    ? "No Slack communication activity found for team members in this analysis period"
+                                    : "Slack integration not connected or no team members mapped to Slack accounts"
+                                  }
+                                </p>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => openMappingDrawer('slack')}
+                                  className="bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100"
+                                >
+                                  <Users className="w-4 h-4 mr-2" />
+                                  Configure Slack Mappings
+                                </Button>
+                              </div>
+                            )
+                          }
                           
                           return (
                             <>
@@ -4063,50 +4109,77 @@ export default function Dashboard() {
                                 </div>
                               )}
                               
-                              {/* Slack Metrics Grid */}
-                              <div className="grid grid-cols-2 gap-4">
-                                <div className="bg-purple-50 rounded-lg p-3">
-                                  <p className="text-xs text-purple-600 font-medium">Total Messages</p>
-                                  <p className="text-lg font-bold text-purple-900">{(slackMetrics as any).total_messages?.toLocaleString() || 0}</p>
-                                </div>
-                                <div className="bg-purple-50 rounded-lg p-3">
-                                  <p className="text-xs text-purple-600 font-medium">Active Channels</p>
-                                  <p className="text-lg font-bold text-purple-900">{(slackMetrics as any).active_channels || 0}</p>
-                                </div>
-                                <div className="bg-purple-50 rounded-lg p-3">
-                                  <p className="text-xs text-purple-600 font-medium">After Hours</p>
-                                  <p className="text-lg font-bold text-purple-900">{(slackMetrics as any).after_hours_activity_percentage?.toFixed(1) || 0}%</p>
-                                </div>
-                                <div className="bg-purple-50 rounded-lg p-3">
-                                  <p className="text-xs text-purple-600 font-medium">Weekend Messages</p>
-                                  <p className="text-lg font-bold text-purple-900">{(slackMetrics as any).weekend_activity_percentage?.toFixed(1) || 0}%</p>
-                                </div>
-                                <div className="bg-purple-50 rounded-lg p-3">
-                                  <p className="text-xs text-purple-600 font-medium">Avg Response Time</p>
-                                  <p className="text-lg font-bold text-purple-900">{(slackMetrics as any).avg_response_time_minutes?.toFixed(0) || 0}m</p>
-                                </div>
-                                <div className="bg-purple-50 rounded-lg p-3">
-                                  <p className="text-xs text-purple-600 font-medium">After Hours</p>
-                                  <p className="text-lg font-bold text-purple-900">{(slackMetrics as any).after_hours_activity_percentage?.toFixed(1) || 0}%</p>
-                                </div>
-                              </div>
+                              {/* Only show metrics if we have real data */}
+                              {hasRealSlackData && (
+                                <>
+                                  {/* Slack Metrics Grid */}
+                                  <div className="grid grid-cols-2 gap-4">
+                                    <div className="bg-purple-50 rounded-lg p-3">
+                                      <p className="text-xs text-purple-600 font-medium">Total Messages</p>
+                                      {slack?.total_messages ? (
+                                        <p className="text-lg font-bold text-purple-900">{slack.total_messages.toLocaleString()}</p>
+                                      ) : (
+                                        <p className="text-lg font-bold text-gray-400 italic">No data</p>
+                                      )}
+                                    </div>
+                                    <div className="bg-purple-50 rounded-lg p-3">
+                                      <p className="text-xs text-purple-600 font-medium">Active Channels</p>
+                                      {slack?.active_channels ? (
+                                        <p className="text-lg font-bold text-purple-900">{slack.active_channels}</p>
+                                      ) : (
+                                        <p className="text-lg font-bold text-gray-400 italic">No data</p>
+                                      )}
+                                    </div>
+                                    <div className="bg-purple-50 rounded-lg p-3">
+                                      <p className="text-xs text-purple-600 font-medium">After Hours</p>
+                                      {slack?.after_hours_activity_percentage !== undefined && slack.after_hours_activity_percentage !== null ? (
+                                        <p className="text-lg font-bold text-purple-900">{slack.after_hours_activity_percentage.toFixed(1)}%</p>
+                                      ) : (
+                                        <p className="text-lg font-bold text-gray-400 italic">No data</p>
+                                      )}
+                                    </div>
+                                    <div className="bg-purple-50 rounded-lg p-3">
+                                      <p className="text-xs text-purple-600 font-medium">Weekend Messages</p>
+                                      {slack?.weekend_activity_percentage !== undefined && slack.weekend_activity_percentage !== null ? (
+                                        <p className="text-lg font-bold text-purple-900">{slack.weekend_activity_percentage.toFixed(1)}%</p>
+                                      ) : (
+                                        <p className="text-lg font-bold text-gray-400 italic">No data</p>
+                                      )}
+                                    </div>
+                                    <div className="bg-purple-50 rounded-lg p-3">
+                                      <p className="text-xs text-purple-600 font-medium">Avg Response Time</p>
+                                      {slack?.avg_response_time_minutes ? (
+                                        <p className="text-lg font-bold text-purple-900">{slack.avg_response_time_minutes.toFixed(0)}m</p>
+                                      ) : (
+                                        <p className="text-lg font-bold text-gray-400 italic">No data</p>
+                                      )}
+                                    </div>
+                                    <div className="bg-purple-50 rounded-lg p-3">
+                                      <p className="text-xs text-purple-600 font-medium">Sentiment Score</p>
+                                      {slack?.sentiment_analysis?.avg_sentiment !== undefined && slack.sentiment_analysis.avg_sentiment !== null ? (
+                                        <p className="text-lg font-bold text-purple-900">{slack.sentiment_analysis.avg_sentiment.toFixed(2)}</p>
+                                      ) : (
+                                        <p className="text-lg font-bold text-gray-400 italic">No data</p>
+                                      )}
+                                    </div>
+                                  </div>
 
-                              {/* Sentiment Analysis */}
-                              {(slackMetrics as any).sentiment_analysis && (
-                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                                  <h4 className="text-sm font-semibold text-blue-800 mb-2">Communication Health</h4>
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-xs text-blue-700">Average Sentiment</span>
-                                    <div className="flex items-center space-x-2">
-                                      <span className={`text-lg font-bold ${
-                                        (slackMetrics as any).sentiment_analysis.avg_sentiment > 0.1 ? 'text-green-600' :
-                                        (slackMetrics as any).sentiment_analysis.avg_sentiment < -0.1 ? 'text-red-600' : 'text-yellow-600'
-                                      }`}>
-                                        {(slackMetrics as any).sentiment_analysis.avg_sentiment > 0.1 ? 'Positive' :
-                                         (slackMetrics as any).sentiment_analysis.avg_sentiment < -0.1 ? 'Negative' : 'Neutral'}
-                                      </span>
-                                      <span className="text-xs text-blue-600">
-                                        ({(slackMetrics as any).sentiment_analysis.avg_sentiment?.toFixed(2) || 'N/A'})
+                                  {/* Sentiment Analysis */}
+                                  {slack?.sentiment_analysis && slack.sentiment_analysis.avg_sentiment !== null && (
+                                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                                      <h4 className="text-sm font-semibold text-blue-800 mb-2">Communication Health</h4>
+                                      <div className="flex items-center justify-between">
+                                        <span className="text-xs text-blue-700">Average Sentiment</span>
+                                        <div className="flex items-center space-x-2">
+                                          <span className={`text-lg font-bold ${
+                                            slack.sentiment_analysis.avg_sentiment > 0.1 ? 'text-green-600' :
+                                            slack.sentiment_analysis.avg_sentiment < -0.1 ? 'text-red-600' : 'text-yellow-600'
+                                          }`}>
+                                            {slack.sentiment_analysis.avg_sentiment > 0.1 ? 'Positive' :
+                                             slack.sentiment_analysis.avg_sentiment < -0.1 ? 'Negative' : 'Neutral'}
+                                          </span>
+                                          <span className="text-xs text-blue-600">
+                                            ({slack.sentiment_analysis.avg_sentiment.toFixed(2)})
                                       </span>
                                     </div>
                                   </div>

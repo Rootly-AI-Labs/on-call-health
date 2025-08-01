@@ -35,14 +35,15 @@ class AIBurnoutAnalyzerService:
     - Sentiment analysis integration
     """
     
-    def __init__(self):
+    def __init__(self, api_key: Optional[str] = None):
         """Initialize the AI burnout analyzer service."""
         self.logger = logging.getLogger(__name__)
+        self.api_key = api_key
         
         try:
-            self.agent = create_burnout_agent()
+            self.agent = create_burnout_agent(api_key=api_key)
             self.available = True
-            self.logger.info("AI Burnout Analyzer initialized successfully")
+            self.logger.info(f"AI Burnout Analyzer initialized successfully (with API key: {bool(api_key)})")
         except Exception as e:
             self.logger.error(f"Failed to initialize AI agent: {e}")
             self.available = False
@@ -1145,12 +1146,24 @@ The combination of workload concentration, boundary erosion, and risk clustering
         return narrative
 
 
-# Singleton instance for global use
-_ai_analyzer_instance = None
+# Cache for AI analyzer instances (keyed by API key hash for security)
+_ai_analyzer_cache = {}
 
-def get_ai_burnout_analyzer() -> AIBurnoutAnalyzerService:
-    """Get singleton instance of AI burnout analyzer."""
-    global _ai_analyzer_instance
-    if _ai_analyzer_instance is None:
-        _ai_analyzer_instance = AIBurnoutAnalyzerService()
-    return _ai_analyzer_instance
+def get_ai_burnout_analyzer(api_key: Optional[str] = None) -> AIBurnoutAnalyzerService:
+    """
+    Get AI burnout analyzer instance.
+    
+    Args:
+        api_key: Optional API key for LLM access
+        
+    Returns:
+        AIBurnoutAnalyzerService instance
+    """
+    # Use a hash of the API key as cache key (for security)
+    import hashlib
+    cache_key = hashlib.sha256((api_key or "").encode()).hexdigest()[:16]
+    
+    if cache_key not in _ai_analyzer_cache:
+        _ai_analyzer_cache[cache_key] = AIBurnoutAnalyzerService(api_key=api_key)
+    
+    return _ai_analyzer_cache[cache_key]
