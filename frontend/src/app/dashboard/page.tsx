@@ -2462,8 +2462,8 @@ export default function Dashboard() {
     severity: factor.value! >= 7 ? 'Critical' : factor.value! >= 5 ? 'Warning' : factor.value! >= 3 ? 'Good' : 'Low Risk'
   })) : [];
   
-  // Get elevated risk factors (medium risk or above - value >= 5)
-  const elevatedRiskFactors = burnoutFactors.filter(f => f.value >= 5).sort((a, b) => b.value - a.value);
+  // Get high-risk factors for emphasis (temporarily lowered threshold to test)
+  const highRiskFactors = burnoutFactors.filter(f => f.value >= 2).sort((a, b) => b.value - a.value);
 
   // Debug log to check the actual values
   useEffect(() => {
@@ -4161,11 +4161,11 @@ export default function Dashboard() {
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle>Team Burnout Risk Factors</CardTitle>
-                      {elevatedRiskFactors.length > 0 && (
+                      {highRiskFactors.length > 0 && (
                         <div className="flex items-center space-x-2">
                           <AlertTriangle className="w-4 h-4 text-red-500" />
                           <span className="text-sm font-medium text-red-600">
-                            {elevatedRiskFactors.length} factor{elevatedRiskFactors.length > 1 ? 's' : ''} need{elevatedRiskFactors.length === 1 ? 's' : ''} attention
+                            {highRiskFactors.length} factor{highRiskFactors.length > 1 ? 's' : ''} need{highRiskFactors.length === 1 ? 's' : ''} attention
                           </span>
                         </div>
                       )}
@@ -4237,22 +4237,34 @@ export default function Dashboard() {
                   </CardContent>
                 </Card>
                 
-                {/* Risk Factors Bar Chart - Only show for elevated risk (medium or above) */}
-                {elevatedRiskFactors.length > 0 && (
+                {/* Risk Factors Bar Chart - Always show if we have any factors */}
+                {burnoutFactors.length > 0 && (
                   <Card>
                     <CardHeader>
                       <CardTitle className="flex items-center space-x-2">
-                        <AlertTriangle className="w-5 h-5 text-orange-500" />
-                        <span>Elevated Risk Factors</span>
+                        {highRiskFactors.length > 0 ? (
+                          <>
+                            <AlertTriangle className="w-5 h-5 text-red-500" />
+                            <span>Risk Factors</span>
+                          </>
+                        ) : (
+                          <>
+                            <BarChart3 className="w-5 h-5 text-blue-500" />
+                            <span>Risk Factors</span>
+                          </>
+                        )}
                       </CardTitle>
                       <CardDescription>
-                        Risk factors at medium or higher levels requiring attention based on combined incident response and development activity patterns
+                        {highRiskFactors.length > 0 
+                          ? "Risk factors requiring immediate attention based on combined incident response and development activity patterns"
+                          : "Current risk factors based on team activity patterns"
+                        }
                       </CardDescription>
                     </CardHeader>
                     
                     <CardContent>
                       <div className="space-y-4">
-                        {elevatedRiskFactors.map((factor, index) => (
+                        {(highRiskFactors.length > 0 ? highRiskFactors : burnoutFactors.slice(0, 5)).map((factor, index) => (
                           <div key={factor.factor} className="relative">
                             <div className="flex items-center justify-between mb-2">
                               <div className="flex items-center space-x-2">
