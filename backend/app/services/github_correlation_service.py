@@ -5,7 +5,7 @@ This fixes the issue where only top_contributors (5 users) were used instead of 
 import logging
 from typing import Dict, List, Any, Optional
 from datetime import datetime
-import psycopg2
+from sqlalchemy import create_engine, text
 import os
 
 logger = logging.getLogger(__name__)
@@ -125,11 +125,14 @@ class GitHubCorrelationService:
         Fetch successful GitHub mappings from integration_mappings table
         """
         try:
-            # Use DATABASE_URL environment variable, fallback to Railway public connection
-            database_url = os.getenv('DATABASE_URL', 'postgresql://postgres:SJANsAgrQqHJWcPrhoGJcRtsPlyXzRNd@turntable.proxy.rlwy.net:27775/railway')
+            # Use DATABASE_URL environment variable
+            database_url = os.getenv('DATABASE_URL')
+            if not database_url:
+                self.logger.error("DATABASE_URL environment variable not set")
+                return []
             
-            conn = psycopg2.connect(database_url)
-            cursor = conn.cursor()
+            engine = create_engine(database_url)
+            conn = engine.connect()
             
             # Get all successful GitHub mappings for the current user
             query = """
@@ -143,15 +146,15 @@ class GitHubCorrelationService:
             """
             
             # Add user filter if available
-            params = []
+            params = {}
             if self.current_user_id:
-                query += " AND user_id = %s"
-                params.append(self.current_user_id)
+                query += " AND user_id = :user_id"
+                params['user_id'] = self.current_user_id
             
             query += " ORDER BY created_at DESC"
             
-            cursor.execute(query, params)
-            results = cursor.fetchall()
+            result = conn.execute(text(query), params)
+            results = result.fetchall()
             
             mappings = []
             for row in results:
@@ -165,7 +168,6 @@ class GitHubCorrelationService:
                     'created_at': created_at
                 })
             
-            cursor.close()
             conn.close()
             
             self.logger.info(f"Fetched {len(mappings)} successful GitHub mappings from integration_mappings")
