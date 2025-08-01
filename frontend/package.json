@@ -8,8 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
-    "check": "npm run type-check && npm run lint",
-    "pre-commit": "./pre-commit-check.sh"
+    "check": "npm run type-check && npm run lint"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.1.1",
