@@ -4246,22 +4246,34 @@ export default function Dashboard() {
                   </CardContent>
                 </Card>
                 
-                {/* Top Risk Factors Bar Chart - Only show if there are high-risk factors */}
-                {highRiskFactors.length > 0 && (
+                {/* Risk Factors Bar Chart - Always show if we have any factors */}
+                {burnoutFactors.length > 0 && (
                   <Card>
                     <CardHeader>
                       <CardTitle className="flex items-center space-x-2">
-                        <AlertTriangle className="w-5 h-5 text-red-500" />
-                        <span>Critical Risks</span>
+                        {highRiskFactors.length > 0 ? (
+                          <>
+                            <AlertTriangle className="w-5 h-5 text-red-500" />
+                            <span>Risk Factors</span>
+                          </>
+                        ) : (
+                          <>
+                            <BarChart3 className="w-5 h-5 text-blue-500" />
+                            <span>Risk Factors</span>
+                          </>
+                        )}
                       </CardTitle>
                       <CardDescription>
-                        Risk factors requiring immediate attention based on combined incident response and development activity patterns
+                        {highRiskFactors.length > 0 
+                          ? "Risk factors requiring immediate attention based on combined incident response and development activity patterns"
+                          : "Current risk factors based on team activity patterns"
+                        }
                       </CardDescription>
                     </CardHeader>
                     
                     <CardContent>
                       <div className="space-y-4">
-                        {highRiskFactors.map((factor, index) => (
+                        {(highRiskFactors.length > 0 ? highRiskFactors : burnoutFactors.slice(0, 5)).map((factor, index) => (
                           <div key={factor.factor} className="relative">
                             <div className="flex items-center justify-between mb-2">
                               <div className="flex items-center space-x-2">

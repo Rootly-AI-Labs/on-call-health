@@ -1395,22 +1395,47 @@ async def get_analysis_github_commits_timeline(
             "data": None
         }
     
+    # Get GitHub insights to find ALL contributors (not just those in team_analysis)
+    github_insights = analysis.results.get("github_insights", {})
+    top_contributors = github_insights.get("top_contributors", [])
+    
+    # Also check team_analysis for additional members
     team_analysis = analysis.results.get("team_analysis", {})
     members = team_analysis.get("members", [])
     if isinstance(team_analysis, list):
         members = team_analysis
     
-    # Filter members who have GitHub activity
+    # Combine contributors from both sources
     github_members = []
+    seen_usernames = set()
+    
+    # First, add all top contributors from github_insights
+    for contributor in top_contributors:
+        if isinstance(contributor, dict) and contributor.get("username"):
+            username = contributor.get("username", "")
+            if username and username not in seen_usernames:
+                github_members.append({
+                    "email": contributor.get("email", ""),
+                    "username": username,
+                    "commits_count": contributor.get("total_commits", 0)
+                })
+                seen_usernames.add(username)
+    
+    # Then add any additional members from team_analysis with GitHub activity
     for member in members:
         if isinstance(member, dict):
             github_activity = member.get("github_activity", {})
-            if github_activity and github_activity.get("commits_count", 0) > 0:
+            username = github_activity.get("username", "")
+            if github_activity and username and username not in seen_usernames:
                 github_members.append({
                     "email": member.get("user_email", ""),
-                    "username": github_activity.get("username", ""),
+                    "username": username,
                     "commits_count": github_activity.get("commits_count", 0)
                 })
+                seen_usernames.add(username)
+    
+    # Sort by commits to prioritize heavy contributors
+    github_members.sort(key=lambda x: x.get("commits_count", 0), reverse=True)
     
     if not github_members:
         return {
@@ -1467,7 +1492,13 @@ async def get_analysis_github_commits_timeline(
     all_daily_data = {}
     tasks = []
     
-    for member in github_members[:5]:  # Limit to top 5 contributors to avoid rate limits
+    # Log the GitHub members we found
+    logger.info(f"Found {len(github_members)} GitHub members to fetch daily commits for")
+    logger.info(f"GitHub members: {[m['username'] for m in github_members]}")
+    logger.info(f"Total commits in insights: {github_insights.get('total_commits', 0)}")
+    
+    # Fetch daily commit data for more members (increase from 5 to 10)
+    for member in github_members[:10]:  # Increased limit to get better coverage
         if member["username"]:
             task = collector.fetch_daily_commit_data(
                 username=member["username"],
