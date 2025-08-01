@@ -9,8 +9,7 @@
     "lint": "next lint",
     "type-check": "tsc --noEmit",
     "check": "npm run type-check && npm run lint",
-    "pre-commit": "./pre-commit-check.sh",
-    "prepare": "husky"
+    "pre-commit": "./pre-commit-check.sh"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.1.1",
