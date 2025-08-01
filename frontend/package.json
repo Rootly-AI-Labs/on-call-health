@@ -9,7 +9,8 @@
     "lint": "next lint",
     "type-check": "tsc --noEmit",
     "check": "npm run type-check && npm run lint",
-    "pre-commit": "./pre-commit-check.sh"
+    "pre-commit": "./pre-commit-check.sh",
+    "prepare": "husky"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.1.1",
@@ -47,6 +48,7 @@
   },
   "devDependencies": {
     "eslint": "^8",
-    "eslint-config-next": "14.0.0"
+    "eslint-config-next": "14.0.0",
+    "husky": "^9.1.7"
   }
 }

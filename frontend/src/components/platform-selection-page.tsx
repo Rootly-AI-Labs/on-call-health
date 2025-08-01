@@ -246,7 +246,7 @@ export default function PlatformSelectionPage() {
             </h1>
 
             <p className="text-lg text-slate-600 mb-2">
-              Let's analyze your team's burnout risk
+              Let&apos;s analyze your team&apos;s burnout risk
             </p>
             
             <p className="text-slate-600">

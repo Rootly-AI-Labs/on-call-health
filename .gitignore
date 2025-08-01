@@ -76,3 +76,17 @@ frontend/dist/
 
 # Vercel
 .vercel
+
+# Debug and test files
+backend/debug_*.py
+backend/test_*.py
+backend/audit_*.py
+backend/investigate_*.py
+backend/query_*.py
+backend/railway_*.py
+backend/*_backup.py
+backend/*_v2.py
+query_db.sh
+
+# Husky
+.husky/
