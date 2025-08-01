@@ -228,19 +228,8 @@ class UnifiedBurnoutAnalyzer:
                 logger.error(f"🔍 BURNOUT ANALYSIS: Metadata type: {type(metadata)}")
                 raise
             
-            # Calculate overall team health
-            health_calc_start = datetime.now()
-            logger.info(f"🔍 BURNOUT ANALYSIS: Step 4 - Calculating team health for {time_range_days}-day analysis")
-            team_health = self._calculate_team_health(team_analysis["members"])
-            health_calc_duration = (datetime.now() - health_calc_start).total_seconds()
-            logger.info(f"🔍 BURNOUT ANALYSIS: Step 4 completed in {health_calc_duration:.3f}s - Health score: {team_health.get('overall_score', 'N/A')}")
-            
-            # Generate insights and recommendations
-            insights_start = datetime.now()
-            logger.info(f"🔍 BURNOUT ANALYSIS: Step 5 - Generating insights and recommendations")
-            insights = self._generate_insights(team_analysis, team_health)
-            insights_duration = (datetime.now() - insights_start).total_seconds()
-            logger.info(f"🔍 BURNOUT ANALYSIS: Step 5 completed in {insights_duration:.3f}s - Generated {len(insights)} insights")
+            # Placeholder for team_health - will be calculated after GitHub correlation
+            team_health = None
             
             # Create data sources structure
             logger.info(f"🔍 BURNOUT ANALYSIS: Step 6 - Creating data source structure")
@@ -293,6 +282,28 @@ class UnifiedBurnoutAnalyzer:
                 # GITHUB BURNOUT ADJUSTMENT: Recalculate burnout scores using GitHub data
                 logger.info(f"🔥 GITHUB BURNOUT: Recalculating scores with GitHub activity data")
                 team_analysis["members"] = self._recalculate_burnout_with_github(team_analysis["members"], metadata)
+            
+            # Calculate overall team health AFTER GitHub burnout adjustment
+            health_calc_start = datetime.now()
+            logger.info(f"🔍 BURNOUT ANALYSIS: Step 4 - Calculating team health for {time_range_days}-day analysis")
+            team_health = self._calculate_team_health(team_analysis["members"])
+            health_calc_duration = (datetime.now() - health_calc_start).total_seconds()
+            logger.info(f"🔍 BURNOUT ANALYSIS: Step 4 completed in {health_calc_duration:.3f}s - Health score: {team_health.get('overall_score', 'N/A')}")
+            
+            # If GitHub features are disabled, calculate team health here
+            if not self.features['github'] or not github_insights:
+                health_calc_start = datetime.now()
+                logger.info(f"🔍 BURNOUT ANALYSIS: Step 4 - Calculating team health for {time_range_days}-day analysis")
+                team_health = self._calculate_team_health(team_analysis["members"])
+                health_calc_duration = (datetime.now() - health_calc_start).total_seconds()
+                logger.info(f"🔍 BURNOUT ANALYSIS: Step 4 completed in {health_calc_duration:.3f}s - Health score: {team_health.get('overall_score', 'N/A')}")
+            
+            # Generate insights and recommendations
+            insights_start = datetime.now()
+            logger.info(f"🔍 BURNOUT ANALYSIS: Step 5 - Generating insights and recommendations")
+            insights = self._generate_insights(team_analysis, team_health)
+            insights_duration = (datetime.now() - insights_start).total_seconds()
+            logger.info(f"🔍 BURNOUT ANALYSIS: Step 5 completed in {insights_duration:.3f}s - Generated {len(insights)} insights")
 
             # Calculate period summary for consistent UI display
             team_overall_score = team_health.get("overall_score", 0.0)  # This is already health scale 0-10
