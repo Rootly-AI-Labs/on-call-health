@@ -323,7 +323,14 @@ async def run_analysis_task(analysis_id: int, integration_id: int, days_back: in
             # Check if we got meaningful incident data
             incidents = test_data.get("incidents", [])
             users = test_data.get("users", [])
-            incident_data_available = len(incidents) > 0 or (len(users) > 0 and not test_data.get("collection_metadata", {}).get("incidents_api_failed", False))
+            metadata = test_data.get("collection_metadata", {})
+            
+            # Only consider incident data available if we have actual incidents AND users
+            incident_data_available = (
+                len(incidents) > 0 and 
+                len(users) > 0 and 
+                not metadata.get("incidents_api_failed", False)
+            )
             
             logger.info(f"Incident data test: {len(incidents)} incidents, {len(users)} users, available: {incident_data_available}")
             
