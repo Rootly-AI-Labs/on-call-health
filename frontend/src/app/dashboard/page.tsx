@@ -4850,7 +4850,7 @@ export default function Dashboard() {
             const memberData = members?.find(m => m.user_name === selectedMember.name);
             
             // Get the correct burnout score (handle both data formats)
-            const burnoutScore = memberData?.burnout_score || (selectedMember.burnoutScore / 10) || 0;
+            const burnoutScore = memberData?.burnout_score || (selectedMember.burnoutScore ? selectedMember.burnoutScore / 10 : 0) || 0;
             
             // Calculate Maslach dimensions from consistent burnout score (no maslach_dimensions in data)
             const maslachDimensions = [
@@ -4878,7 +4878,7 @@ export default function Dashboard() {
             ];
             
             // Calculate overall burnout score (0-10 scale, higher = more burnout, consistent with dimensions)
-            const overallBurnoutScore = Math.max(0, Math.min(10, burnoutScore));
+            const overallBurnoutScore = Math.max(0, Math.min(10, burnoutScore || 0));
             const healthStatus = overallBurnoutScore <= 3 ? 'Low Risk' : 
                                overallBurnoutScore <= 5 ? 'Moderate Risk' : 
                                overallBurnoutScore <= 7 ? 'High Risk' : 'Critical Risk';
