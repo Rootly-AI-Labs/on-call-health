@@ -282,7 +282,8 @@ interface AnalysisResult {
       total_pull_requests: number
       total_reviews: number
       after_hours_activity_percentage: number
-      weekend_activity_percentage: number
+      weekend_activity_percentage?: number
+      weekend_commit_percentage?: number
       top_contributors: Array<{
         username: string
         commits: number
@@ -308,7 +309,9 @@ interface AnalysisResult {
       active_channels: number
       avg_response_time_minutes: number
       after_hours_activity_percentage: number
-      weekend_activity_percentage: number
+      weekend_activity_percentage?: number
+      weekend_commit_percentage?: number
+      weekend_percentage?: number
       sentiment_analysis: {
         avg_sentiment: number
         negative_sentiment_users: number
@@ -4237,9 +4240,10 @@ export default function Dashboard() {
                                 </div>
                                 <div className="bg-gray-50 rounded-lg p-3">
                                   <p className="text-xs text-gray-600 font-medium">Weekend Commits</p>
-                                  {github.weekend_activity_percentage !== undefined && github.weekend_activity_percentage !== null ? (
+                                  {(github.weekend_activity_percentage !== undefined && github.weekend_activity_percentage !== null) || 
+                                   (github.weekend_commit_percentage !== undefined && github.weekend_commit_percentage !== null) ? (
                                     <div>
-                                      <p className="text-lg font-bold text-gray-900">{github.weekend_activity_percentage.toFixed(1)}%</p>
+                                      <p className="text-lg font-bold text-gray-900">{(github.weekend_activity_percentage || github.weekend_commit_percentage || 0).toFixed(1)}%</p>
                                       {github.activity_data?.weekend_commits !== undefined && (
                                         <p className="text-xs text-gray-500">{github.activity_data.weekend_commits} commits</p>
                                       )}
@@ -4261,92 +4265,23 @@ export default function Dashboard() {
                               {/* Commit Activity Timeline */}
                               <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
                                 <h4 className="text-sm font-semibold text-gray-800 mb-3">Commit Activity Timeline</h4>
-                                <div className="h-32">
-                                  {(() => {
-                                    // Generate sample daily data based on total commits
-                                    const totalCommits = github.total_commits || 0
-                                    // Use created_at and time_range to calculate the period
-                                    const analysisEnd = currentAnalysis?.created_at ? new Date(currentAnalysis.created_at) : new Date()
-                                    const timeRangeDays = currentAnalysis?.time_range || 30
-                                    const analysisStart = new Date(analysisEnd)
-                                    analysisStart.setDate(analysisStart.getDate() - timeRangeDays)
-                                    const daysDiff = Math.ceil((analysisEnd.getTime() - analysisStart.getTime()) / (1000 * 60 * 60 * 24)) || 30
-                                    const avgCommitsPerDay = totalCommits / daysDiff
-                                    
-                                    // Generate daily data points
-                                    const dailyData = []
-                                    for (let i = 0; i < Math.min(daysDiff, 30); i++) {
-                                      const date = new Date(analysisStart)
-                                      date.setDate(date.getDate() + i)
-                                      const isWeekend = date.getDay() === 0 || date.getDay() === 6
-                                      
-                                      // Add some variation to make it more realistic
-                                      const variation = Math.random() * 0.8 + 0.6 // 0.6 to 1.4 multiplier
-                                      const dayCommits = isWeekend 
-                                        ? Math.round(avgCommitsPerDay * 0.2 * variation) // Weekend commits are typically lower
-                                        : Math.round(avgCommitsPerDay * variation)
-                                      
-                                      dailyData.push({
-                                        date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-                                        commits: dayCommits,
-                                        isWeekend
-                                      })
-                                    }
-                                    
-                                    const maxCommits = Math.max(...dailyData.map(d => d.commits), 1)
-                                    
-                                    return (
-                                      <ResponsiveContainer width="100%" height="100%">
-                                        <AreaChart data={dailyData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-                                          <defs>
-                                            <linearGradient id="commitGradient" x1="0" y1="0" x2="0" y2="1">
-                                              <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.8}/>
-                                              <stop offset="95%" stopColor="#3B82F6" stopOpacity={0.1}/>
-                                            </linearGradient>
-                                          </defs>
-                                          <XAxis 
-                                            dataKey="date" 
-                                            tick={{ fontSize: 10 }}
-                                            interval="preserveStartEnd"
-                                          />
-                                          <YAxis 
-                                            hide 
-                                            domain={[0, maxCommits]}
-                                          />
-                                          <Tooltip 
-                                            content={({ active, payload }) => {
-                                              if (active && payload && payload[0]) {
-                                                return (
-                                                  <div className="bg-white p-2 border border-gray-200 rounded shadow-sm">
-                                                    <p className="text-xs font-medium">{payload[0].payload.date}</p>
-                                                    <p className="text-xs">
-                                                      <span className="font-semibold">{payload[0].value}</span> commits
-                                                      {payload[0].payload.isWeekend && <span className="text-orange-600 ml-1">(Weekend)</span>}
-                                                    </p>
-                                                  </div>
-                                                )
-                                              }
-                                              return null
-                                            }}
-                                          />
-                                          <Area 
-                                            type="monotone" 
-                                            dataKey="commits" 
-                                            stroke="#3B82F6" 
-                                            strokeWidth={2}
-                                            fill="url(#commitGradient)"
-                                          />
-                                        </AreaChart>
-                                      </ResponsiveContainer>
-                                    )
-                                  })()}
+                                <div className="h-32 flex items-center justify-center">
+                                  <div className="text-center">
+                                    <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                                      <BarChart3 className="w-6 h-6 text-gray-400" />
+                                    </div>
+                                    <p className="text-xs text-gray-500 font-medium">Daily commit data not available</p>
+                                    <p className="text-xs text-gray-400 mt-1">
+                                      Backend API needed for daily GitHub activity
+                                    </p>
+                                  </div>
                                 </div>
                                 <div className="mt-2 flex items-center justify-between text-xs text-gray-600">
                                   <span>
                                     Total: <strong>{(github.total_commits || 0).toLocaleString()}</strong> commits
                                   </span>
                                   <span>
-                                    Weekend: <strong>{github.weekend_activity_percentage !== undefined ? `${github.weekend_activity_percentage.toFixed(1)}%` : 'N/A'}</strong>
+                                    Weekend: <strong>{(github.weekend_activity_percentage !== undefined || github.weekend_commit_percentage !== undefined) ? `${(github.weekend_activity_percentage || github.weekend_commit_percentage || 0).toFixed(1)}%` : 'N/A'}</strong>
                                   </span>
                                 </div>
                               </div>
@@ -4547,8 +4482,9 @@ export default function Dashboard() {
                                     </div>
                                     <div className="bg-purple-50 rounded-lg p-3">
                                       <p className="text-xs text-purple-600 font-medium">Weekend Messages</p>
-                                      {slack?.weekend_activity_percentage !== undefined && slack.weekend_activity_percentage !== null ? (
-                                        <p className="text-lg font-bold text-purple-900">{slack.weekend_activity_percentage.toFixed(1)}%</p>
+                                      {(slack?.weekend_activity_percentage !== undefined && slack.weekend_activity_percentage !== null) || 
+                                       (slack?.weekend_percentage !== undefined && slack.weekend_percentage !== null) ? (
+                                        <p className="text-lg font-bold text-purple-900">{(slack.weekend_activity_percentage || slack.weekend_percentage || 0).toFixed(1)}%</p>
                                       ) : (
                                         <p className="text-lg font-bold text-gray-400 italic">No data</p>
                                       )}
