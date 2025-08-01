@@ -778,6 +778,8 @@ export default function Dashboard() {
   }
 
   const loadSpecificAnalysis = async (analysisId: string) => {
+    console.log(`🔍 DEBUG: loadSpecificAnalysis called with ID: ${analysisId}`)
+    console.trace('Call stack for loadSpecificAnalysis')
     try {
       const authToken = localStorage.getItem('auth_token')
       if (!authToken) {
@@ -790,6 +792,7 @@ export default function Dashboard() {
 
       // Use the unified endpoint that handles both UUIDs and integer IDs
       const endpoint = `${API_BASE}/analyses/by-id/${analysisId}`
+      console.log(`🔍 DEBUG: Making API call to ${endpoint}`)
       
       console.log(`Making API call to load analysis: ${endpoint}`)
       const response = await fetch(endpoint, {
@@ -1590,6 +1593,7 @@ export default function Dashboard() {
           
           let pollResponse
           try {
+            console.log(`🔍 DEBUG: Polling analysis ${analysis_id}`)
             pollResponse = await fetch(`${API_BASE}/analyses/${analysis_id}`, {
               headers: {
                 'Authorization': `Bearer ${authToken}`
