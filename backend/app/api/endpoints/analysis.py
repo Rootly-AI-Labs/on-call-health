@@ -325,10 +325,18 @@ async def run_analysis_task(analysis_id: int, integration_id: int, days_back: in
             users = test_data.get("users", [])
             metadata = test_data.get("collection_metadata", {})
             
-            # Only consider incident data available if we have actual incidents AND users
+            # Check for various failure conditions that should trigger GitHub-only fallback
+            connection_failed = (
+                metadata.get("connection_failed", False) or
+                metadata.get("error", "").startswith("Connection test failed") or
+                "HTTP 401" in metadata.get("error", "") or
+                "HTTP 403" in metadata.get("error", "")
+            )
+            
+            # Only consider incident data available if we have meaningful data
             incident_data_available = (
-                len(incidents) > 0 and 
                 len(users) > 0 and 
+                not connection_failed and
                 not metadata.get("incidents_api_failed", False)
             )
             
