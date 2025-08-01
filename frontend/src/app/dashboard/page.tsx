@@ -375,6 +375,7 @@ export default function Dashboard() {
   const [analysisRunning, setAnalysisRunning] = useState(false)
   const [analysisStage, setAnalysisStage] = useState<AnalysisStage>("loading")
   const [analysisProgress, setAnalysisProgress] = useState(0)
+  const [currentRunningAnalysisId, setCurrentRunningAnalysisId] = useState<number | null>(null)
   const [currentStageIndex, setCurrentStageIndex] = useState(0)
   const [targetProgress, setTargetProgress] = useState(0)
   const [currentAnalysis, setCurrentAnalysis] = useState<AnalysisResult | null>(null)
@@ -431,6 +432,38 @@ export default function Dashboard() {
     localStorage.removeItem('all_integrations')
     localStorage.removeItem('all_integrations_timestamp')
     console.log('Integration cache cleared')
+  }
+
+  const cancelRunningAnalysis = async () => {
+    try {
+      // If there's a running analysis, delete it
+      if (currentRunningAnalysisId) {
+        const authToken = localStorage.getItem('auth_token')
+        if (authToken) {
+          await fetch(`${API_BASE}/analyses/${currentRunningAnalysisId}`, {
+            method: 'DELETE',
+            headers: {
+              'Authorization': `Bearer ${authToken}`
+            }
+          })
+          console.log(`Deleted cancelled analysis ${currentRunningAnalysisId}`)
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to delete cancelled analysis:', error)
+    } finally {
+      // Reset all analysis state
+      setAnalysisRunning(false)
+      setCurrentRunningAnalysisId(null)
+      setCurrentRunningAnalysisId(null)
+      setAnalysisProgress(0)
+      setAnalysisStage("loading")
+      setCurrentStageIndex(0)
+      setTargetProgress(0)
+      
+      // Refresh the analysis list to remove the deleted analysis
+      await loadPreviousAnalyses()
+    }
   }
 
   // Helper function to determine if insufficient data card should be shown
@@ -778,8 +811,6 @@ export default function Dashboard() {
   }
 
   const loadSpecificAnalysis = async (analysisId: string) => {
-    console.log(`🔍 DEBUG: loadSpecificAnalysis called with ID: ${analysisId}`)
-    console.trace('Call stack for loadSpecificAnalysis')
     try {
       const authToken = localStorage.getItem('auth_token')
       if (!authToken) {
@@ -792,7 +823,6 @@ export default function Dashboard() {
 
       // Use the unified endpoint that handles both UUIDs and integer IDs
       const endpoint = `${API_BASE}/analyses/by-id/${analysisId}`
-      console.log(`🔍 DEBUG: Making API call to ${endpoint}`)
       
       console.log(`Making API call to load analysis: ${endpoint}`)
       const response = await fetch(endpoint, {
@@ -1565,6 +1595,7 @@ export default function Dashboard() {
       }
 
       const { id: analysis_id } = responseData
+      setCurrentRunningAnalysisId(analysis_id)
       
       if (!analysis_id) {
         throw new Error('No analysis ID returned from server')
@@ -1588,12 +1619,13 @@ export default function Dashboard() {
           if (!analysis_id) {
             console.error('Analysis ID is undefined, stopping polling')
             setAnalysisRunning(false)
+      setCurrentRunningAnalysisId(null)
+            setCurrentRunningAnalysisId(null)
             return
           }
           
           let pollResponse
           try {
-            console.log(`🔍 DEBUG: Polling analysis ${analysis_id}`)
             pollResponse = await fetch(`${API_BASE}/analyses/${analysis_id}`, {
               headers: {
                 'Authorization': `Bearer ${authToken}`
@@ -1622,6 +1654,9 @@ export default function Dashboard() {
                 setTargetProgress(100)
                 setTimeout(() => {
                   setAnalysisRunning(false)
+      setCurrentRunningAnalysisId(null)
+            setCurrentRunningAnalysisId(null)
+                  setCurrentRunningAnalysisId(null)
                   setCurrentAnalysis(analysisData)
                   setRedirectingToSuggested(false) // Turn off redirect loader
                   updateURLWithAnalysis(analysisData.uuid || analysisData.id)
@@ -1635,6 +1670,8 @@ export default function Dashboard() {
               return
             } else if (analysisData.status === 'failed') {
               setAnalysisRunning(false)
+      setCurrentRunningAnalysisId(null)
+            setCurrentRunningAnalysisId(null)
               
               // Check if we have partial data to display
               if (analysisData.analysis_data?.partial_data) {
@@ -1723,6 +1760,8 @@ export default function Dashboard() {
           if (pollRetryCount >= maxRetries) {
             console.error('Max polling retries reached, stopping analysis')
             setAnalysisRunning(false)
+      setCurrentRunningAnalysisId(null)
+            setCurrentRunningAnalysisId(null)
             toast.error("Analysis polling failed - please try again")
             return
           }
@@ -1738,6 +1777,7 @@ export default function Dashboard() {
     } catch (error) {
       console.error('Analysis error:', error)
       setAnalysisRunning(false)
+      setCurrentRunningAnalysisId(null)
       toast.error(error instanceof Error ? error.message : "Failed to run analysis")
     }
   }
@@ -2468,7 +2508,7 @@ export default function Dashboard() {
                   </p>
                 </div>
                 
-                <Button variant="outline" onClick={() => setAnalysisRunning(false)} className="border-purple-300 hover:bg-purple-50 text-purple-700">
+                <Button variant="outline" onClick={cancelRunningAnalysis} className="border-purple-300 hover:bg-purple-50 text-purple-700">
                   <X className="w-4 h-4 mr-2" />
                   Cancel Analysis
                 </Button>
