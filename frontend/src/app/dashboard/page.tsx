@@ -294,6 +294,14 @@ interface AnalysisResult {
         large_pr_pattern: number
         weekend_workers: number
       }
+      activity_data?: {
+        commits_count: number
+        pull_requests_count: number
+        reviews_count: number
+        after_hours_commits: number
+        weekend_commits: number
+        avg_pr_size: number
+      }
     }
     slack_insights?: {
       total_messages: number
@@ -4230,7 +4238,12 @@ export default function Dashboard() {
                                 <div className="bg-gray-50 rounded-lg p-3">
                                   <p className="text-xs text-gray-600 font-medium">Weekend Commits</p>
                                   {github.weekend_activity_percentage !== undefined && github.weekend_activity_percentage !== null ? (
-                                    <p className="text-lg font-bold text-gray-900">{github.weekend_activity_percentage.toFixed(1)}%</p>
+                                    <div>
+                                      <p className="text-lg font-bold text-gray-900">{github.weekend_activity_percentage.toFixed(1)}%</p>
+                                      {github.activity_data?.weekend_commits !== undefined && (
+                                        <p className="text-xs text-gray-500">{github.activity_data.weekend_commits} commits</p>
+                                      )}
+                                    </div>
                                   ) : (
                                     <p className="text-lg font-bold text-gray-400 italic">No data</p>
                                   )}
@@ -4243,6 +4256,80 @@ export default function Dashboard() {
                                     <p className="text-lg font-bold text-gray-400 italic">No data</p>
                                   )}
                                 </div>
+                              </div>
+
+                              {/* Weekly Commit Pattern */}
+                              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                                <h4 className="text-sm font-semibold text-blue-800 mb-2">Weekly Commit Pattern</h4>
+                                <div className="grid grid-cols-7 gap-1 text-xs">
+                                  {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, index) => {
+                                    // Calculate estimated commits per day based on total and weekend percentage
+                                    const isWeekend = index >= 5
+                                    const totalCommits = github.total_commits || 0
+                                    const weekendCommits = github.activity_data?.weekend_commits || 0
+                                    const weekdayCommits = totalCommits - weekendCommits
+                                    const avgWeekdayCommits = weekdayCommits / 5
+                                    const avgWeekendCommits = weekendCommits / 2
+                                    const dayCommits = isWeekend ? avgWeekendCommits : avgWeekdayCommits
+                                    const maxDayCommits = Math.max(avgWeekdayCommits, avgWeekendCommits)
+                                    const heightPercent = maxDayCommits > 0 ? (dayCommits / maxDayCommits) * 100 : 0
+                                    
+                                    return (
+                                      <div key={day} className="text-center">
+                                        <div className="mb-1 text-gray-600">{day}</div>
+                                        <div className="relative h-16 bg-gray-100 rounded">
+                                          <div 
+                                            className={`absolute bottom-0 w-full rounded transition-all ${
+                                              isWeekend ? 'bg-orange-400' : 'bg-blue-400'
+                                            }`}
+                                            style={{ height: `${heightPercent}%` }}
+                                            title={`~${Math.round(dayCommits)} commits`}
+                                          />
+                                        </div>
+                                        <div className="mt-1 text-gray-500">{Math.round(dayCommits)}</div>
+                                      </div>
+                                    )
+                                  })}
+                                </div>
+                                <div className="flex items-center justify-between mt-2 text-xs">
+                                  <div className="flex items-center space-x-2">
+                                    <div className="w-3 h-3 bg-blue-400 rounded"></div>
+                                    <span className="text-gray-600">Weekday</span>
+                                  </div>
+                                  <div className="flex items-center space-x-2">
+                                    <div className="w-3 h-3 bg-orange-400 rounded"></div>
+                                    <span className="text-gray-600">Weekend</span>
+                                  </div>
+                                </div>
+                                {/* Work Pattern Insight */}
+                                {(() => {
+                                  const weekendCommits = github.activity_data?.weekend_commits || 0
+                                  const totalCommits = github.total_commits || 0
+                                  const weekendPercent = totalCommits > 0 ? (weekendCommits / totalCommits) * 100 : 0
+                                  
+                                  if (weekendPercent > 20) {
+                                    return (
+                                      <div className="mt-2 flex items-start space-x-1">
+                                        <AlertTriangle className="w-3 h-3 text-orange-600 mt-0.5 flex-shrink-0" />
+                                        <p className="text-xs text-orange-700">High weekend activity detected - consider work-life balance</p>
+                                      </div>
+                                    )
+                                  } else if (weekendPercent > 10) {
+                                    return (
+                                      <div className="mt-2 flex items-start space-x-1">
+                                        <Info className="w-3 h-3 text-blue-600 mt-0.5 flex-shrink-0" />
+                                        <p className="text-xs text-blue-700">Moderate weekend activity - monitoring recommended</p>
+                                      </div>
+                                    )
+                                  } else {
+                                    return (
+                                      <div className="mt-2 flex items-start space-x-1">
+                                        <CheckCircle className="w-3 h-3 text-green-600 mt-0.5 flex-shrink-0" />
+                                        <p className="text-xs text-green-700">Healthy work pattern - minimal weekend commits</p>
+                                      </div>
+                                    )
+                                  }
+                                })()}
                               </div>
 
                               {/* Burnout Indicators */}
