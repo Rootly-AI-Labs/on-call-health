@@ -289,6 +289,10 @@ class UnifiedBurnoutAnalyzer:
                 
                 logger.info(f"🔗 GITHUB CORRELATION: Correlated {correlation_stats['team_members_with_github_data']}/{correlation_stats['total_team_members']} members ({correlation_stats['correlation_rate']:.1f}%)")
                 logger.info(f"🔗 GITHUB CORRELATION: Total commits correlated: {correlation_stats['total_commits_correlated']}")
+                
+                # GITHUB BURNOUT ADJUSTMENT: Recalculate burnout scores using GitHub data
+                logger.info(f"🔥 GITHUB BURNOUT: Recalculating scores with GitHub activity data")
+                team_analysis["members"] = self._recalculate_burnout_with_github(team_analysis["members"], metadata)
 
             # Calculate period summary for consistent UI display
             team_overall_score = team_health.get("overall_score", 0.0)  # This is already health scale 0-10
@@ -1848,3 +1852,180 @@ class UnifiedBurnoutAnalyzer:
             return "poor"
         else:
             return "critical"
+    
+    def _recalculate_burnout_with_github(self, members: List[Dict[str, Any]], metadata: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """
+        Recalculate burnout scores incorporating GitHub activity data.
+        This handles users with 0 incidents but significant GitHub activity.
+        """
+        try:
+            updated_members = []
+            github_adjustments_made = 0
+            
+            for member in members:
+                if not isinstance(member, dict):
+                    updated_members.append(member)
+                    continue
+                
+                # Get current burnout info
+                current_score = member.get("burnout_score", 0)
+                incident_count = member.get("incident_count", 0)
+                github_activity = member.get("github_activity", {})
+                
+                # Extract GitHub metrics (even if no activity to properly set score_source)
+                commits_count = github_activity.get("commits_count", 0) if github_activity else 0
+                commits_per_week = github_activity.get("commits_per_week", 0) if github_activity else 0
+                after_hours_commits = github_activity.get("after_hours_commits", 0) if github_activity else 0
+                weekend_commits = github_activity.get("weekend_commits", 0) if github_activity else 0
+                has_github_username = github_activity.get("username") if github_activity else None
+                
+                # Calculate GitHub-based burnout score (even if 0 to determine score_source properly)
+                github_burnout_score = 0.0
+                if has_github_username and (commits_count > 0 or commits_per_week > 0):
+                    github_burnout_score = self._calculate_github_burnout_score(
+                        commits_count, commits_per_week, after_hours_commits, weekend_commits
+                    )
+                
+                # Determine final burnout score based on available data
+                final_score = current_score  # Default to current score
+                score_source = "incident_based"  # Default score source
+                
+                if incident_count == 0 and github_burnout_score > 0:
+                    # User has no incidents but GitHub activity - use GitHub score
+                    final_score = github_burnout_score
+                    score_source = "github_based"
+                    github_adjustments_made += 1
+                elif incident_count > 0 and github_burnout_score > 0:
+                    # User has both incidents and GitHub activity - combine scores
+                    # Weight: 70% incident-based, 30% GitHub-based for users with incidents
+                    final_score = (current_score * 0.7) + (github_burnout_score * 0.3)
+                    score_source = "hybrid"
+                    github_adjustments_made += 1
+                elif incident_count == 0 and github_burnout_score == 0:
+                    # User has no incidents and no GitHub activity
+                    score_source = "incident_based"  # Keep as incident_based since that's the baseline
+                
+                # Update member with new score
+                updated_member = member.copy()
+                updated_member["burnout_score"] = round(final_score, 2)
+                updated_member["risk_level"] = self._determine_risk_level(final_score)
+                
+                # Add GitHub burnout breakdown for transparency
+                updated_member["github_burnout_breakdown"] = {
+                    "github_score": round(github_burnout_score, 2),
+                    "original_score": round(current_score, 2),
+                    "final_score": round(final_score, 2),
+                    "score_source": score_source,
+                    "github_indicators": {
+                        "high_commit_volume": commits_per_week > 25,
+                        "excessive_commits": commits_per_week > 50,
+                        "after_hours_work": (after_hours_commits / max(commits_count, 1)) > 0.15 if commits_count > 0 else False,
+                        "weekend_work": (weekend_commits / max(commits_count, 1)) > 0.10 if commits_count > 0 else False
+                    }
+                }
+                
+                updated_members.append(updated_member)
+            
+            logger.info(f"🔥 GITHUB BURNOUT: Adjusted scores for {github_adjustments_made}/{len(members)} members using GitHub activity")
+            
+            return updated_members
+            
+        except Exception as e:
+            logger.error(f"Error in _recalculate_burnout_with_github: {e}")
+            return members
+    
+    def _calculate_github_burnout_score(
+        self, 
+        commits_count: int, 
+        commits_per_week: float, 
+        after_hours_commits: int, 
+        weekend_commits: int
+    ) -> float:
+        """
+        Calculate burnout score based on GitHub activity patterns.
+        Based on Maslach dimensions but simplified for GitHub data.
+        """
+        try:
+            if commits_count == 0 and commits_per_week == 0:
+                return 0.0
+            
+            # Emotional Exhaustion Score (0-10, higher = more exhausted)
+            exhaustion_score = 0.0
+            
+            # High commit volume indicates potential overwork (more aggressive scoring)
+            if commits_per_week >= 100:  # Extreme - unsustainable pace
+                exhaustion_score += 9.0
+            elif commits_per_week >= 80:  # Very extreme
+                exhaustion_score += 8.0
+            elif commits_per_week >= 60:  # High extreme
+                exhaustion_score += 6.5
+            elif commits_per_week >= 50:  # Very high
+                exhaustion_score += 5.0
+            elif commits_per_week >= 25:  # Moderately high
+                exhaustion_score += 3.0
+            elif commits_per_week >= 15:  # Above average
+                exhaustion_score += 1.5
+            
+            # After-hours work patterns
+            if commits_count > 0:
+                after_hours_ratio = after_hours_commits / commits_count
+                if after_hours_ratio > 0.30:  # >30% after hours
+                    exhaustion_score += 3.0
+                elif after_hours_ratio > 0.15:  # >15% after hours
+                    exhaustion_score += 1.5
+                elif after_hours_ratio > 0.05:  # >5% after hours
+                    exhaustion_score += 0.5
+                
+                # Weekend work patterns
+                weekend_ratio = weekend_commits / commits_count
+                if weekend_ratio > 0.25:  # >25% on weekends
+                    exhaustion_score += 2.0
+                elif weekend_ratio > 0.10:  # >10% on weekends
+                    exhaustion_score += 1.0
+            
+            # Cap exhaustion score at 10
+            exhaustion_score = min(10.0, exhaustion_score)
+            
+            # Depersonalization Score (0-10, based on work patterns)
+            # High volume with poor work-life balance suggests cynicism
+            depersonalization_score = 0.0
+            if commits_per_week >= 100:  # Extreme activity often leads to cynicism
+                depersonalization_score = 8.0
+            elif commits_per_week >= 80:  # Very extreme activity
+                depersonalization_score = 6.0
+            elif commits_per_week >= 60:
+                depersonalization_score = 5.0
+            elif commits_per_week >= 40:
+                depersonalization_score = 2.5
+            elif commits_per_week > 30 and (after_hours_commits + weekend_commits) > (commits_count * 0.2):
+                depersonalization_score = 3.0
+            elif commits_per_week > 20:
+                depersonalization_score = 1.0
+            
+            # Personal Accomplishment Score (0-10, higher = better accomplishment)
+            # Assume reasonable accomplishment for active developers
+            accomplishment_score = 7.0  # Default good accomplishment for active devs
+            
+            # Reduce if showing signs of overwork (quality may suffer)
+            if commits_per_week > 50:
+                accomplishment_score = 5.0  # May indicate rushed work
+            elif commits_per_week > 30:
+                accomplishment_score = 6.0
+            
+            # Calculate final burnout score using adjusted Maslach weighting
+            # Emotional Exhaustion (45%), Depersonalization (35%), Personal Accomplishment inverted (20%)
+            # Slightly increased exhaustion weight for GitHub-based scoring
+            burnout_score = (
+                exhaustion_score * 0.45 +
+                depersonalization_score * 0.35 +
+                (10 - accomplishment_score) * 0.20
+            )
+            
+            # Ensure score is between 0 and 10
+            burnout_score = max(0.0, min(10.0, burnout_score))
+            
+            return burnout_score
+            
+        except Exception as e:
+            logger.error(f"Error calculating GitHub burnout score: {e}")
+            return 0.0
