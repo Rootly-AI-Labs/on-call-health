@@ -3308,29 +3308,40 @@ export default function Dashboard() {
                       </div>
                       
                       {/* GitHub Data */}
-                      <div className="flex items-center">
-                        <div className="w-2 h-2 bg-gray-900 rounded-full mr-2"></div>
-                        <span className="text-xs font-medium text-slate-700 flex-1">GitHub Activity</span>
-                        {currentAnalysis?.analysis_data?.data_sources?.github_data ? (
-                          <div className="flex items-center gap-1">
-                            <span className="text-xs font-semibold text-slate-900">
-                              {currentAnalysis?.analysis_data?.github_insights?.total_commits?.toLocaleString() || '0'} commits
-                            </span>
-                            <CheckCircle className="w-3 h-3 text-green-600" />
+                      <div className="space-y-2">
+                        <div className="flex items-center">
+                          <div className="w-2 h-2 bg-gray-900 rounded-full mr-2"></div>
+                          <span className="text-xs font-medium text-slate-700 flex-1">GitHub Activity</span>
+                          {currentAnalysis?.analysis_data?.data_sources?.github_data ? (
+                            <CheckCircle className="w-3 h-3 text-green-600 ml-2" />
+                          ) : (
+                            <Minus className="w-3 h-3 text-gray-400 ml-2" />
+                          )}
+                        </div>
+                        {currentAnalysis?.analysis_data?.data_sources?.github_data && (
+                          <div className="ml-4 text-xs text-gray-600 space-y-1">
+                            <div>• {currentAnalysis?.analysis_data?.github_insights?.total_commits?.toLocaleString() || '0'} commits</div>
+                            <div>• {currentAnalysis?.analysis_data?.github_insights?.total_pull_requests?.toLocaleString() || '0'} PRs</div>
                           </div>
-                        ) : (
-                          <Minus className="w-3 h-3 text-gray-400 ml-2" />
                         )}
                       </div>
                       
                       {/* Slack Data */}
-                      <div className="flex items-center">
-                        <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
-                        <span className="text-xs font-medium text-slate-700 flex-1">Slack Communications</span>
-                        {currentAnalysis?.analysis_data?.data_sources?.slack_data ? (
-                          <CheckCircle className="w-3 h-3 text-green-600 ml-2" />
-                        ) : (
-                          <Minus className="w-3 h-3 text-gray-400 ml-2" />
+                      <div className="space-y-2">
+                        <div className="flex items-center">
+                          <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
+                          <span className="text-xs font-medium text-slate-700 flex-1">Slack Communications</span>
+                          {currentAnalysis?.analysis_data?.data_sources?.slack_data ? (
+                            <CheckCircle className="w-3 h-3 text-green-600 ml-2" />
+                          ) : (
+                            <Minus className="w-3 h-3 text-gray-400 ml-2" />
+                          )}
+                        </div>
+                        {currentAnalysis?.analysis_data?.data_sources?.slack_data && (
+                          <div className="ml-4 text-xs text-gray-600 space-y-1">
+                            <div>• {currentAnalysis?.analysis_data?.slack_insights?.total_messages?.toLocaleString() || '0'} messages</div>
+                            <div>• {currentAnalysis?.analysis_data?.slack_insights?.active_channels?.toLocaleString() || '0'} channels</div>
+                          </div>
                         )}
                       </div>
                     </div>
