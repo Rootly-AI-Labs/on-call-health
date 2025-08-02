@@ -840,9 +840,15 @@ class UnifiedBurnoutAnalyzer:
             severity_counts[severity] += 1
         
         # Calculate averages and percentages with comprehensive None safety
-        incidents_per_week = (len(incidents) / max(days_analyzed, 1)) * 7 if days_analyzed and days_analyzed > 0 else 0
-        after_hours_percentage = after_hours_count / len(incidents) if incidents and len(incidents) > 0 else 0
-        weekend_percentage = weekend_count / len(incidents) if incidents and len(incidents) > 0 else 0
+        # Ensure all values are not None before calculations
+        safe_after_hours = after_hours_count if after_hours_count is not None else 0
+        safe_weekend = weekend_count if weekend_count is not None else 0
+        safe_incidents_len = len(incidents) if incidents is not None else 0
+        safe_days = days_analyzed if days_analyzed is not None and days_analyzed > 0 else 1
+        
+        incidents_per_week = (safe_incidents_len / safe_days) * 7 if safe_days > 0 else 0
+        after_hours_percentage = safe_after_hours / safe_incidents_len if safe_incidents_len > 0 else 0
+        weekend_percentage = safe_weekend / safe_incidents_len if safe_incidents_len > 0 else 0
         avg_response_time = sum(response_times) / len(response_times) if response_times and len(response_times) > 0 else 0
         
         return {

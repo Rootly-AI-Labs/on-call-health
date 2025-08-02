@@ -1212,6 +1212,157 @@ def classify_burnout_risk(burnout_assessment):
   - `backend/app/core/simple_burnout_analyzer.py` - Added same consistency fix
 - **Result**: All dashboard components now use the same incident data source, ensuring consistency between total counts, daily trends, and individual metrics
 
+### AI INSIGHTS - MAKE 100% DYNAMIC (Remove Template Fallbacks)
+
+#### Objective: Keep Current Content Structure but Ensure Everything is AI-Generated
+
+**Current Situation**: 
+- AI insights has good content structure (Summary, Key Observations, Recommendations)
+- BUT: Falls back to template-based content when LLM unavailable
+- User wants: Same quality insights but ALWAYS AI-generated, never templated
+
+#### Implementation Plan:
+
+**Phase 1: Enhance LLM Prompt to Generate Current Format**
+File: `backend/app/services/ai_burnout_analyzer.py`
+
+Update `_generate_llm_team_narrative()` prompt to explicitly request:
+```python
+prompt = """
+Generate a team burnout analysis with EXACTLY these sections:
+
+**Summary** (1 paragraph):
+- Start with: "The team has X members total, with Y handling incidents."
+- Include average burnout score for incident responders
+- Highlight how many at high/medium/low risk
+- Identify primary burnout driver and impact score
+- Mention any detected patterns
+
+**Key Observations** (1 paragraph):
+- Spotlight highest risk individual with specific metrics
+- Explain their primary stress factors
+- Mention other at-risk members if applicable
+- Describe team-wide stress patterns
+- Include specific data points and percentages
+
+**Recommendations** (bullet points):
+- 3-5 specific, actionable recommendations
+- Tie each to observed patterns
+- Include both immediate and long-term actions
+- Reference specific team members when relevant
+
+Use the exact data provided. Be specific with names, numbers, and percentages.
+Make each analysis unique - vary sentence structure and focus areas.
+"""
+```
+
+**Phase 2: Remove ALL Template Fallbacks**
+File: `frontend/src/app/dashboard/page.tsx`
+
+Replace lines ~3421-3550 (entire template fallback) with:
+```typescript
+// Only show AI insights if LLM-generated content exists
+if (!aiInsights?.llm_team_analysis) {
+  return (
+    <div className="text-center py-12 text-gray-500">
+      <Sparkles className="h-10 w-10 mx-auto mb-4 opacity-40" />
+      <h4 className="font-medium text-gray-700 mb-2">AI Analysis Unavailable</h4>
+      <p className="text-sm mb-4">Configure your AI token to enable intelligent team insights</p>
+      <Button 
+        variant="outline" 
+        size="sm"
+        onClick={() => router.push('/settings')}
+      >
+        Configure AI Settings
+      </Button>
+    </div>
+  )
+}
+
+// Render the LLM-generated content
+return (
+  <div className="space-y-4">
+    <div 
+      className="prose prose-sm max-w-none"
+      dangerouslySetInnerHTML={{ 
+        __html: aiInsights.llm_team_analysis
+          .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+          .replace(/\n\n/g, '</p><p class="mt-4">')
+          .replace(/^/, '<p>')
+          .replace(/$/, '</p>')
+      }}
+    />
+  </div>
+)
+```
+
+**Phase 3: Ensure Unique Content Every Run**
+
+Add variation instructions to prompt:
+```python
+# At the end of prompt
+variation_instruction = f"""
+Analysis ID: {analysis_id}
+Timestamp: {datetime.now().isoformat()}
+
+IMPORTANT: Make this analysis unique. Vary:
+- Opening sentence structure
+- Which metrics to emphasize
+- Order of observations
+- Specific examples used
+- Recommendation priorities
+
+Never use the exact same phrases as previous analyses.
+"""
+```
+
+**Phase 4: Enhanced Data Injection**
+
+Provide richer context to LLM:
+```python
+team_context = {
+    "time_context": {
+        "day_of_week": datetime.now().strftime("%A"),
+        "month": datetime.now().strftime("%B"),
+        "is_weekend": datetime.now().weekday() >= 5,
+        "is_end_of_month": datetime.now().day > 25,
+        "is_holiday_season": month in ["November", "December", "January"]
+    },
+    "comparison_context": {
+        "vs_last_analysis": "20% increase" if prev_score else "first analysis",
+        "trend": "improving" if trend_positive else "declining",
+        "notable_changes": self._identify_changes(current, previous)
+    },
+    "environmental_context": {
+        "recent_incidents": self._get_recent_major_incidents(),
+        "upcoming_events": self._check_calendar_context(),
+        "team_changes": self._detect_team_changes()
+    }
+}
+```
+
+**Phase 5: Quality Assurance**
+
+Before returning LLM content, validate:
+- Contains all three sections (Summary, Key Observations, Recommendations)
+- Includes actual member names and data
+- Minimum length threshold (500 characters)
+- No placeholder text like "[Name]" or "[X]"
+
+If validation fails, retry with more explicit prompt.
+
+#### Benefits:
+1. **Preserves Current UX**: Users see same structured insights
+2. **Always Fresh**: Every analysis is uniquely written
+3. **No Templates**: Zero fallback to generic text
+4. **Clear Degradation**: When AI unavailable, shows clear call-to-action
+
+#### Success Criteria:
+- Running same analysis twice produces different narratives
+- All content references actual data from the analysis
+- No generic/template phrases appear
+- Clear messaging when AI token not configured
+
 ### DATA COLLECTION & STORAGE ENHANCEMENT PLAN
 
 #### Objective: Maximize Data Granularity for Better Analysis

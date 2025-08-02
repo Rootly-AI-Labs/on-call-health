@@ -1738,7 +1738,8 @@ async def run_analysis_task(
             
             # A/B Testing: Log comparative metrics for monitoring
             try:
-                analyzer_type = "unified" if use_unified_analyzer else "legacy"
+                # We're always using UnifiedBurnoutAnalyzer now
+                analyzer_type = "unified"
                 daily_trends_count = len(results.get("daily_trends", [])) if results else 0
                 team_members_count = len(results.get("team_analysis", {}).get("members", [])) if results else 0
                 ai_enhanced = results.get("ai_enhanced", False) if results else False
