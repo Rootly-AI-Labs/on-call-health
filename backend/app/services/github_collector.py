@@ -227,7 +227,8 @@ class GitHubCollector:
                         emails.add(user_data['email'])
             
             # Get user's recent events to find repositories they've contributed to
-            events_url = f"https://api.github.com/users/{username}/events?per_page=100"
+            # Reduced from 100 to 30 to minimize API calls
+            events_url = f"https://api.github.com/users/{username}/events?per_page=30"
             async with session.get(events_url, headers=headers) as resp:
                 if resp.status == 200:
                     events_data = await resp.json()
@@ -240,9 +241,11 @@ class GitHubCollector:
                             repos_to_check.add(repo_name)
                     
                     # For each repo, check recent commits by this user
-                    for repo_name in list(repos_to_check):  # No limit on repos
+                    # Limit to 3 repos to reduce API calls
+                    for repo_name in list(repos_to_check)[:3]:
                         try:
-                            commits_url = f"https://api.github.com/repos/{repo_name}/commits?author={username}&per_page=100"
+                            # Reduced from 100 to 10 commits per repo
+                            commits_url = f"https://api.github.com/repos/{repo_name}/commits?author={username}&per_page=10"
                             async with session.get(commits_url, headers=headers) as resp:
                                 if resp.status == 200:
                                     commits_data = await resp.json()
@@ -277,11 +280,12 @@ class GitHubCollector:
             # Phase 2.3: Use API manager for resilient GitHub API calls
             from .github_api_manager import github_api_manager
             
+            # Use search API to get counts only (1 call instead of paginating)
             # Get commits across all repos
-            commits_url = f"https://api.github.com/search/commits?q=author:{username}+author-date:{start_date.strftime('%Y-%m-%d')}..{end_date.strftime('%Y-%m-%d')}"
+            commits_url = f"https://api.github.com/search/commits?q=author:{username}+author-date:{start_date.strftime('%Y-%m-%d')}..{end_date.strftime('%Y-%m-%d')}&per_page=1"
             
-            # Get pull requests
-            prs_url = f"https://api.github.com/search/issues?q=author:{username}+type:pr+created:{start_date.strftime('%Y-%m-%d')}..{end_date.strftime('%Y-%m-%d')}"
+            # Get pull requests count
+            prs_url = f"https://api.github.com/search/issues?q=author:{username}+type:pr+created:{start_date.strftime('%Y-%m-%d')}..{end_date.strftime('%Y-%m-%d')}&per_page=1"
             
             # Make resilient API calls with rate limiting and circuit breaker
             async def fetch_commits():
@@ -400,6 +404,21 @@ class GitHubCollector:
         try:
             import aiohttp
             async with aiohttp.ClientSession() as session:
+                # Check rate limit before starting
+                rate_check_url = "https://api.github.com/rate_limit"
+                async with session.get(rate_check_url, headers=headers) as resp:
+                    if resp.status == 200:
+                        rate_data = await resp.json()
+                        remaining = rate_data['rate']['remaining']
+                        reset_time = rate_data['rate']['reset']
+                        logger.info(f"GitHub API rate limit: {remaining} calls remaining, resets at {datetime.fromtimestamp(reset_time)}")
+                        
+                        if remaining < 50:
+                            logger.warning(f"Low GitHub API rate limit: only {remaining} calls remaining!")
+                            if remaining < 10:
+                                logger.error("Critical GitHub API rate limit! Aborting to prevent hitting limit.")
+                                return None
+                
                 # Initialize daily data structure
                 daily_commits = {}
                 current_date = start_date

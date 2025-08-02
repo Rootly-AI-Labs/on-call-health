@@ -1212,6 +1212,124 @@ def classify_burnout_risk(burnout_assessment):
   - `backend/app/core/simple_burnout_analyzer.py` - Added same consistency fix
 - **Result**: All dashboard components now use the same incident data source, ensuring consistency between total counts, daily trends, and individual metrics
 
+### REDUCE GITHUB API CALLS - AVOID RATE LIMITS
+
+#### Problem: Hitting GitHub API rate limits during analysis
+
+**Current Issues**:
+1. Making too many API calls per analysis
+2. Re-fetching data that hasn't changed
+3. Not leveraging caching effectively
+4. Fetching unnecessary data
+
+#### Implementation Strategies:
+
+**1. Enable Smart Caching Service** ✅
+- Already implemented in `GitHubMappingService`
+- Cache email->username mappings for 7 days
+- Only refresh activity data when needed
+- Implementation in `enhanced_github_collector.py`
+
+**2. Batch API Calls**
+- Use GitHub's GraphQL API instead of REST for some calls
+- Fetch multiple users' data in single request
+- Reduce per-user API calls from 3-4 to 1
+
+**3. Implement Request Pooling**
+```python
+# Instead of individual calls per user:
+for user in users:
+    fetch_user_data(user)  # BAD - N API calls
+
+# Use batch fetching:
+fetch_users_data(users)  # GOOD - 1 API call
+```
+
+**4. Skip Unnecessary Data**
+- Don't fetch commit details if only counting
+- Use search API for counts instead of paginating all results
+- Skip users with recent cached data
+
+**5. Rate Limit Monitoring**
+```python
+# Add rate limit tracking
+class GitHubRateLimiter:
+    def check_rate_limit(self, response_headers):
+        remaining = int(response_headers.get('X-RateLimit-Remaining', 0))
+        reset_time = int(response_headers.get('X-RateLimit-Reset', 0))
+        
+        if remaining < 100:  # Getting close to limit
+            wait_time = reset_time - time.time()
+            logger.warning(f"GitHub rate limit low: {remaining} remaining. Reset in {wait_time}s")
+            
+        if remaining < 10:  # Critical
+            raise RateLimitException("GitHub rate limit critical")
+```
+
+**6. Implement Progressive Backoff**
+- If rate limit hit, wait until reset
+- Implement exponential backoff for retries
+- Queue requests to avoid bursts
+
+**7. Local Caching Database**
+```sql
+CREATE TABLE github_api_cache (
+    id SERIAL PRIMARY KEY,
+    cache_key VARCHAR(255) UNIQUE,
+    api_endpoint VARCHAR(500),
+    response_data JSONB,
+    created_at TIMESTAMP DEFAULT NOW(),
+    expires_at TIMESTAMP,
+    hit_count INTEGER DEFAULT 0
+);
+
+CREATE INDEX idx_cache_key ON github_api_cache(cache_key);
+CREATE INDEX idx_expires_at ON github_api_cache(expires_at);
+```
+
+**8. Configuration Options**
+```python
+GITHUB_API_CONFIG = {
+    "max_requests_per_minute": 30,  # Stay well below limit
+    "cache_ttl_hours": 24,          # Cache non-user data
+    "user_cache_ttl_hours": 2,      # Cache user data briefly
+    "enable_smart_caching": True,
+    "batch_size": 50,               # Batch API requests
+    "retry_after_rate_limit": True
+}
+```
+
+#### Quick Wins to Implement NOW:
+
+**1. Ensure Smart Caching is Enabled**
+File: `backend/app/services/enhanced_github_collector.py`
+```python
+# Line 26 - Make sure this is 'true'
+use_smart_caching = os.getenv('USE_SMART_GITHUB_CACHING', 'true').lower() == 'true'
+```
+
+**2. Reduce Event Fetching**
+File: `backend/app/services/github_collector.py`
+- Line 230: Change `per_page=100` to `per_page=30`
+- Only fetch first page of events
+
+**3. Skip Redundant User Lookups**
+- Check if user already mapped before API call
+- Don't re-fetch if analyzed recently
+
+**4. Add Rate Limit Headers Logging**
+```python
+if resp.headers.get('X-RateLimit-Remaining'):
+    logger.info(f"GitHub API calls remaining: {resp.headers['X-RateLimit-Remaining']}")
+```
+
+#### Environment Variables to Set in Railway:
+```
+USE_SMART_GITHUB_CACHING=true
+GITHUB_API_MAX_RETRIES=3
+GITHUB_API_CACHE_TTL=86400
+```
+
 ### AI INSIGHTS - MAKE 100% DYNAMIC (Remove Template Fallbacks)
 
 #### Objective: Keep Current Content Structure but Ensure Everything is AI-Generated
