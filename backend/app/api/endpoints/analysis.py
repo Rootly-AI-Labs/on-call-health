@@ -12,8 +12,7 @@ from sqlalchemy.orm import Session
 from ...models import get_db, User, Analysis, RootlyIntegration
 from ...auth.dependencies import get_current_active_user
 from ...core.rootly_client import RootlyAPIClient
-from ...core.simple_burnout_analyzer import SimpleBurnoutAnalyzer
-from ...services.burnout_analyzer import BurnoutAnalyzerService
+from ...services.unified_burnout_analyzer import UnifiedBurnoutAnalyzer
 from ...services.github_only_burnout_analyzer import GitHubOnlyBurnoutAnalyzer
 
 logger = logging.getLogger(__name__)
@@ -401,42 +400,30 @@ async def run_analysis_task(analysis_id: int, integration_id: int, days_back: in
                 logger.error(f"GitHub-only analysis failed: {e}")
                 raise Exception(f"GitHub-only analysis failed: {str(e)}")
                 
-        elif has_llm_token:
-            logger.info(f"User has LLM token ({user.llm_provider}), using full analyzer with AI enhancement")
+        else:
+            logger.info(f"Using UnifiedBurnoutAnalyzer (AI={has_llm_token})")
             
-            # Set user context for AI analysis
-            from ...services.ai_burnout_analyzer import set_user_context
-            set_user_context(user)
+            # Set user context for AI analysis if needed
+            if has_llm_token:
+                from ...services.ai_burnout_analyzer import set_user_context
+                set_user_context(user)
+                logger.info(f"Set user context for AI analysis (LLM provider: {user.llm_provider})")
             
-            analyzer = BurnoutAnalyzerService(integration.api_token, integration.platform)
+            # Initialize UnifiedBurnoutAnalyzer
+            analyzer = UnifiedBurnoutAnalyzer(
+                api_token=integration.api_token,
+                platform=integration.platform,
+                enable_ai=has_llm_token,
+                github_token=None,  # TODO: Add GitHub integration
+                slack_token=None    # TODO: Add Slack integration
+            )
             
-            # Run full analysis with AI enhancement
+            # Run analysis
             results = await analyzer.analyze_burnout(
                 time_range_days=days_back,
                 include_weekends=True,
-                include_github=False,  # TODO: Add GitHub integration flags
-                include_slack=False    # TODO: Add Slack integration flags
-            )
-        else:
-            logger.info("No LLM token available, using simple analyzer")
-            # Initialize Rootly client
-            client = RootlyAPIClient(integration.api_token)
-            
-            # Collect data
-            logger.info(f"Collecting data from integration '{integration.name}' for {days_back} days")
-            raw_data = await client.collect_analysis_data(days_back=days_back)
-            
-            # Log detailed info about what was collected
-            logger.info(f"Data collection completed: {len(raw_data.get('users', []))} users, {len(raw_data.get('incidents', []))} incidents")
-            
-            # Initialize simple analyzer
-            analyzer = SimpleBurnoutAnalyzer()
-            
-            # Run simple analysis
-            results = analyzer.analyze_team_burnout(
-                users=raw_data["users"],
-                incidents=raw_data["incidents"],
-                metadata=raw_data["collection_metadata"]
+                user_id=user.id,
+                analysis_id=analysis_id
             )
         
         # Update analysis with results

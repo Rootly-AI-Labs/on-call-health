@@ -4,7 +4,7 @@ FastAPI main application for Rootly Burnout Detector.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .models import create_tables
-from .api.endpoints import auth, rootly, analysis, analyses, pagerduty, github, slack, llm, debug, mappings, manual_mappings, migration
+from .api.endpoints import auth, rootly, analysis, analyses, pagerduty, github, slack, llm, mappings, manual_mappings
 
 # Create FastAPI application
 app = FastAPI(
@@ -37,16 +37,6 @@ async def health():
 async def startup_event():
     create_tables()
     
-    # Auto-cleanup duplicate mappings from before Phase 1 fixes
-    try:
-        import sys
-        from pathlib import Path
-        backend_path = Path(__file__).parent.parent
-        sys.path.insert(0, str(backend_path))
-        from auto_cleanup_duplicates import auto_cleanup_duplicates
-        auto_cleanup_duplicates()
-    except Exception as e:
-        print(f"⚠️ Auto-cleanup failed (non-critical): {e}")
 
 # Include API routers
 app.include_router(auth.router, prefix="/auth", tags=["authentication"])
@@ -59,5 +49,3 @@ app.include_router(slack.router, prefix="/integrations", tags=["slack-integratio
 app.include_router(llm.router, tags=["llm-tokens"])
 app.include_router(mappings.router, prefix="/integrations", tags=["integration-mappings"])
 app.include_router(manual_mappings.router, prefix="/integrations", tags=["manual-mappings"])
-app.include_router(debug.router, prefix="/api", tags=["debug"])
-app.include_router(migration.router, prefix="/migration", tags=["database-migration"])

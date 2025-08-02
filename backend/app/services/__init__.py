@@ -2,6 +2,6 @@
 Services module for business logic and data processing.
 """
 
-from .burnout_analyzer import BurnoutAnalyzerService
+from .unified_burnout_analyzer import UnifiedBurnoutAnalyzer
 
-__all__ = ["BurnoutAnalyzerService"]
+__all__ = ["UnifiedBurnoutAnalyzer"]
