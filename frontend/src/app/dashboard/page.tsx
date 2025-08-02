@@ -3312,7 +3312,12 @@ export default function Dashboard() {
                         <div className="w-2 h-2 bg-gray-900 rounded-full mr-2"></div>
                         <span className="text-xs font-medium text-slate-700 flex-1">GitHub Activity</span>
                         {currentAnalysis?.analysis_data?.data_sources?.github_data ? (
-                          <CheckCircle className="w-3 h-3 text-green-600 ml-2" />
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs font-semibold text-slate-900">
+                              {currentAnalysis?.analysis_data?.github_insights?.total_commits?.toLocaleString() || '0'} commits
+                            </span>
+                            <CheckCircle className="w-3 h-3 text-green-600" />
+                          </div>
                         ) : (
                           <Minus className="w-3 h-3 text-gray-400 ml-2" />
                         )}
