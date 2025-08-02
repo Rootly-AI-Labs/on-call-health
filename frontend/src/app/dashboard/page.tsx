@@ -61,6 +61,7 @@ import {
   Shield,
   BarChart3,
   Database,
+  Sparkles,
 } from "lucide-react"
 import Image from "next/image"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -3418,143 +3419,20 @@ export default function Dashboard() {
                         );
                       }
                       
-                      // Fallback to template-based insights
-                      const teamAnalysis = currentAnalysis.analysis_data.team_analysis;
-                      const members = Array.isArray(teamAnalysis) ? teamAnalysis : (teamAnalysis?.members || []);
-                      const riskDist = aiInsights?.risk_distribution;
-                      const highRiskCount = (riskDist?.high || 0) + ((riskDist as any)?.critical || 0);
-                      const mediumRiskCount = riskDist?.medium || 0;
-                      const lowRiskCount = riskDist?.low || 0;
-                      const highRiskMembers = members.filter(m => m.risk_level === 'high' || m.risk_level === 'critical');
-                      const hasPatterns = aiInsights?.common_patterns && aiInsights.common_patterns.length > 0;
-                      const hasRecommendations = aiInsights?.team_recommendations && aiInsights.team_recommendations.length > 0;
-                      
-                      // Calculate average burnout score - only include users with incidents
-                      const membersWithIncidentsForInsights = (members as any[]).filter((m: any) => (m?.incident_count || 0) > 0);
-                      const avgBurnoutScore = membersWithIncidentsForInsights.length > 0 ? 
-                        membersWithIncidentsForInsights.reduce((sum: number, m: any) => sum + (m.burnout_score || 0), 0) / membersWithIncidentsForInsights.length * 10 : 0;
-                      
-                      // Analyze burnout sources from team factors
-                      const analyzeBurnoutSources = () => {
-                        if (members.length === 0) return null;
-                        
-                        const factorTotals = {
-                          workload: 0,
-                          after_hours: 0,
-                          weekend_work: 0,
-                          incident_load: 0,
-                          response_time: 0
-                        };
-                        
-                        // Sum all factor scores across team members
-                        members.forEach(member => {
-                          if (member.factors || member.key_metrics) {
-                            factorTotals.workload += member.factors?.workload || member.key_metrics?.incidents_per_week || 0;
-                            factorTotals.after_hours += member.factors?.after_hours || member.key_metrics?.after_hours_percentage || 0;
-                            factorTotals.weekend_work += member.factors?.weekend_work || 0;
-                            factorTotals.incident_load += member.factors?.incident_load || member.key_metrics?.incidents_per_week || 0;
-                            factorTotals.response_time += member.factors?.response_time || member.key_metrics?.avg_resolution_hours || 0;
-                          }
-                        });
-                        
-                        // Calculate averages
-                        const factorAverages = Object.entries(factorTotals).map(([key, total]) => ({
-                          name: key,
-                          average: total / members.length,
-                          displayName: key.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())
-                        }));
-                        
-                        // Sort by highest average impact
-                        return factorAverages.sort((a, b) => b.average - a.average);
-                      };
-                      
-                      const burnoutSources = analyzeBurnoutSources();
-                      const topBurnoutFactor = burnoutSources?.[0];
-                      const secondaryFactors = burnoutSources?.slice(1, 3).filter(f => f.average > 0.3);
-                      
+                      // No LLM-generated content available
                       return (
-                        <div className="space-y-4 text-gray-700">
-                          {/* Summary Paragraph */}
-                          <div>
-                            <h4 className="font-semibold text-gray-900 mb-2">Summary</h4>
-                            <p className="leading-relaxed">
-                              The team has {members.length} members total, with {membersWithIncidentsForInsights.length} handling incidents. Among active incident responders, the average burnout score is {(avgBurnoutScore || 0).toFixed(0)}%. 
-                              {highRiskCount > 0 ? (
-                                <> Currently, <span className="font-semibold text-red-600">{highRiskCount} member{highRiskCount > 1 ? 's are' : ' is'} at high risk</span> of burnout, requiring immediate attention. </>
-                              ) : mediumRiskCount > 0 ? (
-                                <> The team has <span className="font-semibold text-amber-600">{mediumRiskCount} member{mediumRiskCount > 1 ? 's' : ''} at medium risk</span>, indicating emerging stress patterns that should be monitored. </>
-                              ) : (
-                                <> The team is in <span className="font-semibold text-green-600">good health</span> with no members currently at high risk. </>
-                              )}
-                              {topBurnoutFactor && topBurnoutFactor.average && topBurnoutFactor.average > 0.4 && (
-                                <> The primary burnout driver is <span className="font-semibold text-red-600">{topBurnoutFactor.displayName.toLowerCase()}</span> (impact: {Math.min(topBurnoutFactor.average * 10, 10).toFixed(1)}/10){secondaryFactors.length > 0 && (
-                                  <>, with secondary stress from {secondaryFactors.map(f => f.displayName.toLowerCase()).join(' and ')}</>
-                                )}. </>
-                              )}
-                              {hasPatterns && aiInsights.common_patterns[0] && (
-                                <> Analysis reveals {aiInsights.common_patterns[0].description.toLowerCase()} </>
-                              )}
-                            </p>
-                          </div>
-
-                          {/* Standouts Paragraph */}
-                          {(highRiskMembers.length > 0 || hasPatterns || (topBurnoutFactor && topBurnoutFactor.average && topBurnoutFactor.average > 0.3)) && (
-                            <div>
-                              <h4 className="font-semibold text-gray-900 mb-2">Key Observations</h4>
-                              <p className="leading-relaxed">
-                                {highRiskMembers.length > 0 && (
-                                  <>
-                                    <span className="font-semibold">{highRiskMembers[0].user_name}</span> stands out with a burnout score of {((highRiskMembers[0].burnout_score || 0) * 10).toFixed(0)}%, 
-                                    having handled {highRiskMembers[0].incident_count || 0} incidents in the analysis period{(() => {
-                                      const topMemberFactor = highRiskMembers[0].factors ? 
-                                        Object.entries(highRiskMembers[0].factors)
-                                          .sort(([,a], [,b]) => (b as number) - (a as number))[0] : null;
-                                      if (topMemberFactor && (topMemberFactor[1] as number) > 0.6) {
-                                        const factorName = topMemberFactor[0].replace('_', ' ');
-                                        return `, primarily driven by ${factorName}`;
-                                      }
-                                      return '';
-                                    })()}. 
-                                    {highRiskMembers.length > 1 && (
-                                      <> Similarly, {highRiskMembers.slice(1, 3).map(m => m.user_name).join(' and ')} 
-                                      {highRiskMembers.length > 3 && ` (and ${highRiskMembers.length - 3} others)`} also show concerning burnout indicators. </>
-                                    )}
-                                  </>
-                                )}
-                                {topBurnoutFactor && topBurnoutFactor.average && topBurnoutFactor.average > 0.3 && !highRiskMembers.length && (
-                                  <>Across the team, <span className="font-semibold text-amber-600">{topBurnoutFactor.displayName.toLowerCase()}</span> is the most significant stress factor, 
-                                  affecting team members with an average impact of {Math.min(topBurnoutFactor.average * 10, 10).toFixed(1)}/10. </>
-                                )}
-                                {hasPatterns && aiInsights.common_patterns.length > 1 && (
-                                  <> The team exhibits {aiInsights.common_patterns.length} distinct burnout patterns, 
-                                  with "{aiInsights.common_patterns[0].pattern}" being the most prevalent. </>
-                                )}
-                              </p>
-                            </div>
-                          )}
-
-                          {/* Recommendations Paragraph */}
-                          {hasRecommendations && (
-                            <div>
-                              <h4 className="font-semibold text-gray-900 mb-2">Recommendations</h4>
-                              <p className="leading-relaxed">
-                                {aiInsights.team_recommendations[0] && (
-                                  <>
-                                    The highest priority action is to <span className="font-semibold">{aiInsights.team_recommendations[0].title.toLowerCase()}</span>. 
-                                    {aiInsights.team_recommendations[0].description} 
-                                    {aiInsights.team_recommendations[0].expected_impact && (
-                                      <> This is expected to {aiInsights.team_recommendations[0].expected_impact.toLowerCase()}</>
-                                    )}
-                                  </>
-                                )}
-                                {aiInsights.team_recommendations.length > 1 && (
-                                  <> Additionally, consider {aiInsights.team_recommendations[1].title.toLowerCase()} 
-                                  {aiInsights.team_recommendations.length > 2 && 
-                                    ` along with ${aiInsights.team_recommendations.length - 2} other recommended actions`}. </>
-                                )}
-                              </p>
-                            </div>
-                          )}
+                        <div className="text-center py-12 text-gray-500">
+                          <Sparkles className="h-10 w-10 mx-auto mb-4 opacity-40" />
+                          <h4 className="font-medium text-gray-700 mb-2">AI Analysis Unavailable</h4>
+                          <p className="text-sm mb-4">Configure your AI token to enable intelligent team insights</p>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => router.push('/settings')}
+                            className="mx-auto"
+                          >
+                            Configure AI Settings
+                          </Button>
                         </div>
                       )
                     })()}

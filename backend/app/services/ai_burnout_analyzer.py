@@ -8,6 +8,7 @@ from typing import Dict, List, Any, Optional
 from datetime import datetime
 
 from ..agents.burnout_agent import create_burnout_agent
+from ..agents.workflows import run_team_analysis_workflow
 
 logger = logging.getLogger(__name__)
 
@@ -142,6 +143,58 @@ class AIBurnoutAnalyzerService:
         except Exception as e:
             self.logger.error(f"Error generating team insights: {e}")
             return {"available": False, "error": str(e)}
+    
+    async def run_comprehensive_workflow(
+        self,
+        team_data: List[Dict[str, Any]],
+        available_integrations: List[str],
+        historical_data: Optional[List[Dict]] = None
+    ) -> Dict[str, Any]:
+        """
+        Run comprehensive team analysis workflow using advanced smolagents capabilities.
+        
+        Args:
+            team_data: List of team member data
+            available_integrations: Available data sources
+            historical_data: Optional historical analyses for trend analysis
+            
+        Returns:
+            Comprehensive workflow results with multi-phase analysis
+        """
+        if not self.available:
+            return {
+                "available": False, 
+                "message": "AI agent not available for workflow analysis"
+            }
+        
+        try:
+            # Run the comprehensive workflow
+            workflow_results = await run_team_analysis_workflow(
+                agent=self.agent,
+                team_data=team_data,
+                available_data_sources=available_integrations,
+                historical_data=historical_data
+            )
+            
+            # Log workflow completion
+            phases_completed = len(workflow_results.get("phases", {}))
+            team_size = workflow_results.get("team_size", 0)
+            self.logger.info(
+                f"Comprehensive workflow completed - Team size: {team_size}, "
+                f"Phases: {phases_completed}, Status: {workflow_results.get('executive_summary', {}).get('team_health_status', 'unknown')}"
+            )
+            
+            return {
+                "available": True,
+                "workflow_results": workflow_results
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Error in comprehensive workflow: {e}")
+            return {
+                "available": False,
+                "error": str(e)
+            }
     
     def _prepare_ai_data(self, member_data: Dict[str, Any], integrations: List[str]) -> Dict[str, Any]:
         """
@@ -914,7 +967,9 @@ class AIBurnoutAnalyzerService:
             
             # Create detailed prompt for rich narrative generation
             prompt = f"""
-You are an expert burnout analyst reviewing a software team's health data. Generate a detailed, insightful narrative analysis that goes beyond basic statistics.
+You are an expert burnout analyst reviewing a software team's health data. Generate a detailed, insightful narrative analysis that is COMPLETELY UNIQUE to this team's specific situation. Every analysis must be different - no templates or boilerplate.
+
+**Analysis Timestamp:** {datetime.utcnow().isoformat()}
 
 **Team Data:**
 - Team Size: {team_data['team_size']} members
@@ -931,27 +986,38 @@ You are an expert burnout analyst reviewing a software team's health data. Gener
 **Communication & Activity Patterns:**
 {team_data['activity_patterns']}
 
-**Generate a comprehensive analysis with:**
+**Additional Context:**
+- Analysis Period: Last 30 days
+- High Risk Members: {len([m for m in team_members if m.get('burnout_score', 0) >= 7])}
+- Total Incidents: {sum(m.get('incident_count', 0) for m in team_members)}
 
-**Summary Section:**
-- Rich contextual opening that tells the story of this team
-- Specific numbers with meaningful interpretation
-- Overall health assessment with nuanced reasoning
+**CRITICAL REQUIREMENTS - Generate a UNIQUE analysis:**
 
-**Key Observations Section:**
-- 3-4 detailed observations about patterns, risks, and team dynamics  
-- Include specific examples and data points
-- Explain WHY these patterns are concerning or positive
-- Connect different data sources (incidents, GitHub, Slack) to show relationships
+**Summary Section (2-3 paragraphs):**
+- Start with a unique opening that captures THIS team's specific situation
+- Tell their story through the data - what makes this team different?
+- Include ALL key metrics but weave them into a narrative, not a list
+- Assess health with specific reasoning unique to their data patterns
+- Use metaphors or analogies that fit their specific context
 
-**Focus on:**
-- Storytelling with data - make the numbers come alive
-- Specific behavioral patterns and their implications
-- Industry context and comparisons where relevant
-- Actionable insights rather than just descriptions
-- Interdependencies between workload, communication, and burnout
+**Key Observations Section (3-4 detailed observations):**
+- Each observation must be data-driven and specific to this team
+- Look for non-obvious patterns or correlations in their data
+- Explain the "why" - what might be causing these specific patterns?
+- Connect different data sources to reveal unique insights
+- Include industry context where it adds value
+- Suggest root causes based on the specific data combinations
 
-Make it engaging, specific, and actionable. Use concrete examples from the data.
+**MANDATORY - Make it unique by:**
+- Varying sentence structure and writing style
+- Using different analytical frameworks each time
+- Finding surprising connections in the data
+- Referencing specific numbers in creative ways
+- Acknowledging data limitations honestly
+- Never using phrases that could apply to any team
+- Making each insight actionable and specific
+
+**Remember:** This team is unique. Their data tells a specific story. Your analysis should feel custom-written for their exact situation, with insights they couldn't get from a generic report.
 """
 
             # Call LLM for narrative generation
@@ -988,49 +1054,119 @@ Make it engaging, specific, and actionable. Use concrete examples from the data.
         
         # Calculate comprehensive metrics
         avg_burnout = sum(m.get("burnout_score", 0) for m in team_members) / len(team_members) if team_members else 0
+        total_incidents = sum(m.get("incident_count", 0) for m in team_members)
+        
+        # Risk distribution
+        risk_levels = {"low": 0, "medium": 0, "high": 0, "critical": 0}
+        for member in team_members:
+            risk_level = member.get("risk_level", "low").lower()
+            if risk_level in risk_levels:
+                risk_levels[risk_level] += 1
         
         # Detailed metrics breakdown
         metrics_breakdown = []
+        github_stats = {}
+        slack_stats = {}
+        
         if "github" in available_integrations:
             total_commits = sum(m.get("github_activity", {}).get("commits_count", 0) for m in team_members)
             after_hours_commits = sum(m.get("github_activity", {}).get("after_hours_commits", 0) for m in team_members)
+            weekend_commits = sum(m.get("github_activity", {}).get("weekend_commits", 0) for m in team_members)
+            total_prs = sum(m.get("github_activity", {}).get("pull_requests_count", 0) for m in team_members)
+            total_reviews = sum(m.get("github_activity", {}).get("reviews_count", 0) for m in team_members)
+            
             after_hours_pct = (after_hours_commits / total_commits * 100) if total_commits > 0 else 0
-            metrics_breakdown.append(f"GitHub: {total_commits} commits, {after_hours_pct:.1f}% after hours")
+            weekend_pct = (weekend_commits / total_commits * 100) if total_commits > 0 else 0
+            
+            metrics_breakdown.append(f"GitHub: {total_commits} commits ({after_hours_pct:.1f}% after hours, {weekend_pct:.1f}% weekends), {total_prs} PRs, {total_reviews} reviews")
+            
+            github_stats = {
+                "total_commits": total_commits,
+                "after_hours_percentage": after_hours_pct,
+                "weekend_percentage": weekend_pct,
+                "total_prs": total_prs,
+                "total_reviews": total_reviews
+            }
         
         if "slack" in available_integrations:
             total_messages = sum(m.get("slack_activity", {}).get("messages_sent", 0) for m in team_members)
             after_hours_messages = sum(m.get("slack_activity", {}).get("after_hours_messages", 0) for m in team_members)
             after_hours_msg_pct = (after_hours_messages / total_messages * 100) if total_messages > 0 else 0
-            avg_sentiment = sum(m.get("slack_activity", {}).get("sentiment_score", 0) for m in team_members) / len(team_members)
-            metrics_breakdown.append(f"Slack: {total_messages} messages, {after_hours_msg_pct:.1f}% after hours, {avg_sentiment:.2f} avg sentiment")
+            avg_sentiment = sum(m.get("slack_activity", {}).get("sentiment_score", 0) for m in team_members) / len(team_members) if team_members else 0
+            
+            sentiment_label = "negative" if avg_sentiment < -0.1 else "neutral" if avg_sentiment < 0.1 else "positive"
+            metrics_breakdown.append(f"Slack: {total_messages} messages ({after_hours_msg_pct:.1f}% after hours), {sentiment_label} sentiment ({avg_sentiment:.2f})")
+            
+            slack_stats = {
+                "total_messages": total_messages,
+                "after_hours_percentage": after_hours_msg_pct,
+                "avg_sentiment": avg_sentiment,
+                "sentiment_label": sentiment_label
+            }
         
-        # Individual patterns
-        high_risk_members = [m for m in team_members if m.get("burnout_score", 0) >= 7]
+        # Individual patterns with more detail
+        high_risk_members = sorted(
+            [m for m in team_members if m.get("burnout_score", 0) >= 7],
+            key=lambda x: x.get("burnout_score", 0),
+            reverse=True
+        )
+        
         individual_insights = []
-        for member in high_risk_members[:3]:  # Top 3 highest risk
+        for member in high_risk_members[:5]:  # Top 5 highest risk
             name = member.get("user_name", "Anonymous")
             score = member.get("burnout_score", 0)
             incidents = member.get("incident_count", 0)
-            individual_insights.append(f"{name}: {score:.1f}/10 burnout, {incidents} incidents")
+            risk_level = member.get("risk_level", "unknown")
+            
+            # Add more context about the member
+            github_commits = member.get("github_activity", {}).get("commits_count", 0)
+            after_hours_pct = member.get("after_hours_percentage", 0)
+            
+            insight = f"{name}: {score:.1f}/10 burnout ({risk_level} risk), {incidents} incidents"
+            if github_commits > 0:
+                insight += f", {github_commits} commits ({after_hours_pct:.1f}% after hours)"
+            
+            individual_insights.append(insight)
         
-        # Activity patterns
+        # Activity patterns with more detail
         activity_insights = []
-        weekend_workers = len([m for m in team_members if m.get("github_activity", {}).get("weekend_commits", 0) > 0])
-        if weekend_workers > 0:
-            activity_insights.append(f"{weekend_workers} members working weekends")
         
-        late_responders = len([m for m in team_members if m.get("metrics", {}).get("avg_response_time_minutes", 0) > 120])
-        if late_responders > 0:
-            activity_insights.append(f"{late_responders} members with slow incident response (>2h)")
+        # Weekend workers
+        weekend_workers = [m for m in team_members if m.get("github_activity", {}).get("weekend_commits", 0) > 0]
+        if weekend_workers:
+            weekend_worker_names = [m.get("user_name", "Unknown") for m in weekend_workers[:3]]
+            activity_insights.append(f"{len(weekend_workers)} members working weekends (including {', '.join(weekend_worker_names)})")
+        
+        # Late responders
+        late_responders = [m for m in team_members if m.get("metrics", {}).get("avg_response_time_minutes", 0) > 120]
+        if late_responders:
+            activity_insights.append(f"{len(late_responders)} members with slow incident response (>2h avg)")
+        
+        # Incident concentration
+        if active_responders and total_incidents > 0:
+            top_responder = max(active_responders, key=lambda x: x.get("incident_count", 0))
+            top_responder_load = (top_responder.get("incident_count", 0) / total_incidents * 100)
+            if top_responder_load > 30:
+                activity_insights.append(f"{top_responder.get('user_name', 'Top responder')} handles {top_responder_load:.0f}% of all incidents")
+        
+        # Workload imbalance
+        if team_members:
+            zero_incident_members = len([m for m in team_members if m.get("incident_count", 0) == 0])
+            if zero_incident_members > len(team_members) * 0.5:
+                activity_insights.append(f"{zero_incident_members}/{len(team_members)} members have zero incidents")
         
         return {
             "team_size": len(team_members),
             "active_responders": len(active_responders),
             "responder_percentage": len(active_responders) / len(team_members) * 100 if team_members else 0,
             "avg_burnout_score": avg_burnout,
+            "total_incidents": total_incidents,
+            "risk_distribution": f"Critical: {risk_levels['critical']}, High: {risk_levels['high']}, Medium: {risk_levels['medium']}, Low: {risk_levels['low']}",
             "detailed_metrics": "; ".join(metrics_breakdown) if metrics_breakdown else "Limited metrics available",
             "individual_patterns": "; ".join(individual_insights) if individual_insights else "No high-risk members identified",
-            "activity_patterns": "; ".join(activity_insights) if activity_insights else "Standard activity patterns"
+            "activity_patterns": "; ".join(activity_insights) if activity_insights else "Standard activity patterns",
+            "github_stats": github_stats,
+            "slack_stats": slack_stats
         }
 
     def _call_anthropic_for_narrative(self, prompt: str, api_key: str) -> str:
@@ -1090,68 +1226,8 @@ Make it engaging, specific, and actionable. Use concrete examples from the data.
             raise Exception(f"OpenAI API error: {response.status_code} - {response.text}")
 
     def _generate_fallback_detailed_narrative(self, team_members: List[Dict[str, Any]], available_integrations: List[str]) -> str:
-        """Generate detailed narrative without LLM when API is unavailable."""
-        active_responders = [m for m in team_members if m.get("incident_count", 0) > 0]
-        avg_burnout = sum(m.get("burnout_score", 0) for m in team_members) / len(team_members) if team_members else 0
-        high_risk_count = len([m for m in team_members if m.get("burnout_score", 0) >= 7])
-        
-        # Calculate additional insights
-        total_incidents = sum(m.get("incident_count", 0) for m in team_members)
-        workload_concentration = len(active_responders) / len(team_members) * 100 if team_members else 0
-        
-        # GitHub insights
-        github_insights = ""
-        if "github" in available_integrations:
-            total_commits = sum(m.get("github_activity", {}).get("commits_count", 0) for m in team_members)
-            after_hours_commits = sum(m.get("github_activity", {}).get("after_hours_commits", 0) for m in team_members)
-            weekend_commits = sum(m.get("github_activity", {}).get("weekend_commits", 0) for m in team_members)
-            
-            if total_commits > 0:
-                after_hours_pct = (after_hours_commits / total_commits) * 100
-                weekend_pct = (weekend_commits / total_commits) * 100
-                
-                # Determine work-life balance assessment based on actual percentages
-                if after_hours_pct > 30 or weekend_pct > 15:
-                    boundary_assessment = "indicating significant work-life boundary challenges"
-                elif after_hours_pct > 20 or weekend_pct > 10:
-                    boundary_assessment = "suggesting some work-life balance concerns"
-                elif after_hours_pct > 10 or weekend_pct > 5:
-                    boundary_assessment = "showing minor after-hours activity"
-                else:
-                    boundary_assessment = "demonstrating excellent work-life boundaries"
-                
-                github_insights = f" Code activity analysis reveals {after_hours_pct:.1f}% of commits happen after hours and {weekend_pct:.1f}% on weekends, {boundary_assessment}."
-        
-        # Slack insights  
-        slack_insights = ""
-        if "slack" in available_integrations:
-            total_messages = sum(m.get("slack_activity", {}).get("messages_sent", 0) for m in team_members)
-            after_hours_messages = sum(m.get("slack_activity", {}).get("after_hours_messages", 0) for m in team_members)
-            avg_sentiment = sum(m.get("slack_activity", {}).get("sentiment_score", 0) for m in team_members) / len(team_members) if team_members else 0
-            
-            if total_messages > 0:
-                after_hours_msg_pct = (after_hours_messages / total_messages) * 100
-                sentiment_label = "concerning" if avg_sentiment < -0.1 else "neutral" if avg_sentiment < 0.1 else "positive"
-                slack_insights = f" Communication patterns show {after_hours_msg_pct:.1f}% of messages sent after hours with {sentiment_label} overall sentiment (score: {avg_sentiment:.2f})."
-        
-        # Risk assessment
-        risk_level = "critical" if high_risk_count > len(team_members) * 0.3 else "elevated" if high_risk_count > 0 else "manageable" if avg_burnout > 5 else "good"
-        
-        narrative = f"""**Summary**
-
-Your {len(team_members)}-person team shows a {workload_concentration:.0f}% concentration of incident responsibility, with only {len(active_responders)} members handling all {total_incidents} incidents over the analysis period. This creates a classic 'hero syndrome' where a small group carries disproportionate operational burden. The team's average burnout score of {avg_burnout:.1f}/10 places them in {risk_level} territory, with {high_risk_count} member{'s' if high_risk_count != 1 else ''} showing high-risk burnout symptoms.{github_insights}{slack_insights}
-
-**Key Observations**
-
-The data reveals several concerning patterns that warrant immediate attention. First, the extreme concentration of incident response duties suggests systemic knowledge silos - when incident handling is limited to {workload_concentration:.0f}% of the team, it creates both single points of failure and unsustainable pressure on key individuals. This pattern typically leads to accelerated burnout among top performers while leaving other team members disconnected from production realities.
-
-Second, the cross-platform activity data {'shows clear work-life boundary erosion' if 'github' in available_integrations or 'slack' in available_integrations else 'suggests potential work-life balance challenges'}. When team members consistently work outside normal hours across multiple platforms, it indicates either unrealistic workload expectations or poor work distribution. This pattern is particularly dangerous because it normalizes 'always-on' culture.
-
-Third, the team's risk distribution suggests burnout is not randomly distributed but concentrated among your most engaged contributors - precisely the people you can least afford to lose. {'This creates a vicious cycle where your best performers become increasingly overwhelmed while taking on even more responsibility.' if high_risk_count > 0 else 'While current risk levels are manageable, the concentration patterns suggest vulnerability to rapid deterioration under increased pressure.'}
-
-The combination of workload concentration, boundary erosion, and risk clustering creates a fragile system vulnerable to cascade failures - where one person's burnout can trigger increased pressure on others, leading to team-wide degradation."""
-        
-        return narrative
+        """Return empty string when LLM is not available - no template fallback."""
+        return ""
 
 
 # Cache for AI analyzer instances (keyed by API key hash for security)
