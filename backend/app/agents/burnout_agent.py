@@ -7,11 +7,11 @@ import logging
 from datetime import datetime
 
 try:
-    from smolagents import CodeAgent, HfApiModel
+    from smolagents import CodeAgent, LiteLLMModel
 except ImportError:
     # Fallback for development/testing
     CodeAgent = None
-    HfApiModel = None
+    LiteLLMModel = None
 
 from .tools.sentiment_analyzer import create_sentiment_analyzer_tool
 from .tools.pattern_analyzer import create_pattern_analyzer_tool
