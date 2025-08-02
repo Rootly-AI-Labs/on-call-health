@@ -956,10 +956,18 @@ Make it engaging, specific, and actionable. Use concrete examples from the data.
 
             # Call LLM for narrative generation
             try:
+                # Decrypt the LLM token before using it
+                from ..api.endpoints.llm import decrypt_token
+                decrypted_token = decrypt_token(current_user.llm_token) if current_user.llm_token else None
+                
+                if not decrypted_token:
+                    self.logger.warning("No valid LLM token available after decryption")
+                    return self._generate_fallback_detailed_narrative(team_members, available_integrations)
+                
                 if current_user.llm_provider == "anthropic":
-                    narrative = self._call_anthropic_for_narrative(prompt, current_user.llm_token)
+                    narrative = self._call_anthropic_for_narrative(prompt, decrypted_token)
                 elif current_user.llm_provider == "openai":
-                    narrative = self._call_openai_for_narrative(prompt, current_user.llm_token)
+                    narrative = self._call_openai_for_narrative(prompt, decrypted_token)
                 else:
                     self.logger.warning(f"Unsupported LLM provider: {current_user.llm_provider}")
                     return self._generate_fallback_detailed_narrative(team_members, available_integrations)
