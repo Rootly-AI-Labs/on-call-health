@@ -1180,7 +1180,7 @@ You are an expert burnout analyst reviewing a software team's health data. Gener
         }
         
         data = {
-            "model": "claude-3-sonnet-20240229",
+            "model": "claude-3-5-sonnet-20241022",
             "max_tokens": 1500,
             "messages": [{"role": "user", "content": prompt}]
         }

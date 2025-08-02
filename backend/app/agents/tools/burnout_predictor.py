@@ -173,8 +173,24 @@ class BurnoutPredictorTool:
         mean_x = statistics.mean(x_values)
         mean_y = statistics.mean(values)
         
-        numerator = sum((x - mean_x) * (y - mean_y) for x, y in zip(x_values, values))
-        denominator = sum((x - mean_x) ** 2 for x in x_values)
+        # Filter out None values
+        valid_pairs = [(x, y) for x, y in zip(x_values, values) if y is not None]
+        if not valid_pairs:
+            return {
+                "direction": "insufficient_data",
+                "slope": 0,
+                "acceleration": 0,
+                "volatility": 0
+            }
+        
+        x_valid = [x for x, y in valid_pairs]
+        y_valid = [y for x, y in valid_pairs]
+        
+        mean_x = statistics.mean(x_valid) if x_valid else 0
+        mean_y = statistics.mean(y_valid) if y_valid else 0
+        
+        numerator = sum((x - mean_x) * (y - mean_y) for x, y in valid_pairs)
+        denominator = sum((x - mean_x) ** 2 for x in x_valid)
         
         slope = numerator / denominator if denominator != 0 else 0
         
@@ -184,14 +200,17 @@ class BurnoutPredictorTool:
         
         # Calculate acceleration (change in slope)
         acceleration = 0
-        if len(values) >= 4:
-            mid_point = len(values) // 2
-            first_half_slope = self._calculate_simple_slope(values[:mid_point])
-            second_half_slope = self._calculate_simple_slope(values[mid_point:])
+        if len(y_valid) >= 4:
+            mid_point = len(y_valid) // 2
+            first_half_slope = self._calculate_simple_slope(y_valid[:mid_point])
+            second_half_slope = self._calculate_simple_slope(y_valid[mid_point:])
             acceleration = second_half_slope - first_half_slope
         
         # Calculate volatility
-        volatility = statistics.stdev(values) / statistics.mean(values) if len(values) > 1 and statistics.mean(values) != 0 else 0
+        if len(y_valid) > 1 and statistics.mean(y_valid) != 0:
+            volatility = statistics.stdev(y_valid) / statistics.mean(y_valid)
+        else:
+            volatility = 0
         
         # Determine direction
         if slope > 0.1:
@@ -212,9 +231,9 @@ class BurnoutPredictorTool:
             "slope": round(slope, 3),
             "acceleration": round(acceleration, 3),
             "volatility": round(volatility, 3),
-            "current_value": values[-1] if values else 0,
-            "mean_value": round(statistics.mean(values), 2) if values else 0,
-            "data_points": len(values)
+            "current_value": y_valid[-1] if y_valid else 0,
+            "mean_value": round(statistics.mean(y_valid), 2) if y_valid else 0,
+            "data_points": len(y_valid)
         }
     
     def _calculate_simple_slope(self, values: List[float]) -> float:
