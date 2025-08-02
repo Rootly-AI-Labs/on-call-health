@@ -122,7 +122,7 @@ class GitHubCorrelationService:
     
     def _fetch_integration_mappings(self) -> List[Dict[str, Any]]:
         """
-        Fetch successful GitHub mappings from integration_mappings table
+        Fetch successful GitHub mappings from BOTH integration_mappings and user_mappings tables
         """
         try:
             # Use DATABASE_URL environment variable
@@ -134,10 +134,12 @@ class GitHubCorrelationService:
             engine = create_engine(database_url)
             conn = engine.connect()
             
-            # Get all successful GitHub mappings for the current user
-            query = """
+            mappings = []
+            
+            # First, get mappings from integration_mappings table (auto-detected)
+            query1 = """
                 SELECT source_identifier, target_identifier, data_points_count, 
-                       mapping_successful, created_at
+                       mapping_successful, created_at, 'auto' as mapping_source
                 FROM integration_mappings 
                 WHERE target_platform = 'github' 
                   AND mapping_successful = true
@@ -145,36 +147,84 @@ class GitHubCorrelationService:
                   AND target_identifier != 'None'
             """
             
-            # Add user filter if available
             params = {}
             if self.current_user_id:
-                query += " AND user_id = :user_id"
+                query1 += " AND user_id = :user_id"
                 params['user_id'] = self.current_user_id
             
-            query += " ORDER BY created_at DESC"
+            query1 += " ORDER BY created_at DESC"
             
-            result = conn.execute(text(query), params)
-            results = result.fetchall()
+            result1 = conn.execute(text(query1), params)
+            auto_mappings = result1.fetchall()
             
-            mappings = []
-            for row in results:
-                email, username, data_points, successful, created_at = row
+            # Process auto-detected mappings
+            seen_emails = set()
+            for row in auto_mappings:
+                email, username, data_points, successful, created_at, source = row
+                email_lower = email.lower()
+                if email_lower not in seen_emails:
+                    mappings.append({
+                        'email': email,
+                        'username': username,
+                        'data_points': data_points or 0,
+                        'mapping_successful': successful,
+                        'created_at': created_at,
+                        'source': 'auto_detected'
+                    })
+                    seen_emails.add(email_lower)
+            
+            # Second, get manual mappings from user_mappings table
+            query2 = """
+                SELECT source_identifier, target_identifier, created_at
+                FROM user_mappings
+                WHERE source_platform = 'rootly'
+                  AND target_platform = 'github'
+                  AND target_identifier IS NOT NULL
+                  AND target_identifier != ''
+            """
+            
+            if self.current_user_id:
+                query2 += " AND user_id = :user_id"
+            
+            query2 += " ORDER BY created_at DESC"
+            
+            result2 = conn.execute(text(query2), params)
+            manual_mappings = result2.fetchall()
+            
+            # Process manual mappings, preferring them over auto-detected
+            for row in manual_mappings:
+                email, username, created_at = row
+                email_lower = email.lower()
                 
+                # Remove any existing auto-detected mapping for this email
+                mappings = [m for m in mappings if m['email'].lower() != email_lower]
+                
+                # Add the manual mapping
                 mappings.append({
                     'email': email,
                     'username': username,
-                    'data_points': data_points or 0,
-                    'mapping_successful': successful,
-                    'created_at': created_at
+                    'data_points': 0,  # Will be fetched when collecting data
+                    'mapping_successful': True,
+                    'created_at': created_at,
+                    'source': 'manual'
                 })
+                seen_emails.add(email_lower)
             
             conn.close()
             
-            self.logger.info(f"Fetched {len(mappings)} successful GitHub mappings from integration_mappings")
+            self.logger.info(f"Fetched {len(mappings)} total GitHub mappings:")
+            self.logger.info(f"  - Auto-detected: {len([m for m in mappings if m['source'] == 'auto_detected'])}")
+            self.logger.info(f"  - Manual: {len([m for m in mappings if m['source'] == 'manual'])}")
+            
+            # Log manual mappings for debugging
+            for mapping in mappings:
+                if mapping['source'] == 'manual':
+                    self.logger.info(f"  Manual mapping: {mapping['email']} → {mapping['username']}")
+            
             return mappings
             
         except Exception as e:
-            self.logger.error(f"Error fetching integration mappings: {e}")
+            self.logger.error(f"Error fetching mappings: {e}")
             return []
     
     def _create_github_activity_from_integration_mapping(self, mapping: Dict[str, Any]) -> Dict[str, Any]:

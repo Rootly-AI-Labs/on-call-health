@@ -49,8 +49,8 @@ async def collect_team_github_data_with_mapping(
     # Phase 1.3: Track processed emails to prevent duplicates within this analysis session
     processed_emails = set()
     
-    # Call original function
-    github_data = await original_collect_team_github_data(team_emails, days, github_token)
+    # Call original function with user_id for manual mapping support
+    github_data = await original_collect_team_github_data(team_emails, days, github_token, user_id)
     
     # Record mapping attempts if we have user context
     if recorder and user_id:

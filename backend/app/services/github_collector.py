@@ -9,6 +9,8 @@ from pathlib import Path
 from typing import Dict, List, Optional
 import requests
 import asyncio
+import os
+from sqlalchemy import create_engine, text
 # from sqlalchemy.orm import Session
 # from ..models import GitHubIntegration
 
@@ -52,24 +54,31 @@ class GitHubCollector:
         # Cache for email mapping
         self._email_mapping_cache = None
         
-    async def _correlate_email_to_github(self, email: str, token: str) -> Optional[str]:
+    async def _correlate_email_to_github(self, email: str, token: str, user_id: Optional[int] = None) -> Optional[str]:
         """
         Correlate an email address to a GitHub username using multiple strategies.
         
-        This mimics the logic from the original burnout detector:
-        1. Check manual mappings first
-        2. Check discovered email mappings from organization members
+        This checks in order:
+        1. Manual mappings from user_mappings table (highest priority)
+        2. Predefined mappings (hardcoded)
+        3. Discovered email mappings from organization members
         """
-        logger.info(f"GitHub correlation attempt for {email}, token={'present' if token else 'missing'}")
+        logger.info(f"GitHub correlation attempt for {email}, token={'present' if token else 'missing'}, user_id={user_id}")
         
         if not token:
             logger.warning("No GitHub token provided for correlation")
             return None
             
         try:
-            # First check predefined mappings
+            # FIRST: Check manual mappings from user_mappings table (highest priority)
+            if user_id:
+                manual_username = await self._check_manual_mappings(email, user_id)
+                if manual_username:
+                    logger.info(f"Found GitHub correlation via MANUAL mapping: {email} -> {manual_username}")
+                    return manual_username
+            
+            # SECOND: Check predefined mappings (hardcoded)
             logger.info(f"Checking predefined mappings for {email}. Available mappings: {list(self.predefined_email_mappings.keys())}")
-            logger.info(f"Predefined mappings dict: {self.predefined_email_mappings}")
             username = self.predefined_email_mappings.get(email)
             if username:
                 logger.info(f"Found GitHub correlation via predefined mapping: {email} -> {username}")
@@ -95,6 +104,59 @@ class GitHubCollector:
             
         except Exception as e:
             logger.error(f"Error correlating email {email} to GitHub: {e}")
+            return None
+    
+    async def _check_manual_mappings(self, email: str, user_id: int) -> Optional[str]:
+        """
+        Check user_mappings table for manual GitHub mappings.
+        
+        Args:
+            email: The email address to look up
+            user_id: The user ID who owns the mappings
+            
+        Returns:
+            GitHub username if found, None otherwise
+        """
+        try:
+            database_url = os.getenv('DATABASE_URL')
+            if not database_url:
+                logger.warning("DATABASE_URL not set, cannot check manual mappings")
+                return None
+            
+            engine = create_engine(database_url)
+            conn = engine.connect()
+            
+            # Query for manual mapping
+            query = """
+                SELECT target_identifier
+                FROM user_mappings
+                WHERE user_id = :user_id
+                  AND source_platform = 'rootly'
+                  AND source_identifier = :email
+                  AND target_platform = 'github'
+                  AND target_identifier IS NOT NULL
+                  AND target_identifier != ''
+                ORDER BY created_at DESC
+                LIMIT 1
+            """
+            
+            result = conn.execute(
+                text(query),
+                {'user_id': user_id, 'email': email}
+            )
+            row = result.fetchone()
+            conn.close()
+            
+            if row:
+                username = row[0]
+                logger.info(f"Found manual GitHub mapping: {email} -> {username}")
+                return username
+            else:
+                logger.debug(f"No manual GitHub mapping found for {email}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error checking manual mappings: {e}")
             return None
     
     async def _build_email_mapping(self, token: str) -> Dict[str, str]:
@@ -433,7 +495,7 @@ class GitHubCollector:
             logger.error(f"Error fetching daily commit data for {username}: {e}")
             return None
     
-    async def collect_github_data_for_user(self, user_email: str, days: int = 30, github_token: str = None) -> Optional[Dict]:
+    async def collect_github_data_for_user(self, user_email: str, days: int = 30, github_token: str = None, user_id: Optional[int] = None) -> Optional[Dict]:
         """
         Collect GitHub activity data for a single user using email correlation.
         
@@ -441,12 +503,13 @@ class GitHubCollector:
             user_email: User's email to correlate with GitHub
             days: Number of days to analyze
             github_token: GitHub API token for authentication
+            user_id: User ID for checking manual mappings
             
         Returns:
             GitHub activity data or None if no correlation found
         """
         # Use email-based correlation to find GitHub username
-        github_username = await self._correlate_email_to_github(user_email, github_token)
+        github_username = await self._correlate_email_to_github(user_email, github_token, user_id)
         
         if not github_username:
             logger.warning(f"No GitHub username found for email {user_email}")
@@ -557,7 +620,7 @@ class GitHubCollector:
         self.last_request_time = time.time()
 
 
-async def collect_team_github_data(team_emails: List[str], days: int = 30, github_token: str = None) -> Dict[str, Dict]:
+async def collect_team_github_data(team_emails: List[str], days: int = 30, github_token: str = None, user_id: Optional[int] = None) -> Dict[str, Dict]:
     """
     Collect GitHub data for all team members.
     
@@ -565,6 +628,7 @@ async def collect_team_github_data(team_emails: List[str], days: int = 30, githu
         team_emails: List of team member emails
         days: Number of days to analyze
         github_token: GitHub API token for real data collection
+        user_id: User ID for checking manual mappings
         
     Returns:
         Dict mapping email -> github_activity_data
@@ -574,7 +638,7 @@ async def collect_team_github_data(team_emails: List[str], days: int = 30, githu
     
     for email in team_emails:
         try:
-            user_data = await collector.collect_github_data_for_user(email, days, github_token)
+            user_data = await collector.collect_github_data_for_user(email, days, github_token, user_id)
             if user_data:
                 github_data[email] = user_data
         except Exception as e:
