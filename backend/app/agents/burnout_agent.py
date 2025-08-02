@@ -31,13 +31,14 @@ class BurnoutDetectionAgent:
     adaptive analysis of burnout risk factors across multiple data sources.
     """
     
-    def __init__(self, model_name: str = "gpt-4o-mini", api_key: Optional[str] = None):
+    def __init__(self, model_name: str = "gpt-4o-mini", api_key: Optional[str] = None, provider: Optional[str] = None):
         """
         Initialize the burnout detection agent.
         
         Args:
             model_name: Name of the language model to use
             api_key: Optional API key for LLM access
+            provider: LLM provider ('openai' or 'anthropic')
         """
         self.logger = logging.getLogger(__name__)
         
@@ -68,9 +69,25 @@ class BurnoutDetectionAgent:
                 ]
                 
                 # Create the actual smolagents agent with reasoning capabilities
-                # Configure the model with the API key
+                # Configure the model with the API key based on provider
                 import os
-                os.environ["ANTHROPIC_API_KEY"] = api_key  # Set for LiteLLM
+                
+                # Set appropriate environment variable based on provider
+                if provider == "anthropic":
+                    os.environ["ANTHROPIC_API_KEY"] = api_key
+                    # Use appropriate Anthropic model name for LiteLLM
+                    if model_name == "gpt-4o-mini":  # Default was OpenAI
+                        model_name = "claude-3-haiku-20240307"  # Use Haiku for cost efficiency
+                elif provider == "openai":
+                    os.environ["OPENAI_API_KEY"] = api_key
+                else:
+                    # If provider not specified, try to detect from model name
+                    if "claude" in model_name.lower():
+                        os.environ["ANTHROPIC_API_KEY"] = api_key
+                        provider = "anthropic"
+                    else:
+                        os.environ["OPENAI_API_KEY"] = api_key
+                        provider = "openai"
                 
                 self.agent = CodeAgent(
                     tools=self.tools,
@@ -79,7 +96,7 @@ class BurnoutDetectionAgent:
                 )
                 
                 self.agent_available = True
-                self.logger.info(f"Smolagents agent initialized with {model_name} for natural language reasoning")
+                self.logger.info(f"Smolagents agent initialized with {model_name} ({provider}) for natural language reasoning")
                 
             except Exception as e:
                 self.logger.warning(f"Could not initialize smolagents with LLM: {e}")
@@ -783,15 +800,16 @@ Begin your comprehensive analysis of {member_name} now, using the tools in a log
         }
 
 
-def create_burnout_agent(model_name: str = "gpt-4o-mini", api_key: Optional[str] = None) -> BurnoutDetectionAgent:
+def create_burnout_agent(model_name: str = "gpt-4o-mini", api_key: Optional[str] = None, provider: Optional[str] = None) -> BurnoutDetectionAgent:
     """
     Factory function to create a burnout detection agent.
     
     Args:
         model_name: Name of the language model to use
         api_key: Optional API key for LLM access
+        provider: LLM provider ('openai' or 'anthropic')
         
     Returns:
         Configured BurnoutDetectionAgent instance
     """
-    return BurnoutDetectionAgent(model_name, api_key)
+    return BurnoutDetectionAgent(model_name, api_key, provider)

@@ -36,15 +36,22 @@ class AIBurnoutAnalyzerService:
     - Sentiment analysis integration
     """
     
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: Optional[str] = None, provider: Optional[str] = None):
         """Initialize the AI burnout analyzer service."""
         self.logger = logging.getLogger(__name__)
         self.api_key = api_key
+        self.provider = provider
         
         try:
-            self.agent = create_burnout_agent(api_key=api_key)
+            # Determine model name based on provider
+            if provider == "anthropic":
+                model_name = "claude-3-haiku-20240307"  # Cost-efficient for agent reasoning
+            else:
+                model_name = "gpt-4o-mini"  # Default OpenAI model
+            
+            self.agent = create_burnout_agent(model_name=model_name, api_key=api_key, provider=provider)
             self.available = True
-            self.logger.info(f"AI Burnout Analyzer initialized successfully (with API key: {bool(api_key)})")
+            self.logger.info(f"AI Burnout Analyzer initialized successfully (provider: {provider}, with API key: {bool(api_key)})")
         except Exception as e:
             self.logger.error(f"Failed to initialize AI agent: {e}")
             self.available = False
@@ -1233,21 +1240,22 @@ You are an expert burnout analyst reviewing a software team's health data. Gener
 # Cache for AI analyzer instances (keyed by API key hash for security)
 _ai_analyzer_cache = {}
 
-def get_ai_burnout_analyzer(api_key: Optional[str] = None) -> AIBurnoutAnalyzerService:
+def get_ai_burnout_analyzer(api_key: Optional[str] = None, provider: Optional[str] = None) -> AIBurnoutAnalyzerService:
     """
     Get AI burnout analyzer instance.
     
     Args:
         api_key: Optional API key for LLM access
+        provider: LLM provider ('openai' or 'anthropic')
         
     Returns:
         AIBurnoutAnalyzerService instance
     """
-    # Use a hash of the API key as cache key (for security)
+    # Use a hash of the API key and provider as cache key (for security)
     import hashlib
-    cache_key = hashlib.sha256((api_key or "").encode()).hexdigest()[:16]
+    cache_key = hashlib.sha256(f"{api_key or ''}:{provider or ''}".encode()).hexdigest()[:16]
     
     if cache_key not in _ai_analyzer_cache:
-        _ai_analyzer_cache[cache_key] = AIBurnoutAnalyzerService(api_key=api_key)
+        _ai_analyzer_cache[cache_key] = AIBurnoutAnalyzerService(api_key=api_key, provider=provider)
     
     return _ai_analyzer_cache[cache_key]
