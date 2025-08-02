@@ -10,7 +10,12 @@ load_dotenv()
 
 class Settings:
     # Database
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./test.db")
+    DATABASE_URL: str = os.getenv("DATABASE_URL")
+    if not DATABASE_URL:
+        raise ValueError(
+            "DATABASE_URL environment variable is required. "
+            "For local development, use PostgreSQL (e.g., postgresql://user:password@localhost/dbname)"
+        )
     
     # JWT
     JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "your-secret-key-change-in-production")

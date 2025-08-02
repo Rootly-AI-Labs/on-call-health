@@ -7,26 +7,21 @@ from sqlalchemy.orm import sessionmaker
 import os
 
 # Database configuration
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./test.db")
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise ValueError(
+        "DATABASE_URL environment variable is required. "
+        "For local development, use PostgreSQL (e.g., postgresql://user:password@localhost/dbname)"
+    )
 
-# Handle SQLite URL format for SQLAlchemy 2.0+
-if DATABASE_URL.startswith("sqlite"):
-    engine = create_engine(
-        DATABASE_URL, 
-        connect_args={"check_same_thread": False},
-        pool_size=20,
-        max_overflow=0,
-        pool_pre_ping=True,
-        pool_recycle=300
-    )
-else:
-    engine = create_engine(
-        DATABASE_URL,
-        pool_size=20,
-        max_overflow=0,
-        pool_pre_ping=True,
-        pool_recycle=300
-    )
+# Create PostgreSQL engine
+engine = create_engine(
+    DATABASE_URL,
+    pool_size=20,
+    max_overflow=0,
+    pool_pre_ping=True,
+    pool_recycle=300
+)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
