@@ -37,6 +37,7 @@ import {
   Activity,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Play,
   Clock,
   FileText,
@@ -754,6 +755,17 @@ export default function Dashboard() {
   // Mapping drawer states
   const [mappingDrawerOpen, setMappingDrawerOpen] = useState(false)
   const [mappingDrawerPlatform, setMappingDrawerPlatform] = useState<'github' | 'slack'>('github')
+  
+  // Data source expansion states
+  const [expandedDataSources, setExpandedDataSources] = useState<{
+    incident: boolean
+    github: boolean
+    slack: boolean
+  }>({
+    incident: false,
+    github: false,
+    slack: false
+  })
   // Initialize redirectingToSuggested to true if there's an analysis ID in URL
   const [redirectingToSuggested, setRedirectingToSuggested] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -3296,20 +3308,36 @@ export default function Dashboard() {
                     <div className="space-y-3">
                       {/* Incident Data */}
                       <div className="space-y-2">
-                        <div className="flex items-center">
+                        <div 
+                          className="flex items-center cursor-pointer hover:bg-gray-50 rounded px-1 py-0.5 transition-colors"
+                          onClick={() => setExpandedDataSources(prev => ({ ...prev, incident: !prev.incident }))}
+                        >
+                          {expandedDataSources.incident ? 
+                            <ChevronDown className="w-3 h-3 mr-1 text-gray-500" /> : 
+                            <ChevronRight className="w-3 h-3 mr-1 text-gray-500" />
+                          }
                           <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
                           <span className="text-xs font-medium text-slate-700 flex-1">Incident Management</span>
                           <CheckCircle className="w-3 h-3 text-green-600 ml-2" />
                         </div>
-                        <div className="ml-4 text-xs text-gray-600 space-y-1">
-                          <div>• {(currentAnalysis?.analysis_data as any)?.metadata?.total_incidents || 0} incidents</div>
-                          <div>• {(currentAnalysis?.analysis_data as any)?.team_analysis?.members?.length || 0} users</div>
-                        </div>
+                        {expandedDataSources.incident && (
+                          <div className="ml-7 text-xs text-gray-600 space-y-1">
+                            <div>• {(currentAnalysis?.analysis_data as any)?.metadata?.total_incidents || 0} incidents</div>
+                            <div>• {(currentAnalysis?.analysis_data as any)?.team_analysis?.members?.length || 0} users</div>
+                          </div>
+                        )}
                       </div>
                       
                       {/* GitHub Data */}
                       <div className="space-y-2">
-                        <div className="flex items-center">
+                        <div 
+                          className="flex items-center cursor-pointer hover:bg-gray-50 rounded px-1 py-0.5 transition-colors"
+                          onClick={() => setExpandedDataSources(prev => ({ ...prev, github: !prev.github }))}
+                        >
+                          {expandedDataSources.github ? 
+                            <ChevronDown className="w-3 h-3 mr-1 text-gray-500" /> : 
+                            <ChevronRight className="w-3 h-3 mr-1 text-gray-500" />
+                          }
                           <div className="w-2 h-2 bg-gray-900 rounded-full mr-2"></div>
                           <span className="text-xs font-medium text-slate-700 flex-1">GitHub Activity</span>
                           {currentAnalysis?.analysis_data?.data_sources?.github_data ? (
@@ -3318,8 +3346,8 @@ export default function Dashboard() {
                             <Minus className="w-3 h-3 text-gray-400 ml-2" />
                           )}
                         </div>
-                        {currentAnalysis?.analysis_data?.data_sources?.github_data && (
-                          <div className="ml-4 text-xs text-gray-600 space-y-1">
+                        {expandedDataSources.github && currentAnalysis?.analysis_data?.data_sources?.github_data && (
+                          <div className="ml-7 text-xs text-gray-600 space-y-1">
                             <div>• {currentAnalysis?.analysis_data?.github_insights?.total_commits?.toLocaleString() || '0'} commits</div>
                             <div>• {currentAnalysis?.analysis_data?.github_insights?.total_pull_requests?.toLocaleString() || '0'} PRs</div>
                           </div>
@@ -3328,7 +3356,14 @@ export default function Dashboard() {
                       
                       {/* Slack Data */}
                       <div className="space-y-2">
-                        <div className="flex items-center">
+                        <div 
+                          className="flex items-center cursor-pointer hover:bg-gray-50 rounded px-1 py-0.5 transition-colors"
+                          onClick={() => setExpandedDataSources(prev => ({ ...prev, slack: !prev.slack }))}
+                        >
+                          {expandedDataSources.slack ? 
+                            <ChevronDown className="w-3 h-3 mr-1 text-gray-500" /> : 
+                            <ChevronRight className="w-3 h-3 mr-1 text-gray-500" />
+                          }
                           <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
                           <span className="text-xs font-medium text-slate-700 flex-1">Slack Communications</span>
                           {currentAnalysis?.analysis_data?.data_sources?.slack_data ? (
@@ -3337,8 +3372,8 @@ export default function Dashboard() {
                             <Minus className="w-3 h-3 text-gray-400 ml-2" />
                           )}
                         </div>
-                        {currentAnalysis?.analysis_data?.data_sources?.slack_data && (
-                          <div className="ml-4 text-xs text-gray-600 space-y-1">
+                        {expandedDataSources.slack && currentAnalysis?.analysis_data?.data_sources?.slack_data && (
+                          <div className="ml-7 text-xs text-gray-600 space-y-1">
                             <div>• {currentAnalysis?.analysis_data?.slack_insights?.total_messages?.toLocaleString() || '0'} messages</div>
                             <div>• {currentAnalysis?.analysis_data?.slack_insights?.active_channels?.toLocaleString() || '0'} channels</div>
                           </div>
