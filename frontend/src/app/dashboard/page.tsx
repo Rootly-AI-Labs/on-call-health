@@ -3428,7 +3428,7 @@ export default function Dashboard() {
                           <Button 
                             variant="outline" 
                             size="sm"
-                            onClick={() => router.push('/settings')}
+                            onClick={() => router.push('/integrations')}
                             className="mx-auto"
                           >
                             Configure AI Settings
