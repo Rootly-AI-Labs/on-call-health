@@ -2802,7 +2802,7 @@ export default function Dashboard() {
           </div>
 
           {/* Debug Section - Only show in development */}
-          {process.env.NODE_ENV === 'development' && currentAnalysis && (
+          {false && process.env.NODE_ENV === 'development' && currentAnalysis && (
             <Card className="mb-6 bg-yellow-50 border-yellow-200">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-3">
@@ -2847,7 +2847,7 @@ export default function Dashboard() {
                           {currentAnalysis.analysis_data.team_analysis && (
                             <div className="ml-4 space-y-1 mt-2">
                               <div className="font-medium text-gray-700">Team Analysis:</div>
-                              <div>Members count: {Array.isArray(currentAnalysis.analysis_data.team_analysis) ? currentAnalysis.analysis_data.team_analysis.length : (currentAnalysis.analysis_data.team_analysis.members?.length || 0)}</div>
+                              <div>Members count: {Array.isArray(currentAnalysis.analysis_data.team_analysis) ? (currentAnalysis.analysis_data.team_analysis as any[]).length : ((currentAnalysis.analysis_data.team_analysis as any)?.members?.length || 0)}</div>
                               <div>Has organization_health: {(currentAnalysis.analysis_data.team_analysis as any).organization_health ? 'Yes' : 'No'}</div>
                               <div>Has insights: {(currentAnalysis.analysis_data.team_analysis as any).insights ? 'Yes' : 'No'}</div>
                             </div>
@@ -2855,14 +2855,14 @@ export default function Dashboard() {
                           
                           {(() => {
                             const teamAnalysis = currentAnalysis.analysis_data.team_analysis
-                            const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members
+                            const members = Array.isArray(teamAnalysis) ? teamAnalysis : (teamAnalysis as any)?.members
                             return members && members.length > 0
                           })() && (
                             <div className="ml-4 space-y-1 mt-2">
                               <div className="font-medium text-gray-700">Sample Member Data Sources:</div>
                               {(() => {
                                 const teamAnalysis = currentAnalysis.analysis_data.team_analysis
-                                const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members
+                                const members = Array.isArray(teamAnalysis) ? teamAnalysis : (teamAnalysis as any)?.members
                                 const member = members[0]
                                 return (
                                   <div className="ml-4 space-y-1">
@@ -2991,7 +2991,7 @@ export default function Dashboard() {
           {!shouldShowInsufficientDataCard() && !analysisRunning && currentAnalysis && (currentAnalysis.analysis_data?.team_health || currentAnalysis.analysis_data?.team_summary || currentAnalysis.analysis_data?.partial_data || currentAnalysis.analysis_data?.team_analysis) && (
             <>
               {/* Debug Section - Development Only */}
-              {process.env.NODE_ENV === 'development' && (
+              {false && process.env.NODE_ENV === 'development' && (
                 <Card className="mb-6 border-yellow-300 bg-yellow-50">
                   <CardHeader>
                     <CardTitle className="text-yellow-800 text-sm">🐛 Debug: Analysis Data Sources</CardTitle>
@@ -3007,7 +3007,7 @@ export default function Dashboard() {
                         <li>• slack_data flag: {currentAnalysis.analysis_data?.data_sources?.slack_data ? '✅ True' : '❌ False/Missing'}</li>
                         <li>• github_insights: {currentAnalysis.analysis_data?.github_insights ? '✅ Present' : '❌ Missing'}</li>
                         <li>• slack_insights: {currentAnalysis.analysis_data?.slack_insights ? '✅ Present' : '❌ Missing'}</li>
-                        <li>• team_analysis.members count: {Array.isArray(currentAnalysis.analysis_data?.team_analysis) ? currentAnalysis.analysis_data.team_analysis.length : (currentAnalysis.analysis_data?.team_analysis?.members?.length || 0)}</li>
+                        <li>• team_analysis.members count: {Array.isArray(currentAnalysis.analysis_data?.team_analysis) ? (currentAnalysis.analysis_data.team_analysis as any[]).length : ((currentAnalysis.analysis_data?.team_analysis as any)?.members?.length || 0)}</li>
                       </ul>
                       <p><strong>Metadata Check:</strong></p>
                       <ul className="ml-4 space-y-1">
