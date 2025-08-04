@@ -329,7 +329,7 @@ async def run_github_mapping(
             raise HTTPException(status_code=400, detail="GitHub integration not found")
         
         # Decrypt GitHub token
-        from ..github import decrypt_token
+        from .github import decrypt_token
         github_token = decrypt_token(github_integration.github_token)
         
         # Get unmapped Rootly users
