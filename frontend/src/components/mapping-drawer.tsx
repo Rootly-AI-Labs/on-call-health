@@ -279,7 +279,7 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
         return
       }
       
-      const response = await fetch(`${API_BASE}/manual-mappings/run-github-mapping`, {
+      const response = await fetch(`${API_BASE}/integrations/manual-mappings/run-github-mapping`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${authToken}`,
