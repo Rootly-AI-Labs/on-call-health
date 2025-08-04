@@ -2494,8 +2494,8 @@ export default function Dashboard() {
         </div>
 
         {/* Navigation */}
-        {!sidebarCollapsed && (
-          <div className="flex-1 flex flex-col p-4 space-y-2">
+        <div className={`flex-1 flex flex-col ${sidebarCollapsed ? 'p-2' : 'p-4'} space-y-2`}>
+          {!sidebarCollapsed ? (
             <div className="flex-1 space-y-2">
               <Button
                 onClick={startAnalysis}
@@ -2623,56 +2623,82 @@ export default function Dashboard() {
               })}
               </div>
             </div>
-          </div>
+            </div>
+          ) : (
+            <div className="flex-1">
+              {/* Collapsed state - just show new analysis button */}
+              <Button
+                onClick={startAnalysis}
+                disabled={analysisRunning}
+                className="w-full bg-purple-600 hover:bg-purple-700 text-white p-2"
+                title="New Analysis"
+              >
+                <Play className="w-4 h-4" />
+              </Button>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Separator className="bg-gray-700" />
             <Button 
               variant="ghost" 
-              className="w-full justify-start text-gray-300 hover:text-white hover:bg-gray-800"
+              className={`w-full ${sidebarCollapsed ? 'p-2' : ''} justify-start text-gray-300 hover:text-white hover:bg-gray-800`}
               onClick={() => router.push('/methodology')}
+              title="Methodology"
             >
-              <BookOpen className="w-4 h-4 mr-2" />
-              Methodology
+              <BookOpen className={`w-4 h-4 ${sidebarCollapsed ? '' : 'mr-2'}`} />
+              {!sidebarCollapsed && "Methodology"}
             </Button>
             <Button 
               variant="ghost" 
-              className="w-full justify-start text-gray-300 hover:text-white hover:bg-gray-800"
+              className={`w-full ${sidebarCollapsed ? 'p-2' : ''} justify-start text-gray-300 hover:text-white hover:bg-gray-800`}
+              onClick={() => router.push('/changelog')}
+              title="Changelog"
+            >
+              <FileText className={`w-4 h-4 ${sidebarCollapsed ? '' : 'mr-2'}`} />
+              {!sidebarCollapsed && "Changelog"}
+            </Button>
+            <Button 
+              variant="ghost" 
+              className={`w-full ${sidebarCollapsed ? 'p-2' : ''} justify-start text-gray-300 hover:text-white hover:bg-gray-800`}
               onClick={handleManageIntegrations}
+              title="Manage Integrations"
             >
-              <Settings className="w-4 h-4 mr-2" />
-              Manage Integrations
+              <Settings className={`w-4 h-4 ${sidebarCollapsed ? '' : 'mr-2'}`} />
+              {!sidebarCollapsed && "Manage Integrations"}
             </Button>
             <Button 
               variant="ghost" 
-              className="w-full justify-start text-gray-300 hover:text-white hover:bg-gray-800"
+              className={`w-full ${sidebarCollapsed ? 'p-2' : ''} justify-start text-gray-300 hover:text-white hover:bg-gray-800`}
               onClick={handleSignOut}
+              title="Sign Out"
             >
-              <LogOut className="w-4 h-4 mr-2" />
-              Sign Out
+              <LogOut className={`w-4 h-4 ${sidebarCollapsed ? '' : 'mr-2'}`} />
+              {!sidebarCollapsed && "Sign Out"}
             </Button>
             
             {/* Powered by Rootly */}
-            <div className="mt-4 pt-4 border-t border-gray-700">
-              <a 
-                href="https://rootly.com" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="flex flex-col items-center -space-y-1 hover:opacity-80 transition-opacity"
-              >
-                <span className="text-xs text-gray-400">powered by</span>
-                <Image 
-                  src="/images/rootly-logo-branded.png" 
-                  alt="Rootly" 
-                  width={90} 
-                  height={24} 
-                  className="h-6 w-auto ml-3"
-                />
-              </a>
-            </div>
+            {!sidebarCollapsed && (
+              <div className="mt-4 pt-4 border-t border-gray-700">
+                <a 
+                  href="https://rootly.com" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="flex flex-col items-center -space-y-1 hover:opacity-80 transition-opacity"
+                >
+                  <span className="text-xs text-gray-400">powered by</span>
+                  <Image 
+                    src="/images/rootly-logo-branded.png" 
+                    alt="Rootly" 
+                    width={90} 
+                    height={24} 
+                    className="h-6 w-auto ml-3"
+                  />
+                </a>
+              </div>
+            )}
           </div>
-          </div>
-        )}
+        </div>
       </div>
 
       {/* Main Content */}
