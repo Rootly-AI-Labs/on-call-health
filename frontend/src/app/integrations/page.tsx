@@ -800,18 +800,8 @@ export default function IntegrationsPage() {
         setPreviewData(null)
         setAddingPlatform(null)
         
-        // Reload only the specific integration type instead of all integrations
-        const authToken = localStorage.getItem('auth_token')
-        if (authToken) {
-          // Refresh just the integrations list without showing global loading
-          const response = await fetch('/api/integrations', {
-            headers: { 'Authorization': `Bearer ${authToken}` }
-          })
-          if (response.ok) {
-            const data = await response.json()
-            setIntegrations(data.integrations || [])
-          }
-        }
+        // Reload integrations to show the newly added one
+        await loadAllIntegrations(true)
       } else {
         throw new Error(responseData.detail?.message || responseData.message || 'Failed to add integration')
       }
