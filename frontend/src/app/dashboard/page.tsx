@@ -4182,6 +4182,27 @@ export default function Dashboard() {
                 )}
               </div>
 
+              {/* Validation Warnings - Show if any mismatches detected */}
+              {(currentAnalysis?.analysis_data as any)?.validation_warnings && (currentAnalysis?.analysis_data as any)?.validation_warnings?.length > 0 && (
+                <Card className="mb-6 border-2 border-yellow-200 bg-yellow-50/70">
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2 text-yellow-800">
+                      <AlertTriangle className="w-5 h-5" />
+                      <span>Data Validation Warnings</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {(currentAnalysis?.analysis_data as any)?.validation_warnings?.map((warning: any, index: number) => (
+                        <div key={index} className="text-sm text-yellow-700">
+                          <strong>{warning.type === 'github_high_risk_count_mismatch' ? 'GitHub Count Mismatch:' : 'Warning:'}</strong> {warning.message}
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* GitHub and Slack Metrics Section */}
               {(currentAnalysis?.analysis_data?.github_insights || currentAnalysis?.analysis_data?.slack_insights) && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
@@ -4311,6 +4332,17 @@ export default function Dashboard() {
                               {github.burnout_indicators && (
                                 <div className="bg-red-50 border border-red-200 rounded-lg p-3">
                                   <h4 className="text-sm font-semibold text-red-800 mb-2">Burnout Risk Indicators</h4>
+                                  {/* Show total high-risk member count if available */}
+                                  {(github as any).high_risk_member_count !== undefined && (github as any).high_risk_member_count > 0 && (
+                                    <div className="mb-2 pb-2 border-b border-red-200">
+                                      <div className="flex items-center space-x-2">
+                                        <AlertTriangle className="w-4 h-4 text-red-600" />
+                                        <span className="text-sm font-semibold text-red-800">
+                                          {(github as any).high_risk_member_count} total members at high risk due to GitHub activity
+                                        </span>
+                                      </div>
+                                    </div>
+                                  )}
                                   <div className="space-y-1 text-xs">
                                     {github.burnout_indicators.excessive_late_night_commits > 0 && (
                                       <div className="flex items-center space-x-2">

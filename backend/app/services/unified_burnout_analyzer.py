@@ -349,6 +349,33 @@ class UnifiedBurnoutAnalyzer:
             if github_insights:
                 result["github_insights"] = github_insights
                 
+                # Validate GitHub high-risk member count matches team analysis
+                if github_insights.get("high_risk_member_count", 0) > 0:
+                    # Count members marked as high risk due to GitHub in team analysis
+                    team_github_high_risk_count = 0
+                    for member in result.get("team_analysis", {}).get("members", []):
+                        if member.get("risk_level") in ["high", "critical"]:
+                            # Check if they have GitHub risk indicators
+                            github_activity = member.get("github_activity", {})
+                            github_indicators = github_activity.get("burnout_indicators", {})
+                            if any(github_indicators.values()):
+                                team_github_high_risk_count += 1
+                    
+                    # Log validation results
+                    github_insight_count = github_insights.get("high_risk_member_count", 0)
+                    logger.warning(f"GitHub high-risk validation: Insights count={github_insight_count}, Team analysis count={team_github_high_risk_count}")
+                    
+                    if github_insight_count != team_github_high_risk_count:
+                        logger.error(f"MISMATCH: GitHub insights shows {github_insight_count} high-risk members but team analysis shows {team_github_high_risk_count}")
+                        # Add validation metadata
+                        result["validation_warnings"] = result.get("validation_warnings", [])
+                        result["validation_warnings"].append({
+                            "type": "github_high_risk_count_mismatch",
+                            "insight_count": github_insight_count,
+                            "team_count": team_github_high_risk_count,
+                            "message": f"GitHub high-risk member count mismatch: insights={github_insight_count}, team={team_github_high_risk_count}"
+                        })
+                
             # Add Slack insights if enabled  
             if slack_insights:
                 result["slack_insights"] = slack_insights
@@ -740,6 +767,28 @@ class UnifiedBurnoutAnalyzer:
         # Add GitHub activity if available
         if github_data and github_data.get("activity_data"):
             result["github_activity"] = github_data["activity_data"]
+            
+            # Check if GitHub activity indicates high risk
+            github_indicators = github_data.get("activity_data", {}).get("burnout_indicators", {})
+            has_github_risk_indicators = any([
+                github_indicators.get("excessive_commits", False),
+                github_indicators.get("late_night_activity", False),
+                github_indicators.get("weekend_work", False),
+                github_indicators.get("large_prs", False)
+            ])
+            
+            # Log GitHub risk assessment for validation
+            if has_github_risk_indicators:
+                logger.info(f"Member {user_email} has GitHub risk indicators: {[k for k, v in github_indicators.items() if v]}")
+                # Upgrade risk level if GitHub activity shows risk but incidents don't
+                if result["risk_level"] == "low" and has_github_risk_indicators:
+                    result["risk_level"] = "medium"
+                    result["risk_level_reason"] = "Upgraded due to GitHub activity patterns"
+                    logger.info(f"Upgraded {user_email} risk level from low to medium due to GitHub activity")
+                elif result["risk_level"] == "medium" and has_github_risk_indicators:
+                    result["risk_level"] = "high"
+                    result["risk_level_reason"] = "Upgraded due to combined incident and GitHub patterns"
+                    logger.info(f"Upgraded {user_email} risk level from medium to high due to GitHub activity")
         else:
             # Add placeholder GitHub activity
             result["github_activity"] = {
@@ -1389,11 +1438,30 @@ class UnifiedBurnoutAnalyzer:
             "large_prs": 0
         }
         
-        for data in github_data.values():
+        # Track high-risk members for validation
+        high_risk_github_members = []
+        
+        for email, data in github_data.items():
             indicators = data.get("burnout_indicators", {})
+            has_high_risk_indicator = False
+            
             for key in burnout_counts:
                 if indicators.get(key, False):
                     burnout_counts[key] += 1
+                    has_high_risk_indicator = True
+                    logger.info(f"GitHub high-risk indicator '{key}' detected for {email}")
+            
+            # Track members with any high-risk GitHub indicator
+            if has_high_risk_indicator:
+                high_risk_github_members.append({
+                    "email": email,
+                    "username": data.get("username", ""),
+                    "indicators": {k: v for k, v in indicators.items() if v}
+                })
+        
+        # Log total high-risk GitHub members for validation
+        logger.info(f"GitHub high-risk members count: {len(high_risk_github_members)}")
+        logger.info(f"GitHub burnout indicator counts: {burnout_counts}")
         
         # Top contributors (top 5 by commits)
         contributors = []
@@ -1435,7 +1503,10 @@ class UnifiedBurnoutAnalyzer:
                 "excessive_late_night_commits": burnout_counts.get("after_hours_coding", 0),
                 "weekend_workers": burnout_counts.get("weekend_work", 0),
                 "large_pr_pattern": burnout_counts.get("large_prs", 0)
-            }
+            },
+            # Add high-risk member details for validation
+            "high_risk_members": high_risk_github_members,
+            "high_risk_member_count": len(high_risk_github_members)
         }
     
     def _calculate_slack_insights(self, slack_data: Dict[str, Dict]) -> Dict[str, Any]:
