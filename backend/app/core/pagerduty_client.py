@@ -289,6 +289,48 @@ class PagerDutyAPIClient:
             if not users:
                 raise Exception("No users found - check API permissions")
             
+            # Count incidents by urgency/priority (PagerDuty equivalent of severity)
+            urgency_counts = {
+                "sev1_count": 0,  # High urgency = SEV1
+                "sev2_count": 0,  # Medium urgency = SEV2  
+                "sev3_count": 0,  # Low urgency = SEV3
+                "sev4_count": 0   # Info/null = SEV4
+            }
+            
+            # Process incidents to count urgencies
+            for incident in incidents:
+                try:
+                    # PagerDuty uses urgency field (high, low)
+                    urgency = incident.get("urgency", "low").lower()
+                    
+                    # Map PagerDuty urgency to severity levels
+                    if urgency == "high":
+                        urgency_counts["sev1_count"] += 1
+                    elif urgency == "low":
+                        # Check priority for more granular classification
+                        priority = incident.get("priority")
+                        if priority and isinstance(priority, dict):
+                            priority_name = priority.get("summary", "").lower()
+                            if "p1" in priority_name or "critical" in priority_name:
+                                urgency_counts["sev2_count"] += 1
+                            elif "p2" in priority_name or "high" in priority_name:
+                                urgency_counts["sev2_count"] += 1
+                            elif "p3" in priority_name or "medium" in priority_name:
+                                urgency_counts["sev3_count"] += 1
+                            else:
+                                urgency_counts["sev4_count"] += 1
+                        else:
+                            # Default low urgency to SEV3
+                            urgency_counts["sev3_count"] += 1
+                    else:
+                        # Unknown urgency defaults to SEV4
+                        urgency_counts["sev4_count"] += 1
+                        
+                except Exception as e:
+                    logger.debug(f"Error counting urgency for incident: {e}")
+                    # Default to sev4 on error
+                    urgency_counts["sev4_count"] += 1
+            
             # Normalize data to common format for burnout analysis
             normalized_data = self.normalize_to_common_format(incidents, users)
             
@@ -301,6 +343,7 @@ class PagerDutyAPIClient:
                     "days_analyzed": days_back,
                     "total_users": len(users),
                     "total_incidents": len(incidents),
+                    "severity_breakdown": urgency_counts,  # Use same key as Rootly for consistency
                     "date_range": {
                         "start": start_date.isoformat(),
                         "end": end_date.isoformat()
@@ -322,6 +365,12 @@ class PagerDutyAPIClient:
                     "days_analyzed": days_back,
                     "total_users": 0,
                     "total_incidents": 0,
+                    "severity_breakdown": {
+                        "sev1_count": 0,
+                        "sev2_count": 0,
+                        "sev3_count": 0,
+                        "sev4_count": 0
+                    },
                     "error": str(e),
                     "date_range": {
                         "start": (datetime.now() - timedelta(days=days_back)).isoformat(),
