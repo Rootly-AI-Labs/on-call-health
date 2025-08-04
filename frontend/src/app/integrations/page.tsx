@@ -121,6 +121,7 @@ interface MappingStatistics {
   mapped_members?: number
   members_with_data?: number
   manual_mappings_count?: number
+  github_was_enabled?: boolean | null
   platform_breakdown: {
     [key: string]: {
       total_attempts: number
@@ -3787,7 +3788,10 @@ export default function IntegrationsPage() {
                               {mapping.data_points_count ? (
                                 <span>{mapping.data_points_count} data points</span>
                               ) : (
-                                <span>No data</span>
+                                // Only show "No data" if GitHub was enabled in the analysis
+                                mappingStats?.github_was_enabled && selectedMappingPlatform === 'github' ? (
+                                  <span>No data</span>
+                                ) : null
                               )}
                             </div>
                           </div>

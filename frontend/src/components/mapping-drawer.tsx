@@ -56,6 +56,7 @@ interface MappingStatistics {
   mapped_members?: number
   members_with_data?: number
   manual_mappings_count?: number
+  github_was_enabled?: boolean | null
 }
 
 interface MappingDrawerProps {
@@ -668,7 +669,10 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
                             {mapping.data_points_count ? (
                               <span>{mapping.data_points_count} data points</span>
                             ) : (
-                              <span>No data</span>
+                              // Only show "No data" if GitHub was enabled in the analysis
+                              mappingStats?.github_was_enabled && platform === 'github' ? (
+                                <span>No data</span>
+                              ) : null
                             )}
                           </div>
                         </div>
