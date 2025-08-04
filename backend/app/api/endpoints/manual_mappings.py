@@ -315,14 +315,13 @@ async def run_github_mapping(
     """Run the enhanced GitHub mapping process for all unmapped users."""
     try:
         from ...services.enhanced_github_matcher import EnhancedGitHubMatcher
-        from ...models import Integration
+        from ...models import GitHubIntegration, RootlyIntegration
         import asyncio
         
         # Get GitHub integration
-        github_integration = db.query(Integration).filter(
-            Integration.user_id == current_user.id,
-            Integration.platform == "github",
-            Integration.github_token.isnot(None)
+        github_integration = db.query(GitHubIntegration).filter(
+            GitHubIntegration.user_id == current_user.id,
+            GitHubIntegration.github_token.isnot(None)
         ).first()
         
         if not github_integration:
@@ -336,9 +335,9 @@ async def run_github_mapping(
         service = ManualMappingService(db)
         
         # Get all Rootly/PagerDuty users
-        rootly_integrations = db.query(Integration).filter(
-            Integration.user_id == current_user.id,
-            Integration.platform.in_(["rootly", "pagerduty"])
+        rootly_integrations = db.query(RootlyIntegration).filter(
+            RootlyIntegration.user_id == current_user.id,
+            RootlyIntegration.platform.in_(["rootly", "pagerduty"])
         ).all()
         
         all_users = []
