@@ -349,32 +349,30 @@ class UnifiedBurnoutAnalyzer:
             if github_insights:
                 result["github_insights"] = github_insights
                 
-                # Validate GitHub high-risk member count matches team analysis
+                # Log GitHub indicator details for transparency
                 if github_insights.get("high_risk_member_count", 0) > 0:
-                    # Count members marked as high risk due to GitHub in team analysis
-                    team_github_high_risk_count = 0
+                    # Count risk level distribution for members with GitHub indicators
+                    github_members_by_risk = {"low": 0, "medium": 0, "high": 0}
+                    github_members_details = []
+                    
                     for member in result.get("team_analysis", {}).get("members", []):
-                        if member.get("risk_level") in ["high", "critical"]:
-                            # Check if they have GitHub risk indicators
-                            github_activity = member.get("github_activity", {})
-                            github_indicators = github_activity.get("burnout_indicators", {})
-                            if any(github_indicators.values()):
-                                team_github_high_risk_count += 1
+                        github_activity = member.get("github_activity", {})
+                        github_indicators = github_activity.get("burnout_indicators", {})
+                        if any(github_indicators.values()):
+                            risk_level = member.get("risk_level", "low")
+                            github_members_by_risk[risk_level] += 1
+                            github_members_details.append({
+                                "email": member.get("user_email", "unknown"),
+                                "risk_level": risk_level,
+                                "indicators": [k for k, v in github_indicators.items() if v]
+                            })
                     
-                    # Log validation results
-                    github_insight_count = github_insights.get("high_risk_member_count", 0)
-                    logger.warning(f"GitHub high-risk validation: Insights count={github_insight_count}, Team analysis count={team_github_high_risk_count}")
+                    # Add risk distribution to GitHub insights for frontend display
+                    github_insights["risk_distribution"] = github_members_by_risk
+                    github_insights["members_with_indicators"] = github_members_details
                     
-                    if github_insight_count != team_github_high_risk_count:
-                        logger.error(f"MISMATCH: GitHub insights shows {github_insight_count} high-risk members but team analysis shows {team_github_high_risk_count}")
-                        # Add validation metadata
-                        result["validation_warnings"] = result.get("validation_warnings", [])
-                        result["validation_warnings"].append({
-                            "type": "github_high_risk_count_mismatch",
-                            "insight_count": github_insight_count,
-                            "team_count": team_github_high_risk_count,
-                            "message": f"GitHub high-risk member count mismatch: insights={github_insight_count}, team={team_github_high_risk_count}"
-                        })
+                    logger.info(f"GitHub indicators found in {sum(github_members_by_risk.values())} members")
+                    logger.info(f"Risk distribution: {github_members_by_risk}")
                 
             # Add Slack insights if enabled  
             if slack_insights:

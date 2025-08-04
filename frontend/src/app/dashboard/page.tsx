@@ -4182,26 +4182,6 @@ export default function Dashboard() {
                 )}
               </div>
 
-              {/* Validation Warnings - Show if any mismatches detected */}
-              {(currentAnalysis?.analysis_data as any)?.validation_warnings && (currentAnalysis?.analysis_data as any)?.validation_warnings?.length > 0 && (
-                <Card className="mb-6 border-2 border-yellow-200 bg-yellow-50/70">
-                  <CardHeader>
-                    <CardTitle className="flex items-center space-x-2 text-yellow-800">
-                      <AlertTriangle className="w-5 h-5" />
-                      <span>Data Validation Warnings</span>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      {(currentAnalysis?.analysis_data as any)?.validation_warnings?.map((warning: any, index: number) => (
-                        <div key={index} className="text-sm text-yellow-700">
-                          <strong>{warning.type === 'github_high_risk_count_mismatch' ? 'GitHub Count Mismatch:' : 'Warning:'}</strong> {warning.message}
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
 
               {/* GitHub and Slack Metrics Section */}
               {(currentAnalysis?.analysis_data?.github_insights || currentAnalysis?.analysis_data?.slack_insights) && (
@@ -4338,9 +4318,25 @@ export default function Dashboard() {
                                       <div className="flex items-center space-x-2">
                                         <AlertTriangle className="w-4 h-4 text-red-600" />
                                         <span className="text-sm font-semibold text-red-800">
-                                          {(github as any).high_risk_member_count} total members at high risk due to GitHub activity
+                                          {(github as any).high_risk_member_count} members with GitHub burnout indicators
                                         </span>
                                       </div>
+                                      {/* Show risk distribution if available */}
+                                      {(github as any).risk_distribution && (
+                                        <div className="mt-1 text-xs text-gray-600">
+                                          Overall risk levels: {
+                                            (() => {
+                                              const dist = (github as any).risk_distribution
+                                              const parts = []
+                                              if (dist.high > 0) parts.push(`${dist.high} high`)
+                                              if (dist.medium > 0) parts.push(`${dist.medium} medium`)
+                                              if (dist.low > 0) parts.push(`${dist.low} low`)
+                                              
+                                              return parts.join(', ') || 'Risk distribution unavailable'
+                                            })()
+                                          }
+                                        </div>
+                                      )}
                                     </div>
                                   )}
                                   <div className="space-y-1 text-xs">
