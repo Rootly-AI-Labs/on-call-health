@@ -354,6 +354,7 @@ export default function IntegrationsPage() {
   // Edit/Delete state
   const [editingIntegration, setEditingIntegration] = useState<number | null>(null)
   const [editingName, setEditingName] = useState("")
+  const [savingIntegrationId, setSavingIntegrationId] = useState<number | null>(null)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [integrationToDelete, setIntegrationToDelete] = useState<Integration | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -872,6 +873,7 @@ export default function IntegrationsPage() {
   }
 
   const updateIntegrationName = async (integration: Integration, newName: string) => {
+    setSavingIntegrationId(integration.id)
     try {
       const authToken = localStorage.getItem('auth_token')
       if (!authToken) return
@@ -891,11 +893,25 @@ export default function IntegrationsPage() {
 
       if (response.ok) {
         toast.success("Integration name has been updated.")
-        loadAllIntegrations(true) // Force refresh after changes
+        
+        // Update the integration in state without reloading everything
+        setIntegrations(prevIntegrations => 
+          prevIntegrations.map(int => 
+            int.id === integration.id 
+              ? { ...int, name: newName }
+              : int
+          )
+        )
+        
+        // Clear cache to ensure next full reload has fresh data
+        localStorage.removeItem('all_integrations')
+        localStorage.removeItem('all_integrations_timestamp')
       }
     } catch (error) {
       console.error('Error updating name:', error)
       toast.error("Could not update integration name.")
+    } finally {
+      setSavingIntegrationId(null)
     }
   }
 
@@ -2495,9 +2511,20 @@ export default function IntegrationsPage() {
                 <CardContent className="p-6 space-y-4">
                   {filteredIntegrations.map((integration) => (
                     <div key={integration.id} className={`
-                      p-6 rounded-lg border
+                      p-6 rounded-lg border relative
                       ${integration.platform === 'rootly' ? 'border-green-200 bg-green-50' : 'border-green-200 bg-green-50'}
+                      ${savingIntegrationId === integration.id ? 'opacity-75' : ''}
                     `}>
+                      {/* Saving overlay */}
+                      {savingIntegrationId === integration.id && (
+                        <div className="absolute inset-0 bg-white bg-opacity-50 flex items-center justify-center rounded-lg">
+                          <div className="flex items-center space-x-2">
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                            <span className="text-sm font-medium">Saving...</span>
+                          </div>
+                        </div>
+                      )}
+                      
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
                           <div className="flex items-center space-x-3 mb-2">
@@ -2508,8 +2535,9 @@ export default function IntegrationsPage() {
                                   value={editingName}
                                   onChange={(e) => setEditingName(e.target.value)}
                                   className="h-8 w-48"
+                                  disabled={savingIntegrationId === integration.id}
                                   onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
+                                    if (e.key === 'Enter' && savingIntegrationId !== integration.id) {
                                       updateIntegrationName(integration, editingName)
                                       setEditingIntegration(null)
                                     } else if (e.key === 'Escape') {
@@ -2520,6 +2548,7 @@ export default function IntegrationsPage() {
                                 <Button
                                   size="sm"
                                   variant="ghost"
+                                  disabled={savingIntegrationId === integration.id}
                                   onClick={() => {
                                     updateIntegrationName(integration, editingName)
                                     setEditingIntegration(null)
@@ -2534,6 +2563,7 @@ export default function IntegrationsPage() {
                                 <Button
                                   size="sm"
                                   variant="ghost"
+                                  disabled={savingIntegrationId === integration.id}
                                   onClick={() => {
                                     setEditingIntegration(integration.id)
                                     setEditingName(integration.name)
