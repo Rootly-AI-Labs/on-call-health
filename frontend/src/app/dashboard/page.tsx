@@ -2094,9 +2094,9 @@ export default function Dashboard() {
                 // Simulate progress through stages - advance conservatively with random increments
                 console.log('Using simulated progress, advancing stages...')
                 setCurrentStageIndex(prevIndex => {
-                  // Don't advance past "analyzing" stage (index 5) without API confirmation
-                  const maxSimulatedIndex = 6 // Stop at "Finalizing Analysis" (50%)
+                  // Allow simulation to progress further while waiting for API
                   const currentStages = getAnalysisStages()
+                  const maxSimulatedIndex = currentStages.length - 2 // Stop before final stage
                   const stageIndex = Math.min(prevIndex, currentStages.length - 1)
                   const stage = currentStages[stageIndex]
                   console.log('Advancing to stage:', stage.key, 'progress:', stage.progress, 'index:', prevIndex)
@@ -2105,7 +2105,7 @@ export default function Dashboard() {
                   // Add some randomness to the target progress
                   const baseProgress = stage.progress
                   const randomOffset = Math.floor(Math.random() * 5) // 0-4 random offset
-                  const targetWithRandomness = Math.min(baseProgress + randomOffset, 70) // Cap at 70% for simulation
+                  const targetWithRandomness = Math.min(baseProgress + randomOffset, 85) // Cap at 85% for simulation
                   setTargetProgress(targetWithRandomness)
                   
                   // Only advance if we haven't reached the max simulated stage
@@ -4393,20 +4393,6 @@ export default function Dashboard() {
                                 </div>
                               )}
 
-                              {/* Top Contributors */}
-                              {github.top_contributors && github.top_contributors.length > 0 && (
-                                <div>
-                                  <h4 className="text-sm font-semibold text-gray-800 mb-2">Top Contributors</h4>
-                                  <div className="space-y-1">
-                                    {github.top_contributors.slice(0, 3).map((contributor, index) => (
-                                      <div key={index} className="flex items-center justify-between text-xs bg-gray-50 rounded px-2 py-1">
-                                        <span className="font-medium text-gray-700">{contributor.username}</span>
-                                        <span className="text-gray-600">{contributor.commits} commits, {contributor.prs} PRs</span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
                             </>
                           )
                         })()}

@@ -174,6 +174,7 @@ class PagerDutyAPIClient:
                 offset = 0
                 
                 while len(all_incidents) < limit:
+                    logger.info(f"Fetching PagerDuty incidents: offset={offset}, collected={len(all_incidents)}/{limit}")
                     async with session.get(
                         f"{self.base_url}/incidents",
                         headers=self.headers,
@@ -240,9 +241,9 @@ class PagerDutyAPIClient:
             end_date = datetime.now(pytz.UTC)
             start_date = end_date - timedelta(days=days_back)
             
-            # Collect users and incidents in parallel (no limits for complete data collection)
+            # Collect users and incidents in parallel (reasonable limits to avoid timeout)
             users_task = self.get_users(limit=1000)
-            incidents_task = self.get_incidents(since=start_date, until=end_date, limit=10000)
+            incidents_task = self.get_incidents(since=start_date, until=end_date, limit=1000)  # Reduced from 10000
             
             users = await users_task
             incidents = await incidents_task
