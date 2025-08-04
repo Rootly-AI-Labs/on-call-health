@@ -406,14 +406,16 @@ async def run_github_mapping(
                         "email": user["email"],
                         "name": user["name"],
                         "github_username": github_username,
-                        "status": "mapped"
+                        "status": "mapped",
+                        "platform": user["platform"]
                     })
                 else:
                     results.append({
                         "email": user["email"],
                         "name": user["name"],
                         "github_username": None,
-                        "status": "not_found"
+                        "status": "not_found",
+                        "platform": user["platform"]
                     })
                     
             except Exception as e:
@@ -423,7 +425,8 @@ async def run_github_mapping(
                     "name": user["name"],
                     "github_username": None,
                     "status": "error",
-                    "error": str(e)
+                    "error": str(e),
+                    "platform": user["platform"]
                 })
         
         # Calculate summary stats

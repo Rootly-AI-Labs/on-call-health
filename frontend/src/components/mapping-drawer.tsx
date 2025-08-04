@@ -94,6 +94,7 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
     github_username: string | null
     status: 'mapped' | 'not_found' | 'error'
     error?: string
+    platform?: string
   }>>([])
   const [showMappingResults, setShowMappingResults] = useState(false)
 
@@ -374,6 +375,36 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
   const platformTitle = platform === 'github' ? 'GitHub' : 'Slack'
   const platformColor = platform === 'github' ? 'blue' : 'purple'
 
+  // Platform logo component
+  const PlatformLogo = ({ platform, size = 'sm' }: { platform: string, size?: 'sm' | 'md' }) => {
+    const sizeClass = size === 'sm' ? 'w-4 h-4' : 'w-5 h-5'
+    
+    if (platform === 'rootly') {
+      return (
+        <div className={`${sizeClass} rounded bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center`} title="Rootly">
+          <span className="text-white font-bold text-[10px]">R</span>
+        </div>
+      )
+    } else if (platform === 'pagerduty') {
+      return (
+        <div className={`${sizeClass} rounded bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center`} title="PagerDuty">
+          <span className="text-white font-bold text-[10px]">PD</span>
+        </div>
+      )
+    }
+    return null
+  }
+
+  // Group mappings by source identifier to detect users in multiple platforms
+  const groupedMappings = sortedMappings.reduce((acc, mapping) => {
+    const key = mapping.source_identifier
+    if (!acc[key]) {
+      acc[key] = []
+    }
+    acc[key].push(mapping)
+    return acc
+  }, {} as Record<string, IntegrationMapping[]>)
+
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
       <SheetContent className="sm:max-w-4xl lg:max-w-5xl">
@@ -507,6 +538,7 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
                     {mappingResults.map((result, idx) => (
                       <div key={idx} className="flex items-center justify-between text-sm">
                         <div className="flex items-center space-x-2">
+                          {result.platform && <PlatformLogo platform={result.platform} size="sm" />}
                           <span className="font-medium truncate max-w-[200px]" title={result.email}>
                             {result.name || result.email}
                           </span>
@@ -595,15 +627,28 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
                     <div key={mapping.id} className="px-4 py-3">
                       <div className="grid grid-cols-4 gap-4 text-sm">
                         <div className="font-medium" title={mapping.source_identifier}>
-                          <div className="truncate">
-                            {mapping.source_name ? (
-                              <>
-                                <span className="font-semibold">{mapping.source_name}</span>
-                                <div className="text-xs text-gray-500 truncate">{mapping.source_identifier}</div>
-                              </>
-                            ) : (
-                              mapping.source_identifier
-                            )}
+                          <div className="flex items-start space-x-2">
+                            <div className="flex flex-col space-y-1">
+                              {(() => {
+                                // Get all platforms this user appears in
+                                const userMappings = groupedMappings[mapping.source_identifier] || []
+                                const platforms = Array.from(new Set(userMappings.map(m => m.source_platform)))
+                                
+                                return platforms.map(platform => (
+                                  <PlatformLogo key={platform} platform={platform} size="sm" />
+                                ))
+                              })()}
+                            </div>
+                            <div className="truncate flex-1">
+                              {mapping.source_name ? (
+                                <>
+                                  <span className="font-semibold">{mapping.source_name}</span>
+                                  <div className="text-xs text-gray-500 truncate">{mapping.source_identifier}</div>
+                                </>
+                              ) : (
+                                mapping.source_identifier
+                              )}
+                            </div>
                           </div>
                         </div>
                         
