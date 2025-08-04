@@ -28,8 +28,16 @@ class MappingRecorder:
         error_message: Optional[str] = None,
         data_collected: bool = False,
         data_points_count: Optional[int] = None
-    ) -> IntegrationMapping:
+    ) -> Optional[IntegrationMapping]:
         """Record a mapping attempt."""
+        
+        # If analysis_id is provided, verify it exists
+        if analysis_id is not None:
+            from ..models import Analysis
+            analysis_exists = self.db.query(Analysis).filter(Analysis.id == analysis_id).first()
+            if not analysis_exists:
+                logger.warning(f"Skipping mapping record - analysis {analysis_id} does not exist")
+                return None
         
         # Check if this exact mapping already exists for this analysis
         existing = self.db.query(IntegrationMapping).filter(

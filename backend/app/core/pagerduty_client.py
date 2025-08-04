@@ -172,12 +172,18 @@ class PagerDutyAPIClient:
             async with aiohttp.ClientSession() as session:
                 all_incidents = []
                 offset = 0
+                max_requests = 20  # Circuit breaker - max 20 requests (2000 incidents)
+                request_count = 0
                 
-                while len(all_incidents) < limit:
+                while len(all_incidents) < limit and request_count < max_requests:
                     logger.info(f"Fetching PagerDuty incidents: offset={offset}, collected={len(all_incidents)}/{limit}")
+                    
+                    # Add timeout to prevent hanging
+                    timeout = aiohttp.ClientTimeout(total=30)  # 30 second timeout per request
                     async with session.get(
                         f"{self.base_url}/incidents",
                         headers=self.headers,
+                        timeout=timeout,
                         params={
                             "since": since_str,
                             "until": until_str,
@@ -187,6 +193,8 @@ class PagerDutyAPIClient:
                             "statuses[]": ["triggered", "acknowledged", "resolved"]
                         }
                     ) as response:
+                        request_count += 1
+                        
                         if response.status != 200:
                             logger.error(f"Failed to fetch incidents: HTTP {response.status}")
                             break
@@ -195,17 +203,27 @@ class PagerDutyAPIClient:
                         incidents = data.get("incidents", [])
                         all_incidents.extend(incidents)
                         
+                        logger.info(f"PagerDuty: Fetched {len(incidents)} incidents in this batch")
+                        
                         # Check if we have more pages
                         if not data.get("more", False) or len(incidents) == 0:
+                            logger.info(f"PagerDuty: No more incidents to fetch")
                             break
                             
                         offset += len(incidents)
                 
+                if request_count >= max_requests:
+                    logger.warning(f"PagerDuty: Hit request limit ({max_requests}), stopping incident fetch")
+                
+                logger.info(f"PagerDuty: Completed incident fetch - total incidents: {len(all_incidents)}")
                 return all_incidents
                 
+        except asyncio.TimeoutError:
+            logger.error(f"PagerDuty incident fetch timed out after collecting {len(all_incidents) if 'all_incidents' in locals() else 0} incidents")
+            return all_incidents if 'all_incidents' in locals() else []
         except Exception as e:
             logger.error(f"Error fetching PagerDuty incidents: {e}")
-            return []
+            return all_incidents if 'all_incidents' in locals() else []
     
     async def get_services(self, limit: int = 100) -> List[Dict[str, Any]]:
         """Fetch services from PagerDuty."""

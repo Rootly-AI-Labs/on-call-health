@@ -313,7 +313,7 @@ class UnifiedBurnoutAnalyzer:
             logger.info(f"Team health keys: {list(team_health.keys()) if team_health else 'None'}")
             
             # Generate daily trends from incident data
-            daily_trends = self._generate_daily_trends(incidents, team_analysis["members"], metadata)
+            daily_trends = self._generate_daily_trends(incidents, team_analysis["members"], metadata, team_health)
             logger.info(f"🔍 MAIN_ANALYSIS_DEBUG: Generated {len(daily_trends)} daily trends for final result")
             
             result = {
@@ -1659,7 +1659,7 @@ class UnifiedBurnoutAnalyzer:
         
         return incidents
 
-    def _generate_daily_trends(self, incidents: List[Dict[str, Any]], team_analysis: List[Dict[str, Any]], metadata: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def _generate_daily_trends(self, incidents: List[Dict[str, Any]], team_analysis: List[Dict[str, Any]], metadata: Dict[str, Any], team_health: Dict[str, Any] = None) -> List[Dict[str, Any]]:
         """Generate daily trend data from incidents and team analysis - only includes days with actual incident data."""
         try:
             days_analyzed = metadata.get("days_analyzed", 30) or 30 if isinstance(metadata, dict) else 30
@@ -1816,19 +1816,25 @@ class UnifiedBurnoutAnalyzer:
                 # Floor at 2.0 (20% health) even on worst days
                 daily_score = max(daily_score, 2.0)
                 
-                # Calculate members at risk for this day (sophisticated risk assessment)
-                members_at_risk = 0
-                total_members = users_involved_count
-                
-                if users_involved_count > 0:
-                    # Risk assessment based on daily load per person
-                    avg_incidents_per_person = incident_count / users_involved_count if users_involved_count > 0 else 0
-                    if avg_incidents_per_person > 3:
-                        members_at_risk = max(1, int(users_involved_count * 0.8))
-                    elif avg_incidents_per_person > 2:
-                        members_at_risk = max(1, int(users_involved_count * 0.5))
-                    elif after_hours_count > 0:
-                        members_at_risk = max(1, int(users_involved_count * 0.3))
+                # Calculate members at risk - use overall team health data if available
+                if team_health and isinstance(team_health, dict):
+                    # Use the overall team members at risk from the full analysis
+                    members_at_risk = team_health.get("members_at_risk", 0)
+                    total_members = len(team_analysis) if team_analysis else users_involved_count
+                else:
+                    # Fallback to day-specific calculation
+                    members_at_risk = 0
+                    total_members = users_involved_count
+                    
+                    if users_involved_count > 0:
+                        # Risk assessment based on daily load per person
+                        avg_incidents_per_person = incident_count / users_involved_count if users_involved_count > 0 else 0
+                        if avg_incidents_per_person > 3:
+                            members_at_risk = max(1, int(users_involved_count * 0.8))
+                        elif avg_incidents_per_person > 2:
+                            members_at_risk = max(1, int(users_involved_count * 0.5))
+                        elif after_hours_count > 0:
+                            members_at_risk = max(1, int(users_involved_count * 0.3))
                 
                 # Determine health status
                 health_status = self._determine_health_status_from_score(daily_score)

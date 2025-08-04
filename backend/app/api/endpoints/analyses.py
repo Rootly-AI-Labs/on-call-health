@@ -136,9 +136,21 @@ async def run_burnout_analysis(
     db.commit()
     db.refresh(analysis)
     
+    # Log the created analysis ID for debugging
+    logger.info(f"ENDPOINT: Created analysis with ID {analysis.id} for user {current_user.id}")
+    
     # Update integration last_used_at
     integration.last_used_at = datetime.now()
     db.commit()
+    
+    # Ensure the analysis exists before starting background task
+    verify_analysis = db.query(Analysis).filter(Analysis.id == analysis.id).first()
+    if not verify_analysis:
+        logger.error(f"ENDPOINT: Analysis {analysis.id} not found immediately after creation!")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create analysis record"
+        )
     
     # Start analysis in background
     logger.info(f"ENDPOINT: About to add background task for analysis {analysis.id}")
@@ -869,13 +881,16 @@ async def get_historical_trends(
         except (ValueError, TypeError):
             continue
         
-        # Get incident count to determine members at risk
+        # Get incident count and member data
         incident_count = trend_data.get("incident_count", 0)
         users_involved_count = trend_data.get("users_involved_count", 0)
         
-        # Estimate members at risk based on incident patterns
-        members_at_risk = 0
-        if incident_count > 0:
+        # Use the actual members_at_risk from the analysis if available
+        members_at_risk = trend_data.get("members_at_risk", 0)
+        total_members = trend_data.get("total_members", users_involved_count)
+        
+        # Only estimate if members_at_risk is not provided
+        if members_at_risk == 0 and incident_count > 0:
             if incident_count >= 5:  # High incident volume
                 members_at_risk = min(users_involved_count + 1, 5)
             elif incident_count >= 3:  # Medium incident volume
@@ -899,7 +914,7 @@ async def get_historical_trends(
             overall_score=float(overall_score),
             average_burnout_score=float(trend_data.get("overall_score", 0.0)),  # Use same score for consistency
             members_at_risk=int(members_at_risk),
-            total_members=max(int(users_involved_count), 1),  # At least 1 to avoid division by zero
+            total_members=max(int(total_members), 1),  # Use actual total_members from analysis
             health_status=health_status,
             analysis_count=1  # Single analysis
         ))
@@ -1595,13 +1610,21 @@ async def run_analysis_task(
     print(f"BACKGROUND_TASK: User ID received: {user_id}")
     print(f"BACKGROUND_TASK: AI params - enable_ai: {enable_ai}")
     
-    db = next(get_db())
+    # Get a fresh database session for the background task
+    from ...models import SessionLocal
+    db = SessionLocal()
     
     try:
+        # Log database connection info
+        logger.info(f"BACKGROUND_TASK: Got new database session for analysis {analysis_id}")
+        
         # Update status to running
         analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
         if not analysis:
-            logger.info(f"BACKGROUND_TASK: Analysis {analysis_id} not found in database")
+            logger.error(f"BACKGROUND_TASK: Analysis {analysis_id} not found in database")
+            # Try to debug what analyses exist
+            all_analyses = db.query(Analysis.id).order_by(Analysis.id.desc()).limit(5).all()
+            logger.error(f"BACKGROUND_TASK: Recent analysis IDs in database: {[a.id for a in all_analyses]}")
             return  # Analysis doesn't exist
             
         logger.info(f"BACKGROUND_TASK: Setting analysis {analysis_id} to running status")

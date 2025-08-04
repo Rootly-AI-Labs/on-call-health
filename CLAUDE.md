@@ -1193,9 +1193,54 @@ def classify_burnout_risk(burnout_assessment):
 - Reduction in developer churn/turnover
 - Improvement in code quality metrics over time
 
-### Outstanding Issues:
-1. Slack channel access errors (bot not in channels) - Low priority
-2. Invalid Anthropic API key for AI narratives - User configuration issue
+### Outstanding Issues & Technical Debt:
+
+#### High Priority Tasks:
+1. **Fix Frontend Duplicate Factor Calculations** ✅ COMPLETED
+   - **Issue**: Frontend was calculating burnout factors differently than backend
+   - **Impact**: Inconsistent data display between charts and actual analysis
+   - **Root Cause**: Frontend was recalculating factors with different formulas:
+     - Different scaling (e.g., incidents * 0.4 vs backend's tiered scaling)
+     - Including GitHub activity in calculations (backend doesn't)
+     - Different thresholds for response time calculations
+   - **Solution**: Removed all frontend calculations, now using only backend factors
+   - **Files Fixed**: 
+     - `frontend/src/app/dashboard/page.tsx` - member modal factors (lines 5384-5415)
+     - `frontend/src/app/dashboard/page.tsx` - organization burnout factors (lines 2319-2408)
+
+2. **Fix Analysis ID Not Found in Background Task** 🔧
+   - **Issue**: Analysis records created in main request not visible to background tasks
+   - **Impact**: Analyses fail with "Analysis 103 not found" errors
+   - **Cause**: Database transaction isolation or session management issues
+   - **Solution**: Using SessionLocal() instead of get_db() in background tasks
+
+3. **Fix NoneType Conversion Errors** 📋
+   - **Issue**: Multiple "can't convert type 'NoneType' to numerator/denominator" errors
+   - **Impact**: Analysis crashes when encountering null values
+   - **Location**: Burnout calculation functions with division operations
+   - **Solution**: Add comprehensive null checks before mathematical operations
+
+4. **Standardize Risk Level Thresholds** 📋
+   - **Issue**: Different analyzers use different thresholds for risk levels
+   - **Impact**: Inconsistent risk categorization across the application
+   - **Example**: SimpleBurnoutAnalyzer vs UnifiedBurnoutAnalyzer thresholds differ
+   - **Solution**: Create centralized configuration for all thresholds
+
+#### Medium Priority Tasks:
+5. **Create Centralized Burnout Configuration File** 📋
+   - **Purpose**: Single source of truth for all burnout calculation parameters
+   - **Contents**: Risk thresholds, scoring weights, factor calculations
+   - **Location**: `backend/app/core/burnout_config.py`
+   - **Benefits**: Easier tuning, consistency, maintainability
+
+6. **Add Memory/Context Retention to Agent** 📋
+   - **Issue**: AI agent doesn't remember previous analyses or context
+   - **Impact**: Can't provide trend-based insights or learn from patterns
+   - **Solution**: Store analysis history and context for agent reference
+
+#### Low Priority Issues:
+7. Slack channel access errors (bot not in channels)
+8. Invalid Anthropic API key for AI narratives - User configuration issue
 
 ### Recently Completed:
 1. ✅ **Health Trends Chart Logic** - Fixed to show daily incident data from current analysis period

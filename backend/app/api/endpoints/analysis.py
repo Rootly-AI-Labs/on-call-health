@@ -286,6 +286,32 @@ async def run_analysis_task(analysis_id: int, integration_id: int, days_back: in
     db = next(get_db())
     
     try:
+        # Set a timeout for the entire analysis (5 minutes)
+        async def run_with_timeout():
+            return await asyncio.wait_for(_run_analysis_task_impl(db, analysis_id, integration_id, days_back, user_id), timeout=300)
+        
+        await run_with_timeout()
+        
+    except asyncio.TimeoutError:
+        logger.error(f"Analysis {analysis_id} timed out after 5 minutes")
+        analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
+        if analysis:
+            analysis.status = "failed"
+            analysis.error_message = "Analysis timed out after 5 minutes. This may be due to too much data or API rate limits."
+            db.commit()
+    except Exception as e:
+        logger.error(f"Analysis {analysis_id} failed: {str(e)}", exc_info=True)
+        analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
+        if analysis:
+            analysis.status = "failed"
+            analysis.error_message = str(e)
+            db.commit()
+    finally:
+        db.close()
+
+async def _run_analysis_task_impl(db, analysis_id: int, integration_id: int, days_back: int, user_id: int):
+    """Implementation of the analysis task."""
+    try:
         # Update status to running
         analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
         analysis.status = "running"
@@ -433,18 +459,6 @@ async def run_analysis_task(analysis_id: int, integration_id: int, days_back: in
         db.commit()
         
         logger.info(f"Analysis {analysis_id} completed successfully")
-        
-    except Exception as e:
-        logger.error(f"Analysis {analysis_id} failed: {str(e)}", exc_info=True)
-        # Update analysis with error
-        analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
-        if analysis:
-            analysis.status = "failed"
-            analysis.error_message = str(e)
-            db.commit()
-    
-    finally:
-        db.close()
 
 async def run_github_only_analysis_task(analysis_id: int, days_back: int, team_emails: Optional[list], user_id: int):
     """Background task to run GitHub-only burnout analysis."""

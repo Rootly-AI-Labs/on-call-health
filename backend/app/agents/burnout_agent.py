@@ -89,11 +89,19 @@ class BurnoutDetectionAgent:
                         os.environ["OPENAI_API_KEY"] = api_key
                         provider = "openai"
                 
-                self.agent = CodeAgent(
-                    tools=self.tools,
-                    model=LiteLLMModel(model_name),
-                    max_iterations=3  # Allow multiple reasoning steps
-                )
+                # Check if max_iterations is supported
+                try:
+                    self.agent = CodeAgent(
+                        tools=self.tools,
+                        model=LiteLLMModel(model_name),
+                        max_iterations=3  # Allow multiple reasoning steps
+                    )
+                except TypeError:
+                    # Fallback without max_iterations if not supported
+                    self.agent = CodeAgent(
+                        tools=self.tools,
+                        model=LiteLLMModel(model_name)
+                    )
                 
                 self.agent_available = True
                 self.logger.info(f"Smolagents agent initialized with {model_name} ({provider}) for natural language reasoning")

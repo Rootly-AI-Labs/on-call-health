@@ -2252,7 +2252,7 @@ export default function Dashboard() {
     const teamAnalysis = currentAnalysis?.analysis_data?.team_analysis
     const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members
     return members
-      ?.filter((member) => member.incident_count > 0) // Filter out users with no incidents
+      ?.filter((member) => member.burnout_score !== undefined && member.burnout_score !== null && member.burnout_score > 0) // Include all members with burnout scores
       ?.map((member) => ({
         name: member.user_name.split(" ")[0],
         fullName: member.user_name,
@@ -2298,7 +2298,13 @@ export default function Dashboard() {
   }
   
   // NO FALLBACK DATA: Only show burnout factors if we have REAL API data
-  // Filter to only include members with incidents (this is acceptable - members without incidents shouldn't contribute to burnout analysis)
+  // Include ALL members with burnout scores, not just those with incidents
+  // Members with high GitHub activity but no incidents should still be included
+  const membersWithBurnoutScores = members.filter((m: any) => 
+    m?.burnout_score !== undefined && m?.burnout_score !== null && m?.burnout_score > 0
+  );
+  
+  // For backward compatibility, keep membersWithIncidents for other parts of the code
   const membersWithIncidents = members.filter((m: any) => (m?.incident_count || 0) > 0);
   
   // Check if we have any real factors data from the API (not calculated/fake values)
@@ -2310,162 +2316,97 @@ export default function Dashboard() {
       (m.factors.response_time !== undefined && m.factors.response_time !== null)
     ));
   
-  // Holistic burnout factors combining incident patterns + GitHub activity patterns
+  // Use backend-calculated factors for organization-level metrics
+  // Backend provides pre-calculated factors - frontend should ONLY display, never recalculate
   const membersWithGitHubData = members.filter((m: any) => 
     m?.github_activity && (m.github_activity.commits_count > 0 || m.github_activity.commits_per_week > 0));
-  const allActiveMembers = Array.from(new Set([...membersWithIncidents, ...membersWithGitHubData])); // Unique members with any activity
+  const allActiveMembers = membersWithBurnoutScores; // All members with burnout scores should be included
 
-  const burnoutFactors = (hasRealFactorsData || membersWithGitHubData.length > 0) ? [
+  const burnoutFactors = (allActiveMembers.length > 0) ? [
     { 
       factor: "Workload Intensity", 
       value: (() => {
         if (allActiveMembers.length === 0) return null;
         
-        const workloadScores = allActiveMembers.map((m: any) => {
-          let workloadScore = 0;
-          
-          // Incident workload component
-          if (m?.incident_count > 0) {
-            const incidentsPerWeek = (m.incident_count || 0) / 4.3;
-            workloadScore += Math.min(incidentsPerWeek * 0.4, 5);
-          }
-          
-          // GitHub workload component
-          if (m?.github_activity) {
-            const commitsPerWeek = m.github_activity.commits_per_week || 0;
-            if (commitsPerWeek >= 80) workloadScore += 5;
-            else if (commitsPerWeek >= 50) workloadScore += 4;
-            else if (commitsPerWeek >= 25) workloadScore += 2.5;
-            else if (commitsPerWeek >= 15) workloadScore += 1.5;
-          }
-          
-          return Math.min(workloadScore, 10);
-        });
+        // Use backend-calculated workload factors
+        const workloadScores = allActiveMembers
+          .map((m: any) => m?.factors?.workload ?? 0)
+          .filter(score => score > 0);
+        
+        if (workloadScores.length === 0) return null;
         
         const sum = workloadScores.reduce((total, score) => total + score, 0);
         return Number((sum / workloadScores.length).toFixed(1));
       })(),
-      metrics: `Combined incident load + development activity from ${allActiveMembers.length} active team members`
+      metrics: `Average workload factor from ${allActiveMembers.length} active team members`
     },
     { 
       factor: "After Hours Activity", 
       value: (() => {
         if (allActiveMembers.length === 0) return null;
         
-        const afterHoursScores = allActiveMembers.map((m: any) => {
-          let afterHoursScore = 0;
-          
-          // Incident after-hours component  
-          if (m?.incident_count > 0 && m?.metrics?.after_hours_percentage) {
-            afterHoursScore += Math.min(m.metrics.after_hours_percentage / 10, 5);
-          }
-          
-          // GitHub after-hours component
-          if (m?.github_activity) {
-            const githubAfterHoursRatio = (m.github_activity.after_hours_commits || 0) / Math.max(m.github_activity.commits_count || 1, 1);
-            if (githubAfterHoursRatio > 0.30) afterHoursScore += 4;
-            else if (githubAfterHoursRatio > 0.15) afterHoursScore += 2.5;
-            else if (githubAfterHoursRatio > 0.05) afterHoursScore += 1;
-          }
-          
-          return Math.min(afterHoursScore, 10);
-        });
+        // Use backend-calculated after_hours factors
+        const afterHoursScores = allActiveMembers
+          .map((m: any) => m?.factors?.after_hours ?? 0)
+          .filter(score => score > 0);
+        
+        if (afterHoursScores.length === 0) return null;
         
         const sum = afterHoursScores.reduce((total, score) => total + score, 0);
         return Number((sum / afterHoursScores.length).toFixed(1));
       })(),
-      metrics: `Combined incident response + development work after normal hours from ${allActiveMembers.length} team members`
+      metrics: `Average after-hours factor from ${allActiveMembers.length} active team members`
     },
     { 
       factor: "Weekend Work", 
       value: (() => {
         if (allActiveMembers.length === 0) return null;
         
-        const weekendScores = allActiveMembers.map((m: any) => {
-          let weekendScore = 0;
-          
-          // Incident weekend work component
-          if (m?.incident_count > 0 && m?.metrics?.weekend_percentage) {
-            weekendScore += Math.min(m.metrics.weekend_percentage / 10, 5);
-          }
-          
-          // GitHub weekend commits component
-          if (m?.github_activity) {
-            const githubWeekendRatio = (m.github_activity.weekend_commits || 0) / Math.max(m.github_activity.commits_count || 1, 1);
-            if (githubWeekendRatio > 0.25) weekendScore += 3;
-            else if (githubWeekendRatio > 0.10) weekendScore += 1.5;
-            else if (githubWeekendRatio > 0.05) weekendScore += 0.5;
-          }
-          
-          return Math.min(weekendScore, 10);
-        });
+        // Use backend-calculated weekend_work factors
+        const weekendScores = allActiveMembers
+          .map((m: any) => m?.factors?.weekend_work ?? 0)
+          .filter(score => score > 0);
+        
+        if (weekendScores.length === 0) return null;
         
         const sum = weekendScores.reduce((total, score) => total + score, 0);
         return Number((sum / weekendScores.length).toFixed(1));
       })(),
-      metrics: `Combined incident handling + development work on weekends from ${allActiveMembers.length} team members`
+      metrics: `Average weekend work factor from ${allActiveMembers.length} active team members`
     },
     { 
       factor: "Response Pressure", 
       value: (() => {
-        const membersWithResponseData = membersWithIncidents.filter((m: any) => 
-          m?.factors?.response_time !== undefined && m.factors.response_time !== null);
-        if (membersWithResponseData.length === 0) return null;
+        if (allActiveMembers.length === 0) return null;
         
-        const responseScores = membersWithResponseData.map((m: any) => {
-          let responseScore = m.factors.response_time;
-          
-          // Add GitHub code review pressure
-          if (m?.github_activity) {
-            const commitsPerWeek = m.github_activity.commits_per_week || 0;
-            if (commitsPerWeek >= 60) responseScore += 2;
-            else if (commitsPerWeek >= 30) responseScore += 1;
-          }
-          
-          return Math.min(responseScore, 10);
-        });
+        // Use backend-calculated response_time factors
+        const responseScores = allActiveMembers
+          .map((m: any) => m?.factors?.response_time ?? 0)
+          .filter(score => score > 0);
+        
+        if (responseScores.length === 0) return null;
         
         const sum = responseScores.reduce((total, score) => total + score, 0);
         return Number((sum / responseScores.length).toFixed(1));
       })(),
-      metrics: `Incident response time pressure enhanced by development review load from ${membersWithIncidents.length} team members`
+      metrics: `Average response time factor from ${allActiveMembers.length} active team members`
     },
     { 
-      factor: "Severity Impact", 
+      factor: "Incident Load", 
       value: (() => {
-        if (membersWithIncidents.length === 0) return null;
+        if (allActiveMembers.length === 0) return null;
         
-        const severityScores = membersWithIncidents.map((m: any) => {
-          let score = 0;
-          const metrics = m.key_metrics || {};
-          
-          // Severity-weighted incidents per week (key metric)
-          const severityWeighted = metrics.severity_weighted_per_week || 0;
-          
-          // Calculate high severity ratio
-          const totalIncidents = m.incident_count || 0;
-          const sev0Count = m.severity_breakdown?.SEV0 || 0;
-          const sev1Count = m.severity_breakdown?.SEV1 || 0;
-          const highSeverityCount = sev0Count + sev1Count;
-          const highSeverityRatio = totalIncidents > 0 ? highSeverityCount / totalIncidents : 0;
-          
-          // Score based on severity-weighted incidents (0-7 points)
-          // Threshold: 3+ severity-weighted incidents per week is high stress
-          score += Math.min(7, (severityWeighted / 3) * 7);
-          
-          // Additional score for high severity ratio (0-3 points)
-          // If >30% of incidents are SEV0/SEV1, that's high stress
-          score += Math.min(3, (highSeverityRatio / 0.3) * 3);
-          
-          return Math.min(10, score);
-        }).filter((s: number) => s > 0);
+        // Use backend-calculated incident_load factors
+        const incidentLoadScores = allActiveMembers
+          .map((m: any) => m?.factors?.incident_load ?? 0)
+          .filter(score => score > 0);
         
-        if (severityScores.length === 0) return null;
+        if (incidentLoadScores.length === 0) return null;
         
-        const sum = severityScores.reduce((a: number, b: number) => a + b, 0);
-        return Number((sum / severityScores.length).toFixed(1));
+        const sum = incidentLoadScores.reduce((a: number, b: number) => a + b, 0);
+        return Number((sum / incidentLoadScores.length).toFixed(1));
       })(),
-      metrics: `High-severity incident impact (SEV0/SEV1) across ${membersWithIncidents.length} responders`
+      metrics: `Average incident load factor from ${allActiveMembers.length} active team members`
     },
   ].filter(factor => factor.value !== null) // Remove factors with no real data
    .map(factor => ({
@@ -5374,139 +5315,35 @@ export default function Dashboard() {
             // Temporary: Keep memberHighRisk for old code that hasn't been replaced yet
             const memberHighRisk = []; // Will be removed when modal redesign is complete
             
-            // Calculate holistic member factors for radar chart (GitHub + Incident patterns)
+            // Use backend-calculated factors for consistency - NO FRONTEND CALCULATIONS
             const m = memberData;
-            const hasGitHubData = m?.github_activity && (m.github_activity.commits_count > 0 || m.github_activity.commits_per_week > 0);
-            const hasIncidentData = (m?.incident_count || 0) > 0;
             
+            // Backend factors come pre-calculated from the API
+            // The frontend should ONLY display them, never recalculate
             const memberFactors = [
               {
                 factor: 'Workload Intensity',
-                value: (() => {
-                  // Combine incident volume + GitHub commit volume
-                  let workloadScore = 0;
-                  
-                  // Incident workload component (0-5 scale)
-                  if (hasIncidentData) {
-                    const incidentsCount = m?.incident_count || 0;
-                    const incidentsPerWeek = incidentsCount / 4.3;
-                    workloadScore += Math.min(incidentsPerWeek * 0.4, 5); // Cap at 5 for incidents
-                  }
-                  
-                  // GitHub workload component (0-5 scale)  
-                  if (hasGitHubData) {
-                    const commitsPerWeek = m.github_activity.commits_per_week || 0;
-                    if (commitsPerWeek >= 80) workloadScore += 5;
-                    else if (commitsPerWeek >= 50) workloadScore += 4;
-                    else if (commitsPerWeek >= 25) workloadScore += 2.5;
-                    else if (commitsPerWeek >= 15) workloadScore += 1.5;
-                  }
-                  
-                  return Math.min(workloadScore, 10);
-                })() || (m?.factors?.workload ?? 0.1),
+                value: m?.factors?.workload ?? 0.1,
                 color: '#FF6B6B'
               },
               {
                 factor: 'After Hours Activity',
-                value: (() => {
-                  // Combine incident after-hours + GitHub after-hours
-                  let afterHoursScore = 0;
-                  
-                  // Incident after-hours component
-                  if (hasIncidentData) {
-                    const incidentAfterHours = m?.metrics?.after_hours_percentage || 0;
-                    afterHoursScore += Math.min(incidentAfterHours / 10, 5); // Cap at 5
-                  }
-                  
-                  // GitHub after-hours component
-                  if (hasGitHubData) {
-                    const githubAfterHoursRatio = (m.github_activity.after_hours_commits || 0) / Math.max(m.github_activity.commits_count || 1, 1);
-                    if (githubAfterHoursRatio > 0.30) afterHoursScore += 4;
-                    else if (githubAfterHoursRatio > 0.15) afterHoursScore += 2.5;
-                    else if (githubAfterHoursRatio > 0.05) afterHoursScore += 1;
-                  }
-                  
-                  return Math.min(afterHoursScore, 10);
-                })() || (m?.factors?.after_hours ?? 0.1),
+                value: m?.factors?.after_hours ?? 0.1,
                 color: '#4ECDC4'
               },
               {
                 factor: 'Response Pressure',
-                value: (() => {
-                  // Primarily incident-based but consider GitHub PR review pressure
-                  let responseScore = 0;
-                  
-                  // Incident response pressure (primary component)
-                  if (hasIncidentData) {
-                    const responseMinutes = m?.metrics?.avg_response_time_minutes || 0;
-                    if (responseMinutes <= 30) responseScore += 2.0;      // Excellent
-                    else if (responseMinutes <= 60) responseScore += 4.0; // Good
-                    else if (responseMinutes <= 120) responseScore += 6.0; // Acceptable
-                    else if (responseMinutes <= 240) responseScore += 8.0; // Poor
-                    else responseScore += 10.0; // Critical
-                  }
-                  
-                  // GitHub review pressure (supplementary)
-                  if (hasGitHubData) {
-                    const commitsPerWeek = m.github_activity.commits_per_week || 0;
-                    if (commitsPerWeek >= 60) responseScore += 2; // High code review pressure
-                    else if (commitsPerWeek >= 30) responseScore += 1;
-                  }
-                  
-                  return Math.min(responseScore, 10);
-                })() || (m?.factors?.response_time ?? 0.1),
+                value: m?.factors?.response_time ?? 0.1,
                 color: '#45B7D1'
               },
               {
                 factor: 'Weekend Work',
-                value: (() => {
-                  // Combine incident weekend work + GitHub weekend commits
-                  let weekendScore = 0;
-                  
-                  // Incident weekend work component
-                  if (hasIncidentData) {
-                    const incidentWeekend = m?.metrics?.weekend_percentage || 0;
-                    weekendScore += Math.min(incidentWeekend / 10, 5); // Cap at 5
-                  }
-                  
-                  // GitHub weekend commits component
-                  if (hasGitHubData) {
-                    const githubWeekendRatio = (m.github_activity.weekend_commits || 0) / Math.max(m.github_activity.commits_count || 1, 1);
-                    if (githubWeekendRatio > 0.25) weekendScore += 3;
-                    else if (githubWeekendRatio > 0.10) weekendScore += 1.5;
-                    else if (githubWeekendRatio > 0.05) weekendScore += 0.5;
-                  }
-                  
-                  return Math.min(weekendScore, 10);
-                })() || (m?.factors?.weekend_work ?? 0.1),
+                value: m?.factors?.weekend_work ?? 0.1,
                 color: '#96CEB4'
               },
               {
-                factor: 'Severity Impact',
-                value: (() => {
-                  // Severity impact score
-                  let severityScore = 0;
-                  
-                  if (hasIncidentData) {
-                    // Severity-weighted incidents per week
-                    const severityWeighted = (m as any)?.key_metrics?.severity_weighted_per_week || 0;
-                    
-                    // Calculate high severity ratio
-                    const totalIncidents = m?.incident_count || 0;
-                    const sev0Count = (m as any)?.severity_breakdown?.SEV0 || 0;
-                    const sev1Count = (m as any)?.severity_breakdown?.SEV1 || 0;
-                    const highSeverityCount = sev0Count + sev1Count;
-                    const highSeverityRatio = totalIncidents > 0 ? highSeverityCount / totalIncidents : 0;
-                    
-                    // Score based on severity-weighted incidents (0-7 points)
-                    severityScore += Math.min(7, (severityWeighted / 3) * 7);
-                    
-                    // Additional score for high severity ratio (0-3 points)
-                    severityScore += Math.min(3, (highSeverityRatio / 0.3) * 3);
-                  }
-                  
-                  return Math.min(severityScore, 10);
-                })() || 0.1,
+                factor: 'Incident Load',
+                value: m?.factors?.incident_load ?? 0.1,
                 color: '#FECA57'
               }
             ];
