@@ -54,14 +54,15 @@ class GitHubCollector:
         # Cache for email mapping
         self._email_mapping_cache = None
         
-    async def _correlate_email_to_github(self, email: str, token: str, user_id: Optional[int] = None) -> Optional[str]:
+    async def _correlate_email_to_github(self, email: str, token: str, user_id: Optional[int] = None, full_name: Optional[str] = None) -> Optional[str]:
         """
         Correlate an email address to a GitHub username using multiple strategies.
         
         This checks in order:
         1. Manual mappings from user_mappings table (highest priority)
         2. Predefined mappings (hardcoded)
-        3. Discovered email mappings from organization members
+        3. Enhanced matching algorithm with multiple strategies
+        4. Legacy discovered email mappings from organization members
         """
         logger.info(f"GitHub correlation attempt for {email}, token={'present' if token else 'missing'}, user_id={user_id}")
         
@@ -86,7 +87,18 @@ class GitHubCollector:
             else:
                 logger.warning(f"No predefined mapping found for {email}")
             
-            # Build email mapping if not cached
+            # THIRD: Use enhanced matching algorithm
+            try:
+                from .enhanced_github_matcher import EnhancedGitHubMatcher
+                matcher = EnhancedGitHubMatcher(token, self.organizations)
+                username = await matcher.match_email_to_github(email, full_name)
+                if username:
+                    logger.info(f"Found GitHub correlation via ENHANCED matching: {email} -> {username}")
+                    return username
+            except Exception as e:
+                logger.warning(f"Enhanced matcher failed, falling back to legacy: {e}")
+            
+            # FOURTH: Legacy approach - build email mapping if not cached
             if self._email_mapping_cache is None:
                 logger.info("Building email mapping cache from GitHub API")
                 self._email_mapping_cache = await self._build_email_mapping(token)
@@ -514,7 +526,7 @@ class GitHubCollector:
             logger.error(f"Error fetching daily commit data for {username}: {e}")
             return None
     
-    async def collect_github_data_for_user(self, user_email: str, days: int = 30, github_token: str = None, user_id: Optional[int] = None) -> Optional[Dict]:
+    async def collect_github_data_for_user(self, user_email: str, days: int = 30, github_token: str = None, user_id: Optional[int] = None, full_name: Optional[str] = None) -> Optional[Dict]:
         """
         Collect GitHub activity data for a single user using email correlation.
         
@@ -528,7 +540,7 @@ class GitHubCollector:
             GitHub activity data or None if no correlation found
         """
         # Use email-based correlation to find GitHub username
-        github_username = await self._correlate_email_to_github(user_email, github_token, user_id)
+        github_username = await self._correlate_email_to_github(user_email, github_token, user_id, full_name)
         
         if not github_username:
             logger.warning(f"No GitHub username found for email {user_email}")

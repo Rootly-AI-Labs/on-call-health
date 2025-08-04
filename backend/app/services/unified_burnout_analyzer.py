@@ -150,6 +150,8 @@ class UnifiedBurnoutAnalyzer:
                 # Get team member emails and names from JSONAPI format
                 team_emails = []
                 team_names = []
+                email_to_name = {}  # Map emails to full names for better GitHub matching
+                
                 for user in users:
                     if isinstance(user, dict) and "attributes" in user:
                         attrs = user["attributes"]
@@ -157,6 +159,8 @@ class UnifiedBurnoutAnalyzer:
                         name = attrs.get("full_name") or attrs.get("name")
                         if email:
                             team_emails.append(email)
+                            if name:
+                                email_to_name[email] = name
                         if name:
                             team_names.append(name)
                     elif isinstance(user, dict):
@@ -165,6 +169,8 @@ class UnifiedBurnoutAnalyzer:
                         name = user.get("full_name") or user.get("name")
                         if email:
                             team_emails.append(email)
+                            if name:
+                                email_to_name[email] = name
                         if name:
                             team_names.append(name)
                 
@@ -176,7 +182,8 @@ class UnifiedBurnoutAnalyzer:
                         
                         github_data = await collect_team_github_data_with_mapping(
                             team_emails, time_range_days, self.github_token,
-                            user_id=user_id, analysis_id=analysis_id, source_platform=self.platform
+                            user_id=user_id, analysis_id=analysis_id, source_platform=self.platform,
+                            email_to_name=email_to_name
                         )
                         logger.info(f"🔍 UNIFIED ANALYZER: Collected GitHub data for {len(github_data)} users")
                         logger.info(f"GitHub data keys: {list(github_data.keys())[:5]}")  # Log first 5 keys

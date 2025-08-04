@@ -15,7 +15,8 @@ async def collect_team_github_data_with_mapping(
     github_token: str = None,
     user_id: Optional[int] = None,
     analysis_id: Optional[int] = None,
-    source_platform: str = "rootly"
+    source_platform: str = "rootly",
+    email_to_name: Optional[Dict[str, str]] = None
 ) -> Dict[str, Dict]:
     """
     Enhanced version of collect_team_github_data that records mapping attempts.
@@ -36,7 +37,8 @@ async def collect_team_github_data_with_mapping(
                 github_token=github_token,
                 user_id=user_id,
                 analysis_id=analysis_id,
-                source_platform=source_platform
+                source_platform=source_platform,
+                email_to_name=email_to_name
             )
         except Exception as e:
             logger.error(f"Smart caching failed, falling back to original logic: {e}")
@@ -50,7 +52,24 @@ async def collect_team_github_data_with_mapping(
     processed_emails = set()
     
     # Call original function with user_id for manual mapping support
-    github_data = await original_collect_team_github_data(team_emails, days, github_token, user_id)
+    # Pass email_to_name mapping for better GitHub username matching
+    from .github_collector import GitHubCollector
+    collector = GitHubCollector()
+    github_data = {}
+    
+    for email in team_emails:
+        try:
+            # Get full name for this email if available
+            full_name = email_to_name.get(email) if email_to_name else None
+            
+            # Collect data with full name for better matching
+            user_data = await collector.collect_github_data_for_user(
+                email, days, github_token, user_id, full_name=full_name
+            )
+            if user_data:
+                github_data[email] = user_data
+        except Exception as e:
+            logger.error(f"Failed to collect GitHub data for {email}: {e}")
     
     # Record mapping attempts if we have user context
     if recorder and user_id:
