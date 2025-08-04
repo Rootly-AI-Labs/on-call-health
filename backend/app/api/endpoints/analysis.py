@@ -459,6 +459,15 @@ async def _run_analysis_task_impl(db, analysis_id: int, integration_id: int, day
         db.commit()
         
         logger.info(f"Analysis {analysis_id} completed successfully")
+        
+    except Exception as e:
+        logger.error(f"Analysis {analysis_id} failed: {str(e)}", exc_info=True)
+        analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
+        if analysis:
+            analysis.status = "failed"
+            analysis.error_message = str(e)
+            db.commit()
+        raise
 
 async def run_github_only_analysis_task(analysis_id: int, days_back: int, team_emails: Optional[list], user_id: int):
     """Background task to run GitHub-only burnout analysis."""
