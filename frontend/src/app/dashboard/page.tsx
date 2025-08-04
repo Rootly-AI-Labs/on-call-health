@@ -5241,32 +5241,51 @@ export default function Dashboard() {
       {/* Member Detail Modal */}
       <Dialog open={!!selectedMember} onOpenChange={() => setSelectedMember(null)}>
         <DialogContent className="max-w-5xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center space-x-4">
-              <Avatar className="w-16 h-16">
-                <AvatarImage src={selectedMember?.avatar} />
-                <AvatarFallback className="text-lg">
-                  {selectedMember?.name
-                    .split(" ")
-                    .map((n) => n[0])
-                    .join("")}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1">
-                <h2 className="text-xl font-semibold">{selectedMember?.name}</h2>
-                <p className="text-gray-600">{selectedMember?.role || selectedMember?.email}</p>
-              </div>
-            </DialogTitle>
-          </DialogHeader>
           {selectedMember && (() => {
             // Find the correct member data from the analysis (consistent with dashboard)
             const memberData = members?.find(m => m.user_name === selectedMember.name);
             
-            // Get the correct burnout score (handle both data formats)
-            const burnoutScore = memberData?.burnout_score || (selectedMember.burnoutScore ? selectedMember.burnoutScore / 10 : 0) || 0;
+            return (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="flex items-center space-x-4">
+                    <Avatar className="w-16 h-16">
+                      <AvatarImage src={selectedMember?.avatar} />
+                      <AvatarFallback className="text-lg">
+                        {selectedMember?.name
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h2 className="text-xl font-semibold">{selectedMember?.name}</h2>
+                          <p className="text-gray-600">{selectedMember?.role || selectedMember?.email}</p>
+                        </div>
+                        {memberData && 'github_burnout_breakdown' in memberData && memberData.github_burnout_breakdown && (
+                          <span className={`text-xs font-semibold px-3 py-1 rounded-full ${
+                            (memberData.github_burnout_breakdown as any).score_source === 'github_based' ? 'bg-blue-100 text-blue-800' :
+                            (memberData.github_burnout_breakdown as any).score_source === 'hybrid' ? 'bg-purple-100 text-purple-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {(memberData.github_burnout_breakdown as any).score_source === 'github_based' ? 'GitHub Activity Only' :
+                             (memberData.github_burnout_breakdown as any).score_source === 'hybrid' ? 'GitHub + Incidents Combined' :
+                             'Incident-Based Only'}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </DialogTitle>
+                </DialogHeader>
             
-            // Calculate Maslach dimensions from consistent burnout score (no maslach_dimensions in data)
-            const maslachDimensions = [
+            {(() => {
+              // Get the correct burnout score (handle both data formats)
+              const burnoutScore = memberData?.burnout_score || (selectedMember.burnoutScore ? selectedMember.burnoutScore / 10 : 0) || 0;
+              
+              // Calculate Maslach dimensions from consistent burnout score (no maslach_dimensions in data)
+              const maslachDimensions = [
               {
                 dimension: "Emotional Exhaustion",
                 value: Math.min(Math.max(Number((burnoutScore * 1.2).toFixed(1)), 0), 10),
@@ -5697,6 +5716,17 @@ export default function Dashboard() {
                       <div className="bg-white p-3 rounded-lg">
                         <div className="text-xl font-bold text-gray-900">{memberData.github_activity?.commits_per_week?.toFixed(1) || '0.0'}</div>
                         <p className="text-xs text-gray-600 font-medium">Commits/Week</p>
+                        <div className="mt-1">
+                          <span className={`text-xs font-medium px-2 py-1 rounded ${
+                            (memberData.github_activity?.commits_per_week || 0) > 50 ? 'bg-red-100 text-red-600' :
+                            (memberData.github_activity?.commits_per_week || 0) > 25 ? 'bg-orange-100 text-orange-600' :
+                            (memberData.github_activity?.commits_per_week || 0) > 10 ? 'bg-green-100 text-green-600' : 'bg-blue-100 text-blue-600'
+                          }`}>
+                            {(memberData.github_activity?.commits_per_week || 0) > 50 ? 'Very High' :
+                             (memberData.github_activity?.commits_per_week || 0) > 25 ? 'High' :
+                             (memberData.github_activity?.commits_per_week || 0) > 10 ? 'Moderate' : 'Low'}
+                          </span>
+                        </div>
                       </div>
                       <div className="bg-white p-3 rounded-lg">
                         <div className="text-xl font-bold text-gray-900">{memberData.github_activity ? (((memberData.github_activity.after_hours_commits || 0) / Math.max(memberData.github_activity.commits_count || 1, 1)) * 100).toFixed(1) : '0.0'}%</div>
@@ -5708,43 +5738,11 @@ export default function Dashboard() {
                       </div>
                     </div>
                     
-                    {/* GitHub Activity Health */}
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-3">
-                      <h4 className="text-sm font-semibold text-blue-800 mb-2">Development Health</h4>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="bg-white p-2 rounded">
-                          <span className="text-xs text-blue-700">Activity Level</span>
-                          <div className="flex items-center space-x-2">
-                            <span className={`text-lg font-bold ${
-                              (memberData.github_activity?.commits_per_week || 0) > 50 ? 'text-red-600' :
-                              (memberData.github_activity?.commits_per_week || 0) > 25 ? 'text-orange-600' :
-                              (memberData.github_activity?.commits_per_week || 0) > 10 ? 'text-green-600' : 'text-blue-600'
-                            }`}>
-                              {(memberData.github_activity?.commits_per_week || 0) > 50 ? 'Very High' :
-                               (memberData.github_activity?.commits_per_week || 0) > 25 ? 'High' :
-                               (memberData.github_activity?.commits_per_week || 0) > 10 ? 'Moderate' : 'Low'}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="bg-white p-2 rounded">
-                          <span className="text-xs text-blue-700">Severity Impact</span>
-                          <div className="flex items-center space-x-2">
-                            <span className={`text-lg font-bold ${
-                              ((memberData.github_activity?.after_hours_commits || 0) + (memberData.github_activity?.weekend_commits || 0)) / Math.max(memberData.github_activity?.commits_count || 1, 1) > 0.3 ? 'text-red-600' :
-                              ((memberData.github_activity?.after_hours_commits || 0) + (memberData.github_activity?.weekend_commits || 0)) / Math.max(memberData.github_activity?.commits_count || 1, 1) > 0.15 ? 'text-orange-600' : 'text-green-600'
-                            }`}>
-                              {((memberData.github_activity?.after_hours_commits || 0) + (memberData.github_activity?.weekend_commits || 0)) / Math.max(memberData.github_activity?.commits_count || 1, 1) > 0.3 ? 'Poor' :
-                               ((memberData.github_activity?.after_hours_commits || 0) + (memberData.github_activity?.weekend_commits || 0)) / Math.max(memberData.github_activity?.commits_count || 1, 1) > 0.15 ? 'Fair' : 'Good'}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
                     
                     {/* GitHub Burnout Indicators */}
                     {memberData.github_activity?.burnout_indicators && Object.values(memberData.github_activity.burnout_indicators).some(indicator => indicator) && (
-                      <div className="bg-red-50 border border-red-200 rounded-lg p-3 mt-3">
-                        <h4 className="text-sm font-semibold text-red-800 mb-2">Development Risk Indicators</h4>
+                      <div className="mt-3">
+                        <h4 className="text-sm font-semibold text-red-800 mb-2">⚠️ Burnout Warning Signs</h4>
                         <div className="space-y-1 text-xs">
                           {memberData.github_activity?.burnout_indicators?.excessive_commits && (
                             <div className="flex items-center space-x-2">
@@ -5776,32 +5774,30 @@ export default function Dashboard() {
 
                     {/* GitHub Burnout Score Breakdown (if using GitHub-based scoring) */}
                     {memberData && 'github_burnout_breakdown' in memberData && memberData.github_burnout_breakdown && (
-                      <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mt-3">
+                      <div className="mt-3">
                         <h4 className="text-sm font-semibold text-orange-800 mb-2">GitHub Burnout Analysis</h4>
                         <div className="space-y-2">
-                          <div className="flex justify-between items-center">
-                            <span className="text-xs text-orange-700">Score Source:</span>
-                            <span className={`text-xs font-semibold px-2 py-1 rounded ${
-                              (memberData.github_burnout_breakdown as any).score_source === 'github_based' ? 'bg-blue-100 text-blue-800' :
-                              (memberData.github_burnout_breakdown as any).score_source === 'hybrid' ? 'bg-purple-100 text-purple-800' :
-                              'bg-gray-100 text-gray-800'
-                            }`}>
-                              {(memberData.github_burnout_breakdown as any).score_source === 'github_based' ? 'GitHub Activity Only' :
-                               (memberData.github_burnout_breakdown as any).score_source === 'hybrid' ? 'GitHub + Incidents Combined' :
-                               'Incident-Based Only'}
-                            </span>
-                          </div>
                           {(memberData.github_burnout_breakdown as any).github_score > 0 && (
                             <div className="flex justify-between items-center">
                               <span className="text-xs text-orange-700">GitHub Burnout Score:</span>
-                              <span className="text-xs font-bold text-orange-900">
+                              <span className={`text-xs font-bold ${
+                                (memberData.github_burnout_breakdown as any).github_score >= 7 ? 'text-red-600' :
+                                (memberData.github_burnout_breakdown as any).github_score >= 5 ? 'text-orange-600' :
+                                (memberData.github_burnout_breakdown as any).github_score >= 3 ? 'text-yellow-600' :
+                                'text-green-600'
+                              }`}>
                                 {(memberData.github_burnout_breakdown as any).github_score}/10
                               </span>
                             </div>
                           )}
                           <div className="flex justify-between items-center">
                             <span className="text-xs text-orange-700">Final Burnout Score:</span>
-                            <span className="text-xs font-bold text-orange-900">
+                            <span className={`text-xs font-bold ${
+                              (memberData.github_burnout_breakdown as any).final_score >= 7 ? 'text-red-600' :
+                              (memberData.github_burnout_breakdown as any).final_score >= 5 ? 'text-orange-600' :
+                              (memberData.github_burnout_breakdown as any).final_score >= 3 ? 'text-yellow-600' :
+                              'text-green-600'
+                            }`}>
                               {(memberData.github_burnout_breakdown as any).final_score}/10
                             </span>
                           </div>
@@ -5809,22 +5805,15 @@ export default function Dashboard() {
                       </div>
                     )}
 
-                    {/* GitHub Activity Trends Chart */}
-                    {memberData && memberData.github_activity?.commits_count > 0 && (
-                      <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3 mt-3">
-                        <h4 className="text-sm font-semibold text-indigo-800 mb-3">Development Activity Trends</h4>
-                        <GitHubActivityChart 
-                          userEmail={selectedMember.email}
-                          analysisId={currentAnalysis?.id ? parseInt(currentAnalysis.id) : 0}
-                          memberData={memberData}
-                        />
-                      </div>
-                    )}
                   </div>
                 )}
               </div>
             </div>
-            )})()}
+            );
+          })()}
+              </>
+            );
+          })()}
         </DialogContent>
       </Dialog>
 
