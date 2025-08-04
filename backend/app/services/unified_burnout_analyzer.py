@@ -1083,11 +1083,13 @@ class UnifiedBurnoutAnalyzer:
     
     def _determine_risk_level(self, burnout_score: float) -> str:
         """Determine risk level based on burnout score using Maslach methodology."""
-        if burnout_score >= 5.0:  # Further lowered to catch high-incident users
+        if burnout_score >= 7.0:  # Critical risk - severe burnout
+            return "critical"
+        elif burnout_score >= 5.0:  # High risk - significant burnout
             return "high"
-        elif burnout_score >= 3.5:  # Lowered from 4.0 to catch moderate cases
+        elif burnout_score >= 3.5:  # Medium risk - moderate burnout signs
             return "medium"
-        else:
+        else:  # Low risk - manageable stress levels
             return "low"
     
     def _calculate_team_health(self, member_analyses: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -1108,8 +1110,8 @@ class UnifiedBurnoutAnalyzer:
         all_burnout_scores = [m.get("burnout_score", 0) for m in member_analyses if m and isinstance(m, dict)]
         avg_burnout = sum(all_burnout_scores) / len(all_burnout_scores) if all_burnout_scores and len(all_burnout_scores) > 0 else 0
         
-        # Count risk levels (updated for 3-tier system) - include ALL members (incidents + GitHub-only)
-        risk_dist = {"low": 0, "medium": 0, "high": 0}
+        # Count risk levels (updated for 4-tier system) - include ALL members (incidents + GitHub-only)
+        risk_dist = {"low": 0, "medium": 0, "high": 0, "critical": 0}
         for member in member_analyses:
             if member and isinstance(member, dict):
                 risk_level = member.get("risk_level", "low")
@@ -1166,7 +1168,7 @@ class UnifiedBurnoutAnalyzer:
             "risk_distribution": risk_dist,
             "average_burnout_score": round(avg_burnout, 2),
             "health_status": health_status,
-            "members_at_risk": risk_dist["high"]
+            "members_at_risk": risk_dist["high"] + risk_dist["critical"]
         }
     
     def _generate_insights(

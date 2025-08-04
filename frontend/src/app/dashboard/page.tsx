@@ -217,6 +217,7 @@ interface AnalysisResult {
         low: number
         medium: number
         high: number
+        critical: number
       }
       health_status: string
       data_source_contributions?: {
@@ -233,6 +234,7 @@ interface AnalysisResult {
         high: number
         medium: number
         low: number
+        critical: number
       }
       users_at_risk: number
     }
@@ -357,6 +359,7 @@ interface AnalysisResult {
           high: number
           medium: number
           low: number
+          critical?: number
         }
         [key: string]: any
       }
@@ -3186,6 +3189,13 @@ export default function Dashboard() {
                     {currentAnalysis?.analysis_data?.team_health || (currentAnalysis?.analysis_data?.team_analysis && currentAnalysis?.status === 'completed') ? (
                       <div>
                         <div className="space-y-1">
+                          {(currentAnalysis.analysis_data.team_health?.risk_distribution?.critical > 0 || currentAnalysis.analysis_data.team_summary?.risk_distribution?.critical > 0) && (
+                            <div className="flex items-center space-x-2">
+                              <div className="text-2xl font-bold text-red-800">{currentAnalysis.analysis_data.team_health?.risk_distribution?.critical || currentAnalysis.analysis_data.team_summary?.risk_distribution?.critical || 0}</div>
+                              <AlertTriangle className="w-6 h-6 text-red-700" />
+                              <span className="text-sm text-gray-600">Critical risk</span>
+                            </div>
+                          )}
                           <div className="flex items-center space-x-2">
                             <div className="text-2xl font-bold text-red-600">{currentAnalysis.analysis_data.team_health?.risk_distribution?.high || currentAnalysis.analysis_data.team_summary?.risk_distribution?.high || 0}</div>
                             <AlertTriangle className="w-6 h-6 text-red-500" />
