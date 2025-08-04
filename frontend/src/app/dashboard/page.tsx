@@ -3112,11 +3112,12 @@ export default function Dashboard() {
                             }
                             
                             // Convert to health status (0-10 scale, higher=better)
-                            if (currentScore >= 8) return 'Excellent';
-                            if (currentScore >= 6) return 'Good';
-                            if (currentScore >= 4) return 'Fair';
-                            if (currentScore >= 2) return 'Poor';
-                            return 'Critical';
+                            // 90%+ = Excellent, 80-89% = Good, 70-79% = Fair, 60-69% = Poor, <60% = Critical
+                            if (currentScore >= 9) return 'Excellent';  // 90%+
+                            if (currentScore >= 8) return 'Good';        // 80-89%
+                            if (currentScore >= 7) return 'Fair';        // 70-79%
+                            if (currentScore >= 6) return 'Poor';        // 60-69%
+                            return 'Critical';                           // <60%
                           })()}</div>
                           <Info className="w-3 h-3 text-purple-500" 
                                   onMouseEnter={(e) => {
@@ -3142,12 +3143,12 @@ export default function Dashboard() {
                             const status = (currentAnalysis.analysis_data.team_health?.health_status || (() => {
                               // Derive health status from average score for team_summary (now health scale 0-10, higher=better)
                               const avgScore = currentAnalysis.analysis_data.team_summary?.average_score;
-                              if (!avgScore) return 'excellent';
-                              if (avgScore >= 8) return 'excellent';
-                              if (avgScore >= 6) return 'good';
-                              if (avgScore >= 4) return 'fair';
-                              if (avgScore >= 2) return 'poor';
-                              return 'critical';
+                              if (!avgScore) return 'good';  // Default to good instead of excellent
+                              if (avgScore >= 9) return 'excellent';  // 90%+
+                              if (avgScore >= 8) return 'good';       // 80-89%
+                              if (avgScore >= 7) return 'fair';       // 70-79%
+                              if (avgScore >= 6) return 'poor';       // 60-69%
+                              return 'critical';                      // <60%
                             })()).toLowerCase()
                             switch(status) {
                               case 'excellent':

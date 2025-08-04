@@ -1148,16 +1148,17 @@ class UnifiedBurnoutAnalyzer:
         # Ensure minimum score of 2.0 (20% when displayed)
         overall_score = max(2.0, overall_score)
         
-        # Determine health status
-        if overall_score >= 8:
+        # Determine health status with more realistic thresholds
+        # 90%+ = Excellent, 80-89% = Good, 70-79% = Fair, 60-69% = Poor, <60% = Critical
+        if overall_score >= 9:  # 90%+
             health_status = "excellent"
-        elif overall_score >= 6:
+        elif overall_score >= 8:  # 80-89%
             health_status = "good"
-        elif overall_score >= 4:
+        elif overall_score >= 7:  # 70-79%
             health_status = "fair"
-        elif overall_score >= 2:
+        elif overall_score >= 6:  # 60-69%
             health_status = "poor"
-        else:
+        else:  # <60%
             health_status = "critical"
         
         return {

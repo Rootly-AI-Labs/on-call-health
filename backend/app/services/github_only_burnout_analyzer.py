@@ -579,15 +579,18 @@ class GitHubOnlyBurnoutAnalyzer:
             risk_level = member.get("risk_level", "low")
             risk_counts[risk_level] += 1
         
-        # Determine health status
-        if health_score >= 8:
+        # Determine health status with more realistic thresholds
+        # 90%+ = Excellent, 80-89% = Good, 70-79% = Fair, 60-69% = Poor, <60% = Critical
+        if health_score >= 9:  # 90%+
             health_status = "excellent"
-        elif health_score >= 6:
+        elif health_score >= 8:  # 80-89%
             health_status = "good"
-        elif health_score >= 4:
+        elif health_score >= 7:  # 70-79%
             health_status = "fair"
-        else:
+        elif health_score >= 6:  # 60-69%
             health_status = "poor"
+        else:  # <60%
+            health_status = "critical"
         
         # Calculate team confidence level
         individual_confidences = [m.get("confidence_level", 0.5) for m in member_analyses]
