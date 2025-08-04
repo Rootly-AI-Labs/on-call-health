@@ -78,6 +78,24 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
   const [savingInlineMapping, setSavingInlineMapping] = useState(false)
   const [githubValidation, setGithubValidation] = useState<{valid?: boolean, message?: string} | null>(null)
   const [validatingGithub, setValidatingGithub] = useState(false)
+  
+  // Auto-mapping states
+  const [runningAutoMapping, setRunningAutoMapping] = useState(false)
+  const [mappingProgress, setMappingProgress] = useState<{
+    total: number
+    processed: number
+    mapped: number
+    notFound: number
+    errors: number
+  } | null>(null)
+  const [mappingResults, setMappingResults] = useState<Array<{
+    email: string
+    name: string
+    github_username: string | null
+    status: 'mapped' | 'not_found' | 'error'
+    error?: string
+  }>>([])
+  const [showMappingResults, setShowMappingResults] = useState(false)
 
   const loadMappingData = useCallback(async () => {
     console.log(`🚀 MappingDrawer: loadMappingData called - isOpen: ${isOpen}, platform: ${platform}`)
@@ -243,6 +261,65 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
     }
   }, [inlineEditingValue, platform, validateGitHubUsername])
 
+  const runAutoMapping = async () => {
+    if (platform !== 'github') {
+      toast.error('Auto-mapping is only available for GitHub')
+      return
+    }
+    
+    setRunningAutoMapping(true)
+    setMappingProgress(null)
+    setMappingResults([])
+    
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) {
+        toast.error('Authentication required')
+        return
+      }
+      
+      const response = await fetch(`${API_BASE}/api/manual-mappings/run-github-mapping`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.detail || 'Failed to run auto-mapping')
+      }
+      
+      const result = await response.json()
+      
+      setMappingProgress({
+        total: result.total_processed,
+        processed: result.total_processed,
+        mapped: result.mapped,
+        notFound: result.not_found,
+        errors: result.errors
+      })
+      
+      setMappingResults(result.results)
+      setShowMappingResults(true)
+      
+      if (result.mapped > 0) {
+        toast.success(`Successfully mapped ${result.mapped} users to GitHub`)
+        // Reload mapping data to show new mappings
+        await loadMappingData()
+      } else {
+        toast.info('No new mappings found')
+      }
+      
+    } catch (error) {
+      console.error('Error running auto-mapping:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to run auto-mapping')
+    } finally {
+      setRunningAutoMapping(false)
+    }
+  }
+
   const saveInlineMapping = async (mappingId: number | string, email: string) => {
     if (!inlineEditingValue.trim()) {
       toast.error(`Please enter a ${platform === 'github' ? 'GitHub username' : 'Slack user ID'}`)
@@ -318,11 +395,31 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
             </div>
           ) : (
             <>
-              {/* Statistics */}
+              {/* Statistics and Auto-Mapping */}
               {mappingStats && (
                 <div className="mb-8">
-                  <div className="mb-6">
+                  <div className="mb-6 flex items-center justify-between">
                     <h3 className="font-semibold text-gray-900">Mapping Statistics</h3>
+                    {platform === 'github' && (
+                      <Button
+                        onClick={runAutoMapping}
+                        disabled={runningAutoMapping}
+                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                        size="sm"
+                      >
+                        {runningAutoMapping ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Running Auto-Mapping...
+                          </>
+                        ) : (
+                          <>
+                            <Users className="w-4 h-4 mr-2" />
+                            Run GitHub Auto-Mapping
+                          </>
+                        )}
+                      </Button>
+                    )}
                   </div>
                   <div className="grid grid-cols-3 gap-4">
                     <Card className="p-4 border-purple-200">
@@ -352,6 +449,87 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
                         </div>
                       </div>
                     </Card>
+                  </div>
+                </div>
+              )}
+
+              {/* Auto-Mapping Progress */}
+              {runningAutoMapping && (
+                <div className="mb-6 p-4 bg-blue-50 rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-blue-700">
+                      <Loader2 className="w-3 h-3 inline-block mr-1 animate-spin" />
+                      Searching for GitHub usernames...
+                    </span>
+                    {mappingProgress && (
+                      <span className="text-sm text-blue-600">
+                        {mappingProgress.processed} / {mappingProgress.total}
+                      </span>
+                    )}
+                  </div>
+                  {mappingProgress && (
+                    <>
+                      <div className="w-full bg-blue-100 rounded-full h-2 mb-2">
+                        <div 
+                          className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                          style={{ width: `${(mappingProgress.processed / mappingProgress.total) * 100}%` }}
+                        />
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-xs text-blue-700">
+                        <div>✓ Mapped: {mappingProgress.mapped}</div>
+                        <div>✗ Not Found: {mappingProgress.notFound}</div>
+                        <div>⚠ Errors: {mappingProgress.errors}</div>
+                      </div>
+                    </>
+                  )}
+                  {!mappingProgress && (
+                    <div className="text-xs text-blue-600 mt-2">
+                      Analyzing team member emails and searching GitHub for matches...
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Auto-Mapping Results */}
+              {showMappingResults && mappingResults.length > 0 && (
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-medium text-gray-900">Auto-Mapping Results</h4>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowMappingResults(false)}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  <div className="max-h-48 overflow-y-auto border rounded-lg p-3 space-y-2">
+                    {mappingResults.map((result, idx) => (
+                      <div key={idx} className="flex items-center justify-between text-sm">
+                        <div className="flex items-center space-x-2">
+                          <span className="font-medium truncate max-w-[200px]" title={result.email}>
+                            {result.name || result.email}
+                          </span>
+                          {result.status === 'mapped' && (
+                            <>
+                              <span className="text-gray-500">→</span>
+                              <span className="text-blue-600">@{result.github_username}</span>
+                            </>
+                          )}
+                        </div>
+                        <div>
+                          {result.status === 'mapped' && (
+                            <Badge variant="secondary" className="bg-green-100 text-green-700 border-0">Mapped</Badge>
+                          )}
+                          {result.status === 'not_found' && (
+                            <Badge variant="secondary" className="bg-gray-100 text-gray-700 border-0">Not Found</Badge>
+                          )}
+                          {result.status === 'error' && (
+                            <Badge variant="destructive" className="bg-red-100 text-red-700 border-0" title={result.error}>Error</Badge>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}

@@ -306,3 +306,142 @@ async def get_unmapped_identifiers(
     except Exception as e:
         logger.error(f"Error fetching unmapped identifiers: {e}")
         raise HTTPException(status_code=500, detail="Failed to fetch unmapped identifiers")
+
+@router.post("/manual-mappings/run-github-mapping", summary="Run GitHub mapping process")
+async def run_github_mapping(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Run the enhanced GitHub mapping process for all unmapped users."""
+    try:
+        from ...services.enhanced_github_matcher import EnhancedGitHubMatcher
+        from ...models import Integration
+        import asyncio
+        
+        # Get GitHub integration
+        github_integration = db.query(Integration).filter(
+            Integration.user_id == current_user.id,
+            Integration.platform == "github",
+            Integration.github_token.isnot(None)
+        ).first()
+        
+        if not github_integration:
+            raise HTTPException(status_code=400, detail="GitHub integration not found")
+        
+        # Decrypt GitHub token
+        from ..github import decrypt_token
+        github_token = decrypt_token(github_integration.github_token)
+        
+        # Get unmapped Rootly users
+        service = ManualMappingService(db)
+        
+        # Get all Rootly/PagerDuty users
+        rootly_integrations = db.query(Integration).filter(
+            Integration.user_id == current_user.id,
+            Integration.platform.in_(["rootly", "pagerduty"])
+        ).all()
+        
+        all_users = []
+        for integration in rootly_integrations:
+            # Get users from this integration
+            if integration.platform == "rootly":
+                from ...core.rootly_client import RootlyAPIClient
+                client = RootlyAPIClient(integration.api_token)
+                users_data = await client.get_users()
+                for user in users_data:
+                    all_users.append({
+                        "email": user.get("email"),
+                        "name": user.get("full_name") or user.get("name"),
+                        "platform": "rootly",
+                        "integration_id": integration.id
+                    })
+            # TODO: Add PagerDuty support
+        
+        # Get existing mappings
+        existing_mappings = service.get_all_mappings(
+            user_id=current_user.id,
+            target_platform="github"
+        )
+        mapped_emails = {m.source_identifier for m in existing_mappings if m.source_platform == "rootly"}
+        
+        # Filter unmapped users
+        unmapped_users = [u for u in all_users if u["email"] not in mapped_emails]
+        
+        # Get GitHub organizations from integration settings
+        github_orgs = []
+        if hasattr(github_integration, 'github_organizations') and github_integration.github_organizations:
+            import json
+            try:
+                github_orgs = json.loads(github_integration.github_organizations)
+            except:
+                github_orgs = ["rootly-hq"]  # Default fallback
+        
+        if not github_orgs:
+            github_orgs = ["rootly-hq"]  # Default if not configured
+            
+        # Run matching process
+        matcher = EnhancedGitHubMatcher(github_token, github_orgs)
+        results = []
+        
+        for i, user in enumerate(unmapped_users):
+            try:
+                # Send progress update via SSE or WebSocket (future enhancement)
+                github_username = await matcher.match_email_to_github(
+                    email=user["email"],
+                    full_name=user["name"]
+                )
+                
+                if github_username:
+                    # Create mapping
+                    service.create_mapping(
+                        user_id=current_user.id,
+                        source_platform=user["platform"],
+                        source_identifier=user["email"],
+                        target_platform="github",
+                        target_identifier=github_username,
+                        mapping_type="automated"
+                    )
+                    
+                    results.append({
+                        "email": user["email"],
+                        "name": user["name"],
+                        "github_username": github_username,
+                        "status": "mapped"
+                    })
+                else:
+                    results.append({
+                        "email": user["email"],
+                        "name": user["name"],
+                        "github_username": None,
+                        "status": "not_found"
+                    })
+                    
+            except Exception as e:
+                logger.error(f"Error mapping {user['email']}: {e}")
+                results.append({
+                    "email": user["email"],
+                    "name": user["name"],
+                    "github_username": None,
+                    "status": "error",
+                    "error": str(e)
+                })
+        
+        # Calculate summary stats
+        mapped_count = len([r for r in results if r["status"] == "mapped"])
+        not_found_count = len([r for r in results if r["status"] == "not_found"])
+        error_count = len([r for r in results if r["status"] == "error"])
+        
+        return {
+            "total_processed": len(results),
+            "mapped": mapped_count,
+            "not_found": not_found_count,
+            "errors": error_count,
+            "success_rate": mapped_count / len(results) if results else 0,
+            "results": results
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error running GitHub mapping: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to run GitHub mapping: {str(e)}")
