@@ -1990,6 +1990,12 @@ class UnifiedBurnoutAnalyzer:
                 commits_per_week = github_activity.get("commits_per_week", 0) if github_activity else 0
                 after_hours_commits = github_activity.get("after_hours_commits", 0) if github_activity else 0
                 weekend_commits = github_activity.get("weekend_commits", 0) if github_activity else 0
+                
+                # Ensure None values are converted to 0 to prevent NoneType errors
+                commits_count = commits_count if commits_count is not None else 0
+                commits_per_week = commits_per_week if commits_per_week is not None else 0
+                after_hours_commits = after_hours_commits if after_hours_commits is not None else 0
+                weekend_commits = weekend_commits if weekend_commits is not None else 0
                 has_github_username = github_activity.get("username") if github_activity else None
                 
                 # Calculate GitHub-based burnout score (even if 0 to determine score_source properly)
@@ -2032,8 +2038,8 @@ class UnifiedBurnoutAnalyzer:
                     "github_indicators": {
                         "high_commit_volume": commits_per_week > 25,
                         "excessive_commits": commits_per_week > 50,
-                        "after_hours_work": (after_hours_commits / max(commits_count, 1)) > 0.15 if commits_count > 0 else False,
-                        "weekend_work": (weekend_commits / max(commits_count, 1)) > 0.10 if commits_count > 0 else False
+                        "after_hours_work": (after_hours_commits / max(commits_count, 1)) > 0.15 if commits_count and commits_count > 0 and after_hours_commits is not None else False,
+                        "weekend_work": (weekend_commits / max(commits_count, 1)) > 0.10 if commits_count and commits_count > 0 and weekend_commits is not None else False
                     }
                 }
                 
@@ -2049,16 +2055,22 @@ class UnifiedBurnoutAnalyzer:
     
     def _calculate_github_burnout_score(
         self, 
-        commits_count: int, 
-        commits_per_week: float, 
-        after_hours_commits: int, 
-        weekend_commits: int
+        commits_count: Optional[int], 
+        commits_per_week: Optional[float], 
+        after_hours_commits: Optional[int], 
+        weekend_commits: Optional[int]
     ) -> float:
         """
         Calculate burnout score based on GitHub activity patterns.
         Based on Maslach dimensions but simplified for GitHub data.
         """
         try:
+            # Convert None values to 0 for safe calculations
+            commits_count = commits_count if commits_count is not None else 0
+            commits_per_week = commits_per_week if commits_per_week is not None else 0.0
+            after_hours_commits = after_hours_commits if after_hours_commits is not None else 0
+            weekend_commits = weekend_commits if weekend_commits is not None else 0
+            
             if commits_count == 0 and commits_per_week == 0:
                 return 0.0
             
@@ -2080,7 +2092,7 @@ class UnifiedBurnoutAnalyzer:
                 exhaustion_score += 1.5
             
             # After-hours work patterns
-            if commits_count > 0:
+            if commits_count and commits_count > 0 and after_hours_commits is not None:
                 after_hours_ratio = after_hours_commits / commits_count
                 if after_hours_ratio > 0.30:  # >30% after hours
                     exhaustion_score += 3.0
@@ -2090,11 +2102,12 @@ class UnifiedBurnoutAnalyzer:
                     exhaustion_score += 0.5
                 
                 # Weekend work patterns
-                weekend_ratio = weekend_commits / commits_count
-                if weekend_ratio > 0.25:  # >25% on weekends
-                    exhaustion_score += 2.0
-                elif weekend_ratio > 0.10:  # >10% on weekends
-                    exhaustion_score += 1.0
+                if weekend_commits is not None:
+                    weekend_ratio = weekend_commits / commits_count
+                    if weekend_ratio > 0.25:  # >25% on weekends
+                        exhaustion_score += 2.0
+                    elif weekend_ratio > 0.10:  # >10% on weekends
+                        exhaustion_score += 1.0
             
             # Cap exhaustion score at 10
             exhaustion_score = min(10.0, exhaustion_score)
@@ -2139,6 +2152,10 @@ class UnifiedBurnoutAnalyzer:
             
             return burnout_score
             
+        except (TypeError, ZeroDivisionError, ValueError) as e:
+            logger.error(f"Error calculating GitHub burnout score (math error): {e}")
+            logger.error(f"Values: commits_count={commits_count}, commits_per_week={commits_per_week}, after_hours_commits={after_hours_commits}, weekend_commits={weekend_commits}")
+            return 0.0
         except Exception as e:
-            logger.error(f"Error calculating GitHub burnout score: {e}")
+            logger.error(f"Unexpected error calculating GitHub burnout score: {e}")
             return 0.0
