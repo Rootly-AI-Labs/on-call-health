@@ -314,6 +314,7 @@ async def run_github_mapping(
 ):
     """Run the enhanced GitHub mapping process for all unmapped users."""
     try:
+        logger.info(f"Starting GitHub mapping for user {current_user.id}")
         from ...services.enhanced_github_matcher import EnhancedGitHubMatcher
         from ...models import GitHubIntegration, RootlyIntegration
         import asyncio
