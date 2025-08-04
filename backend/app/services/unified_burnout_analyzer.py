@@ -1816,25 +1816,32 @@ class UnifiedBurnoutAnalyzer:
                 # Floor at 2.0 (20% health) even on worst days
                 daily_score = max(daily_score, 2.0)
                 
-                # Calculate members at risk - use overall team health data if available
-                if team_health and isinstance(team_health, dict):
-                    # Use the overall team members at risk from the full analysis
-                    members_at_risk = team_health.get("members_at_risk", 0)
-                    total_members = len(team_analysis) if team_analysis else users_involved_count
-                else:
-                    # Fallback to day-specific calculation
-                    members_at_risk = 0
-                    total_members = users_involved_count
-                    
-                    if users_involved_count > 0:
-                        # Risk assessment based on daily load per person
-                        avg_incidents_per_person = incident_count / users_involved_count if users_involved_count > 0 else 0
-                        if avg_incidents_per_person > 3:
-                            members_at_risk = max(1, int(users_involved_count * 0.8))
-                        elif avg_incidents_per_person > 2:
-                            members_at_risk = max(1, int(users_involved_count * 0.5))
-                        elif after_hours_count > 0:
-                            members_at_risk = max(1, int(users_involved_count * 0.3))
+                # Calculate members at risk for this specific day
+                total_members = len(team_analysis) if team_analysis else users_involved_count
+                
+                # Calculate day-specific members at risk based on who was involved in incidents on this day
+                members_at_risk = 0
+                
+                if day_data["users_involved"]:
+                    # Count how many of the users involved in today's incidents are high risk
+                    for user_email in day_data["users_involved"]:
+                        # Find this user in the team analysis
+                        for member in (team_analysis or []):
+                            if member.get("user_email") == user_email or member.get("user_name") == user_email:
+                                if member.get("risk_level") in ["high", "critical"]:
+                                    members_at_risk += 1
+                                break
+                
+                # If we couldn't match users, fallback to load-based estimation
+                if members_at_risk == 0 and users_involved_count > 0:
+                    # Risk assessment based on daily load per person
+                    avg_incidents_per_person = incident_count / users_involved_count if users_involved_count > 0 else 0
+                    if avg_incidents_per_person > 3:
+                        members_at_risk = max(1, int(users_involved_count * 0.8))
+                    elif avg_incidents_per_person > 2:
+                        members_at_risk = max(1, int(users_involved_count * 0.5))
+                    elif after_hours_count > 0:
+                        members_at_risk = max(1, int(users_involved_count * 0.3))
                 
                 # Determine health status
                 health_status = self._determine_health_status_from_score(daily_score)
