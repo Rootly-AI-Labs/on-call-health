@@ -3240,7 +3240,15 @@ export default function Dashboard() {
                       In the last {currentAnalysis.time_range || 30} days
                     </p>
                     {(currentAnalysis.analysis_data as any)?.metadata?.severity_breakdown && (
-                      <div className="mt-4 grid grid-cols-4 gap-2">
+                      <div className={`mt-4 grid ${(currentAnalysis.analysis_data as any).metadata.severity_breakdown.sev0_count > 0 ? 'grid-cols-5' : 'grid-cols-4'} gap-2`}>
+                        {(currentAnalysis.analysis_data as any).metadata.severity_breakdown.sev0_count > 0 && (
+                          <div className="bg-purple-50 rounded-lg p-2 text-center">
+                            <div className="text-xs font-semibold text-purple-700">SEV0</div>
+                            <div className="text-lg font-bold text-purple-600">
+                              {(currentAnalysis.analysis_data as any).metadata.severity_breakdown.sev0_count}
+                            </div>
+                          </div>
+                        )}
                         <div className="bg-red-50 rounded-lg p-2 text-center">
                           <div className="text-xs font-semibold text-red-700">SEV1</div>
                           <div className="text-lg font-bold text-red-600">

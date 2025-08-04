@@ -291,6 +291,7 @@ class PagerDutyAPIClient:
             
             # Count incidents by urgency/priority (PagerDuty equivalent of severity)
             urgency_counts = {
+                "sev0_count": 0,  # Critical/P0 = SEV0
                 "sev1_count": 0,  # High urgency = SEV1
                 "sev2_count": 0,  # Medium urgency = SEV2  
                 "sev3_count": 0,  # Low urgency = SEV3
@@ -303,25 +304,31 @@ class PagerDutyAPIClient:
                     # PagerDuty uses urgency field (high, low)
                     urgency = incident.get("urgency", "low").lower()
                     
-                    # Map PagerDuty urgency to severity levels
-                    if urgency == "high":
-                        urgency_counts["sev1_count"] += 1
+                    # Check priority first for P0/critical classification
+                    priority = incident.get("priority")
+                    priority_name = ""
+                    if priority and isinstance(priority, dict):
+                        priority_name = priority.get("summary", "").lower()
+                    
+                    # Map PagerDuty urgency/priority to severity levels
+                    if "p0" in priority_name or "emergency" in priority_name:
+                        urgency_counts["sev0_count"] += 1
+                    elif urgency == "high":
+                        # High urgency without P0 = SEV1
+                        if "p1" in priority_name:
+                            urgency_counts["sev1_count"] += 1
+                        else:
+                            urgency_counts["sev1_count"] += 1
                     elif urgency == "low":
                         # Check priority for more granular classification
-                        priority = incident.get("priority")
-                        if priority and isinstance(priority, dict):
-                            priority_name = priority.get("summary", "").lower()
-                            if "p1" in priority_name or "critical" in priority_name:
-                                urgency_counts["sev2_count"] += 1
-                            elif "p2" in priority_name or "high" in priority_name:
-                                urgency_counts["sev2_count"] += 1
-                            elif "p3" in priority_name or "medium" in priority_name:
-                                urgency_counts["sev3_count"] += 1
-                            else:
-                                urgency_counts["sev4_count"] += 1
-                        else:
-                            # Default low urgency to SEV3
+                        if "p1" in priority_name or "critical" in priority_name:
+                            urgency_counts["sev1_count"] += 1  # P1 with low urgency still SEV1
+                        elif "p2" in priority_name or "high" in priority_name:
+                            urgency_counts["sev2_count"] += 1
+                        elif "p3" in priority_name or "medium" in priority_name:
                             urgency_counts["sev3_count"] += 1
+                        else:
+                            urgency_counts["sev4_count"] += 1
                     else:
                         # Unknown urgency defaults to SEV4
                         urgency_counts["sev4_count"] += 1
@@ -366,6 +373,7 @@ class PagerDutyAPIClient:
                     "total_users": 0,
                     "total_incidents": 0,
                     "severity_breakdown": {
+                        "sev0_count": 0,
                         "sev1_count": 0,
                         "sev2_count": 0,
                         "sev3_count": 0,

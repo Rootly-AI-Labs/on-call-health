@@ -491,6 +491,7 @@ class RootlyAPIClient:
             
             # Count incidents by severity
             severity_counts = {
+                "sev0_count": 0,  # Critical/Emergency
                 "sev1_count": 0,
                 "sev2_count": 0,
                 "sev3_count": 0,
@@ -522,7 +523,9 @@ class RootlyAPIClient:
                                 severity_name = severity_map.get(severity_name.lower(), "sev4")
                     
                     # Increment the appropriate counter
-                    if severity_name == "sev1":
+                    if severity_name == "sev0" or severity_name == "emergency":
+                        severity_counts["sev0_count"] += 1
+                    elif severity_name == "sev1":
                         severity_counts["sev1_count"] += 1
                     elif severity_name == "sev2":
                         severity_counts["sev2_count"] += 1
@@ -576,6 +579,7 @@ class RootlyAPIClient:
                     "total_users": 0,
                     "total_incidents": 0,
                     "severity_breakdown": {
+                        "sev0_count": 0,
                         "sev1_count": 0,
                         "sev2_count": 0,
                         "sev3_count": 0,
