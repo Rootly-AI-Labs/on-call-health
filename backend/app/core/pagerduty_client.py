@@ -172,7 +172,7 @@ class PagerDutyAPIClient:
             async with aiohttp.ClientSession() as session:
                 all_incidents = []
                 offset = 0
-                max_requests = 20  # Circuit breaker - max 20 requests (2000 incidents)
+                max_requests = 150  # Circuit breaker - max 150 requests (15000 incidents at 100 per page)
                 request_count = 0
                 
                 while len(all_incidents) < limit and request_count < max_requests:
@@ -259,9 +259,28 @@ class PagerDutyAPIClient:
             end_date = datetime.now(pytz.UTC)
             start_date = end_date - timedelta(days=days_back)
             
-            # Collect users and incidents in parallel (reasonable limits to avoid timeout)
+            # Dynamic incident limits based on time range (similar to Rootly)
+            incident_limits_by_range = {
+                7: 2000,   # 7-day: up to 2000 incidents
+                14: 3000,  # 14-day: up to 3000 incidents  
+                30: 5000,  # 30-day: up to 5000 incidents
+                60: 7000,  # 60-day: up to 7000 incidents
+                90: 10000, # 90-day: up to 10000 incidents
+                180: 15000 # 180-day (6 months): up to 15000 incidents
+            }
+            
+            # Find appropriate limit for the time range
+            incident_limit = 10000  # Default fallback
+            for range_days in sorted(incident_limits_by_range.keys()):
+                if days_back <= range_days:
+                    incident_limit = incident_limits_by_range[range_days]
+                    break
+            
+            logger.info(f"📊 PagerDuty: Using incident limit of {incident_limit} for {days_back}-day analysis")
+            
+            # Collect users and incidents in parallel
             users_task = self.get_users(limit=1000)
-            incidents_task = self.get_incidents(since=start_date, until=end_date, limit=1000)  # Reduced from 10000
+            incidents_task = self.get_incidents(since=start_date, until=end_date, limit=incident_limit)
             
             users = await users_task
             incidents = await incidents_task
