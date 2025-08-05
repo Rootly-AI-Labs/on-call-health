@@ -132,8 +132,8 @@ export default function OnboardingPage() {
     fetchUserData()
   }, [])
 
-  const handleConnectRootly = () => {
-    // Direct navigation to Rootly token setup
+  const handleSetupIntegrations = () => {
+    // Direct navigation to integrations setup
     router.push('/integrations')
   }
 
@@ -230,13 +230,13 @@ export default function OnboardingPage() {
               </Badge>
             </div>
 
-            <p className="text-slate-600 text-lg">Let's get your team's burnout analysis set up</p>
+            <p className="text-slate-600 text-lg">Let's connect your tools and start protecting your team's wellbeing</p>
           </div>
 
           {/* Progress Section */}
           <div className="mb-8">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-medium text-slate-700">Step 1 of 2: Connect Rootly</span>
+              <span className="text-sm font-medium text-slate-700">Step 1 of 2: Connect Your Platform</span>
               <span className="text-sm text-slate-500">50% complete</span>
             </div>
             <Progress value={50} className="h-2 bg-purple-100">
@@ -252,10 +252,10 @@ export default function OnboardingPage() {
                   <Link2 className="w-6 h-6 text-white" />
                 </div>
                 <div className="flex-1">
-                  <h2 className="text-xl font-semibold text-slate-900 mb-3">Connect Your Rootly Account</h2>
+                  <h2 className="text-xl font-semibold text-slate-900 mb-3">Connect Your On-Call Platform</h2>
                   <p className="text-slate-600 mb-4 leading-relaxed">
-                    To analyze your team's burnout patterns, we need access to your Rootly incident data. This helps us
-                    identify workload distribution and after-hours activity.
+                    To analyze your team's burnout patterns, we need access to your incident data from Rootly, PagerDuty, or other platforms. 
+                    This helps us identify workload distribution, response patterns, and after-hours activity.
                   </p>
                   <div className="flex items-center space-x-2 text-sm text-slate-500">
                     <Shield className="w-4 h-4 text-purple-600" />
@@ -271,9 +271,9 @@ export default function OnboardingPage() {
             <Button
               size="lg"
               className="w-full sm:w-auto bg-gradient-to-r from-purple-600 to-fuchsia-500 hover:from-purple-700 hover:to-fuchsia-600 text-white px-8 py-4 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
-              onClick={handleConnectRootly}
+              onClick={handleSetupIntegrations}
             >
-              Connect Rootly Account
+              Choose Your Platform
               <ChevronRight className="w-5 h-5 ml-2" />
             </Button>
 
@@ -283,7 +283,7 @@ export default function OnboardingPage() {
           <div className="mt-12 p-6 bg-white/50 rounded-lg border border-purple-100">
             <h3 className="font-semibold text-slate-900 mb-2">What's next?</h3>
             <p className="text-sm text-slate-600 mb-3">
-              After connecting your Rootly account, we'll analyze your incident data and show you:
+              After connecting your platform, we'll analyze your incident data and show you:
             </p>
             <ul className="text-sm text-slate-600 space-y-1">
               <li className="flex items-center space-x-2">
