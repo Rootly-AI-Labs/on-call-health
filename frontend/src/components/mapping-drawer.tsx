@@ -72,6 +72,8 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
   const [loadingMappingData, setLoadingMappingData] = useState(false)
   const [sortField, setSortField] = useState<'source_identifier' | 'target_identifier' | 'status' | 'method'>('source_identifier')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  const [githubOrganizations, setGithubOrganizations] = useState<string[]>([])
+  const [loadingGithubOrgs, setLoadingGithubOrgs] = useState(false)
   
   // Inline editing states
   const [inlineEditingId, setInlineEditingId] = useState<number | string | null>(null)
@@ -161,11 +163,39 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
     }
   }, [isOpen, platform])
 
+  // Fetch GitHub organizations when platform is GitHub
+  const fetchGithubOrganizations = useCallback(async () => {
+    if (platform !== 'github' || !isOpen) return
+    
+    try {
+      setLoadingGithubOrgs(true)
+      const authToken = localStorage.getItem('auth_token')
+      
+      if (!authToken) return
+      
+      const response = await fetch(`${API_BASE}/integrations/github/status`, {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        if (data.connected && data.integration?.organizations) {
+          setGithubOrganizations(data.integration.organizations)
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching GitHub organizations:', error)
+    } finally {
+      setLoadingGithubOrgs(false)
+    }
+  }, [platform, isOpen])
+
   useEffect(() => {
     if (isOpen) {
       loadMappingData()
+      fetchGithubOrganizations()
     }
-  }, [isOpen, loadMappingData])
+  }, [isOpen, loadMappingData, fetchGithubOrganizations])
 
   const handleSort = (field: typeof sortField) => {
     if (sortField === field) {
@@ -417,6 +447,27 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
           <SheetDescription>
             View and manage user mappings for {platformTitle} integration
           </SheetDescription>
+          {platform === 'github' && githubOrganizations.length > 0 && (
+            <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
+              <p className="text-sm text-blue-800">
+                <span className="font-medium">Organization Restriction:</span> GitHub mappings are limited to members of{' '}
+                {githubOrganizations.length === 1 ? (
+                  <span className="font-mono">{githubOrganizations[0]}</span>
+                ) : (
+                  <>
+                    {githubOrganizations.slice(0, -1).map((org, i) => (
+                      <span key={org}>
+                        {i > 0 && ', '}
+                        <span className="font-mono">{org}</span>
+                      </span>
+                    ))}
+                    {' and '}
+                    <span className="font-mono">{githubOrganizations[githubOrganizations.length - 1]}</span>
+                  </>
+                )}
+              </p>
+            </div>
+          )}
         </SheetHeader>
 
         <div className="mt-6">

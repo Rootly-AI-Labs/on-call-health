@@ -4674,11 +4674,11 @@ export default function Dashboard() {
                           incidentsHandled: member.incident_count || 0,
                           avgResponseTime: `${Math.round(member.metrics?.avg_response_time_minutes || 0)}m`,
                           factors: {
-                            workload: Math.round(((member.factors?.workload || member.key_metrics?.incidents_per_week || 0)) * 10) / 10,
-                            afterHours: Math.round(((member.factors?.after_hours || member.key_metrics?.after_hours_percentage || 0)) * 10) / 10,
+                            workload: Math.round(((member.factors?.workload || (member as any).key_metrics?.incidents_per_week || 0)) * 10) / 10,
+                            afterHours: Math.round(((member.factors?.after_hours || (member as any).key_metrics?.after_hours_percentage || 0)) * 10) / 10,
                             weekendWork: Math.round(((member.factors?.weekend_work || 0)) * 10) / 10,
-                            incidentLoad: Math.round(((member.factors?.incident_load || member.key_metrics?.incidents_per_week || 0)) * 10) / 10,
-                            responseTime: Math.round(((member.factors?.response_time || member.key_metrics?.avg_resolution_hours || 0)) * 10) / 10,
+                            incidentLoad: Math.round(((member.factors?.incident_load || (member as any).key_metrics?.incidents_per_week || 0)) * 10) / 10,
+                            responseTime: Math.round(((member.factors?.response_time || (member as any).key_metrics?.avg_resolution_hours || 0)) * 10) / 10,
                           },
                           metrics: member.metrics || {},
                           github_activity: member.github_activity || null,
@@ -4744,7 +4744,7 @@ export default function Dashboard() {
                             )}
                             
                             {/* PagerDuty - incident response */}
-                            {member.pagerduty_activity && (
+                            {(member as any).pagerduty_activity && (
                               <div className="flex items-center justify-center w-6 h-6 bg-green-100 rounded-full border border-green-200" title="PagerDuty">
                                 <svg className="w-3.5 h-3.5 text-green-600" fill="currentColor" viewBox="0 0 24 24">
                                   <path d="M12 2l2 7h7l-5.5 4 2 7L12 16l-5.5 4 2-7L3 9h7l2-7z"/>
