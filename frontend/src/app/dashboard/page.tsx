@@ -4706,19 +4706,35 @@ export default function Dashboard() {
                             </div>
                           </div>
                           
-                          {/* Integration icons */}
+                          {/* Integration icons - show based on actual data presence */}
                           <div className="flex flex-wrap gap-2 mb-3">
-                            {/* Rootly - incident management - always show since all analyses come from Rootly */}
-                            <div className="flex items-center justify-center w-6 h-6 bg-white rounded-full border border-orange-200" title="Rootly">
-                              <img 
-                                src="/rootly-logo.png" 
-                                alt="Rootly" 
-                                className="w-3.5 h-3.5"
-                              />
-                            </div>
+                            {/* Rootly/PagerDuty - incident source */}
+                            {(() => {
+                              const platform = selectedIntegrationData?.platform;
+                              if (platform === 'pagerduty') {
+                                return (
+                                  <div className="flex items-center justify-center w-6 h-6 bg-green-100 rounded-full border border-green-200" title="PagerDuty">
+                                    <svg className="w-3.5 h-3.5 text-green-600" fill="currentColor" viewBox="0 0 24 24">
+                                      <path d="M12 2l2 7h7l-5.5 4 2 7L12 16l-5.5 4 2-7L3 9h7l2-7z"/>
+                                    </svg>
+                                  </div>
+                                );
+                              } else {
+                                // Default to Rootly
+                                return (
+                                  <div className="flex items-center justify-center w-6 h-6 bg-white rounded-full border border-orange-200" title="Rootly">
+                                    <img 
+                                      src="/rootly-logo.png" 
+                                      alt="Rootly" 
+                                      className="w-3.5 h-3.5"
+                                    />
+                                  </div>
+                                );
+                              }
+                            })()}
                             
-                            {/* GitHub - code repository - show if user has GitHub mapping */}
-                            {hasGitHubMapping(member.user_email) && (
+                            {/* GitHub - show if user has actual GitHub data */}
+                            {member.github_activity && (member.github_activity.commits_count > 0 || member.github_activity.commits_per_week > 0) && (
                               <div className="flex items-center justify-center w-6 h-6 bg-gray-100 rounded-full border border-gray-200" title="GitHub">
                                 <svg className="w-3.5 h-3.5 text-gray-700" fill="currentColor" viewBox="0 0 24 24">
                                   <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/>
@@ -4726,8 +4742,8 @@ export default function Dashboard() {
                               </div>
                             )}
                             
-                            {/* Slack - communication - show if user has Slack mapping */}
-                            {hasSlackMapping(member.user_email) && (
+                            {/* Slack - show if user has actual Slack data */}
+                            {member.slack_activity && (member.slack_activity.messages_sent > 0 || member.slack_activity.channels_active > 0) && (
                               <div className="flex items-center justify-center w-6 h-6 bg-white rounded-full border border-gray-200" title="Slack">
                                 <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
                                   {/* Official Slack logo pattern */}
@@ -4739,15 +4755,6 @@ export default function Dashboard() {
                                   <path d="M17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312z" fill="#2EB67D"/>
                                   <path d="M15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52z" fill="#ECB22E"/>
                                   <path d="M15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z" fill="#ECB22E"/>
-                                </svg>
-                              </div>
-                            )}
-                            
-                            {/* PagerDuty - incident response */}
-                            {(member as any).pagerduty_activity && (
-                              <div className="flex items-center justify-center w-6 h-6 bg-green-100 rounded-full border border-green-200" title="PagerDuty">
-                                <svg className="w-3.5 h-3.5 text-green-600" fill="currentColor" viewBox="0 0 24 24">
-                                  <path d="M12 2l2 7h7l-5.5 4 2 7L12 16l-5.5 4 2-7L3 9h7l2-7z"/>
                                 </svg>
                               </div>
                             )}
