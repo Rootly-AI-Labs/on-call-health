@@ -1543,3 +1543,108 @@ If validation fails, retry with more explicit prompt.
 - Archive detailed timeline and response data
 
 **Implementation**: New database tables for granular storage, enhanced API collectors, correlation analysis services
+
+## DEMO CONFIGURATION - GitHub-Only Scoring Restriction
+
+### Configuration Active: August 2025 Demo
+**Purpose**: For demo purposes, only score GitHub activity for users who have at least one incident via Rootly or PagerDuty.
+
+**Rationale**: Demonstrates the integrated nature of the burnout analysis by showing how incident response correlates with development patterns.
+
+### Implementation Details
+
+#### 1. Backend Changes - `unified_burnout_analyzer.py`
+**Location**: `backend/app/services/unified_burnout_analyzer.py`
+
+**Current Demo Logic**:
+```python
+# Line ~1200 in _analyze_github_activity_members()
+# Only analyze GitHub activity for users with incidents
+incident_responders = set()
+for incident in self.incidents:
+    if incident.get('assigned_to', {}).get('email'):
+        incident_responders.add(incident['assigned_to']['email'].lower())
+
+# Filter GitHub-only users
+if user_email.lower() not in incident_responders:
+    logger.info(f"Skipping GitHub-only analysis for {user_email} (no incidents) - DEMO MODE")
+    continue
+```
+
+#### 2. Frontend Filtering - `dashboard/page.tsx`
+**Location**: `frontend/src/app/dashboard/page.tsx`
+
+**Current Demo Logic**:
+```typescript
+// Line ~2500 in team members display
+// Filter to only show users with incidents
+const membersWithIncidents = teamAnalysis?.members?.filter(
+    member => member.incident_count > 0
+) || [];
+```
+
+### How to Revert After Demo
+
+#### Step 1: Remove Backend Filtering
+In `backend/app/services/unified_burnout_analyzer.py`, remove or comment out:
+```python
+# REMOVE THIS BLOCK:
+if user_email.lower() not in incident_responders:
+    logger.info(f"Skipping GitHub-only analysis for {user_email} (no incidents) - DEMO MODE")
+    continue
+```
+
+#### Step 2: Update Frontend Display
+In `frontend/src/app/dashboard/page.tsx`, change:
+```typescript
+// FROM:
+const membersWithIncidents = teamAnalysis?.members?.filter(
+    member => member.incident_count > 0
+) || [];
+
+// TO:
+const membersWithIncidents = teamAnalysis?.members || [];
+```
+
+#### Step 3: Update Risk Calculation
+Ensure risk factors include GitHub-only developers:
+```typescript
+// Update any filtering logic that excludes zero-incident users
+// Search for: member.incident_count > 0
+// Replace with: member.burnout_score > 0 (or remove filter entirely)
+```
+
+#### Step 4: Verify Full Team Display
+After reverting:
+1. Run a new analysis
+2. Verify GitHub-only developers appear in:
+   - Team members graph
+   - Risk factors chart
+   - Individual member cards
+   - At-risk count
+
+### Files Affected by Demo Configuration
+1. `backend/app/services/unified_burnout_analyzer.py` - Lines ~1200-1210
+2. `frontend/src/app/dashboard/page.tsx` - Lines ~2500, risk calculation sections
+3. Team member filtering logic throughout dashboard
+
+### Testing the Reversion
+```bash
+# After reverting, test with:
+1. Create a test user with GitHub activity but no incidents
+2. Run analysis
+3. Verify user appears in all dashboard sections
+4. Check burnout score is calculated based on GitHub patterns alone
+```
+
+### Demo Talking Points
+- "The system integrates incident response data with development patterns"
+- "We're focusing on on-call engineers who both respond to incidents and write code"
+- "In production, this would include all developers to catch burnout before they're on-call"
+
+---
+
+### Outstanding Issues:
+1. Slack channel access errors (bot not in channels) - Low priority
+2. Invalid Anthropic API key for AI narratives - User configuration issue
+3. Demo mode active - GitHub scoring restricted to incident responders only

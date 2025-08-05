@@ -523,6 +523,29 @@ async def validate_github_username(
         )
         
         if user_info and not user_info.get("error"):
+            # Check organization membership if organizations are configured
+            if integration.organizations:
+                from ...services.enhanced_github_matcher import EnhancedGitHubMatcher
+                
+                try:
+                    # EnhancedGitHubMatcher expects list of org names
+                    org_list = integration.organizations if isinstance(integration.organizations, list) else []
+                    
+                    if org_list:
+                        matcher = EnhancedGitHubMatcher(decrypted_token, org_list)
+                        is_org_member = await matcher._verify_user_in_organizations(username)
+                        
+                        if not is_org_member:
+                            org_names = ", ".join(org_list)
+                            return {
+                                "valid": False,
+                                "error": "Not in organization",
+                                "message": f"GitHub user '{username}' is not a member of your configured organizations: {org_names}"
+                            }
+                except Exception as e:
+                    logger.warning(f"Organization verification failed, proceeding without check: {e}")
+                    # Continue without org check if verification fails
+            
             return {
                 "valid": True,
                 "username": user_info.get("login"),

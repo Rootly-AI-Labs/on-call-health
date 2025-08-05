@@ -300,7 +300,10 @@ class EnhancedGitHubMatcher:
                                     commit_email = commit.get('commit', {}).get('author', {}).get('email', '')
                                     if commit_email.lower() == email.lower():
                                         if commit.get('author'):
-                                            return commit['author']['login']
+                                            username = commit['author']['login']
+                                            # Verify user is in our organizations
+                                            if await self._verify_user_in_organizations(username):
+                                                return username
                                             
         except Exception as e:
             logger.error(f"Error in commit history search: {e}")
@@ -351,12 +354,38 @@ class EnhancedGitHubMatcher:
                 for username, score in candidates[:3]:
                     # Verify with additional checks
                     if await self._check_user_commits_for_email(username, email_parts['email']):
-                        return username
+                        # CRITICAL: Verify user is actually in our organizations
+                        if await self._verify_user_in_organizations(username):
+                            return username
                         
         except Exception as e:
             logger.error(f"Error in fuzzy name match: {e}")
             
         return None
+    
+    async def _verify_user_in_organizations(self, username: str) -> bool:
+        """Verify that a user is a member of at least one of our specified organizations."""
+        if not self.organizations:
+            return True  # No org restrictions configured
+            
+        try:
+            async with aiohttp.ClientSession() as session:
+                for org in self.organizations:
+                    # Get org members (use cache if available)
+                    if org not in self._org_members_cache:
+                        members = await self._get_org_members(org, session)
+                        self._org_members_cache[org] = members
+                    
+                    if username in self._org_members_cache[org]:
+                        logger.info(f"✅ User {username} verified as member of {org}")
+                        return True
+                        
+                logger.warning(f"❌ User {username} is NOT a member of any specified organizations: {self.organizations}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error verifying org membership for {username}: {e}")
+            return False
     
     async def _check_github_user_exists(self, username: str) -> bool:
         """Check if a GitHub username exists."""

@@ -2255,7 +2255,7 @@ export default function Dashboard() {
     const teamAnalysis = currentAnalysis?.analysis_data?.team_analysis
     const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members
     return members
-      ?.filter((member) => member.burnout_score !== undefined && member.burnout_score !== null && member.burnout_score > 0) // Include all members with burnout scores
+      ?.filter((member) => member.burnout_score !== undefined && member.burnout_score !== null && member.burnout_score > 0 && member.incident_count > 0) // DEMO MODE: Only include members with incidents
       ?.map((member) => ({
         name: member.user_name.split(" ")[0],
         fullName: member.user_name,
@@ -2323,7 +2323,7 @@ export default function Dashboard() {
   // Backend provides pre-calculated factors - frontend should ONLY display, never recalculate
   const membersWithGitHubData = members.filter((m: any) => 
     m?.github_activity && (m.github_activity.commits_count > 0 || m.github_activity.commits_per_week > 0));
-  const allActiveMembers = membersWithBurnoutScores; // All members with burnout scores should be included
+  const allActiveMembers = membersWithIncidents; // DEMO MODE: Only members with incidents
 
   const burnoutFactors = (allActiveMembers.length > 0) ? [
     { 
@@ -4658,6 +4658,7 @@ export default function Dashboard() {
                       const teamAnalysis = currentAnalysis?.analysis_data?.team_analysis
                       const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members
                       return members
+                        ?.filter((member) => member.incident_count > 0) // DEMO MODE: Only show members with incidents
                         ?.sort((a, b) => b.burnout_score - a.burnout_score) // Sort by burnout score descending (highest risk first)
                         ?.map((member) => (
                       <Card
@@ -5333,9 +5334,9 @@ export default function Dashboard() {
             const healthStatus = overallBurnoutScore <= 3 ? 'Low Risk' : 
                                overallBurnoutScore <= 5 ? 'Moderate Risk' : 
                                overallBurnoutScore <= 7 ? 'High Risk' : 'Critical Risk';
-            const healthColor = overallBurnoutScore <= 3 ? 'text-green-600 bg-green-50' : 
-                              overallBurnoutScore <= 5 ? 'text-yellow-600 bg-yellow-50' : 
-                              overallBurnoutScore <= 7 ? 'text-orange-600 bg-orange-50' : 'text-red-600 bg-red-50';
+            const healthColor = overallBurnoutScore <= 3 ? 'text-green-700 bg-green-100 font-medium' : 
+                              overallBurnoutScore <= 5 ? 'text-amber-700 bg-amber-100 font-medium' : 
+                              overallBurnoutScore <= 7 ? 'text-orange-700 bg-orange-100 font-medium' : 'text-red-700 bg-red-100 font-medium';
                               
             // Generate burnout summary highlighting concrete metrics and patterns
             const burnoutSummary = (() => {
@@ -5453,7 +5454,7 @@ export default function Dashboard() {
                     </div>
                     <div className="text-right">
                       <div className="text-2xl font-bold mb-1 text-gray-900">{overallBurnoutScore.toFixed(1)}/10</div>
-                      <Badge className={`${healthColor} text-sm px-3 py-1 border-0`}>
+                      <Badge className={`${healthColor} text-sm px-4 py-1 border-0 whitespace-nowrap inline-flex items-center justify-center`}>
                         {healthStatus}
                       </Badge>
                     </div>
