@@ -26,9 +26,9 @@ export default function AuthSuccessPage() {
       // Set success status
       setStatus('success')
       
-      // Redirect to dashboard after a brief delay
+      // Redirect to integrations setup after a brief delay
       setTimeout(() => {
-        router.push('/dashboard')
+        router.push('/integrations')
       }, 1500)
       
     } catch (err) {
@@ -92,7 +92,7 @@ export default function AuthSuccessPage() {
           Authentication Successful!
         </h2>
         <p className="text-gray-600">
-          Redirecting to your dashboard...
+          Redirecting to setup your integrations...
         </p>
       </div>
     </div>
