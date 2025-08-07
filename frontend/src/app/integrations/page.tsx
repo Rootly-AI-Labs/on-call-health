@@ -1752,19 +1752,7 @@ export default function IntegrationsPage() {
                 </Button>
               </Link>
             )}
-            <div className="flex items-center space-x-4">
-              <h1 className="text-2xl font-bold text-slate-900">Manage Integrations</h1>
-              <div className="flex flex-col items-start -space-y-1">
-                <span className="text-xs text-slate-400">powered by</span>
-                <Image 
-                  src="/images/rootly-ai-logo.png" 
-                  alt="Rootly AI" 
-                  width={120} 
-                  height={48}
-                  className="h-6 w-auto"
-                />
-              </div>
-            </div>
+            <h1 className="text-2xl font-bold text-slate-900">Manage Integrations</h1>
           </div>
 
           <Link href="/dashboard">
@@ -4460,6 +4448,25 @@ export default function IntegrationsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Powered by Rootly AI Footer */}
+      <div className="mt-12 pt-8 border-t border-gray-200 text-center">
+        <a 
+          href="https://rootly.com" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="inline-flex flex-col items-center space-y-1 hover:opacity-80 transition-opacity"
+        >
+          <span className="text-sm text-gray-500">powered by</span>
+          <Image 
+            src="/images/rootly-ai-logo.png" 
+            alt="Rootly AI" 
+            width={160} 
+            height={64}
+            className="h-8 w-auto"
+          />
+        </a>
+      </div>
     </div>
   )
 }
