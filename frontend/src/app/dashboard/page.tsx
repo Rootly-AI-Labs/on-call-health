@@ -2689,13 +2689,13 @@ export default function Dashboard() {
                   rel="noopener noreferrer"
                   className="flex flex-col items-center -space-y-1 hover:opacity-80 transition-opacity"
                 >
-                  <span className="text-xs text-gray-400">powered by</span>
+                  <span className="text-xs text-slate-400">powered by</span>
                   <Image 
-                    src="/images/rootly-logo-branded.png" 
-                    alt="Rootly" 
-                    width={90} 
-                    height={24} 
-                    className="h-6 w-auto ml-3"
+                    src="/images/rootly-ai-logo-white.png" 
+                    alt="Rootly AI" 
+                    width={160} 
+                    height={64} 
+                    className="h-6 w-auto ml-3 brightness-110 contrast-110"
                   />
                 </a>
               </div>

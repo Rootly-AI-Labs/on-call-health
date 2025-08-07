@@ -1544,6 +1544,18 @@ If validation fails, retry with more explicit prompt.
 
 **Implementation**: New database tables for granular storage, enhanced API collectors, correlation analysis services
 
+## UI ASSETS REFERENCES
+
+### Logos and Branding
+- **Head Logo**: `/images/oncall-burnout-logo.png` - OnCall Burnout head logo (currently removed from UI but available for future use)
+- **Rootly AI Logo**: `/images/rootly-ai-logo.png` - Main Rootly AI logo for light backgrounds
+- **Rootly AI Logo White**: `/images/rootly-ai-logo-white.png` - Rootly AI logo for dark backgrounds (used in sidebar footer)
+
+### Logo Usage Notes
+- The head logo was temporarily removed from landing page and integrations page headers
+- Can be restored by referencing `/images/oncall-burnout-logo.png` in Image components
+- Original usage locations: landing-page.tsx (header & footer), integrations/page.tsx (header)
+
 ## DEMO CONFIGURATION - GitHub-Only Scoring Restriction
 
 ### Configuration Active: August 2025 Demo
