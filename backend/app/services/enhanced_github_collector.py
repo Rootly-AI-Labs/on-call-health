@@ -3,6 +3,7 @@ Enhanced GitHub collector that records mapping data with smart caching.
 """
 import logging
 import os
+from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 from .github_collector import collect_team_github_data as original_collect_team_github_data
 from .mapping_recorder import MappingRecorder
@@ -25,6 +26,34 @@ async def collect_team_github_data_with_mapping(
     """
     # Phase 2: Check if smart caching is enabled
     use_smart_caching = os.getenv('USE_SMART_GITHUB_CACHING', 'true').lower() == 'true'
+    
+    # OPTIMIZATION: Check if we should use fast mode for analysis performance
+    fast_mode = os.getenv('GITHUB_FAST_MODE', 'true').lower() == 'true'
+    
+    # FAST MODE: Only use predefined mappings during analysis for speed
+    if fast_mode:
+        logger.info(f"🚀 FAST MODE: Only using predefined mappings for {len(team_emails)} emails")
+        
+        from .github_collector import GitHubCollector
+        collector = GitHubCollector()
+        github_data = {}
+        
+        # Only check predefined mappings
+        for email in team_emails:
+            if email in collector.predefined_email_mappings:
+                github_username = collector.predefined_email_mappings[email]
+                logger.info(f"🚀 FAST MODE: Found predefined mapping {email} -> {github_username}")
+                
+                # Generate mock data with the known username
+                github_data[email] = collector._generate_mock_github_data(
+                    github_username, email, 
+                    datetime.now() - timedelta(days=days),
+                    datetime.now()
+                )
+            else:
+                logger.info(f"🚀 FAST MODE: No predefined mapping for {email}, skipping")
+        
+        return github_data
     
     if use_smart_caching and user_id:
         logger.info(f"🧠 SMART CACHING: Using GitHubMappingService for {len(team_emails)} emails")

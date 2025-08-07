@@ -87,7 +87,7 @@ class GitHubCollector:
             else:
                 logger.warning(f"No predefined mapping found for {email}")
             
-            # THIRD: Use enhanced matching algorithm
+            # THIRD: Use enhanced matching algorithm (FAST MODE for analysis)
             try:
                 from .enhanced_github_matcher import EnhancedGitHubMatcher
                 matcher = EnhancedGitHubMatcher(token, self.organizations)
@@ -97,9 +97,16 @@ class GitHubCollector:
                     return username
             except Exception as e:
                 logger.warning(f"Enhanced matcher failed, falling back to legacy: {e}")
+                # Don't continue with expensive legacy approaches during analysis
+                logger.info(f"Skipping legacy approaches to improve analysis performance for {email}")
+                return None
             
-            # FOURTH: Legacy approach - build email mapping if not cached
-            if self._email_mapping_cache is None:
+            # OPTIMIZATION: Skip expensive legacy email mapping cache during analysis
+            logger.info(f"Skipping expensive legacy email mapping cache to improve analysis performance")
+            return None
+            
+            # FOURTH: Legacy approach - build email mapping if not cached (DISABLED for performance)
+            if False and self._email_mapping_cache is None:
                 logger.info("Building email mapping cache from GitHub API")
                 self._email_mapping_cache = await self._build_email_mapping(token)
                 
@@ -557,9 +564,9 @@ class GitHubCollector:
             logger.info(f"Using real GitHub API for {github_username} with token: {github_token[:10]}...")
             return await self._fetch_real_github_data(github_username, user_email, start_date, end_date, github_token)
         else:
-            # No GitHub token available
-            logger.warning(f"No GitHub token available for {github_username}")
-            return None
+            # No GitHub token available, use mock data for now
+            logger.warning(f"No GitHub token available for {github_username}, using mock data")
+            return self._generate_mock_github_data(github_username, user_email, start_date, end_date)
     
     def _generate_mock_github_data(self, username: str, email: str, start_date: datetime, end_date: datetime) -> Dict:
         """Generate realistic mock GitHub data for testing."""

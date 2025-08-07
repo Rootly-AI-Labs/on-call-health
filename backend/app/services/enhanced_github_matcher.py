@@ -56,18 +56,24 @@ class EnhancedGitHubMatcher:
         # Extract name parts from email
         email_parts = self._extract_name_from_email(email)
         
-        # Try strategies in order of accuracy
+        # Try strategies in order of accuracy - OPTIMIZED for speed
+        # Skip expensive strategies during analysis to improve performance
         strategies = [
             ("direct_api_search", self._search_by_email_api),
             ("exact_username_match", self._try_exact_username_patterns),
             ("org_member_search", self._search_org_members),
-            ("commit_history", self._search_commit_history),
-            ("fuzzy_name_match", self._fuzzy_name_match),
+            # Skip expensive strategies that cause slowdowns:
+            # ("commit_history", self._search_commit_history),  # Too many API calls
+            # ("fuzzy_name_match", self._fuzzy_name_match),     # Too many API calls
         ]
         
         for strategy_name, strategy_func in strategies:
             try:
                 logger.info(f"Trying {strategy_name} for {email}")
+                
+                # Add small delay to avoid hitting rate limits
+                import asyncio
+                await asyncio.sleep(0.1)  # 100ms delay between strategies
                 
                 if strategy_name == "direct_api_search":
                     result = await strategy_func(email)
@@ -211,8 +217,8 @@ class EnhancedGitHubMatcher:
         # Remove duplicates and empty strings
         patterns = list(filter(None, list(dict.fromkeys(patterns))))
         
-        # Check each pattern
-        for pattern in patterns:
+        # Check each pattern - LIMIT to first 5 patterns for performance
+        for pattern in patterns[:5]:  # Limit to 5 API calls max
             if await self._check_github_user_exists(pattern):
                 return pattern
                 
