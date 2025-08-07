@@ -12,15 +12,33 @@ console.log('API_BASE:', API_BASE) // Debug log to verify the URL
 export default function LandingPage() {
   const handleGoogleLogin = async () => {
     try {
+      console.log('🔍 Starting Google login process...')
+      console.log('🔍 API_BASE:', API_BASE)
+      
       // Pass the current origin to the backend
       const currentOrigin = window.location.origin
-      const response = await fetch(`${API_BASE}/auth/google?redirect_origin=${encodeURIComponent(currentOrigin)}`)
+      console.log('🔍 Current origin:', currentOrigin)
+      
+      const url = `${API_BASE}/auth/google?redirect_origin=${encodeURIComponent(currentOrigin)}`
+      console.log('🔍 Requesting URL:', url)
+      
+      const response = await fetch(url)
+      console.log('🔍 Response status:', response.status)
+      console.log('🔍 Response ok:', response.ok)
+      
       const data = await response.json()
+      console.log('🔍 Response data:', data)
+      
       if (data.authorization_url) {
+        console.log('✅ Redirecting to:', data.authorization_url)
         window.location.href = data.authorization_url
+      } else {
+        console.error('❌ No authorization_url in response:', data)
+        alert('Google OAuth not configured. Please check the console for details.')
       }
     } catch (error) {
-      console.error('Google login error:', error)
+      console.error('❌ Google login error:', error)
+      alert('Error connecting to authentication service. Please check the console for details.')
     }
   }
 
