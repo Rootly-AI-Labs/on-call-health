@@ -2691,11 +2691,11 @@ export default function Dashboard() {
                 >
                   <span className="text-xs text-slate-400">powered by</span>
                   <Image 
-                    src="/images/rootly-ai-logo-black.png" 
+                    src="/images/rootly-ai-logo-white.png" 
                     alt="Rootly AI" 
                     width={160} 
                     height={64} 
-                    className="h-6 w-auto ml-3 bg-white rounded px-2 py-1"
+                    className="h-6 w-auto ml-3 brightness-110 contrast-110"
                   />
                 </a>
               </div>
