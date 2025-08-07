@@ -38,20 +38,26 @@ async def collect_team_github_data_with_mapping(
         collector = GitHubCollector()
         github_data = {}
         
-        # Only check predefined mappings
+        # Only check predefined mappings and fetch REAL data
         for email in team_emails:
             if email in collector.predefined_email_mappings:
                 github_username = collector.predefined_email_mappings[email]
                 logger.info(f"🚀 FAST MODE: Found predefined mapping {email} -> {github_username}")
                 
-                # Generate mock data with the known username
-                github_data[email] = collector._generate_mock_github_data(
-                    github_username, email, 
-                    datetime.now() - timedelta(days=days),
-                    datetime.now()
-                )
+                # Fetch REAL GitHub data for known users
+                try:
+                    user_data = await collector.collect_github_data_for_user(
+                        email, days, github_token, user_id, full_name=None
+                    )
+                    if user_data:
+                        github_data[email] = user_data
+                        logger.info(f"🚀 FAST MODE: Retrieved real GitHub data for {email}")
+                    else:
+                        logger.warning(f"🚀 FAST MODE: Could not fetch GitHub data for {email}")
+                except Exception as e:
+                    logger.error(f"🚀 FAST MODE: Failed to fetch GitHub data for {email}: {e}")
             else:
-                logger.info(f"🚀 FAST MODE: No predefined mapping for {email}, skipping")
+                logger.info(f"🚀 FAST MODE: No predefined mapping for {email}, skipping (no fake data)")
         
         return github_data
     

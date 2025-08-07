@@ -564,9 +564,9 @@ class GitHubCollector:
             logger.info(f"Using real GitHub API for {github_username} with token: {github_token[:10]}...")
             return await self._fetch_real_github_data(github_username, user_email, start_date, end_date, github_token)
         else:
-            # No GitHub token available, use mock data for now
-            logger.warning(f"No GitHub token available for {github_username}, using mock data")
-            return self._generate_mock_github_data(github_username, user_email, start_date, end_date)
+            # No GitHub token available - return None instead of mock data
+            logger.warning(f"No GitHub token available for {github_username}, returning None")
+            return None
     
     def _generate_mock_github_data(self, username: str, email: str, start_date: datetime, end_date: datetime) -> Dict:
         """Generate realistic mock GitHub data for testing."""
