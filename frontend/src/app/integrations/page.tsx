@@ -1752,7 +1752,19 @@ export default function IntegrationsPage() {
                 </Button>
               </Link>
             )}
-            <h1 className="text-2xl font-bold text-slate-900">Manage Integrations</h1>
+            <div className="flex items-center space-x-4">
+              <h1 className="text-2xl font-bold text-slate-900">Manage Integrations</h1>
+              <div className="flex flex-col items-start -space-y-1">
+                <span className="text-xs text-slate-400">powered by</span>
+                <Image 
+                  src="/images/rootly-ai-logo.png" 
+                  alt="Rootly AI" 
+                  width={120} 
+                  height={48}
+                  className="h-6 w-auto"
+                />
+              </div>
+            </div>
           </div>
 
           <Link href="/dashboard">

@@ -7,6 +7,7 @@ import { Separator } from "@/components/ui/separator"
 import { Progress } from "@/components/ui/progress"
 import { ArrowLeft, TrendingUp, Clock, Calendar, Activity, AlertTriangle } from "lucide-react"
 import { useRouter } from "next/navigation"
+import Image from "next/image"
 
 export default function MethodologyPage() {
   const router = useRouter()
@@ -438,6 +439,25 @@ export default function MethodologyPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Powered by Rootly AI Footer */}
+        <div className="mt-12 pt-8 border-t border-gray-200 text-center">
+          <a 
+            href="https://rootly.com" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="inline-flex flex-col items-center space-y-1 hover:opacity-80 transition-opacity"
+          >
+            <span className="text-sm text-gray-500">powered by</span>
+            <Image 
+              src="/images/rootly-ai-logo.png" 
+              alt="Rootly AI" 
+              width={160} 
+              height={64} 
+              className="h-8 w-auto"
+            />
+          </a>
+        </div>
       </div>
     </div>
   )
