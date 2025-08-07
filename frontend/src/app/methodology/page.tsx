@@ -26,12 +26,26 @@ export default function MethodologyPage() {
             Back to Dashboard
           </Button>
           
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Burnout Score Methodology
-          </h1>
-          <p className="text-gray-600">
-            Understanding how we calculate team burnout risk using the Maslach Burnout Inventory
-          </p>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex-1">
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                Burnout Score Methodology
+              </h1>
+              <p className="text-gray-600">
+                Understanding how we calculate team burnout risk using the Maslach Burnout Inventory
+              </p>
+            </div>
+            <div className="flex flex-col items-center ml-8">
+              <span className="text-xs text-gray-400">powered by</span>
+              <Image 
+                src="/images/rootly-ai-logo.png" 
+                alt="Rootly AI" 
+                width={120} 
+                height={48}
+                className="h-6 w-auto"
+              />
+            </div>
+          </div>
         </div>
 
         {/* Overview Card */}

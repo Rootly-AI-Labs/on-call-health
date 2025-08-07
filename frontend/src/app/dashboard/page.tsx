@@ -2709,66 +2709,80 @@ export default function Dashboard() {
         <div className="p-6">
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Organization Burnout Analysis</h1>
-              <p className="text-gray-600">
-                {(() => {
-                  // If viewing a specific analysis, show the integration used for that analysis
-                  if (currentAnalysis) {
-                    const analysisIntegration = integrations.find(i => i.id === currentAnalysis.integration_id);
-                    if (analysisIntegration) {
-                      const platform = analysisIntegration.platform === 'pagerduty' ? 'PagerDuty' : 'Rootly';
-                      return `${platform} - ${analysisIntegration.organization_name || analysisIntegration.name}`;
+            <div className="flex items-center justify-between w-full">
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">Organization Burnout Analysis</h1>
+                <p className="text-gray-600">
+                  {(() => {
+                    // If viewing a specific analysis, show the integration used for that analysis
+                    if (currentAnalysis) {
+                      const analysisIntegration = integrations.find(i => i.id === currentAnalysis.integration_id);
+                      if (analysisIntegration) {
+                        const platform = analysisIntegration.platform === 'pagerduty' ? 'PagerDuty' : 'Rootly';
+                        return `${platform} - ${analysisIntegration.organization_name || analysisIntegration.name}`;
+                      }
+                      return 'Analysis Dashboard';
                     }
-                    return 'Analysis Dashboard';
-                  }
-                  // Otherwise show the currently selected integration
-                  if (selectedIntegrationData) {
-                    const platform = selectedIntegrationData.platform === 'pagerduty' ? 'PagerDuty' : 'Rootly';
-                    return `${platform} - ${selectedIntegrationData.organization_name || selectedIntegrationData.name}`;
-                  }
-                  return 'Organization Burnout Analysis Dashboard';
-                })()}
-              </p>
+                    // Otherwise show the currently selected integration
+                    if (selectedIntegrationData) {
+                      const platform = selectedIntegrationData.platform === 'pagerduty' ? 'PagerDuty' : 'Rootly';
+                      return `${platform} - ${selectedIntegrationData.organization_name || selectedIntegrationData.name}`;
+                    }
+                    return 'Organization Burnout Analysis Dashboard';
+                  })()}
+                </p>
+              </div>
+              <div className="flex items-center space-x-4">
+                <div className="flex flex-col items-center">
+                  <span className="text-xs text-gray-400">powered by</span>
+                  <Image 
+                    src="/images/rootly-ai-logo.png" 
+                    alt="Rootly AI" 
+                    width={120} 
+                    height={48}
+                    className="h-6 w-auto"
+                  />
+                </div>
+                {/* Export Dropdown */}
+                {!shouldShowInsufficientDataCard() && currentAnalysis && currentAnalysis.analysis_data && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button 
+                        variant="outline" 
+                        className="flex items-center space-x-2 border-gray-300 hover:bg-gray-50"
+                        title="Export analysis data"
+                      >
+                        <Download className="w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56">
+                      <DropdownMenuItem onClick={exportAsJSON} className="flex items-center space-x-2">
+                        <Download className="w-4 h-4" />
+                        <div className="flex flex-col">
+                          <span className="font-medium">Export as JSON</span>
+                          <span className="text-xs text-gray-500">Complete analysis data</span>
+                        </div>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem disabled className="flex items-center space-x-2 opacity-50">
+                        <Download className="w-4 h-4" />
+                        <div className="flex flex-col">
+                          <span className="font-medium">Export as CSV</span>
+                          <span className="text-xs text-gray-500">Organization member scores</span>
+                        </div>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem disabled className="flex items-center space-x-2 opacity-50">
+                        <FileText className="w-4 h-4" />
+                        <div className="flex flex-col">
+                          <span className="font-medium">Generate PDF Report</span>
+                          <span className="text-xs text-gray-500">Executive summary</span>
+                        </div>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+              </div>
             </div>
-            {/* Export Dropdown */}
-            {!shouldShowInsufficientDataCard() && currentAnalysis && currentAnalysis.analysis_data && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button 
-                    variant="outline" 
-                    className="flex items-center space-x-2 border-gray-300 hover:bg-gray-50"
-                    title="Export analysis data"
-                  >
-                    <Download className="w-4 h-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuItem onClick={exportAsJSON} className="flex items-center space-x-2">
-                    <Download className="w-4 h-4" />
-                    <div className="flex flex-col">
-                      <span className="font-medium">Export as JSON</span>
-                      <span className="text-xs text-gray-500">Complete analysis data</span>
-                    </div>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem disabled className="flex items-center space-x-2 opacity-50">
-                    <Download className="w-4 h-4" />
-                    <div className="flex flex-col">
-                      <span className="font-medium">Export as CSV</span>
-                      <span className="text-xs text-gray-500">Organization member scores</span>
-                    </div>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem disabled className="flex items-center space-x-2 opacity-50">
-                    <FileText className="w-4 h-4" />
-                    <div className="flex flex-col">
-                      <span className="font-medium">Generate PDF Report</span>
-                      <span className="text-xs text-gray-500">Executive summary</span>
-                    </div>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
           </div>
 
           {/* Debug Section - Only show in development */}
