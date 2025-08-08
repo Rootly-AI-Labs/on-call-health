@@ -5565,33 +5565,181 @@ export default function Dashboard() {
                 </Card>
               </div>
 
-              {/* Daily Health Timeline Chart - PLACEHOLDER for future backend implementation */}
+              {/* Individual Daily Health Timeline Chart */}
               {(() => {
-                // NO FAKE DATA: This feature requires individual daily health scores from backend
-                // The current analysis doesn't contain individual member daily data
-                
+                const [dailyHealthData, setDailyHealthData] = useState<any[]>([]);
+                const [loading, setLoading] = useState(false);
+                const [error, setError] = useState<string | null>(null);
+
+                // Fetch daily health data for this member
+                useEffect(() => {
+                  const fetchDailyHealth = async () => {
+                    if (!memberData?.user_email || !currentAnalysis?.id) return;
+                    
+                    setLoading(true);
+                    setError(null);
+                    
+                    try {
+                      const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+                      const response = await fetch(
+                        `${API_BASE}/analyses/${currentAnalysis.id}/members/${encodeURIComponent(memberData.user_email)}/daily-health`, {
+                        headers: {
+                          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+                          'Content-Type': 'application/json'
+                        }
+                      });
+                      
+                      if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                      }
+                      
+                      const result = await response.json();
+                      
+                      if (result.status === 'success' && result.data?.daily_health) {
+                        // Format the data for the chart
+                        const formattedData = result.data.daily_health.map((day: any) => ({
+                          date: day.date,
+                          health_score: day.health_score,
+                          incident_count: day.incident_count,
+                          team_health: day.team_health,
+                          day_name: new Date(day.date).toLocaleDateString('en-US', { 
+                            weekday: 'short', month: 'short', day: 'numeric' 
+                          }),
+                          factors: day.factors
+                        }));
+                        
+                        setDailyHealthData(formattedData);
+                      } else {
+                        setError(result.message || 'No daily health data available');
+                      }
+                    } catch (err) {
+                      console.error('Error fetching daily health:', err);
+                      setError('Failed to load daily health data');
+                    } finally {
+                      setLoading(false);
+                    }
+                  };
+                  
+                  fetchDailyHealth();
+                }, [memberData?.user_email, currentAnalysis?.id]);
+
+                if (loading) {
+                  return (
+                    <div>
+                      <h3 className="text-lg font-semibold mb-4">📈 Individual Daily Health Timeline</h3>
+                      <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
+                        <RefreshCw className="w-8 h-8 animate-spin text-gray-400 mx-auto mb-2" />
+                        <p className="text-sm text-gray-600">Loading daily health data...</p>
+                      </div>
+                    </div>
+                  );
+                }
+
+                if (error || !dailyHealthData || dailyHealthData.length === 0) {
+                  return (
+                    <div>
+                      <h3 className="text-lg font-semibold mb-4">📈 Individual Daily Health Timeline</h3>
+                      <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
+                        <div className="text-gray-500 mb-2">
+                          <BarChart3 className="w-8 h-8 mx-auto mb-2" />
+                          {error || 'No daily health data available'}
+                        </div>
+                        <p className="text-sm text-gray-600">
+                          Daily health scores are calculated for days when incidents occur
+                        </p>
+                      </div>
+                    </div>
+                  );
+                }
+
                 return (
                   <div>
                     <h3 className="text-lg font-semibold mb-4">📈 Individual Daily Health Timeline</h3>
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
-                      <div className="text-blue-600 mb-3">
-                        <BarChart3 className="w-12 h-12 mx-auto mb-2" />
-                        <h4 className="text-lg font-semibold">Feature Coming Soon</h4>
+                    <div className="bg-white p-6 rounded-lg border border-gray-200">
+                      <div className="mb-4 flex items-center justify-between">
+                        <p className="text-sm text-gray-600">
+                          Health scores on incident days (last {dailyHealthData.length} days)
+                        </p>
+                        <div className="flex items-center space-x-4 text-xs text-gray-500">
+                          <div className="flex items-center space-x-1">
+                            <div className="w-3 h-3 bg-green-500 rounded"></div>
+                            <span>Good (70+)</span>
+                          </div>
+                          <div className="flex items-center space-x-1">
+                            <div className="w-3 h-3 bg-yellow-500 rounded"></div>
+                            <span>Moderate (40-70)</span>
+                          </div>
+                          <div className="flex items-center space-x-1">
+                            <div className="w-3 h-3 bg-red-500 rounded"></div>
+                            <span>Poor (&lt;40)</span>
+                          </div>
+                        </div>
                       </div>
-                      <p className="text-sm text-blue-800 mb-4">
-                        Individual daily health tracking requires backend analysis of member-specific daily patterns
-                      </p>
-                      <div className="bg-white rounded-lg p-4 border border-blue-100 text-left">
-                        <p className="text-xs text-gray-700 mb-2"><strong>What this will show:</strong></p>
-                        <ul className="text-xs text-gray-600 space-y-1">
-                          <li>• Real daily health scores based on actual incident response patterns</li>
-                          <li>• Individual stress levels during high-incident days</li>
-                          <li>• Response time trends and workload impact</li>
-                          <li>• After-hours and weekend work health effects</li>
-                        </ul>
+                      
+                      <div style={{ width: '100%', height: '300px' }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart
+                            data={dailyHealthData}
+                            margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                          >
+                            <XAxis 
+                              dataKey="day_name" 
+                              fontSize={11}
+                              tick={{ fill: '#6B7280' }}
+                              axisLine={false}
+                              tickLine={false}
+                            />
+                            <YAxis 
+                              domain={[0, 100]}
+                              fontSize={11}
+                              tick={{ fill: '#6B7280' }}
+                              axisLine={false}
+                              tickLine={false}
+                              label={{ 
+                                value: 'Health Score', 
+                                angle: -90, 
+                                position: 'insideLeft',
+                                style: { textAnchor: 'middle' }
+                              }}
+                            />
+                            <Tooltip 
+                              formatter={(value, name) => [`${value}%`, 'Health Score']}
+                              labelFormatter={(label, payload) => {
+                                if (payload && payload.length > 0) {
+                                  const data = payload[0].payload;
+                                  return `${data.day_name} (${data.incident_count} incident${data.incident_count !== 1 ? 's' : ''})`;
+                                }
+                                return label;
+                              }}
+                              contentStyle={{
+                                backgroundColor: '#F9FAFB',
+                                border: '1px solid #E5E7EB',
+                                borderRadius: '8px',
+                                fontSize: '12px'
+                              }}
+                            />
+                            <Bar 
+                              dataKey="health_score" 
+                              radius={[4, 4, 0, 0]}
+                            >
+                              {dailyHealthData.map((entry, index) => (
+                                <Cell 
+                                  key={`cell-${index}`} 
+                                  fill={
+                                    entry.health_score >= 70 ? '#10B981' : 
+                                    entry.health_score >= 40 ? '#F59E0B' : '#EF4444'
+                                  } 
+                                />
+                              ))}
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
                       </div>
-                      <div className="mt-4 text-xs text-blue-700">
-                        <strong>Implementation needed:</strong> Backend endpoint to calculate individual daily health from incident data, GitHub activity, and Slack patterns
+                      
+                      <div className="mt-4 text-xs text-gray-500 space-y-1">
+                        <p>• Health scores based on real burnout factors and daily incident patterns</p>
+                        <p>• Lower scores indicate higher stress from workload, after-hours work, and response time pressure</p>
+                        <p>• Calculated using team health trends and individual member burnout data</p>
                       </div>
                     </div>
                   </div>

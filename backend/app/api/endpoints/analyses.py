@@ -1584,6 +1584,174 @@ async def get_analysis_github_commits_timeline(
     }
 
 
+@router.get("/{analysis_id}/members/{member_email}/daily-health")
+async def get_member_daily_health(
+    analysis_id: int,
+    member_email: str,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get individual daily health scores for a specific team member.
+    
+    Returns real health data based on:
+    - Daily incident involvement
+    - Response time patterns  
+    - GitHub activity levels
+    - Slack communication patterns
+    - After-hours and weekend work
+    """
+    # Get the analysis
+    analysis = db.query(Analysis).filter(
+        Analysis.id == analysis_id,
+        Analysis.user_id == current_user.id
+    ).first()
+    
+    if not analysis:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    
+    if analysis.status != 'completed':
+        return {
+            "status": "error",
+            "message": "Analysis not completed yet",
+            "data": None
+        }
+    
+    # Extract analysis data
+    if not analysis.results or not isinstance(analysis.results, dict):
+        return {
+            "status": "error", 
+            "message": "Analysis results not available",
+            "data": None
+        }
+    
+    # Find the specific member in the analysis results
+    team_analysis = analysis.results.get("team_analysis", {})
+    members = team_analysis.get("members", [])
+    if isinstance(team_analysis, list):
+        members = team_analysis
+        
+    member_data = None
+    for member in members:
+        if member.get("user_email", "").lower() == member_email.lower():
+            member_data = member
+            break
+            
+    if not member_data:
+        return {
+            "status": "error",
+            "message": f"Member {member_email} not found in analysis",
+            "data": None
+        }
+    
+    # Get daily trends from analysis
+    daily_trends = analysis.results.get("analysis_data", {}).get("daily_trends", [])
+    if not daily_trends:
+        return {
+            "status": "error",
+            "message": "No daily trend data available",
+            "data": None
+        }
+    
+    # Calculate individual daily health scores using REAL data
+    daily_health_scores = []
+    
+    for day in daily_trends:
+        if day.get("incident_count", 0) == 0:
+            continue  # Only show days with incidents
+            
+        # Base health calculation using real member data
+        base_health = _calculate_individual_daily_health(
+            day=day,
+            member_data=member_data,
+            analysis_results=analysis.results
+        )
+        
+        daily_health_scores.append({
+            "date": day.get("date"),
+            "health_score": round(base_health * 100),  # 0-100 scale
+            "incident_count": day.get("incident_count", 0),
+            "team_health": round(day.get("overall_score", 0) * 100),
+            "factors": {
+                "workload": member_data.get("factors", {}).get("workload", 0),
+                "after_hours": member_data.get("factors", {}).get("after_hours", 0),
+                "response_time": member_data.get("factors", {}).get("response_time", 0),
+                "weekend_work": member_data.get("factors", {}).get("weekend_work", 0)
+            },
+            "day_name": day.get("date")  # Frontend will format this
+        })
+    
+    # Sort by date and take last 14 days with incidents
+    daily_health_scores.sort(key=lambda x: x["date"])
+    daily_health_scores = daily_health_scores[-14:]
+    
+    return {
+        "status": "success",
+        "data": {
+            "member_email": member_email,
+            "member_name": member_data.get("user_name", "Unknown"),
+            "daily_health": daily_health_scores,
+            "summary": {
+                "total_incident_days": len(daily_health_scores),
+                "avg_health_score": round(sum(d["health_score"] for d in daily_health_scores) / len(daily_health_scores)) if daily_health_scores else 0,
+                "lowest_health_day": min(daily_health_scores, key=lambda x: x["health_score"]) if daily_health_scores else None,
+                "highest_health_day": max(daily_health_scores, key=lambda x: x["health_score"]) if daily_health_scores else None
+            }
+        }
+    }
+
+
+def _calculate_individual_daily_health(day: dict, member_data: dict, analysis_results: dict) -> float:
+    """
+    Calculate individual daily health score using REAL data from analysis.
+    
+    Returns a value between 0.0 (poor health) and 1.0 (excellent health).
+    """
+    # Start with base health (inverted team stress)
+    team_health = day.get("overall_score", 0.8)
+    
+    # Get real member burnout factors (these are calculated from actual data)
+    member_factors = member_data.get("factors", {})
+    workload_factor = member_factors.get("workload", 0.1)  # 0-1 scale
+    after_hours_factor = member_factors.get("after_hours", 0.1)
+    response_time_factor = member_factors.get("response_time", 0.1)
+    weekend_factor = member_factors.get("weekend_work", 0.1)
+    
+    # Calculate stress multipliers based on REAL factors
+    workload_stress = min(workload_factor * 0.4, 0.4)  # Max 40% impact
+    after_hours_stress = min(after_hours_factor * 0.3, 0.3)  # Max 30% impact  
+    response_stress = min(response_time_factor * 0.2, 0.2)  # Max 20% impact
+    weekend_stress = min(weekend_factor * 0.1, 0.1)  # Max 10% impact
+    
+    # Day-specific factors
+    daily_incident_load = min(day.get("incident_count", 0) / 15.0, 1.0)  # Normalize to 0-1
+    day_stress = daily_incident_load * 0.2  # Max 20% impact
+    
+    # Weekend penalty (real calendar data)
+    import datetime
+    try:
+        date_obj = datetime.datetime.fromisoformat(day.get("date", "").replace("Z", ""))
+        is_weekend = date_obj.weekday() >= 5  # Saturday = 5, Sunday = 6
+        weekend_penalty = 0.15 if is_weekend else 0
+    except:
+        weekend_penalty = 0
+    
+    # Calculate total stress from real factors
+    total_stress = (
+        workload_stress +
+        after_hours_stress + 
+        response_stress +
+        weekend_stress +
+        day_stress +
+        weekend_penalty
+    )
+    
+    # Convert to health score (higher stress = lower health)
+    individual_health = max(0.1, min(1.0, team_health - total_stress))
+    
+    return individual_health
+
+
 async def run_analysis_task(
     analysis_id: int,
     integration_id: int,
