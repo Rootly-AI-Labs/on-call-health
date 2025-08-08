@@ -4480,13 +4480,13 @@ export default function IntegrationsPage() {
           rel="noopener noreferrer"
           className="inline-flex flex-col items-center space-y-1 hover:opacity-80 transition-opacity"
         >
-          <span className="text-sm text-gray-500">powered by</span>
+          <span className="text-lg text-gray-600">powered by</span>
           <Image 
             src="/images/rootly-ai-logo.png" 
             alt="Rootly AI" 
-            width={160} 
-            height={64}
-            className="h-8 w-auto"
+            width={200} 
+            height={80}
+            className="h-12 w-auto"
           />
         </a>
       </div>
