@@ -389,6 +389,20 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
       
       const result = await response.json()
       console.log('🧹 Cleanup result:', result)
+      
+      // Log detailed cleanup plan
+      if (result.cleanup_plan) {
+        result.cleanup_plan.forEach((plan, index) => {
+          console.log(`🧹 Cleanup Plan ${index + 1}:`, plan)
+          if (plan.type === 'duplicate') {
+            console.log(`  📧 Email: ${plan.source_identifier}`)
+            console.log(`  ✅ Keep:`, plan.keep)
+            console.log(`  ❌ Remove:`, plan.remove)
+          } else if (plan.type === 'test_emails') {
+            console.log(`  📧 Test emails to remove:`, plan.remove)
+          }
+        })
+      }
       setCleanupResults(result)
       
       if (result.total_to_remove === 0) {

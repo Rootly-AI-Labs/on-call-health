@@ -319,6 +319,16 @@ async def cleanup_duplicate_mappings(
     try:
         logger.info(f"Starting duplicate cleanup for user {current_user.id}, platform {target_platform}")
         
+        # Debug: Show all mappings for this user/platform
+        all_mappings = db.query(UserMapping).filter(
+            UserMapping.user_id == current_user.id,
+            UserMapping.target_platform == target_platform
+        ).all()
+        
+        logger.info(f"Found {len(all_mappings)} total mappings for platform {target_platform}")
+        for mapping in all_mappings:
+            logger.info(f"  Mapping {mapping.id}: {mapping.source_platform}:{mapping.source_identifier} -> {mapping.target_identifier}")
+        
         # Find duplicates: same user_id + source_platform + source_identifier + target_platform
         from sqlalchemy import and_, func
         
@@ -352,13 +362,21 @@ async def cleanup_duplicate_mappings(
             )
         ).all()
         
-        # Group duplicates by source identifier
+        # Group duplicates by source identifier  
+        logger.info(f"Found {len(duplicates)} duplicate mapping records")
+        for dup in duplicates:
+            logger.info(f"  Duplicate: {dup.id} - {dup.source_platform}:{dup.source_identifier} -> {dup.target_identifier}")
+        
         duplicate_groups = {}
         for mapping in duplicates:
             key = f"{mapping.source_platform}:{mapping.source_identifier}"
             if key not in duplicate_groups:
                 duplicate_groups[key] = []
             duplicate_groups[key].append(mapping)
+            
+        logger.info(f"Grouped into {len(duplicate_groups)} duplicate groups")
+        for key, group in duplicate_groups.items():
+            logger.info(f"  Group {key}: {len(group)} mappings")
         
         cleanup_plan = []
         total_to_remove = 0
@@ -405,7 +423,9 @@ async def cleanup_duplicate_mappings(
                 UserMapping.source_identifier.like('%+%')
             ).all()
             
+            logger.info(f"Found {len(test_emails)} test email mappings with + symbols")
             for mapping in test_emails:
+                logger.info(f"  Test email: {mapping.id} - {mapping.source_identifier} -> {mapping.target_identifier}")
                 test_email_mappings.append({
                     "id": mapping.id,
                     "source_identifier": mapping.source_identifier,
