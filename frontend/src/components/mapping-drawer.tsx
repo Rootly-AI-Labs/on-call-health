@@ -370,7 +370,7 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
         return
       }
       
-      const url = `${API_BASE}/integrations/manual-mappings/cleanup-duplicates?target_platform=${platform}&dry_run=${dryRun}`
+      const url = `${API_BASE}/integrations/manual-mappings/cleanup-duplicates?target_platform=${platform}&dry_run=${dryRun}&remove_test_emails=true`
       console.log('🧹 Cleanup URL:', url)
       
       const response = await fetch(url, {
@@ -388,6 +388,7 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
       }
       
       const result = await response.json()
+      console.log('🧹 Cleanup result:', result)
       setCleanupResults(result)
       
       if (result.total_to_remove === 0) {
@@ -665,7 +666,7 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
                           ) : (
                             <>
                               <Database className="w-4 h-4 mr-2" />
-                              Clean Duplicates
+                              Clean Up Mappings
                             </>
                           )}
                         </Button>
@@ -757,10 +758,16 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
                     </Button>
                   </div>
                   <div className="border rounded-lg p-4 space-y-3">
-                    <div className="text-sm">
-                      <strong>Found {cleanupResults.total_duplicate_groups} users with duplicates</strong>
-                      <br />
-                      Total duplicates to remove: {cleanupResults.total_to_remove}
+                    <div className="text-sm space-y-1">
+                      {cleanupResults.total_duplicates_found > 0 && (
+                        <div><strong>Duplicates:</strong> {cleanupResults.total_duplicate_groups} users with {cleanupResults.total_duplicates_found} duplicate mappings</div>
+                      )}
+                      {cleanupResults.total_test_emails_found > 0 && (
+                        <div><strong>Test emails:</strong> {cleanupResults.total_test_emails_found} mappings with + symbols</div>
+                      )}
+                      <div className="font-medium">
+                        Total to remove: {cleanupResults.total_to_remove}
+                      </div>
                     </div>
                     {cleanupResults.dry_run && cleanupResults.total_to_remove > 0 && (
                       <div className="flex space-x-2">
