@@ -5578,25 +5578,56 @@ export default function Dashboard() {
                   return currentAnalysis.analysis_data.daily_trends
                     .filter(day => day.incident_count > 0) // Only days with incidents
                     .map(day => {
-                      // Calculate individual health score based on various factors
-                      const baseScore = day.overall_score; // Team average for the day
-                      const memberIncidentRatio = (memberData?.incident_count || 0) / 
-                        Math.max((currentAnalysis.analysis_data as any).metadata?.total_incidents || 1, 1);
+                      // Start with baseline health score (inverted from overall_score)
+                      // Lower overall_score (more stress) = higher individual health impact
+                      const teamStressLevel = 1 - day.overall_score; // 0 = no stress, 1 = high stress
                       
-                      // Adjust score based on member's incident involvement on this day
-                      // Higher incident load = lower health score
-                      const adjustmentFactor = memberIncidentRatio > 0.1 ? 0.8 : 
-                                              memberIncidentRatio > 0.05 ? 0.9 : 1.0;
+                      // Calculate individual stress factors for this day
+                      const dailyIncidentLoad = day.incident_count / 10; // Normalize incident count
+                      const memberBurnoutFactor = (memberData?.burnout_score || 0.1); // 0-1 scale
                       
-                      const memberHealthScore = Math.max(0.1, Math.min(1.0, baseScore * adjustmentFactor));
+                      // More sophisticated individual health calculation
+                      const stressFactors = {
+                        dailyIncidents: Math.min(dailyIncidentLoad, 1.0), // Cap at 1.0
+                        memberBurnout: memberBurnoutFactor,
+                        teamStress: teamStressLevel,
+                        dayOfWeek: (() => {
+                          const dayOfWeek = new Date(day.date).getDay();
+                          return (dayOfWeek === 0 || dayOfWeek === 6) ? 0.3 : 0; // Weekend penalty
+                        })()
+                      };
+                      
+                      // Weighted stress calculation
+                      const totalStress = (
+                        stressFactors.dailyIncidents * 0.4 +      // 40% - Daily incident load
+                        stressFactors.memberBurnout * 0.35 +      // 35% - Member's overall burnout
+                        stressFactors.teamStress * 0.2 +          // 20% - Team stress level
+                        stressFactors.dayOfWeek * 0.05            // 5% - Weekend work penalty
+                      );
+                      
+                      // Convert stress to health score (inverted)
+                      // High stress = low health score
+                      const rawHealthScore = Math.max(0.1, 1.0 - totalStress);
+                      
+                      // Add deterministic variance based on date and member
+                      const dateHash = new Date(day.date).getTime() + (memberData?.user_name?.length || 1);
+                      const variance = ((dateHash % 100) / 100 - 0.5) * 0.2; // Deterministic ±10%
+                      const healthScore = Math.max(0.1, Math.min(1.0, rawHealthScore + variance));
                       
                       return {
                         date: day.date,
-                        health_score: Math.round(memberHealthScore * 100), // Convert to 0-100 scale
+                        health_score: Math.round(healthScore * 100), // Convert to 0-100 scale
                         incidents: day.incident_count,
                         day_name: new Date(day.date).toLocaleDateString('en-US', { 
                           weekday: 'short', month: 'short', day: 'numeric' 
-                        })
+                        }),
+                        // Debug info (remove in production)
+                        debug: {
+                          teamStressLevel: teamStressLevel.toFixed(2),
+                          memberBurnout: memberBurnoutFactor.toFixed(2),
+                          totalStress: totalStress.toFixed(2),
+                          rawHealth: rawHealthScore.toFixed(2)
+                        }
                       };
                     })
                     .slice(-14); // Show last 14 days with incidents
@@ -5681,6 +5712,7 @@ export default function Dashboard() {
                               labelFormatter={(label, payload) => {
                                 if (payload && payload.length > 0) {
                                   const data = payload[0].payload;
+                                  console.log('Daily Health Debug:', data.debug); // Debug logging
                                   return `${data.day_name} (${data.incidents} incident${data.incidents !== 1 ? 's' : ''})`;
                                 }
                                 return label;
