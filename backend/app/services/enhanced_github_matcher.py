@@ -47,6 +47,11 @@ class EnhancedGitHubMatcher:
         Returns:
             GitHub username if found, None otherwise
         """
+        # Validate email input
+        if not email or not isinstance(email, str):
+            logger.warning(f"Invalid email provided: {email}")
+            return None
+            
         email_lower = email.lower()
         
         # Check cache first

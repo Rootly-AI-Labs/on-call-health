@@ -520,8 +520,14 @@ async def run_github_mapping(
                 client = RootlyAPIClient(integration.api_token)
                 users_data = await client.get_users()
                 for user in users_data:
+                    email = user.get("email")
+                    # Skip users without valid email addresses
+                    if not email or not email.strip():
+                        logger.warning(f"Skipping user {user.get('name', 'Unknown')} - no email address")
+                        continue
+                        
                     all_users.append({
-                        "email": user.get("email"),
+                        "email": email.strip(),
                         "name": user.get("full_name") or user.get("name"),
                         "platform": "rootly",
                         "integration_id": integration.id
@@ -535,8 +541,8 @@ async def run_github_mapping(
         )
         mapped_emails = {m.source_identifier for m in existing_mappings if m.source_platform == "rootly"}
         
-        # Filter unmapped users
-        unmapped_users = [u for u in all_users if u["email"] not in mapped_emails]
+        # Filter unmapped users (with valid emails)
+        unmapped_users = [u for u in all_users if u["email"] and u["email"] not in mapped_emails]
         
         # Get GitHub organizations from integration settings
         github_orgs = []
