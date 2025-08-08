@@ -274,13 +274,13 @@ export default function LandingPage() {
               <div className="flex items-center">
                 <span className="text-2xl font-semibold text-white">OnCall Burnout</span>
                 <div className="ml-2 flex flex-col items-start -space-y-1">
-                  <span className="text-xs text-slate-500">powered by</span>
+                  <span className="text-xs text-slate-400">powered by</span>
                   <Image 
-                    src="/images/rootly-logo-branded.png" 
-                    alt="Rootly" 
+                    src="/images/rootly-ai-logo-white.png" 
+                    alt="Rootly AI" 
                     width={120} 
                     height={48}
-                    className="h-6 w-auto opacity-80"
+                    className="h-6 w-auto"
                   />
                 </div>
               </div>
