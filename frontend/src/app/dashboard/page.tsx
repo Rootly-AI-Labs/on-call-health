@@ -5565,187 +5565,33 @@ export default function Dashboard() {
                 </Card>
               </div>
 
-              {/* Daily Health Timeline Chart */}
+              {/* Daily Health Timeline Chart - PLACEHOLDER for future backend implementation */}
               {(() => {
-                // Get daily health data for this member based on incident days
-                const dailyHealthData = (() => {
-                  if (!currentAnalysis?.analysis_data?.daily_trends) return [];
-                  
-                  const memberEmail = memberData?.user_email || selectedMember.email;
-                  const memberName = memberData?.user_name || selectedMember.name;
-                  
-                  // Calculate daily health scores for days with incidents
-                  return currentAnalysis.analysis_data.daily_trends
-                    .filter(day => day.incident_count > 0) // Only days with incidents
-                    .map(day => {
-                      // Start with baseline health score (inverted from overall_score)
-                      // Lower overall_score (more stress) = higher individual health impact
-                      const teamStressLevel = 1 - day.overall_score; // 0 = no stress, 1 = high stress
-                      
-                      // Calculate individual stress factors for this day
-                      const dailyIncidentLoad = day.incident_count / 10; // Normalize incident count
-                      const memberBurnoutFactor = (memberData?.burnout_score || 0.1); // 0-1 scale
-                      
-                      // More sophisticated individual health calculation
-                      const stressFactors = {
-                        dailyIncidents: Math.min(dailyIncidentLoad, 1.0), // Cap at 1.0
-                        memberBurnout: memberBurnoutFactor,
-                        teamStress: teamStressLevel,
-                        dayOfWeek: (() => {
-                          const dayOfWeek = new Date(day.date).getDay();
-                          return (dayOfWeek === 0 || dayOfWeek === 6) ? 0.3 : 0; // Weekend penalty
-                        })()
-                      };
-                      
-                      // Weighted stress calculation
-                      const totalStress = (
-                        stressFactors.dailyIncidents * 0.4 +      // 40% - Daily incident load
-                        stressFactors.memberBurnout * 0.35 +      // 35% - Member's overall burnout
-                        stressFactors.teamStress * 0.2 +          // 20% - Team stress level
-                        stressFactors.dayOfWeek * 0.05            // 5% - Weekend work penalty
-                      );
-                      
-                      // Convert stress to health score (inverted)
-                      // High stress = low health score
-                      const rawHealthScore = Math.max(0.1, 1.0 - totalStress);
-                      
-                      // Add deterministic variance based on date and member
-                      const dateHash = new Date(day.date).getTime() + (memberData?.user_name?.length || 1);
-                      const variance = ((dateHash % 100) / 100 - 0.5) * 0.2; // Deterministic ±10%
-                      const healthScore = Math.max(0.1, Math.min(1.0, rawHealthScore + variance));
-                      
-                      return {
-                        date: day.date,
-                        health_score: Math.round(healthScore * 100), // Convert to 0-100 scale
-                        incidents: day.incident_count,
-                        day_name: new Date(day.date).toLocaleDateString('en-US', { 
-                          weekday: 'short', month: 'short', day: 'numeric' 
-                        }),
-                        // Debug info (remove in production)
-                        debug: {
-                          teamStressLevel: teamStressLevel.toFixed(2),
-                          memberBurnout: memberBurnoutFactor.toFixed(2),
-                          totalStress: totalStress.toFixed(2),
-                          rawHealth: rawHealthScore.toFixed(2)
-                        }
-                      };
-                    })
-                    .slice(-14); // Show last 14 days with incidents
-                })();
-
-                if (dailyHealthData.length === 0) {
-                  return (
-                    <div>
-                      <h3 className="text-lg font-semibold mb-4">📈 Daily Health Timeline</h3>
-                      <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
-                        <div className="text-gray-500 mb-2">
-                          <BarChart3 className="w-8 h-8 mx-auto mb-2" />
-                          No incident days found in analysis period
-                        </div>
-                        <p className="text-sm text-gray-600">
-                          Daily health scores are calculated for days when incidents occur
-                        </p>
-                      </div>
-                    </div>
-                  );
-                }
-
+                // NO FAKE DATA: This feature requires individual daily health scores from backend
+                // The current analysis doesn't contain individual member daily data
+                
                 return (
                   <div>
-                    <h3 className="text-lg font-semibold mb-4">📈 Daily Health Timeline</h3>
-                    <div className="bg-white p-6 rounded-lg border border-gray-200">
-                      <div className="mb-4 flex items-center justify-between">
-                        <p className="text-sm text-gray-600">
-                          Health scores on days with incidents (last 14 incident days)
-                        </p>
-                        <div className="flex items-center space-x-4 text-xs text-gray-500">
-                          <div className="flex items-center space-x-1">
-                            <div className="w-3 h-3 bg-green-500 rounded"></div>
-                            <span>Good (70+)</span>
-                          </div>
-                          <div className="flex items-center space-x-1">
-                            <div className="w-3 h-3 bg-yellow-500 rounded"></div>
-                            <span>Moderate (40-70)</span>
-                          </div>
-                          <div className="flex items-center space-x-1">
-                            <div className="w-3 h-3 bg-red-500 rounded"></div>
-                            <span>Poor (&lt;40)</span>
-                          </div>
-                        </div>
+                    <h3 className="text-lg font-semibold mb-4">📈 Individual Daily Health Timeline</h3>
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
+                      <div className="text-blue-600 mb-3">
+                        <BarChart3 className="w-12 h-12 mx-auto mb-2" />
+                        <h4 className="text-lg font-semibold">Feature Coming Soon</h4>
                       </div>
-                      
-                      <div style={{ width: '100%', height: '300px' }}>
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart
-                            data={dailyHealthData}
-                            margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                          >
-                            <defs>
-                              <linearGradient id="healthGradient" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="0%" stopColor="#10B981" stopOpacity={0.8}/>
-                                <stop offset="50%" stopColor="#F59E0B" stopOpacity={0.6}/>
-                                <stop offset="100%" stopColor="#EF4444" stopOpacity={0.8}/>
-                              </linearGradient>
-                            </defs>
-                            <XAxis 
-                              dataKey="day_name" 
-                              fontSize={11}
-                              tick={{ fill: '#6B7280' }}
-                              axisLine={false}
-                              tickLine={false}
-                            />
-                            <YAxis 
-                              domain={[0, 100]}
-                              fontSize={11}
-                              tick={{ fill: '#6B7280' }}
-                              axisLine={false}
-                              tickLine={false}
-                              label={{ 
-                                value: 'Health Score', 
-                                angle: -90, 
-                                position: 'insideLeft',
-                                style: { textAnchor: 'middle' }
-                              }}
-                            />
-                            <Tooltip 
-                              formatter={(value, name) => [`${value}%`, 'Health Score']}
-                              labelFormatter={(label, payload) => {
-                                if (payload && payload.length > 0) {
-                                  const data = payload[0].payload;
-                                  console.log('Daily Health Debug:', data.debug); // Debug logging
-                                  return `${data.day_name} (${data.incidents} incident${data.incidents !== 1 ? 's' : ''})`;
-                                }
-                                return label;
-                              }}
-                              contentStyle={{
-                                backgroundColor: '#F9FAFB',
-                                border: '1px solid #E5E7EB',
-                                borderRadius: '8px',
-                                fontSize: '12px'
-                              }}
-                            />
-                            <Bar 
-                              dataKey="health_score" 
-                              radius={[4, 4, 0, 0]}
-                            >
-                              {dailyHealthData.map((entry, index) => (
-                                <Cell 
-                                  key={`cell-${index}`} 
-                                  fill={
-                                    entry.health_score >= 70 ? '#10B981' : 
-                                    entry.health_score >= 40 ? '#F59E0B' : '#EF4444'
-                                  } 
-                                />
-                              ))}
-                            </Bar>
-                          </BarChart>
-                        </ResponsiveContainer>
+                      <p className="text-sm text-blue-800 mb-4">
+                        Individual daily health tracking requires backend analysis of member-specific daily patterns
+                      </p>
+                      <div className="bg-white rounded-lg p-4 border border-blue-100 text-left">
+                        <p className="text-xs text-gray-700 mb-2"><strong>What this will show:</strong></p>
+                        <ul className="text-xs text-gray-600 space-y-1">
+                          <li>• Real daily health scores based on actual incident response patterns</li>
+                          <li>• Individual stress levels during high-incident days</li>
+                          <li>• Response time trends and workload impact</li>
+                          <li>• After-hours and weekend work health effects</li>
+                        </ul>
                       </div>
-                      
-                      <div className="mt-4 text-xs text-gray-500 space-y-1">
-                        <p>• Health scores reflect estimated individual wellbeing on incident days</p>
-                        <p>• Lower scores indicate higher stress/workload during incident response</p>
-                        <p>• Based on team health trends and individual incident involvement</p>
+                      <div className="mt-4 text-xs text-blue-700">
+                        <strong>Implementation needed:</strong> Backend endpoint to calculate individual daily health from incident data, GitHub activity, and Slack patterns
                       </div>
                     </div>
                   </div>
