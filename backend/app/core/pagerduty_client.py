@@ -291,11 +291,11 @@ class PagerDutyAPIClient:
             
             # Count incidents by urgency/priority (PagerDuty equivalent of severity)
             urgency_counts = {
-                "sev0_count": 0,  # Critical/P0 = SEV0
-                "sev1_count": 0,  # High urgency = SEV1
-                "sev2_count": 0,  # Medium urgency = SEV2  
-                "sev3_count": 0,  # Low urgency = SEV3
-                "sev4_count": 0   # Info/null = SEV4
+                "sev1_count": 0,  # P1/Critical = SEV1
+                "sev2_count": 0,  # P2/High = SEV2
+                "sev3_count": 0,  # P3/Medium = SEV3  
+                "sev4_count": 0,  # P4/Low = SEV4
+                "sev5_count": 0   # P5/Info = SEV5
             }
             
             # Process incidents to count urgencies
@@ -310,33 +310,31 @@ class PagerDutyAPIClient:
                     if priority and isinstance(priority, dict):
                         priority_name = priority.get("summary", "").lower()
                     
-                    # Map PagerDuty urgency/priority to severity levels
-                    if "p0" in priority_name or "emergency" in priority_name:
-                        urgency_counts["sev0_count"] += 1
-                    elif urgency == "high":
-                        # High urgency without P0 = SEV1
-                        if "p1" in priority_name:
-                            urgency_counts["sev1_count"] += 1
-                        else:
-                            urgency_counts["sev1_count"] += 1
-                    elif urgency == "low":
-                        # Check priority for more granular classification
-                        if "p1" in priority_name or "critical" in priority_name:
-                            urgency_counts["sev1_count"] += 1  # P1 with low urgency still SEV1
-                        elif "p2" in priority_name or "high" in priority_name:
-                            urgency_counts["sev2_count"] += 1
-                        elif "p3" in priority_name or "medium" in priority_name:
-                            urgency_counts["sev3_count"] += 1
-                        else:
-                            urgency_counts["sev4_count"] += 1
-                    else:
-                        # Unknown urgency defaults to SEV4
+                    # Map PagerDuty priorities P1-P5 to severity levels SEV1-5
+                    if "p1" in priority_name or "critical" in priority_name:
+                        urgency_counts["sev1_count"] += 1
+                    elif "p2" in priority_name or "high" in priority_name:
+                        urgency_counts["sev2_count"] += 1
+                    elif "p3" in priority_name or "medium" in priority_name:
+                        urgency_counts["sev3_count"] += 1
+                    elif "p4" in priority_name or "low" in priority_name:
                         urgency_counts["sev4_count"] += 1
+                    elif "p5" in priority_name or "info" in priority_name:
+                        urgency_counts["sev5_count"] += 1
+                    elif urgency == "high":
+                        # High urgency without specific priority = SEV1
+                        urgency_counts["sev1_count"] += 1
+                    elif urgency == "low":
+                        # Low urgency without specific priority = SEV4
+                        urgency_counts["sev4_count"] += 1
+                    else:
+                        # Unknown urgency/priority defaults to SEV5
+                        urgency_counts["sev5_count"] += 1
                         
                 except Exception as e:
                     logger.debug(f"Error counting urgency for incident: {e}")
-                    # Default to sev4 on error
-                    urgency_counts["sev4_count"] += 1
+                    # Default to sev5 on error
+                    urgency_counts["sev5_count"] += 1
             
             # Normalize data to common format for burnout analysis
             normalized_data = self.normalize_to_common_format(incidents, users)
@@ -373,11 +371,11 @@ class PagerDutyAPIClient:
                     "total_users": 0,
                     "total_incidents": 0,
                     "severity_breakdown": {
-                        "sev0_count": 0,
                         "sev1_count": 0,
                         "sev2_count": 0,
                         "sev3_count": 0,
-                        "sev4_count": 0
+                        "sev4_count": 0,
+                        "sev5_count": 0
                     },
                     "error": str(e),
                     "date_range": {
@@ -415,20 +413,33 @@ class PagerDutyAPIClient:
             if assignees:
                 assigned_user = assignees[0].get("assignee", {})
             
-            # Determine severity from urgency
+            # Determine severity from urgency/priority (PagerDuty P1-P5 → SEV1-5)
             urgency = incident.get("urgency", "low")
-            severity = "sev4"
-            if urgency == "high":
+            priority = incident.get("priority")
+            priority_name = ""
+            if priority and isinstance(priority, dict):
+                priority_name = priority.get("summary", "").lower()
+            
+            # Map PagerDuty priorities P1-P5 to severity levels SEV1-5
+            if "p1" in priority_name or "critical" in priority_name:
                 severity = "sev1"
-            elif incident.get("priority") and incident["priority"].get("name"):
-                # Map priority if available
-                priority_name = incident["priority"]["name"].lower()
-                if "p1" in priority_name or "critical" in priority_name:
-                    severity = "sev1"
-                elif "p2" in priority_name or "high" in priority_name:
-                    severity = "sev2"
-                elif "p3" in priority_name or "medium" in priority_name:
-                    severity = "sev3"
+            elif "p2" in priority_name or "high" in priority_name:
+                severity = "sev2"
+            elif "p3" in priority_name or "medium" in priority_name:
+                severity = "sev3"
+            elif "p4" in priority_name or "low" in priority_name:
+                severity = "sev4"
+            elif "p5" in priority_name or "info" in priority_name:
+                severity = "sev5"
+            elif urgency == "high":
+                # High urgency without specific priority = SEV1
+                severity = "sev1"
+            elif urgency == "low":
+                # Low urgency without specific priority = SEV4
+                severity = "sev4"
+            else:
+                # Unknown urgency/priority defaults to SEV5
+                severity = "sev5"
             
             # Calculate duration
             created_at = incident.get("created_at")
