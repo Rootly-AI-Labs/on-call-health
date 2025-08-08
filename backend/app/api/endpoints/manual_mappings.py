@@ -529,7 +529,7 @@ async def run_github_mapping(
             # TODO: Add PagerDuty support
         
         # Get existing mappings
-        existing_mappings = service.get_all_mappings(
+        existing_mappings = service.get_platform_mappings(
             user_id=current_user.id,
             target_platform="github"
         )
