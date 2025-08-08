@@ -88,6 +88,7 @@ import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { useBackendHealth } from "@/hooks/use-backend-health"
+import { MappingDrawer } from "@/components/mapping-drawer"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -282,6 +283,10 @@ export default function IntegrationsPage() {
   // Mapping data state
   const [showMappingDialog, setShowMappingDialog] = useState(false)
   const [selectedMappingPlatform, setSelectedMappingPlatform] = useState<'github' | 'slack' | null>(null)
+  
+  // MappingDrawer state (reusable component)
+  const [mappingDrawerOpen, setMappingDrawerOpen] = useState(false)
+  const [mappingDrawerPlatform, setMappingDrawerPlatform] = useState<'github' | 'slack'>('github')
   const [mappingData, setMappingData] = useState<IntegrationMapping[]>([])
   const [mappingStats, setMappingStats] = useState<MappingStatistics | null>(null)
   const [analysisMappingStats, setAnalysisMappingStats] = useState<AnalysisMappingStatistics | null>(null)
@@ -1155,6 +1160,13 @@ export default function IntegrationsPage() {
   }
 
   // Mapping data handlers
+  // Function to open the reusable MappingDrawer
+  const openMappingDrawer = (platform: 'github' | 'slack') => {
+    console.log(`🎯 Integrations: openMappingDrawer called with platform: ${platform}`)
+    setMappingDrawerPlatform(platform)
+    setMappingDrawerOpen(true)
+  }
+
   const loadMappingData = async (platform: 'github' | 'slack') => {
     console.log('🔴 loadMappingData called with platform:', platform)
     setLoadingMappingData(true)
@@ -3171,7 +3183,7 @@ export default function IntegrationsPage() {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => loadMappingData('github')}
+                        onClick={() => openMappingDrawer('github')}
                         disabled={loadingMappingData}
                         className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 hover:text-blue-800 hover:border-blue-300"
                         title="View and manage GitHub user mappings"
@@ -3262,7 +3274,7 @@ export default function IntegrationsPage() {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => loadMappingData('slack')}
+                        onClick={() => openMappingDrawer('slack')}
                         disabled={loadingMappingData}
                         className="bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100 hover:text-purple-800 hover:border-purple-300"
                         title="View and manage Slack user mappings"
@@ -4027,6 +4039,17 @@ export default function IntegrationsPage() {
 
         </SheetContent>
       </Sheet>
+
+      {/* Reusable Mapping Drawer */}
+      <MappingDrawer
+        isOpen={mappingDrawerOpen}
+        onClose={() => setMappingDrawerOpen(false)}
+        platform={mappingDrawerPlatform}
+        onRefresh={() => {
+          // Optional: Refresh any parent data if needed
+          console.log(`Refreshed ${mappingDrawerPlatform} mapping data from integrations page`)
+        }}
+      />
 
       {/* Manual Mapping Management Dialog */}
       <Dialog open={showManualMappingDialog} onOpenChange={setShowManualMappingDialog}>
