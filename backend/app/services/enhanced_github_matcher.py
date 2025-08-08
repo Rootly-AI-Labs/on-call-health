@@ -151,9 +151,11 @@ class EnhancedGitHubMatcher:
                         data = await resp.json()
                         if data.get('total_count', 0) > 0:
                             username = data['items'][0]['login']
-                            # Verify by checking user details
+                            # Verify by checking user details and org membership
                             if await self._verify_user_email(username, email):
-                                return username
+                                # CRITICAL: Verify user is actually in our organizations
+                                if await self._verify_user_in_organizations(username):
+                                    return username
                 
                 # Try commits search
                 search_url = f"https://api.github.com/search/commits?q=author-email:{email}"
@@ -167,7 +169,10 @@ class EnhancedGitHubMatcher:
                             # Get the author from the first commit
                             commit = data['items'][0]
                             if commit.get('author'):
-                                return commit['author']['login']
+                                username = commit['author']['login']
+                                # CRITICAL: Verify user is actually in our organizations
+                                if await self._verify_user_in_organizations(username):
+                                    return username
                                 
         except Exception as e:
             logger.error(f"Error in email API search: {e}")
@@ -220,7 +225,9 @@ class EnhancedGitHubMatcher:
         # Check each pattern - LIMIT to first 5 patterns for performance
         for pattern in patterns[:5]:  # Limit to 5 API calls max
             if await self._check_github_user_exists(pattern):
-                return pattern
+                # CRITICAL: Verify user is actually in our organizations
+                if await self._verify_user_in_organizations(pattern):
+                    return pattern
                 
         return None
     
