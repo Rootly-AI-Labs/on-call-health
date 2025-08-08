@@ -3441,12 +3441,12 @@ export default function IntegrationsPage() {
         {integrations.length > 0 && (
           <div className="mt-16 space-y-8">
             <div className="text-center">
-              <h2 className="text-2xl font-bold text-slate-900 mb-3">AI Insights</h2>
+              <h2 className="text-2xl font-bold text-slate-900 mb-3">AI Insights Included</h2>
               <p className="text-lg text-slate-600 mb-2">
                 Enable AI-powered burnout analysis with natural language reasoning
               </p>
               <p className="text-slate-500">
-                Add an LLM API token to get intelligent insights and recommendations
+                Get intelligent insights and recommendations automatically with every analysis
               </p>
             </div>
 
@@ -3606,7 +3606,7 @@ export default function IntegrationsPage() {
                   <Alert>
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription className="text-sm">
-                      AI features work without tokens using fallback analysis. Add a token for enhanced natural language insights.
+                      AI insights are automatically included with every analysis - no setup or API tokens required!
                     </AlertDescription>
                   </Alert>
                 </CardContent>
