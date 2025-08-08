@@ -4720,9 +4720,7 @@ export default function Dashboard() {
                               if (platform === 'pagerduty') {
                                 return (
                                   <div className="flex items-center justify-center w-6 h-6 bg-green-100 rounded-full border border-green-200" title="PagerDuty">
-                                    <svg className="w-3.5 h-3.5 text-green-600" fill="currentColor" viewBox="0 0 24 24">
-                                      <path d="M12 2l2 7h7l-5.5 4 2 7L12 16l-5.5 4 2-7L3 9h7l2-7z"/>
-                                    </svg>
+                                    <span className="text-green-600 font-bold text-xs">PD</span>
                                   </div>
                                 );
                               } else {
@@ -5567,6 +5565,160 @@ export default function Dashboard() {
                 </Card>
               </div>
 
+              {/* Daily Health Timeline Chart */}
+              {(() => {
+                // Get daily health data for this member based on incident days
+                const dailyHealthData = (() => {
+                  if (!currentAnalysis?.analysis_data?.daily_trends) return [];
+                  
+                  const memberEmail = memberData?.user_email || selectedMember.email;
+                  const memberName = memberData?.user_name || selectedMember.name;
+                  
+                  // Calculate daily health scores for days with incidents
+                  return currentAnalysis.analysis_data.daily_trends
+                    .filter(day => day.incident_count > 0) // Only days with incidents
+                    .map(day => {
+                      // Calculate individual health score based on various factors
+                      const baseScore = day.overall_score; // Team average for the day
+                      const memberIncidentRatio = (memberData?.incident_count || 0) / 
+                        Math.max((currentAnalysis.analysis_data as any).metadata?.total_incidents || 1, 1);
+                      
+                      // Adjust score based on member's incident involvement on this day
+                      // Higher incident load = lower health score
+                      const adjustmentFactor = memberIncidentRatio > 0.1 ? 0.8 : 
+                                              memberIncidentRatio > 0.05 ? 0.9 : 1.0;
+                      
+                      const memberHealthScore = Math.max(0.1, Math.min(1.0, baseScore * adjustmentFactor));
+                      
+                      return {
+                        date: day.date,
+                        health_score: Math.round(memberHealthScore * 100), // Convert to 0-100 scale
+                        incidents: day.incident_count,
+                        day_name: new Date(day.date).toLocaleDateString('en-US', { 
+                          weekday: 'short', month: 'short', day: 'numeric' 
+                        })
+                      };
+                    })
+                    .slice(-14); // Show last 14 days with incidents
+                })();
+
+                if (dailyHealthData.length === 0) {
+                  return (
+                    <div>
+                      <h3 className="text-lg font-semibold mb-4">📈 Daily Health Timeline</h3>
+                      <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
+                        <div className="text-gray-500 mb-2">
+                          <BarChart3 className="w-8 h-8 mx-auto mb-2" />
+                          No incident days found in analysis period
+                        </div>
+                        <p className="text-sm text-gray-600">
+                          Daily health scores are calculated for days when incidents occur
+                        </p>
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div>
+                    <h3 className="text-lg font-semibold mb-4">📈 Daily Health Timeline</h3>
+                    <div className="bg-white p-6 rounded-lg border border-gray-200">
+                      <div className="mb-4 flex items-center justify-between">
+                        <p className="text-sm text-gray-600">
+                          Health scores on days with incidents (last 14 incident days)
+                        </p>
+                        <div className="flex items-center space-x-4 text-xs text-gray-500">
+                          <div className="flex items-center space-x-1">
+                            <div className="w-3 h-3 bg-green-500 rounded"></div>
+                            <span>Good (70+)</span>
+                          </div>
+                          <div className="flex items-center space-x-1">
+                            <div className="w-3 h-3 bg-yellow-500 rounded"></div>
+                            <span>Moderate (40-70)</span>
+                          </div>
+                          <div className="flex items-center space-x-1">
+                            <div className="w-3 h-3 bg-red-500 rounded"></div>
+                            <span>Poor (&lt;40)</span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div style={{ width: '100%', height: '300px' }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart
+                            data={dailyHealthData}
+                            margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                          >
+                            <defs>
+                              <linearGradient id="healthGradient" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#10B981" stopOpacity={0.8}/>
+                                <stop offset="50%" stopColor="#F59E0B" stopOpacity={0.6}/>
+                                <stop offset="100%" stopColor="#EF4444" stopOpacity={0.8}/>
+                              </linearGradient>
+                            </defs>
+                            <XAxis 
+                              dataKey="day_name" 
+                              fontSize={11}
+                              tick={{ fill: '#6B7280' }}
+                              axisLine={false}
+                              tickLine={false}
+                            />
+                            <YAxis 
+                              domain={[0, 100]}
+                              fontSize={11}
+                              tick={{ fill: '#6B7280' }}
+                              axisLine={false}
+                              tickLine={false}
+                              label={{ 
+                                value: 'Health Score', 
+                                angle: -90, 
+                                position: 'insideLeft',
+                                style: { textAnchor: 'middle' }
+                              }}
+                            />
+                            <Tooltip 
+                              formatter={(value, name) => [`${value}%`, 'Health Score']}
+                              labelFormatter={(label, payload) => {
+                                if (payload && payload.length > 0) {
+                                  const data = payload[0].payload;
+                                  return `${data.day_name} (${data.incidents} incident${data.incidents !== 1 ? 's' : ''})`;
+                                }
+                                return label;
+                              }}
+                              contentStyle={{
+                                backgroundColor: '#F9FAFB',
+                                border: '1px solid #E5E7EB',
+                                borderRadius: '8px',
+                                fontSize: '12px'
+                              }}
+                            />
+                            <Bar 
+                              dataKey="health_score" 
+                              radius={[4, 4, 0, 0]}
+                            >
+                              {dailyHealthData.map((entry, index) => (
+                                <Cell 
+                                  key={`cell-${index}`} 
+                                  fill={
+                                    entry.health_score >= 70 ? '#10B981' : 
+                                    entry.health_score >= 40 ? '#F59E0B' : '#EF4444'
+                                  } 
+                                />
+                              ))}
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                      
+                      <div className="mt-4 text-xs text-gray-500 space-y-1">
+                        <p>• Health scores reflect estimated individual wellbeing on incident days</p>
+                        <p>• Lower scores indicate higher stress/workload during incident response</p>
+                        <p>• Based on team health trends and individual incident involvement</p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Burnout Dimensions */}
               <div>
