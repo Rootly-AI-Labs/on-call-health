@@ -299,8 +299,14 @@ class PagerDutyAPIClient:
             }
             
             # Process incidents to count urgencies
-            for incident in incidents:
+            for i, incident in enumerate(incidents):
                 try:
+                    # Debug: Log incident structure for first few incidents
+                    if i < 3:
+                        logger.info(f"DEBUG PagerDuty incident #{i}: urgency='{incident.get('urgency')}', priority='{incident.get('priority')}', title='{incident.get('title', 'no title')[:50]}'")
+                        if incident.get('priority'):
+                            logger.info(f"  Priority object: {incident['priority']}")
+                    
                     # PagerDuty uses urgency field (high, low)
                     urgency = incident.get("urgency", "low").lower()
                     
@@ -309,32 +315,54 @@ class PagerDutyAPIClient:
                     priority_name = ""
                     if priority and isinstance(priority, dict):
                         priority_name = priority.get("summary", "").lower()
+                        # Also check 'name' field in case summary doesn't exist
+                        if not priority_name:
+                            priority_name = priority.get("name", "").lower()
                     
                     # Map PagerDuty priorities P1-P5 to severity levels SEV1-5
+                    mapped_severity = None
                     if "p1" in priority_name or "critical" in priority_name:
                         urgency_counts["sev1_count"] += 1
+                        mapped_severity = "sev1 (p1/critical)"
                     elif "p2" in priority_name or "high" in priority_name:
                         urgency_counts["sev2_count"] += 1
+                        mapped_severity = "sev2 (p2/high)"
                     elif "p3" in priority_name or "medium" in priority_name:
                         urgency_counts["sev3_count"] += 1
+                        mapped_severity = "sev3 (p3/medium)"
                     elif "p4" in priority_name or "low" in priority_name:
                         urgency_counts["sev4_count"] += 1
+                        mapped_severity = "sev4 (p4/low)"
                     elif "p5" in priority_name or "info" in priority_name:
                         urgency_counts["sev5_count"] += 1
+                        mapped_severity = "sev5 (p5/info)"
                     elif urgency == "high":
                         # High urgency without specific priority = SEV1
                         urgency_counts["sev1_count"] += 1
+                        mapped_severity = "sev1 (high urgency, no priority)"
                     elif urgency == "low":
                         # Low urgency without specific priority = SEV4
                         urgency_counts["sev4_count"] += 1
+                        mapped_severity = "sev4 (low urgency, no priority)"
                     else:
                         # Unknown urgency/priority defaults to SEV5
                         urgency_counts["sev5_count"] += 1
+                        mapped_severity = f"sev5 (unknown: urgency='{urgency}', priority='{priority_name}')"
+                    
+                    # Debug: Log mapping for first few incidents
+                    if i < 3:
+                        logger.info(f"  → Mapped to {mapped_severity}")
                         
                 except Exception as e:
                     logger.debug(f"Error counting urgency for incident: {e}")
                     # Default to sev5 on error
                     urgency_counts["sev5_count"] += 1
+            
+            # Debug: Log final severity breakdown
+            total_mapped = sum(urgency_counts.values())
+            logger.info(f"PagerDuty severity mapping summary ({total_mapped} incidents):")
+            for sev, count in urgency_counts.items():
+                logger.info(f"  {sev}: {count} incidents ({count/total_mapped*100:.1f}%)" if total_mapped > 0 else f"  {sev}: {count} incidents")
             
             # Normalize data to common format for burnout analysis
             normalized_data = self.normalize_to_common_format(incidents, users)
