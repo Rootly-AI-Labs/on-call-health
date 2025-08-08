@@ -332,10 +332,9 @@ async def cleanup_duplicate_mappings(
         # Find duplicates: same user_id + source_platform + source_identifier + target_platform
         from sqlalchemy import and_, func
         
-        # Query to find duplicates
+        # Query to find duplicates - group by source_identifier only since source_platform can be null
         subquery = db.query(
             UserMapping.user_id,
-            UserMapping.source_platform,
             UserMapping.source_identifier,
             UserMapping.target_platform,
             func.count(UserMapping.id).label('mapping_count'),
@@ -346,7 +345,6 @@ async def cleanup_duplicate_mappings(
             UserMapping.target_platform == target_platform
         ).group_by(
             UserMapping.user_id,
-            UserMapping.source_platform,
             UserMapping.source_identifier,
             UserMapping.target_platform
         ).having(func.count(UserMapping.id) > 1).subquery()
@@ -356,7 +354,6 @@ async def cleanup_duplicate_mappings(
             subquery,
             and_(
                 UserMapping.user_id == subquery.c.user_id,
-                UserMapping.source_platform == subquery.c.source_platform,
                 UserMapping.source_identifier == subquery.c.source_identifier,
                 UserMapping.target_platform == subquery.c.target_platform
             )
@@ -369,7 +366,8 @@ async def cleanup_duplicate_mappings(
         
         duplicate_groups = {}
         for mapping in duplicates:
-            key = f"{mapping.source_platform}:{mapping.source_identifier}"
+            # Use just the email as the key since source_platform can be null
+            key = mapping.source_identifier
             if key not in duplicate_groups:
                 duplicate_groups[key] = []
             duplicate_groups[key].append(mapping)
@@ -386,9 +384,10 @@ async def cleanup_duplicate_mappings(
             if len(group) <= 1:
                 continue
                 
-            # Sort by: manual first, then by most recent update, then by ID
+            # Sort by: non-empty target_identifier first, then manual, then by most recent update, then by ID
             group.sort(key=lambda x: (
-                not x.mapping_type == 'manual',  # Manual first (False sorts before True)
+                not bool(x.target_identifier and x.target_identifier.strip()),  # Non-empty target first
+                not (x.mapping_type == 'manual' if x.mapping_type else False),  # Manual first (handle None)
                 -(x.updated_at.timestamp() if x.updated_at else 0),  # Most recent first
                 -x.id  # Highest ID first
             ))

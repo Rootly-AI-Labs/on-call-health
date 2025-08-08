@@ -359,6 +359,42 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
     }
   }
 
+  const debugMappings = async () => {
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) return
+      
+      console.log('🔍 All mappings for debugging:')
+      mappings.forEach((mapping, index) => {
+        console.log(`  ${index + 1}. ID:${mapping.id} | ${mapping.source_platform}:${mapping.source_identifier} -> ${mapping.target_identifier} | Type:${mapping.mapping_type} | Manual:${mapping.is_manual}`)
+      })
+      
+      // Find potential duplicates client-side
+      const emailGroups = mappings.reduce((acc, mapping) => {
+        const email = mapping.source_identifier
+        if (!acc[email]) acc[email] = []
+        acc[email].push(mapping)
+        return acc
+      }, {} as Record<string, any[]>)
+      
+      console.log('🔍 Email groups:')
+      Object.entries(emailGroups).forEach(([email, group]) => {
+        if (group.length > 1) {
+          console.log(`  📧 ${email}: ${group.length} mappings`)
+          group.forEach(m => console.log(`    - ID:${m.id} ${m.source_platform} -> ${m.target_identifier}`))
+        }
+      })
+      
+      // Find test emails
+      const testEmails = mappings.filter(m => m.source_identifier.includes('+'))
+      console.log('🔍 Test emails found:', testEmails.length)
+      testEmails.forEach(m => console.log(`  📧 ${m.source_identifier} -> ${m.target_identifier}`))
+      
+    } catch (error) {
+      console.error('Debug error:', error)
+    }
+  }
+
   const runCleanupDuplicates = async (dryRun: boolean = true) => {
     setRunningCleanup(true)
     setCleanupResults(null)
@@ -684,6 +720,14 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
                             </>
                           )}
                         </Button>
+                        <Button
+                          onClick={debugMappings}
+                          variant="ghost"
+                          size="sm"
+                          className="text-xs"
+                        >
+                          🔍 Debug
+                        </Button>
                       </div>
                     )}
                   </div>
@@ -927,11 +971,21 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
                             <div className="truncate flex-1">
                               {mapping.source_name ? (
                                 <>
-                                  <span className="font-semibold">{mapping.source_name}</span>
+                                  <div className="flex items-center space-x-2">
+                                    <span className="font-semibold">{mapping.source_name}</span>
+                                    <span className="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded">
+                                      {mapping.source_platform?.toUpperCase() || 'UNKNOWN'}
+                                    </span>
+                                  </div>
                                   <div className="text-xs text-gray-500 truncate">{mapping.source_identifier}</div>
                                 </>
                               ) : (
-                                mapping.source_identifier
+                                <div className="flex items-center space-x-2">
+                                  <span>{mapping.source_identifier}</span>
+                                  <span className="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded">
+                                    {mapping.source_platform?.toUpperCase() || 'UNKNOWN'}
+                                  </span>
+                                </div>
                               )}
                             </div>
                           </div>
