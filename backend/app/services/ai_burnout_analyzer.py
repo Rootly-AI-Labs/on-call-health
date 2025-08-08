@@ -1244,18 +1244,26 @@ def get_ai_burnout_analyzer(api_key: Optional[str] = None, provider: Optional[st
     """
     Get AI burnout analyzer instance.
     
+    Uses system API key for all users to provide AI insights by default.
+    
     Args:
-        api_key: Optional API key for LLM access
-        provider: LLM provider ('openai' or 'anthropic')
+        api_key: Deprecated - system uses Railway environment key
+        provider: LLM provider (always 'anthropic' for system key)
         
     Returns:
         AIBurnoutAnalyzerService instance
     """
-    # Use a hash of the API key and provider as cache key (for security)
+    import os
+    
+    # Always use system API key from Railway environment
+    system_api_key = os.getenv('ANTHROPIC_API_KEY')
+    system_provider = 'anthropic'
+    
+    # Use system key for cache (single instance for all users)
     import hashlib
-    cache_key = hashlib.sha256(f"{api_key or ''}:{provider or ''}".encode()).hexdigest()[:16]
+    cache_key = hashlib.sha256(f"{system_api_key or ''}:{system_provider}".encode()).hexdigest()[:16]
     
     if cache_key not in _ai_analyzer_cache:
-        _ai_analyzer_cache[cache_key] = AIBurnoutAnalyzerService(api_key=api_key, provider=provider)
+        _ai_analyzer_cache[cache_key] = AIBurnoutAnalyzerService(api_key=system_api_key, provider=system_provider)
     
     return _ai_analyzer_cache[cache_key]

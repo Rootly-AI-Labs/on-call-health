@@ -1622,11 +1622,8 @@ class UnifiedBurnoutAnalyzer:
             current_user = get_user_context()
             user_llm_token = None
             user_llm_provider = None
-            if current_user:
-                user_llm_token = get_user_llm_token(current_user)
-                user_llm_provider = current_user.llm_provider if hasattr(current_user, 'llm_provider') else None
-            
-            ai_analyzer = get_ai_burnout_analyzer(api_key=user_llm_token, provider=user_llm_provider)
+            # Use system API key for all users (Railway environment key)
+            ai_analyzer = get_ai_burnout_analyzer()
             
             # Enhance each member analysis with null safety
             enhanced_members = []

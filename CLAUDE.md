@@ -1556,6 +1556,222 @@ If validation fails, retry with more explicit prompt.
 - Can be restored by referencing `/images/oncall-burnout-logo.png` in Image components
 - Original usage locations: landing-page.tsx (header & footer), integrations/page.tsx (header)
 
+## GITHUB MAPPING CLEANUP - ORGANIZATION MEMBER VALIDATION
+
+### Problem Statement
+**Issue**: GitHub user mappings include users who are not members of the GitHub organizations associated with the token, causing incorrect data collection and analysis.
+
+**Impact**: 
+- Analyses include GitHub activity from users outside the organization
+- Team burnout scores are diluted by non-team member data  
+- Dashboard shows incorrect team composition
+- API rate limits hit unnecessarily for non-org members
+
+### Solution Overview
+Create a "Refresh Mappings" button that validates all GitHub username mappings against actual organization membership and removes invalid mappings.
+
+### Implementation Plan
+
+#### Phase 1: Backend Validation Service
+**File**: `backend/app/services/github_mapping_validator.py`
+
+```python
+class GitHubMappingValidator:
+    """Service to validate and clean GitHub user mappings against org membership."""
+    
+    async def validate_all_mappings(self, github_token: str, integration_id: int) -> Dict:
+        """
+        Validate all GitHub mappings for an integration against org membership.
+        
+        Returns:
+        {
+            "total_mappings": 45,
+            "validated": 38,
+            "removed": 7,
+            "removed_users": [
+                {"username": "external_user", "email": "external@other.com"},
+                ...
+            ],
+            "org_members_found": 150,
+            "organizations": ["acme-corp", "acme-mobile"]
+        }
+        """
+        
+    async def get_all_org_members(self, github_token: str) -> Set[str]:
+        """
+        Efficiently get all members from all organizations the token has access to.
+        Uses existing _get_org_members from enhanced_github_matcher.py
+        """
+        
+    async def remove_invalid_mappings(self, invalid_mappings: List[int]) -> int:
+        """Remove mappings that don't correspond to org members."""
+```
+
+#### Phase 2: API Endpoint  
+**File**: `backend/app/api/endpoints/github.py`
+
+```python
+@router.post("/integrations/{integration_id}/validate-github-mappings")
+async def validate_github_mappings(
+    integration_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Validate GitHub mappings against organization membership.
+    Remove mappings for users not in any accessible GitHub org.
+    """
+```
+
+#### Phase 3: Frontend Refresh Button
+**File**: `frontend/src/components/mapping-drawer.tsx`
+
+**Location**: Add to GitHub Mapping Drawer header, next to existing buttons
+
+**UI Design**:
+```tsx
+<div className="flex items-center space-x-2">
+  <Button 
+    variant="outline" 
+    size="sm"
+    onClick={handleRefreshMappings}
+    disabled={isRefreshing}
+    className="flex items-center space-x-2"
+  >
+    {isRefreshing ? (
+      <Loader2 className="w-4 h-4 animate-spin" />
+    ) : (
+      <RefreshCw className="w-4 h-4" />
+    )}
+    Validate Mappings
+  </Button>
+  
+  <TooltipProvider>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <InfoIcon className="w-4 h-4 text-gray-400" />
+      </TooltipTrigger>
+      <TooltipContent>
+        <p className="max-w-xs">
+          Removes GitHub mappings for users who are not members 
+          of your GitHub organizations
+        </p>
+      </TooltipContent>
+    </Tooltip>
+  </TooltipProvider>
+</div>
+```
+
+#### Phase 4: Validation Results Modal
+**Component**: `ValidationResultsModal.tsx`
+
+**Features**:
+- Shows before/after mapping counts
+- Lists removed users with reasons
+- Organizations checked
+- Option to undo changes (restore from backup)
+- Success/error states with clear messaging
+
+**Example Results Display**:
+```
+✅ Validation Complete
+
+📊 Summary:
+- 45 mappings checked
+- 38 mappings validated (users are org members)  
+- 7 mappings removed (users not in organizations)
+
+🏢 Organizations Checked:
+- acme-corp (95 members)
+- acme-mobile (42 members)  
+- acme-data (23 members)
+
+❌ Removed Mappings:
+- external_user (external@contractor.com) - Not found in any org
+- old_employee (former@acme.com) - No longer org member
+- consultant123 (temp@freelance.com) - Not found in any org
+
+⚠️  Impact: Future analyses will only include validated team members
+```
+
+#### Phase 5: Optimization Strategy
+
+**Efficient Validation Process**:
+1. **Batch API Calls**: Get all org members in 1-3 API calls (one per org)
+2. **Smart Caching**: Cache org member lists for 24 hours  
+3. **Incremental Updates**: Only check mappings created/updated since last validation
+4. **Background Processing**: For large teams, run validation in background task
+
+**Rate Limit Management**:
+```python
+# Estimated API calls for validation:
+# - 1 call per organization to get all members (typically 1-3 orgs)
+# - 0 calls per individual user (just check against cached member list)
+# Total: 1-3 API calls instead of 1 call per mapped user (45+ calls)
+```
+
+#### Phase 6: Integration Points
+
+**Database Changes** (Optional):
+```sql
+-- Add validation metadata to user_mappings table
+ALTER TABLE user_mappings ADD COLUMN last_validated TIMESTAMP;
+ALTER TABLE user_mappings ADD COLUMN validation_status VARCHAR(50); -- 'valid', 'invalid', 'pending'
+ALTER TABLE user_mappings ADD COLUMN validation_notes TEXT;
+```
+
+**Integration with Existing Systems**:
+- Use existing `enhanced_github_matcher._get_org_members()` function
+- Leverage current `UserMapping` model and database structure
+- Integrate with existing `MappingDrawer` component
+- Maintain current caching strategies from `GitHubMappingService`
+
+#### Phase 7: User Experience Flow
+
+**Happy Path**:
+1. User opens GitHub Mapping Drawer
+2. Sees "Validate Mappings" button in header
+3. Clicks button → Loading state shows
+4. Validation completes → Results modal shows summary
+5. User reviews removed mappings → Confirms changes
+6. Drawer refreshes showing cleaned mapping list
+
+**Edge Cases**:
+- **No Invalid Mappings**: Show "All mappings validated ✅" message
+- **API Token Issues**: Show clear error with token permission instructions
+- **Rate Limit Hit**: Queue validation for later, show estimated completion time
+- **Network Errors**: Allow retry with exponential backoff
+
+### Implementation Timeline
+
+**Day 1**: Backend validation service and API endpoint
+**Day 2**: Frontend refresh button and modal components  
+**Day 3**: Integration testing and error handling
+**Day 4**: UI polish and user experience refinement
+
+### Success Metrics
+- **Data Quality**: % of mappings that are valid org members (target: >95%)
+- **API Efficiency**: Reduced API calls per validation (from N calls to 1-3 calls)
+- **User Adoption**: % of admin users who use validation feature (target: >80%)
+- **Analysis Accuracy**: Improved team composition accuracy in burnout analyses
+
+### Technical Considerations
+
+**Performance**: 
+- Cache org member lists to avoid repeated API calls
+- Batch process large mapping lists
+- Use background tasks for teams >100 members
+
+**Security**: 
+- Validate GitHub token permissions before validation
+- Log all mapping changes for audit trail
+- Require user confirmation before bulk deletions
+
+**Backwards Compatibility**:
+- Validation is opt-in via button click
+- Existing mappings remain until explicitly validated
+- No automatic cleanup without user action
+
 ## DEMO CONFIGURATION - GitHub-Only Scoring Restriction
 
 ### Configuration Active: August 2025 Demo

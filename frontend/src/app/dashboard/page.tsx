@@ -3422,17 +3422,9 @@ export default function Dashboard() {
                       // No LLM-generated content available
                       return (
                         <div className="text-center py-12 text-gray-500">
-                          <Sparkles className="h-10 w-10 mx-auto mb-4 opacity-40" />
-                          <h4 className="font-medium text-gray-700 mb-2">AI Analysis Unavailable</h4>
-                          <p className="text-sm mb-4">Configure your AI token to enable intelligent team insights</p>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => router.push('/integrations')}
-                            className="mx-auto"
-                          >
-                            Configure AI Settings
-                          </Button>
+                          <Sparkles className="h-10 w-10 mx-auto mb-4 opacity-40 animate-pulse" />
+                          <h4 className="font-medium text-gray-700 mb-2">Generating AI Insights</h4>
+                          <p className="text-sm">AI analysis will be available in future runs. Try running a new analysis!</p>
                         </div>
                       )
                     })()}
