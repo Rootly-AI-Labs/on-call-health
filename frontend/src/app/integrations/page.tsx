@@ -3492,7 +3492,7 @@ export default function IntegrationsPage() {
                             {llmConfig.provider === 'openai' ? 'OpenAI' : 'Anthropic'} Connected
                           </p>
                           <p className="text-xs">
-                            Token ending in {llmConfig.token_suffix} • AI-powered analysis enabled
+                            AI-powered analysis enabled for all users
                           </p>
                         </div>
                       </div>
