@@ -307,6 +307,121 @@ async def get_unmapped_identifiers(
         logger.error(f"Error fetching unmapped identifiers: {e}")
         raise HTTPException(status_code=500, detail="Failed to fetch unmapped identifiers")
 
+@router.post("/manual-mappings/cleanup-duplicates", summary="Clean up duplicate mappings")
+async def cleanup_duplicate_mappings(
+    target_platform: str = Query("github", description="Target platform to clean up"),
+    dry_run: bool = Query(True, description="If true, only return what would be cleaned up"),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Clean up duplicate mappings for the same source_identifier."""
+    try:
+        logger.info(f"Starting duplicate cleanup for user {current_user.id}, platform {target_platform}")
+        
+        # Find duplicates: same user_id + source_platform + source_identifier + target_platform
+        from sqlalchemy import and_, func
+        
+        # Query to find duplicates
+        subquery = db.query(
+            UserMapping.user_id,
+            UserMapping.source_platform,
+            UserMapping.source_identifier,
+            UserMapping.target_platform,
+            func.count(UserMapping.id).label('mapping_count'),
+            func.min(UserMapping.id).label('keep_id'),
+            func.max(UserMapping.updated_at).label('latest_update')
+        ).filter(
+            UserMapping.user_id == current_user.id,
+            UserMapping.target_platform == target_platform
+        ).group_by(
+            UserMapping.user_id,
+            UserMapping.source_platform,
+            UserMapping.source_identifier,
+            UserMapping.target_platform
+        ).having(func.count(UserMapping.id) > 1).subquery()
+        
+        # Get the actual duplicate records
+        duplicates = db.query(UserMapping).join(
+            subquery,
+            and_(
+                UserMapping.user_id == subquery.c.user_id,
+                UserMapping.source_platform == subquery.c.source_platform,
+                UserMapping.source_identifier == subquery.c.source_identifier,
+                UserMapping.target_platform == subquery.c.target_platform
+            )
+        ).all()
+        
+        # Group duplicates by source identifier
+        duplicate_groups = {}
+        for mapping in duplicates:
+            key = f"{mapping.source_platform}:{mapping.source_identifier}"
+            if key not in duplicate_groups:
+                duplicate_groups[key] = []
+            duplicate_groups[key].append(mapping)
+        
+        cleanup_plan = []
+        total_to_remove = 0
+        
+        for key, group in duplicate_groups.items():
+            if len(group) <= 1:
+                continue
+                
+            # Sort by: manual first, then by most recent update, then by ID
+            group.sort(key=lambda x: (
+                not x.mapping_type == 'manual',  # Manual first (False sorts before True)
+                -(x.updated_at.timestamp() if x.updated_at else 0),  # Most recent first
+                -x.id  # Highest ID first
+            ))
+            
+            keep = group[0]
+            remove = group[1:]
+            total_to_remove += len(remove)
+            
+            cleanup_plan.append({
+                "source_identifier": keep.source_identifier,
+                "keep": {
+                    "id": keep.id,
+                    "target_identifier": keep.target_identifier,
+                    "mapping_type": keep.mapping_type,
+                    "updated_at": keep.updated_at.isoformat() if keep.updated_at else None
+                },
+                "remove": [{
+                    "id": m.id,
+                    "target_identifier": m.target_identifier,
+                    "mapping_type": m.mapping_type,
+                    "updated_at": m.updated_at.isoformat() if m.updated_at else None
+                } for m in remove]
+            })
+        
+        if not dry_run and cleanup_plan:
+            # Actually remove the duplicates
+            removed_count = 0
+            for plan in cleanup_plan:
+                for remove_mapping in plan["remove"]:
+                    mapping = db.query(UserMapping).filter(
+                        UserMapping.id == remove_mapping["id"],
+                        UserMapping.user_id == current_user.id
+                    ).first()
+                    if mapping:
+                        db.delete(mapping)
+                        removed_count += 1
+            
+            db.commit()
+            logger.info(f"Removed {removed_count} duplicate mappings for user {current_user.id}")
+        
+        return {
+            "dry_run": dry_run,
+            "total_duplicate_groups": len(cleanup_plan),
+            "total_duplicates_found": sum(len(plan["remove"]) for plan in cleanup_plan),
+            "total_to_remove": total_to_remove,
+            "cleanup_plan": cleanup_plan,
+            "message": f"{'Would remove' if dry_run else 'Removed'} {total_to_remove} duplicate mappings"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error during duplicate cleanup: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to clean up duplicates: {str(e)}")
+
 @router.post("/manual-mappings/run-github-mapping", summary="Run GitHub mapping process")
 async def run_github_mapping(
     current_user: User = Depends(get_current_active_user),

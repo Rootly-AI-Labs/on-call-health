@@ -84,6 +84,13 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
   
   // Auto-mapping states
   const [runningAutoMapping, setRunningAutoMapping] = useState(false)
+  
+  // Remove mapping states
+  const [removingMappingId, setRemovingMappingId] = useState<number | string | null>(null)
+  
+  // Cleanup duplicates states
+  const [runningCleanup, setRunningCleanup] = useState(false)
+  const [cleanupResults, setCleanupResults] = useState<any>(null)
   const [mappingProgress, setMappingProgress] = useState<{
     total: number
     processed: number
@@ -352,6 +359,130 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
     }
   }
 
+  const runCleanupDuplicates = async (dryRun: boolean = true) => {
+    setRunningCleanup(true)
+    setCleanupResults(null)
+    
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) {
+        toast.error('Authentication required')
+        return
+      }
+      
+      const url = `${API_BASE}/integrations/manual-mappings/cleanup-duplicates?target_platform=${platform}&dry_run=${dryRun}`
+      console.log('🧹 Cleanup URL:', url)
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authToken}`
+        }
+      })
+      
+      console.log('🧹 Cleanup response status:', response.status)
+      
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.detail || 'Failed to clean up duplicates')
+      }
+      
+      const result = await response.json()
+      setCleanupResults(result)
+      
+      if (result.total_to_remove === 0) {
+        toast.info('No duplicate mappings found!')
+      } else if (dryRun) {
+        toast.info(`Found ${result.total_to_remove} duplicate mappings. Review and confirm to remove them.`)
+      } else {
+        toast.success(`Successfully removed ${result.total_to_remove} duplicate mappings!`)
+        await loadMappingData()
+        onRefresh?.()
+      }
+      
+    } catch (error) {
+      console.error('Error cleaning up duplicates:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to clean up duplicates')
+    } finally {
+      setRunningCleanup(false)
+    }
+  }
+
+  const removeMapping = async (mappingId: number | string) => {
+    const mapping = mappings.find(m => m.id === mappingId)
+    if (!mapping) {
+      toast.error('Mapping not found')
+      return
+    }
+
+    setRemovingMappingId(mappingId)
+    
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) {
+        toast.error('Authentication required')
+        return
+      }
+
+      let response
+
+      if (mapping.is_manual) {
+        // Delete the manual mapping directly
+        response = await fetch(`${API_BASE}/integrations/manual-mappings/${mappingId}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${authToken}`
+          }
+        })
+      } else {
+        // For auto mappings, create a manual "override" mapping with empty target to effectively remove it
+        response = await fetch(`${API_BASE}/integrations/manual-mappings`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${authToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            source_platform: mapping.source_platform,
+            source_identifier: mapping.source_identifier,
+            target_platform: platform,
+            target_identifier: "", // Empty string to "clear" the mapping
+            is_removal_override: true // Flag to indicate this is removing an auto mapping
+          })
+        })
+      }
+
+      if (response.ok) {
+        toast.success(`${platform === 'github' ? 'GitHub' : 'Slack'} username removed successfully!`)
+        await loadMappingData()
+        onRefresh?.()
+      } else {
+        const errorData = await response.json().catch(() => ({}))
+        console.error('Remove mapping error:', errorData)
+        
+        // Handle different error response formats
+        let errorMessage = 'Failed to remove mapping'
+        if (typeof errorData === 'string') {
+          errorMessage = errorData
+        } else if (errorData.detail && typeof errorData.detail === 'string') {
+          errorMessage = errorData.detail
+        } else if (errorData.message && typeof errorData.message === 'string') {
+          errorMessage = errorData.message
+        } else if (Array.isArray(errorData.detail)) {
+          // Handle validation error arrays
+          errorMessage = errorData.detail.map(err => err.msg || err).join(', ')
+        }
+        
+        toast.error(errorMessage)
+      }
+    } catch (error) {
+      console.error('Error removing mapping:', error)
+      toast.error('Network error occurred')
+    } finally {
+      setRemovingMappingId(null)
+    }
+  }
+
   const saveInlineMapping = async (mappingId: number | string, email: string) => {
     if (!inlineEditingValue.trim()) {
       toast.error(`Please enter a ${platform === 'github' ? 'GitHub username' : 'Slack user ID'}`)
@@ -371,20 +502,37 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
         return
       }
 
-      // Create new manual mapping
-      const response = await fetch(`${API_BASE}/integrations/manual-mappings`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          source_platform: 'rootly',
-          source_identifier: email,
-          target_platform: platform,
-          target_identifier: inlineEditingValue.trim()
+      const mapping = mappings.find(m => m.id === mappingId)
+      let response
+
+      if (mapping && mapping.is_manual) {
+        // Update existing manual mapping
+        response = await fetch(`${API_BASE}/integrations/manual-mappings/${mappingId}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${authToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            target_identifier: inlineEditingValue.trim()
+          })
         })
-      })
+      } else {
+        // Create new manual mapping (for auto mappings or new entries)
+        response = await fetch(`${API_BASE}/integrations/manual-mappings`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${authToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            source_platform: mapping?.source_platform || 'rootly',
+            source_identifier: email,
+            target_platform: platform,
+            target_identifier: inlineEditingValue.trim()
+          })
+        })
+      }
 
       if (response.ok) {
         toast.success(`${platform === 'github' ? 'GitHub' : 'Slack'} username saved successfully!`)
@@ -484,24 +632,44 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
                   <div className="mb-6 flex items-center justify-between">
                     <h3 className="font-semibold text-gray-900">Mapping Statistics</h3>
                     {platform === 'github' && (
-                      <Button
-                        onClick={runAutoMapping}
-                        disabled={runningAutoMapping}
-                        className="bg-blue-600 hover:bg-blue-700 text-white"
-                        size="sm"
-                      >
-                        {runningAutoMapping ? (
-                          <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Running Auto-Mapping...
-                          </>
-                        ) : (
-                          <>
-                            <Users className="w-4 h-4 mr-2" />
-                            Run GitHub Auto-Mapping
-                          </>
-                        )}
-                      </Button>
+                      <div className="flex space-x-2">
+                        <Button
+                          onClick={runAutoMapping}
+                          disabled={runningAutoMapping}
+                          className="bg-blue-600 hover:bg-blue-700 text-white"
+                          size="sm"
+                        >
+                          {runningAutoMapping ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Running Auto-Mapping...
+                            </>
+                          ) : (
+                            <>
+                              <Users className="w-4 h-4 mr-2" />
+                              Run GitHub Auto-Mapping
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          onClick={() => runCleanupDuplicates(true)}
+                          disabled={runningCleanup}
+                          variant="outline"
+                          size="sm"
+                        >
+                          {runningCleanup ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Cleaning...
+                            </>
+                          ) : (
+                            <>
+                              <Database className="w-4 h-4 mr-2" />
+                              Clean Duplicates
+                            </>
+                          )}
+                        </Button>
+                      </div>
                     )}
                   </div>
                   <div className="grid grid-cols-3 gap-4">
@@ -570,6 +738,50 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
                       Analyzing team member emails and searching GitHub for matches...
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Cleanup Results */}
+              {cleanupResults && cleanupResults.total_to_remove > 0 && (
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-medium text-gray-900">
+                      {cleanupResults.dry_run ? 'Duplicate Cleanup Preview' : 'Cleanup Results'}
+                    </h4>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setCleanupResults(null)}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  <div className="border rounded-lg p-4 space-y-3">
+                    <div className="text-sm">
+                      <strong>Found {cleanupResults.total_duplicate_groups} users with duplicates</strong>
+                      <br />
+                      Total duplicates to remove: {cleanupResults.total_to_remove}
+                    </div>
+                    {cleanupResults.dry_run && cleanupResults.total_to_remove > 0 && (
+                      <div className="flex space-x-2">
+                        <Button
+                          onClick={() => runCleanupDuplicates(false)}
+                          disabled={runningCleanup}
+                          className="bg-red-600 hover:bg-red-700 text-white"
+                          size="sm"
+                        >
+                          Confirm & Remove Duplicates
+                        </Button>
+                        <Button
+                          onClick={() => setCleanupResults(null)}
+                          variant="outline"
+                          size="sm"
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -729,30 +941,15 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
                         </div>
 
                         <div className="truncate" title={mapping.target_identifier || mapping.error_message || ''}>
-                          {mapping.target_identifier ? (
-                            <div className="flex items-center space-x-2">
-                              <span className="truncate">{mapping.target_identifier}</span>
-                              {mapping.is_manual && (
-                                <Tooltip content="This is a manual mapping. Data will show after running an analysis.">
-                                  <Badge 
-                                    variant="outline"
-                                    className={`text-xs px-1.5 py-0.5 bg-${platformColor}-50 text-${platformColor}-700 border-${platformColor}-200`}
-                                  >
-                                    Manual
-                                  </Badge>
-                                </Tooltip>
-                              )}
-                              <button 
-                                onClick={() => startInlineEdit(mapping.id, mapping.target_identifier || '')}
-                                className="text-gray-400 hover:text-gray-600"
-                                title="Edit mapping"
-                              >
-                                <Edit2 className="w-3 h-3" />
-                              </button>
-                            </div>
-                          ) : inlineEditingId === mapping.id ? (
-                            <div className="flex items-center space-x-2">
-                              <Input
+                          {(() => {
+                            const isCurrentlyEditing = inlineEditingId === mapping.id
+                            const hasTargetId = !!mapping.target_identifier
+                            
+                            // Show input field if this mapping is being edited
+                            if (isCurrentlyEditing) {
+                              return (
+                                <div className="flex items-center space-x-2">
+                                  <Input
                                 value={inlineEditingValue}
                                 onChange={(e) => setInlineEditingValue(e.target.value)}
                                 placeholder={`Enter ${platform === 'github' ? 'GitHub username' : 'Slack user ID'}`}
@@ -798,15 +995,69 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
                               >
                                 <X className="w-4 h-4" />
                               </button>
-                            </div>
-                          ) : (
-                            <button
-                              onClick={() => startInlineEdit(mapping.id)}
-                              className="flex items-center space-x-1 px-3 py-1 text-xs text-gray-500 border border-dashed border-gray-300 rounded hover:bg-gray-50 hover:border-gray-400 hover:text-gray-700 transition-colors"
-                            >
-                              <span>+ Click to add {platform === 'github' ? 'GitHub username' : 'Slack user ID'}</span>
-                            </button>
-                          )}
+                                </div>
+                              )
+                            }
+                            
+                            // Show edit button if has target_identifier and not editing
+                            if (hasTargetId && !isCurrentlyEditing) {
+                              return (
+                                <div className="flex items-center space-x-2">
+                                  <span className="truncate">{mapping.target_identifier}</span>
+                                  {mapping.is_manual && (
+                                    <Tooltip content="This is a manual mapping. Data will show after running an analysis.">
+                                      <Badge 
+                                        variant="outline"
+                                        className={`text-xs px-1.5 py-0.5 bg-${platformColor}-50 text-${platformColor}-700 border-${platformColor}-200`}
+                                      >
+                                        Manual
+                                      </Badge>
+                                    </Tooltip>
+                                  )}
+                                  <button 
+                                    onClick={() => startInlineEdit(mapping.id, mapping.target_identifier || '')}
+                                    className="text-gray-400 hover:text-gray-600"
+                                    title="Edit mapping"
+                                  >
+                                    <Edit2 className="w-3 h-3" />
+                                  </button>
+                                  <button 
+                                    onClick={() => removeMapping(mapping.id)}
+                                    disabled={removingMappingId === mapping.id}
+                                    className={`${
+                                      removingMappingId === mapping.id 
+                                        ? 'text-gray-300 cursor-not-allowed' 
+                                        : 'text-gray-400 hover:text-red-600'
+                                    }`}
+                                    title={removingMappingId === mapping.id 
+                                      ? 'Removing...' 
+                                      : `Remove ${platform === 'github' ? 'GitHub username' : 'Slack user ID'}${mapping.is_manual ? '' : ' (will override auto-detection)'}`
+                                    }
+                                  >
+                                    {removingMappingId === mapping.id ? (
+                                      <Loader2 className="w-3 h-3 animate-spin" />
+                                    ) : (
+                                      <X className="w-3 h-3" />
+                                    )}
+                                  </button>
+                                </div>
+                              )
+                            }
+                            
+                            // Show add button if no target_identifier and not editing
+                            if (!hasTargetId && !isCurrentlyEditing) {
+                              return (
+                                <button
+                                  onClick={() => startInlineEdit(mapping.id)}
+                                  className="flex items-center space-x-1 px-3 py-1 text-xs text-gray-500 border border-dashed border-gray-300 rounded hover:bg-gray-50 hover:border-gray-400 hover:text-gray-700 transition-colors"
+                                >
+                                  <span>+ Click to add {platform === 'github' ? 'GitHub username' : 'Slack user ID'}</span>
+                                </button>
+                              )
+                            }
+                            
+                            return null
+                          })()}
                           
                           {platform === 'github' && inlineEditingId === mapping.id && githubValidation && (
                             <div className={`text-xs mt-1 ${githubValidation.valid ? 'text-green-600' : 'text-red-600'}`}>
