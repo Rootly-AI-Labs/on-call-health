@@ -12,33 +12,15 @@ console.log('API_BASE:', API_BASE) // Debug log to verify the URL
 export default function LandingPage() {
   const handleGoogleLogin = async () => {
     try {
-      console.log('🔍 Starting Google login process...')
-      console.log('🔍 API_BASE:', API_BASE)
-      
       // Pass the current origin to the backend
       const currentOrigin = window.location.origin
-      console.log('🔍 Current origin:', currentOrigin)
-      
-      const url = `${API_BASE}/auth/google?redirect_origin=${encodeURIComponent(currentOrigin)}`
-      console.log('🔍 Requesting URL:', url)
-      
-      const response = await fetch(url)
-      console.log('🔍 Response status:', response.status)
-      console.log('🔍 Response ok:', response.ok)
-      
+      const response = await fetch(`${API_BASE}/auth/google?redirect_origin=${encodeURIComponent(currentOrigin)}`)
       const data = await response.json()
-      console.log('🔍 Response data:', data)
-      
       if (data.authorization_url) {
-        console.log('✅ Redirecting to:', data.authorization_url)
         window.location.href = data.authorization_url
-      } else {
-        console.error('❌ No authorization_url in response:', data)
-        alert('Google OAuth not configured. Please check the console for details.')
       }
     } catch (error) {
-      console.error('❌ Google login error:', error)
-      alert('Error connecting to authentication service. Please check the console for details.')
+      console.error('Google login error:', error)
     }
   }
 
@@ -62,16 +44,18 @@ export default function LandingPage() {
       <header className="border-b border-slate-200 bg-white">
         <div className="container mx-auto px-4 py-2">
           <div className="flex items-center">
-            <span className="text-2xl font-bold text-slate-900">OnCall Burnout</span>
-            <div className="ml-2 flex flex-col items-start -space-y-1">
-              <span className="text-xs text-slate-400">powered by</span>
-              <Image 
-                src="/images/rootly-logo-branded.png" 
-                alt="Rootly" 
-                width={120} 
-                height={48}
-                className="h-6 w-auto"
-              />
+            <div className="flex items-center">
+              <span className="text-2xl font-bold text-slate-900">OnCall Burnout</span>
+              <div className="ml-2 flex flex-col items-start -space-y-1">
+                <span className="text-xs text-slate-400">powered by</span>
+                <Image 
+                  src="/images/rootly-ai-logo.png" 
+                  alt="Rootly AI" 
+                  width={160} 
+                  height={64}
+                  className="h-8 w-auto"
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -267,20 +251,17 @@ export default function LandingPage() {
       <footer className="bg-slate-900 text-slate-300 py-12">
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row justify-between items-center">
-            <div className="flex items-center space-x-3 mb-4 md:mb-0">
-              <div className="w-8 h-8 bg-gradient-to-br from-purple-600 to-purple-700 rounded-lg flex items-center justify-center">
-                <Activity className="w-5 h-5 text-white" />
-              </div>
+            <div className="flex items-center mb-4 md:mb-0">
               <div className="flex items-center">
                 <span className="text-2xl font-semibold text-white">OnCall Burnout</span>
                 <div className="ml-2 flex flex-col items-start -space-y-1">
-                  <span className="text-xs text-slate-400">powered by</span>
+                  <span className="text-xs text-slate-500">powered by</span>
                   <Image 
-                    src="/images/rootly-ai-logo-white.png" 
+                    src="/images/rootly-ai-logo.png" 
                     alt="Rootly AI" 
-                    width={120} 
-                    height={48}
-                    className="h-6 w-auto"
+                    width={160} 
+                    height={64}
+                    className="h-8 w-auto opacity-80 brightness-0 invert"
                   />
                 </div>
               </div>
@@ -295,7 +276,7 @@ export default function LandingPage() {
 
           <div className="border-t border-slate-800 mt-8 pt-8 text-center">
             <p className="text-slate-400">
-              © {new Date().getFullYear()} OnCall Burnout by Rootly. Free for all engineering teams.
+              © {new Date().getFullYear()} OnCall Burnout by Rootly AI. Free for all engineering teams.
             </p>
           </div>
         </div>
