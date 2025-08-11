@@ -1644,41 +1644,93 @@ async def get_member_daily_health(
             "data": None
         }
     
-    # Get daily trends from analysis
-    daily_trends = analysis.results.get("analysis_data", {}).get("daily_trends", [])
-    if not daily_trends:
+    # Get individual daily data from analysis results
+    individual_daily_data = analysis.results.get("individual_daily_data", {})
+    daily_trends = analysis.results.get("daily_trends", [])
+    
+    user_key = member_email.lower()
+    
+    if user_key not in individual_daily_data:
         return {
             "status": "error",
-            "message": "No daily trend data available",
+            "message": f"No individual daily data available for {member_email}",
             "data": None
         }
     
-    # Calculate individual daily health scores using REAL data
+    user_daily_data = individual_daily_data[user_key]
+    
+    if not user_daily_data:
+        return {
+            "status": "error",
+            "message": "No daily incident data available for this user",
+            "data": None
+        }
+    
+    # Calculate individual daily health scores using NEW individual tracking
     daily_health_scores = []
     
+    # Create a mapping of dates to team health scores
+    team_health_by_date = {}
     for day in daily_trends:
-        if day.get("incident_count", 0) == 0:
+        team_health_by_date[day.get("date")] = day.get("overall_score", 0)
+    
+    for date_str, day_data in user_daily_data.items():
+        incident_count = day_data.get("incident_count", 0)
+        
+        if incident_count == 0:
             continue  # Only show days with incidents
-            
-        # Base health calculation using real member data
-        base_health = _calculate_individual_daily_health(
-            day=day,
-            member_data=member_data,
-            analysis_results=analysis.results
-        )
+        
+        # Calculate individual health score
+        severity_weighted = day_data.get("severity_weighted_count", 0)
+        after_hours_count = day_data.get("after_hours_count", 0) 
+        high_severity_count = day_data.get("high_severity_count", 0)
+        
+        # Individual scoring
+        base_score = 8.5
+        
+        # Incident volume penalty
+        if incident_count > 0:
+            incident_penalty = min(incident_count * 1.0, 3.0)
+            base_score -= incident_penalty
+        
+        # Severity penalty
+        if severity_weighted > incident_count:
+            severity_penalty = min((severity_weighted - incident_count) * 0.8, 2.0)
+            base_score -= severity_penalty
+        
+        # After-hours penalty
+        if after_hours_count > 0:
+            after_hours_penalty = min(after_hours_count * 0.7, 1.5)
+            base_score -= after_hours_penalty
+        
+        # High severity penalty
+        if high_severity_count > 0:
+            high_sev_penalty = min(high_severity_count * 1.0, 2.0)
+            base_score -= high_sev_penalty
+        
+        # Floor at 1.0
+        daily_health_score = max(base_score, 1.0)
+        
+        # Calculate factors
+        member_factors = member_data.get("factors", {})
+        factors = {
+            "workload": min(incident_count / 5.0 * 10, 10),
+            "after_hours": (after_hours_count / max(incident_count, 1)) * 10 if incident_count > 0 else 0,
+            "response_time": member_factors.get("response_time", 0),
+            "weekend_work": member_factors.get("weekend_work", 0),
+            "severity_pressure": (high_severity_count / max(incident_count, 1)) * 10 if incident_count > 0 else 0
+        }
         
         daily_health_scores.append({
-            "date": day.get("date"),
-            "health_score": round(base_health * 100),  # 0-100 scale
-            "incident_count": day.get("incident_count", 0),
-            "team_health": round(day.get("overall_score", 0) * 100),
-            "factors": {
-                "workload": member_data.get("factors", {}).get("workload", 0),
-                "after_hours": member_data.get("factors", {}).get("after_hours", 0),
-                "response_time": member_data.get("factors", {}).get("response_time", 0),
-                "weekend_work": member_data.get("factors", {}).get("weekend_work", 0)
-            },
-            "day_name": day.get("date")  # Frontend will format this
+            "date": date_str,
+            "health_score": round(daily_health_score * 10),  # 0-100 scale
+            "incident_count": incident_count,
+            "team_health": round(team_health_by_date.get(date_str, 0) * 10),  # Team score for comparison
+            "factors": factors,
+            "incidents": day_data.get("incidents", []),
+            "severity_weighted_count": round(severity_weighted, 1),
+            "after_hours_count": after_hours_count,
+            "high_severity_count": high_severity_count
         })
     
     # Sort by date and take last 14 days with incidents

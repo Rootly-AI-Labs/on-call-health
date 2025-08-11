@@ -956,38 +956,15 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
                     <div key={mapping.id} className="px-4 py-3">
                       <div className="grid grid-cols-4 gap-4 text-sm">
                         <div className="font-medium" title={mapping.source_identifier}>
-                          <div className="flex items-start space-x-2">
-                            <div className="flex flex-col space-y-1">
-                              {(() => {
-                                // Get all platforms this user appears in
-                                const userMappings = groupedMappings[mapping.source_identifier] || []
-                                const platforms = Array.from(new Set(userMappings.map(m => m.source_platform)))
-                                
-                                return platforms.map(platform => (
-                                  <PlatformLogo key={platform} platform={platform} size="sm" />
-                                ))
-                              })()}
-                            </div>
-                            <div className="truncate flex-1">
-                              {mapping.source_name ? (
-                                <>
-                                  <div className="flex items-center space-x-2">
-                                    <span className="font-semibold">{mapping.source_name}</span>
-                                    <span className="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded">
-                                      {mapping.source_platform?.toUpperCase() || 'UNKNOWN'}
-                                    </span>
-                                  </div>
-                                  <div className="text-xs text-gray-500 truncate">{mapping.source_identifier}</div>
-                                </>
-                              ) : (
-                                <div className="flex items-center space-x-2">
-                                  <span>{mapping.source_identifier}</span>
-                                  <span className="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded">
-                                    {mapping.source_platform?.toUpperCase() || 'UNKNOWN'}
-                                  </span>
-                                </div>
-                              )}
-                            </div>
+                          <div className="truncate">
+                            {mapping.source_name ? (
+                              <>
+                                <span className="font-semibold">{mapping.source_name}</span>
+                                <div className="text-xs text-gray-500 truncate">{mapping.source_identifier}</div>
+                              </>
+                            ) : (
+                              mapping.source_identifier
+                            )}
                           </div>
                         </div>
                         

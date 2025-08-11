@@ -4,6 +4,7 @@ Replacement for both SimpleBurnoutAnalyzer and BurnoutAnalyzerService.
 """
 import logging
 import math
+import random
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
 from collections import defaultdict
@@ -122,6 +123,14 @@ class UnifiedBurnoutAnalyzer:
             users = data.get("users", []) if data else []
             incidents = data.get("incidents", []) if data else []
             metadata = data.get("collection_metadata", {}) if data else {}
+            
+            # No fake data generation - if API returns 0 incidents, we show the real state
+            if len(incidents) == 0 and len(users) > 0:
+                expected_incidents = metadata.get("total_incidents", 0)
+                if expected_incidents > 0:
+                    logger.warning(f"🔍 DATA ISSUE: API returned 0 incidents but metadata shows {expected_incidents} incidents. This indicates API permission issues.")
+                    logger.info(f"🔍 DATA TRANSPARENCY: Showing real state - no incidents available for daily trends")
+            
             extraction_duration = (datetime.now() - extraction_start).total_seconds()
             logger.info(f"🔍 BURNOUT ANALYSIS: Step 2 completed in {extraction_duration:.3f}s - {len(users)} users, {len(incidents)} incidents")
             
@@ -338,6 +347,7 @@ class UnifiedBurnoutAnalyzer:
                 "insights": insights,
                 "recommendations": self._generate_recommendations(team_health, team_analysis),
                 "daily_trends": daily_trends,
+                "individual_daily_data": getattr(self, 'individual_daily_data', {}),  # Include individual daily tracking
                 "period_summary": {
                     "average_score": round(period_average_score, 2),
                     "days_analyzed": time_range_days,
@@ -1736,12 +1746,13 @@ class UnifiedBurnoutAnalyzer:
         return incidents
 
     def _generate_daily_trends(self, incidents: List[Dict[str, Any]], team_analysis: List[Dict[str, Any]], metadata: Dict[str, Any], team_health: Dict[str, Any] = None) -> List[Dict[str, Any]]:
-        """Generate daily trend data from incidents and team analysis - only includes days with actual incident data."""
+        """Generate daily trend data from incidents and team analysis - includes individual user daily tracking."""
         try:
             days_analyzed = metadata.get("days_analyzed", 30) or 30 if isinstance(metadata, dict) else 30
             
-            # Initialize daily data structure - only for days with incidents
+            # Initialize daily data structures - team level and individual level
             daily_data = {}
+            individual_daily_data = {}  # New: track per-user daily data
             
             # Process incidents to populate daily data - only for days with incidents
             if incidents and isinstance(incidents, list):
@@ -1815,12 +1826,16 @@ class UnifiedBurnoutAnalyzer:
                                 daily_data[date_str]["after_hours_count"] += 1
                             
                             # Track users involved - handle both platforms
+                            user_id = None
+                            user_email = None
+                            
                             if self.platform == "pagerduty":
                                 # PagerDuty format
                                 assignments = incident.get("assignments", [])
                                 if assignments:
                                     assignee = assignments[0].get("assignee", {})
                                     user_id = assignee.get("id")
+                                    user_email = assignee.get("email")
                                     if user_id:
                                         daily_data[date_str]["users_involved"].add(user_id)
                             else:  # Rootly
@@ -1831,8 +1846,47 @@ class UnifiedBurnoutAnalyzer:
                                     if isinstance(user_info, dict) and "data" in user_info:
                                         user_data = user_info.get("data", {})
                                         user_id = user_data.get("id")
+                                        user_email = user_data.get("email")
                                         if user_id:
                                             daily_data[date_str]["users_involved"].add(user_id)
+                            
+                            # Track individual user daily data
+                            if user_email:
+                                user_key = user_email.lower()
+                                
+                                # Initialize user daily data structure if needed
+                                if user_key not in individual_daily_data:
+                                    individual_daily_data[user_key] = {}
+                                
+                                if date_str not in individual_daily_data[user_key]:
+                                    individual_daily_data[user_key][date_str] = {
+                                        "date": date_str,
+                                        "incident_count": 0,
+                                        "severity_weighted_count": 0.0,
+                                        "after_hours_count": 0,
+                                        "high_severity_count": 0,
+                                        "incidents": []  # Store full incident details for granular analysis
+                                    }
+                                
+                                # Update individual user metrics for this day
+                                user_day_data = individual_daily_data[user_key][date_str]
+                                user_day_data["incident_count"] += 1
+                                user_day_data["severity_weighted_count"] += severity_weight
+                                
+                                if incident_hour < 8 or incident_hour > 18:
+                                    user_day_data["after_hours_count"] += 1
+                                
+                                if severity_weight >= 2.0:  # High severity threshold
+                                    user_day_data["high_severity_count"] += 1
+                                
+                                # Store incident details for individual analysis
+                                user_day_data["incidents"].append({
+                                    "id": incident.get("id", "unknown"),
+                                    "severity": severity_weight,
+                                    "after_hours": incident_hour < 8 or incident_hour > 18,
+                                    "hour": incident_hour,
+                                    "created_at": created_at
+                                })
                                         
                         except Exception as date_error:
                             logger.debug(f"Error parsing incident date: {date_error}")
@@ -1936,8 +1990,12 @@ class UnifiedBurnoutAnalyzer:
                     "health_percentage": round(daily_score * 10, 1)  # Convert to percentage for display
                 })
             
+            # Store individual daily data for later access
+            self.individual_daily_data = individual_daily_data
+            
             # Return only days with actual incident data - no fake data generation
             logger.info(f"Generated {len(daily_trends)} daily trend data points with actual incident data for {days_analyzed}-day analysis")
+            logger.info(f"Individual daily data collected for {len(individual_daily_data)} users")
             
             # Debug: Log sample data for troubleshooting
             if daily_trends:
@@ -1946,6 +2004,12 @@ class UnifiedBurnoutAnalyzer:
                 logger.info(f"🔍 DAILY_TRENDS_DEBUG: Score range: {min(d['overall_score'] for d in daily_trends):.2f} to {max(d['overall_score'] for d in daily_trends):.2f}")
             else:
                 logger.warning(f"🔍 DAILY_TRENDS_DEBUG: No incident data available - returning empty trends")
+            
+            # Debug individual data
+            if individual_daily_data:
+                sample_user = list(individual_daily_data.keys())[0]
+                sample_days = len(individual_daily_data[sample_user])
+                logger.info(f"🔍 INDIVIDUAL_DATA_DEBUG: Sample user {sample_user} has {sample_days} days of data")
                 
             return daily_trends
             
@@ -2167,3 +2231,115 @@ class UnifiedBurnoutAnalyzer:
         except Exception as e:
             logger.error(f"Unexpected error calculating GitHub burnout score: {e}")
             return 0.0
+
+    def calculate_individual_daily_health(self, user_email: str, date: str, member_data: Dict[str, Any] = None) -> Dict[str, Any]:
+        """
+        Calculate individual daily health score for a specific user on a specific date.
+        Returns detailed health data including score, factors, and incident details.
+        """
+        try:
+            user_key = user_email.lower()
+            
+            # Check if we have individual daily data for this user
+            if not hasattr(self, 'individual_daily_data') or user_key not in self.individual_daily_data:
+                return {
+                    "date": date,
+                    "health_score": None,
+                    "incident_count": 0,
+                    "team_health": None,
+                    "factors": {},
+                    "error": "No individual daily data available for this user"
+                }
+            
+            user_daily_data = self.individual_daily_data[user_key]
+            
+            if date not in user_daily_data:
+                return {
+                    "date": date,
+                    "health_score": None,
+                    "incident_count": 0,
+                    "team_health": None,
+                    "factors": {},
+                    "error": "No data available for this date"
+                }
+            
+            day_data = user_daily_data[date]
+            
+            # Calculate individual health score based on daily incident load
+            base_score = 8.5  # Start with healthy baseline
+            
+            incident_count = day_data["incident_count"]
+            severity_weighted = day_data["severity_weighted_count"]
+            after_hours_count = day_data["after_hours_count"]
+            high_severity_count = day_data["high_severity_count"]
+            
+            # Individual scoring penalties
+            # Incident volume penalty (more aggressive for individuals)
+            if incident_count > 0:
+                incident_penalty = min(incident_count * 1.0, 3.0)  # Up to 3 points for high incident days
+                base_score -= incident_penalty
+            
+            # Severity penalty (critical incidents impact individual more heavily)
+            if severity_weighted > incident_count:  # Above-average severity
+                severity_penalty = min((severity_weighted - incident_count) * 0.8, 2.0)
+                base_score -= severity_penalty
+            
+            # After-hours penalty (work-life balance impact)
+            if after_hours_count > 0:
+                after_hours_penalty = min(after_hours_count * 0.7, 1.5)
+                base_score -= after_hours_penalty
+            
+            # High severity penalty (stress impact)
+            if high_severity_count > 0:
+                high_sev_penalty = min(high_severity_count * 1.0, 2.0)
+                base_score -= high_sev_penalty
+            
+            # Floor at 1.0 (10% health) for very bad days
+            daily_health_score = max(base_score, 1.0)
+            
+            # Calculate contributing factors
+            factors = {}
+            
+            if member_data:
+                # Use member-wide factors as context
+                member_factors = member_data.get("factors", {})
+                factors = {
+                    "workload": min(incident_count / 5.0 * 10, 10),  # Scale incidents to 0-10
+                    "after_hours": (after_hours_count / max(incident_count, 1)) * 10 if incident_count > 0 else 0,
+                    "response_time": member_factors.get("response_time", 0),
+                    "weekend_work": member_factors.get("weekend_work", 0),
+                    "severity_pressure": (high_severity_count / max(incident_count, 1)) * 10 if incident_count > 0 else 0
+                }
+            else:
+                # Calculate basic factors from daily data only
+                factors = {
+                    "workload": min(incident_count / 3.0 * 10, 10),
+                    "after_hours": (after_hours_count / max(incident_count, 1)) * 10 if incident_count > 0 else 0,
+                    "response_time": 5.0,  # Default moderate
+                    "weekend_work": 0,     # Can't determine from daily data
+                    "severity_pressure": (high_severity_count / max(incident_count, 1)) * 10 if incident_count > 0 else 0
+                }
+            
+            return {
+                "date": date,
+                "health_score": round(daily_health_score * 10),  # Convert to 0-100 scale
+                "incident_count": incident_count,
+                "team_health": None,  # Will be filled by API endpoint
+                "factors": factors,
+                "incidents": day_data.get("incidents", []),  # Include incident details
+                "severity_weighted_count": round(severity_weighted, 1),
+                "after_hours_count": after_hours_count,
+                "high_severity_count": high_severity_count
+            }
+            
+        except Exception as e:
+            logger.error(f"Error calculating individual daily health for {user_email} on {date}: {e}")
+            return {
+                "date": date,
+                "health_score": None,
+                "incident_count": 0,
+                "team_health": None,
+                "factors": {},
+                "error": f"Calculation error: {str(e)}"
+            }
+
