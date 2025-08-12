@@ -52,6 +52,12 @@ def get_cors_origins():
     if production_frontend:
         origins.append(production_frontend)
     
+    # Add the production domain explicitly
+    origins.extend([
+        "https://www.oncallburnout.com",
+        "https://oncallburnout.com"
+    ])
+    
     # Add Vercel preview URLs if in development/staging
     vercel_url = os.getenv("VERCEL_URL") 
     if vercel_url:

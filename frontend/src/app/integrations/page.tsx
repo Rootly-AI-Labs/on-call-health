@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"
 import {
@@ -271,6 +272,7 @@ export default function IntegrationsPage() {
   // State management
   const [integrations, setIntegrations] = useState<Integration[]>([])
   const [loadingIntegrations, setLoadingIntegrations] = useState(true)
+  const [userInfo, setUserInfo] = useState<{name: string, email: string, avatar?: string} | null>(null)
   const [activeTab, setActiveTab] = useState<"rootly" | "pagerduty" | null>(null)
   const [backUrl, setBackUrl] = useState<string>('/dashboard')
   const [selectedOrganization, setSelectedOrganization] = useState<string>("")
@@ -402,6 +404,19 @@ export default function IntegrationsPage() {
     const savedOrg = localStorage.getItem('selected_organization')
     if (savedOrg) {
       setSelectedOrganization(savedOrg)
+    }
+    
+    // Load user info from localStorage
+    const userName = localStorage.getItem('user_name')
+    const userEmail = localStorage.getItem('user_email')
+    const userAvatar = localStorage.getItem('user_avatar')
+    
+    if (userName && userEmail) {
+      setUserInfo({
+        name: userName,
+        email: userEmail,
+        avatar: userAvatar || undefined
+      })
     }
     
     // Determine back navigation based on referrer
@@ -1767,12 +1782,30 @@ export default function IntegrationsPage() {
             <h1 className="text-2xl font-bold text-slate-900">Manage Integrations</h1>
           </div>
 
-          <Link href="/dashboard">
-            <Button size="sm" className="flex items-center space-x-2 bg-purple-600 hover:bg-purple-700 text-white">
-              <Activity className="w-4 h-4" />
-              <span>Go to Dashboard</span>
-            </Button>
-          </Link>
+          <div className="flex items-center space-x-3">
+            {/* User Account Indicator */}
+            {userInfo && (
+              <div className="flex items-center space-x-3 px-3 py-1 bg-slate-50/80 rounded-full border border-slate-200">
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={userInfo.avatar} alt={userInfo.name} />
+                  <AvatarFallback className="bg-purple-600 text-white text-xs">
+                    {userInfo.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="hidden sm:block text-left">
+                  <div className="text-sm font-medium text-slate-900">{userInfo.name}</div>
+                  <div className="text-xs text-slate-500">{userInfo.email}</div>
+                </div>
+              </div>
+            )}
+            
+            <Link href="/dashboard">
+              <Button size="sm" className="flex items-center space-x-2 bg-purple-600 hover:bg-purple-700 text-white">
+                <Activity className="w-4 h-4" />
+                <span>Go to Dashboard</span>
+              </Button>
+            </Link>
+          </div>
         </div>
       </header>
 

@@ -21,6 +21,16 @@ _temp_auth_codes = {}
 
 router = APIRouter()
 
+# Allowed OAuth redirect origins
+ALLOWED_OAUTH_ORIGINS = [
+    "http://localhost:3000",
+    "http://localhost:3001", 
+    "http://localhost:3002",
+    settings.FRONTEND_URL,
+    "https://www.oncallburnout.com",
+    "https://oncallburnout.com"
+]
+
 # ===== VALIDATION MODELS =====
 
 class OAuthLoginRequest(BaseValidatedModel):
@@ -35,14 +45,7 @@ class OAuthLoginRequest(BaseValidatedModel):
             return v
         
         # Only allow known safe origins
-        safe_origins = [
-            "http://localhost:3000",
-            "http://localhost:3001", 
-            "http://localhost:3002",
-            settings.FRONTEND_URL
-        ]
-        
-        if v not in safe_origins:
+        if v not in ALLOWED_OAUTH_ORIGINS:
             raise ValueError(f"Redirect origin not allowed: {v}")
         
         return v
@@ -74,7 +77,7 @@ async def google_login(request: Request, redirect_origin: str = Query(None)):
     
     # Store the redirect origin in state parameter for OAuth callback
     state = None
-    if redirect_origin and redirect_origin in ["http://localhost:3000", settings.FRONTEND_URL]:
+    if redirect_origin and redirect_origin in ALLOWED_OAUTH_ORIGINS:
         # Only allow known origins for security
         state = redirect_origin
     
@@ -138,7 +141,7 @@ async def google_callback(
         
         # Determine redirect URL based on state parameter
         frontend_url = settings.FRONTEND_URL
-        if state and state in ["http://localhost:3000", settings.FRONTEND_URL]:
+        if state and state in ALLOWED_OAUTH_ORIGINS:
             frontend_url = state
             
         # ✅ SECURITY FIX: Use httpOnly cookie instead of URL parameter  
@@ -178,7 +181,7 @@ async def google_callback(
     except Exception as e:
         # Use state for error redirect too
         frontend_url = settings.FRONTEND_URL
-        if state and state in ["http://localhost:3000", settings.FRONTEND_URL]:
+        if state and state in ALLOWED_OAUTH_ORIGINS:
             frontend_url = state
         error_url = f"{frontend_url}/auth/error?message={str(e)}"
         return RedirectResponse(url=error_url)
@@ -195,7 +198,7 @@ async def github_login(request: Request, redirect_origin: str = Query(None)):
     
     # Store the redirect origin in state parameter for OAuth callback
     state = None
-    if redirect_origin and redirect_origin in ["http://localhost:3000", settings.FRONTEND_URL]:
+    if redirect_origin and redirect_origin in ALLOWED_OAUTH_ORIGINS:
         # Only allow known origins for security
         state = redirect_origin
     
@@ -258,7 +261,7 @@ async def github_callback(
         
         # Determine redirect URL based on state parameter
         frontend_url = settings.FRONTEND_URL
-        if state and state in ["http://localhost:3000", settings.FRONTEND_URL]:
+        if state and state in ALLOWED_OAUTH_ORIGINS:
             frontend_url = state
             
         # ✅ SECURITY FIX: Use httpOnly cookie instead of URL parameter  
@@ -298,7 +301,7 @@ async def github_callback(
     except Exception as e:
         # Use state for error redirect too
         frontend_url = settings.FRONTEND_URL
-        if state and state in ["http://localhost:3000", settings.FRONTEND_URL]:
+        if state and state in ALLOWED_OAUTH_ORIGINS:
             frontend_url = state
         error_url = f"{frontend_url}/auth/error?message={str(e)}"
         return RedirectResponse(url=error_url)
