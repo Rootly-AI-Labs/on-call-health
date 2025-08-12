@@ -1,8 +1,9 @@
 "use client"
 
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Activity, Link2, Brain, Target, Github, Chrome, Shield, Users, TrendingUp } from "lucide-react"
+import { Activity, Link2, Brain, Target, Github, Chrome, Shield, Users, TrendingUp, Loader2 } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
 
@@ -10,8 +11,11 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 console.log('API_BASE:', API_BASE) // Debug log to verify the URL
 
 export default function LandingPage() {
+  const [isLoading, setIsLoading] = useState<'google' | 'github' | null>(null)
+
   const handleGoogleLogin = async () => {
     try {
+      setIsLoading('google')
       // Pass the current origin to the backend
       const currentOrigin = window.location.origin
       const response = await fetch(`${API_BASE}/auth/google?redirect_origin=${encodeURIComponent(currentOrigin)}`)
@@ -21,11 +25,13 @@ export default function LandingPage() {
       }
     } catch (error) {
       console.error('Google login error:', error)
+      setIsLoading(null) // Reset loading state on error
     }
   }
 
   const handleGitHubLogin = async () => {
     try {
+      setIsLoading('github')
       // Pass the current origin to the backend
       const currentOrigin = window.location.origin
       const response = await fetch(`${API_BASE}/auth/github?redirect_origin=${encodeURIComponent(currentOrigin)}`)
@@ -35,6 +41,7 @@ export default function LandingPage() {
       }
     } catch (error) {
       console.error('GitHub login error:', error)
+      setIsLoading(null) // Reset loading state on error
     }
   }
 
@@ -83,18 +90,38 @@ export default function LandingPage() {
                 size="lg"
                 className="w-full sm:w-auto bg-slate-900 hover:bg-slate-800 text-white px-8 py-4 text-lg"
                 onClick={handleGitHubLogin}
+                disabled={isLoading === 'github'}
               >
-                <Github className="w-5 h-5 mr-3" />
-                Continue with GitHub
+                {isLoading === 'github' ? (
+                  <>
+                    <Loader2 className="w-5 h-5 mr-3 animate-spin" />
+                    Connecting to GitHub...
+                  </>
+                ) : (
+                  <>
+                    <Github className="w-5 h-5 mr-3" />
+                    Continue with GitHub
+                  </>
+                )}
               </Button>
               <Button
                 size="lg"
                 variant="outline"
                 className="w-full sm:w-auto border-slate-300 px-8 py-4 text-lg hover:bg-slate-50 bg-transparent"
                 onClick={handleGoogleLogin}
+                disabled={isLoading === 'google'}
               >
-                <Chrome className="w-5 h-5 mr-3" />
-                Continue with Google
+                {isLoading === 'google' ? (
+                  <>
+                    <Loader2 className="w-5 h-5 mr-3 animate-spin" />
+                    Connecting to Google...
+                  </>
+                ) : (
+                  <>
+                    <Chrome className="w-5 h-5 mr-3" />
+                    Continue with Google
+                  </>
+                )}
               </Button>
             </div>
 
