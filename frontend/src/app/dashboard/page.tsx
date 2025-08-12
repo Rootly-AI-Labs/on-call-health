@@ -2600,7 +2600,7 @@ export default function Dashboard() {
     ...factor,
     color: getFactorColor(factor.value!),
     recommendation: getRecommendation(factor.factor),
-    severity: factor.value! >= 7 ? 'Critical' : factor.value! >= 5 ? 'Warning' : factor.value! >= 3 ? 'Good' : 'Low Risk'
+    severity: factor.value! >= 7 ? 'Critical' : factor.value! >= 5 ? 'Poor' : factor.value! >= 3 ? 'Fair' : 'Good'
   })) : [];
   
   // Get high-risk factors for emphasis (temporarily lowered threshold to test)
@@ -4087,7 +4087,7 @@ export default function Dashboard() {
                             const chartData = dailyTrends.map((trend: any, index: number) => ({
                               date: new Date(trend.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
                               score: Math.round(trend.overall_score * 10), // Convert 0-10 scale to 0-100 for display
-                              riskLevel: trend.overall_score >= 8 ? 'low' : trend.overall_score >= 6 ? 'medium' : 'high',
+                              riskLevel: trend.overall_score >= 9 ? 'excellent' : trend.overall_score >= 7 ? 'good' : trend.overall_score >= 5 ? 'fair' : trend.overall_score >= 3 ? 'poor' : 'critical',
                               membersAtRisk: trend.members_at_risk,
                               totalMembers: trend.total_members,
                               healthStatus: trend.health_status,
@@ -4168,7 +4168,7 @@ export default function Dashboard() {
                             return historicalTrends.daily_trends.map((trend: any) => ({
                               date: new Date(trend.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
                               score: Math.round(trend.overall_score * 10), // Convert 0-10 scale to 0-100 for display
-                              riskLevel: trend.overall_score >= 8 ? 'low' : trend.overall_score >= 6 ? 'medium' : 'high',
+                              riskLevel: trend.overall_score >= 9 ? 'excellent' : trend.overall_score >= 7 ? 'good' : trend.overall_score >= 5 ? 'fair' : trend.overall_score >= 3 ? 'poor' : 'critical',
                               membersAtRisk: trend.members_at_risk,
                               totalMembers: trend.total_members,
                               healthStatus: trend.health_status,
@@ -4224,8 +4224,10 @@ export default function Dashboard() {
                                     )}
                                     
                                     <p className={`text-sm font-medium ${
-                                      data.riskLevel === 'low' ? 'text-green-600' :
-                                      data.riskLevel === 'medium' ? 'text-yellow-600' : 'text-red-600'
+                                      data.riskLevel === 'excellent' ? 'text-green-700' :
+                                      data.riskLevel === 'good' ? 'text-blue-600' :
+                                      data.riskLevel === 'fair' ? 'text-yellow-600' :
+                                      data.riskLevel === 'poor' ? 'text-orange-600' : 'text-red-600'
                                     }`}>
                                       Risk Level: {data.riskLevel.charAt(0).toUpperCase() + data.riskLevel.slice(1)}
                                     </p>
@@ -4390,8 +4392,9 @@ export default function Dashboard() {
                                 <span className="font-medium text-gray-900">{factor.factor}</span>
                                 <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                                   factor.severity === 'Critical' ? 'bg-red-100 text-red-800' :
-                                  factor.severity === 'Warning' ? 'bg-orange-100 text-orange-800' :
-                                  'bg-yellow-100 text-yellow-800'
+                                  factor.severity === 'Poor' ? 'bg-orange-100 text-orange-800' :
+                                  factor.severity === 'Fair' ? 'bg-yellow-100 text-yellow-800' :
+                                  'bg-green-100 text-green-800'
                                 }`}>
                                   {factor.severity}
                                 </span>
