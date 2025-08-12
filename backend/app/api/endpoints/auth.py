@@ -99,12 +99,16 @@ async def google_callback(
         # Determine if we should use secure cookies (HTTPS only in production)
         is_production = not frontend_url.startswith("http://localhost")
         
+        # For cross-domain cookies, we need SameSite=None with Secure=True
+        cookie_secure = True  # Always secure for OAuth cookies
+        cookie_samesite = "none"  # Allow cross-site requests
+        
         response.set_cookie(
             key="auth_token",
             value=jwt_token,
             httponly=True,        # Prevents XSS access to token
-            secure=is_production, # HTTPS only in production, allow HTTP in local dev
-            samesite="lax",       # CSRF protection while allowing OAuth redirects
+            secure=cookie_secure, # Always secure for cross-domain cookies
+            samesite=cookie_samesite,  # Allow cross-site for OAuth
             max_age=604800,       # 7 days (same as JWT expiration)
             path="/",             # Available to entire frontend
             domain=None           # Use same domain as request
@@ -202,12 +206,16 @@ async def github_callback(
         # Determine if we should use secure cookies (HTTPS only in production)
         is_production = not frontend_url.startswith("http://localhost")
         
+        # For cross-domain cookies, we need SameSite=None with Secure=True
+        cookie_secure = True  # Always secure for OAuth cookies
+        cookie_samesite = "none"  # Allow cross-site requests
+        
         response.set_cookie(
             key="auth_token",
             value=jwt_token,
             httponly=True,        # Prevents XSS access to token
-            secure=is_production, # HTTPS only in production, allow HTTP in local dev
-            samesite="lax",       # CSRF protection while allowing OAuth redirects
+            secure=cookie_secure, # Always secure for cross-domain cookies
+            samesite=cookie_samesite,  # Allow cross-site for OAuth
             max_age=604800,       # 7 days (same as JWT expiration)
             path="/",             # Available to entire frontend
             domain=None           # Use same domain as request
