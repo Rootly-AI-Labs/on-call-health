@@ -4,13 +4,14 @@ Rootly integration API endpoints.
 from typing import Dict, Any
 from datetime import datetime, timedelta
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ...models import get_db, User, RootlyIntegration
 from ...auth.dependencies import get_current_active_user
 from ...core.rootly_client import RootlyAPIClient
+from ...core.rate_limiting import integration_rate_limit
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +35,9 @@ class RootlyTestResponse(BaseModel):
     error_code: str = None
 
 @router.post("/token/test")
+@integration_rate_limit("integration_test")
 async def test_rootly_token_preview(
+    request: Request,
     token_update: RootlyTokenUpdate,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)

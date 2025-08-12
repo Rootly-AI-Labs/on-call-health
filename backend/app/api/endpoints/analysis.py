@@ -5,7 +5,7 @@ import asyncio
 import logging
 from datetime import datetime
 from typing import Dict, Any, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -14,6 +14,7 @@ from ...auth.dependencies import get_current_active_user
 from ...core.rootly_client import RootlyAPIClient
 from ...services.unified_burnout_analyzer import UnifiedBurnoutAnalyzer
 from ...services.github_only_burnout_analyzer import GitHubOnlyBurnoutAnalyzer
+from ...core.rate_limiting import analysis_rate_limit
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -33,7 +34,9 @@ class AnalysisResponse(BaseModel):
     message: str
 
 @router.post("/start", response_model=AnalysisResponse)
+@analysis_rate_limit("analysis_create")
 async def start_analysis(
+    req: Request,
     request: AnalysisRequest,
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_active_user),

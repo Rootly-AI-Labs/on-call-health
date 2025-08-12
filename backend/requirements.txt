@@ -18,6 +18,10 @@ cryptography
 httpx
 aiohttp
 
+# Rate limiting and security
+slowapi
+redis
+
 # Environment and configuration
 python-dotenv
 pydantic

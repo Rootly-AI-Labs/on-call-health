@@ -2,10 +2,12 @@
 FastAPI main application for Rootly Burnout Detector.
 """
 import os
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi.errors import RateLimitExceeded
 from .models import create_tables
 from .core.config import settings
+from .core.rate_limiting import limiter, custom_rate_limit_exceeded_handler
 from .api.endpoints import auth, rootly, analysis, analyses, pagerduty, github, slack, llm, mappings, manual_mappings, changelog
 
 # Create FastAPI application
@@ -14,6 +16,10 @@ app = FastAPI(
     description="API for detecting burnout risk in engineering teams using Rootly incident data",
     version="1.0.0"
 )
+
+# Add rate limiting to the app
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, custom_rate_limit_exceeded_handler)
 
 # Configure CORS - Secure configuration
 def get_cors_origins():

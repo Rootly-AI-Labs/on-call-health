@@ -2,7 +2,7 @@
 Authentication API endpoints.
 """
 from typing import Any, Dict, List
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -12,6 +12,7 @@ from ...auth.jwt import create_access_token
 from ...auth.dependencies import get_current_active_user
 from ...services.account_linking import AccountLinkingService
 from ...core.config import settings
+from ...core.rate_limiting import auth_rate_limit
 
 # Temporary in-memory storage for auth codes (use Redis in production)
 _temp_auth_codes = {}
@@ -19,7 +20,8 @@ _temp_auth_codes = {}
 router = APIRouter()
 
 @router.get("/google")
-async def google_login(redirect_origin: str = Query(None)):
+@auth_rate_limit("auth_login")
+async def google_login(request: Request, redirect_origin: str = Query(None)):
     """Initiate Google OAuth login."""
     if not settings.GOOGLE_CLIENT_ID:
         raise HTTPException(
@@ -141,7 +143,8 @@ async def google_callback(
         return RedirectResponse(url=error_url)
 
 @router.get("/github")
-async def github_login(redirect_origin: str = Query(None)):
+@auth_rate_limit("auth_login")
+async def github_login(request: Request, redirect_origin: str = Query(None)):
     """Initiate GitHub OAuth login."""
     if not settings.GITHUB_CLIENT_ID:
         raise HTTPException(
@@ -322,7 +325,9 @@ async def unlink_provider(
     return {"message": f"{provider} provider unlinked successfully"}
 
 @router.get("/user/me")
+@auth_rate_limit("auth_refresh")
 async def get_current_user_info(
+    request: Request,
     current_user: User = Depends(get_current_active_user)
 ):
     """
@@ -338,7 +343,9 @@ async def get_current_user_info(
     }
 
 @router.post("/exchange-token")
+@auth_rate_limit("auth_exchange")
 async def exchange_auth_code_for_token(
+    request: Request,
     code: str = Query(..., description="Authorization code from OAuth callback")
 ):
     """

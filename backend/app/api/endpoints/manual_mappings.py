@@ -3,7 +3,7 @@ API endpoints for manual mapping management.
 """
 import logging
 from typing import List, Optional, Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
 from pydantic import BaseModel, Field
@@ -12,6 +12,7 @@ from ...models import get_db, UserMapping
 from ...auth.dependencies import get_current_active_user
 from ...models.user import User
 from ...services.manual_mapping_service import ManualMappingService
+from ...core.rate_limiting import mapping_rate_limit
 
 logger = logging.getLogger(__name__)
 

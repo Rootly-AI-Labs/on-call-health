@@ -6,13 +6,14 @@ import os
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
 from collections import defaultdict
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Query
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Query, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ...models import get_db, User, Analysis, RootlyIntegration, SlackIntegration, GitHubIntegration
 from ...auth.dependencies import get_current_active_user
 from ...services.unified_burnout_analyzer import UnifiedBurnoutAnalyzer
+from ...core.rate_limiting import analysis_rate_limit, general_rate_limit
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +75,9 @@ class HistoricalTrendsResponse(BaseModel):
 
 
 @router.post("/run", response_model=AnalysisResponse)
+@analysis_rate_limit("analysis_create")
 async def run_burnout_analysis(
+    req: Request,
     request: RunAnalysisRequest,
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_active_user),
@@ -186,7 +189,9 @@ async def run_burnout_analysis(
 
 
 @router.get("", response_model=AnalysisListResponse)
+@analysis_rate_limit("analysis_list")
 async def list_analyses(
+    request: Request,
     integration_id: Optional[int] = None,
     limit: int = 20,
     offset: int = 0,
