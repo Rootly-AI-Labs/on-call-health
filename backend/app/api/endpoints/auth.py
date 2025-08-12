@@ -1,7 +1,7 @@
 """
 Authentication API endpoints.
 """
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
@@ -14,7 +14,7 @@ from ...services.account_linking import AccountLinkingService
 from ...core.config import settings
 from ...core.rate_limiting import auth_rate_limit
 from ...core.input_validation import BaseValidatedModel
-from pydantic import validator, Field
+from pydantic import field_validator, Field
 
 # Temporary in-memory storage for auth codes (use Redis in production)
 _temp_auth_codes = {}
@@ -27,7 +27,8 @@ class OAuthLoginRequest(BaseValidatedModel):
     """OAuth login request validation."""
     redirect_origin: Optional[str] = Field(None, max_length=500, description="Redirect origin URL")
     
-    @validator('redirect_origin')
+    @field_validator('redirect_origin')
+    @classmethod
     def validate_redirect_origin(cls, v):
         """Validate redirect origin is a safe URL."""
         if v is None:
@@ -50,7 +51,8 @@ class TokenExchangeRequest(BaseValidatedModel):
     """Token exchange request validation."""
     code: str = Field(..., min_length=10, max_length=500, description="Authorization code")
     
-    @validator('code')
+    @field_validator('code')
+    @classmethod
     def validate_auth_code(cls, v):
         """Validate authorization code format."""
         # Must be URL-safe base64 characters only
@@ -170,8 +172,6 @@ async def google_callback(
         
         # Redirect with secure authorization code (not JWT)
         success_url = f"{frontend_url}/auth/success?code={auth_code}"
-        print(f"🔍 OAUTH DEBUG: Using secure 2-step token exchange")
-        print(f"🔍 OAUTH DEBUG: Redirecting to: {frontend_url}/auth/success?code=[AUTH_CODE]")
         response = RedirectResponse(url=success_url)
         return response
         
@@ -292,8 +292,6 @@ async def github_callback(
         
         # Redirect with secure authorization code (not JWT)
         success_url = f"{frontend_url}/auth/success?code={auth_code}"
-        print(f"🔍 OAUTH DEBUG: Using secure 2-step token exchange")
-        print(f"🔍 OAUTH DEBUG: Redirecting to: {frontend_url}/auth/success?code=[AUTH_CODE]")
         response = RedirectResponse(url=success_url)
         return response
         
@@ -398,31 +396,15 @@ async def exchange_auth_code_for_token(
     """
     import time
     
-    print(f"🔍 TOKEN EXCHANGE DEBUG: ===== TOKEN EXCHANGE REQUEST =====")
-    print(f"🔍 TOKEN EXCHANGE DEBUG: Received auth code: {code[:20]}...")
-    print(f"🔍 TOKEN EXCHANGE DEBUG: Current time: {time.time()}")
-    print(f"🔍 TOKEN EXCHANGE DEBUG: Available auth codes: {len(_temp_auth_codes)}")
-    
     # Clean up expired codes
     current_time = time.time()
     expired_codes = [c for c, data in _temp_auth_codes.items() if data['expires_at'] < current_time]
-    print(f"🔍 TOKEN EXCHANGE DEBUG: Expired codes to clean up: {len(expired_codes)}")
     
     for expired_code in expired_codes:
-        print(f"🔍 TOKEN EXCHANGE DEBUG: Removing expired code: {expired_code[:20]}...")
         del _temp_auth_codes[expired_code]
-    
-    print(f"🔍 TOKEN EXCHANGE DEBUG: Remaining auth codes after cleanup: {len(_temp_auth_codes)}")
-    
-    # Debug: Show all available codes (first 20 chars only)
-    for stored_code, data in _temp_auth_codes.items():
-        print(f"🔍 TOKEN EXCHANGE DEBUG: Available code: {stored_code[:20]}... expires at: {data['expires_at']}")
     
     # Check if code exists and is valid
     if code not in _temp_auth_codes:
-        print(f"🔍 TOKEN EXCHANGE DEBUG: ❌ AUTH CODE NOT FOUND")
-        print(f"🔍 TOKEN EXCHANGE DEBUG: Looking for: {code[:20]}...")
-        print(f"🔍 TOKEN EXCHANGE DEBUG: Available codes: {[c[:20] + '...' for c in _temp_auth_codes.keys()]}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid or expired authorization code"
@@ -431,9 +413,6 @@ async def exchange_auth_code_for_token(
     # Get JWT token and clean up code (single use)
     auth_data = _temp_auth_codes.pop(code)
     jwt_token = auth_data['jwt_token']
-    
-    print(f"🔍 TOKEN EXCHANGE DEBUG: Successfully exchanged code for JWT token")
-    print(f"🔍 TOKEN EXCHANGE DEBUG: User ID: {auth_data['user_id']}")
     
     return {
         "access_token": jwt_token,

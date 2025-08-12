@@ -14,21 +14,22 @@ logger = logging.getLogger(__name__)
 
 # Security configuration
 SECURITY_HEADERS = {
-    # Content Security Policy - prevent XSS attacks
+    # Content Security Policy - prevent XSS attacks (HARDENED)
     "Content-Security-Policy": (
-        "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
-        "style-src 'self' 'unsafe-inline'; "
+        "default-src 'none'; "
+        "script-src 'self'; "
+        "style-src 'self'; "
         "img-src 'self' data: https:; "
         "font-src 'self' https:; "
         "connect-src 'self' https:; "
-        "media-src 'self'; "
+        "media-src 'none'; "
         "object-src 'none'; "
         "child-src 'none'; "
         "worker-src 'none'; "
         "form-action 'self'; "
         "base-uri 'self'; "
-        "manifest-src 'self'"
+        "manifest-src 'self'; "
+        "frame-ancestors 'none'"
     ),
     
     # Prevent clickjacking attacks
@@ -88,17 +89,56 @@ async def security_middleware(request: Request, call_next: Callable) -> Response
     start_time = time.time()
     
     try:
-        # 1. Request size validation
+        # 1. Request size validation - HARDENED
         content_length = request.headers.get("content-length")
         if content_length:
-            if not validate_request_size(int(content_length)):
-                logger.warning(f"🚨 Request too large: {content_length} bytes from {request.client.host}")
+            try:
+                content_length_int = int(content_length)
+                if not validate_request_size(content_length_int):
+                    logger.warning(f"🚨 Request too large: {content_length} bytes from {request.client.host}")
+                    return JSONResponse(
+                        status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                        content={
+                            "error": "request_too_large",
+                            "detail": "Request size exceeds maximum allowed limit",
+                            "max_size": "10MB"
+                        }
+                    )
+            except ValueError:
+                logger.warning(f"🚨 Invalid Content-Length header: {content_length} from {request.client.host}")
                 return JSONResponse(
-                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                    status_code=status.HTTP_400_BAD_REQUEST,
                     content={
-                        "error": "request_too_large",
-                        "detail": "Request size exceeds maximum allowed limit",
-                        "max_size": "10MB"
+                        "error": "invalid_content_length",
+                        "detail": "Invalid Content-Length header"
+                    }
+                )
+        
+        # Additional size validation by reading body size
+        if request.method in ["POST", "PUT", "PATCH"]:
+            try:
+                body = await request.body()
+                if len(body) > 10 * 1024 * 1024:  # 10MB
+                    logger.warning(f"🚨 Actual body size too large: {len(body)} bytes from {request.client.host}")
+                    return JSONResponse(
+                        status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                        content={
+                            "error": "request_too_large",
+                            "detail": "Request body exceeds maximum allowed limit",
+                            "max_size": "10MB"
+                        }
+                    )
+                # Recreate request with body for downstream processing
+                async def receive():
+                    return {"type": "http.request", "body": body}
+                request._receive = receive
+            except Exception as e:
+                logger.error(f"🚨 Error reading request body: {e}")
+                return JSONResponse(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    content={
+                        "error": "request_read_error",
+                        "detail": "Unable to read request body"
                     }
                 )
         
