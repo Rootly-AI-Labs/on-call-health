@@ -85,22 +85,25 @@ async def run_burnout_analysis(
     db: Session = Depends(get_db)
 ):
     """Run a new burnout analysis for a specific integration and time range."""
-    print(f"ENDPOINT_DEBUG: Entered run_burnout_analysis for integration {request.integration_id}")
-    print(f"ENDPOINT_DEBUG: Request params - include_github: {request.include_github}, include_slack: {request.include_slack}")
-    logger.info(f"ENDPOINT_DEBUG: Entered run_burnout_analysis for integration {request.integration_id}")
-    logger.info(f"ENDPOINT_DEBUG: Request params - include_github: {request.include_github}, include_slack: {request.include_slack}")
-    # Verify the integration belongs to the current user
-    integration = db.query(RootlyIntegration).filter(
-        RootlyIntegration.id == request.integration_id,
-        RootlyIntegration.user_id == current_user.id,
-        RootlyIntegration.is_active == True
-    ).first()
-    
-    if not integration:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Integration not found or not active"
-        )
+    try:
+        logger.info(f"Starting analysis for integration {request.integration_id}, user {current_user.id}")
+        print(f"ENDPOINT_DEBUG: Entered run_burnout_analysis for integration {request.integration_id}")
+        print(f"ENDPOINT_DEBUG: Request params - include_github: {request.include_github}, include_slack: {request.include_slack}")
+        logger.info(f"ENDPOINT_DEBUG: Entered run_burnout_analysis for integration {request.integration_id}")
+        logger.info(f"ENDPOINT_DEBUG: Request params - include_github: {request.include_github}, include_slack: {request.include_slack}")
+        
+        # Verify the integration belongs to the current user
+        integration = db.query(RootlyIntegration).filter(
+            RootlyIntegration.id == request.integration_id,
+            RootlyIntegration.user_id == current_user.id,
+            RootlyIntegration.is_active == True
+        ).first()
+        
+        if not integration:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Integration not found or not active"
+            )
     
     # Check API permissions before starting analysis
     try:
@@ -177,16 +180,25 @@ async def run_burnout_analysis(
         logger.error(f"ENDPOINT: Failed to add background task for analysis {analysis.id}: {e}")
         raise
     
-    return AnalysisResponse(
-        id=analysis.id,
-        uuid=getattr(analysis, 'uuid', None),
-        integration_id=analysis.rootly_integration_id,
-        status=analysis.status,
-        created_at=analysis.created_at,
-        completed_at=analysis.completed_at,
-        time_range=analysis.time_range,
-        analysis_data=None
-    )
+        return AnalysisResponse(
+            id=analysis.id,
+            uuid=getattr(analysis, 'uuid', None),
+            integration_id=analysis.rootly_integration_id,
+            status=analysis.status,
+            created_at=analysis.created_at,
+            completed_at=analysis.completed_at,
+            time_range=analysis.time_range,
+            analysis_data=None
+        )
+    except Exception as e:
+        logger.error(f"Critical error in run_burnout_analysis: {str(e)}")
+        logger.error(f"Exception type: {type(e).__name__}")
+        import traceback
+        logger.error(f"Full traceback: {traceback.format_exc()}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Analysis creation failed: {str(e)}"
+        )
 
 
 @router.get("", response_model=AnalysisListResponse)
