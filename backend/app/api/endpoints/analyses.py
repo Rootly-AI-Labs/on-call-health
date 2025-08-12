@@ -76,7 +76,7 @@ class HistoricalTrendsResponse(BaseModel):
 
 
 @router.post("/run", response_model=AnalysisResponse)
-@analysis_rate_limit("analysis_create")
+# @analysis_rate_limit("analysis_create")  # Disabled due to request type compatibility issues
 async def run_burnout_analysis(
     req: Request,
     request: ValidatedAnalysisRequest,
