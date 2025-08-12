@@ -11,29 +11,65 @@ export default function AuthSuccessPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // ✅ SECURITY FIX: Verify authentication via httpOnly cookie instead of URL token
-    const verifyAuthentication = async () => {
+    // ✅ ENTERPRISE PATTERN: 2-Step Server-Side Token Exchange
+    const authenticateUser = async () => {
       try {
         const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
         
-        // Check if authentication worked by calling a protected endpoint
-        const response = await fetch(`${API_BASE}/auth/user/me`, {
-          method: 'GET',
-          credentials: 'include', // Include httpOnly cookies
+        // Debug: Log API base URL (will work in production)
+        console.log('🔍 Production Debug: API_BASE =', API_BASE);
+        
+        // Step 1: Extract authorization code from URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const authCode = urlParams.get('code');
+        
+        console.log('🔍 Frontend Debug: Auth code from URL:', authCode?.slice(0, 20) + '...');
+        
+        if (!authCode) {
+          throw new Error('No authorization code received from OAuth callback');
+        }
+        
+        // Step 2: Exchange authorization code for JWT token
+        console.log('🔍 Frontend Debug: Exchanging auth code for JWT token...');
+        const tokenResponse = await fetch(`${API_BASE}/auth/exchange-token?code=${authCode}`, {
+          method: 'POST',
           headers: {
             'Content-Type': 'application/json'
           }
+        });
+        
+        if (!tokenResponse.ok) {
+          const errorText = await tokenResponse.text();
+          throw new Error(`Token exchange failed: ${errorText}`);
+        }
+        
+        const tokenData = await tokenResponse.json();
+        const jwtToken = tokenData.access_token;
+        
+        console.log('🔍 Frontend Debug: Successfully received JWT token');
+        
+        // Step 3: Store JWT token securely
+        localStorage.setItem('auth_token', jwtToken);
+        
+        // Clean up URL (remove auth code)
+        window.history.replaceState(null, '', window.location.pathname);
+        
+        // Step 4: Verify authentication with the JWT token
+        console.log('🔍 Frontend Debug: Verifying authentication with JWT token...');
+        const verifyResponse = await fetch(`${API_BASE}/auth/user/me`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${jwtToken}`
+          }
         })
         
-        if (!response.ok) {
+        if (!verifyResponse.ok) {
           throw new Error('Authentication verification failed')
         }
         
-        const userData = await response.json()
-        console.log('Authentication successful for user:', userData.email)
-        
-        // Clear any old localStorage token (migration from old auth flow)
-        localStorage.removeItem('auth_token')
+        const userData = await verifyResponse.json()
+        console.log('🔍 Frontend Debug: Authentication successful for user:', userData.email)
         
         // Set success status
         setStatus('success')
@@ -44,13 +80,13 @@ export default function AuthSuccessPage() {
         }, 1500)
         
       } catch (err) {
-        console.error('Authentication verification failed:', err)
+        console.error('🔍 Frontend Debug: Authentication failed:', err)
         setStatus('error')
-        setError('Authentication verification failed. Please try logging in again.')
+        setError(err instanceof Error ? err.message : 'Authentication failed. Please try logging in again.')
       }
     }
     
-    verifyAuthentication()
+    authenticateUser()
   }, [router])
 
   if (status === 'processing') {
