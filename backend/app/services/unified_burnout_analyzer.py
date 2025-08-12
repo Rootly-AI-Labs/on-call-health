@@ -1157,8 +1157,8 @@ class UnifiedBurnoutAnalyzer:
             # Slope: -0.5 (gentler slope to avoid extremely low scores)
             overall_score = 3 - ((avg_burnout - 8) * 0.5)
         
-        # Ensure minimum score of 2.0 (20% when displayed)
-        overall_score = max(2.0, overall_score)
+        # Allow scores to reach 0 for accurate representation of team health
+        overall_score = max(0, overall_score)
         
         # Determine health status with more realistic thresholds
         # 90%+ = Excellent, 80-89% = Good, 70-79% = Fair, 60-69% = Poor, <60% = Critical

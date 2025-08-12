@@ -3357,7 +3357,6 @@ export default function Dashboard() {
                               }
                               
                               // Convert to health status using exact tooltip ranges: Good (70-89%), Fair (50-69%), Poor (30-49%), Critical (<30%)
-                              console.log(`DEBUG: Health status calculation - currentScore: ${currentScore}, percentage: ${currentScore * 10}%`);
                               if (!currentScore) return 'good';  // Default to good instead of excellent
                               if (currentScore >= 9) return 'excellent';  // 90-100%
                               if (currentScore >= 7) return 'good';       // 70-89% - "Manageable workload with minor stress"
