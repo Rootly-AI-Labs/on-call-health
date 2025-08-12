@@ -1,9 +1,11 @@
 """
 FastAPI main application for Rootly Burnout Detector.
 """
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .models import create_tables
+from .core.config import settings
 from .api.endpoints import auth, rootly, analysis, analyses, pagerduty, github, slack, llm, mappings, manual_mappings, changelog
 
 # Create FastAPI application
@@ -13,13 +15,40 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Configure CORS
+# Configure CORS - Secure configuration
+def get_cors_origins():
+    """Get allowed CORS origins based on environment."""
+    # Always allow the configured frontend URL
+    origins = [settings.FRONTEND_URL]
+    
+    # Add production domains if they exist
+    production_frontend = os.getenv("PRODUCTION_FRONTEND_URL")
+    if production_frontend:
+        origins.append(production_frontend)
+    
+    # Add Vercel preview URLs if in development/staging
+    vercel_url = os.getenv("VERCEL_URL") 
+    if vercel_url:
+        origins.append(f"https://{vercel_url}")
+    
+    # Log allowed origins for debugging
+    print(f"🔒 CORS Security: Allowing origins: {origins}")
+    
+    return origins
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
+    allow_origins=get_cors_origins(),  # Specific allowed origins only
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # Specific methods only
+    allow_headers=[
+        "Accept",
+        "Accept-Language", 
+        "Content-Language",
+        "Content-Type",
+        "Authorization",
+        "X-Requested-With"
+    ],  # Specific headers only
 )
 
 @app.get("/")

@@ -37,6 +37,9 @@ test.db
 .env
 secrets.env
 
+# Security audit (contains sensitive findings)
+SECURITY.md
+
 # IDEs
 .vscode/
 .idea/

@@ -40,6 +40,9 @@ class Settings:
     # Frontend URL
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
     
+    # Environment detection
+    ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
+    
     # Rootly API
     ROOTLY_API_BASE_URL: str = os.getenv("ROOTLY_API_BASE_URL", "https://api.rootly.com")
 
