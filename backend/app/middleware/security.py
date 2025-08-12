@@ -114,33 +114,8 @@ async def security_middleware(request: Request, call_next: Callable) -> Response
                     }
                 )
         
-        # Additional size validation by reading body size
-        if request.method in ["POST", "PUT", "PATCH"]:
-            try:
-                body = await request.body()
-                if len(body) > 10 * 1024 * 1024:  # 10MB
-                    logger.warning(f"🚨 Actual body size too large: {len(body)} bytes from {request.client.host}")
-                    return JSONResponse(
-                        status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                        content={
-                            "error": "request_too_large",
-                            "detail": "Request body exceeds maximum allowed limit",
-                            "max_size": "10MB"
-                        }
-                    )
-                # Recreate request with body for downstream processing
-                async def receive():
-                    return {"type": "http.request", "body": body}
-                request._receive = receive
-            except Exception as e:
-                logger.error(f"🚨 Error reading request body: {e}")
-                return JSONResponse(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    content={
-                        "error": "request_read_error",
-                        "detail": "Unable to read request body"
-                    }
-                )
+        # Request size validation relies on Content-Length header
+        # Body reading would consume the request stream and break downstream processing
         
         # 2. Request method validation
         if request.method not in ["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"]:
