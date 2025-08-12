@@ -15,6 +15,7 @@ from ...core.rootly_client import RootlyAPIClient
 from ...services.unified_burnout_analyzer import UnifiedBurnoutAnalyzer
 from ...services.github_only_burnout_analyzer import GitHubOnlyBurnoutAnalyzer
 from ...core.rate_limiting import analysis_rate_limit
+from ...core.input_validation import AnalysisRequest as ValidatedAnalysisRequest
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -37,7 +38,7 @@ class AnalysisResponse(BaseModel):
 @analysis_rate_limit("analysis_create")
 async def start_analysis(
     req: Request,
-    request: AnalysisRequest,
+    request: ValidatedAnalysisRequest,
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)

@@ -12,6 +12,7 @@ from ...models import get_db, User, RootlyIntegration
 from ...auth.dependencies import get_current_active_user
 from ...core.rootly_client import RootlyAPIClient
 from ...core.rate_limiting import integration_rate_limit
+from ...core.input_validation import RootlyTokenRequest, RootlyIntegrationRequest
 
 logger = logging.getLogger(__name__)
 
@@ -38,13 +39,13 @@ class RootlyTestResponse(BaseModel):
 @integration_rate_limit("integration_test")
 async def test_rootly_token_preview(
     request: Request,
-    token_update: RootlyTokenUpdate,
+    token_request: RootlyTokenRequest,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """Test Rootly token and return preview info without saving."""
     # Test the token first
-    client = RootlyAPIClient(token_update.token)
+    client = RootlyAPIClient(token_request.token)
     test_result = await client.test_connection()
     
     print(f"DEBUG: Rootly test_connection result: {test_result}")

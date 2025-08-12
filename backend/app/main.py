@@ -8,6 +8,7 @@ from slowapi.errors import RateLimitExceeded
 from .models import create_tables
 from .core.config import settings
 from .core.rate_limiting import limiter, custom_rate_limit_exceeded_handler
+from .middleware.security import security_middleware, request_sanitization_middleware
 from .api.endpoints import auth, rootly, analysis, analyses, pagerduty, github, slack, llm, mappings, manual_mappings, changelog
 
 # Create FastAPI application
@@ -20,6 +21,10 @@ app = FastAPI(
 # Add rate limiting to the app
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, custom_rate_limit_exceeded_handler)
+
+# Add security middleware
+app.middleware("http")(security_middleware)
+app.middleware("http")(request_sanitization_middleware)
 
 # Configure CORS - Secure configuration
 def get_cors_origins():

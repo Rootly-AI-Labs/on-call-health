@@ -14,6 +14,7 @@ from ...models import get_db, User, Analysis, RootlyIntegration, SlackIntegratio
 from ...auth.dependencies import get_current_active_user
 from ...services.unified_burnout_analyzer import UnifiedBurnoutAnalyzer
 from ...core.rate_limiting import analysis_rate_limit, general_rate_limit
+from ...core.input_validation import AnalysisRequest as ValidatedAnalysisRequest, AnalysisFilterRequest
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +79,7 @@ class HistoricalTrendsResponse(BaseModel):
 @analysis_rate_limit("analysis_create")
 async def run_burnout_analysis(
     req: Request,
-    request: RunAnalysisRequest,
+    request: ValidatedAnalysisRequest,
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
@@ -192,9 +193,10 @@ async def run_burnout_analysis(
 @analysis_rate_limit("analysis_list")
 async def list_analyses(
     request: Request,
-    integration_id: Optional[int] = None,
-    limit: int = 20,
-    offset: int = 0,
+    integration_id: Optional[int] = Query(None, gt=0, description="Filter by integration ID"),
+    limit: int = Query(20, gt=0, le=100, description="Results per page"),
+    offset: int = Query(0, ge=0, description="Results offset"),
+    status: Optional[str] = Query(None, regex="^(pending|running|completed|failed)$", description="Filter by status"),
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):

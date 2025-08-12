@@ -13,11 +13,52 @@ from ...auth.dependencies import get_current_active_user
 from ...services.account_linking import AccountLinkingService
 from ...core.config import settings
 from ...core.rate_limiting import auth_rate_limit
+from ...core.input_validation import BaseValidatedModel
+from pydantic import validator, Field
 
 # Temporary in-memory storage for auth codes (use Redis in production)
 _temp_auth_codes = {}
 
 router = APIRouter()
+
+# ===== VALIDATION MODELS =====
+
+class OAuthLoginRequest(BaseValidatedModel):
+    """OAuth login request validation."""
+    redirect_origin: Optional[str] = Field(None, max_length=500, description="Redirect origin URL")
+    
+    @validator('redirect_origin')
+    def validate_redirect_origin(cls, v):
+        """Validate redirect origin is a safe URL."""
+        if v is None:
+            return v
+        
+        # Only allow known safe origins
+        safe_origins = [
+            "http://localhost:3000",
+            "http://localhost:3001", 
+            "http://localhost:3002",
+            settings.FRONTEND_URL
+        ]
+        
+        if v not in safe_origins:
+            raise ValueError(f"Redirect origin not allowed: {v}")
+        
+        return v
+
+class TokenExchangeRequest(BaseValidatedModel):
+    """Token exchange request validation."""
+    code: str = Field(..., min_length=10, max_length=500, description="Authorization code")
+    
+    @validator('code')
+    def validate_auth_code(cls, v):
+        """Validate authorization code format."""
+        # Must be URL-safe base64 characters only
+        import re
+        if not re.match(r"^[A-Za-z0-9_-]+$", v):
+            raise ValueError("Invalid authorization code format")
+        
+        return v
 
 @router.get("/google")
 @auth_rate_limit("auth_login")
