@@ -95,11 +95,15 @@ async def google_callback(
             
         # ✅ SECURITY FIX: Use httpOnly cookie instead of URL parameter  
         response = RedirectResponse(url=f"{frontend_url}/auth/success")
+        
+        # Determine if we should use secure cookies (HTTPS only in production)
+        is_production = not frontend_url.startswith("http://localhost")
+        
         response.set_cookie(
             key="auth_token",
             value=jwt_token,
             httponly=True,        # Prevents XSS access to token
-            secure=True,          # HTTPS only in production
+            secure=is_production, # HTTPS only in production, allow HTTP in local dev
             samesite="lax",       # CSRF protection while allowing OAuth redirects
             max_age=604800,       # 7 days (same as JWT expiration)
             path="/",             # Available to entire frontend
@@ -194,11 +198,15 @@ async def github_callback(
             
         # ✅ SECURITY FIX: Use httpOnly cookie instead of URL parameter  
         response = RedirectResponse(url=f"{frontend_url}/auth/success")
+        
+        # Determine if we should use secure cookies (HTTPS only in production)
+        is_production = not frontend_url.startswith("http://localhost")
+        
         response.set_cookie(
             key="auth_token",
             value=jwt_token,
             httponly=True,        # Prevents XSS access to token
-            secure=True,          # HTTPS only in production
+            secure=is_production, # HTTPS only in production, allow HTTP in local dev
             samesite="lax",       # CSRF protection while allowing OAuth redirects
             max_age=604800,       # 7 days (same as JWT expiration)
             path="/",             # Available to entire frontend
