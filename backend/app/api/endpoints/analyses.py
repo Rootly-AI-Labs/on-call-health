@@ -4,7 +4,7 @@ Burnout analysis API endpoints.
 import logging
 import os
 from datetime import datetime, timedelta
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
 from collections import defaultdict
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Query, Request
 from pydantic import BaseModel
@@ -22,7 +22,7 @@ router = APIRouter()
 
 
 class RunAnalysisRequest(BaseModel):
-    integration_id: int
+    integration_id: Union[int, str]  # Allow both int (regular) and str (beta) IDs
     time_range: int = 30  # days
     include_weekends: bool = True
     include_github: bool = False
@@ -92,18 +92,52 @@ async def run_burnout_analysis(
         logger.info(f"ENDPOINT_DEBUG: Entered run_burnout_analysis for integration {request.integration_id}")
         logger.info(f"ENDPOINT_DEBUG: Request params - include_github: {request.include_github}, include_slack: {request.include_slack}")
         
-        # Verify the integration belongs to the current user
-        integration = db.query(RootlyIntegration).filter(
-            RootlyIntegration.id == request.integration_id,
-            RootlyIntegration.user_id == current_user.id,
-            RootlyIntegration.is_active == True
-        ).first()
-        
-        if not integration:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Integration not found or not active"
-            )
+        # Handle beta integrations vs regular integrations
+        integration = None
+        if isinstance(request.integration_id, str) and request.integration_id.startswith("beta-"):
+            # Handle beta integration
+            beta_rootly_token = os.getenv('ROOTLY_API_TOKEN')
+            beta_pagerduty_token = os.getenv('PAGERDUTY_API_TOKEN')
+            
+            if request.integration_id == "beta-rootly" and beta_rootly_token:
+                # Create a virtual integration object for beta Rootly
+                from types import SimpleNamespace
+                integration = SimpleNamespace(
+                    id="beta-rootly",
+                    api_token=beta_rootly_token,
+                    platform="rootly",
+                    name="Rootly (Beta Access)",
+                    organization_name="Beta Organization"
+                )
+            elif request.integration_id == "beta-pagerduty" and beta_pagerduty_token:
+                # Create a virtual integration object for beta PagerDuty
+                from types import SimpleNamespace
+                integration = SimpleNamespace(
+                    id="beta-pagerduty",
+                    api_token=beta_pagerduty_token,
+                    platform="pagerduty",
+                    name="PagerDuty (Beta Access)",
+                    organization_name="Beta Organization"
+                )
+            
+            if not integration:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Beta integration not available"
+                )
+        else:
+            # Handle regular database integration
+            integration = db.query(RootlyIntegration).filter(
+                RootlyIntegration.id == request.integration_id,
+                RootlyIntegration.user_id == current_user.id,
+                RootlyIntegration.is_active == True
+            ).first()
+            
+            if not integration:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Integration not found or not active"
+                )
         
         # Check API permissions before starting analysis
         # Use beta token if available for permission check
@@ -137,16 +171,20 @@ async def run_burnout_analysis(
             permission_warnings = [f"Permission check failed: {str(e)}"]
         
         # Create new analysis record
+        # For beta integrations, store a special marker in the integration_id field
+        db_integration_id = None if isinstance(integration.id, str) else integration.id
+        
         analysis = Analysis(
             user_id=current_user.id,
-            rootly_integration_id=integration.id,
+            rootly_integration_id=db_integration_id,  # Null for beta integrations
             time_range=request.time_range,
             status="pending",
             config={
                 "include_weekends": request.include_weekends,
                 "include_github": request.include_github,
                 "include_slack": request.include_slack,
-                "permission_warnings": permission_warnings
+                "permission_warnings": permission_warnings,
+                "beta_integration_id": integration.id if isinstance(integration.id, str) else None
             }
         )
         db.add(analysis)

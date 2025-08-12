@@ -4,6 +4,8 @@ PagerDuty integration API endpoints.
 
 from datetime import datetime
 from typing import List, Optional
+import os
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -15,6 +17,7 @@ from ...auth.dependencies import get_current_active_user
 from ...core.pagerduty_client import PagerDutyAPIClient
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 class TokenTestRequest(BaseModel):
     token: str
@@ -89,7 +92,7 @@ async def test_pagerduty_token(
     return result
 
 @router.get("/integrations")
-def get_pagerduty_integrations(
+async def get_pagerduty_integrations(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
@@ -114,6 +117,35 @@ def get_pagerduty_integrations(
             "token_suffix": f"****{i.api_token[-4:]}" if i.api_token and len(i.api_token) >= 4 else "****",
             "platform": i.platform
         })
+    
+    # Add beta fallback integration if available
+    beta_pagerduty_token = os.getenv('PAGERDUTY_API_TOKEN')
+    if beta_pagerduty_token:
+        try:
+            # Test the beta token and get organization info
+            client = PagerDutyAPIClient(beta_pagerduty_token)
+            test_result = await client.test_connection()
+            
+            if test_result.get("valid"):
+                account_info = test_result.get("account_info", {})
+                beta_integration = {
+                    "id": "beta-pagerduty",  # Special ID for beta integration
+                    "name": "PagerDuty (Beta Access)",
+                    "organization_name": account_info.get("name", "Beta Organization"),
+                    "total_users": 0,  # PagerDuty doesn't provide user count in test
+                    "is_default": True,
+                    "is_beta": True,  # Special flag to indicate beta integration
+                    "created_at": datetime.now().isoformat(),
+                    "last_used_at": None,
+                    "token_suffix": "****BETA",
+                    "platform": "pagerduty"
+                }
+                
+                # Add beta integration at the beginning of the list
+                result_integrations.insert(0, beta_integration)
+                logger.info(f"Added beta PagerDuty integration for user {current_user.id}")
+        except Exception as e:
+            logger.warning(f"Failed to add beta PagerDuty integration: {str(e)}")
     
     return {
         "integrations": result_integrations,

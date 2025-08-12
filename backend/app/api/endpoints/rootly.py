@@ -4,6 +4,7 @@ Rootly integration API endpoints.
 from typing import Dict, Any
 from datetime import datetime, timedelta
 import logging
+import os
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -255,6 +256,35 @@ async def list_integrations(
                 }
         
         result_integrations.append(integration_data)
+    
+    # Add beta fallback integration if available
+    beta_rootly_token = os.getenv('ROOTLY_API_TOKEN')
+    if beta_rootly_token:
+        try:
+            # Test the beta token and get organization info
+            client = RootlyAPIClient(beta_rootly_token)
+            test_result = await client.test_connection()
+            permissions = await client.check_permissions()
+            
+            if test_result.get("status") == "success":
+                beta_integration = {
+                    "id": "beta-rootly",  # Special ID for beta integration
+                    "name": "Rootly (Beta Access)",
+                    "organization_name": test_result.get("organization_name", "Beta Organization"),
+                    "total_users": test_result.get("total_users", 0),
+                    "is_default": True,
+                    "is_beta": True,  # Special flag to indicate beta integration
+                    "created_at": datetime.now().isoformat(),
+                    "last_used_at": None,
+                    "token_suffix": "****BETA",
+                    "permissions": permissions
+                }
+                
+                # Add beta integration at the beginning of the list
+                result_integrations.insert(0, beta_integration)
+                logger.info(f"Added beta Rootly integration for user {current_user.id}")
+        except Exception as e:
+            logger.warning(f"Failed to add beta Rootly integration: {str(e)}")
     
     return {
         "integrations": result_integrations
