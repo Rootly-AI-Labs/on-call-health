@@ -109,6 +109,7 @@ async def google_callback(
         
         if is_same_domain:
             # Same domain: Use secure httpOnly cookies
+            print(f"🔍 OAUTH DEBUG: Same-domain detected, using httpOnly cookies")
             response.set_cookie(
                 key="auth_token",
                 value=jwt_token,
@@ -123,6 +124,9 @@ async def google_callback(
             # Cross-domain: Use hash fragment (not logged in server logs)
             # Hash fragments are not sent to servers, only available to frontend
             success_url = f"{frontend_url}/auth/success#{jwt_token}"
+            print(f"🔍 OAUTH DEBUG: Cross-domain detected, redirecting to: {frontend_url}/auth/success#[TOKEN]")
+            print(f"🔍 OAUTH DEBUG: Frontend domain: {parsed_frontend.netloc}")
+            print(f"🔍 OAUTH DEBUG: Backend domain: {parsed_backend.netloc}")
             response = RedirectResponse(url=success_url)
         return response
         
@@ -227,6 +231,7 @@ async def github_callback(
         
         if is_same_domain:
             # Same domain: Use secure httpOnly cookies
+            print(f"🔍 OAUTH DEBUG: Same-domain detected, using httpOnly cookies")
             response.set_cookie(
                 key="auth_token",
                 value=jwt_token,
@@ -241,6 +246,9 @@ async def github_callback(
             # Cross-domain: Use hash fragment (not logged in server logs)
             # Hash fragments are not sent to servers, only available to frontend
             success_url = f"{frontend_url}/auth/success#{jwt_token}"
+            print(f"🔍 OAUTH DEBUG: Cross-domain detected, redirecting to: {frontend_url}/auth/success#[TOKEN]")
+            print(f"🔍 OAUTH DEBUG: Frontend domain: {parsed_frontend.netloc}")
+            print(f"🔍 OAUTH DEBUG: Backend domain: {parsed_backend.netloc}")
             response = RedirectResponse(url=success_url)
         return response
         
