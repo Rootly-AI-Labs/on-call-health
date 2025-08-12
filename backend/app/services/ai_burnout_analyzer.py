@@ -973,8 +973,38 @@ class AIBurnoutAnalyzerService:
             team_data = self._prepare_comprehensive_team_data(team_members, available_integrations)
             
             # Create detailed prompt for rich narrative generation
+            import random
+            
+            # Add randomization elements to ensure unique responses
+            opening_styles = [
+                "Begin with an unexpected observation about the data patterns",
+                "Start by highlighting the most surprising metric first", 
+                "Open with a comparison to industry standards or benchmarks",
+                "Lead with the strongest indicator of team health (positive or negative)",
+                "Begin with a temporal pattern that stands out in the timeline",
+                "Start by addressing the most actionable insight for leadership"
+            ]
+            
+            analysis_perspectives = [
+                "Focus on the human element behind the metrics",
+                "Emphasize data-driven patterns and correlations", 
+                "Take a preventive/proactive management perspective",
+                "Analyze through a team dynamics and collaboration lens",
+                "Approach from a sustainable engineering practices angle",
+                "Frame as a strategic workforce health assessment"
+            ]
+            
+            selected_opening = random.choice(opening_styles)
+            selected_perspective = random.choice(analysis_perspectives)
+            
             prompt = f"""
 You are an expert burnout analyst reviewing a software team's health data. Generate a detailed, insightful narrative analysis that is COMPLETELY UNIQUE to this team's specific situation. Every analysis must be different - no templates or boilerplate.
+
+**VARIATION INSTRUCTIONS FOR THIS ANALYSIS:**
+- Opening approach: {selected_opening}
+- Analytical perspective: {selected_perspective}
+- Avoid phrases like "intriguing paradox" or other cliche openings
+- Write each sentence with fresh language - no recycled phrases from previous analyses
 
 **Analysis Timestamp:** {datetime.utcnow().isoformat()}
 
@@ -1189,6 +1219,7 @@ You are an expert burnout analyst reviewing a software team's health data. Gener
         data = {
             "model": "claude-3-5-sonnet-20241022",
             "max_tokens": 1500,
+            "temperature": 0.8,  # Add higher temperature for creative, varied responses
             "messages": [{"role": "user", "content": prompt}]
         }
         

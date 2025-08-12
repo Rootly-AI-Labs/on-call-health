@@ -3342,14 +3342,28 @@ export default function Dashboard() {
                         <p className="text-xs text-gray-600 mt-1">
                           {(() => {
                             const status = (currentAnalysis.analysis_data.team_health?.health_status || (() => {
-                              // Derive health status from average score for team_summary (now health scale 0-10, higher=better)
-                              const avgScore = currentAnalysis.analysis_data.team_summary?.average_score;
-                              if (!avgScore) return 'good';  // Default to good instead of excellent
-                              if (avgScore >= 9) return 'excellent';  // 90%+
-                              if (avgScore >= 8) return 'good';       // 80-89%
-                              if (avgScore >= 7) return 'fair';       // 70-79%
-                              if (avgScore >= 6) return 'poor';       // 60-69%
-                              return 'critical';                      // <60%
+                              // Use the SAME score calculation logic as the percentage display for consistency
+                              let currentScore = 0;
+                              if (historicalTrends?.daily_trends?.length > 0) {
+                                const latestTrend = historicalTrends.daily_trends[historicalTrends.daily_trends.length - 1];
+                                currentScore = latestTrend.overall_score;
+                              } else if (currentAnalysis?.analysis_data?.daily_trends?.length > 0) {
+                                const latestTrend = currentAnalysis.analysis_data.daily_trends[currentAnalysis.analysis_data.daily_trends.length - 1];
+                                currentScore = latestTrend.overall_score;
+                              } else if (currentAnalysis?.analysis_data?.team_health) {
+                                currentScore = currentAnalysis.analysis_data.team_health.overall_score;
+                              } else if (currentAnalysis?.analysis_data?.team_summary) {
+                                currentScore = currentAnalysis.analysis_data.team_summary.average_score;
+                              }
+                              
+                              // Convert to health status using consistent 0-10 scale where higher=better (like the percentage)
+                              if (!currentScore) return 'good';  // Default to good instead of excellent
+                              if (currentScore >= 9) return 'excellent';  // 90%+
+                              if (currentScore >= 8) return 'good';       // 80-89%
+                              if (currentScore >= 7) return 'fair';       // 70-79%
+                              if (currentScore >= 6) return 'poor';       // 60-69%
+                              if (currentScore >= 3) return 'poor';       // 30-59% - was missing this range
+                              return 'critical';                          // <30%
                             })()).toLowerCase()
                             switch(status) {
                               case 'excellent':
