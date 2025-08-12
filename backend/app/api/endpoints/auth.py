@@ -13,6 +13,9 @@ from ...auth.dependencies import get_current_active_user
 from ...services.account_linking import AccountLinkingService
 from ...core.config import settings
 
+# Temporary in-memory storage for auth codes (use Redis in production)
+_temp_auth_codes = {}
+
 router = APIRouter()
 
 @router.get("/google")
@@ -99,35 +102,34 @@ async def google_callback(
         # Determine if we should use secure cookies (HTTPS only in production)
         is_production = not frontend_url.startswith("http://localhost")
         
-        # For same-domain, use httpOnly cookies (most secure)
-        # For cross-domain, use a secure redirect with token in hash fragment
-        import urllib.parse
-        parsed_frontend = urllib.parse.urlparse(frontend_url)
-        parsed_backend = urllib.parse.urlparse("https://rootly-burnout-detector-web-production.up.railway.app")
+        # ✅ ENTERPRISE PATTERN: 2-Step Server-Side Token Exchange
+        # 1. Create temporary auth code (not JWT) 
+        # 2. Frontend exchanges code for JWT via secure API call
+        import secrets
+        import time
         
-        is_same_domain = parsed_frontend.netloc == parsed_backend.netloc
+        # Create temporary authorization code
+        auth_code = secrets.token_urlsafe(32)
         
-        if is_same_domain:
-            # Same domain: Use secure httpOnly cookies
-            print(f"🔍 OAUTH DEBUG: Same-domain detected, using httpOnly cookies")
-            response.set_cookie(
-                key="auth_token",
-                value=jwt_token,
-                httponly=True,
-                secure=True,
-                samesite="lax",
-                max_age=604800,
-                path="/",
-                domain=None
-            )
-        else:
-            # Cross-domain: Use hash fragment (not logged in server logs)
-            # Hash fragments are not sent to servers, only available to frontend
-            success_url = f"{frontend_url}/auth/success#{jwt_token}"
-            print(f"🔍 OAUTH DEBUG: Cross-domain detected, redirecting to: {frontend_url}/auth/success#[TOKEN]")
-            print(f"🔍 OAUTH DEBUG: Frontend domain: {parsed_frontend.netloc}")
-            print(f"🔍 OAUTH DEBUG: Backend domain: {parsed_backend.netloc}")
-            response = RedirectResponse(url=success_url)
+        # Store JWT temporarily (in production: use Redis/cache)
+        # Clean up expired codes first
+        current_time = time.time()
+        expired_codes = [code for code, data in _temp_auth_codes.items() if data['expires_at'] < current_time]
+        for code in expired_codes:
+            del _temp_auth_codes[code]
+        
+        # Store with 5-minute expiration
+        _temp_auth_codes[auth_code] = {
+            'jwt_token': jwt_token,
+            'expires_at': time.time() + 300,  # 5 minutes
+            'user_id': user.id
+        }
+        
+        # Redirect with secure authorization code (not JWT)
+        success_url = f"{frontend_url}/auth/success?code={auth_code}"
+        print(f"🔍 OAUTH DEBUG: Using secure 2-step token exchange")
+        print(f"🔍 OAUTH DEBUG: Redirecting to: {frontend_url}/auth/success?code=[AUTH_CODE]")
+        response = RedirectResponse(url=success_url)
         return response
         
     except Exception as e:
@@ -221,35 +223,34 @@ async def github_callback(
         # Determine if we should use secure cookies (HTTPS only in production)
         is_production = not frontend_url.startswith("http://localhost")
         
-        # For same-domain, use httpOnly cookies (most secure)
-        # For cross-domain, use a secure redirect with token in hash fragment
-        import urllib.parse
-        parsed_frontend = urllib.parse.urlparse(frontend_url)
-        parsed_backend = urllib.parse.urlparse("https://rootly-burnout-detector-web-production.up.railway.app")
+        # ✅ ENTERPRISE PATTERN: 2-Step Server-Side Token Exchange
+        # 1. Create temporary auth code (not JWT) 
+        # 2. Frontend exchanges code for JWT via secure API call
+        import secrets
+        import time
         
-        is_same_domain = parsed_frontend.netloc == parsed_backend.netloc
+        # Create temporary authorization code
+        auth_code = secrets.token_urlsafe(32)
         
-        if is_same_domain:
-            # Same domain: Use secure httpOnly cookies
-            print(f"🔍 OAUTH DEBUG: Same-domain detected, using httpOnly cookies")
-            response.set_cookie(
-                key="auth_token",
-                value=jwt_token,
-                httponly=True,
-                secure=True,
-                samesite="lax",
-                max_age=604800,
-                path="/",
-                domain=None
-            )
-        else:
-            # Cross-domain: Use hash fragment (not logged in server logs)
-            # Hash fragments are not sent to servers, only available to frontend
-            success_url = f"{frontend_url}/auth/success#{jwt_token}"
-            print(f"🔍 OAUTH DEBUG: Cross-domain detected, redirecting to: {frontend_url}/auth/success#[TOKEN]")
-            print(f"🔍 OAUTH DEBUG: Frontend domain: {parsed_frontend.netloc}")
-            print(f"🔍 OAUTH DEBUG: Backend domain: {parsed_backend.netloc}")
-            response = RedirectResponse(url=success_url)
+        # Store JWT temporarily (in production: use Redis/cache)
+        # Clean up expired codes first
+        current_time = time.time()
+        expired_codes = [code for code, data in _temp_auth_codes.items() if data['expires_at'] < current_time]
+        for code in expired_codes:
+            del _temp_auth_codes[code]
+        
+        # Store with 5-minute expiration
+        _temp_auth_codes[auth_code] = {
+            'jwt_token': jwt_token,
+            'expires_at': time.time() + 300,  # 5 minutes
+            'user_id': user.id
+        }
+        
+        # Redirect with secure authorization code (not JWT)
+        success_url = f"{frontend_url}/auth/success?code={auth_code}"
+        print(f"🔍 OAUTH DEBUG: Using secure 2-step token exchange")
+        print(f"🔍 OAUTH DEBUG: Redirecting to: {frontend_url}/auth/success?code=[AUTH_CODE]")
+        response = RedirectResponse(url=success_url)
         return response
         
     except Exception as e:
@@ -326,7 +327,7 @@ async def get_current_user_info(
 ):
     """
     ✅ SECURITY: Get current authenticated user information.
-    Used to verify httpOnly cookie authentication works.
+    Used to verify authentication works.
     """
     return {
         "id": current_user.id,
@@ -334,4 +335,47 @@ async def get_current_user_info(
         "name": current_user.name,
         "created_at": current_user.created_at.isoformat() if current_user.created_at else None,
         "updated_at": current_user.updated_at.isoformat() if current_user.updated_at else None
+    }
+
+@router.post("/exchange-token")
+async def exchange_auth_code_for_token(
+    code: str = Query(..., description="Authorization code from OAuth callback")
+):
+    """
+    ✅ ENTERPRISE PATTERN: Exchange temporary auth code for JWT token.
+    
+    This implements the industry-standard 2-step OAuth token exchange:
+    1. OAuth callback creates temporary auth code
+    2. Frontend securely exchanges code for JWT token
+    """
+    import time
+    
+    print(f"🔍 TOKEN EXCHANGE DEBUG: Received auth code: {code[:20]}...")
+    
+    # Clean up expired codes
+    current_time = time.time()
+    expired_codes = [c for c, data in _temp_auth_codes.items() if data['expires_at'] < current_time]
+    for expired_code in expired_codes:
+        del _temp_auth_codes[expired_code]
+    
+    # Check if code exists and is valid
+    if code not in _temp_auth_codes:
+        print(f"🔍 TOKEN EXCHANGE DEBUG: Invalid or expired auth code")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired authorization code"
+        )
+    
+    # Get JWT token and clean up code (single use)
+    auth_data = _temp_auth_codes.pop(code)
+    jwt_token = auth_data['jwt_token']
+    
+    print(f"🔍 TOKEN EXCHANGE DEBUG: Successfully exchanged code for JWT token")
+    print(f"🔍 TOKEN EXCHANGE DEBUG: User ID: {auth_data['user_id']}")
+    
+    return {
+        "access_token": jwt_token,
+        "token_type": "bearer",
+        "expires_in": 604800,  # 7 days
+        "user_id": auth_data['user_id']
     }
