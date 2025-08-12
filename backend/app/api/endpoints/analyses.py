@@ -1981,6 +1981,11 @@ async def run_analysis_task(
             
             # Call UnifiedBurnoutAnalyzer
             logger.info(f"BACKGROUND_TASK: Calling UnifiedBurnoutAnalyzer.analyze_burnout()")
+            logger.info(f"BACKGROUND_TASK: Analysis parameters - time_range_days={time_range}, include_weekends={include_weekends}, user_id={user_id}, analysis_id={analysis_id}")
+            
+            # Add progress tracking
+            logger.info(f"BACKGROUND_TASK: Starting analysis execution at {datetime.now()}")
+            
             results = await asyncio.wait_for(
                 analyzer_service.analyze_burnout(
                     time_range_days=time_range,
@@ -1988,8 +1993,10 @@ async def run_analysis_task(
                     user_id=user_id,
                     analysis_id=analysis_id
                 ),
-                timeout=900.0  # 15 minutes
+                timeout=600.0  # Reduce timeout to 10 minutes to fail faster
             )
+            
+            logger.info(f"BACKGROUND_TASK: Analysis execution completed at {datetime.now()}")
             
             # Validate results
             if not results:
@@ -2033,11 +2040,14 @@ async def run_analysis_task(
                 
         except asyncio.TimeoutError:
             # Handle timeout
-            logger.error(f"BACKGROUND_TASK: Analysis {analysis_id} timed out after 15 minutes")
+            logger.error(f"BACKGROUND_TASK: Analysis {analysis_id} timed out after 10 minutes")
+            logger.error(f"BACKGROUND_TASK: Timeout occurred at {datetime.now()}")
+            logger.error(f"BACKGROUND_TASK: Analysis was stuck in UnifiedBurnoutAnalyzer.analyze_burnout() method")
+            
             analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
             if analysis:
                 analysis.status = "failed"
-                analysis.error_message = "Analysis timed out after 15 minutes"
+                analysis.error_message = "Analysis timed out after 10 minutes - likely stuck in data collection or processing"
                 analysis.completed_at = datetime.now()
                 db.commit()
                 logger.info(f"BACKGROUND_TASK: Updated analysis {analysis_id} status to failed due to timeout")
