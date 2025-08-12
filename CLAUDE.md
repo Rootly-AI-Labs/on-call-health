@@ -2029,6 +2029,22 @@ After reverting:
 
 ---
 
+## BETA TESTING CONFIGURATION
+
+### Shared Integration Tokens (Temporary)
+**Status**: Active for beta testing
+**Environment Variables Set on Railway**:
+- `ROOTLY_API_TOKEN` - Shared Rootly token for all beta users
+- `PAGERDUTY_API_TOKEN` - Shared PagerDuty token for all beta users
+
+**Purpose**: Allows all beta users to access incident data immediately without individual token setup.
+
+**Implementation**: Backend uses these as fallback tokens when users haven't configured their own integrations.
+
+**Revert Plan**: Remove environment variables and require individual user token configuration before production.
+
+---
+
 ### Outstanding Issues:
 1. Slack channel access errors (bot not in channels) - Low priority
 2. Invalid Anthropic API key for AI narratives - User configuration issue

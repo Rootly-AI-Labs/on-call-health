@@ -106,9 +106,19 @@ async def run_burnout_analysis(
             )
         
         # Check API permissions before starting analysis
+        # Use beta token if available for permission check
+        check_token = integration.api_token
+        beta_rootly_token = os.getenv('ROOTLY_API_TOKEN')
+        beta_pagerduty_token = os.getenv('PAGERDUTY_API_TOKEN')
+        
+        if integration.platform == "rootly" and beta_rootly_token:
+            check_token = beta_rootly_token
+        elif integration.platform == "pagerduty" and beta_pagerduty_token:
+            check_token = beta_pagerduty_token
+        
         try:
             from ...core.rootly_client import RootlyAPIClient
-            client = RootlyAPIClient(integration.api_token)
+            client = RootlyAPIClient(check_token)
             permissions = await client.check_permissions()
             
             # Check if incidents permission is missing
@@ -1877,6 +1887,19 @@ async def run_analysis_task(
             cleared_count = recorder.clear_analysis_mappings(analysis_id)
             logger.info(f"BACKGROUND_TASK: Cleared {cleared_count} existing mappings for analysis {analysis_id}")
         
+        # Check for beta testing fallback tokens first
+        beta_rootly_token = os.getenv('ROOTLY_API_TOKEN')
+        beta_pagerduty_token = os.getenv('PAGERDUTY_API_TOKEN')
+        
+        # Use beta token if available, otherwise use user's configured token
+        effective_api_token = api_token
+        if platform == "rootly" and beta_rootly_token:
+            effective_api_token = beta_rootly_token
+            logger.info(f"BACKGROUND_TASK: Using beta Rootly token for analysis {analysis_id}")
+        elif platform == "pagerduty" and beta_pagerduty_token:
+            effective_api_token = beta_pagerduty_token
+            logger.info(f"BACKGROUND_TASK: Using beta PagerDuty token for analysis {analysis_id}")
+        
         # Fetch user-specific integration tokens if needed
         slack_token = None
         github_token = None
@@ -1961,7 +1984,7 @@ async def run_analysis_task(
             logger.info(f"BACKGROUND_TASK: Set user context for AI analysis (LLM provider: {user.llm_provider if user.llm_token else 'none'})")
         
         analyzer_service = UnifiedBurnoutAnalyzer(
-            api_token=api_token,
+            api_token=effective_api_token,
             platform=platform,
             enable_ai=use_ai_analyzer,
             github_token=github_token if include_github else None,
