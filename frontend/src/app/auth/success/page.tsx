@@ -48,7 +48,28 @@ export default function AuthSuccessPage() {
         
         console.log('🔍 Frontend Debug: Successfully received JWT token');
         
-        // Step 3: Store JWT token securely
+        // Step 3: Clear any existing user data and store new JWT token
+        // Clear all user-specific cached data to prevent cross-user data leakage
+        const keysToRemove = []
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i)
+          if (key && (
+            key.includes('integrations') ||
+            key.includes('selected_organization') ||
+            key.includes('analyses') ||
+            key.includes('user_') ||
+            key.endsWith('_cache') ||
+            key.endsWith('_timestamp')
+          )) {
+            keysToRemove.push(key)
+          }
+        }
+        
+        // Remove all cached user data
+        console.log('🔍 Frontend Debug: Clearing cached user data:', keysToRemove)
+        keysToRemove.forEach(key => localStorage.removeItem(key))
+        
+        // Store the new JWT token
         localStorage.setItem('auth_token', jwtToken);
         
         // Clean up URL (remove auth code)
