@@ -3478,19 +3478,9 @@ export default function IntegrationsPage() {
                       </div>
                     </div>
                     {llmConfig?.has_token && (
-                      <div className="flex items-center space-x-2">
-                        <Badge variant="secondary" className="bg-green-100 text-green-700">
-                          Connected
-                        </Badge>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={handleDisconnectAI}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
+                      <Badge variant="secondary" className="bg-green-100 text-green-700">
+                        Connected
+                      </Badge>
                     )}
                   </div>
                 </CardHeader>
