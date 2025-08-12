@@ -350,17 +350,31 @@ async def exchange_auth_code_for_token(
     """
     import time
     
+    print(f"🔍 TOKEN EXCHANGE DEBUG: ===== TOKEN EXCHANGE REQUEST =====")
     print(f"🔍 TOKEN EXCHANGE DEBUG: Received auth code: {code[:20]}...")
+    print(f"🔍 TOKEN EXCHANGE DEBUG: Current time: {time.time()}")
+    print(f"🔍 TOKEN EXCHANGE DEBUG: Available auth codes: {len(_temp_auth_codes)}")
     
     # Clean up expired codes
     current_time = time.time()
     expired_codes = [c for c, data in _temp_auth_codes.items() if data['expires_at'] < current_time]
+    print(f"🔍 TOKEN EXCHANGE DEBUG: Expired codes to clean up: {len(expired_codes)}")
+    
     for expired_code in expired_codes:
+        print(f"🔍 TOKEN EXCHANGE DEBUG: Removing expired code: {expired_code[:20]}...")
         del _temp_auth_codes[expired_code]
+    
+    print(f"🔍 TOKEN EXCHANGE DEBUG: Remaining auth codes after cleanup: {len(_temp_auth_codes)}")
+    
+    # Debug: Show all available codes (first 20 chars only)
+    for stored_code, data in _temp_auth_codes.items():
+        print(f"🔍 TOKEN EXCHANGE DEBUG: Available code: {stored_code[:20]}... expires at: {data['expires_at']}")
     
     # Check if code exists and is valid
     if code not in _temp_auth_codes:
-        print(f"🔍 TOKEN EXCHANGE DEBUG: Invalid or expired auth code")
+        print(f"🔍 TOKEN EXCHANGE DEBUG: ❌ AUTH CODE NOT FOUND")
+        print(f"🔍 TOKEN EXCHANGE DEBUG: Looking for: {code[:20]}...")
+        print(f"🔍 TOKEN EXCHANGE DEBUG: Available codes: {[c[:20] + '...' for c in _temp_auth_codes.keys()]}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid or expired authorization code"
