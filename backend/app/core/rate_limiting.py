@@ -92,8 +92,17 @@ def get_rate_limit_key(request: Request) -> str:
     except Exception:
         pass
     
-    # Fallback to IP address
-    return get_remote_address(request)
+    # Defensive fallback to IP address with type checking
+    try:
+        # Ensure request is the correct type before calling get_remote_address
+        if hasattr(request, 'client') and hasattr(request.client, 'host'):
+            return request.client.host
+        else:
+            return get_remote_address(request)
+    except Exception as e:
+        logger.warning(f"Failed to get remote address for rate limiting: {e}")
+        # Ultimate fallback
+        return "unknown"
 
 # Initialize rate limiter
 redis_client = get_redis_client()
