@@ -99,20 +99,31 @@ async def google_callback(
         # Determine if we should use secure cookies (HTTPS only in production)
         is_production = not frontend_url.startswith("http://localhost")
         
-        # For cross-domain cookies, we need SameSite=None with Secure=True
-        cookie_secure = True  # Always secure for OAuth cookies
-        cookie_samesite = "none"  # Allow cross-site requests
+        # For same-domain, use httpOnly cookies (most secure)
+        # For cross-domain, use a secure redirect with token in hash fragment
+        import urllib.parse
+        parsed_frontend = urllib.parse.urlparse(frontend_url)
+        parsed_backend = urllib.parse.urlparse("https://rootly-burnout-detector-web-production.up.railway.app")
         
-        response.set_cookie(
-            key="auth_token",
-            value=jwt_token,
-            httponly=True,        # Prevents XSS access to token
-            secure=cookie_secure, # Always secure for cross-domain cookies
-            samesite=cookie_samesite,  # Allow cross-site for OAuth
-            max_age=604800,       # 7 days (same as JWT expiration)
-            path="/",             # Available to entire frontend
-            domain=None           # Use same domain as request
-        )
+        is_same_domain = parsed_frontend.netloc == parsed_backend.netloc
+        
+        if is_same_domain:
+            # Same domain: Use secure httpOnly cookies
+            response.set_cookie(
+                key="auth_token",
+                value=jwt_token,
+                httponly=True,
+                secure=True,
+                samesite="lax",
+                max_age=604800,
+                path="/",
+                domain=None
+            )
+        else:
+            # Cross-domain: Use hash fragment (not logged in server logs)
+            # Hash fragments are not sent to servers, only available to frontend
+            success_url = f"{frontend_url}/auth/success#{jwt_token}"
+            response = RedirectResponse(url=success_url)
         return response
         
     except Exception as e:
@@ -206,20 +217,31 @@ async def github_callback(
         # Determine if we should use secure cookies (HTTPS only in production)
         is_production = not frontend_url.startswith("http://localhost")
         
-        # For cross-domain cookies, we need SameSite=None with Secure=True
-        cookie_secure = True  # Always secure for OAuth cookies
-        cookie_samesite = "none"  # Allow cross-site requests
+        # For same-domain, use httpOnly cookies (most secure)
+        # For cross-domain, use a secure redirect with token in hash fragment
+        import urllib.parse
+        parsed_frontend = urllib.parse.urlparse(frontend_url)
+        parsed_backend = urllib.parse.urlparse("https://rootly-burnout-detector-web-production.up.railway.app")
         
-        response.set_cookie(
-            key="auth_token",
-            value=jwt_token,
-            httponly=True,        # Prevents XSS access to token
-            secure=cookie_secure, # Always secure for cross-domain cookies
-            samesite=cookie_samesite,  # Allow cross-site for OAuth
-            max_age=604800,       # 7 days (same as JWT expiration)
-            path="/",             # Available to entire frontend
-            domain=None           # Use same domain as request
-        )
+        is_same_domain = parsed_frontend.netloc == parsed_backend.netloc
+        
+        if is_same_domain:
+            # Same domain: Use secure httpOnly cookies
+            response.set_cookie(
+                key="auth_token",
+                value=jwt_token,
+                httponly=True,
+                secure=True,
+                samesite="lax",
+                max_age=604800,
+                path="/",
+                domain=None
+            )
+        else:
+            # Cross-domain: Use hash fragment (not logged in server logs)
+            # Hash fragments are not sent to servers, only available to frontend
+            success_url = f"{frontend_url}/auth/success#{jwt_token}"
+            response = RedirectResponse(url=success_url)
         return response
         
     except Exception as e:
