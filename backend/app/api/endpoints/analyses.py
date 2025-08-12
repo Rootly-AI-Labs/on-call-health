@@ -104,82 +104,82 @@ async def run_burnout_analysis(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Integration not found or not active"
             )
-    
-    # Check API permissions before starting analysis
-    try:
-        from ...core.rootly_client import RootlyAPIClient
-        client = RootlyAPIClient(integration.api_token)
-        permissions = await client.check_permissions()
         
-        # Check if incidents permission is missing
-        if not permissions.get("incidents", {}).get("access", False):
-            incidents_error = permissions.get("incidents", {}).get("error", "Unknown permission error")
-            logger.warning(f"Analysis {integration.id} starting with incidents permission issue: {incidents_error}")
+        # Check API permissions before starting analysis
+        try:
+            from ...core.rootly_client import RootlyAPIClient
+            client = RootlyAPIClient(integration.api_token)
+            permissions = await client.check_permissions()
             
-            # Still allow analysis to proceed but with warning in config
-            permission_warnings = [f"Incidents API: {incidents_error}"]
-        else:
-            permission_warnings = []
-            
-    except Exception as e:
-        logger.error(f"Failed to check permissions for integration {integration.id}: {str(e)}")
-        # Allow analysis to proceed but note the permission check failure
-        permission_warnings = [f"Permission check failed: {str(e)}"]
-    
-    # Create new analysis record
-    analysis = Analysis(
-        user_id=current_user.id,
-        rootly_integration_id=integration.id,
-        time_range=request.time_range,
-        status="pending",
-        config={
-            "include_weekends": request.include_weekends,
-            "include_github": request.include_github,
-            "include_slack": request.include_slack,
-            "permission_warnings": permission_warnings
-        }
-    )
-    db.add(analysis)
-    db.commit()
-    db.refresh(analysis)
-    
-    # Log the created analysis ID for debugging
-    logger.info(f"ENDPOINT: Created analysis with ID {analysis.id} for user {current_user.id}")
-    
-    # Update integration last_used_at
-    integration.last_used_at = datetime.now()
-    db.commit()
-    
-    # Ensure the analysis exists before starting background task
-    verify_analysis = db.query(Analysis).filter(Analysis.id == analysis.id).first()
-    if not verify_analysis:
-        logger.error(f"ENDPOINT: Analysis {analysis.id} not found immediately after creation!")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to create analysis record"
-        )
-    
-    # Start analysis in background
-    logger.info(f"ENDPOINT: About to add background task for analysis {analysis.id}")
-    try:
-        background_tasks.add_task(
-            run_analysis_task,
-            analysis_id=analysis.id,
-            integration_id=integration.id,
-            api_token=integration.api_token,
-            platform=integration.platform,
-            time_range=request.time_range,
-            include_weekends=request.include_weekends,
-            include_github=request.include_github,
-            include_slack=request.include_slack,
+            # Check if incidents permission is missing
+            if not permissions.get("incidents", {}).get("access", False):
+                incidents_error = permissions.get("incidents", {}).get("error", "Unknown permission error")
+                logger.warning(f"Analysis {integration.id} starting with incidents permission issue: {incidents_error}")
+                
+                # Still allow analysis to proceed but with warning in config
+                permission_warnings = [f"Incidents API: {incidents_error}"]
+            else:
+                permission_warnings = []
+                
+        except Exception as e:
+            logger.error(f"Failed to check permissions for integration {integration.id}: {str(e)}")
+            # Allow analysis to proceed but note the permission check failure
+            permission_warnings = [f"Permission check failed: {str(e)}"]
+        
+        # Create new analysis record
+        analysis = Analysis(
             user_id=current_user.id,
-            enable_ai=request.enable_ai
+            rootly_integration_id=integration.id,
+            time_range=request.time_range,
+            status="pending",
+            config={
+                "include_weekends": request.include_weekends,
+                "include_github": request.include_github,
+                "include_slack": request.include_slack,
+                "permission_warnings": permission_warnings
+            }
         )
-        logger.info(f"ENDPOINT: Successfully added background task for analysis {analysis.id}")
-    except Exception as e:
-        logger.error(f"ENDPOINT: Failed to add background task for analysis {analysis.id}: {e}")
-        raise
-    
+        db.add(analysis)
+        db.commit()
+        db.refresh(analysis)
+        
+        # Log the created analysis ID for debugging
+        logger.info(f"ENDPOINT: Created analysis with ID {analysis.id} for user {current_user.id}")
+        
+        # Update integration last_used_at
+        integration.last_used_at = datetime.now()
+        db.commit()
+        
+        # Ensure the analysis exists before starting background task
+        verify_analysis = db.query(Analysis).filter(Analysis.id == analysis.id).first()
+        if not verify_analysis:
+            logger.error(f"ENDPOINT: Analysis {analysis.id} not found immediately after creation!")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to create analysis record"
+            )
+        
+        # Start analysis in background
+        logger.info(f"ENDPOINT: About to add background task for analysis {analysis.id}")
+        try:
+            background_tasks.add_task(
+                run_analysis_task,
+                analysis_id=analysis.id,
+                integration_id=integration.id,
+                api_token=integration.api_token,
+                platform=integration.platform,
+                time_range=request.time_range,
+                include_weekends=request.include_weekends,
+                include_github=request.include_github,
+                include_slack=request.include_slack,
+                user_id=current_user.id,
+                enable_ai=request.enable_ai
+            )
+            logger.info(f"ENDPOINT: Successfully added background task for analysis {analysis.id}")
+        except Exception as e:
+            logger.error(f"ENDPOINT: Failed to add background task for analysis {analysis.id}: {e}")
+            raise
+        
         return AnalysisResponse(
             id=analysis.id,
             uuid=getattr(analysis, 'uuid', None),
