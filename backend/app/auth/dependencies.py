@@ -26,16 +26,26 @@ async def get_current_user(
     # ✅ SECURITY FIX: Check both Authorization header and httpOnly cookies
     token = None
     
+    # Debug logging
+    print(f"🔍 AUTH DEBUG: cookies available: {list(request.cookies.keys())}")
+    print(f"🔍 AUTH DEBUG: auth_token cookie: {request.cookies.get('auth_token', 'NOT_FOUND')[:50]}...")
+    
     # First, try Authorization header (for API calls)
     if credentials and credentials.credentials:
         token = credentials.credentials
+        print(f"🔍 AUTH DEBUG: Using Authorization header token")
     
     # If no header token, try httpOnly cookie (for OAuth flow)
     if not token:
         token = request.cookies.get("auth_token")
+        if token:
+            print(f"🔍 AUTH DEBUG: Using cookie token: {token[:50]}...")
+        else:
+            print(f"🔍 AUTH DEBUG: No cookie token found")
     
     # If still no token, authentication failed
     if not token:
+        print(f"🔍 AUTH DEBUG: No token found - failing authentication")
         raise credentials_exception
     
     payload = decode_access_token(token)
