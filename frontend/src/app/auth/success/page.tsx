@@ -11,32 +11,47 @@ export default function AuthSuccessPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const token = searchParams.get('token')
+    // ✅ SECURITY FIX: Verify authentication via httpOnly cookie instead of URL token
+    const verifyAuthentication = async () => {
+      try {
+        const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+        
+        // Check if authentication worked by calling a protected endpoint
+        const response = await fetch(`${API_BASE}/auth/user/me`, {
+          method: 'GET',
+          credentials: 'include', // Include httpOnly cookies
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        })
+        
+        if (!response.ok) {
+          throw new Error('Authentication verification failed')
+        }
+        
+        const userData = await response.json()
+        console.log('Authentication successful for user:', userData.email)
+        
+        // Clear any old localStorage token (migration from old auth flow)
+        localStorage.removeItem('auth_token')
+        
+        // Set success status
+        setStatus('success')
+        
+        // Redirect to integrations page after a brief delay
+        setTimeout(() => {
+          router.push('/integrations')
+        }, 1500)
+        
+      } catch (err) {
+        console.error('Authentication verification failed:', err)
+        setStatus('error')
+        setError('Authentication verification failed. Please try logging in again.')
+      }
+    }
     
-    if (!token) {
-      setStatus('error')
-      setError('No authentication token received')
-      return
-    }
-
-    try {
-      // Store the auth token in localStorage
-      localStorage.setItem('auth_token', token)
-      
-      // Set success status
-      setStatus('success')
-      
-      // Redirect to integrations page after a brief delay
-      setTimeout(() => {
-        router.push('/integrations')
-      }, 1500)
-      
-    } catch (err) {
-      console.error('Error processing authentication:', err)
-      setStatus('error')
-      setError('Failed to process authentication token')
-    }
-  }, [searchParams, router])
+    verifyAuthentication()
+  }, [router])
 
   if (status === 'processing') {
     return (

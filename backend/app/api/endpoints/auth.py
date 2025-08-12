@@ -93,9 +93,19 @@ async def google_callback(
         if state and state in ["http://localhost:3000", settings.FRONTEND_URL]:
             frontend_url = state
             
-        # Redirect to frontend with token
-        redirect_url = f"{frontend_url}/auth/success?token={jwt_token}"
-        return RedirectResponse(url=redirect_url)
+        # ✅ SECURITY FIX: Use httpOnly cookie instead of URL parameter  
+        response = RedirectResponse(url=f"{frontend_url}/auth/success")
+        response.set_cookie(
+            key="auth_token",
+            value=jwt_token,
+            httponly=True,        # Prevents XSS access to token
+            secure=True,          # HTTPS only in production
+            samesite="lax",       # CSRF protection while allowing OAuth redirects
+            max_age=604800,       # 7 days (same as JWT expiration)
+            path="/",             # Available to entire frontend
+            domain=None           # Use same domain as request
+        )
+        return response
         
     except Exception as e:
         # Use state for error redirect too
@@ -182,9 +192,19 @@ async def github_callback(
         if state and state in ["http://localhost:3000", settings.FRONTEND_URL]:
             frontend_url = state
             
-        # Redirect to frontend with token
-        redirect_url = f"{frontend_url}/auth/success?token={jwt_token}"
-        return RedirectResponse(url=redirect_url)
+        # ✅ SECURITY FIX: Use httpOnly cookie instead of URL parameter  
+        response = RedirectResponse(url=f"{frontend_url}/auth/success")
+        response.set_cookie(
+            key="auth_token",
+            value=jwt_token,
+            httponly=True,        # Prevents XSS access to token
+            secure=True,          # HTTPS only in production
+            samesite="lax",       # CSRF protection while allowing OAuth redirects
+            max_age=604800,       # 7 days (same as JWT expiration)
+            path="/",             # Available to entire frontend
+            domain=None           # Use same domain as request
+        )
+        return response
         
     except Exception as e:
         # Use state for error redirect too
@@ -253,3 +273,19 @@ async def unlink_provider(
         )
     
     return {"message": f"{provider} provider unlinked successfully"}
+
+@router.get("/user/me")
+async def get_current_user_info(
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    ✅ SECURITY: Get current authenticated user information.
+    Used to verify httpOnly cookie authentication works.
+    """
+    return {
+        "id": current_user.id,
+        "email": current_user.email,
+        "name": current_user.name,
+        "created_at": current_user.created_at.isoformat() if current_user.created_at else None,
+        "updated_at": current_user.updated_at.isoformat() if current_user.updated_at else None
+    }
