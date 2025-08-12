@@ -21,6 +21,22 @@ def get_cors_origins():
     # Always allow the configured frontend URL
     origins = [settings.FRONTEND_URL]
     
+    # Add common development ports for localhost
+    if settings.FRONTEND_URL.startswith("http://localhost"):
+        # Allow common Next.js development ports
+        origins.extend([
+            "http://localhost:3000",
+            "http://localhost:3001", 
+            "http://localhost:3002"
+        ])
+    
+    # TEMPORARY: Allow localhost for OAuth testing (remove after testing)
+    if not any("localhost" in origin for origin in origins):
+        origins.extend([
+            "http://localhost:3000",
+            "http://localhost:3001"
+        ])
+    
     # Add production domains if they exist
     production_frontend = os.getenv("PRODUCTION_FRONTEND_URL")
     if production_frontend:
@@ -30,6 +46,9 @@ def get_cors_origins():
     vercel_url = os.getenv("VERCEL_URL") 
     if vercel_url:
         origins.append(f"https://{vercel_url}")
+    
+    # Remove duplicates while preserving order
+    origins = list(dict.fromkeys(origins))
     
     # Log allowed origins for debugging
     print(f"🔒 CORS Security: Allowing origins: {origins}")
