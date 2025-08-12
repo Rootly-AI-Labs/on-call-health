@@ -411,17 +411,64 @@ export default function IntegrationsPage() {
     const userEmail = localStorage.getItem('user_email')
     const userAvatar = localStorage.getItem('user_avatar')
     
-    console.log('Debug: User info from localStorage:', { userName, userEmail, userAvatar })
+    console.log('Debug: User info from localStorage:', { 
+      userName, 
+      userEmail, 
+      userAvatar,
+      userNameType: typeof userName,
+      userEmailType: typeof userEmail,
+      userNameTruthy: !!userName,
+      userEmailTruthy: !!userEmail
+    })
     
-    if (userName && userEmail) {
+    // Check for valid, non-empty strings (not "null", "undefined", or empty)
+    const validUserName = userName && userName !== 'null' && userName !== 'undefined' && userName.trim() !== ''
+    const validUserEmail = userEmail && userEmail !== 'null' && userEmail !== 'undefined' && userEmail.trim() !== ''
+    
+    if (validUserName && validUserEmail) {
       setUserInfo({
         name: userName,
         email: userEmail,
-        avatar: userAvatar || undefined
+        avatar: (userAvatar && userAvatar !== 'null' && userAvatar !== 'undefined') ? userAvatar : undefined
       })
       console.log('Debug: User info set:', { name: userName, email: userEmail, avatar: userAvatar })
     } else {
-      console.log('Debug: No user info found in localStorage')
+      console.log('Debug: No valid user info found in localStorage', { 
+        validUserName, 
+        validUserEmail, 
+        userName, 
+        userEmail 
+      })
+      
+      // Try to fetch user info from API as fallback
+      const authToken = localStorage.getItem('auth_token')
+      if (authToken) {
+        console.log('Debug: Attempting to fetch user info from API')
+        const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+        fetch(`${API_BASE}/auth/user/me`, {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        })
+        .then(response => response.json())
+        .then(userData => {
+          console.log('Debug: User data from API:', userData)
+          if (userData.name && userData.email) {
+            setUserInfo({
+              name: userData.name,
+              email: userData.email,
+              avatar: userData.avatar || undefined
+            })
+            // Store in localStorage for future use
+            localStorage.setItem('user_name', userData.name)
+            localStorage.setItem('user_email', userData.email)
+            if (userData.avatar) {
+              localStorage.setItem('user_avatar', userData.avatar)
+            }
+          }
+        })
+        .catch(error => {
+          console.log('Debug: Failed to fetch user info from API:', error)
+        })
+      }
     }
     
     // Determine back navigation based on referrer
