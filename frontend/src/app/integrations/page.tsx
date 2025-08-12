@@ -411,12 +411,17 @@ export default function IntegrationsPage() {
     const userEmail = localStorage.getItem('user_email')
     const userAvatar = localStorage.getItem('user_avatar')
     
+    console.log('Debug: User info from localStorage:', { userName, userEmail, userAvatar })
+    
     if (userName && userEmail) {
       setUserInfo({
         name: userName,
         email: userEmail,
         avatar: userAvatar || undefined
       })
+      console.log('Debug: User info set:', { name: userName, email: userEmail, avatar: userAvatar })
+    } else {
+      console.log('Debug: No user info found in localStorage')
     }
     
     // Determine back navigation based on referrer
@@ -1784,7 +1789,7 @@ export default function IntegrationsPage() {
 
           <div className="flex items-center space-x-3">
             {/* User Account Indicator */}
-            {userInfo && (
+            {userInfo ? (
               <div className="flex items-center space-x-3 px-3 py-1 bg-slate-50/80 rounded-full border border-slate-200">
                 <Avatar className="h-8 w-8">
                   <AvatarImage src={userInfo.avatar} alt={userInfo.name} />
@@ -1795,6 +1800,18 @@ export default function IntegrationsPage() {
                 <div className="hidden sm:block text-left">
                   <div className="text-sm font-medium text-slate-900">{userInfo.name}</div>
                   <div className="text-xs text-slate-500">{userInfo.email}</div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center space-x-2 px-3 py-1 bg-slate-50/80 rounded-full border border-slate-200">
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback className="bg-gray-400 text-white text-xs">
+                    ?
+                  </AvatarFallback>
+                </Avatar>
+                <div className="hidden sm:block text-left">
+                  <div className="text-sm font-medium text-slate-900">Loading...</div>
+                  <div className="text-xs text-slate-500">User info</div>
                 </div>
               </div>
             )}
