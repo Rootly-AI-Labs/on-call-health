@@ -3313,12 +3313,12 @@ export default function Dashboard() {
                             }
                             
                             // Convert to health status (0-10 scale, higher=better)
-                            // 90%+ = Excellent, 80-89% = Good, 70-79% = Fair, 60-69% = Poor, <60% = Critical
-                            if (currentScore >= 9) return 'Excellent';  // 90%+
-                            if (currentScore >= 8) return 'Good';        // 80-89%
-                            if (currentScore >= 7) return 'Fair';        // 70-79%
-                            if (currentScore >= 6) return 'Poor';        // 60-69%
-                            return 'Critical';                           // <60%
+                            // Match tooltip ranges exactly: Good (70-89%), Fair (50-69%), Poor (30-49%), Critical (<30%)
+                            if (currentScore >= 9) return 'Excellent';  // 90-100%
+                            if (currentScore >= 7) return 'Good';        // 70-89% - "Manageable workload with minor stress"
+                            if (currentScore >= 5) return 'Fair';        // 50-69% - "Moderate stress, watch for trends"  
+                            if (currentScore >= 3) return 'Poor';        // 30-49% - "High stress, intervention needed"
+                            return 'Critical';                           // <30% - "Severe burnout risk"
                           })()}</div>
                           <Info className="w-3 h-3 text-purple-500" 
                                   onMouseEnter={(e) => {
@@ -3356,14 +3356,14 @@ export default function Dashboard() {
                                 currentScore = currentAnalysis.analysis_data.team_summary.average_score;
                               }
                               
-                              // Convert to health status using consistent 0-10 scale where higher=better (like the percentage)
+                              // Convert to health status using exact tooltip ranges: Good (70-89%), Fair (50-69%), Poor (30-49%), Critical (<30%)
+                              console.log(`DEBUG: Health status calculation - currentScore: ${currentScore}, percentage: ${currentScore * 10}%`);
                               if (!currentScore) return 'good';  // Default to good instead of excellent
-                              if (currentScore >= 9) return 'excellent';  // 90%+
-                              if (currentScore >= 8) return 'good';       // 80-89%
-                              if (currentScore >= 7) return 'fair';       // 70-79%
-                              if (currentScore >= 6) return 'poor';       // 60-69%
-                              if (currentScore >= 3) return 'poor';       // 30-59% - was missing this range
-                              return 'critical';                          // <30%
+                              if (currentScore >= 9) return 'excellent';  // 90-100%
+                              if (currentScore >= 7) return 'good';       // 70-89% - "Manageable workload with minor stress"
+                              if (currentScore >= 5) return 'fair';       // 50-69% - "Moderate stress, watch for trends"
+                              if (currentScore >= 3) return 'poor';       // 30-49% - "High stress, intervention needed"
+                              return 'critical';                          // <30% - "Severe burnout risk"
                             })()).toLowerCase()
                             switch(status) {
                               case 'excellent':
