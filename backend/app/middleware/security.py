@@ -196,50 +196,8 @@ async def security_middleware(request: Request, call_next: Callable) -> Response
             }
         )
 
-async def request_sanitization_middleware(request: Request, call_next: Callable) -> Response:
-    """
-    Middleware to sanitize request data before processing.
-    """
-    try:
-        # Only sanitize JSON requests
-        if request.method in ["POST", "PUT", "PATCH"]:
-            content_type = request.headers.get("content-type", "").lower()
-            
-            if "application/json" in content_type:
-                # Read and parse request body
-                body = await request.body()
-                
-                if body:
-                    try:
-                        # Parse JSON
-                        json_data = json.loads(body)
-                        
-                        # Sanitize dictionary data
-                        if isinstance(json_data, dict):
-                            sanitized_data = sanitize_dict_recursive(json_data)
-                            
-                            # Replace request body with sanitized version
-                            sanitized_body = json.dumps(sanitized_data).encode()
-                            
-                            # Create new request with sanitized body
-                            async def receive():
-                                return {"type": "http.request", "body": sanitized_body}
-                            
-                            # Update request scope
-                            request._receive = receive
-                            
-                    except json.JSONDecodeError:
-                        # Invalid JSON - let the endpoint handle validation
-                        logger.warning(f"🚨 Invalid JSON in request from {request.client.host}")
-        
-        # Process request normally
-        response = await call_next(request)
-        return response
-        
-    except Exception as e:
-        logger.error(f"🚨 Request sanitization error: {e}")
-        # Continue without sanitization on error
-        return await call_next(request)
+# Request sanitization is handled by Pydantic validation models
+# This eliminates the need for middleware-level body manipulation that can break request handling
 
 def add_security_headers(response: Response, request: Request) -> Response:
     """
@@ -311,7 +269,6 @@ def log_security_event(event_type: str, request: Request, details: dict = None):
 # Export middleware functions
 __all__ = [
     'security_middleware',
-    'request_sanitization_middleware', 
     'add_security_headers',
     'log_security_event',
     'is_suspicious_ip'
