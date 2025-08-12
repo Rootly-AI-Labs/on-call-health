@@ -303,12 +303,30 @@ class GitHubIntegrationRequest(IntegrationBase):
 
 class AnalysisRequest(BaseValidatedModel):
     """Burnout analysis request validation."""
-    integration_id: int = Field(..., gt=0, description="Integration ID")
+    integration_id: Union[int, str] = Field(..., description="Integration ID (int for regular, str for beta)")
     time_range: int = Field(30, gt=0, le=365, description="Analysis time range in days")
     include_weekends: bool = Field(True, description="Include weekend data")
     include_github: bool = Field(False, description="Include GitHub data")
     include_slack: bool = Field(False, description="Include Slack data") 
     enable_ai: bool = Field(False, description="Enable AI insights")
+    
+    @field_validator('integration_id')
+    @classmethod
+    def validate_integration_id(cls, v):
+        """Validate integration ID format."""
+        if isinstance(v, int):
+            # Regular integration ID must be positive
+            if v <= 0:
+                raise ValueError("Integration ID must be positive")
+        elif isinstance(v, str):
+            # Beta integration ID must match expected format
+            if not v.startswith("beta-"):
+                raise ValueError("String integration ID must start with 'beta-'")
+            if v not in ["beta-rootly", "beta-pagerduty"]:
+                raise ValueError("Invalid beta integration ID")
+        else:
+            raise ValueError("Integration ID must be int or str")
+        return v
     
     @field_validator('time_range')
     @classmethod
