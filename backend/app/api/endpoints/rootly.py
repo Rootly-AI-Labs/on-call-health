@@ -266,11 +266,15 @@ async def list_integrations(
             test_result = await client.test_connection()
             permissions = await client.check_permissions()
             
+            logger.info(f"DEBUG: Beta Rootly test_result: {test_result}")
+            org_name = test_result.get("organization_name") or "Beta Organization"
+            logger.info(f"DEBUG: Resolved organization name: {org_name}")
+            
             if test_result.get("status") == "success":
                 beta_integration = {
                     "id": "beta-rootly",  # Special ID for beta integration
                     "name": "Rootly (Beta Access)",
-                    "organization_name": test_result.get("organization_name") or "Beta Organization",
+                    "organization_name": org_name,
                     "total_users": test_result.get("total_users", 0),
                     "is_default": True,
                     "is_beta": True,  # Special flag to indicate beta integration
