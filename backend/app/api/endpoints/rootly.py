@@ -263,20 +263,23 @@ async def list_integrations(
     if beta_rootly_token:
         try:
             # Test the beta token and get organization info
+            logger.info(f"Testing beta Rootly token: {beta_rootly_token[:10]}...")
             client = RootlyAPIClient(beta_rootly_token)
             test_result = await client.test_connection()
             permissions = await client.check_permissions()
             
-            logger.info(f"DEBUG: Beta Rootly test_result: {test_result}")
-            org_name = test_result.get("organization_name") or "Beta Organization"
-            logger.info(f"DEBUG: Resolved organization name: {org_name}")
+            logger.info(f"Beta Rootly test_result: {test_result}")
+            account_info = test_result.get("account_info", {})
+            logger.info(f"Beta Rootly account_info: {account_info}")
+            org_name = account_info.get("organization_name") or test_result.get("organization_name") or "Beta Organization"
+            logger.info(f"Resolved organization name: {org_name}")
             
             if test_result.get("status") == "success":
                 beta_integration = {
                     "id": "beta-rootly",  # Special ID for beta integration
                     "name": "Rootly (Beta Access)",
                     "organization_name": org_name,
-                    "total_users": test_result.get("total_users", 0),
+                    "total_users": account_info.get("total_users", 0),
                     "is_default": True,
                     "is_beta": True,  # Special flag to indicate beta integration
                     "created_at": datetime.now().isoformat(),
@@ -288,8 +291,40 @@ async def list_integrations(
                 # Add beta integration at the beginning of the list
                 result_integrations.insert(0, beta_integration)
                 logger.info(f"Added beta Rootly integration for user {current_user.id}")
+            else:
+                logger.warning(f"Beta Rootly test_connection failed: {test_result}")
+                # Add fallback integration with limited info
+                beta_integration = {
+                    "id": "beta-rootly",
+                    "name": "Rootly (Beta Access)",
+                    "organization_name": org_name,
+                    "total_users": account_info.get("total_users", 0),
+                    "is_default": True,
+                    "is_beta": True,
+                    "created_at": datetime.now().isoformat(),
+                    "last_used_at": None,
+                    "token_suffix": f"***{beta_rootly_token[-4:]}",
+                    "permissions": permissions
+                }
+                result_integrations.insert(0, beta_integration)
+                logger.info(f"Added fallback beta Rootly integration for user {current_user.id}")
         except Exception as e:
             logger.warning(f"Failed to add beta Rootly integration: {str(e)}")
+            # Add fallback integration even on exception
+            beta_integration = {
+                "id": "beta-rootly",
+                "name": "Rootly (Beta Access)",
+                "organization_name": "Beta Organization",
+                "total_users": 0,
+                "is_default": True,
+                "is_beta": True,
+                "created_at": datetime.now().isoformat(),
+                "last_used_at": None,
+                "token_suffix": "***BETA",
+                "permissions": {}
+            }
+            result_integrations.insert(0, beta_integration)
+            logger.info(f"Added exception fallback beta Rootly integration for user {current_user.id}")
     
     return {
         "integrations": result_integrations
