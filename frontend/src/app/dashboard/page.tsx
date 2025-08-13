@@ -2102,8 +2102,13 @@ export default function Dashboard() {
       }
 
       // Debug log the request data
+      // Handle both string (beta) and numeric (regular) integration IDs
+      const integrationId = isNaN(parseInt(dialogSelectedIntegration)) 
+        ? dialogSelectedIntegration  // Keep as string for beta integrations
+        : parseInt(dialogSelectedIntegration);  // Convert to number for regular integrations
+      
       const requestData = {
-        integration_id: parseInt(dialogSelectedIntegration),
+        integration_id: integrationId,
         time_range: parseInt(selectedTimeRange),
         include_weekends: true,
         include_github: githubIntegration ? includeGithub : false,
