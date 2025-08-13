@@ -2758,15 +2758,15 @@ export default function Dashboard() {
                                         `Organization ${analysis.integration_id}`
                 const isSelected = currentAnalysis?.id === analysis.id
                 
-                // Determine platform color from integration or analysis data
+                // Determine platform color from integration or organization name
                 let platformColor = 'bg-gray-500' // default
                 if (matchingIntegration?.platform === 'rootly') {
                   platformColor = 'bg-purple-500'  // Rootly = Purple
                 } else if (matchingIntegration?.platform === 'pagerduty') {
                   platformColor = 'bg-green-500'   // PagerDuty = Green
-                } else if ((analysis as any).config?.beta_integration_id === 'beta-rootly' || organizationName === 'Rootly') {
+                } else if (organizationName === 'Rootly') {
                   platformColor = 'bg-purple-500'  // Rootly = Purple
-                } else if ((analysis as any).config?.beta_integration_id === 'beta-pagerduty' || organizationName === 'PagerDuty') {
+                } else if (organizationName === 'PagerDuty') {
                   platformColor = 'bg-green-500'   // PagerDuty = Green
                 }
                 return (
