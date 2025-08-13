@@ -2016,13 +2016,36 @@ export default function Dashboard() {
   const startAnalysis = async () => {
     // Check if we have basic integrations cached
     if (integrations.length === 0) {
-      // No integrations cached, need to load them first
-      await loadIntegrations(true, true)
+      // Check if we have cached data in localStorage first
+      const cachedIntegrations = localStorage.getItem('all_integrations')
+      const cacheTimestamp = localStorage.getItem('all_integrations_timestamp')
+      
+      if (cachedIntegrations && cacheTimestamp) {
+        const cacheAge = Date.now() - parseInt(cacheTimestamp)
+        if (cacheAge < 5 * 60 * 1000) { // 5 minutes
+          console.log('🔍 DEBUG: Using cached integrations data for modal')
+          // Load from cache without API call
+          const cached = JSON.parse(cachedIntegrations)
+          setIntegrations(cached.rootly.concat(cached.pagerduty))
+          setGithubIntegration(cached.github?.connected ? cached.github.integration : null)
+          setSlackIntegration(cached.slack?.integration || null)
+        } else {
+          // Cache is stale, need to load fresh data
+          console.log('🔍 DEBUG: Cache is stale, loading fresh integrations data')
+          await loadIntegrations(true, true)
+        }
+      } else {
+        // No cache, need to load fresh data  
+        console.log('🔍 DEBUG: No cache found, loading fresh integrations data')
+        await loadIntegrations(true, true)
+      }
       
       if (integrations.length === 0) {
         toast.error("No integrations found - please add an integration first")
         return
       }
+    } else {
+      console.log('🔍 DEBUG: Using existing integrations data, no loading needed')
     }
 
     // If no integration selected but we have integrations available, auto-select the first one
@@ -2048,8 +2071,12 @@ export default function Dashboard() {
     setDialogSelectedIntegration(integrationToUse)
     setShowTimeRangeDialog(true)
 
-    // Only load GitHub/Slack data if we don't already have it or if LLM config is missing
-    const needsGitHubSlackData = !githubIntegration && !slackIntegration
+    // Only load additional data if we don't have it AND we haven't recently checked
+    const lastIntegrationsLoad = localStorage.getItem('all_integrations_timestamp')
+    const integrationsCacheAge = lastIntegrationsLoad ? Date.now() - parseInt(lastIntegrationsLoad) : Infinity
+    const integrationsCacheValid = integrationsCacheAge < 5 * 60 * 1000 // 5 minutes
+    
+    const needsGitHubSlackData = (!githubIntegration && !slackIntegration) && !integrationsCacheValid
     const needsLlmConfig = !llmConfig
     
     if (needsGitHubSlackData || needsLlmConfig) {
@@ -2057,9 +2084,11 @@ export default function Dashboard() {
       
       const promises = []
       if (needsGitHubSlackData) {
+        console.log('🔍 DEBUG: Loading GitHub/Slack data because cache is stale')
         promises.push(loadIntegrations(true, false)) // Refresh integrations without showing loading
       }
       if (needsLlmConfig) {
+        console.log('🔍 DEBUG: Loading LLM config')
         promises.push(loadLlmConfig())
       }
       
@@ -2069,6 +2098,8 @@ export default function Dashboard() {
         console.error('Error loading modal data:', err)
         setIsLoadingGitHubSlack(false)
       })
+    } else {
+      console.log('🔍 DEBUG: Using cached GitHub/Slack/LLM data, no loading needed')
     }
   }
 
