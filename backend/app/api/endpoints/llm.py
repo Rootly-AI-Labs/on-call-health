@@ -52,7 +52,12 @@ async def store_llm_token(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Store or update user's LLM API token."""
+    """Store or update user's LLM API token. Disabled for Railway deployment."""
+    # Railway deployment uses shared system token - no individual user tokens allowed
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Individual LLM tokens not supported in Railway deployment. AI is automatically enabled using system token."
+    )
     
     # Validate provider
     allowed_providers = ['anthropic', 'openai']
@@ -139,56 +144,34 @@ async def get_llm_token_info(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get information about user's stored LLM token (without the actual token)."""
+    """Get information about system LLM token (Railway deployment uses shared token)."""
     
-    # Check if user has their own token
-    if current_user.has_llm_token():
-        # User has their own token - return user token info
-        pass  # Continue with existing user token logic below
+    # Always use Railway system token for all users - no individual user tokens
+    import os
+    system_api_key = os.getenv('ANTHROPIC_API_KEY')
+    if system_api_key:
+        # Return system token info (all users use Railway token)
+        return LLMTokenResponse(
+            has_token=True,
+            provider='anthropic',
+            token_suffix=f"****{system_api_key[-4:]}",
+            created_at=None  # System token doesn't have creation date
+        )
     else:
-        # Check if Railway environment has system token
-        import os
-        system_api_key = os.getenv('ANTHROPIC_API_KEY')
-        if system_api_key:
-            # Return system token info (Railway environment)
-            return LLMTokenResponse(
-                has_token=True,
-                provider='anthropic',
-                token_suffix=f"****{system_api_key[-4:]}",
-                created_at=None  # System token doesn't have creation date
-            )
-        else:
-            # No user token and no system token
-            return LLMTokenResponse(has_token=False)
-    
-    try:
-        # Decrypt token to get suffix
-        decrypted_token = decrypt_token(current_user.llm_token)
-        token_suffix = decrypted_token[-4:] if len(decrypted_token) > 4 else "****"
-        
-        return LLMTokenResponse(
-            has_token=True,
-            provider=current_user.llm_provider,
-            token_suffix=token_suffix,
-            created_at=current_user.updated_at
-        )
-        
-    except Exception as e:
-        logger.error(f"Failed to decrypt LLM token for user {current_user.id}: {e}")
-        # If decryption fails, still indicate they have a token but can't show suffix
-        return LLMTokenResponse(
-            has_token=True,
-            provider=current_user.llm_provider,
-            token_suffix="****",
-            created_at=current_user.updated_at
-        )
+        # Railway token not configured
+        return LLMTokenResponse(has_token=False)
 
 @router.delete("/token")
 async def delete_llm_token(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Delete user's stored LLM token."""
+    """Delete user's stored LLM token. Disabled for Railway deployment."""
+    # Railway deployment uses shared system token - no individual user tokens allowed
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Cannot delete system LLM token in Railway deployment."
+    )
     
     if not current_user.has_llm_token():
         raise HTTPException(
