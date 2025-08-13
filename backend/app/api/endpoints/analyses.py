@@ -2026,7 +2026,8 @@ async def run_analysis_task(
             platform=platform,
             enable_ai=use_ai_analyzer,
             github_token=github_token if include_github else None,
-            slack_token=slack_token if include_slack else None
+            slack_token=slack_token if include_slack else None,
+            organization_name=integration.organization_name
         )
         logger.info(f"BACKGROUND_TASK: UnifiedBurnoutAnalyzer initialized - Features: AI={use_ai_analyzer}, GitHub={include_github}, Slack={include_slack}")
         

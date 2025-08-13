@@ -33,7 +33,8 @@ class UnifiedBurnoutAnalyzer:
         platform: str = "rootly",
         enable_ai: bool = False,
         github_token: Optional[str] = None,
-        slack_token: Optional[str] = None
+        slack_token: Optional[str] = None,
+        organization_name: Optional[str] = None
     ):
         # Use the appropriate client based on platform
         if platform == "pagerduty":
@@ -46,6 +47,7 @@ class UnifiedBurnoutAnalyzer:
         self.enable_ai = enable_ai
         self.github_token = github_token
         self.slack_token = slack_token
+        self.organization_name = organization_name
         
         # Determine which features are enabled
         self.features = {
@@ -336,6 +338,7 @@ class UnifiedBurnoutAnalyzer:
                 "analysis_timestamp": datetime.now().isoformat(),
                 "metadata": {
                     **metadata,
+                    "organization_name": self.organization_name or metadata.get("organization_name", "Organization"),
                     "include_weekends": include_weekends,
                     "include_github": self.features['github'],
                     "include_slack": self.features['slack'],
