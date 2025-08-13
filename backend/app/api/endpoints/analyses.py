@@ -2022,20 +2022,24 @@ async def run_analysis_task(
             logger.info(f"BACKGROUND_TASK: User query result - user exists: {user is not None}")
             print(f"BACKGROUND_TASK: User query result - user exists: {user is not None}")
             
+            # Check if Railway system token is available for AI analysis
+            import os
+            system_api_key = os.getenv('ANTHROPIC_API_KEY')
+            
             if user:
                 logger.info(f"BACKGROUND_TASK: User details - has_llm_token: {user.llm_token is not None}, provider: {user.llm_provider}")
+                logger.info(f"BACKGROUND_TASK: Railway system token available: {system_api_key is not None}")
                 print(f"BACKGROUND_TASK: User details - has_llm_token: {user.llm_token is not None}, provider: {user.llm_provider}")
+                print(f"BACKGROUND_TASK: Railway system token available: {system_api_key is not None}")
                 
-            if user and user.llm_token and user.llm_provider:
+            # Use AI if user requested it AND Railway token is available (or user has their own token)
+            if system_api_key or (user and user.llm_token and user.llm_provider):
                 use_ai_analyzer = True
-                logger.info(f"BACKGROUND_TASK: User has LLM token ({user.llm_provider}), using AI-enhanced analyzer")
-                print(f"BACKGROUND_TASK: User has LLM token ({user.llm_provider}), using AI-enhanced analyzer")
-                # Set user context for AI analysis
-                from ...services.ai_burnout_analyzer import set_user_context
-                set_user_context(user)
+                logger.info(f"BACKGROUND_TASK: AI available via Railway token or user token, using AI-enhanced analyzer")
+                print(f"BACKGROUND_TASK: AI available via Railway token or user token, using AI-enhanced analyzer")
             else:
-                logger.info(f"BACKGROUND_TASK: User has no LLM token, using standard analyzer")
-                print(f"BACKGROUND_TASK: User has no LLM token, using standard analyzer")
+                logger.info(f"BACKGROUND_TASK: No AI tokens available (Railway or user), using standard analyzer")
+                print(f"BACKGROUND_TASK: No AI tokens available (Railway or user), using standard analyzer")
         else:
             logger.info(f"BACKGROUND_TASK: AI not enabled or no user_id, using standard analyzer")
             print(f"BACKGROUND_TASK: AI not enabled or no user_id, using standard analyzer")
