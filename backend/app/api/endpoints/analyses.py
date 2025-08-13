@@ -1919,6 +1919,7 @@ async def run_analysis_task(
     import asyncio
     from datetime import datetime
     import logging
+    import os
     
     logger = logging.getLogger(__name__)
     logger.info(f"BACKGROUND_TASK: Starting analysis {analysis_id} with timeout mechanism")
@@ -2023,7 +2024,6 @@ async def run_analysis_task(
             print(f"BACKGROUND_TASK: User query result - user exists: {user is not None}")
             
             # Check if Railway system token is available for AI analysis
-            import os
             system_api_key = os.getenv('ANTHROPIC_API_KEY')
             
             if user:
