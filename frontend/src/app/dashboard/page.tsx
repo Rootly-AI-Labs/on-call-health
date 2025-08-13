@@ -2144,7 +2144,7 @@ export default function Dashboard() {
         include_weekends: true,
         include_github: githubIntegration ? includeGithub : false,
         include_slack: slackIntegration ? includeSlack : false,
-        enable_ai: true  // Always enabled using Railway token
+        enable_ai: enableAI  // User can toggle, uses Railway token when enabled
       }
       
       console.log('DEBUG: Analysis request data:', requestData)
@@ -5398,12 +5398,12 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* AI Insights - Always Enabled */}
+            {/* AI Insights Toggle */}
             <div>
               <label className="text-sm font-medium text-gray-700 mb-2 block">
                 AI Insights
               </label>
-              <div className="border rounded-lg p-4 border-blue-500 bg-blue-50">
+              <div className={`border rounded-lg p-4 transition-all ${enableAI ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white'}`}>
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center space-x-3">
                     <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
@@ -5414,9 +5414,10 @@ export default function Dashboard() {
                       <p className="text-xs text-gray-600">Natural language reasoning and insights</p>
                     </div>
                   </div>
-                  <div className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-medium">
-                    Always Enabled
-                  </div>
+                  <Switch
+                    checked={enableAI}
+                    onCheckedChange={setEnableAI}
+                  />
                 </div>
                 
                 <div className="space-y-2">
@@ -5427,7 +5428,10 @@ export default function Dashboard() {
                     </span>
                   </div>
                   <div className="text-xs text-gray-600">
-                    ✨ AI will provide intelligent analysis and recommendations
+                    {enableAI ? 
+                      '✨ AI will provide intelligent analysis and recommendations' : 
+                      '⚡ Using traditional pattern analysis only'
+                    }
                   </div>
                 </div>
               </div>
