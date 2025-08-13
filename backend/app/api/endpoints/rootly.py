@@ -259,6 +259,7 @@ async def list_integrations(
     
     # Add beta fallback integration if available
     beta_rootly_token = os.getenv('ROOTLY_API_TOKEN')
+    logger.info(f"Beta Rootly token check: exists={beta_rootly_token is not None}, length={len(beta_rootly_token) if beta_rootly_token else 0}")
     if beta_rootly_token:
         try:
             # Test the beta token and get organization info

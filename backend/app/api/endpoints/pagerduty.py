@@ -120,6 +120,7 @@ async def get_pagerduty_integrations(
     
     # Add beta fallback integration if available
     beta_pagerduty_token = os.getenv('PAGERDUTY_API_TOKEN')
+    logger.info(f"Beta PagerDuty token check: exists={beta_pagerduty_token is not None}, length={len(beta_pagerduty_token) if beta_pagerduty_token else 0}")
     if beta_pagerduty_token:
         try:
             # Test the beta token and get organization info
