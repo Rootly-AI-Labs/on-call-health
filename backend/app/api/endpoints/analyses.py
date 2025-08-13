@@ -100,24 +100,44 @@ async def run_burnout_analysis(
             beta_pagerduty_token = os.getenv('PAGERDUTY_API_TOKEN')
             
             if request.integration_id == "beta-rootly" and beta_rootly_token:
-                # Create a virtual integration object for beta Rootly
+                # Get real organization name from Rootly API
+                from ...core.rootly_client import RootlyAPIClient
                 from types import SimpleNamespace
+                
+                try:
+                    rootly_client = RootlyAPIClient(beta_rootly_token)
+                    test_result = await rootly_client.test_connection()
+                    account_info = test_result.get("account_info", {})
+                    real_org_name = account_info.get("organization_name") or "Rootly"
+                except Exception:
+                    real_org_name = "Rootly"  # Fallback
+                
                 integration = SimpleNamespace(
                     id="beta-rootly",
                     api_token=beta_rootly_token,
                     platform="rootly",
-                    name="Rootly (Beta Access)",
-                    organization_name="Beta Organization"
+                    name=real_org_name,  # Use real organization name
+                    organization_name=real_org_name
                 )
             elif request.integration_id == "beta-pagerduty" and beta_pagerduty_token:
-                # Create a virtual integration object for beta PagerDuty
+                # Get real organization name from PagerDuty API
+                from ...core.pagerduty_client import PagerDutyAPIClient
                 from types import SimpleNamespace
+                
+                try:
+                    pagerduty_client = PagerDutyAPIClient(beta_pagerduty_token)
+                    test_result = await pagerduty_client.test_connection()
+                    account_info = test_result.get("account_info", {})
+                    real_org_name = account_info.get("organization_name") or "PagerDuty"
+                except Exception:
+                    real_org_name = "PagerDuty"  # Fallback
+                
                 integration = SimpleNamespace(
                     id="beta-pagerduty",
                     api_token=beta_pagerduty_token,
                     platform="pagerduty",
-                    name="PagerDuty (Beta Access)",
-                    organization_name="Beta Organization"
+                    name=real_org_name,  # Use real organization name
+                    organization_name=real_org_name
                 )
             
             if not integration:
