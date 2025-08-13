@@ -2232,6 +2232,23 @@ export default function Dashboard() {
           }
 
           if (pollResponse.ok) {
+            // Response is OK, continue to process
+          } else if (pollResponse.status === 404) {
+            // Analysis was deleted during polling - stop immediately
+            console.warn(`Analysis ${analysis_id} was deleted during polling`)
+            setAnalysisRunning(false)
+            setCurrentRunningAnalysisId(null)
+            toast.error("Analysis was deleted or no longer exists")
+            
+            // Try to load the most recent analysis as fallback
+            await loadPreviousAnalyses()
+            return
+          } else {
+            // Other HTTP errors - treat as polling failure
+            throw new Error(`HTTP ${pollResponse.status}: ${pollResponse.statusText}`)
+          }
+          
+          if (pollResponse.ok) {
             const analysisData = await pollResponse.json()
             
             if (analysisData.status === 'completed') {
