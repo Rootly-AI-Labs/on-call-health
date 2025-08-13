@@ -2754,6 +2754,7 @@ export default function Dashboard() {
                 
                 // Use organization name from analysis results if available, fall back to integration name
                 let organizationName = (analysis as any).analysis_data?.metadata?.organization_name || 
+                                      (analysis as any).config?.organization_name ||
                                       matchingIntegration?.name || 
                                       `Organization ${analysis.integration_id}`
                 

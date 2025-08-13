@@ -214,7 +214,8 @@ async def run_burnout_analysis(
                 "include_github": request.include_github,
                 "include_slack": request.include_slack,
                 "permission_warnings": permission_warnings,
-                "beta_integration_id": integration.id if isinstance(integration.id, str) else None
+                "beta_integration_id": integration.id if isinstance(integration.id, str) else None,
+                "organization_name": integration.organization_name if hasattr(integration, 'organization_name') else integration.name
             }
         )
         db.add(analysis)
