@@ -2556,7 +2556,7 @@ export default function Dashboard() {
           .map((m: any) => m?.factors?.workload ?? 0)
           .filter(score => score > 0);
         
-        if (workloadScores.length === 0) return null;
+        if (workloadScores.length === 0) return 0;
         
         const sum = workloadScores.reduce((total, score) => total + score, 0);
         return Number((sum / workloadScores.length).toFixed(1));
@@ -2573,7 +2573,7 @@ export default function Dashboard() {
           .map((m: any) => m?.factors?.after_hours ?? 0)
           .filter(score => score > 0);
         
-        if (afterHoursScores.length === 0) return null;
+        if (afterHoursScores.length === 0) return 0;
         
         const sum = afterHoursScores.reduce((total, score) => total + score, 0);
         return Number((sum / afterHoursScores.length).toFixed(1));
@@ -2590,7 +2590,7 @@ export default function Dashboard() {
           .map((m: any) => m?.factors?.weekend_work ?? 0)
           .filter(score => score > 0);
         
-        if (weekendScores.length === 0) return null;
+        if (weekendScores.length === 0) return 0;
         
         const sum = weekendScores.reduce((total, score) => total + score, 0);
         return Number((sum / weekendScores.length).toFixed(1));
@@ -2607,7 +2607,7 @@ export default function Dashboard() {
           .map((m: any) => m?.factors?.response_time ?? 0)
           .filter(score => score > 0);
         
-        if (responseScores.length === 0) return null;
+        if (responseScores.length === 0) return 0;
         
         const sum = responseScores.reduce((total, score) => total + score, 0);
         return Number((sum / responseScores.length).toFixed(1));
@@ -2624,15 +2624,14 @@ export default function Dashboard() {
           .map((m: any) => m?.factors?.incident_load ?? 0)
           .filter(score => score > 0);
         
-        if (incidentLoadScores.length === 0) return null;
+        if (incidentLoadScores.length === 0) return 0;
         
         const sum = incidentLoadScores.reduce((a: number, b: number) => a + b, 0);
         return Number((sum / incidentLoadScores.length).toFixed(1));
       })(),
       metrics: `Average incident load factor from ${allActiveMembers.length} active team members`
     },
-  ].filter(factor => factor.value !== null) // Remove factors with no real data
-   .map(factor => ({
+  ].map(factor => ({
     ...factor,
     color: getFactorColor(factor.value!),
     recommendation: getRecommendation(factor.factor),
