@@ -2758,16 +2758,26 @@ export default function Dashboard() {
                                         `Organization ${analysis.integration_id}`
                 const isSelected = currentAnalysis?.id === analysis.id
                 
-                // Determine platform color from integration or organization name
+                // Determine platform color from integration or analysis data
                 let platformColor = 'bg-gray-500' // default
                 if (matchingIntegration?.platform === 'rootly') {
                   platformColor = 'bg-purple-500'  // Rootly = Purple
                 } else if (matchingIntegration?.platform === 'pagerduty') {
                   platformColor = 'bg-green-500'   // PagerDuty = Green
-                } else if (organizationName === 'Rootly') {
-                  platformColor = 'bg-purple-500'  // Rootly = Purple
-                } else if (organizationName === 'PagerDuty') {
-                  platformColor = 'bg-green-500'   // PagerDuty = Green
+                } else {
+                  // For beta integrations, check the config to determine platform
+                  const analysisConfig = (analysis as any).analysis_data?.config || {};
+                  const betaIntegrationId = analysisConfig.beta_integration_id;
+                  
+                  if (betaIntegrationId === 'beta-rootly') {
+                    platformColor = 'bg-purple-500'  // Rootly = Purple
+                  } else if (betaIntegrationId === 'beta-pagerduty') {
+                    platformColor = 'bg-green-500'   // PagerDuty = Green
+                  } else if (organizationName === 'Rootly') {
+                    platformColor = 'bg-purple-500'  // Fallback for Rootly
+                  } else if (organizationName === 'PagerDuty') {
+                    platformColor = 'bg-green-500'   // Fallback for PagerDuty
+                  }
                 }
                 return (
                   <div key={analysis.id} className={`relative group ${isSelected ? 'bg-gray-800' : ''} rounded`}>
@@ -2830,7 +2840,7 @@ export default function Dashboard() {
                         <div className="flex flex-col items-start w-full text-xs pr-8">
                           <div className="flex justify-between items-center w-full mb-1">
                             <div className="flex items-center space-x-2">
-                              {(matchingIntegration || organizationName === 'Rootly' || organizationName === 'PagerDuty') && (
+                              {(matchingIntegration || platformColor !== 'bg-gray-500') && (
                                 <div className={`w-2 h-2 rounded-full ${platformColor}`}></div>
                               )}
                               <span className="font-medium">{organizationName}</span>
