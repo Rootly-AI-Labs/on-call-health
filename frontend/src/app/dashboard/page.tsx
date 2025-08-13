@@ -2761,13 +2761,13 @@ export default function Dashboard() {
                 // Determine platform color from integration or analysis data
                 let platformColor = 'bg-gray-500' // default
                 if (matchingIntegration?.platform === 'rootly') {
-                  platformColor = 'bg-purple-500'
+                  platformColor = 'bg-purple-500'  // Rootly = Purple
                 } else if (matchingIntegration?.platform === 'pagerduty') {
-                  platformColor = 'bg-green-500'
+                  platformColor = 'bg-green-500'   // PagerDuty = Green
                 } else if ((analysis as any).config?.beta_integration_id === 'beta-rootly' || organizationName === 'Rootly') {
-                  platformColor = 'bg-purple-500'
+                  platformColor = 'bg-purple-500'  // Rootly = Purple
                 } else if ((analysis as any).config?.beta_integration_id === 'beta-pagerduty' || organizationName === 'PagerDuty') {
-                  platformColor = 'bg-green-500'
+                  platformColor = 'bg-green-500'   // PagerDuty = Green
                 }
                 return (
                   <div key={analysis.id} className={`relative group ${isSelected ? 'bg-gray-800' : ''} rounded`}>
