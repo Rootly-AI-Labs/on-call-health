@@ -3550,8 +3550,8 @@ export default function IntegrationsPage() {
           </div>
         </div>
 
-        {/* AI Insights Section - Only show if Rootly or PagerDuty integrations exist */}
-        {integrations.length > 0 && (
+        {/* AI Insights Section - Hidden for Railway deployment (AI always enabled) */}
+        {false && (
           <div className="mt-16 space-y-8">
             <div className="text-center">
               <h2 className="text-2xl font-bold text-slate-900 mb-3">AI Insights Included</h2>
