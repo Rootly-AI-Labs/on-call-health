@@ -2752,9 +2752,23 @@ export default function Dashboard() {
                 const matchingIntegration = integrations.find(i => i.id === Number(analysis.integration_id)) || 
                                           integrations.find(i => String(i.id) === String(analysis.integration_id))
                 
-                const organizationName = matchingIntegration?.name || `Organization ${analysis.integration_id}`
+                // Use organization name from analysis results if available, fall back to integration name
+                const organizationName = (analysis as any).results?.metadata?.organization_name || 
+                                        matchingIntegration?.name || 
+                                        `Organization ${analysis.integration_id}`
                 const isSelected = currentAnalysis?.id === analysis.id
-                const platformColor = matchingIntegration?.platform === 'rootly' ? 'bg-purple-500' : 'bg-green-500'
+                
+                // Determine platform color from integration or analysis data
+                let platformColor = 'bg-gray-500' // default
+                if (matchingIntegration?.platform === 'rootly') {
+                  platformColor = 'bg-purple-500'
+                } else if (matchingIntegration?.platform === 'pagerduty') {
+                  platformColor = 'bg-green-500'
+                } else if ((analysis as any).config?.beta_integration_id === 'beta-rootly' || organizationName === 'Rootly') {
+                  platformColor = 'bg-purple-500'
+                } else if ((analysis as any).config?.beta_integration_id === 'beta-pagerduty' || organizationName === 'PagerDuty') {
+                  platformColor = 'bg-green-500'
+                }
                 return (
                   <div key={analysis.id} className={`relative group ${isSelected ? 'bg-gray-800' : ''} rounded`}>
                     <Button 
@@ -2816,7 +2830,7 @@ export default function Dashboard() {
                         <div className="flex flex-col items-start w-full text-xs pr-8">
                           <div className="flex justify-between items-center w-full mb-1">
                             <div className="flex items-center space-x-2">
-                              {matchingIntegration && (
+                              {(matchingIntegration || organizationName === 'Rootly' || organizationName === 'PagerDuty') && (
                                 <div className={`w-2 h-2 rounded-full ${platformColor}`}></div>
                               )}
                               <span className="font-medium">{organizationName}</span>
