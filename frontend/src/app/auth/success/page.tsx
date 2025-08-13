@@ -58,8 +58,13 @@ export default function AuthSuccessPage() {
             key.includes('selected_organization') ||
             key.includes('analyses') ||
             key.includes('user_') ||
+            key.includes('github_') ||
+            key.includes('slack_') ||
+            key.includes('rootly_') ||
+            key.includes('pagerduty_') ||
             key.endsWith('_cache') ||
-            key.endsWith('_timestamp')
+            key.endsWith('_timestamp') ||
+            key.endsWith('_data')
           )) {
             keysToRemove.push(key)
           }
@@ -68,6 +73,18 @@ export default function AuthSuccessPage() {
         // Remove all cached user data
         console.log('🔍 Frontend Debug: Clearing cached user data:', keysToRemove)
         keysToRemove.forEach(key => localStorage.removeItem(key))
+        
+        // Additional explicit clearing of potential problematic keys
+        const explicitKeysToRemove = [
+          'user_name', 'user_email', 'user_avatar', 'user_id',
+          'current_user', 'userInfo', 'userData', 'user_profile'
+        ]
+        explicitKeysToRemove.forEach(key => {
+          if (localStorage.getItem(key)) {
+            console.log('🔍 Frontend Debug: Explicitly removing:', key)
+            localStorage.removeItem(key)
+          }
+        })
         
         // Store the new JWT token
         localStorage.setItem('auth_token', jwtToken);
@@ -91,6 +108,20 @@ export default function AuthSuccessPage() {
         
         const userData = await verifyResponse.json()
         console.log('🔍 Frontend Debug: Authentication successful for user:', userData.email)
+        
+        // Store fresh user data immediately to prevent cross-user contamination
+        if (userData.name && userData.email) {
+          localStorage.setItem('user_name', userData.name)
+          localStorage.setItem('user_email', userData.email)
+          if (userData.avatar) {
+            localStorage.setItem('user_avatar', userData.avatar)
+          }
+          console.log('🔍 Frontend Debug: Stored fresh user data:', {
+            name: userData.name,
+            email: userData.email,
+            avatar: userData.avatar
+          })
+        }
         
         // Set success status
         setStatus('success')

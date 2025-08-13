@@ -1039,16 +1039,8 @@ class UnifiedBurnoutAnalyzer:
         # Weekend work factor
         weekend_work = min(10, (metrics.get("weekend_percentage", 0) or 0) * 25)
         
-        # Incident load factor (direct calculation based on weekly incident rate)
-        # Scale: 0-3 incidents/week = 0-3, 3-6 = 3-7, 6-10 = 7-10, 10+ = 10
-        if incidents_per_week <= 3:
-            incident_load = incidents_per_week
-        elif incidents_per_week <= 6:
-            incident_load = 3 + ((incidents_per_week - 3) / 3) * 4
-        elif incidents_per_week <= 10:
-            incident_load = 7 + ((incidents_per_week - 6) / 4) * 3
-        else:
-            incident_load = 10
+        # REMOVED incident_load factor - was duplicate of workload factor
+        # Both were calculated from incidents_per_week, causing double-counting
         
         # Response time factor
         response_time = min(10, (metrics.get("avg_response_time_minutes", 0) or 0) / 6)
@@ -1057,7 +1049,6 @@ class UnifiedBurnoutAnalyzer:
             "workload": workload,
             "after_hours": after_hours, 
             "weekend_work": weekend_work,
-            "incident_load": incident_load,
             "response_time": response_time
         }
         
@@ -1069,9 +1060,8 @@ class UnifiedBurnoutAnalyzer:
         # For now, we'll use the factors to approximate dimensions
         
         # Approximate Emotional Exhaustion from factors
-        emotional_exhaustion = (factors.get("workload", 0) * 0.4 + 
-                              factors.get("after_hours", 0) * 0.3 + 
-                              factors.get("incident_load", 0) * 0.3)
+        emotional_exhaustion = (factors.get("workload", 0) * 0.5 + 
+                              factors.get("after_hours", 0) * 0.5)
         
         # Approximate Depersonalization from factors
         depersonalization = (factors.get("response_time", 0) * 0.5 + 
@@ -1079,9 +1069,8 @@ class UnifiedBurnoutAnalyzer:
                            factors.get("weekend_work", 0) * 0.2)
         
         # Approximate Personal Accomplishment (inverted)
-        personal_accomplishment = 10 - (factors.get("response_time", 0) * 0.3 + 
-                                       factors.get("workload", 0) * 0.4 + 
-                                       factors.get("incident_load", 0) * 0.3)
+        personal_accomplishment = 10 - (factors.get("response_time", 0) * 0.4 + 
+                                       factors.get("workload", 0) * 0.6)
         personal_accomplishment = max(0, personal_accomplishment)
         
         # Calculate final score using Maslach weights
@@ -1095,15 +1084,9 @@ class UnifiedBurnoutAnalyzer:
         return max(0, burnout_score)
     
     def _determine_risk_level(self, burnout_score: float) -> str:
-        """Determine risk level based on burnout score using Maslach methodology."""
-        if burnout_score >= 7.0:  # Critical risk - severe burnout
-            return "critical"
-        elif burnout_score >= 5.0:  # High risk - significant burnout
-            return "high"
-        elif burnout_score >= 3.5:  # Medium risk - moderate burnout signs
-            return "medium"
-        else:  # Low risk - manageable stress levels
-            return "low"
+        """Determine risk level based on burnout score using standardized thresholds."""
+        from ..core.burnout_config import determine_risk_level
+        return determine_risk_level(burnout_score)
     
     def _calculate_team_health(self, member_analyses: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Calculate overall team health metrics."""

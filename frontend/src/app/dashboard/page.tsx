@@ -2462,7 +2462,7 @@ export default function Dashboard() {
   const chartData = historicalTrends?.daily_trends?.length > 0 
     ? historicalTrends.daily_trends.slice(-7).map((trend: any) => ({
         date: new Date(trend.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        score: Math.round(trend.overall_score * 10) // Convert 0-10 scale to 0-100 for display
+        score: Math.round((10 - trend.overall_score) * 10) // Convert 0-10 burnout to 0-100 health scale
       }))
     : currentAnalysis?.analysis_data?.team_health 
       ? [{ 
@@ -2479,7 +2479,7 @@ export default function Dashboard() {
       ?.map((member) => ({
         name: member.user_name.split(" ")[0],
         fullName: member.user_name,
-        score: member.burnout_score * 10, // Convert 0-10 scale to 0-100 for display
+        score: (10 - member.burnout_score) * 10, // Convert 0-10 burnout to 0-100 health scale
         riskLevel: member.risk_level,
         fill: member.risk_level === "high" ? "#dc2626" :      // Red for high
               member.risk_level === "medium" ? "#f59e0b" :    // Amber for medium
@@ -4121,8 +4121,8 @@ export default function Dashboard() {
                             // Transform data and detect standout events
                             const chartData = dailyTrends.map((trend: any, index: number) => ({
                               date: new Date(trend.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
-                              score: Math.round(trend.overall_score * 10), // Convert 0-10 scale to 0-100 for display
-                              riskLevel: trend.overall_score >= 9 ? 'excellent' : trend.overall_score >= 7 ? 'good' : trend.overall_score >= 5 ? 'fair' : trend.overall_score >= 3 ? 'poor' : 'critical',
+                              score: Math.round((10 - trend.overall_score) * 10), // Convert 0-10 burnout to 0-100 health scale
+                              riskLevel: trend.overall_score <= 3 ? 'excellent' : trend.overall_score <= 5.5 ? 'good' : trend.overall_score <= 7.5 ? 'fair' : trend.overall_score >= 7.5 ? 'poor' : 'critical',
                               membersAtRisk: trend.members_at_risk,
                               totalMembers: trend.total_members,
                               healthStatus: trend.health_status,
@@ -4202,8 +4202,8 @@ export default function Dashboard() {
                           if (historicalTrends?.daily_trends?.length > 0) {
                             return historicalTrends.daily_trends.map((trend: any) => ({
                               date: new Date(trend.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
-                              score: Math.round(trend.overall_score * 10), // Convert 0-10 scale to 0-100 for display
-                              riskLevel: trend.overall_score >= 9 ? 'excellent' : trend.overall_score >= 7 ? 'good' : trend.overall_score >= 5 ? 'fair' : trend.overall_score >= 3 ? 'poor' : 'critical',
+                              score: Math.round((10 - trend.overall_score) * 10), // Convert 0-10 burnout to 0-100 health scale
+                              riskLevel: trend.overall_score <= 3 ? 'excellent' : trend.overall_score <= 5.5 ? 'good' : trend.overall_score <= 7.5 ? 'fair' : trend.overall_score >= 7.5 ? 'poor' : 'critical',
                               membersAtRisk: trend.members_at_risk,
                               totalMembers: trend.total_members,
                               healthStatus: trend.health_status,
@@ -4910,7 +4910,7 @@ export default function Dashboard() {
                           id: member.user_id || '',
                           name: member.user_name || 'Unknown',
                           email: member.user_email || '',
-                          burnoutScore: (member.burnout_score || 0) * 10, // Convert 0-10 scale to 0-100 percentage
+                          burnoutScore: ((10 - (member.burnout_score || 0)) * 10), // Convert 0-10 burnout to 0-100 health scale
                           riskLevel: (member.risk_level || 'low') as 'high' | 'medium' | 'low',
                           trend: 'stable' as const,
                           incidentsHandled: member.incident_count || 0,
@@ -4950,28 +4950,7 @@ export default function Dashboard() {
                           
                           {/* Integration icons - show based on actual data presence */}
                           <div className="flex flex-wrap gap-2 mb-3">
-                            {/* Rootly/PagerDuty - incident source */}
-                            {(() => {
-                              const platform = selectedIntegrationData?.platform;
-                              if (platform === 'pagerduty') {
-                                return (
-                                  <div className="flex items-center justify-center w-6 h-6 bg-green-100 rounded-full border border-green-200" title="PagerDuty">
-                                    <span className="text-green-600 font-bold text-xs">PD</span>
-                                  </div>
-                                );
-                              } else {
-                                // Default to Rootly
-                                return (
-                                  <div className="flex items-center justify-center w-6 h-6 bg-white rounded-full border border-orange-200" title="Rootly">
-                                    <img 
-                                      src="/rootly-logo.png" 
-                                      alt="Rootly" 
-                                      className="w-3.5 h-3.5"
-                                    />
-                                  </div>
-                                );
-                              }
-                            })()}
+                            {/* No platform badges needed */}
                             
                             {/* GitHub - show if user has actual GitHub data */}
                             {member.github_activity && (member.github_activity.commits_count > 0 || member.github_activity.commits_per_week > 0) && (
@@ -5552,30 +5531,8 @@ export default function Dashboard() {
               // Get the correct burnout score (handle both data formats)
               const burnoutScore = memberData?.burnout_score || (selectedMember.burnoutScore ? selectedMember.burnoutScore / 10 : 0) || 0;
               
-              // Calculate Maslach dimensions from consistent burnout score (no maslach_dimensions in data)
-              const maslachDimensions = [
-              {
-                dimension: "Emotional Exhaustion",
-                value: Math.min(Math.max(Number((burnoutScore * 1.2).toFixed(1)), 0), 10),
-                weight: 40,
-                description: "Feeling emotionally drained and depleted by work demands",
-                color: "#DC2626"
-              },
-              {
-                dimension: "Depersonalization", 
-                value: Math.min(Math.max(Number((burnoutScore * 1.0).toFixed(1)), 0), 10),
-                weight: 30,
-                description: "Detached or cynical attitudes toward work and colleagues",
-                color: "#7C2D12"
-              },
-              {
-                dimension: "Personal Accomplishment",
-                value: Math.min(Math.max(Number(Math.max(10 - (burnoutScore * 0.8), 3).toFixed(1)), 0), 10),
-                weight: 30,
-                description: "Diminished sense of personal achievement and effectiveness",
-                color: "#B45309"
-              }
-            ];
+              // Use real Maslach dimensions from backend if available, otherwise show single burnout score  
+              const maslachDimensions = (memberData as any)?.maslach_dimensions || null;
             
             // Calculate overall burnout score (0-10 scale, higher = more burnout, consistent with dimensions)
             const overallBurnoutScore = Math.max(0, Math.min(10, burnoutScore || 0));
@@ -5807,94 +5764,92 @@ export default function Dashboard() {
                 analysisId={currentAnalysis?.id}
               />
 
-              {/* Burnout Dimensions */}
-              <div>
-                <h3 className="text-lg font-semibold mb-4">🧠 Maslach Burnout Dimensions</h3>
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                  {maslachDimensions.map((dimension, index) => (
-                    <div key={index} className="bg-white p-4 rounded-lg border border-gray-200">
-                      <div className="text-center mb-3">
-                        <div className="text-2xl font-bold text-gray-900 mb-1">
-                          {dimension.value.toFixed(1)}/10 
-                          <span className="text-sm text-gray-500 font-normal ml-2">({dimension.weight}% weight)</span>
-                        </div>
-                        <div className="flex items-center justify-center space-x-2">
-                          <h4 className="font-semibold text-gray-900">{dimension.dimension}</h4>
-                          <div className="group relative">
-                            <Info className="w-4 h-4 text-gray-400 cursor-help" />
-                            <div className="invisible group-hover:visible absolute z-10 bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 text-xs text-white bg-gray-900 rounded-lg whitespace-nowrap max-w-xs">
-                              {dimension.description}
-                              <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
-                            </div>
+              {/* Burnout Dimensions - Only show if real dimensions available */}
+              {maslachDimensions && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">🧠 Maslach Burnout Dimensions</h3>
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    {Object.entries(maslachDimensions).map(([dimensionKey, dimensionValue], index) => (
+                      <div key={index} className="bg-white p-4 rounded-lg border border-gray-200">
+                        <div className="text-center mb-3">
+                          <div className="text-2xl font-bold text-gray-900 mb-1">
+                            {typeof dimensionValue === 'number' ? dimensionValue.toFixed(1) : '—'}/10
                           </div>
+                          <h4 className="font-semibold text-gray-900 capitalize">
+                            {dimensionKey.replace(/_/g, ' ')}
+                          </h4>
                         </div>
-                      </div>
-                      
-                      <div className="w-full bg-gray-200 rounded-full h-2 mb-3">
-                        <div 
-                          className="h-2 rounded-full transition-all duration-500"
-                          style={{ 
-                            width: `${Math.max(dimension.value * 10, 5)}%`,
-                            backgroundColor: (() => {
-                              // Standardize colors to match burnout risk levels
-                              if (dimension.value <= 3) return '#10B981'; // green-500 - Low Risk
-                              if (dimension.value <= 5) return '#F59E0B'; // yellow-500 - Moderate Risk
-                              if (dimension.value <= 7) return '#F97316'; // orange-500 - High Risk
-                              return '#EF4444'; // red-500 - Critical Risk
+                        
+                        <div className="w-full bg-gray-200 rounded-full h-2 mb-3">
+                          <div 
+                            className="h-2 rounded-full transition-all duration-500"
+                            style={{ 
+                              width: `${Math.max((typeof dimensionValue === 'number' ? dimensionValue : 0) * 10, 5)}%`,
+                              backgroundColor: (() => {
+                                const value = typeof dimensionValue === 'number' ? dimensionValue : 0;
+                                if (value <= 3) return '#10B981'; // green-500 - Low Risk
+                                if (value <= 5.5) return '#F59E0B'; // yellow-500 - Medium Risk  
+                                if (value <= 7.5) return '#F97316'; // orange-500 - High Risk
+                                return '#EF4444'; // red-500 - Critical Risk
+                              })()
+                            }}
+                          />
+                        </div>
+                        
+                        <div className="mt-3 text-center">
+                          <Badge className={`${
+                            (() => {
+                              const value = typeof dimensionValue === 'number' ? dimensionValue : 0;
+                              if (value <= 3) return 'text-green-600 bg-green-50';
+                              if (value <= 5.5) return 'text-yellow-600 bg-yellow-50';
+                              if (value <= 7.5) return 'text-orange-600 bg-orange-50';
+                              return 'text-red-600 bg-red-50';
                             })()
-                          }}
-                        />
-                      </div>
-                      
-                      {/* Show contributing factors/metrics */}
-                      <div className="text-xs text-gray-500 text-center">
-                        <span className="font-medium">Contributing factors:</span>
-                        <div className="mt-1">
-                          {dimension.dimension === "Emotional Exhaustion" && (
-                            <span>Workload intensity + After-hours incidents + Incident frequency</span>
-                          )}
-                          {dimension.dimension === "Depersonalization" && (
-                            <span>Response time pressure + Weekend work disruption + High incident load</span>
-                          )}
-                          {dimension.dimension === "Personal Accomplishment" && (
-                            <span>Incident resolution success + Response effectiveness + Team contribution</span>
-                          )}
+                          } text-xs px-2 py-1 border-0`}>
+                            {(() => {
+                              const value = typeof dimensionValue === 'number' ? dimensionValue : 0;
+                              if (value <= 3) return 'Low Risk';
+                              if (value <= 5.5) return 'Medium Risk';
+                              if (value <= 7.5) return 'High Risk';
+                              return 'Critical Risk';
+                            })()}
+                          </Badge>
                         </div>
                       </div>
-                      
-                      <div className="mt-3 text-center">
-                        <Badge className={`${
-                          dimension.dimension === "Personal Accomplishment" ? (
-                            // For Personal Accomplishment: Lower scores = Lower risk (less reduction = better)
-                            dimension.value <= 3 ? 'text-green-600 bg-green-50' : 
-                            dimension.value <= 5 ? 'text-yellow-600 bg-yellow-50' : 
-                            dimension.value <= 7 ? 'text-orange-600 bg-orange-50' : 
-                            'text-red-600 bg-red-50'
-                          ) : (
-                            // For other dimensions: Higher scores = Higher risk (normal)
-                            dimension.value <= 3 ? 'text-green-600 bg-green-50' : 
-                            dimension.value <= 5 ? 'text-yellow-600 bg-yellow-50' : 
-                            dimension.value <= 7 ? 'text-orange-600 bg-orange-50' : 
-                            'text-red-600 bg-red-50'
-                          )
-                        } text-xs px-2 py-1 border-0`}>
-                          {dimension.dimension === "Personal Accomplishment" ? (
-                            // For Personal Accomplishment: Lower scores = Lower risk (less reduction = better)
-                            dimension.value <= 3 ? 'Low Risk' : 
-                            dimension.value <= 5 ? 'Moderate' : 
-                            dimension.value <= 7 ? 'Elevated' : 'High Risk'
-                          ) : (
-                            // For other dimensions: Higher scores = Higher risk (normal)
-                            dimension.value <= 3 ? 'Low Risk' : 
-                            dimension.value <= 5 ? 'Moderate' : 
-                            dimension.value <= 7 ? 'Elevated' : 'High Risk'
-                          )}
-                        </Badge>
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
+                  <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <p className="text-sm text-blue-800">
+                      <strong>Note:</strong> These dimensions are calculated using validated Maslach Burnout Inventory methodology 
+                      based on actual behavioral patterns from your incident data, GitHub activity, and communication patterns.
+                    </p>
+                  </div>
                 </div>
-              </div>
+              )}
+              
+              {/* Show single burnout score if no real dimensions available */}
+              {!maslachDimensions && (
+                <div className="bg-amber-50 p-6 rounded-lg border border-amber-200">
+                  <div className="flex items-center space-x-3">
+                    <div className="flex-shrink-0">
+                      <svg className="w-5 h-5 text-amber-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-medium text-amber-800">Limited Burnout Analysis</h3>
+                      <p className="mt-1 text-sm text-amber-700">
+                        Detailed Maslach dimensions are not available for this analysis. 
+                        Overall burnout score: <strong>{overallBurnoutScore.toFixed(1)}/10</strong> ({healthStatus})
+                      </p>
+                      <p className="mt-2 text-sm text-amber-600">
+                        For comprehensive burnout assessment with validated psychological dimensions, 
+                        ensure sufficient data collection across incident response, development activity, and communication patterns.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Activity Summary */}
               <div className="grid grid-cols-1 gap-4">

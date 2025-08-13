@@ -1029,13 +1029,9 @@ class GitHubOnlyBurnoutAnalyzer:
         }
     
     def _determine_risk_level(self, burnout_score: float) -> str:
-        """Determine risk level from burnout score."""
-        if burnout_score >= 7.0:
-            return "high"
-        elif burnout_score >= 4.0:
-            return "medium"
-        else:
-            return "low"
+        """Determine risk level from burnout score using standardized thresholds."""
+        from ..core.burnout_config import determine_risk_level
+        return determine_risk_level(burnout_score)
     
     def _calculate_individual_confidence(
         self, 

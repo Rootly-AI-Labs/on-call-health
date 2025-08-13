@@ -446,7 +446,11 @@ export default function IntegrationsPage() {
         console.log('Debug: Attempting to fetch user info from API')
         const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
         fetch(`${API_BASE}/auth/user/me`, {
-          headers: { 'Authorization': `Bearer ${authToken}` }
+          headers: { 
+            'Authorization': `Bearer ${authToken}`,
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache'
+          }
         })
         .then(response => response.json())
         .then(userData => {
