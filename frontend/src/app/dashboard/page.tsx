@@ -2753,9 +2753,18 @@ export default function Dashboard() {
                                           integrations.find(i => String(i.id) === String(analysis.integration_id))
                 
                 // Use organization name from analysis results if available, fall back to integration name
-                const organizationName = (analysis as any).analysis_data?.metadata?.organization_name || 
-                                        matchingIntegration?.name || 
-                                        `Organization ${analysis.integration_id}`
+                let organizationName = (analysis as any).analysis_data?.metadata?.organization_name || 
+                                      matchingIntegration?.name || 
+                                      `Organization ${analysis.integration_id}`
+                
+                // Special handling for beta integrations during running state
+                if (!matchingIntegration && typeof analysis.integration_id === 'string') {
+                  if (String(analysis.integration_id) === 'beta-rootly') {
+                    organizationName = integrations.find(i => String(i.id) === 'beta-rootly')?.name || 'Rootly'
+                  } else if (String(analysis.integration_id) === 'beta-pagerduty') {
+                    organizationName = integrations.find(i => String(i.id) === 'beta-pagerduty')?.name || 'PagerDuty'
+                  }
+                }
                 const isSelected = currentAnalysis?.id === analysis.id
                 
                 // Determine platform color from integration or analysis data
@@ -2765,18 +2774,14 @@ export default function Dashboard() {
                 } else if (matchingIntegration?.platform === 'pagerduty') {
                   platformColor = 'bg-green-500'   // PagerDuty = Green
                 } else {
-                  // For beta integrations, check the config to determine platform
+                  // For beta integrations or analyses, check multiple sources
                   const analysisConfig = (analysis as any).analysis_data?.config || {};
                   const betaIntegrationId = analysisConfig.beta_integration_id;
                   
-                  if (betaIntegrationId === 'beta-rootly') {
+                  if (betaIntegrationId === 'beta-rootly' || String(analysis.integration_id) === 'beta-rootly' || organizationName.includes('Rootly')) {
                     platformColor = 'bg-purple-500'  // Rootly = Purple
-                  } else if (betaIntegrationId === 'beta-pagerduty') {
+                  } else if (betaIntegrationId === 'beta-pagerduty' || String(analysis.integration_id) === 'beta-pagerduty' || organizationName.includes('PagerDuty')) {
                     platformColor = 'bg-green-500'   // PagerDuty = Green
-                  } else if (organizationName === 'Rootly') {
-                    platformColor = 'bg-purple-500'  // Fallback for Rootly
-                  } else if (organizationName === 'PagerDuty') {
-                    platformColor = 'bg-green-500'   // Fallback for PagerDuty
                   }
                 }
                 return (
