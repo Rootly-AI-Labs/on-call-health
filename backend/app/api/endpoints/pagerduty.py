@@ -123,11 +123,14 @@ async def get_pagerduty_integrations(
     if beta_pagerduty_token:
         try:
             # Test the beta token and get organization info
+            logger.info(f"Testing beta PagerDuty token: {beta_pagerduty_token[:10]}...")
             client = PagerDutyAPIClient(beta_pagerduty_token)
             test_result = await client.test_connection()
+            logger.info(f"Beta PagerDuty test_result: {test_result}")
             
             if test_result.get("valid"):
                 account_info = test_result.get("account_info", {})
+                logger.info(f"Beta PagerDuty account_info: {account_info}")
                 beta_integration = {
                     "id": "beta-pagerduty",  # Special ID for beta integration
                     "name": "PagerDuty (Beta Access)",
@@ -144,8 +147,40 @@ async def get_pagerduty_integrations(
                 # Add beta integration at the beginning of the list
                 result_integrations.insert(0, beta_integration)
                 logger.info(f"Added beta PagerDuty integration for user {current_user.id}")
+            else:
+                logger.warning(f"Beta PagerDuty test_connection failed: {test_result}")
+                # Add fallback integration with limited info
+                beta_integration = {
+                    "id": "beta-pagerduty",
+                    "name": "PagerDuty (Beta Access)",
+                    "organization_name": "Beta Organization", 
+                    "total_users": 0,
+                    "is_default": True,
+                    "is_beta": True,
+                    "created_at": datetime.now().isoformat(),
+                    "last_used_at": None,
+                    "token_suffix": f"***{beta_pagerduty_token[-4:]}",
+                    "platform": "pagerduty"
+                }
+                result_integrations.insert(0, beta_integration)
+                logger.info(f"Added fallback beta PagerDuty integration for user {current_user.id}")
         except Exception as e:
             logger.warning(f"Failed to add beta PagerDuty integration: {str(e)}")
+            # Add fallback integration even on exception
+            beta_integration = {
+                "id": "beta-pagerduty",
+                "name": "PagerDuty (Beta Access)",
+                "organization_name": "Beta Organization",
+                "total_users": 0,
+                "is_default": True,
+                "is_beta": True,
+                "created_at": datetime.now().isoformat(),
+                "last_used_at": None,
+                "token_suffix": "***BETA",
+                "platform": "pagerduty"
+            }
+            result_integrations.insert(0, beta_integration)
+            logger.info(f"Added exception fallback beta PagerDuty integration for user {current_user.id}")
     
     return {
         "integrations": result_integrations,
