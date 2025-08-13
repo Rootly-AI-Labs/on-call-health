@@ -216,6 +216,7 @@ async def run_burnout_analysis(
                 integration_id=integration.id,
                 api_token=integration.api_token,
                 platform=integration.platform,
+                organization_name=integration.organization_name,
                 time_range=request.time_range,
                 include_weekends=request.include_weekends,
                 include_github=request.include_github,
@@ -1876,6 +1877,7 @@ async def run_analysis_task(
     integration_id: int,
     api_token: str,
     platform: str,
+    organization_name: str,
     time_range: int,
     include_weekends: bool,
     include_github: bool = False,
@@ -2027,7 +2029,7 @@ async def run_analysis_task(
             enable_ai=use_ai_analyzer,
             github_token=github_token if include_github else None,
             slack_token=slack_token if include_slack else None,
-            organization_name=integration.organization_name
+            organization_name=organization_name
         )
         logger.info(f"BACKGROUND_TASK: UnifiedBurnoutAnalyzer initialized - Features: AI={use_ai_analyzer}, GitHub={include_github}, Slack={include_slack}")
         
