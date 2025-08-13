@@ -963,10 +963,9 @@ class AIBurnoutAnalyzerService:
     def _generate_llm_team_narrative(self, team_members: List[Dict[str, Any]], available_integrations: List[str]) -> str:
         """Generate detailed, colorful LLM-powered team analysis narrative."""
         try:
-            # Get current user context for LLM access
-            current_user = get_user_context()
-            if not current_user or not current_user.llm_token:
-                self.logger.warning("No LLM token available for team narrative generation")
+            # Check if we have an API key available (system or user)
+            if not self.api_key:
+                self.logger.warning("No LLM API key available for team narrative generation")
                 return self._generate_fallback_detailed_narrative(team_members, available_integrations)
             
             # Prepare comprehensive team data for LLM analysis
@@ -1059,20 +1058,13 @@ You are an expert burnout analyst reviewing a software team's health data. Gener
 
             # Call LLM for narrative generation
             try:
-                # Decrypt the LLM token before using it
-                from ..api.endpoints.llm import decrypt_token
-                decrypted_token = decrypt_token(current_user.llm_token) if current_user.llm_token else None
-                
-                if not decrypted_token:
-                    self.logger.warning("No valid LLM token available after decryption")
-                    return self._generate_fallback_detailed_narrative(team_members, available_integrations)
-                
-                if current_user.llm_provider == "anthropic":
-                    narrative = self._call_anthropic_for_narrative(prompt, decrypted_token)
-                elif current_user.llm_provider == "openai":
-                    narrative = self._call_openai_for_narrative(prompt, decrypted_token)
+                # Use the API key and provider from the service (system or user)
+                if self.provider == "anthropic":
+                    narrative = self._call_anthropic_for_narrative(prompt, self.api_key)
+                elif self.provider == "openai":
+                    narrative = self._call_openai_for_narrative(prompt, self.api_key)
                 else:
-                    self.logger.warning(f"Unsupported LLM provider: {current_user.llm_provider}")
+                    self.logger.warning(f"Unsupported LLM provider: {self.provider}")
                     return self._generate_fallback_detailed_narrative(team_members, available_integrations)
                 
                 return narrative

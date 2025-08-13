@@ -3682,13 +3682,32 @@ export default function Dashboard() {
                       }
                       
                       // No LLM-generated content available
-                      return (
-                        <div className="text-center py-12 text-gray-500">
-                          <Sparkles className="h-10 w-10 mx-auto mb-4 opacity-40 animate-pulse" />
-                          <h4 className="font-medium text-gray-700 mb-2">Generating AI Insights</h4>
-                          <p className="text-sm">AI analysis will be available in future runs. Try running a new analysis!</p>
-                        </div>
-                      )
+                      const isAnalysisRunning = currentAnalysis?.status === 'running' || currentAnalysis?.status === 'pending';
+                      
+                      if (isAnalysisRunning) {
+                        return (
+                          <div className="text-center py-12 text-gray-500">
+                            <Sparkles className="h-10 w-10 mx-auto mb-4 opacity-40 animate-pulse" />
+                            <h4 className="font-medium text-gray-700 mb-2">Generating AI Insights</h4>
+                            <p className="text-sm">AI analysis is being generated...</p>
+                          </div>
+                        )
+                      } else {
+                        return (
+                          <div className="text-center py-12 text-gray-500">
+                            <Sparkles className="h-10 w-10 mx-auto mb-4 opacity-40" />
+                            <h4 className="font-medium text-gray-700 mb-2">AI Insights Unavailable</h4>
+                            <p className="text-sm mb-4">Configure your AI token to enable intelligent team insights</p>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => router.push('/settings')}
+                            >
+                              Configure AI Settings
+                            </Button>
+                          </div>
+                        )
+                      }
                     })()}
                   </CardContent>
                 </Card>
@@ -5232,7 +5251,9 @@ export default function Dashboard() {
                           <div className={`w-2 h-2 rounded-full mr-2 ${
                             selected.platform === 'rootly' ? 'bg-purple-500' : 'bg-green-500'
                           }`}></div>
-                          <span className="font-medium">{selected.name}</span>
+                          <span className="font-medium">
+                            {selected.organization_name || selected.name || `${selected.platform === 'rootly' ? 'Rootly' : 'PagerDuty'} Integration`}
+                          </span>
                           <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 ml-auto" />
                         </div>
                         <button 
