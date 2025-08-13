@@ -280,7 +280,7 @@ async def list_integrations(
                     "is_beta": True,  # Special flag to indicate beta integration
                     "created_at": datetime.now().isoformat(),
                     "last_used_at": None,
-                    "token_suffix": "****BETA",
+                    "token_suffix": f"***{beta_rootly_token[-4:]}",
                     "permissions": permissions
                 }
                 
