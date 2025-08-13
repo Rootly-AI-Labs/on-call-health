@@ -131,7 +131,7 @@ async def get_pagerduty_integrations(
                 beta_integration = {
                     "id": "beta-pagerduty",  # Special ID for beta integration
                     "name": "PagerDuty (Beta Access)",
-                    "organization_name": account_info.get("name", "Beta Organization"),
+                    "organization_name": account_info.get("name") or "Beta Organization",
                     "total_users": 0,  # PagerDuty doesn't provide user count in test
                     "is_default": True,
                     "is_beta": True,  # Special flag to indicate beta integration

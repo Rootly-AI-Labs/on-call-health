@@ -270,7 +270,7 @@ async def list_integrations(
                 beta_integration = {
                     "id": "beta-rootly",  # Special ID for beta integration
                     "name": "Rootly (Beta Access)",
-                    "organization_name": test_result.get("organization_name", "Beta Organization"),
+                    "organization_name": test_result.get("organization_name") or "Beta Organization",
                     "total_users": test_result.get("total_users", 0),
                     "is_default": True,
                     "is_beta": True,  # Special flag to indicate beta integration
