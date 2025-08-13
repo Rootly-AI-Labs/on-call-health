@@ -1881,58 +1881,81 @@ export default function Dashboard() {
     return `${firstLine}\n${secondLine}`;
   };
 
-  // Dynamic analysis stages based on selected data sources
+  // Accurate analysis stages based on actual backend workflow and data sources
   const getAnalysisStages = () => {
     const stages = [
       { key: "loading", label: "Initializing Analysis", detail: "Setting up analysis parameters", progress: 5 },
-      { key: "connecting", label: "Connecting to Platform", detail: "Validating API credentials", progress: 10 },
-      { key: "fetching_users", label: "Fetching Organization Members", detail: "Loading user profiles", progress: 15 },
-      { key: "fetching", label: "Collecting Incident Data", detail: "Gathering incident history", progress: 35 }
+      { key: "connecting", label: "Connecting to Platform", detail: "Validating API credentials", progress: 12 },
+      { key: "fetching_users", label: "Fetching Organization Members", detail: "Loading user profiles and permissions", progress: 20 },
+      { key: "fetching", label: "Collecting Incident Data", detail: "Gathering 30-day incident history", progress: 35 }
     ]
 
     let currentProgress = 35
-    const remainingProgress = 50 // Leave 50% for processing/analysis phases
-    const additionalSources = (includeGithub && githubIntegration ? 1 : 0) + (includeSlack && slackIntegration ? 1 : 0)
-    const progressPerSource = additionalSources > 0 ? remainingProgress / (additionalSources + 2) : remainingProgress / 2
+    const hasGithub = includeGithub && githubIntegration
+    const hasSlack = includeSlack && slackIntegration  
+    const hasAI = enableAI
 
-    // Add GitHub data collection if enabled
-    if (includeGithub && githubIntegration) {
-      currentProgress += progressPerSource
+    // Add GitHub data collection if enabled (Step 2 extension)
+    if (hasGithub) {
       stages.push({
         key: "fetching_github",
         label: "Collecting GitHub Data",
-        detail: "Gathering code activity and review patterns",
-        progress: Math.round(currentProgress)
+        detail: "Gathering commits, PRs, and code review patterns", 
+        progress: 45
       })
+      currentProgress = 45
     }
 
-    // Add Slack data collection if enabled
-    if (includeSlack && slackIntegration) {
-      currentProgress += progressPerSource
+    // Add Slack data collection if enabled (Step 2 extension)  
+    if (hasSlack) {
       stages.push({
         key: "fetching_slack",
-        label: "Collecting Slack Data", 
-        detail: "Gathering communication patterns and activity",
-        progress: Math.round(currentProgress)
+        label: "Collecting Slack Data",
+        detail: "Gathering messaging patterns and team communication",
+        progress: hasGithub ? 52 : 45
       })
+      currentProgress = hasGithub ? 52 : 45
     }
 
-    // Add final processing stages
-    currentProgress += progressPerSource
+    // Backend Step 3: Team analysis (main processing phase)
     stages.push({
-      key: "calculating",
-      label: "Processing Patterns",
-      detail: `Analyzing ${getAnalysisDescription()}`,
-      progress: Math.round(currentProgress)
+      key: "analyzing_team",
+      label: "Analyzing Team Data", 
+      detail: "Processing incidents and calculating member metrics",
+      progress: currentProgress + 15
     })
+    currentProgress += 15
 
+    // Backend Step 4: Team health calculation
     stages.push({
-      key: "analyzing",
-      label: "Calculating Metrics",
-      detail: "Computing burnout scores",
-      progress: 85
+      key: "calculating_health",
+      label: "Calculating Team Health",
+      detail: "Computing burnout scores and risk levels", 
+      progress: currentProgress + 10
     })
+    currentProgress += 10
 
+    // Backend Step 5: Insights generation
+    stages.push({
+      key: "generating_insights",
+      label: "Generating Insights",
+      detail: "Analyzing patterns and creating recommendations",
+      progress: currentProgress + 8
+    })
+    currentProgress += 8
+
+    // Backend Step 7: AI enhancement (if enabled)
+    if (hasAI) {
+      stages.push({
+        key: "ai_analysis", 
+        label: "AI Team Analysis",
+        detail: "Generating intelligent insights and narratives",
+        progress: currentProgress + 12
+      })
+      currentProgress += 12
+    }
+
+    // Final preparation 
     stages.push({
       key: "preparing",
       label: "Finalizing Analysis",
@@ -2342,11 +2365,30 @@ export default function Dashboard() {
                   console.log('Advancing to stage:', stage.key, 'progress:', stage.progress, 'index:', prevIndex)
                   setAnalysisStage(stage.key as AnalysisStage)
                   
-                  // Add some randomness to the target progress
+                  // Add some randomness to the target progress but respect stage boundaries
                   const baseProgress = stage.progress
-                  const randomOffset = Math.floor(Math.random() * 5) // 0-4 random offset
-                  const targetWithRandomness = Math.min(baseProgress + randomOffset, 85) // Cap at 85% for simulation
+                  const randomOffset = Math.floor(Math.random() * 3) // 0-2 random offset (smaller for more predictable feel)
+                  const targetWithRandomness = Math.min(baseProgress + randomOffset, 88) // Cap at 88% for simulation
                   setTargetProgress(targetWithRandomness)
+                  
+                  // Add realistic timing delays based on stage type
+                  const stageTimings = {
+                    'loading': 1500,
+                    'connecting': 2000, 
+                    'fetching_users': 2500,
+                    'fetching': 3000,
+                    'fetching_github': 4000, // GitHub can be slower
+                    'fetching_slack': 3500,  
+                    'analyzing_team': 4500,  // Main processing takes longer
+                    'calculating_health': 2000,
+                    'generating_insights': 2500,
+                    'ai_analysis': 5000,     // AI processing is slower
+                    'preparing': 1000
+                  }
+                  
+                  // Log timing for this stage
+                  const timing = stageTimings[stage.key] || 2000
+                  console.log(`Stage "${stage.key}" will advance in ~${timing}ms`)
                   
                   // Only advance if we haven't reached the max simulated stage
                   if (prevIndex < maxSimulatedIndex) {

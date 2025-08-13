@@ -83,6 +83,7 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
+  LogOut,
 } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
@@ -1838,21 +1839,46 @@ export default function IntegrationsPage() {
             <h1 className="text-2xl font-bold text-slate-900">Manage Integrations</h1>
           </div>
 
-          <div className="flex flex-col items-end space-y-3">
+          <div className="flex items-center">
             {/* User Account Indicator */}
             {userInfo ? (
-              <div className="flex items-center space-x-3 px-3 py-1 bg-slate-50/80 rounded-full border border-slate-200">
-                <Avatar className="h-8 w-8">
-                  <AvatarImage src={userInfo.avatar} alt={userInfo.name} />
-                  <AvatarFallback className="bg-purple-600 text-white text-xs">
-                    {userInfo.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="hidden sm:block text-left">
-                  <div className="text-sm font-medium text-slate-900">{userInfo.name}</div>
-                  <div className="text-xs text-slate-500">{userInfo.email}</div>
-                </div>
-              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <div className="flex items-center space-x-3 px-3 py-1 bg-slate-50/80 rounded-full border border-slate-200 hover:bg-slate-100 cursor-pointer transition-colors">
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={userInfo.avatar} alt={userInfo.name} />
+                      <AvatarFallback className="bg-purple-600 text-white text-xs">
+                        {userInfo.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="hidden sm:block text-left">
+                      <div className="text-sm font-medium text-slate-900">{userInfo.name}</div>
+                      <div className="text-xs text-slate-500">{userInfo.email}</div>
+                    </div>
+                  </div>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem disabled className="px-2 py-1.5">
+                    <div>
+                      <div className="font-medium text-gray-900">{userInfo.name}</div>
+                      <div className="text-xs text-gray-500">{userInfo.email}</div>
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem 
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50 px-2 py-1.5 cursor-pointer"
+                    onClick={() => {
+                      // Clear all user data
+                      localStorage.clear();
+                      // Redirect to home page
+                      window.location.href = '/';
+                    }}
+                  >
+                    <LogOut className="w-4 h-4 mr-2" />
+                    Sign Out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             ) : (
               <div className="flex items-center space-x-2 px-3 py-1 bg-slate-50/80 rounded-full border border-slate-200">
                 <Avatar className="h-8 w-8">
@@ -1866,13 +1892,6 @@ export default function IntegrationsPage() {
                 </div>
               </div>
             )}
-            
-            <Link href="/dashboard">
-              <Button size="sm" className="flex items-center space-x-2 bg-purple-600 hover:bg-purple-700 text-white">
-                <Activity className="w-4 h-4" />
-                <span>Go to Dashboard</span>
-              </Button>
-            </Link>
           </div>
         </div>
       </header>
