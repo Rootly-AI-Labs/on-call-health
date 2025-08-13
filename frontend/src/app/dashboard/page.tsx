@@ -2753,7 +2753,7 @@ export default function Dashboard() {
                                           integrations.find(i => String(i.id) === String(analysis.integration_id))
                 
                 // Use organization name from analysis results if available, fall back to integration name
-                const organizationName = (analysis as any).results?.metadata?.organization_name || 
+                const organizationName = (analysis as any).analysis_data?.metadata?.organization_name || 
                                         matchingIntegration?.name || 
                                         `Organization ${analysis.integration_id}`
                 const isSelected = currentAnalysis?.id === analysis.id
