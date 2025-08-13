@@ -16,6 +16,42 @@ interface Change {
 // Major changes in human-readable format
 const majorChanges: Change[] = [
   {
+    date: "2025-08-13",
+    title: "User account dropdown with sign out",
+    type: "feature",
+    description: "Click on your name in the header to access account options and sign out - no more being stuck logged in!"
+  },
+  {
+    date: "2025-08-13",
+    title: "Better chart title: Individual Burnout Health Levels",
+    type: "improvement",
+    description: "Renamed 'Team Members' chart to 'Individual Burnout Health Levels' for clearer understanding of what the bars represent"
+  },
+  {
+    date: "2025-08-13",
+    title: "Complete radar chart shows all burnout factors",
+    type: "fix",
+    description: "Radar chart now displays all 5 burnout dimensions (workload, after-hours, weekend work, incident load, response pressure) even when some are zero"
+  },
+  {
+    date: "2025-08-13",
+    title: "Beta testing made easier with shared tokens",
+    type: "feature",
+    description: "New users can immediately run analyses without setting up their own integrations - shared beta tokens provide instant access to real data"
+  },
+  {
+    date: "2025-08-13",
+    title: "Fixed cross-user data leakage",
+    type: "fix",
+    description: "Logging in with different Google accounts now properly clears previous user's data - no more seeing someone else's analyses"
+  },
+  {
+    date: "2025-08-13",
+    title: "Improved New Analysis modal performance",
+    type: "improvement",
+    description: "Modal opens instantly when you have cached integration data instead of refetching everything every time"
+  },
+  {
     date: "2025-08-04",
     title: "Changelog now loads instantly",
     type: "fix",
