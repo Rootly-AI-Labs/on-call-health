@@ -3736,8 +3736,8 @@ export default function Dashboard() {
               {/* Organization Member Scores - Full Width */}
               <Card className="mb-6">
                 <CardHeader>
-                  <CardTitle>Team Members</CardTitle>
-                  <CardDescription>Individual burnout risk levels and incident metrics</CardDescription>
+                  <CardTitle>Individual Burnout Health Levels</CardTitle>
+                  <CardDescription>Team member wellness scores and incident response metrics</CardDescription>
                 </CardHeader>
                 <CardContent>
                   {memberBarData.length > 0 ? (
