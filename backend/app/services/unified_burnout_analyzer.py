@@ -337,8 +337,8 @@ class UnifiedBurnoutAnalyzer:
             result = {
                 "analysis_timestamp": datetime.now().isoformat(),
                 "metadata": {
-                    **metadata,
-                    "organization_name": self.organization_name or metadata.get("organization_name", "Organization"),
+                    **{k: v for k, v in metadata.items() if not (k == "organization_name" and v is None)},
+                    "organization_name": self.organization_name or metadata.get("organization_name") or "Organization",
                     "include_weekends": include_weekends,
                     "include_github": self.features['github'],
                     "include_slack": self.features['slack'],
