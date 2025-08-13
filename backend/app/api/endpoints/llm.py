@@ -141,8 +141,25 @@ async def get_llm_token_info(
 ):
     """Get information about user's stored LLM token (without the actual token)."""
     
-    if not current_user.has_llm_token():
-        return LLMTokenResponse(has_token=False)
+    # Check if user has their own token
+    if current_user.has_llm_token():
+        # User has their own token - return user token info
+        pass  # Continue with existing user token logic below
+    else:
+        # Check if Railway environment has system token
+        import os
+        system_api_key = os.getenv('ANTHROPIC_API_KEY')
+        if system_api_key:
+            # Return system token info (Railway environment)
+            return LLMTokenResponse(
+                has_token=True,
+                provider='anthropic',
+                token_suffix=f"****{system_api_key[-4:]}",
+                created_at=None  # System token doesn't have creation date
+            )
+        else:
+            # No user token and no system token
+            return LLMTokenResponse(has_token=False)
     
     try:
         # Decrypt token to get suffix
