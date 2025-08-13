@@ -1839,13 +1839,6 @@ export default function IntegrationsPage() {
           </div>
 
           <div className="flex flex-col items-end space-y-3">
-            <Link href="/dashboard">
-              <Button size="sm" className="flex items-center space-x-2 bg-purple-600 hover:bg-purple-700 text-white">
-                <Activity className="w-4 h-4" />
-                <span>Go to Dashboard</span>
-              </Button>
-            </Link>
-            
             {/* User Account Indicator */}
             {userInfo ? (
               <div className="flex items-center space-x-3 px-3 py-1 bg-slate-50/80 rounded-full border border-slate-200">
@@ -1873,6 +1866,13 @@ export default function IntegrationsPage() {
                 </div>
               </div>
             )}
+            
+            <Link href="/dashboard">
+              <Button size="sm" className="flex items-center space-x-2 bg-purple-600 hover:bg-purple-700 text-white">
+                <Activity className="w-4 h-4" />
+                <span>Go to Dashboard</span>
+              </Button>
+            </Link>
           </div>
         </div>
       </header>
