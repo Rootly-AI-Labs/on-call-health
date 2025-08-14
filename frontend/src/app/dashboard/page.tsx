@@ -1108,19 +1108,31 @@ export default function Dashboard() {
     const orgId = urlParams.get('org')
     const analysisId = urlParams.get('analysis')
     
-    // Add event listener for page focus to refresh integrations
+    // Add event listener for page focus to refresh integrations (less aggressive)
     const handlePageFocus = () => {
-      console.log('Page focused, checking if integrations need refresh')
-      // Force refresh integrations when page regains focus
-      loadIntegrations(true, false)
+      // Only refresh if we haven't refreshed in the last 30 seconds
+      const lastRefresh = localStorage.getItem('last_integrations_refresh')
+      const now = Date.now()
+      if (!lastRefresh || now - parseInt(lastRefresh) > 30000) {
+        console.log('Page focused, refreshing integrations (30s throttle)')
+        localStorage.setItem('last_integrations_refresh', now.toString())
+        loadIntegrations(true, false)
+      }
     }
 
     window.addEventListener('focus', handlePageFocus)
-    document.addEventListener('visibilitychange', () => {
+    const visibilityHandler = () => {
       if (!document.hidden) {
         handlePageFocus()
       }
-    })
+    }
+    document.addEventListener('visibilitychange', visibilityHandler)
+    
+    // Cleanup event listeners on unmount
+    return () => {
+      window.removeEventListener('focus', handlePageFocus)
+      document.removeEventListener('visibilitychange', visibilityHandler)
+    }
 
     // Load cached integrations first
     const cachedIntegrations = localStorage.getItem('all_integrations')
@@ -2460,9 +2472,16 @@ export default function Dashboard() {
             }
           }
 
-          // Continue polling
-          pollRetryCount = 0 // Reset retry count on successful poll
-          setTimeout(pollAnalysis, 2000)
+          // Continue polling only if analysis is still running
+          if (analysisData.status !== 'completed' && analysisData.status !== 'failed') {
+            pollRetryCount = 0 // Reset retry count on successful poll
+            setTimeout(pollAnalysis, 2000)
+          } else {
+            // Analysis is complete - stop polling
+            console.log('Analysis completed, stopping polling')
+            setAnalysisRunning(false)
+            setCurrentRunningAnalysisId(null)
+          }
         } catch (error) {
           console.error('Polling error:', error)
           pollRetryCount++
