@@ -49,7 +49,7 @@ async def test_rootly_token_preview(
     client = RootlyAPIClient(token_request.token)
     test_result = await client.test_connection()
     
-    print(f"DEBUG: Rootly test_connection result: {test_result}")
+    logger.info(f"Rootly test connection: {test_result.get('status', 'unknown')} - {test_result.get('organization_name', 'N/A')}")
     
     if test_result["status"] != "success":
         raise HTTPException(

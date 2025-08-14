@@ -87,8 +87,7 @@ async def run_burnout_analysis(
     """Run a new burnout analysis for a specific integration and time range."""
     try:
         logger.info(f"Starting analysis for integration {request.integration_id}, user {current_user.id}")
-        print(f"ENDPOINT_DEBUG: Entered run_burnout_analysis for integration {request.integration_id}")
-        print(f"ENDPOINT_DEBUG: Request params - include_github: {request.include_github}, include_slack: {request.include_slack}")
+        logger.info(f"Analysis request: integration={request.integration_id}, github={request.include_github}, slack={request.include_slack}")
         logger.info(f"ENDPOINT_DEBUG: Entered run_burnout_analysis for integration {request.integration_id}")
         logger.info(f"ENDPOINT_DEBUG: Request params - include_github: {request.include_github}, include_slack: {request.include_slack}")
         

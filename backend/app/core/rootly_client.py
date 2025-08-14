@@ -109,8 +109,8 @@ class RootlyAPIClient:
                             "error_code": "INVALID_RESPONSE"
                         }
                     
-                    # Log full response to examine available organization data
-                    print(f"DEBUG: Full Rootly API response: {data}")
+                    # Log summary instead of full response to reduce noise
+                    logger.debug(f"Rootly users API: Retrieved {len(data.get('data', []))} users from {data.get('meta', {}).get('total_count', 'unknown')} total")
                     
                     # Extract any organization/account info from the response
                     organization_name = None

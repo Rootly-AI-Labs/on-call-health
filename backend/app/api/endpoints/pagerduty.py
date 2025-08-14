@@ -61,13 +61,13 @@ async def test_pagerduty_token(
     if result["valid"]:
         # Check if this organization is already connected
         org_name = result["account_info"]["organization_name"]
-        print(f"DEBUG: PagerDuty org_name: {org_name}")
+        logger.info(f"PagerDuty organization: {org_name}")
         
         # Get all existing integrations for debugging
         all_existing = db.query(RootlyIntegration).filter(
             RootlyIntegration.user_id == current_user.id
         ).all()
-        print(f"DEBUG: All existing integrations: {[(i.id, i.name, i.organization_name, i.platform) for i in all_existing]}")
+        logger.debug(f"Existing integrations: {len(all_existing)} found for user {current_user.id}")
         
         existing = db.query(RootlyIntegration).filter(
             and_(
