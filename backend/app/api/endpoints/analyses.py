@@ -1750,11 +1750,30 @@ async def get_member_daily_health(
     user_key = member_email.lower()
     
     if user_key not in individual_daily_data:
-        return {
-            "status": "error",
-            "message": f"No individual daily data available for {member_email}",
-            "data": None
-        }
+        # FALLBACK: Generate individual daily data for old analyses
+        logger.info(f"User {member_email} not found in individual_daily_data, generating fallback data from daily_trends")
+        
+        # Create empty daily structure for this user
+        days_analyzed = analysis.results.get("period_summary", {}).get("days_analyzed", 30)
+        user_daily_data = {}
+        
+        # Initialize all days as no-data days
+        from datetime import datetime, timedelta
+        for day_offset in range(days_analyzed):
+            date_obj = datetime.now() - timedelta(days=days_analyzed - day_offset - 1)
+            date_str = date_obj.strftime('%Y-%m-%d')
+            user_daily_data[date_str] = {
+                "date": date_str,
+                "incident_count": 0,
+                "severity_weighted_count": 0.0,
+                "after_hours_count": 0,
+                "weekend_count": 0,
+                "response_times": [],
+                "has_data": False
+            }
+            
+        # Set this as the user's data for the rest of the function
+        individual_daily_data[user_key] = user_daily_data
     
     user_daily_data = individual_daily_data[user_key]
     
@@ -1775,66 +1794,78 @@ async def get_member_daily_health(
     
     for date_str, day_data in user_daily_data.items():
         incident_count = day_data.get("incident_count", 0)
+        has_data = day_data.get("has_data", False)
         
-        if incident_count == 0:
-            continue  # Only show days with incidents
+        # Process ALL days - both with and without incident data
         
-        # Calculate individual health score
-        severity_weighted = day_data.get("severity_weighted_count", 0)
-        after_hours_count = day_data.get("after_hours_count", 0) 
-        high_severity_count = day_data.get("high_severity_count", 0)
-        
-        # Individual scoring
-        base_score = 8.5
-        
-        # Incident volume penalty
-        if incident_count > 0:
-            incident_penalty = min(incident_count * 1.0, 3.0)
-            base_score -= incident_penalty
-        
-        # Severity penalty
-        if severity_weighted > incident_count:
-            severity_penalty = min((severity_weighted - incident_count) * 0.8, 2.0)
-            base_score -= severity_penalty
-        
-        # After-hours penalty
-        if after_hours_count > 0:
-            after_hours_penalty = min(after_hours_count * 0.7, 1.5)
-            base_score -= after_hours_penalty
-        
-        # High severity penalty
-        if high_severity_count > 0:
-            high_sev_penalty = min(high_severity_count * 1.0, 2.0)
-            base_score -= high_sev_penalty
-        
-        # Floor at 1.0
-        daily_health_score = max(base_score, 1.0)
-        
-        # Calculate factors
-        member_factors = member_data.get("factors", {})
-        factors = {
-            "workload": min(incident_count / 5.0 * 10, 10),
-            "after_hours": (after_hours_count / max(incident_count, 1)) * 10 if incident_count > 0 else 0,
-            "response_time": member_factors.get("response_time", 0),
-            "weekend_work": member_factors.get("weekend_work", 0),
-            "severity_pressure": (high_severity_count / max(incident_count, 1)) * 10 if incident_count > 0 else 0
-        }
+        # Calculate individual health score - only for days with data
+        if has_data:
+            severity_weighted = day_data.get("severity_weighted_count", 0)
+            after_hours_count = day_data.get("after_hours_count", 0) 
+            high_severity_count = day_data.get("high_severity_count", 0)
+            
+            # Individual scoring
+            base_score = 8.5
+            
+            # Incident volume penalty
+            if incident_count > 0:
+                incident_penalty = min(incident_count * 1.0, 3.0)
+                base_score -= incident_penalty
+            
+            # Severity penalty
+            if severity_weighted > incident_count:
+                severity_penalty = min((severity_weighted - incident_count) * 0.8, 2.0)
+                base_score -= severity_penalty
+            
+            # After-hours penalty
+            if after_hours_count > 0:
+                after_hours_penalty = min(after_hours_count * 0.7, 1.5)
+                base_score -= after_hours_penalty
+            
+            # High severity penalty
+            if high_severity_count > 0:
+                high_sev_penalty = min(high_severity_count * 1.0, 2.0)
+                base_score -= high_sev_penalty
+            
+            # Floor at 1.0
+            daily_health_score = max(base_score, 1.0)
+            
+            # Calculate factors
+            member_factors = member_data.get("factors", {})
+            factors = {
+                "workload": min(incident_count / 5.0 * 10, 10),
+                "after_hours": (after_hours_count / max(incident_count, 1)) * 10 if incident_count > 0 else 0,
+                "response_time": member_factors.get("response_time", 0),
+                "weekend_work": member_factors.get("weekend_work", 0),
+                "severity_pressure": (high_severity_count / max(incident_count, 1)) * 10 if incident_count > 0 else 0
+            }
+            
+            health_score_scaled = round(daily_health_score * 10)  # 0-100 scale
+        else:
+            # No data day - set scores to None
+            factors = None
+            health_score_scaled = None
         
         daily_health_scores.append({
             "date": date_str,
-            "health_score": round(daily_health_score * 10),  # 0-100 scale
+            "health_score": health_score_scaled,
+            "has_data": has_data,  # NEW: Flag for frontend grey bars
             "incident_count": incident_count,
             "team_health": round(team_health_by_date.get(date_str, 0) * 10),  # Team score for comparison
             "factors": factors,
-            "incidents": day_data.get("incidents", []),
+            "incidents": day_data.get("incidents", []) if has_data else [],
             "severity_weighted_count": round(severity_weighted, 1),
             "after_hours_count": after_hours_count,
             "high_severity_count": high_severity_count
         })
     
-    # Sort by date and take last 14 days with incidents
+    # Sort by date and take last 30 days (now includes no-data days)
     daily_health_scores.sort(key=lambda x: x["date"])
-    daily_health_scores = daily_health_scores[-14:]
+    daily_health_scores = daily_health_scores[-30:]
+    
+    # Calculate summary statistics for days with data only
+    days_with_data = [d for d in daily_health_scores if d["has_data"]]
+    days_without_data = [d for d in daily_health_scores if not d["has_data"]]
     
     return {
         "status": "success",
@@ -1843,10 +1874,12 @@ async def get_member_daily_health(
             "member_name": member_data.get("user_name", "Unknown"),
             "daily_health": daily_health_scores,
             "summary": {
-                "total_incident_days": len(daily_health_scores),
-                "avg_health_score": round(sum(d["health_score"] for d in daily_health_scores) / len(daily_health_scores)) if daily_health_scores else 0,
-                "lowest_health_day": min(daily_health_scores, key=lambda x: x["health_score"]) if daily_health_scores else None,
-                "highest_health_day": max(daily_health_scores, key=lambda x: x["health_score"]) if daily_health_scores else None
+                "total_days": len(daily_health_scores),
+                "days_with_data": len(days_with_data),
+                "days_without_data": len(days_without_data),
+                "avg_health_score": round(sum(d["health_score"] for d in days_with_data) / len(days_with_data)) if days_with_data else 0,
+                "lowest_health_day": min(days_with_data, key=lambda x: x["health_score"]) if days_with_data else None,
+                "highest_health_day": max(days_with_data, key=lambda x: x["health_score"]) if days_with_data else None
             }
         }
     }
@@ -2092,7 +2125,7 @@ async def run_analysis_task(
                     user_id=user_id,
                     analysis_id=analysis_id
                 ),
-                timeout=600.0  # Reduce timeout to 10 minutes to fail faster
+                timeout=480.0  # 8 minutes - aggressive timeout to fail faster
             )
             
             logger.info(f"BACKGROUND_TASK: Analysis execution completed at {datetime.now()}")
@@ -2139,14 +2172,15 @@ async def run_analysis_task(
                 
         except asyncio.TimeoutError:
             # Handle timeout
-            logger.error(f"BACKGROUND_TASK: Analysis {analysis_id} timed out after 10 minutes")
+            logger.error(f"BACKGROUND_TASK: Analysis {analysis_id} timed out after 8 minutes")
             logger.error(f"BACKGROUND_TASK: Timeout occurred at {datetime.now()}")
-            logger.error(f"BACKGROUND_TASK: Analysis was stuck in UnifiedBurnoutAnalyzer.analyze_burnout() method")
+            logger.error(f"BACKGROUND_TASK: Analysis was stuck - likely during incident data collection phase (causing 85% progress hang)")
+            logger.error(f"BACKGROUND_TASK: This typically happens when Rootly API pagination takes too long")
             
             analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
             if analysis:
                 analysis.status = "failed"
-                analysis.error_message = "Analysis timed out after 10 minutes - likely stuck in data collection or processing"
+                analysis.error_message = "Analysis timed out after 8 minutes - likely stuck during incident data collection (85% progress hang). Try with a shorter time range or check Rootly API connectivity."
                 analysis.completed_at = datetime.now()
                 db.commit()
                 logger.info(f"BACKGROUND_TASK: Updated analysis {analysis_id} status to failed due to timeout")

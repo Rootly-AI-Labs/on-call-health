@@ -389,9 +389,10 @@ type AnalysisStage = "loading" | "connecting" | "fetching_users" | "fetching" | 
 // All dashboard components now only display real analysis data from the API
 
 // Component for individual daily health tracking
-function IndividualDailyHealthChart({ memberData, analysisId }: {
+function IndividualDailyHealthChart({ memberData, analysisId, currentAnalysis }: {
   memberData: any
   analysisId?: number | string
+  currentAnalysis?: any
 }) {
   const [dailyHealthData, setDailyHealthData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -440,7 +441,24 @@ function IndividualDailyHealthChart({ memberData, analysisId }: {
         }
       } catch (err) {
         console.error('Error fetching daily health:', err);
-        setError('Failed to load daily health data');
+        console.log('Attempting fallback calculation with analysis:', currentAnalysis?.id);
+        
+        // Fallback: Calculate daily health from existing analysis data
+        if (currentAnalysis && currentAnalysis.results) {
+          try {
+            const dailyTrends = currentAnalysis.results.daily_trends || [];
+            const memberEmail = memberData?.user_email?.toLowerCase();
+            
+            // Don't show fabricated data - only show if there's actual individual incident data
+            console.log(`No individual daily health data available for ${memberData?.user_email}`);
+            setError('No individual daily health data available - this member had no incident involvement during the analysis period');
+          } catch (fallbackErr) {
+            console.error('Fallback calculation failed:', fallbackErr);
+            setError('Failed to load daily health data');
+          }
+        } else {
+          setError('Failed to load daily health data');
+        }
       } finally {
         setLoading(false);
       }
@@ -484,7 +502,7 @@ function IndividualDailyHealthChart({ memberData, analysisId }: {
       <div className="bg-white p-6 rounded-lg border border-gray-200">
         <div className="mb-4 flex items-center justify-between">
           <p className="text-sm text-gray-600">
-            Health scores on incident days (last {dailyHealthData.length} days)
+            Daily health timeline (last {dailyHealthData.length} days)
           </p>
           <div className="flex items-center space-x-4 text-xs text-gray-500">
             <div className="flex items-center space-x-1">
@@ -498,6 +516,10 @@ function IndividualDailyHealthChart({ memberData, analysisId }: {
             <div className="flex items-center space-x-1">
               <div className="w-3 h-3 bg-red-500 rounded"></div>
               <span>Poor (&lt;40)</span>
+            </div>
+            <div className="flex items-center space-x-1">
+              <div className="w-3 h-3 bg-gray-300 border border-gray-400 border-dashed rounded"></div>
+              <span>No Data</span>
             </div>
           </div>
         </div>
@@ -529,19 +551,25 @@ function IndividualDailyHealthChart({ memberData, analysisId }: {
                 }}
               />
               <Tooltip 
-                formatter={(value, name) => [`${value}%`, 'Health Score']}
-                labelFormatter={(label, payload) => {
-                  if (payload && payload.length > 0) {
+                content={({ active, payload, label }) => {
+                  if (active && payload && payload[0]) {
                     const data = payload[0].payload;
-                    return `${data.day_name} (${data.incident_count} incident${data.incident_count !== 1 ? 's' : ''})`;
+                    return (
+                      <div className="bg-white p-3 border rounded-lg shadow-lg text-sm">
+                        <p className="font-semibold text-gray-800">{data.day_name}</p>
+                        {data.has_data ? (
+                          <>
+                            <p className="text-green-600">Health Score: {data.health_score}/100</p>
+                            <p className="text-gray-600">Incidents: {data.incident_count}</p>
+                            <p className="text-blue-600">Team Health: {data.team_health}/100</p>
+                          </>
+                        ) : (
+                          <p className="text-gray-500 italic">No incident involvement this day</p>
+                        )}
+                      </div>
+                    );
                   }
-                  return label;
-                }}
-                contentStyle={{
-                  backgroundColor: '#F9FAFB',
-                  border: '1px solid #E5E7EB',
-                  borderRadius: '8px',
-                  fontSize: '12px'
+                  return null;
                 }}
               />
               <Bar 
@@ -552,9 +580,14 @@ function IndividualDailyHealthChart({ memberData, analysisId }: {
                   <Cell 
                     key={`cell-${index}`} 
                     fill={
+                      !entry.has_data ? '#E5E7EB' : // Grey for no-data days
                       entry.health_score >= 70 ? '#10B981' : 
                       entry.health_score >= 40 ? '#F59E0B' : '#EF4444'
-                    } 
+                    }
+                    stroke={!entry.has_data ? '#9CA3AF' : undefined}
+                    strokeWidth={!entry.has_data ? 1 : 0}
+                    strokeDasharray={!entry.has_data ? '3,3' : undefined}
+                    opacity={!entry.has_data ? 0.6 : 1}
                   />
                 ))}
               </Bar>
@@ -563,9 +596,9 @@ function IndividualDailyHealthChart({ memberData, analysisId }: {
         </div>
         
         <div className="mt-4 text-xs text-gray-500 space-y-1">
-          <p>• Health scores based on real burnout factors and daily incident patterns</p>
+          <p>• Health scores calculated only for days with incident involvement</p>
+          <p>• Grey bars indicate days without incident involvement - no data available</p>
           <p>• Lower scores indicate higher stress from workload, after-hours work, and response time pressure</p>
-          <p>• Calculated using team health trends and individual member burnout data</p>
         </div>
       </div>
     </div>
@@ -2094,12 +2127,35 @@ export default function Dashboard() {
     setDialogSelectedIntegration(integrationToUse)
     setShowTimeRangeDialog(true)
 
-    // Only load additional data if we don't have it AND we haven't recently checked
+    // Load cached GitHub/Slack data immediately if we don't have it in state
+    if (!githubIntegration || !slackIntegration) {
+      const cachedGitHub = localStorage.getItem('github_integration')
+      const cachedSlack = localStorage.getItem('slack_integration')
+      
+      if (cachedGitHub && !githubIntegration) {
+        try {
+          setGithubIntegration(JSON.parse(cachedGitHub))
+        } catch (e) {
+          console.error('Error parsing cached GitHub integration:', e)
+        }
+      }
+      
+      if (cachedSlack && !slackIntegration) {
+        try {
+          setSlackIntegration(JSON.parse(cachedSlack))
+        } catch (e) {
+          console.error('Error parsing cached Slack integration:', e)
+        }
+      }
+    }
+
+    // Check if we need to refresh cache
     const lastIntegrationsLoad = localStorage.getItem('all_integrations_timestamp')
     const integrationsCacheAge = lastIntegrationsLoad ? Date.now() - parseInt(lastIntegrationsLoad) : Infinity
     const integrationsCacheValid = integrationsCacheAge < 5 * 60 * 1000 // 5 minutes
     
-    const needsGitHubSlackData = (!githubIntegration && !slackIntegration) && !integrationsCacheValid
+    // Only fetch fresh data if cache is stale
+    const needsGitHubSlackData = !integrationsCacheValid
     const needsLlmConfig = !llmConfig
     
     if (needsGitHubSlackData || needsLlmConfig) {
@@ -5855,6 +5911,7 @@ export default function Dashboard() {
               <IndividualDailyHealthChart 
                 memberData={memberData}
                 analysisId={currentAnalysis?.id}
+                currentAnalysis={currentAnalysis}
               />
 
               {/* Burnout Dimensions - Only show if real dimensions available */}

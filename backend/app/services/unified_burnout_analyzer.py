@@ -1738,9 +1738,31 @@ class UnifiedBurnoutAnalyzer:
             
             # Initialize daily data structures - team level and individual level
             daily_data = {}
-            individual_daily_data = {}  # New: track per-user daily data
+            individual_daily_data = {}  # New: track per-user daily data for ALL days
             
-            # Process incidents to populate daily data - only for days with incidents
+            # NEW: Initialize ALL users with ALL days in analysis period (including no-incident days)
+            all_users = set()
+            for user in users:
+                if user.get('email'):
+                    all_users.add(user['email'].lower())
+            
+            # Initialize every user with every day in the analysis period
+            for user_email in all_users:
+                individual_daily_data[user_email] = {}
+                for day_offset in range(days_analyzed):
+                    date_obj = datetime.now() - timedelta(days=days_analyzed - day_offset - 1)
+                    date_str = date_obj.strftime('%Y-%m-%d')
+                    individual_daily_data[user_email][date_str] = {
+                        "date": date_str,
+                        "incident_count": 0,
+                        "severity_weighted_count": 0.0,
+                        "after_hours_count": 0,
+                        "weekend_count": 0,
+                        "response_times": [],
+                        "has_data": False  # Key flag: True only when real incident involvement exists
+                    }
+            
+            # Process incidents to populate daily data - now updating existing structure
             if incidents and isinstance(incidents, list):
                 for incident in incidents:
                     try:
@@ -1836,34 +1858,27 @@ class UnifiedBurnoutAnalyzer:
                                         if user_id:
                                             daily_data[date_str]["users_involved"].add(user_id)
                             
-                            # Track individual user daily data
+                            # Track individual user daily data - now updating pre-initialized structure
                             if user_email:
                                 user_key = user_email.lower()
                                 
-                                # Initialize user daily data structure if needed
-                                if user_key not in individual_daily_data:
-                                    individual_daily_data[user_key] = {}
-                                
-                                if date_str not in individual_daily_data[user_key]:
-                                    individual_daily_data[user_key][date_str] = {
-                                        "date": date_str,
-                                        "incident_count": 0,
-                                        "severity_weighted_count": 0.0,
-                                        "after_hours_count": 0,
-                                        "high_severity_count": 0,
-                                        "incidents": []  # Store full incident details for granular analysis
-                                    }
-                                
-                                # Update individual user metrics for this day
-                                user_day_data = individual_daily_data[user_key][date_str]
-                                user_day_data["incident_count"] += 1
-                                user_day_data["severity_weighted_count"] += severity_weight
-                                
-                                if incident_hour < 8 or incident_hour > 18:
-                                    user_day_data["after_hours_count"] += 1
-                                
-                                if severity_weight >= 2.0:  # High severity threshold
-                                    user_day_data["high_severity_count"] += 1
+                                # User should already exist in our pre-initialized structure
+                                if user_key in individual_daily_data and date_str in individual_daily_data[user_key]:
+                                    # Update the existing entry (already initialized with defaults)
+                                    user_day_data = individual_daily_data[user_key][date_str]
+                                    user_day_data["incident_count"] += 1
+                                    user_day_data["severity_weighted_count"] += severity_weight
+                                    user_day_data["has_data"] = True  # Mark as having real data
+                                    
+                                    if incident_hour < 8 or incident_hour > 18:
+                                        user_day_data["after_hours_count"] += 1
+                                    
+                                    # Store weekend incidents
+                                    if incident_date.weekday() >= 5:  # Saturday=5, Sunday=6
+                                        user_day_data["weekend_count"] += 1
+                                else:
+                                    # Fallback: user not in our initialized structure (shouldn't happen)
+                                    logger.warning(f"User {user_key} not found in pre-initialized individual_daily_data for date {date_str}")
                                 
                                 # Store incident details for individual analysis
                                 user_day_data["incidents"].append({

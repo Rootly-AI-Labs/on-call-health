@@ -1,6 +1,7 @@
 """
 Rootly API client for direct HTTP integration.
 """
+import asyncio
 import httpx
 import logging
 from datetime import datetime, timedelta
@@ -289,7 +290,11 @@ class RootlyAPIClient:
                     logger.info("🔍 INCIDENT TEST: PASSED - Endpoint accessible")
                 
                 pagination_start = datetime.now()
-                while len(all_incidents) < limit:
+                consecutive_failures = 0
+                max_consecutive_failures = 3
+                total_pagination_timeout = 600  # 10 minutes max for all pagination
+                
+                while len(all_incidents) < limit and consecutive_failures < max_consecutive_failures:
                     page_start_time = datetime.now()
                     
                     # Use adaptive page size based on time range to optimize performance
@@ -319,29 +324,63 @@ class RootlyAPIClient:
                     logger.info(f"🔍 INCIDENT PAGE {page}: Requesting {actual_page_size} incidents for {days_back}-day analysis")
                     
                     try:
+                        # Check if we've exceeded total pagination timeout
+                        pagination_elapsed = (datetime.now() - pagination_start).total_seconds()
+                        if pagination_elapsed > total_pagination_timeout:
+                            logger.error(f"🔍 PAGINATION TIMEOUT: Exceeded {total_pagination_timeout}s limit after {len(all_incidents)} incidents")
+                            break
+                        
                         response = await client.get(
                             f"{self.base_url}/v1/incidents?{params_encoded}",
                             headers=self.headers,
-                            timeout=30.0  # Increase timeout to 30 seconds
+                            timeout=15.0  # Reduce timeout to 15 seconds for faster failure
                         )
                         api_calls_made += 1
                         page_request_duration = (datetime.now() - page_start_time).total_seconds()
                         logger.info(f"🔍 INCIDENT PAGE {page}: Request completed in {page_request_duration:.2f}s - Status: {response.status_code}")
                     except Exception as request_error:
+                        consecutive_failures += 1
                         page_request_duration = (datetime.now() - page_start_time).total_seconds()
-                        logger.error(f"🔍 INCIDENT PAGE {page}: REQUEST FAILED after {page_request_duration:.2f}s: {request_error}")
+                        logger.error(f"🔍 INCIDENT PAGE {page}: REQUEST FAILED after {page_request_duration:.2f}s: {request_error} (failure {consecutive_failures}/{max_consecutive_failures})")
                         logger.error(f"🔍 INCIDENT PAGE {page}: Exception type: {type(request_error).__name__}")
-                        raise request_error
+                        
+                        # If we have some incidents already, continue with partial data
+                        if consecutive_failures >= max_consecutive_failures:
+                            if all_incidents:
+                                logger.warning(f"🔍 INCIDENT FETCH: Stopping after {consecutive_failures} consecutive failures. Returning {len(all_incidents)} incidents collected so far.")
+                                break
+                            else:
+                                # No incidents collected, re-raise the error
+                                raise request_error
+                        else:
+                            # Wait before retrying
+                            await asyncio.sleep(2 ** consecutive_failures)  # Exponential backoff
+                            continue
                     
                     if response.status_code != 200:
+                        consecutive_failures += 1
                         error_detail = response.text
-                        logger.error(f"🔍 INCIDENT PAGE {page}: API ERROR - {response.status_code}: {error_detail}")
+                        logger.error(f"🔍 INCIDENT PAGE {page}: API ERROR - {response.status_code}: {error_detail} (failure {consecutive_failures}/{max_consecutive_failures})")
                         
-                        # Provide more helpful error message for common issues
+                        # Handle specific error cases
                         if response.status_code == 404 and "not found or unauthorized" in error_detail.lower():
                             raise Exception(f"Rootly API access denied. Please ensure your API token has 'incidents:read' permission and access to incident data. Error: {response.status_code} {error_detail}")
+                        elif response.status_code in [429, 502, 503, 504]:  # Rate limit or server errors
+                            if consecutive_failures >= max_consecutive_failures:
+                                if all_incidents:
+                                    logger.warning(f"🔍 INCIDENT FETCH: API errors after {consecutive_failures} attempts. Returning {len(all_incidents)} incidents collected so far.")
+                                    break
+                                else:
+                                    raise Exception(f"API repeatedly failing: {response.status_code} {error_detail}")
+                            else:
+                                # Wait before retrying
+                                await asyncio.sleep(5 * consecutive_failures)  # Linear backoff for server errors
+                                continue
                         else:
                             raise Exception(f"API request failed: {response.status_code} {error_detail}")
+                    else:
+                        # Reset failure counter on success
+                        consecutive_failures = 0
                     
                     data = response.json()
                     
@@ -429,18 +468,18 @@ class RootlyAPIClient:
             logger.info(f"🔍 USER FETCH: Starting user collection for {days_back}-day analysis (limit: 1000)")
             users_task = self.get_users(limit=1000)  # Get all users
             
-            # Use adaptive incident limits to prevent timeout on longer analyses
+            # Use conservative incident limits to prevent timeout on longer analyses
             incident_limits_by_range = {
-                7: 2000,   # 7-day: up to 2000 incidents
-                14: 3000,  # 14-day: up to 3000 incidents  
-                30: 5000,  # 30-day: up to 5000 incidents (reduced from 10000)
-                60: 7000,  # 60-day: up to 7000 incidents
-                90: 10000, # 90-day: up to 10000 incidents
-                180: 15000 # 180-day (6 months): up to 15000 incidents
+                7: 1500,   # 7-day: up to 1500 incidents (reduced from 2000)
+                14: 2000,  # 14-day: up to 2000 incidents (reduced from 3000)  
+                30: 3000,  # 30-day: up to 3000 incidents (reduced from 5000)
+                60: 4000,  # 60-day: up to 4000 incidents (reduced from 7000)
+                90: 5000,  # 90-day: up to 5000 incidents (reduced from 10000)
+                180: 7500  # 180-day: up to 7500 incidents (reduced from 15000)
             }
             
             # Find appropriate limit for the time range
-            incident_limit = 10000  # Default fallback
+            incident_limit = 5000  # Conservative default fallback
             for range_days in sorted(incident_limits_by_range.keys()):
                 if days_back <= range_days:
                     incident_limit = incident_limits_by_range[range_days]
