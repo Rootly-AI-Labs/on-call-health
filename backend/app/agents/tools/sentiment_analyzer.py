@@ -6,16 +6,27 @@ from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 import statistics
 import logging
 
+try:
+    from smolagents import BaseTool
+except ImportError:
+    # Fallback for development/testing when smolagents not available
+    class BaseTool:
+        def __init__(self, name, description):
+            self.name = name
+            self.description = description
+
 logger = logging.getLogger(__name__)
 
 
-class SentimentAnalyzerTool:
+class SentimentAnalyzerTool(BaseTool):
     """Tool for analyzing sentiment patterns in communication data."""
     
     def __init__(self):
+        super().__init__(
+            name="sentiment_analyzer",
+            description="Analyzes sentiment patterns in messages to detect communication stress indicators"
+        )
         self.analyzer = SentimentIntensityAnalyzer()
-        self.name = "sentiment_analyzer"
-        self.description = "Analyzes sentiment patterns in messages to detect communication stress indicators"
     
     def __call__(self, messages: List[str], context: str = "general") -> Dict[str, Any]:
         """
@@ -150,19 +161,4 @@ class SentimentAnalyzerTool:
 
 def create_sentiment_analyzer_tool():
     """Factory function to create sentiment analyzer tool for smolagents."""
-    tool = SentimentAnalyzerTool()
-    
-    def sentiment_analyzer(messages: List[str], context: str = "general") -> Dict[str, Any]:
-        """
-        Analyze sentiment patterns in messages to detect communication stress.
-        
-        Args:
-            messages: List of message texts to analyze
-            context: Context for analysis ('slack', 'incident_comments', 'pr_comments')
-            
-        Returns:
-            Dictionary with sentiment analysis including overall sentiment, stress indicators, and patterns
-        """
-        return tool(messages, context)
-    
-    return sentiment_analyzer
+    return SentimentAnalyzerTool()

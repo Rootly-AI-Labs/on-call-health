@@ -6,15 +6,26 @@ import statistics
 import logging
 from datetime import datetime, timedelta
 
+try:
+    from smolagents import BaseTool
+except ImportError:
+    # Fallback for development/testing when smolagents not available
+    class BaseTool:
+        def __init__(self, name, description):
+            self.name = name
+            self.description = description
+
 logger = logging.getLogger(__name__)
 
 
-class WorkloadAnalyzerTool:
+class WorkloadAnalyzerTool(BaseTool):
     """Tool for analyzing workload distribution and intensity."""
     
     def __init__(self):
-        self.name = "workload_analyzer"
-        self.description = "Analyzes workload distribution across time periods to identify unsustainable patterns"
+        super().__init__(
+            name="workload_analyzer",
+            description="Analyzes workload distribution across time periods to identify unsustainable patterns"
+        )
     
     def __call__(self, user_data: Dict[str, Any], team_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
@@ -322,19 +333,4 @@ class WorkloadAnalyzerTool:
 
 def create_workload_analyzer_tool():
     """Factory function to create workload analyzer tool for smolagents."""
-    tool = WorkloadAnalyzerTool()
-    
-    def workload_analyzer(user_data: Dict[str, Any], team_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """
-        Analyze individual workload patterns and sustainability.
-        
-        Args:
-            user_data: Dictionary containing user's activity data
-            team_context: Optional team statistics for comparison
-            
-        Returns:
-            Dictionary with workload analysis including status, intensity, and recommendations
-        """
-        return tool(user_data, team_context)
-    
-    return workload_analyzer
+    return WorkloadAnalyzerTool()

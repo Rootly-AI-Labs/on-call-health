@@ -12,15 +12,26 @@ import statistics
 from datetime import datetime, timedelta
 import logging
 
+try:
+    from smolagents import BaseTool
+except ImportError:
+    # Fallback for development/testing when smolagents not available
+    class BaseTool:
+        def __init__(self, name, description):
+            self.name = name
+            self.description = description
+
 logger = logging.getLogger(__name__)
 
 
-class CodeQualityAnalyzerTool:
+class CodeQualityAnalyzerTool(BaseTool):
     """Tool for analyzing code quality patterns that may indicate burnout."""
     
     def __init__(self):
-        self.name = "code_quality_analyzer"
-        self.description = "Analyzes GitHub activity to detect code quality issues and rushed development patterns"
+        super().__init__(
+            name="code_quality_analyzer",
+            description="Analyzes GitHub activity to detect code quality issues and rushed development patterns"
+        )
         
     def __call__(self, github_data: Dict[str, Any], time_window_days: int = 30) -> Dict[str, Any]:
         """
@@ -318,19 +329,4 @@ class CodeQualityAnalyzerTool:
 
 def create_code_quality_analyzer_tool():
     """Factory function to create code quality analyzer tool for smolagents."""
-    tool = CodeQualityAnalyzerTool()
-    
-    def code_quality_analyzer(github_data: Dict[str, Any], time_window_days: int = 30) -> Dict[str, Any]:
-        """
-        Analyze code quality patterns from GitHub data to detect burnout indicators.
-        
-        Args:
-            github_data: Dictionary containing commits, PRs, and review data
-            time_window_days: Analysis window in days (default: 30)
-            
-        Returns:
-            Dictionary with quality score, risk indicators, patterns, and recommendations
-        """
-        return tool(github_data, time_window_days)
-    
-    return code_quality_analyzer
+    return CodeQualityAnalyzerTool()

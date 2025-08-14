@@ -12,15 +12,26 @@ from datetime import datetime, timedelta
 import statistics
 import logging
 
+try:
+    from smolagents import BaseTool
+except ImportError:
+    # Fallback for development/testing when smolagents not available
+    class BaseTool:
+        def __init__(self, name, description):
+            self.name = name
+            self.description = description
+
 logger = logging.getLogger(__name__)
 
 
-class CrossPlatformCorrelatorTool:
+class CrossPlatformCorrelatorTool(BaseTool):
     """Tool for finding correlations across different data platforms."""
     
     def __init__(self):
-        self.name = "cross_platform_correlator"
-        self.description = "Analyzes correlations between incidents, code activity, and communication patterns"
+        super().__init__(
+            name="cross_platform_correlator",
+            description="Analyzes correlations between incidents, code activity, and communication patterns"
+        )
         
     def __call__(
         self, 
@@ -512,24 +523,4 @@ class CrossPlatformCorrelatorTool:
 
 def create_cross_platform_correlator_tool():
     """Factory function to create cross-platform correlator tool for smolagents."""
-    tool = CrossPlatformCorrelatorTool()
-    
-    def cross_platform_correlator(
-        incidents: List[Dict], 
-        github_data: Dict[str, Any], 
-        slack_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """
-        Analyze correlations between incidents, code activity, and communication patterns.
-        
-        Args:
-            incidents: List of incident data
-            github_data: GitHub activity data (commits, PRs, reviews)
-            slack_data: Slack communication data (messages, sentiment)
-            
-        Returns:
-            Dictionary with correlations, insights, and risk score
-        """
-        return tool(incidents, github_data, slack_data)
-    
-    return cross_platform_correlator
+    return CrossPlatformCorrelatorTool()

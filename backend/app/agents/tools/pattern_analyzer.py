@@ -7,15 +7,26 @@ import statistics
 import logging
 from collections import defaultdict, Counter
 
+try:
+    from smolagents import BaseTool
+except ImportError:
+    # Fallback for development/testing when smolagents not available
+    class BaseTool:
+        def __init__(self, name, description):
+            self.name = name
+            self.description = description
+
 logger = logging.getLogger(__name__)
 
 
-class PatternAnalyzerTool:
+class PatternAnalyzerTool(BaseTool):
     """Tool for analyzing work patterns and detecting burnout indicators."""
     
     def __init__(self):
-        self.name = "pattern_analyzer"
-        self.description = "Analyzes work patterns across different data sources to identify burnout risk factors"
+        super().__init__(
+            name="pattern_analyzer",
+            description="Analyzes work patterns across different data sources to identify burnout risk factors"
+        )
     
     def __call__(self, data_type: str, events: List[Dict[str, Any]], analysis_window_days: int = 30) -> Dict[str, Any]:
         """
@@ -361,20 +372,4 @@ class PatternAnalyzerTool:
 
 def create_pattern_analyzer_tool():
     """Factory function to create pattern analyzer tool for smolagents."""
-    tool = PatternAnalyzerTool()
-    
-    def pattern_analyzer(data_type: str, events: List[Dict[str, Any]], analysis_window_days: int = 30) -> Dict[str, Any]:
-        """
-        Analyze patterns in work-related events to detect burnout indicators.
-        
-        Args:
-            data_type: Type of data ('incidents', 'commits', 'messages', 'prs')
-            events: List of events with timestamp and metadata
-            analysis_window_days: Days to analyze (default 30)
-            
-        Returns:
-            Dictionary with pattern analysis including burnout indicators and recommendations
-        """
-        return tool(data_type, events, analysis_window_days)
-    
-    return pattern_analyzer
+    return PatternAnalyzerTool()

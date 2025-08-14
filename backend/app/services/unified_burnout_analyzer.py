@@ -918,11 +918,17 @@ class UnifiedBurnoutAnalyzer:
         weekend_percentage = safe_weekend / safe_incidents_len if safe_incidents_len > 0 else 0
         avg_response_time = sum(response_times) / len(response_times) if response_times and len(response_times) > 0 else 0
         
+        # Ensure all numeric values are not None before rounding
+        safe_incidents_per_week = incidents_per_week if incidents_per_week is not None else 0
+        safe_after_hours_percentage = after_hours_percentage if after_hours_percentage is not None else 0
+        safe_weekend_percentage = weekend_percentage if weekend_percentage is not None else 0
+        safe_avg_response_time = avg_response_time if avg_response_time is not None else 0
+        
         return {
-            "incidents_per_week": round(incidents_per_week, 2),
-            "after_hours_percentage": round(after_hours_percentage, 3),
-            "weekend_percentage": round(weekend_percentage, 3),
-            "avg_response_time_minutes": round(avg_response_time, 1),
+            "incidents_per_week": round(safe_incidents_per_week, 2),
+            "after_hours_percentage": round(safe_after_hours_percentage, 3),
+            "weekend_percentage": round(safe_weekend_percentage, 3),
+            "avg_response_time_minutes": round(safe_avg_response_time, 1),
             "severity_distribution": dict(severity_counts),
             "status_distribution": dict(status_counts)
         }
@@ -941,16 +947,22 @@ class UnifiedBurnoutAnalyzer:
         # Personal Accomplishment (30% of final score, inverted)
         personal_accomplishment = self._calculate_personal_accomplishment_incident(metrics)
         
+        # Ensure all dimension values are numeric before rounding
+        safe_emotional_exhaustion = emotional_exhaustion if emotional_exhaustion is not None else 0.0
+        safe_depersonalization = depersonalization if depersonalization is not None else 0.0
+        safe_personal_accomplishment = personal_accomplishment if personal_accomplishment is not None else 0.0
+        
         return {
-            "emotional_exhaustion": round(emotional_exhaustion, 2),
-            "depersonalization": round(depersonalization, 2),
-            "personal_accomplishment": round(personal_accomplishment, 2)
+            "emotional_exhaustion": round(safe_emotional_exhaustion, 2),
+            "depersonalization": round(safe_depersonalization, 2),
+            "personal_accomplishment": round(safe_personal_accomplishment, 2)
         }
     
     def _calculate_emotional_exhaustion_incident(self, metrics: Dict[str, Any]) -> float:
         """Calculate Emotional Exhaustion from incident data (0-10 scale)."""
         # Incident frequency score - more realistic thresholds
-        ipw = metrics.get("incidents_per_week", 0) or 0
+        ipw = metrics.get("incidents_per_week", 0)
+        ipw = float(ipw) if ipw is not None else 0.0
         # Scale: 0-2 incidents/week = 0-3, 2-5 = 3-7, 5-8 = 7-10, 8+ = 10
         if ipw <= 2:
             incident_frequency_score = ipw * 1.5  # 0-3 range
@@ -962,12 +974,14 @@ class UnifiedBurnoutAnalyzer:
             incident_frequency_score = 10  # 8+ incidents per week = maximum burnout
         
         # After hours score
-        ahp = metrics.get("after_hours_percentage", 0) or 0
+        ahp = metrics.get("after_hours_percentage", 0)
+        ahp = float(ahp) if ahp is not None else 0.0
         after_hours_score = min(10, ahp * 20)
         
         # Resolution time score (using response time as proxy)
         art = metrics.get("avg_response_time_minutes", 0)
-        resolution_time_score = min(10, (art / 60) * 10) if art is not None and art > 0 else 0  # Normalize to hours
+        art = float(art) if art is not None else 0.0
+        resolution_time_score = min(10, (art / 60) * 10) if art > 0 else 0  # Normalize to hours
         
         # Clustering score (simplified - assume 20% clustering for now)
         clustering_score = min(10, 0.2 * 15)  # Placeholder
@@ -1020,7 +1034,10 @@ class UnifiedBurnoutAnalyzer:
     def _calculate_burnout_factors(self, metrics: Dict[str, Any]) -> Dict[str, float]:
         """Calculate individual burnout factors for UI display."""
         # Calculate factors that properly reflect incident load
-        incidents_per_week = metrics.get("incidents_per_week", 0) or 0
+        incidents_per_week = metrics.get("incidents_per_week", 0)
+        if incidents_per_week is None:
+            incidents_per_week = 0
+        incidents_per_week = float(incidents_per_week) if incidents_per_week is not None else 0.0
         
         # Workload factor based on incident frequency (more direct)
         # Scale: 0-2 incidents/week = 0-3, 2-5 = 3-7, 5-8 = 7-10, 8+ = 10
@@ -1033,17 +1050,23 @@ class UnifiedBurnoutAnalyzer:
         else:
             workload = 10
         
-        # After hours factor 
-        after_hours = min(10, (metrics.get("after_hours_percentage", 0) or 0) * 20)
+        # After hours factor - ensure numeric value
+        after_hours_pct = metrics.get("after_hours_percentage", 0)
+        after_hours_pct = float(after_hours_pct) if after_hours_pct is not None else 0.0
+        after_hours = min(10, after_hours_pct * 20)
         
-        # Weekend work factor
-        weekend_work = min(10, (metrics.get("weekend_percentage", 0) or 0) * 25)
+        # Weekend work factor - ensure numeric value
+        weekend_pct = metrics.get("weekend_percentage", 0)
+        weekend_pct = float(weekend_pct) if weekend_pct is not None else 0.0
+        weekend_work = min(10, weekend_pct * 25)
         
         # REMOVED incident_load factor - was duplicate of workload factor
         # Both were calculated from incidents_per_week, causing double-counting
         
-        # Response time factor
-        response_time = min(10, (metrics.get("avg_response_time_minutes", 0) or 0) / 6)
+        # Response time factor - ensure numeric value
+        response_time_mins = metrics.get("avg_response_time_minutes", 0)
+        response_time_mins = float(response_time_mins) if response_time_mins is not None else 0.0
+        response_time = min(10, response_time_mins / 6)
         
         factors = {
             "workload": workload,

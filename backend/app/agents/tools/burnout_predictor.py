@@ -13,15 +13,26 @@ import statistics
 import math
 import logging
 
+try:
+    from smolagents import BaseTool
+except ImportError:
+    # Fallback for development/testing when smolagents not available
+    class BaseTool:
+        def __init__(self, name, description):
+            self.name = name
+            self.description = description
+
 logger = logging.getLogger(__name__)
 
 
-class BurnoutPredictorTool:
+class BurnoutPredictorTool(BaseTool):
     """Tool for predicting future burnout risk based on trends and patterns."""
     
     def __init__(self):
-        self.name = "burnout_predictor"
-        self.description = "Predicts future burnout risk using trend analysis and pattern recognition"
+        super().__init__(
+            name="burnout_predictor",
+            description="Predicts future burnout risk using trend analysis and pattern recognition"
+        )
         
     def __call__(
         self, 
@@ -575,24 +586,4 @@ class BurnoutPredictorTool:
 
 def create_burnout_predictor_tool():
     """Factory function to create burnout predictor tool for smolagents."""
-    tool = BurnoutPredictorTool()
-    
-    def burnout_predictor(
-        historical_analyses: List[Dict[str, Any]],
-        current_metrics: Dict[str, Any],
-        time_horizon_days: int = 30
-    ) -> Dict[str, Any]:
-        """
-        Predict future burnout risk using trend analysis and pattern recognition.
-        
-        Args:
-            historical_analyses: List of past burnout analyses (ordered by date)
-            current_metrics: Current burnout metrics and indicators
-            time_horizon_days: Prediction time horizon in days (default: 30)
-            
-        Returns:
-            Dictionary with risk predictions, early warnings, and intervention recommendations
-        """
-        return tool(historical_analyses, current_metrics, time_horizon_days)
-    
-    return burnout_predictor
+    return BurnoutPredictorTool()
