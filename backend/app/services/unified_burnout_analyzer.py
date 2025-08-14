@@ -967,9 +967,9 @@ class UnifiedBurnoutAnalyzer:
         if ipw <= 2:
             incident_frequency_score = ipw * 1.5  # 0-3 range
         elif ipw <= 5:
-            incident_frequency_score = 3 + ((ipw - 2) / 3) * 4  # 3-7 range
+            incident_frequency_score = 3 + ((ipw - 2) / 3) * 4 if ipw >= 2 else 3  # 3-7 range
         elif ipw <= 8:
-            incident_frequency_score = 7 + ((ipw - 5) / 3) * 3  # 7-10 range
+            incident_frequency_score = 7 + ((ipw - 5) / 3) * 3 if ipw >= 5 else 7  # 7-10 range
         else:
             incident_frequency_score = 10  # 8+ incidents per week = maximum burnout
         
@@ -1044,9 +1044,9 @@ class UnifiedBurnoutAnalyzer:
         if incidents_per_week <= 2:
             workload = incidents_per_week * 1.5
         elif incidents_per_week <= 5:
-            workload = 3 + ((incidents_per_week - 2) / 3) * 4
+            workload = 3 + ((incidents_per_week - 2) / 3) * 4 if incidents_per_week >= 2 else 3
         elif incidents_per_week <= 8:
-            workload = 7 + ((incidents_per_week - 5) / 3) * 3
+            workload = 7 + ((incidents_per_week - 5) / 3) * 3 if incidents_per_week >= 5 else 7
         else:
             workload = 10
         
@@ -1126,7 +1126,7 @@ class UnifiedBurnoutAnalyzer:
         members_with_incidents = [m for m in member_analyses if m and isinstance(m, dict) and m.get("incident_count", 0) > 0]
         
         # Calculate average burnout for ALL members (including GitHub-only burnout)
-        all_burnout_scores = [m.get("burnout_score", 0) for m in member_analyses if m and isinstance(m, dict)]
+        all_burnout_scores = [m.get("burnout_score", 0) for m in member_analyses if m and isinstance(m, dict) and m.get("burnout_score") is not None]
         avg_burnout = sum(all_burnout_scores) / len(all_burnout_scores) if all_burnout_scores and len(all_burnout_scores) > 0 else 0
         
         # Count risk levels (updated for 4-tier system) - include ALL members (incidents + GitHub-only)
@@ -1413,7 +1413,7 @@ class UnifiedBurnoutAnalyzer:
         variance = sum((x - mean) ** 2 for x in incident_counts) / len(incident_counts) if incident_counts and len(incident_counts) > 0 else 0
         
         # Normalize by mean to get coefficient of variation
-        return variance / mean if mean and mean > 0 else 0
+        return variance / mean if mean and mean > 0 and variance is not None and mean is not None else 0
     
     def _calculate_github_insights(self, github_data: Dict[str, Dict]) -> Dict[str, Any]:
         """Calculate aggregated GitHub insights from team data."""
@@ -2413,20 +2413,20 @@ class UnifiedBurnoutAnalyzer:
                 # Use member-wide factors as context
                 member_factors = member_data.get("factors", {})
                 factors = {
-                    "workload": min(incident_count / 5.0 * 10, 10),  # Scale incidents to 0-10
-                    "after_hours": (after_hours_count / max(incident_count, 1)) * 10 if incident_count > 0 else 0,
-                    "response_time": member_factors.get("response_time", 0),
-                    "weekend_work": member_factors.get("weekend_work", 0),
-                    "severity_pressure": (high_severity_count / max(incident_count, 1)) * 10 if incident_count > 0 else 0
+                    "workload": min((incident_count or 0) / 5.0 * 10, 10),  # Scale incidents to 0-10
+                    "after_hours": ((after_hours_count or 0) / max((incident_count or 1), 1)) * 10 if (incident_count or 0) > 0 else 0,
+                    "response_time": member_factors.get("response_time", 0) or 0,
+                    "weekend_work": member_factors.get("weekend_work", 0) or 0,
+                    "severity_pressure": ((high_severity_count or 0) / max((incident_count or 1), 1)) * 10 if (incident_count or 0) > 0 else 0
                 }
             else:
                 # Calculate basic factors from daily data only
                 factors = {
-                    "workload": min(incident_count / 3.0 * 10, 10),
-                    "after_hours": (after_hours_count / max(incident_count, 1)) * 10 if incident_count > 0 else 0,
+                    "workload": min((incident_count or 0) / 3.0 * 10, 10),
+                    "after_hours": ((after_hours_count or 0) / max((incident_count or 1), 1)) * 10 if (incident_count or 0) > 0 else 0,
                     "response_time": 5.0,  # Default moderate
                     "weekend_work": 0,     # Can't determine from daily data
-                    "severity_pressure": (high_severity_count / max(incident_count, 1)) * 10 if incident_count > 0 else 0
+                    "severity_pressure": ((high_severity_count or 0) / max((incident_count or 1), 1)) * 10 if (incident_count or 0) > 0 else 0
                 }
             
             return {
