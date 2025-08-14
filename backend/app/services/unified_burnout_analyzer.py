@@ -1987,9 +1987,9 @@ class UnifiedBurnoutAnalyzer:
             
             # AFTER main processing: Fill out individual daily data for ALL users and ALL days
             all_users = set()
-            for user in users:
-                if user.get('email'):
-                    all_users.add(user['email'].lower())
+            for user in team_analysis:
+                if user.get('user_email'):  # team_analysis uses user_email, not email
+                    all_users.add(user['user_email'].lower())
             
             # Initialize complete individual daily data structure
             complete_individual_data = {}
