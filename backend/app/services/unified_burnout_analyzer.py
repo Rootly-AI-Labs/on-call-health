@@ -1047,8 +1047,12 @@ class UnifiedBurnoutAnalyzer:
         # Communication score (assume average communication for now)
         communication_score = 5  # Placeholder
         
-        # Mean of all components
-        return (escalation_score + solo_work_score + response_trend_score + communication_score) / 4
+        # Mean of all components - ensure all values are numeric
+        escalation_safe = escalation_score if escalation_score is not None else 0.0
+        solo_safe = solo_work_score if solo_work_score is not None else 0.0
+        response_safe = response_trend_score if response_trend_score is not None else 0.0
+        communication_safe = communication_score if communication_score is not None else 0.0
+        return (escalation_safe + solo_safe + response_safe + communication_safe) / 4
     
     def _calculate_personal_accomplishment_incident(self, metrics: Dict[str, Any]) -> float:
         """Calculate Personal Accomplishment from incident data (0-10 scale)."""
@@ -1068,8 +1072,12 @@ class UnifiedBurnoutAnalyzer:
         # Knowledge sharing score (assume minimal for now)
         knowledge_sharing_score = 2.0  # Placeholder
         
-        # Mean of all components
-        return (resolution_success_score + improvement_score + complexity_score + knowledge_sharing_score) / 4
+        # Mean of all components - ensure all values are numeric
+        resolution_safe = resolution_success_score if resolution_success_score is not None else 0.0
+        improvement_safe = improvement_score if improvement_score is not None else 0.0
+        complexity_safe = complexity_score if complexity_score is not None else 0.0
+        knowledge_safe = knowledge_sharing_score if knowledge_sharing_score is not None else 0.0
+        return (resolution_safe + improvement_safe + complexity_safe + knowledge_safe) / 4
     
     def _calculate_burnout_factors(self, metrics: Dict[str, Any]) -> Dict[str, float]:
         """Calculate individual burnout factors for UI display."""
@@ -1103,10 +1111,10 @@ class UnifiedBurnoutAnalyzer:
         # REMOVED incident_load factor - was duplicate of workload factor
         # Both were calculated from incidents_per_week, causing double-counting
         
-        # Response time factor - ensure numeric value
+        # Response time factor - ensure numeric value with division safety
         response_time_mins = metrics.get("avg_response_time_minutes", 0)
         response_time_mins = float(response_time_mins) if response_time_mins is not None else 0.0
-        response_time = min(10, response_time_mins / 6)
+        response_time = min(10, response_time_mins / 6) if response_time_mins and response_time_mins >= 0 else 0.0
         
         factors = {
             "workload": workload,
@@ -2314,7 +2322,7 @@ class UnifiedBurnoutAnalyzer:
             
             # After-hours work patterns
             if commits_count and commits_count > 0 and after_hours_commits is not None:
-                after_hours_ratio = after_hours_commits / commits_count
+                after_hours_ratio = (after_hours_commits or 0) / commits_count
                 if after_hours_ratio > 0.30:  # >30% after hours
                     exhaustion_score += 3.0
                 elif after_hours_ratio > 0.15:  # >15% after hours
@@ -2324,7 +2332,7 @@ class UnifiedBurnoutAnalyzer:
                 
                 # Weekend work patterns
                 if weekend_commits is not None:
-                    weekend_ratio = weekend_commits / commits_count
+                    weekend_ratio = (weekend_commits or 0) / commits_count
                     if weekend_ratio > 0.25:  # >25% on weekends
                         exhaustion_score += 2.0
                     elif weekend_ratio > 0.10:  # >10% on weekends
