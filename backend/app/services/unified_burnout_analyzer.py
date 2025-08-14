@@ -1875,6 +1875,22 @@ class UnifiedBurnoutAnalyzer:
                         logger.debug(f"Error processing incident for daily trends: {inc_error}")
                         continue
             
+            # Ensure daily_data has entries for ALL days in analysis period, not just incident days
+            for day_offset in range(days_analyzed):
+                date_obj = datetime.now() - timedelta(days=days_analyzed - day_offset - 1)
+                date_str = date_obj.strftime('%Y-%m-%d')
+                
+                # Initialize empty days (no incidents)
+                if date_str not in daily_data:
+                    daily_data[date_str] = {
+                        "date": date_str,
+                        "incident_count": 0,
+                        "severity_weighted_count": 0.0,
+                        "after_hours_count": 0,
+                        "users_involved": set(),
+                        "high_severity_count": 0
+                    }
+            
             # Convert to list and calculate daily scores
             daily_trends = []
             for date_str in sorted(daily_data.keys()):
