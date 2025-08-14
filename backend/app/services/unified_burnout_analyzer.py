@@ -2120,6 +2120,10 @@ class UnifiedBurnoutAnalyzer:
             
         except Exception as e:
             logger.error(f"Error in _generate_daily_trends: {e}")
+            # Ensure individual_daily_data is set even in error cases
+            if not hasattr(self, 'individual_daily_data'):
+                self.individual_daily_data = {}
+                logger.warning(f"🚨 Setting empty individual_daily_data due to error in _generate_daily_trends")
             return []
     
     def _determine_health_status_from_score(self, score: float) -> str:

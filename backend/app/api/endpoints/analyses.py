@@ -1749,9 +1749,14 @@ async def get_member_daily_health(
     
     user_key = member_email.lower()
     
+    # Debug logging for individual_daily_data issues
+    logger.info(f"🔍 INDIVIDUAL_DAILY_API_DEBUG: Looking for user {member_email} (key: {user_key})")
+    logger.info(f"🔍 INDIVIDUAL_DAILY_API_DEBUG: Available users in individual_daily_data: {list(individual_daily_data.keys())[:10]}")
+    logger.info(f"🔍 INDIVIDUAL_DAILY_API_DEBUG: individual_daily_data has {len(individual_daily_data)} users total")
+    
     if user_key not in individual_daily_data:
         # FALLBACK: Generate individual daily data for old analyses
-        logger.info(f"User {member_email} not found in individual_daily_data, generating fallback data from daily_trends")
+        logger.warning(f"🔍 User {member_email} not found in individual_daily_data, generating fallback data from daily_trends")
         
         # Create empty daily structure for this user
         days_analyzed = analysis.results.get("period_summary", {}).get("days_analyzed", 30)
@@ -1868,6 +1873,14 @@ async def get_member_daily_health(
     # Calculate summary statistics for days with data only
     days_with_data = [d for d in daily_health_scores if d["has_data"]]
     days_without_data = [d for d in daily_health_scores if not d["has_data"]]
+    
+    # Debug logging for API response
+    logger.info(f"🔍 INDIVIDUAL_DAILY_API_RESPONSE: Returning {len(daily_health_scores)} days total")
+    logger.info(f"🔍 INDIVIDUAL_DAILY_API_RESPONSE: {len(days_with_data)} days WITH data, {len(days_without_data)} days WITHOUT data")
+    if days_with_data:
+        logger.info(f"🔍 INDIVIDUAL_DAILY_API_RESPONSE: Sample day with data: {days_with_data[0]}")
+    if days_without_data:
+        logger.info(f"🔍 INDIVIDUAL_DAILY_API_RESPONSE: Sample day without data: {days_without_data[0]}")
     
     return {
         "status": "success",
