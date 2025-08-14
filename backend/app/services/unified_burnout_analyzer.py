@@ -2296,10 +2296,10 @@ class UnifiedBurnoutAnalyzer:
             # Calculate individual health score based on daily incident load
             base_score = 8.5  # Start with healthy baseline
             
-            incident_count = day_data["incident_count"]
-            severity_weighted = day_data["severity_weighted_count"]
-            after_hours_count = day_data["after_hours_count"]
-            high_severity_count = day_data["high_severity_count"]
+            incident_count = day_data.get("incident_count", 0)
+            severity_weighted = day_data.get("severity_weighted_count", 0.0)
+            after_hours_count = day_data.get("after_hours_count", 0)
+            high_severity_count = day_data.get("high_severity_count", 0)
             
             # Individual scoring penalties
             # Incident volume penalty (more aggressive for individuals)
@@ -2355,9 +2355,9 @@ class UnifiedBurnoutAnalyzer:
                 "team_health": None,  # Will be filled by API endpoint
                 "factors": factors,
                 "incidents": day_data.get("incidents", []),  # Include incident details
-                "severity_weighted_count": round(severity_weighted, 1),
-                "after_hours_count": after_hours_count,
-                "high_severity_count": high_severity_count
+                "severity_weighted_count": round(severity_weighted or 0.0, 1),
+                "after_hours_count": after_hours_count or 0,
+                "high_severity_count": high_severity_count or 0
             }
             
         except Exception as e:
