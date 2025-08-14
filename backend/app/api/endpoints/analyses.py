@@ -1769,7 +1769,9 @@ async def get_member_daily_health(
                 "after_hours_count": 0,
                 "weekend_count": 0,
                 "response_times": [],
-                "has_data": False
+                "has_data": False,
+                "incidents": [],
+                "high_severity_count": 0
             }
             
         # Set this as the user's data for the rest of the function

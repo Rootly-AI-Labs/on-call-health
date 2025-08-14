@@ -1759,7 +1759,9 @@ class UnifiedBurnoutAnalyzer:
                         "after_hours_count": 0,
                         "weekend_count": 0,
                         "response_times": [],
-                        "has_data": False  # Key flag: True only when real incident involvement exists
+                        "has_data": False,  # Key flag: True only when real incident involvement exists
+                        "incidents": [],  # CRITICAL: Store incident details for analysis
+                        "high_severity_count": 0  # Also needed by the analysis logic
                     }
             
             # Process incidents to populate daily data - now updating existing structure
