@@ -4281,19 +4281,26 @@ export default function Dashboard() {
                           if (currentAnalysis?.analysis_data?.daily_trends?.length > 0) {
                             const dailyTrends = currentAnalysis.analysis_data.daily_trends;
                             
-                            // Transform data and detect standout events
-                            const chartData = dailyTrends.map((trend: any, index: number) => ({
-                              date: new Date(trend.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
-                              score: Math.round((10 - trend.overall_score) * 10), // Convert 0-10 burnout to 0-100 health scale
-                              riskLevel: trend.overall_score <= 3 ? 'excellent' : trend.overall_score <= 5.5 ? 'good' : trend.overall_score <= 7.5 ? 'fair' : trend.overall_score >= 7.5 ? 'poor' : 'critical',
-                              membersAtRisk: trend.members_at_risk,
-                              totalMembers: trend.total_members,
-                              healthStatus: trend.health_status,
-                              incidentCount: trend.incident_count || trend.analysis_count || 0,
-                              rawScore: trend.overall_score,
-                              originalDate: trend.date,
-                              index: index
-                            }));
+                            // Transform data and detect standout events with real data tracking
+                            const chartData = dailyTrends.map((trend: any, index: number) => {
+                              const incidentCount = trend.incident_count || trend.analysis_count || 0;
+                              const hasRealData = incidentCount > 0; // True if incidents occurred on this day
+                              
+                              return {
+                                date: new Date(trend.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
+                                score: Math.round((10 - trend.overall_score) * 10), // Convert 0-10 burnout to 0-100 health scale
+                                riskLevel: trend.overall_score <= 3 ? 'excellent' : trend.overall_score <= 5.5 ? 'good' : trend.overall_score <= 7.5 ? 'fair' : trend.overall_score >= 7.5 ? 'poor' : 'critical',
+                                membersAtRisk: trend.members_at_risk,
+                                totalMembers: trend.total_members,
+                                healthStatus: trend.health_status,
+                                incidentCount: incidentCount,
+                                rawScore: trend.overall_score,
+                                originalDate: trend.date,
+                                index: index,
+                                hasRealData: hasRealData, // NEW: Track if this day has real incident data
+                                dataType: hasRealData ? 'real' : 'estimated' // NEW: For legend and styling
+                              };
+                            });
                             
                             // Identify standout events
                             const identifyStandoutEvents = (data: any[]) => {
@@ -4393,7 +4400,29 @@ export default function Dashboard() {
                                 return (
                                   <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
                                     <p className="font-semibold text-gray-900">{label}</p>
-                                    <p className="text-purple-600">Health Score: {Math.round(Number(payload[0].value))}%</p>
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <p className="text-purple-600 font-bold">Health Score: {Math.round(Number(payload[0].value))}%</p>
+                                      {/* NEW: Data type indicator */}
+                                      <span className={`px-2 py-1 text-xs rounded-full ${
+                                        data.hasRealData 
+                                          ? 'bg-green-100 text-green-700 border border-green-200'
+                                          : 'bg-gray-100 text-gray-600 border border-gray-200'
+                                      }`}>
+                                        {data.hasRealData ? '📊 Real Data' : '📈 No Data'}
+                                      </span>
+                                    </div>
+                                    
+                                    {/* NEW: Enhanced data availability explanation */}
+                                    {!data.hasRealData && (
+                                      <div className="bg-gray-50 border-l-4 border-gray-300 p-2 mb-2 rounded">
+                                        <p className="text-xs text-gray-600 font-medium">
+                                          💡 No incidents recorded on this date
+                                        </p>
+                                        <p className="text-xs text-gray-500 mt-1">
+                                          Health score represents baseline team wellness
+                                        </p>
+                                      </div>
+                                    )}
                                     
                                     {/* Show standout event information */}
                                     {data.isStandout && data.eventDescription && (
@@ -4450,22 +4479,91 @@ export default function Dashboard() {
                               return null
                             }}
                           />
+                          {/* Main area fill with gradient */}
                           <Area
                             type="monotone"
                             dataKey="score"
                             stroke="none"
                             fill="url(#healthGradient)"
                           />
+                          
+                          {/* Subtle overlay for estimated data sections */}
+                          <Area
+                            type="monotone"
+                            dataKey={(entry: any) => entry.hasRealData ? null : entry.score}
+                            stroke="none"
+                            fill="rgba(156, 163, 175, 0.1)"
+                            connectNulls={false}
+                          />
+                          {/* Main line for all data */}
                           <Line 
                             type="monotone" 
                             dataKey="score" 
                             stroke="#8B5CF6" 
                             strokeWidth={2}
-                            dot={false}
+                            dot={(props: any) => {
+                              const { cx, cy, payload } = props;
+                              if (!payload) return null;
+                              
+                              // Different dot styles for real vs estimated data
+                              if (payload.hasRealData) {
+                                return (
+                                  <circle 
+                                    cx={cx} 
+                                    cy={cy} 
+                                    r={3} 
+                                    fill="#8B5CF6" 
+                                    stroke="white" 
+                                    strokeWidth={2}
+                                  />
+                                );
+                              } else {
+                                return (
+                                  <circle 
+                                    cx={cx} 
+                                    cy={cy} 
+                                    r={2} 
+                                    fill="#9CA3AF" 
+                                    stroke="white" 
+                                    strokeWidth={1}
+                                    opacity={0.7}
+                                  />
+                                );
+                              }
+                            }}
                             activeDot={{ r: 6, stroke: '#8B5CF6', strokeWidth: 2, fill: '#8B5CF6' }}
+                          />
+                          
+                          {/* Overlay dotted line for estimated data segments */}
+                          <Line 
+                            type="monotone" 
+                            dataKey={(entry: any) => entry.hasRealData ? null : entry.score}
+                            stroke="#9CA3AF" 
+                            strokeWidth={1.5}
+                            strokeDasharray="4,4"
+                            dot={false}
+                            connectNulls={false}
                           />
                         </AreaChart>
                       </ResponsiveContainer>
+                      
+                      {/* NEW: Legend for hybrid UX */}
+                      <div className="mt-3 flex items-center justify-center gap-6 text-xs text-gray-600">
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center">
+                            <div className="w-4 h-0.5 bg-purple-500 mr-1"></div>
+                            <div className="w-2 h-2 bg-purple-500 rounded-full border border-white"></div>
+                          </div>
+                          <span>Days with incident data</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center">
+                            <div className="w-4 h-0.5 bg-gray-400 border-dashed border-t mr-1" style={{borderTop: '1.5px dashed #9CA3AF'}}></div>
+                            <div className="w-2 h-2 bg-gray-400 rounded-full border border-white opacity-70"></div>
+                          </div>
+                          <span>Days without incident data</span>
+                        </div>
+                      </div>
                         );
                       })()}
                     </div>
