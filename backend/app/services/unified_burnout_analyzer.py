@@ -136,6 +136,46 @@ class UnifiedBurnoutAnalyzer:
             extraction_duration = (datetime.now() - extraction_start).total_seconds()
             logger.info(f"🔍 BURNOUT ANALYSIS: Step 2 completed in {extraction_duration:.3f}s - {len(users)} users, {len(incidents)} incidents")
             
+            # Step 2.5: Filter to only on-call users (NEW FEATURE)
+            oncall_filter_start = datetime.now()
+            logger.info(f"🔍 BURNOUT ANALYSIS: Step 2.5 - Filtering to on-call users only for {time_range_days}-day period")
+            
+            try:
+                # Get on-call schedule data for the analysis period
+                start_date = datetime.now() - timedelta(days=time_range_days)
+                end_date = datetime.now()
+                on_call_shifts = await self.client.get_on_call_shifts(start_date, end_date)
+                on_call_user_emails = await self.client.extract_on_call_users_from_shifts(on_call_shifts)
+                
+                logger.info(f"🗓️ ON_CALL_FILTERING: Found {len(on_call_user_emails)} users who were on-call during the {time_range_days}-day period")
+                logger.info(f"🗓️ ON_CALL_FILTERING: Total team members: {len(users)}, On-call members: {len(on_call_user_emails)}")
+                
+                if on_call_user_emails:
+                    # Filter users to only those who were on-call during the period
+                    original_user_count = len(users)
+                    filtered_users = []
+                    
+                    for user in users:
+                        user_email = self._get_user_email_from_user(user)
+                        if user_email and user_email.lower() in on_call_user_emails:
+                            filtered_users.append(user)
+                    
+                    users = filtered_users
+                    logger.info(f"🗓️ ON_CALL_FILTERING: Filtered from {original_user_count} total users to {len(users)} on-call users")
+                    
+                    # Log the on-call users for verification
+                    oncall_names = [self._get_user_name_from_user(user) for user in users]
+                    logger.info(f"🗓️ ON_CALL_FILTERING: On-call users being analyzed: {', '.join(oncall_names[:10])}{'...' if len(oncall_names) > 10 else ''}")
+                else:
+                    logger.warning(f"🗓️ ON_CALL_FILTERING: No on-call shifts found for the period, analyzing all users as fallback")
+                    
+            except Exception as e:
+                logger.error(f"🗓️ ON_CALL_FILTERING: Error fetching on-call data: {e}")
+                logger.warning(f"🗓️ ON_CALL_FILTERING: Falling back to analyzing all users (original behavior)")
+            
+            oncall_filter_duration = (datetime.now() - oncall_filter_start).total_seconds()
+            logger.info(f"🔍 BURNOUT ANALYSIS: Step 2.5 completed in {oncall_filter_duration:.3f}s - Now analyzing {len(users)} on-call users")
+            
             # Log potential issues based on data patterns
             if len(users) == 0:
                 logger.error(f"🔍 BURNOUT ANALYSIS: CRITICAL - No users found for {time_range_days}-day analysis")
@@ -2451,4 +2491,30 @@ class UnifiedBurnoutAnalyzer:
                 "factors": {},
                 "error": f"Calculation error: {str(e)}"
             }
+    
+    def _get_user_email_from_user(self, user: Dict) -> str:
+        """Extract user email from user data, handling different formats."""
+        if isinstance(user, dict):
+            # Handle JSONAPI format
+            if "attributes" in user:
+                attrs = user["attributes"]
+                return attrs.get("email", "").strip().lower() if attrs.get("email") else ""
+            # Handle direct format
+            elif "email" in user:
+                return user["email"].strip().lower() if user["email"] else ""
+        return ""
+    
+    def _get_user_name_from_user(self, user: Dict) -> str:
+        """Extract user name from user data, handling different formats."""
+        if isinstance(user, dict):
+            # Handle JSONAPI format
+            if "attributes" in user:
+                attrs = user["attributes"]
+                return attrs.get("name", attrs.get("full_name", "Unknown User"))
+            # Handle direct format
+            elif "name" in user:
+                return user["name"]
+            elif "full_name" in user:
+                return user["full_name"]
+        return "Unknown User"
 

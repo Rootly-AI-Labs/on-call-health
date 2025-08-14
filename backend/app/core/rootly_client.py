@@ -250,6 +250,128 @@ class RootlyAPIClient:
             logger.error(f"Error fetching users: {e}")
             raise
     
+    async def get_on_call_shifts(self, start_date: datetime, end_date: datetime) -> List[Dict[str, Any]]:
+        """
+        Get on-call shifts for a specific time period.
+        Returns list of shifts with user information for the exact analysis timeframe.
+        
+        This handles historical schedules - if your analysis period is 30 days ago,
+        it will fetch who was on-call during that historical period.
+        """
+        try:
+            # Format dates for API (Rootly expects ISO format)
+            start_str = start_date.strftime('%Y-%m-%dT%H:%M:%S.%fZ')
+            end_str = end_date.strftime('%Y-%m-%dT%H:%M:%S.%fZ')
+            
+            params = {
+                'filter[starts_at][gte]': start_str,
+                'filter[ends_at][lte]': end_str,
+                'include': 'user',  # Include user data in response
+                'page[size]': 100   # Get up to 100 shifts per request
+            }
+            
+            all_shifts = []
+            page = 1
+            
+            async with httpx.AsyncClient() as client:
+                while True:
+                    params['page[number]'] = page
+                    
+                    response = await client.get(
+                        f"{self.base_url}/shifts",
+                        headers=self.headers,
+                        params=params,
+                        timeout=30.0
+                    )
+                    
+                    if response.status_code == 200:
+                        data = response.json()
+                        shifts = data.get('data', [])
+                        
+                        if not shifts:
+                            break
+                            
+                        all_shifts.extend(shifts)
+                        
+                        # Check if there are more pages
+                        links = data.get('links', {})
+                        if not links.get('next'):
+                            break
+                            
+                        page += 1
+                    else:
+                        logger.error(f"Failed to fetch on-call shifts: {response.status_code} - {response.text}")
+                        break
+                
+                logger.info(f"Retrieved {len(all_shifts)} on-call shifts for period {start_str} to {end_str}")
+                return all_shifts
+                    
+        except Exception as e:
+            logger.error(f"Error fetching on-call shifts: {e}")
+            return []
+    
+    async def extract_on_call_users_from_shifts(self, shifts: List[Dict[str, Any]]) -> set:
+        """
+        Extract unique user emails from shifts data.
+        Returns set of user emails who were on-call during the period.
+        """
+        if not shifts:
+            return set()
+            
+        # Step 1: Extract unique user IDs from shifts
+        user_ids = set()
+        for shift in shifts:
+            try:
+                relationships = shift.get('relationships', {})
+                user_data = relationships.get('user', {}).get('data', {})
+                
+                if user_data and user_data.get('type') == 'users':
+                    user_id = user_data.get('id')
+                    if user_id:
+                        user_ids.add(user_id)
+                        
+            except Exception as e:
+                logger.warning(f"Error extracting user ID from shift: {e}")
+                continue
+        
+        logger.info(f"Found {len(user_ids)} unique user IDs from {len(shifts)} shifts")
+        
+        # Step 2: Fetch user details to get emails
+        on_call_user_emails = set()
+        
+        if user_ids:
+            try:
+                # Fetch all users (we already have this data from get_users)
+                # Instead of making new API calls, we'll match against existing user data
+                # For now, let's make targeted calls for the on-call user IDs
+                
+                async with httpx.AsyncClient() as client:
+                    for user_id in user_ids:
+                        try:
+                            response = await client.get(
+                                f"{self.base_url}/users/{user_id}",
+                                headers=self.headers,
+                                timeout=10.0
+                            )
+                            
+                            if response.status_code == 200:
+                                user_data = response.json()
+                                if 'data' in user_data:
+                                    attributes = user_data['data'].get('attributes', {})
+                                    email = attributes.get('email')
+                                    if email:
+                                        on_call_user_emails.add(email.lower().strip())
+                                        
+                        except Exception as e:
+                            logger.warning(f"Error fetching user {user_id}: {e}")
+                            continue
+                            
+            except Exception as e:
+                logger.error(f"Error fetching on-call user details: {e}")
+        
+        logger.info(f"Successfully extracted {len(on_call_user_emails)} on-call user emails")
+        return on_call_user_emails
+    
     async def get_incidents(self, days_back: int = 30, limit: int = 1000) -> List[Dict[str, Any]]:
         """Fetch incidents from Rootly API."""
         fetch_start_time = datetime.now()
