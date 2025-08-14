@@ -23,10 +23,17 @@ class PatternAnalyzerTool(BaseTool):
     """Tool for analyzing work patterns and detecting burnout indicators."""
     
     def __init__(self):
-        super().__init__(
-            name="pattern_analyzer",
-            description="Analyzes work patterns across different data sources to identify burnout risk factors"
-        )
+        try:
+            # Try the smolagents BaseTool signature
+            super().__init__()
+            self.name = "pattern_analyzer"
+            self.description = "Analyzes work patterns across different data sources to identify burnout risk factors"
+        except TypeError:
+            # Fallback to our custom BaseTool signature  
+            super().__init__(
+                name="pattern_analyzer",
+                description="Analyzes work patterns across different data sources to identify burnout risk factors"
+            )
     
     def __call__(self, data_type: str, events: List[Dict[str, Any]], analysis_window_days: int = 30) -> Dict[str, Any]:
         """

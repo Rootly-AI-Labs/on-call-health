@@ -28,10 +28,17 @@ class CodeQualityAnalyzerTool(BaseTool):
     """Tool for analyzing code quality patterns that may indicate burnout."""
     
     def __init__(self):
-        super().__init__(
-            name="code_quality_analyzer",
-            description="Analyzes GitHub activity to detect code quality issues and rushed development patterns"
-        )
+        try:
+            # Try the smolagents BaseTool signature
+            super().__init__()
+            self.name = "code_quality_analyzer"
+            self.description = "Analyzes GitHub activity to detect code quality issues and rushed development patterns"
+        except TypeError:
+            # Fallback to our custom BaseTool signature  
+            super().__init__(
+                name="code_quality_analyzer",
+                description="Analyzes GitHub activity to detect code quality issues and rushed development patterns"
+            )
         
     def __call__(self, github_data: Dict[str, Any], time_window_days: int = 30) -> Dict[str, Any]:
         """

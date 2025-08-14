@@ -28,10 +28,17 @@ class CrossPlatformCorrelatorTool(BaseTool):
     """Tool for finding correlations across different data platforms."""
     
     def __init__(self):
-        super().__init__(
-            name="cross_platform_correlator",
-            description="Analyzes correlations between incidents, code activity, and communication patterns"
-        )
+        try:
+            # Try the smolagents BaseTool signature
+            super().__init__()
+            self.name = "cross_platform_correlator"
+            self.description = "Analyzes correlations between incidents, code activity, and communication patterns"
+        except TypeError:
+            # Fallback to our custom BaseTool signature  
+            super().__init__(
+                name="cross_platform_correlator",
+                description="Analyzes correlations between incidents, code activity, and communication patterns"
+            )
         
     def __call__(
         self, 

@@ -1923,10 +1923,16 @@ class UnifiedBurnoutAnalyzer:
                 users_involved_count = len(day_data["users_involved"])
                 
                 # Calculate daily health score (SimpleBurnoutAnalyzer approach)
-                incident_count = day_data["incident_count"]
-                severity_weighted = day_data["severity_weighted_count"]
-                after_hours_count = day_data["after_hours_count"]
-                high_severity_count = day_data["high_severity_count"]
+                incident_count = day_data.get("incident_count", 0)
+                severity_weighted = day_data.get("severity_weighted_count", 0.0)
+                after_hours_count = day_data.get("after_hours_count", 0)
+                high_severity_count = day_data.get("high_severity_count", 0)
+                
+                # Ensure all variables are numeric and not None
+                incident_count = incident_count if incident_count is not None else 0
+                severity_weighted = severity_weighted if severity_weighted is not None else 0.0
+                after_hours_count = after_hours_count if after_hours_count is not None else 0
+                high_severity_count = high_severity_count if high_severity_count is not None else 0
                 
                 # Advanced scoring algorithm from SimpleBurnoutAnalyzer
                 # Start with baseline of 8.7 for operational activity days

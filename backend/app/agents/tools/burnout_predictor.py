@@ -29,10 +29,17 @@ class BurnoutPredictorTool(BaseTool):
     """Tool for predicting future burnout risk based on trends and patterns."""
     
     def __init__(self):
-        super().__init__(
-            name="burnout_predictor",
-            description="Predicts future burnout risk using trend analysis and pattern recognition"
-        )
+        try:
+            # Try the smolagents BaseTool signature
+            super().__init__()
+            self.name = "burnout_predictor"
+            self.description = "Predicts future burnout risk using trend analysis and pattern recognition"
+        except TypeError:
+            # Fallback to our custom BaseTool signature  
+            super().__init__(
+                name="burnout_predictor",
+                description="Predicts future burnout risk using trend analysis and pattern recognition"
+            )
         
     def __call__(
         self, 

@@ -22,10 +22,17 @@ class WorkloadAnalyzerTool(BaseTool):
     """Tool for analyzing workload distribution and intensity."""
     
     def __init__(self):
-        super().__init__(
-            name="workload_analyzer",
-            description="Analyzes workload distribution across time periods to identify unsustainable patterns"
-        )
+        try:
+            # Try the smolagents BaseTool signature
+            super().__init__()
+            self.name = "workload_analyzer"
+            self.description = "Analyzes workload distribution across time periods to identify unsustainable patterns"
+        except TypeError:
+            # Fallback to our custom BaseTool signature  
+            super().__init__(
+                name="workload_analyzer",
+                description="Analyzes workload distribution across time periods to identify unsustainable patterns"
+            )
     
     def __call__(self, user_data: Dict[str, Any], team_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
