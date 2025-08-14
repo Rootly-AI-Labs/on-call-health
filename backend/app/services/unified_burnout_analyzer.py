@@ -1763,6 +1763,29 @@ class UnifiedBurnoutAnalyzer:
             daily_data = {}
             individual_daily_data = {}  # New: track per-user daily data
             
+            # PRE-INITIALIZE individual_daily_data with all team members
+            # This is critical - users must exist in the structure before incident processing
+            for user in team_analysis:
+                if user.get('user_email'):  # team_analysis uses user_email, not email
+                    user_key = user['user_email'].lower()
+                    individual_daily_data[user_key] = {}
+                    
+                    # Pre-create all date entries for this user
+                    for day_offset in range(days_analyzed):
+                        date_obj = datetime.now() - timedelta(days=days_analyzed - day_offset - 1)
+                        date_str = date_obj.strftime('%Y-%m-%d')
+                        individual_daily_data[user_key][date_str] = {
+                            "date": date_str,
+                            "incident_count": 0,
+                            "severity_weighted_count": 0.0,
+                            "after_hours_count": 0,
+                            "weekend_count": 0,
+                            "response_times": [],
+                            "has_data": False,
+                            "incidents": [],
+                            "high_severity_count": 0
+                        }
+            
             # Process incidents to populate daily data - only for days with incidents
             if incidents and isinstance(incidents, list):
                 for incident in incidents:
@@ -1878,8 +1901,28 @@ class UnifiedBurnoutAnalyzer:
                                     if incident_date.weekday() >= 5:  # Saturday=5, Sunday=6
                                         user_day_data["weekend_count"] += 1
                                 else:
-                                    # Fallback: user not in our initialized structure (shouldn't happen)
-                                    logger.warning(f"User {user_key} not found in pre-initialized individual_daily_data for date {date_str}")
+                                    # Fallback: user not in our initialized structure (shouldn't happen after pre-initialization)
+                                    logger.error(f"🚨 CRITICAL: User {user_key} not found in pre-initialized individual_daily_data for date {date_str}. Available users: {list(individual_daily_data.keys())[:5]}")
+                                    # Create the missing user structure on-the-fly as emergency fallback
+                                    if user_key not in individual_daily_data:
+                                        individual_daily_data[user_key] = {}
+                                    if date_str not in individual_daily_data[user_key]:
+                                        individual_daily_data[user_key][date_str] = {
+                                            "date": date_str,
+                                            "incident_count": 0,
+                                            "severity_weighted_count": 0.0,
+                                            "after_hours_count": 0,
+                                            "weekend_count": 0,
+                                            "response_times": [],
+                                            "has_data": False,
+                                            "incidents": [],
+                                            "high_severity_count": 0
+                                        }
+                                    # Now process the incident
+                                    user_day_data = individual_daily_data[user_key][date_str]
+                                    user_day_data["incident_count"] += 1
+                                    user_day_data["severity_weighted_count"] += severity_weight
+                                    user_day_data["has_data"] = True
                                 
                                 # Store incident details for individual analysis
                                 user_day_data["incidents"].append({
@@ -2066,7 +2109,12 @@ class UnifiedBurnoutAnalyzer:
             if individual_daily_data:
                 sample_user = list(individual_daily_data.keys())[0]
                 sample_days = len(individual_daily_data[sample_user])
-                logger.info(f"🔍 INDIVIDUAL_DATA_DEBUG: Sample user {sample_user} has {sample_days} days of data")
+                users_with_data = sum(1 for user_data in individual_daily_data.values() 
+                                    for day_data in user_data.values() 
+                                    if day_data.get('has_data', False))
+                logger.info(f"🔍 INDIVIDUAL_DATA_DEBUG: {len(individual_daily_data)} users initialized, sample user {sample_user} has {sample_days} days. {users_with_data} user-days have actual incident data.")
+            else:
+                logger.warning(f"🔍 INDIVIDUAL_DATA_DEBUG: individual_daily_data is empty! Team analysis had {len(team_analysis)} members.")
                 
             return daily_trends
             
