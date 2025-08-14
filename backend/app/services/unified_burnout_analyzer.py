@@ -1738,33 +1738,9 @@ class UnifiedBurnoutAnalyzer:
             
             # Initialize daily data structures - team level and individual level
             daily_data = {}
-            individual_daily_data = {}  # New: track per-user daily data for ALL days
+            individual_daily_data = {}  # New: track per-user daily data
             
-            # NEW: Initialize ALL users with ALL days in analysis period (including no-incident days)
-            all_users = set()
-            for user in users:
-                if user.get('email'):
-                    all_users.add(user['email'].lower())
-            
-            # Initialize every user with every day in the analysis period
-            for user_email in all_users:
-                individual_daily_data[user_email] = {}
-                for day_offset in range(days_analyzed):
-                    date_obj = datetime.now() - timedelta(days=days_analyzed - day_offset - 1)
-                    date_str = date_obj.strftime('%Y-%m-%d')
-                    individual_daily_data[user_email][date_str] = {
-                        "date": date_str,
-                        "incident_count": 0,
-                        "severity_weighted_count": 0.0,
-                        "after_hours_count": 0,
-                        "weekend_count": 0,
-                        "response_times": [],
-                        "has_data": False,  # Key flag: True only when real incident involvement exists
-                        "incidents": [],  # CRITICAL: Store incident details for analysis
-                        "high_severity_count": 0  # Also needed by the analysis logic
-                    }
-            
-            # Process incidents to populate daily data - now updating existing structure
+            # Process incidents to populate daily data - only for days with incidents
             if incidents and isinstance(incidents, list):
                 for incident in incidents:
                     try:
@@ -1993,12 +1969,45 @@ class UnifiedBurnoutAnalyzer:
                     "health_percentage": round(daily_score * 10, 1)  # Convert to percentage for display
                 })
             
-            # Store individual daily data for later access
-            self.individual_daily_data = individual_daily_data
+            # AFTER main processing: Fill out individual daily data for ALL users and ALL days
+            all_users = set()
+            for user in users:
+                if user.get('email'):
+                    all_users.add(user['email'].lower())
+            
+            # Initialize complete individual daily data structure
+            complete_individual_data = {}
+            for user_email in all_users:
+                complete_individual_data[user_email] = {}
+                for day_offset in range(days_analyzed):
+                    date_obj = datetime.now() - timedelta(days=days_analyzed - day_offset - 1)
+                    date_str = date_obj.strftime('%Y-%m-%d')
+                    
+                    # Start with no-data default
+                    complete_individual_data[user_email][date_str] = {
+                        "date": date_str,
+                        "incident_count": 0,
+                        "severity_weighted_count": 0.0,
+                        "after_hours_count": 0,
+                        "weekend_count": 0,
+                        "response_times": [],
+                        "has_data": False,
+                        "incidents": [],
+                        "high_severity_count": 0
+                    }
+                    
+                    # If user has data for this day, copy it over and mark as has_data
+                    if user_email in individual_daily_data and date_str in individual_daily_data[user_email]:
+                        original_data = individual_daily_data[user_email][date_str]
+                        complete_individual_data[user_email][date_str].update(original_data)
+                        complete_individual_data[user_email][date_str]["has_data"] = True
+            
+            # Store the complete individual daily data
+            self.individual_daily_data = complete_individual_data
             
             # Return only days with actual incident data - no fake data generation
             logger.info(f"Generated {len(daily_trends)} daily trend data points with actual incident data for {days_analyzed}-day analysis")
-            logger.info(f"Individual daily data collected for {len(individual_daily_data)} users")
+            logger.info(f"Individual daily data collected for {len(complete_individual_data)} users with complete {days_analyzed}-day coverage")
             
             # Debug: Log sample data for troubleshooting
             if daily_trends:
