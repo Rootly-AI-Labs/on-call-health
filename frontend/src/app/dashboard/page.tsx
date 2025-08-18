@@ -4289,9 +4289,8 @@ export default function Dashboard() {
                           );
                         }
                         
-                        return (
-                          <ResponsiveContainer width="100%" height="100%">
-                          <AreaChart data={(() => {
+                        // Generate chart data
+                        const chartData = (() => {
                           // ONLY show data if we have a valid current analysis - NO FALLBACK DATA
                           if (!currentAnalysis || currentAnalysis.status !== 'completed') {
                             return []; // Return empty array - no fallback data
@@ -4403,7 +4402,11 @@ export default function Dashboard() {
                           
                           // Return empty array if no valid data available - NO FALLBACK
                           return [];
-                        })()}>
+                        })();
+
+                        return (
+                          <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={chartData}>
                           <defs>
                             <linearGradient id="healthGradient" x1="0" y1="0" x2="0" y2="1">
                               <stop offset="0%" stopColor="#8B5CF6" stopOpacity={1.0}/>
