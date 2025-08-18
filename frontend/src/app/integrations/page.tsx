@@ -808,6 +808,8 @@ export default function IntegrationsPage() {
       toast.error("Failed to load integrations. Please try refreshing the page.")
     } finally {
       // Set all integration loading states to false
+      setLoadingRootly(false)
+      setLoadingPagerDuty(false)
       setLoadingGitHub(false)
       setLoadingSlack(false)
     }
