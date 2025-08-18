@@ -272,7 +272,10 @@ interface PreviewData {
 export default function IntegrationsPage() {
   // State management
   const [integrations, setIntegrations] = useState<Integration[]>([])
-  const [loadingIntegrations, setLoadingIntegrations] = useState(true)
+  const [loadingRootly, setLoadingRootly] = useState(true)
+  const [loadingPagerDuty, setLoadingPagerDuty] = useState(true) 
+  const [loadingGitHub, setLoadingGitHub] = useState(true)
+  const [loadingSlack, setLoadingSlack] = useState(true)
   const [userInfo, setUserInfo] = useState<{name: string, email: string, avatar?: string} | null>(null)
   const [activeTab, setActiveTab] = useState<"rootly" | "pagerduty" | null>(null)
   const [backUrl, setBackUrl] = useState<string>('/dashboard')
@@ -398,7 +401,11 @@ export default function IntegrationsPage() {
   })
 
   useEffect(() => {
-    loadAllIntegrations()
+    // Load all integrations independently
+    loadRootlyIntegrations()
+    loadPagerDutyIntegrations()
+    loadGitHubIntegration()
+    loadSlackIntegration()
     loadLlmConfig()
     
     // Load saved organization preference
@@ -504,6 +511,149 @@ export default function IntegrationsPage() {
       loadSlackPermissions()
     }
   }, [slackIntegration, activeEnhancementTab])
+
+  // Load each provider independently for better UX
+  const loadRootlyIntegrations = async (forceRefresh = false) => {
+    // Check cache first
+    if (!forceRefresh) {
+      const cachedIntegrations = localStorage.getItem('all_integrations')
+      if (cachedIntegrations) {
+        try {
+          const parsed = JSON.parse(cachedIntegrations)
+          const rootlyIntegrations = parsed.filter((i: Integration) => i.platform === 'rootly')
+          setIntegrations(prev => [
+            ...prev.filter(i => i.platform !== 'rootly'),
+            ...rootlyIntegrations
+          ])
+          setLoadingRootly(false)
+          return
+        } catch (e) {}
+      }
+    }
+
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) return
+
+      const response = await fetch(`${API_BASE}/rootly/integrations`, {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      })
+
+      const data = response.ok ? await response.json() : { integrations: [] }
+      const rootlyIntegrations = data.integrations.map((i: Integration) => ({ ...i, platform: 'rootly' }))
+
+      setIntegrations(prev => [
+        ...prev.filter(i => i.platform !== 'rootly'),
+        ...rootlyIntegrations
+      ])
+    } catch (error) {
+      console.error('Error loading Rootly integrations:', error)
+    } finally {
+      setLoadingRootly(false)
+    }
+  }
+
+  const loadPagerDutyIntegrations = async (forceRefresh = false) => {
+    // Check cache first
+    if (!forceRefresh) {
+      const cachedIntegrations = localStorage.getItem('all_integrations')
+      if (cachedIntegrations) {
+        try {
+          const parsed = JSON.parse(cachedIntegrations)
+          const pagerdutyIntegrations = parsed.filter((i: Integration) => i.platform === 'pagerduty')
+          setIntegrations(prev => [
+            ...prev.filter(i => i.platform !== 'pagerduty'),
+            ...pagerdutyIntegrations
+          ])
+          setLoadingPagerDuty(false)
+          return
+        } catch (e) {}
+      }
+    }
+
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) return
+
+      const response = await fetch(`${API_BASE}/pagerduty/integrations`, {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      })
+
+      const data = response.ok ? await response.json() : { integrations: [] }
+      const pagerdutyIntegrations = data.integrations || []
+
+      setIntegrations(prev => [
+        ...prev.filter(i => i.platform !== 'pagerduty'),
+        ...pagerdutyIntegrations
+      ])
+    } catch (error) {
+      console.error('Error loading PagerDuty integrations:', error)
+    } finally {
+      setLoadingPagerDuty(false)
+    }
+  }
+
+  const loadGitHubIntegration = async (forceRefresh = false) => {
+    if (!forceRefresh) {
+      const cached = localStorage.getItem('github_integration')
+      if (cached) {
+        try {
+          const githubData = JSON.parse(cached)
+          setGithubIntegration(githubData.connected ? githubData.integration : null)
+          setLoadingGitHub(false)
+          return
+        } catch (e) {}
+      }
+    }
+
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) return
+
+      const response = await fetch(`${API_BASE}/integrations/github/status`, {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      })
+
+      const githubData = response.ok ? await response.json() : { connected: false, integration: null }
+      setGithubIntegration(githubData.connected ? githubData.integration : null)
+      localStorage.setItem('github_integration', JSON.stringify(githubData))
+    } catch (error) {
+      console.error('Error loading GitHub integration:', error)
+    } finally {
+      setLoadingGitHub(false)
+    }
+  }
+
+  const loadSlackIntegration = async (forceRefresh = false) => {
+    if (!forceRefresh) {
+      const cached = localStorage.getItem('slack_integration')
+      if (cached) {
+        try {
+          const slackData = JSON.parse(cached)
+          setSlackIntegration(slackData.integration)
+          setLoadingSlack(false)
+          return
+        } catch (e) {}
+      }
+    }
+
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) return
+
+      const response = await fetch(`${API_BASE}/integrations/slack/status`, {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      })
+
+      const slackData = response.ok ? await response.json() : { integration: null }
+      setSlackIntegration(slackData.integration)
+      localStorage.setItem('slack_integration', JSON.stringify(slackData))
+    } catch (error) {
+      console.error('Error loading Slack integration:', error)
+    } finally {
+      setLoadingSlack(false)
+    }
+  }
 
   const loadAllIntegrations = async (forceRefresh = false) => {
     // Check localStorage cache first if not forcing refresh
@@ -880,7 +1030,11 @@ export default function IntegrationsPage() {
         setAddingPlatform(null)
         
         // Reload integrations to show the newly added one
-        await loadAllIntegrations(true)
+        if (platform === 'rootly') {
+          await loadRootlyIntegrations(true)
+        } else {
+          await loadPagerDutyIntegrations(true)
+        }
       } else {
         throw new Error(responseData.detail?.message || responseData.message || 'Failed to add integration')
       }
@@ -1031,7 +1185,7 @@ export default function IntegrationsPage() {
       
       setGithubToken('')
       setActiveEnhancementTab(null)
-      loadAllIntegrations(true) // Force refresh to update cache
+      loadGitHubIntegration(true) // Force refresh to update cache
     } catch (error) {
       console.error('Error connecting GitHub:', error)
       toast.error(error instanceof Error ? error.message : "An unexpected error occurred.")
@@ -1056,7 +1210,7 @@ export default function IntegrationsPage() {
       if (response.ok) {
         toast.success("Your GitHub integration has been removed.")
         setGithubDisconnectDialogOpen(false)
-        loadAllIntegrations(true) // Force refresh after changes
+        loadGitHubIntegration(true) // Force refresh after changes
       }
     } catch (error) {
       console.error('Error disconnecting GitHub:', error)
@@ -1127,7 +1281,7 @@ export default function IntegrationsPage() {
       setSlackWebhookUrl('')
       setSlackBotToken('')
       setActiveEnhancementTab(null)
-      loadAllIntegrations()
+      loadSlackIntegration(true)
     } catch (error) {
       console.error('Error connecting Slack:', error)
       toast.error(error instanceof Error ? error.message : "An unexpected error occurred.")
@@ -1152,7 +1306,7 @@ export default function IntegrationsPage() {
       if (response.ok) {
         toast.success("Your Slack integration has been removed.")
         setSlackDisconnectDialogOpen(false)
-        loadAllIntegrations(true) // Force refresh after changes
+        loadSlackIntegration(true) // Force refresh after changes
       }
     } catch (error) {
       console.error('Error disconnecting Slack:', error)
@@ -1910,7 +2064,7 @@ export default function IntegrationsPage() {
         </div>
 
         {/* Ready for Analysis CTA */}
-        {loadingIntegrations ? (
+        {(loadingRootly || loadingPagerDuty) ? (
           <div className="bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 rounded-lg p-6 mb-8 max-w-2xl mx-auto animate-pulse">
             <div className="text-center">
               <div className="w-12 h-12 bg-gray-300 rounded-full mx-auto mb-4"></div>
@@ -1945,26 +2099,13 @@ export default function IntegrationsPage() {
 
         {/* Platform Selection Cards */}
         <div className="grid md:grid-cols-2 gap-8 mb-8 max-w-2xl mx-auto">
-          {loadingIntegrations ? (
-            <>
-              {/* Rootly Card Skeleton */}
-              <Card className="border-2 border-gray-200 p-8 flex items-center justify-center relative h-32 animate-pulse">
+          {/* Rootly Card */}
+          {loadingRootly ? (
+            <Card className="border-2 border-gray-200 p-8 flex items-center justify-center relative h-32 animate-pulse">
                 <div className="absolute top-4 right-4 w-6 h-6 bg-gray-300 rounded"></div>
                 <div className="h-12 w-48 bg-gray-300 rounded"></div>
-              </Card>
-              
-              {/* PagerDuty Card Skeleton */}
-              <Card className="border-2 border-gray-200 p-8 flex items-center justify-center relative h-32 animate-pulse">
-                <div className="absolute top-4 right-4 w-6 h-6 bg-gray-300 rounded"></div>
-                <div className="flex items-center space-x-2">
-                  <div className="w-10 h-10 bg-gray-300 rounded"></div>
-                  <div className="h-8 w-32 bg-gray-300 rounded"></div>
-                </div>
-              </Card>
-            </>
+            </Card>
           ) : (
-            <>
-              {/* Rootly Card */}
               <Card 
                 className={`border-2 transition-all cursor-pointer hover:shadow-lg ${
                   activeTab === 'rootly' 
@@ -1999,40 +2140,49 @@ export default function IntegrationsPage() {
                   />
                 </div>
               </Card>
+          )}
 
-              {/* PagerDuty Card */}
-              <Card 
-                className={`border-2 transition-all cursor-pointer hover:shadow-lg ${
-                  activeTab === 'pagerduty' 
-                    ? 'border-green-500 shadow-lg bg-green-50' 
-                    : 'border-gray-200 hover:border-green-300'
-                } p-8 flex items-center justify-center relative h-32`}
-                onClick={() => {
-                  setActiveTab('pagerduty')
-                  setAddingPlatform('pagerduty')
-                }}
-              >
-                {activeTab === 'pagerduty' && (
-                  <>
-                    <div className="absolute top-4 left-4">
-                      <CheckCircle className="w-6 h-6 text-green-600" />
-                    </div>
-                    <div className="absolute top-4 right-4">
-                      <Badge variant="secondary" className="bg-green-100 text-green-700">{pagerdutyCount}</Badge>
-                    </div>
-                  </>
-                )}
-                {activeTab !== 'pagerduty' && pagerdutyCount > 0 && (
-                  <Badge variant="secondary" className="absolute top-4 right-4">{pagerdutyCount}</Badge>
-                )}
-                <div className="flex items-center space-x-2">
-                  <div className="w-10 h-10 bg-green-600 rounded flex items-center justify-center">
-                    <span className="text-white font-bold text-base">PD</span>
+          {/* PagerDuty Card */}
+          {loadingPagerDuty ? (
+            <Card className="border-2 border-gray-200 p-8 flex items-center justify-center relative h-32 animate-pulse">
+              <div className="absolute top-4 right-4 w-6 h-6 bg-gray-300 rounded"></div>
+              <div className="flex items-center space-x-2">
+                <div className="w-10 h-10 bg-gray-300 rounded"></div>
+                <div className="h-8 w-32 bg-gray-300 rounded"></div>
+              </div>
+            </Card>
+          ) : (
+            <Card 
+              className={`border-2 transition-all cursor-pointer hover:shadow-lg ${
+                activeTab === 'pagerduty' 
+                  ? 'border-green-500 shadow-lg bg-green-50' 
+                  : 'border-gray-200 hover:border-green-300'
+              } p-8 flex items-center justify-center relative h-32`}
+              onClick={() => {
+                setActiveTab('pagerduty')
+                setAddingPlatform('pagerduty')
+              }}
+            >
+              {activeTab === 'pagerduty' && (
+                <>
+                  <div className="absolute top-4 left-4">
+                    <CheckCircle className="w-6 h-6 text-green-600" />
                   </div>
-                  <span className="text-2xl font-bold text-slate-900">PagerDuty</span>
+                  <div className="absolute top-4 right-4">
+                    <Badge variant="secondary" className="bg-green-100 text-green-700">{pagerdutyCount}</Badge>
+                  </div>
+                </>
+              )}
+              {activeTab !== 'pagerduty' && pagerdutyCount > 0 && (
+                <Badge variant="secondary" className="absolute top-4 right-4">{pagerdutyCount}</Badge>
+              )}
+              <div className="flex items-center space-x-2">
+                <div className="w-10 h-10 bg-green-600 rounded flex items-center justify-center">
+                  <span className="text-white font-bold text-base">PD</span>
                 </div>
-              </Card>
-            </>
+                <span className="text-2xl font-bold text-slate-900">PagerDuty</span>
+              </div>
+            </Card>
           )}
         </div>
 
@@ -2602,7 +2752,7 @@ export default function IntegrationsPage() {
                 <p className="text-lg font-medium mb-2 text-slate-700">Choose a platform to get started</p>
                 <p className="text-sm text-slate-500">Select Rootly or PagerDuty above to view and manage your integrations</p>
               </div>
-            ) : loadingIntegrations ? (
+            ) : (loadingRootly || loadingPagerDuty) ? (
               <Card className="max-w-2xl mx-auto">
                 <CardContent className="p-6 space-y-4">
                 {/* Skeleton loading cards */}
@@ -2861,29 +3011,16 @@ export default function IntegrationsPage() {
           </div>
 
           <div className="grid md:grid-cols-2 gap-8 mb-8 max-w-2xl mx-auto">
-            {loadingIntegrations ? (
-              <>
-                {/* GitHub Card Skeleton */}
-                <Card className="border-2 border-gray-200 p-8 flex items-center justify-center relative h-32 animate-pulse">
-                  <div className="absolute top-4 right-4 w-16 h-5 bg-gray-300 rounded"></div>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-10 h-10 bg-gray-300 rounded"></div>
-                    <div className="h-8 w-24 bg-gray-300 rounded"></div>
-                  </div>
-                </Card>
-                
-                {/* Slack Card Skeleton */}
-                <Card className="border-2 border-gray-200 p-8 flex items-center justify-center relative h-32 animate-pulse">
-                  <div className="absolute top-4 right-4 w-16 h-5 bg-gray-300 rounded"></div>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-10 h-10 bg-gray-300 rounded"></div>
-                    <div className="h-8 w-20 bg-gray-300 rounded"></div>
-                  </div>
-                </Card>
-              </>
+            {/* GitHub Card */}
+            {loadingGitHub ? (
+              <Card className="border-2 border-gray-200 p-8 flex items-center justify-center relative h-32 animate-pulse">
+                <div className="absolute top-4 right-4 w-16 h-5 bg-gray-300 rounded"></div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-10 h-10 bg-gray-300 rounded"></div>
+                  <div className="h-8 w-24 bg-gray-300 rounded"></div>
+                </div>
+              </Card>
             ) : (
-              <>
-                {/* GitHub Integration Card */}
                 <Card 
                   className={`border-2 transition-all cursor-pointer hover:shadow-lg ${
                     activeEnhancementTab === 'github' 
@@ -2917,18 +3054,28 @@ export default function IntegrationsPage() {
                     <span className="text-2xl font-bold text-slate-900">GitHub</span>
                   </div>
                 </Card>
+            )}
 
-                {/* Slack Integration Card */}
-                <Card 
-                  className={`border-2 transition-all cursor-pointer hover:shadow-lg ${
-                    activeEnhancementTab === 'slack' 
-                      ? 'border-purple-500 shadow-lg bg-purple-50' 
-                      : 'border-gray-200 hover:border-purple-300'
-                  } p-8 flex items-center justify-center relative h-32`}
-                  onClick={() => {
-                    setActiveEnhancementTab(activeEnhancementTab === 'slack' ? null : 'slack')
-                  }}
-                >
+            {/* Slack Card */}
+            {loadingSlack ? (
+              <Card className="border-2 border-gray-200 p-8 flex items-center justify-center relative h-32 animate-pulse">
+                <div className="absolute top-4 right-4 w-16 h-5 bg-gray-300 rounded"></div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-10 h-10 bg-gray-300 rounded"></div>
+                  <div className="h-8 w-20 bg-gray-300 rounded"></div>
+                </div>
+              </Card>
+            ) : (
+              <Card 
+                className={`border-2 transition-all cursor-pointer hover:shadow-lg ${
+                  activeEnhancementTab === 'slack' 
+                    ? 'border-purple-500 shadow-lg bg-purple-50' 
+                    : 'border-gray-200 hover:border-purple-300'
+                } p-8 flex items-center justify-center relative h-32`}
+                onClick={() => {
+                  setActiveEnhancementTab(activeEnhancementTab === 'slack' ? null : 'slack')
+                }}
+              >
                   {slackIntegration ? (
                     <div className="absolute top-4 right-4">
                       <Badge variant="secondary" className="bg-green-100 text-green-700">Connected</Badge>
@@ -2952,7 +3099,6 @@ export default function IntegrationsPage() {
                     <span className="text-2xl font-bold text-slate-900">Slack</span>
                   </div>
                 </Card>
-              </>
             )}
           </div>
 

@@ -34,8 +34,7 @@ rootly-burnout-detector-web/
 │   │   ├── auth/           # Authentication
 │   │   └── api/            # API endpoints
 │   └── requirements.txt
-├── frontend/               # React application (coming soon)
-├── docs/                   # Documentation
+├── frontend/               # Next.js application  
 └── README.md
 ```
 
@@ -63,12 +62,14 @@ python -m app.main
 
 The API will be available at `http://localhost:8000`
 
-### Frontend Setup (Coming Soon)
+### Frontend Setup
 ```bash
 cd frontend
 npm install
-npm start
+npm run dev
 ```
+
+The frontend will be available at `http://localhost:3000`
 
 ## 🔧 Configuration
 
@@ -94,7 +95,7 @@ FRONTEND_URL=http://localhost:3000
 
 ```bash
 cd backend
-python test_api.py
+python -m pytest
 ```
 
 ## 📊 Burnout Analysis

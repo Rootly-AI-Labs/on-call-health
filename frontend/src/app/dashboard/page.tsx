@@ -2161,13 +2161,14 @@ export default function Dashboard() {
       }
     }
 
-    // Check if we need to refresh cache
+    // Check cache validity for GitHub/Slack data
     const lastIntegrationsLoad = localStorage.getItem('all_integrations_timestamp')
     const integrationsCacheAge = lastIntegrationsLoad ? Date.now() - parseInt(lastIntegrationsLoad) : Infinity
-    const integrationsCacheValid = integrationsCacheAge < 5 * 60 * 1000 // 5 minutes
+    const integrationsCacheValid = integrationsCacheAge < 15 * 60 * 1000 // 15 minutes (increased from 5)
     
-    // Only fetch fresh data if cache is stale
-    const needsGitHubSlackData = !integrationsCacheValid
+    // Only load GitHub/Slack data if we don't have it in state yet
+    // The modal can function without this data - it's only needed for the toggle switches
+    const needsGitHubSlackData = (!githubIntegration || !slackIntegration) && !integrationsCacheValid
     const needsLlmConfig = !llmConfig
     
     if (needsGitHubSlackData || needsLlmConfig) {
@@ -2175,7 +2176,7 @@ export default function Dashboard() {
       
       const promises = []
       if (needsGitHubSlackData) {
-        console.log('🔍 DEBUG: Loading GitHub/Slack data because cache is stale')
+        console.log('🔍 DEBUG: Loading GitHub/Slack data for toggle switches')
         promises.push(loadIntegrations(true, false)) // Refresh integrations without showing loading
       }
       if (needsLlmConfig) {
@@ -2190,7 +2191,7 @@ export default function Dashboard() {
         setIsLoadingGitHubSlack(false)
       })
     } else {
-      console.log('🔍 DEBUG: Using cached GitHub/Slack/LLM data, no loading needed')
+      console.log('🔍 DEBUG: GitHub/Slack/LLM data available, no loading needed')
     }
   }
 
@@ -4565,26 +4566,6 @@ export default function Dashboard() {
                           />
                         </AreaChart>
                       </ResponsiveContainer>
-                      
-                      {/* NEW: Legend for hybrid UX */}
-                      <div className="mt-3 flex items-center justify-center gap-6 text-xs text-gray-600">
-                        <div className="flex items-center gap-2">
-                          <div className="flex items-center">
-                            <div className="w-4 h-0.5 bg-purple-500 mr-1"></div>
-                            <div className="w-2 h-2 bg-purple-500 rounded-full border border-white"></div>
-                          </div>
-                          <span>Days with incident data</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="flex items-center">
-                            <div className="w-4 h-0.5 bg-gray-400 border-dashed border-t mr-1" style={{borderTop: '1.5px dashed #9CA3AF'}}></div>
-                            <div className="w-2 h-2 bg-gray-400 rounded-full border border-white opacity-70"></div>
-                          </div>
-                          <span>Days without incident data</span>
-                        </div>
-                      </div>
-                        );
-                      })()}
                     </div>
                   </CardContent>
                 </Card>
@@ -5546,20 +5527,8 @@ export default function Dashboard() {
                   {/* GitHub Toggle Card */}
                   {true && (
                     <div className={`border rounded-lg p-3 transition-all ${includeGithub && githubIntegration ? 'border-gray-900 bg-gray-50' : 'border-gray-200 bg-white'}`}>
-                      {isLoadingGitHubSlack ? (
-                        /* Skeleton loader for GitHub */
-                        <div className="animate-pulse">
-                          <div className="flex items-start justify-between mb-2">
-                            <div className="flex items-center space-x-2">
-                              <div className="w-6 h-6 bg-gray-300 rounded"></div>
-                              <div className="h-4 bg-gray-300 rounded w-16"></div>
-                            </div>
-                            <div className="w-10 h-6 bg-gray-300 rounded-full"></div>
-                          </div>
-                          <div className="h-3 bg-gray-300 rounded w-24 mb-1"></div>
-                          <div className="h-3 bg-gray-300 rounded w-20"></div>
-                        </div>
-                      ) : (
+                      {/* Always show GitHub content immediately, no skeleton loader */}
+                      {(
                         <>
                           <div className="flex items-start justify-between mb-2">
                             <div className="flex items-center space-x-2">
@@ -5581,7 +5550,7 @@ export default function Dashboard() {
                                   setIncludeGithub(checked)
                                 }
                               }}
-                              disabled={isLoadingGitHubSlack}
+                              disabled={false}
                             />
                           </div>
                           <p className="text-xs text-gray-600 mb-1">Code patterns & activity</p>
@@ -5594,20 +5563,8 @@ export default function Dashboard() {
                   {/* Slack Toggle Card */}
                   {true && (
                     <div className={`border rounded-lg p-3 transition-all ${includeSlack && slackIntegration ? 'border-purple-500 bg-purple-50' : 'border-gray-200 bg-white'}`}>
-                      {isLoadingGitHubSlack ? (
-                        /* Skeleton loader for Slack */
-                        <div className="animate-pulse">
-                          <div className="flex items-start justify-between mb-2">
-                            <div className="flex items-center space-x-2">
-                              <div className="w-6 h-6 bg-gray-300 rounded"></div>
-                              <div className="h-4 bg-gray-300 rounded w-12"></div>
-                            </div>
-                            <div className="w-10 h-6 bg-gray-300 rounded-full"></div>
-                          </div>
-                          <div className="h-3 bg-gray-300 rounded w-28 mb-1"></div>
-                          <div className="h-3 bg-gray-300 rounded w-20"></div>
-                        </div>
-                      ) : (
+                      {/* Always show Slack content immediately, no skeleton loader */}
+                      {(
                         <>
                           <div className="flex items-start justify-between mb-2">
                             <div className="flex items-center space-x-2">
@@ -5636,7 +5593,7 @@ export default function Dashboard() {
                                   setIncludeSlack(checked)
                                 }
                               }}
-                              disabled={isLoadingGitHubSlack}
+                              disabled={false}
                             />
                           </div>
                           <p className="text-xs text-gray-600 mb-1">Communication patterns</p>
@@ -5720,7 +5677,7 @@ export default function Dashboard() {
               <Button 
                 onClick={runAnalysisWithTimeRange} 
                 className="bg-purple-600 hover:bg-purple-700"
-                disabled={isLoadingGitHubSlack || !dialogSelectedIntegration || (() => {
+                disabled={!dialogSelectedIntegration || (() => {
                   const selectedIntegration = integrations.find(i => i.id.toString() === dialogSelectedIntegration);
                   
                   // Only check permissions for Rootly integrations, not PagerDuty
@@ -5734,17 +5691,10 @@ export default function Dashboard() {
                   return false;
                 })()}
               >
-                {isLoadingGitHubSlack ? (
-                  <>
-                    <div className="w-4 h-4 mr-2 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
-                    Loading...
-                  </>
-                ) : (
-                  <>
-                    <Play className="w-4 h-4 mr-2" />
-                    Start Analysis
-                  </>
-                )}
+                <>
+                  <Play className="w-4 h-4 mr-2" />
+                  Start Analysis
+                </>
               </Button>
             </div>
           </div>

@@ -37,8 +37,10 @@ test.db
 .env
 secrets.env
 
-# Security audit (contains sensitive findings)
-SECURITY.md
+# All markdown files except README (internal documentation not for public release)
+*.md
+!README.md
+!frontend/README.md
 
 # IDEs
 .vscode/
@@ -93,3 +95,11 @@ query_db.sh
 
 # Husky
 .husky/
+
+# Cache directories
+.slack_cache/
+.claude/
+
+# Frontend
+frontend/.env.local
+frontend/.next/
