@@ -664,9 +664,16 @@ export default function IntegrationsPage() {
   // Synchronous cache reading for instant display
   const loadFromCacheSync = () => {
     try {
+      console.log('🚀 DEBUG: Reading cache from localStorage')
       const cachedIntegrations = localStorage.getItem('all_integrations')
       const cachedGithub = localStorage.getItem('github_integration')
       const cachedSlack = localStorage.getItem('slack_integration')
+      
+      console.log('🚀 DEBUG: Cache items found:', {
+        cachedIntegrations: !!cachedIntegrations,
+        cachedGithub: !!cachedGithub,
+        cachedSlack: !!cachedSlack
+      })
       
       if (cachedIntegrations) {
         const parsedIntegrations = JSON.parse(cachedIntegrations)
@@ -677,16 +684,20 @@ export default function IntegrationsPage() {
       if (cachedGithub) {
         const githubData = JSON.parse(cachedGithub)
         setGithubIntegration(githubData.connected ? githubData.integration : null)
+        console.log('🚀 DEBUG: Loaded GitHub cache')
       }
       
       if (cachedSlack) {
         const slackData = JSON.parse(cachedSlack)
         setSlackIntegration(slackData.integration)
+        console.log('🚀 DEBUG: Loaded Slack cache')
       }
       
-      return !!(cachedIntegrations && cachedGithub && cachedSlack)
+      const hasAllCache = !!(cachedIntegrations && cachedGithub && cachedSlack)
+      console.log('🚀 DEBUG: Has all cache?', hasAllCache)
+      return hasAllCache
     } catch (error) {
-      console.error('Error loading cache:', error)
+      console.error('🚀 DEBUG: Error loading cache:', error)
       return false
     }
   }
@@ -716,41 +727,58 @@ export default function IntegrationsPage() {
   
   // New optimized loading function with instant cache + background refresh
   const loadAllIntegrationsOptimized = async (forceRefresh = false) => {
-    console.log('✨ PHASE 1: Starting optimized integration loading')
+    console.log('🚀 DEBUG: Starting optimized integration loading, forceRefresh=', forceRefresh)
     
-    // Step 1: Always show cached data instantly (0ms)
-    const hasCachedData = loadFromCacheSync()
-    
-    // Step 2: If we have cached data and it's not forced refresh, show it immediately
-    if (hasCachedData && !forceRefresh) {
-      setLoadingRootly(false) // Hide skeleton immediately
+    try {
+      // Step 1: Always show cached data instantly (0ms)
+      console.log('🚀 DEBUG: Calling loadFromCacheSync()')
+      const hasCachedData = loadFromCacheSync()
+      console.log('🚀 DEBUG: hasCachedData =', hasCachedData)
+      
+      // Step 2: If we have cached data and it's not forced refresh, show it immediately
+      if (hasCachedData && !forceRefresh) {
+        console.log('🚀 DEBUG: Has cached data, setting loading states to false')
+        setLoadingRootly(false) // Hide skeleton immediately
+        setLoadingPagerDuty(false)
+        setLoadingGitHub(false)
+        setLoadingSlack(false)
+        
+        // Step 3: Check if cache is stale and refresh in background if needed
+        const cacheIsStale = isCacheStale()
+        console.log('🚀 DEBUG: Cache is stale?', cacheIsStale)
+        if (cacheIsStale) {
+          console.log('✨ CACHE STALE: Starting background refresh')
+          // Non-blocking background refresh
+          setTimeout(() => refreshInBackground(), 100)
+        } else {
+          console.log('✨ CACHE FRESH: No refresh needed')
+        }
+        return
+      }
+      
+      // Step 4: If no cache or forced refresh, fall back to normal loading
+      console.log('🚀 DEBUG: No cache or forced refresh, calling loadAllIntegrationsAPI()')
+      await loadAllIntegrationsAPI()
+      console.log('🚀 DEBUG: loadAllIntegrationsAPI() completed')
+    } catch (error) {
+      console.error('🚀 DEBUG: Error in loadAllIntegrationsOptimized:', error)
+      // Fallback: set loading states to false to prevent infinite loading
+      setLoadingRootly(false)
       setLoadingPagerDuty(false)
       setLoadingGitHub(false)
       setLoadingSlack(false)
-      
-      // Step 3: Check if cache is stale and refresh in background if needed
-      if (isCacheStale()) {
-        console.log('✨ CACHE STALE: Starting background refresh')
-        // Non-blocking background refresh
-        setTimeout(() => refreshInBackground(), 100)
-      } else {
-        console.log('✨ CACHE FRESH: No refresh needed')
-      }
-      return
     }
-    
-    // Step 4: If no cache or forced refresh, fall back to normal loading
-    console.log('✨ NO CACHE: Falling back to API loading')
-    await loadAllIntegrationsAPI()
   }
   
   // Original API loading logic (extracted for reuse)
   const loadAllIntegrationsAPI = async () => {
+    console.log('🚀 DEBUG: loadAllIntegrationsAPI starting')
     // Set individual loading states to true
     setLoadingRootly(true)
     setLoadingPagerDuty(true)
     setLoadingGitHub(true)
     setLoadingSlack(true)
+    console.log('🚀 DEBUG: Set all loading states to true')
     try {
       const authToken = localStorage.getItem('auth_token')
       if (!authToken) {
@@ -804,14 +832,16 @@ export default function IntegrationsPage() {
         // Otherwise keep backUrl empty to hide the back button
       }
     } catch (error) {
-      console.error('Failed to load integrations:', error)
+      console.error('🚀 DEBUG: Error in loadAllIntegrationsAPI:', error)
       toast.error("Failed to load integrations. Please try refreshing the page.")
     } finally {
+      console.log('🚀 DEBUG: loadAllIntegrationsAPI finally block - setting loading states to false')
       // Set all integration loading states to false
       setLoadingRootly(false)
       setLoadingPagerDuty(false)
       setLoadingGitHub(false)
       setLoadingSlack(false)
+      console.log('🚀 DEBUG: All loading states set to false')
     }
   }
 
