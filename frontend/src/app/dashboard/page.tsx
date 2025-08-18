@@ -4304,17 +4304,25 @@ export default function Dashboard() {
                               
                               return {
                                 date: new Date(trend.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
-                                score: Math.round((10 - trend.overall_score) * 10), // Convert 0-10 burnout to 0-100 health scale
-                                riskLevel: trend.overall_score <= 3 ? 'excellent' : trend.overall_score <= 5.5 ? 'good' : trend.overall_score <= 7.5 ? 'fair' : trend.overall_score >= 7.5 ? 'poor' : 'critical',
-                                membersAtRisk: trend.members_at_risk,
-                                totalMembers: trend.total_members,
-                                healthStatus: trend.health_status,
+                                // Convert burnout score (0-10) to health score (0-100)
+                                // Higher burnout = lower health, so: health = (10 - burnout) * 10
+                                score: hasRealData ? Math.round((10 - trend.overall_score) * 10) : 0, 
+                                // Calculate risk level based on the CONVERTED health score (0-100), not raw burnout
+                                riskLevel: hasRealData ? (() => {
+                                  const healthScore = Math.round((10 - trend.overall_score) * 10);
+                                  if (healthScore >= 70) return 'good';
+                                  if (healthScore >= 40) return 'fair';
+                                  return 'poor';
+                                })() : null,
+                                membersAtRisk: hasRealData ? trend.members_at_risk : null,
+                                totalMembers: hasRealData ? trend.total_members : null,
+                                healthStatus: hasRealData ? trend.health_status : null,
                                 incidentCount: incidentCount,
-                                rawScore: trend.overall_score,
+                                rawScore: hasRealData ? trend.overall_score : null,
                                 originalDate: trend.date,
                                 index: index,
-                                hasRealData: hasRealData, // NEW: Track if this day has real incident data
-                                dataType: hasRealData ? 'real' : 'estimated' // NEW: For legend and styling
+                                hasRealData: hasRealData,
+                                dataType: hasRealData ? 'real' : 'no_data'
                               };
                             });
                             
@@ -4327,21 +4335,32 @@ export default function Dashboard() {
                                 let eventDescription = '';
                                 let significance = 0;
                                 
+                                // Only analyze standout events for days with real incident data
+                                if (!point.hasRealData) {
+                                  return {
+                                    ...point,
+                                    eventType,
+                                    eventDescription,
+                                    significance,
+                                    isStandout: false
+                                  };
+                                }
+                                
                                 const prev = i > 0 ? data[i-1] : null;
                                 const next = i < data.length-1 ? data[i+1] : null;
                                 
-                                // Calculate changes
-                                const prevChange = prev ? point.score - prev.score : 0;
-                                const nextChange = next ? next.score - point.score : 0;
+                                // Calculate changes (only for days with data)
+                                const prevChange = prev && prev.hasRealData ? point.score - prev.score : 0;
+                                const nextChange = next && next.hasRealData ? next.score - point.score : 0;
                                 
-                                // Detect peaks (local maxima)
-                                if (prev && next && point.score > prev.score && point.score > next.score && point.score >= 75) {
+                                // Detect peaks (local maxima) - only for days with incidents
+                                if (prev && prev.hasRealData && next && next.hasRealData && point.score > prev.score && point.score > next.score && point.score >= 75) {
                                   eventType = 'peak';
                                   eventDescription = `Health peak: Excellent day with ${point.incidentCount} incidents`;
                                   significance = point.score >= 90 ? 3 : 2;
                                 }
-                                // Detect valleys (local minima)  
-                                else if (prev && next && point.score < prev.score && point.score < next.score && point.score <= 60) {
+                                // Detect valleys (local minima) - only for days with incidents
+                                else if (prev && prev.hasRealData && next && next.hasRealData && point.score < prev.score && point.score < next.score && point.score <= 60) {
                                   eventType = 'valley';
                                   eventDescription = `Health valley: Challenging day with ${point.incidentCount} incidents, ${point.membersAtRisk} at risk`;
                                   significance = point.score <= 40 ? 3 : 2;
@@ -4403,172 +4422,181 @@ export default function Dashboard() {
 
                         return (
                           <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={chartData}>
-                          <defs>
-                            <linearGradient id="healthGradient" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor="#8B5CF6" stopOpacity={1.0}/>
-                              <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0}/>
-                            </linearGradient>
-                          </defs>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                          <YAxis domain={[30, 100]} tick={{ fontSize: 12 }} />
-                          <Tooltip 
-                            content={({ payload, label }) => {
-                              if (payload && payload.length > 0) {
-                                const data = payload[0].payload;
-                                return (
-                                  <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
-                                    <p className="font-semibold text-gray-900">{label}</p>
-                                    <div className="flex items-center gap-2 mb-2">
-                                      <p className="text-purple-600 font-bold">Health Score: {Math.round(Number(payload[0].value))}%</p>
-                                      {/* NEW: Data type indicator */}
-                                      <span className={`px-2 py-1 text-xs rounded-full ${
-                                        data.hasRealData 
-                                          ? 'bg-green-100 text-green-700 border border-green-200'
-                                          : 'bg-gray-100 text-gray-600 border border-gray-200'
-                                      }`}>
-                                        {data.hasRealData ? '📊 Real Data' : '📈 No Data'}
-                                      </span>
-                                    </div>
-                                    
-                                    {/* NEW: Enhanced data availability explanation */}
-                                    {!data.hasRealData && (
-                                      <div className="bg-gray-50 border-l-4 border-gray-300 p-2 mb-2 rounded">
-                                        <p className="text-xs text-gray-600 font-medium">
-                                          💡 No incidents recorded on this date
-                                        </p>
-                                        <p className="text-xs text-gray-500 mt-1">
-                                          Health score represents baseline team wellness
-                                        </p>
+                            <BarChart 
+                              data={chartData}
+                              margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis 
+                                dataKey="date" 
+                                fontSize={11}
+                                tick={{ fill: '#6B7280' }}
+                                axisLine={false}
+                                tickLine={false}
+                              />
+                              <YAxis 
+                                domain={[0, 100]} 
+                                fontSize={11}
+                                tick={{ fill: '#6B7280' }}
+                                axisLine={false}
+                                tickLine={false}
+                                label={{ 
+                                  value: 'Health Score', 
+                                  angle: -90, 
+                                  position: 'insideLeft',
+                                  style: { textAnchor: 'middle' }
+                                }}
+                              />
+                              <Tooltip 
+                                content={({ active, payload, label }) => {
+                                  if (active && payload && payload[0]) {
+                                    const data = payload[0].payload;
+                                    return (
+                                      <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg text-sm">
+                                        <p className="font-semibold text-gray-800">{label}</p>
+                                        
+                                        {data.hasRealData ? (
+                                          <>
+                                            <div className="flex items-center gap-2 mb-2">
+                                              <p className="text-purple-600 font-bold">Health Score: {Math.round(Number(payload[0].value))}%</p>
+                                              <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-700 border border-green-200">
+                                                📊 Real Data
+                                              </span>
+                                            </div>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <div className="flex items-center gap-2 mb-2">
+                                              <span className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-600 border border-gray-200">
+                                                📈 No Data
+                                              </span>
+                                            </div>
+                                            <div className="bg-gray-50 border-l-4 border-gray-300 p-2 mb-2 rounded">
+                                              <p className="text-xs text-gray-600 font-medium">
+                                                💡 No incidents recorded on this date
+                                              </p>
+                                              <p className="text-xs text-gray-500 mt-1">
+                                                No health score calculated for days without incidents
+                                              </p>
+                                            </div>
+                                          </>
+                                        )}
+                                        
+                                        {/* Only show standout events and risk info for days with real data */}
+                                        {data.hasRealData && (
+                                          <>
+                                            {data.isStandout && data.eventDescription && (
+                                              <div className={`p-2 rounded-md mt-2 border-l-4 ${
+                                                data.eventType === 'peak' ? 'bg-green-50 border-green-400' :
+                                                data.eventType === 'valley' ? 'bg-red-50 border-red-400' :
+                                                data.eventType === 'recovery' ? 'bg-blue-50 border-blue-400' :
+                                                data.eventType === 'decline' ? 'bg-orange-50 border-orange-400' :
+                                                data.eventType === 'high-volume' ? 'bg-purple-50 border-purple-400' :
+                                                data.eventType === 'critical' ? 'bg-red-100 border-red-500' :
+                                                'bg-gray-50 border-gray-400'
+                                              }`}>
+                                                <p className={`text-sm font-medium ${
+                                                  data.eventType === 'peak' ? 'text-green-700' :
+                                                  data.eventType === 'valley' ? 'text-red-700' :
+                                                  data.eventType === 'recovery' ? 'text-blue-700' :
+                                                  data.eventType === 'decline' ? 'text-orange-700' :
+                                                  data.eventType === 'high-volume' ? 'text-purple-700' :
+                                                  data.eventType === 'critical' ? 'text-red-800' :
+                                                  'text-gray-700'
+                                                }`}>
+                                                  🎯 Standout Event
+                                                </p>
+                                                <p className="text-xs text-gray-600 mt-1">{data.eventDescription}</p>
+                                              </div>
+                                            )}
+                                            
+                                            {data.riskLevel && (
+                                              <p className={`text-sm font-medium ${
+                                                                                                data.riskLevel === 'good' ? 'text-green-700' :
+                                                data.riskLevel === 'fair' ? 'text-yellow-600' :
+                                                data.riskLevel === 'poor' ? 'text-red-600' : 'text-gray-600'
+                                              }`}>
+                                                Risk Level: {data.riskLevel.charAt(0).toUpperCase() + data.riskLevel.slice(1)}
+                                              </p>
+                                            )}
+                                            
+                                            <p className="text-sm text-gray-600">
+                                              Incidents: {data.incidentCount}
+                                            </p>
+                                            
+                                            {data.membersAtRisk !== null && data.totalMembers !== null && (
+                                              <p className="text-sm text-gray-600">
+                                                At Risk: {data.membersAtRisk}/{data.totalMembers} members
+                                              </p>
+                                            )}
+                                            
+                                            {data.healthStatus && (
+                                              <p className="text-sm text-gray-600">
+                                                Status: {data.healthStatus.charAt(0).toUpperCase() + data.healthStatus.slice(1)}
+                                              </p>
+                                            )}
+                                          </>
+                                        )}
+                                        
+                                        {/* For days without incidents, just show the incident count */}
+                                        {!data.hasRealData && (
+                                          <p className="text-sm text-gray-600">
+                                            Incidents: 0
+                                          </p>
+                                        )}
                                       </div>
-                                    )}
-                                    
-                                    {/* Show standout event information */}
-                                    {data.isStandout && data.eventDescription && (
-                                      <div className={`p-2 rounded-md mt-2 border-l-4 ${
-                                        data.eventType === 'peak' ? 'bg-green-50 border-green-400' :
-                                        data.eventType === 'valley' ? 'bg-red-50 border-red-400' :
-                                        data.eventType === 'recovery' ? 'bg-blue-50 border-blue-400' :
-                                        data.eventType === 'decline' ? 'bg-orange-50 border-orange-400' :
-                                        data.eventType === 'high-volume' ? 'bg-purple-50 border-purple-400' :
-                                        data.eventType === 'critical' ? 'bg-red-100 border-red-500' :
-                                        'bg-gray-50 border-gray-400'
-                                      }`}>
-                                        <p className={`text-sm font-medium ${
-                                          data.eventType === 'peak' ? 'text-green-700' :
-                                          data.eventType === 'valley' ? 'text-red-700' :
-                                          data.eventType === 'recovery' ? 'text-blue-700' :
-                                          data.eventType === 'decline' ? 'text-orange-700' :
-                                          data.eventType === 'high-volume' ? 'text-purple-700' :
-                                          data.eventType === 'critical' ? 'text-red-800' :
-                                          'text-gray-700'
-                                        }`}>
-                                          🎯 Standout Event
-                                        </p>
-                                        <p className="text-xs text-gray-600 mt-1">{data.eventDescription}</p>
-                                      </div>
-                                    )}
-                                    
-                                    <p className={`text-sm font-medium ${
-                                      data.riskLevel === 'excellent' ? 'text-green-700' :
-                                      data.riskLevel === 'good' ? 'text-blue-600' :
-                                      data.riskLevel === 'fair' ? 'text-yellow-600' :
-                                      data.riskLevel === 'poor' ? 'text-orange-600' : 'text-red-600'
-                                    }`}>
-                                      Risk Level: {data.riskLevel.charAt(0).toUpperCase() + data.riskLevel.slice(1)}
-                                    </p>
-                                    {data.incidentCount !== undefined && (
-                                      <p className="text-sm text-gray-600">
-                                        Incidents: {data.incidentCount}
-                                      </p>
-                                    )}
-                                    {data.membersAtRisk !== undefined && (
-                                      <p className="text-sm text-gray-600">
-                                        At Risk: {data.membersAtRisk}/{data.totalMembers} members
-                                      </p>
-                                    )}
-                                    {data.healthStatus && (
-                                      <p className="text-sm text-gray-600">
-                                        Status: {data.healthStatus.charAt(0).toUpperCase() + data.healthStatus.slice(1)}
-                                      </p>
-                                    )}
-                                  </div>
-                                )
-                              }
-                              return null
-                            }}
-                          />
-                          {/* Main area fill with gradient */}
-                          <Area
-                            type="monotone"
-                            dataKey="score"
-                            stroke="none"
-                            fill="url(#healthGradient)"
-                          />
-                          
-                          {/* Subtle overlay for estimated data sections */}
-                          <Area
-                            type="monotone"
-                            dataKey={(entry: any) => entry.hasRealData ? null : entry.score}
-                            stroke="none"
-                            fill="rgba(156, 163, 175, 0.1)"
-                            connectNulls={false}
-                          />
-                          {/* Main line for all data */}
-                          <Line 
-                            type="monotone" 
-                            dataKey="score" 
-                            stroke="#8B5CF6" 
-                            strokeWidth={2}
-                            dot={(props: any) => {
-                              const { cx, cy, payload } = props;
-                              if (!payload) return null;
-                              
-                              // Different dot styles for real vs estimated data
-                              if (payload.hasRealData) {
-                                return (
-                                  <circle 
-                                    cx={cx} 
-                                    cy={cy} 
-                                    r={3} 
-                                    fill="#8B5CF6" 
-                                    stroke="white" 
-                                    strokeWidth={2}
+                                    );
+                                  }
+                                  return null;
+                                }}
+                              />
+                              <Bar 
+                                dataKey="score" 
+                                radius={[4, 4, 0, 0]}
+                              >
+                                {chartData.map((entry, index) => (
+                                  <Cell 
+                                    key={`cell-${index}`} 
+                                    fill={
+                                      !entry.hasRealData ? '#E5E7EB' : // Grey for no-data days
+                                      entry.score >= 70 ? '#10B981' :  // Green for good health (70+)
+                                      entry.score >= 40 ? '#F59E0B' :  // Yellow for moderate health (40-69)
+                                      '#EF4444'                        // Red for poor health (<40)
+                                    }
+                                    stroke={!entry.hasRealData ? '#9CA3AF' : undefined}
+                                    strokeWidth={!entry.hasRealData ? 1 : 0}
+                                    strokeDasharray={!entry.hasRealData ? '3,3' : undefined}
+                                    opacity={!entry.hasRealData ? 0.6 : 1}
                                   />
-                                );
-                              } else {
-                                return (
-                                  <circle 
-                                    cx={cx} 
-                                    cy={cy} 
-                                    r={2} 
-                                    fill="#9CA3AF" 
-                                    stroke="white" 
-                                    strokeWidth={1}
-                                    opacity={0.7}
-                                  />
-                                );
-                              }
-                            }}
-                            activeDot={{ r: 6, stroke: '#8B5CF6', strokeWidth: 2, fill: '#8B5CF6' }}
-                          />
-                          
-                          {/* Overlay dotted line for estimated data segments */}
-                          <Line 
-                            type="monotone" 
-                            dataKey={(entry: any) => entry.hasRealData ? null : entry.score}
-                            stroke="#9CA3AF" 
-                            strokeWidth={1.5}
-                            strokeDasharray="4,4"
-                            dot={false}
-                            connectNulls={false}
-                          />
-                        </AreaChart>
-                      </ResponsiveContainer>
+                                ))}
+                              </Bar>
+                            </BarChart>
+                          </ResponsiveContainer>
                         )
                       })()}
                     </div>
+                    
+                    {/* Legend/Key for bar colors */}
+                    {chartData.length > 0 && (
+                      <div className="mt-4 flex items-center justify-center space-x-3 text-xs text-gray-500">
+                        <div className="flex items-center space-x-1">
+                          <div className="w-3 h-3 bg-green-500 rounded"></div>
+                          <span>Good (70+)</span>
+                        </div>
+                        <div className="flex items-center space-x-1">
+                          <div className="w-3 h-3 bg-yellow-500 rounded"></div>
+                          <span>Moderate (40-69)</span>
+                        </div>
+                        <div className="flex items-center space-x-1">
+                          <div className="w-3 h-3 bg-red-500 rounded"></div>
+                          <span>Poor (&lt;40)</span>
+                        </div>
+                        <div className="flex items-center space-x-1">
+                          <div className="w-3 h-3 bg-gray-300 border border-gray-400 border-dashed rounded"></div>
+                          <span>No Incidents</span>
+                        </div>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </div>

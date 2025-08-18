@@ -1774,31 +1774,12 @@ class UnifiedBurnoutAnalyzer:
         # This is a simplified approach - in a full implementation,
         # we'd want to store the raw incident data
         
-        if incident_count > 0:
-            # Create sample incidents based on the analysis
-            after_hours_rate = metrics.get("after_hours_percentage", 0)
-            weekend_rate = metrics.get("weekend_percentage", 0)
-            avg_response_time = metrics.get("avg_response_time_minutes", 15)
-            
-            for i in range(min(incident_count, 50)):  # Limit to 50 incidents for performance
-                # Create approximated incident
-                incident = {
-                    "timestamp": datetime.utcnow().isoformat(),  # Placeholder
-                    "response_time_minutes": avg_response_time + (i % 20 - 10),  # Add variance
-                    "severity": "medium",  # Default
-                    "created_at": datetime.utcnow().isoformat(),
-                }
-                
-                # Add some patterns based on rates
-                if i < incident_count * after_hours_rate:
-                    # Mark as after-hours
-                    incident["after_hours"] = True
-                
-                if i < incident_count * weekend_rate:
-                    # Mark as weekend
-                    incident["weekend"] = True
-                
-                incidents.append(incident)
+        # Remove artificial incident generation to prevent flat-line health trends
+        # The synthetic incidents were creating identical daily patterns causing
+        # health scores to be consistently 7.8 (78%) instead of realistic variation
+        
+        # Return empty incidents list - AI analysis will work with metrics only
+        logger.info(f"📊 DATA_INTEGRITY: Returning {incident_count} incident metrics without synthetic generation")
         
         return incidents
 
@@ -2091,6 +2072,9 @@ class UnifiedBurnoutAnalyzer:
                 # Determine health status
                 health_status = self._determine_health_status_from_score(daily_score)
                 
+                # 🔍 DEBUG: Log daily score calculation details
+                logger.info(f"📊 DAILY_SCORE_DEBUG for {date_str}: baseline=8.7, incidents={incident_count}, severity_weighted={severity_weighted:.1f}, after_hours={after_hours_count}, high_severity={high_severity_count}, users_involved={users_involved_count}, final_score={daily_score:.2f}")
+                
                 daily_trends.append({
                     "date": date_str,
                     "overall_score": round(daily_score, 2),  # Keep as 0-10 scale (SimpleBurnoutAnalyzer approach)
@@ -2102,7 +2086,14 @@ class UnifiedBurnoutAnalyzer:
                     "members_at_risk": members_at_risk,
                     "total_members": total_members,
                     "health_status": health_status,
-                    "health_percentage": round(daily_score * 10, 1)  # Convert to percentage for display
+                    "health_percentage": round(daily_score * 10, 1),  # Convert to percentage for display
+                    # 🔍 DEBUG: Add penalty breakdown for debugging
+                    "debug_penalties": {
+                        "baseline": 8.7,
+                        "incident_penalty": min(daily_incident_rate * 0.8, 2.0) if 'daily_incident_rate' in locals() else 0,
+                        "severity_penalty": min(daily_severity_rate * 1.2, 3.0) if 'daily_severity_rate' in locals() else 0,
+                        "final_score": daily_score
+                    }
                 })
             
             # AFTER main processing: Fill out individual daily data for ALL users and ALL days
