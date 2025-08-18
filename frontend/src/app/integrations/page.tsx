@@ -401,15 +401,15 @@ export default function IntegrationsPage() {
   })
 
   useEffect(() => {
-    // 🚨 TEMPORARY ROLLBACK: Use old individual loading to debug
-    console.log('🚨 ROLLBACK: Using individual loading functions for debugging')
-    loadRootlyIntegrations()
-    loadPagerDutyIntegrations() 
-    loadGitHubIntegration()
-    loadSlackIntegration()
+    // ✨ PHASE 1 OPTIMIZATION: Re-enabled with API endpoint fixes
+    console.log('✨ PHASE 1 RE-ENABLED: Using optimized loading with correct API endpoints')
+    loadAllIntegrationsOptimized()
     
-    // ✨ PHASE 1 OPTIMIZATION: Temporarily disabled for debugging
-    // loadAllIntegrationsOptimized()
+    // 🚨 ROLLBACK: Individual loading functions (fallback disabled)
+    // loadRootlyIntegrations()
+    // loadPagerDutyIntegrations() 
+    // loadGitHubIntegration()
+    // loadSlackIntegration()
     loadLlmConfig()
     
     // Load saved organization preference
@@ -734,10 +734,10 @@ export default function IntegrationsPage() {
         fetch(`${API_BASE}/pagerduty/integrations`, {
           headers: { 'Authorization': `Bearer ${authToken}` }
         }),
-        fetch(`${API_BASE}/github/integration`, {
+        fetch(`${API_BASE}/integrations/github/status`, {
           headers: { 'Authorization': `Bearer ${authToken}` }
         }),
-        fetch(`${API_BASE}/slack/integration`, {
+        fetch(`${API_BASE}/integrations/slack/status`, {
           headers: { 'Authorization': `Bearer ${authToken}` }
         })
       ])
@@ -745,7 +745,7 @@ export default function IntegrationsPage() {
       const [rootlyData, pagerdutyData, githubData, slackData] = await Promise.all([
         rootlyResponse.ok ? rootlyResponse.json() : { integrations: [] },
         pagerdutyResponse.ok ? pagerdutyResponse.json() : { integrations: [] },
-        githubResponse.ok ? githubResponse.json() : { connected: false },
+        githubResponse.ok ? githubResponse.json() : { connected: false, integration: null },
         slackResponse.ok ? slackResponse.json() : { integration: null }
       ])
 
