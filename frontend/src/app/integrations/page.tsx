@@ -401,11 +401,14 @@ export default function IntegrationsPage() {
   })
 
   useEffect(() => {
-    // Load all integrations independently
-    loadRootlyIntegrations()
-    loadPagerDutyIntegrations()
-    loadGitHubIntegration()
-    loadSlackIntegration()
+    // ✨ PHASE 1 OPTIMIZATION: Use optimized loading instead of individual calls
+    loadAllIntegrationsOptimized()
+    
+    // ❌ OLD INDIVIDUAL LOADING (keeping as fallback for now)
+    // loadRootlyIntegrations()
+    // loadPagerDutyIntegrations() 
+    // loadGitHubIntegration()
+    // loadSlackIntegration()
     loadLlmConfig()
     
     // Load saved organization preference
@@ -655,49 +658,97 @@ export default function IntegrationsPage() {
     }
   }
 
-  const loadAllIntegrations = async (forceRefresh = false) => {
-    // Check localStorage cache first if not forcing refresh
-    if (!forceRefresh) {
+  // ✨ PHASE 1 OPTIMIZATION: Instant cache loading with background refresh
+  const [refreshingInBackground, setRefreshingInBackground] = useState(false)
+  
+  // Synchronous cache reading for instant display
+  const loadFromCacheSync = () => {
+    try {
       const cachedIntegrations = localStorage.getItem('all_integrations')
-      const cacheTimestamp = localStorage.getItem('all_integrations_timestamp')
+      const cachedGithub = localStorage.getItem('github_integration')
+      const cachedSlack = localStorage.getItem('slack_integration')
       
-      if (cachedIntegrations && cacheTimestamp) {
-        const cacheAge = Date.now() - parseInt(cacheTimestamp)
-        const maxCacheAge = 5 * 60 * 1000 // 5 minutes
-        
-        if (cacheAge < maxCacheAge) {
-          try {
-            const parsedIntegrations = JSON.parse(cachedIntegrations)
-            console.log('Loading integrations from cache:', parsedIntegrations.length, 'integrations')
-            setIntegrations(parsedIntegrations)
-            
-            // Still fetch GitHub/Slack status if not cached separately
-            const cachedGithub = localStorage.getItem('github_integration')
-            const cachedSlack = localStorage.getItem('slack_integration')
-            
-            if (cachedGithub) {
-              const githubData = JSON.parse(cachedGithub)
-              setGithubIntegration(githubData.connected ? githubData.integration : null)
-            }
-            if (cachedSlack) {
-              const slackData = JSON.parse(cachedSlack)
-              setSlackIntegration(slackData.integration)
-            }
-            
-            // If we have all cached data, no need to fetch
-            if (cachedGithub && cachedSlack) {
-              setLoadingGitHub(false)
-              setLoadingSlack(false)
-              return
-            }
-          } catch (error) {
-            console.error('Error parsing cached integrations:', error)
-          }
-        }
+      if (cachedIntegrations) {
+        const parsedIntegrations = JSON.parse(cachedIntegrations)
+        setIntegrations(parsedIntegrations)
+        console.log('✨ INSTANT CACHE: Loaded', parsedIntegrations.length, 'integrations immediately')
       }
+      
+      if (cachedGithub) {
+        const githubData = JSON.parse(cachedGithub)
+        setGithubIntegration(githubData.connected ? githubData.integration : null)
+      }
+      
+      if (cachedSlack) {
+        const slackData = JSON.parse(cachedSlack)
+        setSlackIntegration(slackData.integration)
+      }
+      
+      return !!(cachedIntegrations && cachedGithub && cachedSlack)
+    } catch (error) {
+      console.error('Error loading cache:', error)
+      return false
     }
-
-    // Set all integration loading states to true
+  }
+  
+  // Background refresh function (non-blocking)
+  const refreshInBackground = async () => {
+    setRefreshingInBackground(true)
+    try {
+      await loadAllIntegrationsAPI()
+      console.log('✨ BACKGROUND REFRESH: Completed')
+    } catch (error) {
+      console.error('Background refresh failed:', error)
+    } finally {
+      setRefreshingInBackground(false)
+    }
+  }
+  
+  // Check if cache is stale (older than 5 minutes)
+  const isCacheStale = () => {
+    const cacheTimestamp = localStorage.getItem('all_integrations_timestamp')
+    if (!cacheTimestamp) return true
+    
+    const cacheAge = Date.now() - parseInt(cacheTimestamp)
+    const maxCacheAge = 5 * 60 * 1000 // 5 minutes
+    return cacheAge > maxCacheAge
+  }
+  
+  // New optimized loading function with instant cache + background refresh
+  const loadAllIntegrationsOptimized = async (forceRefresh = false) => {
+    console.log('✨ PHASE 1: Starting optimized integration loading')
+    
+    // Step 1: Always show cached data instantly (0ms)
+    const hasCachedData = loadFromCacheSync()
+    
+    // Step 2: If we have cached data and it's not forced refresh, show it immediately
+    if (hasCachedData && !forceRefresh) {
+      setLoadingRootly(false) // Hide skeleton immediately
+      setLoadingPagerDuty(false)
+      setLoadingGitHub(false)
+      setLoadingSlack(false)
+      
+      // Step 3: Check if cache is stale and refresh in background if needed
+      if (isCacheStale()) {
+        console.log('✨ CACHE STALE: Starting background refresh')
+        // Non-blocking background refresh
+        setTimeout(() => refreshInBackground(), 100)
+      } else {
+        console.log('✨ CACHE FRESH: No refresh needed')
+      }
+      return
+    }
+    
+    // Step 4: If no cache or forced refresh, fall back to normal loading
+    console.log('✨ NO CACHE: Falling back to API loading')
+    await loadAllIntegrationsAPI()
+  }
+  
+  // Original API loading logic (extracted for reuse)
+  const loadAllIntegrationsAPI = async () => {
+    // Set individual loading states to true
+    setLoadingRootly(true)
+    setLoadingPagerDuty(true)
     setLoadingGitHub(true)
     setLoadingSlack(true)
     try {
@@ -1995,7 +2046,17 @@ export default function IntegrationsPage() {
                 </Button>
               </Link>
             )}
-            <h1 className="text-2xl font-bold text-slate-900">Manage Integrations</h1>
+            <div className="flex items-center space-x-3">
+              <h1 className="text-2xl font-bold text-slate-900">Manage Integrations</h1>
+              
+              {/* ✨ PHASE 1: Background refresh indicator */}
+              {refreshingInBackground && (
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                  <span className="text-xs text-blue-600 font-medium">Refreshing...</span>
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="flex items-center">
