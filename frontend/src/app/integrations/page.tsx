@@ -686,7 +686,8 @@ export default function IntegrationsPage() {
             
             // If we have all cached data, no need to fetch
             if (cachedGithub && cachedSlack) {
-              setLoadingIntegrations(false)
+              setLoadingGitHub(false)
+              setLoadingSlack(false)
               return
             }
           } catch (error) {
@@ -696,7 +697,9 @@ export default function IntegrationsPage() {
       }
     }
 
-    setLoadingIntegrations(true)
+    // Set all integration loading states to true
+    setLoadingGitHub(true)
+    setLoadingSlack(true)
     try {
       const authToken = localStorage.getItem('auth_token')
       if (!authToken) {
@@ -753,7 +756,9 @@ export default function IntegrationsPage() {
       console.error('Failed to load integrations:', error)
       toast.error("Failed to load integrations. Please try refreshing the page.")
     } finally {
-      setLoadingIntegrations(false)
+      // Set all integration loading states to false
+      setLoadingGitHub(false)
+      setLoadingSlack(false)
     }
   }
 

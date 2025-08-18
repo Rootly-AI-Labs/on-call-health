@@ -2340,8 +2340,9 @@ export default function Dashboard() {
             throw new Error(`HTTP ${pollResponse.status}: ${pollResponse.statusText}`)
           }
           
+          let analysisData
           if (pollResponse.ok) {
-            const analysisData = await pollResponse.json()
+            analysisData = await pollResponse.json()
             
             if (analysisData.status === 'completed') {
               console.log('Analysis completed. Full data structure:', analysisData)
@@ -4569,6 +4570,8 @@ export default function Dashboard() {
                           />
                         </AreaChart>
                       </ResponsiveContainer>
+                        )
+                      })()}
                     </div>
                   </CardContent>
                 </Card>
