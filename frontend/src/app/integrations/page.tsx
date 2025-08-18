@@ -702,16 +702,71 @@ export default function IntegrationsPage() {
     }
   }
   
-  // Background refresh function (non-blocking)
+  // Background refresh function (non-blocking) - does NOT affect loading states
   const refreshInBackground = async () => {
     setRefreshingInBackground(true)
     try {
-      await loadAllIntegrationsAPI()
+      console.log('🚀 DEBUG: Background refresh starting (no loading state changes)')
+      await loadAllIntegrationsAPIBackground()
       console.log('✨ BACKGROUND REFRESH: Completed')
     } catch (error) {
       console.error('Background refresh failed:', error)
     } finally {
       setRefreshingInBackground(false)
+    }
+  }
+
+  // Background API loading - does NOT change loading states (for silent refresh)
+  const loadAllIntegrationsAPIBackground = async () => {
+    console.log('🚀 DEBUG: loadAllIntegrationsAPIBackground starting (no skeleton changes)')
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) {
+        console.log('🚀 DEBUG: No auth token, skipping background refresh')
+        return
+      }
+
+      const [rootlyResponse, pagerdutyResponse, githubResponse, slackResponse] = await Promise.all([
+        fetch(`${API_BASE}/rootly/integrations`, {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        }),
+        fetch(`${API_BASE}/pagerduty/integrations`, {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        }),
+        fetch(`${API_BASE}/github/integration`, {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        }),
+        fetch(`${API_BASE}/slack/integration`, {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        })
+      ])
+
+      const [rootlyData, pagerdutyData, githubData, slackData] = await Promise.all([
+        rootlyResponse.ok ? rootlyResponse.json() : { integrations: [] },
+        pagerdutyResponse.ok ? pagerdutyResponse.json() : { integrations: [] },
+        githubResponse.ok ? githubResponse.json() : { connected: false },
+        slackResponse.ok ? slackResponse.json() : { integration: null }
+      ])
+
+      // Update state silently
+      const allIntegrations = [
+        ...rootlyData.integrations.map((i: any) => ({ ...i, platform: 'rootly' })),
+        ...pagerdutyData.integrations.map((i: any) => ({ ...i, platform: 'pagerduty' }))
+      ]
+
+      setIntegrations(allIntegrations)
+      setGithubIntegration(githubData.connected ? githubData.integration : null)
+      setSlackIntegration(slackData.integration)
+
+      // Update cache with fresh data
+      localStorage.setItem('all_integrations', JSON.stringify(allIntegrations))
+      localStorage.setItem('all_integrations_timestamp', Date.now().toString())
+      localStorage.setItem('github_integration', JSON.stringify(githubData))
+      localStorage.setItem('slack_integration', JSON.stringify(slackData))
+
+      console.log('🚀 DEBUG: Background refresh completed, cache updated')
+    } catch (error) {
+      console.error('🚀 DEBUG: Error in background refresh:', error)
     }
   }
   
