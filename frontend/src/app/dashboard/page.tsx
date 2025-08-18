@@ -1120,21 +1120,7 @@ export default function Dashboard() {
       }
     }
 
-    window.addEventListener('focus', handlePageFocus)
-    const visibilityHandler = () => {
-      if (!document.hidden) {
-        handlePageFocus()
-      }
-    }
-    document.addEventListener('visibilitychange', visibilityHandler)
-    
-    // Cleanup event listeners on unmount
-    return () => {
-      window.removeEventListener('focus', handlePageFocus)
-      document.removeEventListener('visibilitychange', visibilityHandler)
-    }
-
-    // Load cached integrations first
+    // Load cached integrations FIRST (before event listeners)
     const cachedIntegrations = localStorage.getItem('all_integrations')
     const cacheTimestamp = localStorage.getItem('all_integrations_timestamp')
     
@@ -1147,6 +1133,7 @@ export default function Dashboard() {
         try {
           const parsed = JSON.parse(cachedIntegrations)
           setIntegrations(parsed)
+          console.log('🚀 DASHBOARD CACHE: Loaded', parsed.length, 'integrations from cache instantly')
           
           // Also load GitHub and Slack from cache if available
           const cachedGithub = localStorage.getItem('github_integration')
@@ -1201,6 +1188,15 @@ export default function Dashboard() {
         return // Exit early since we used cache
       }
     }
+    
+    // Add event listeners for page focus/visibility changes
+    window.addEventListener('focus', handlePageFocus)
+    const visibilityHandler = () => {
+      if (!document.hidden) {
+        handlePageFocus()
+      }
+    }
+    document.addEventListener('visibilitychange', visibilityHandler)
     
     const loadInitialData = async () => {
       try {
@@ -1273,7 +1269,7 @@ export default function Dashboard() {
     // Cleanup event listeners and timeout
     return () => {
       window.removeEventListener('focus', handlePageFocus)
-      document.removeEventListener('visibilitychange', handlePageFocus)
+      document.removeEventListener('visibilitychange', visibilityHandler)
       window.removeEventListener('storage', handleStorageChange)
       clearTimeout(timeoutId)
     }
