@@ -1209,7 +1209,7 @@ export default function Dashboard() {
         // Load data with individual error handling to prevent blocking
         const results = await Promise.allSettled([
           loadPreviousAnalyses(),
-          loadIntegrations(),
+          loadIntegrations(false, false), // Don't force refresh, don't show global loading
           loadHistoricalTrends()
         ])
         
@@ -2096,12 +2096,12 @@ export default function Dashboard() {
         } else {
           // Cache is stale, need to load fresh data
           console.log('🔍 DEBUG: Cache is stale, loading fresh integrations data')
-          await loadIntegrations(true, true)
+          await loadIntegrations(true, false) // Force refresh but don't show global loading
         }
       } else {
         // No cache, need to load fresh data  
         console.log('🔍 DEBUG: No cache found, loading fresh integrations data')
-        await loadIntegrations(true, true)
+        await loadIntegrations(true, false) // Force refresh but don't show global loading
       }
       
       if (integrations.length === 0) {
