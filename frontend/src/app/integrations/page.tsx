@@ -401,14 +401,15 @@ export default function IntegrationsPage() {
   })
 
   useEffect(() => {
-    // ✨ PHASE 1 OPTIMIZATION: Use optimized loading instead of individual calls
-    loadAllIntegrationsOptimized()
+    // 🚨 TEMPORARY ROLLBACK: Use old individual loading to debug
+    console.log('🚨 ROLLBACK: Using individual loading functions for debugging')
+    loadRootlyIntegrations()
+    loadPagerDutyIntegrations() 
+    loadGitHubIntegration()
+    loadSlackIntegration()
     
-    // ❌ OLD INDIVIDUAL LOADING (keeping as fallback for now)
-    // loadRootlyIntegrations()
-    // loadPagerDutyIntegrations() 
-    // loadGitHubIntegration()
-    // loadSlackIntegration()
+    // ✨ PHASE 1 OPTIMIZATION: Temporarily disabled for debugging
+    // loadAllIntegrationsOptimized()
     loadLlmConfig()
     
     // Load saved organization preference
