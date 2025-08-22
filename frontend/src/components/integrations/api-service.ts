@@ -188,9 +188,8 @@ export class IntegrationsAPIService {
   // Background refresh (non-blocking)
   static async backgroundRefresh(): Promise<void> {
     try {
-      const data = await this.loadAllIntegrations()
+      await this.loadAllIntegrations()
       console.log('🚀 Background refresh completed')
-      return data
     } catch (error) {
       console.error('Background refresh failed:', error)
       throw error

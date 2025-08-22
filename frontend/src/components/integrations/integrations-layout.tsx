@@ -173,7 +173,7 @@ export default function IntegrationsLayout() {
             onEdit={(id, name) => {
               state.setUI({ editingIntegration: id, editingName: name })
             }}
-            onDelete={(integration) => {
+            onDelete={(_integration) => {
               // Handle delete logic
             }}
             onAdd={(platform) => {
@@ -187,10 +187,10 @@ export default function IntegrationsLayout() {
             slackIntegration={state.slackIntegration}
             loading={{ github: state.loading.github, slack: state.loading.slack }}
             onOpenMappings={handleOpenMappingDrawer}
-            onConnect={(platform) => {
+            onConnect={(_platform) => {
               // Handle connection logic
             }}
-            onDisconnect={(platform) => {
+            onDisconnect={(_platform) => {
               // Handle disconnection logic
             }}
           />
@@ -199,7 +199,7 @@ export default function IntegrationsLayout() {
 
       {/* Mapping Drawer */}
       <MappingDrawer
-        open={state.dialogs.mappingDrawerOpen}
+        isOpen={state.dialogs.mappingDrawerOpen}
         onClose={handleCloseMappingDrawer}
         platform={state.dialogs.mappingDrawerPlatform}
       />
