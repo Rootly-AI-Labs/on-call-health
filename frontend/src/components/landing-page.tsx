@@ -19,9 +19,28 @@ export default function LandingPage() {
       // Pass the current origin to the backend
       const currentOrigin = window.location.origin
       const response = await fetch(`${API_BASE}/auth/google?redirect_origin=${encodeURIComponent(currentOrigin)}`)
+      
+      // Check if response is ok before parsing JSON
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('Google auth API error:', response.status, errorText)
+        throw new Error(`Authentication failed: ${response.status}`)
+      }
+      
+      // Check content type to ensure it's JSON
+      const contentType = response.headers.get('content-type')
+      if (!contentType || !contentType.includes('application/json')) {
+        const responseText = await response.text()
+        console.error('Expected JSON but got:', contentType, responseText)
+        throw new Error('Invalid response format from authentication server')
+      }
+      
       const data = await response.json()
       if (data.authorization_url) {
         window.location.href = data.authorization_url
+      } else {
+        console.error('No authorization URL in response:', data)
+        throw new Error('Invalid authentication response')
       }
     } catch (error) {
       console.error('Google login error:', error)
