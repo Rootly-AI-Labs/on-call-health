@@ -2890,7 +2890,10 @@ export default function Dashboard() {
                                       (analysis as any).config?.organization_name ||
                                       matchingIntegration?.name || 
                                       matchingIntegration?.organization_name ||
-                                      (analysis.integration_id && String(analysis.integration_id) !== 'null' ? `Organization ${analysis.integration_id}` : 'Unknown Organization')
+                                      // Handle beta integrations by looking at config
+                                      ((analysis as any).config?.beta_integration_id === 'beta-rootly' ? 'Rootly' : 
+                                       (analysis as any).config?.beta_integration_id === 'beta-pagerduty' ? 'PagerDuty' : 
+                                       (analysis.integration_id && String(analysis.integration_id) !== 'null' ? `Organization ${analysis.integration_id}` : 'Unknown Organization'))
                 
                 // Special handling for beta integrations during running state
                 if (!matchingIntegration && typeof analysis.integration_id === 'string') {

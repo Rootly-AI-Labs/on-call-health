@@ -39,6 +39,7 @@ class AnalysisResponse(BaseModel):
     completed_at: Optional[datetime]
     time_range: int
     analysis_data: Optional[dict]
+    config: Optional[dict]
 
 
 class AnalysisListResponse(BaseModel):
@@ -267,7 +268,8 @@ async def run_burnout_analysis(
             created_at=analysis.created_at,
             completed_at=analysis.completed_at,
             time_range=analysis.time_range,
-            analysis_data=None
+            analysis_data=None,
+            config=analysis.config
         )
     except Exception as e:
         logger.error(f"Critical error in run_burnout_analysis: {str(e)}")
@@ -328,7 +330,8 @@ async def list_analyses(
                 created_at=analysis.created_at,
                 completed_at=analysis.completed_at,
                 time_range=analysis.time_range or 30,
-                analysis_data=analysis.results
+                analysis_data=analysis.results,
+        config=analysis.config
             )
         )
     
@@ -382,7 +385,8 @@ async def get_analysis_by_uuid(
         created_at=analysis.created_at,
         completed_at=analysis.completed_at,
         time_range=analysis.time_range or 30,
-        analysis_data=analysis.results
+        analysis_data=analysis.results,
+        config=analysis.config
     )
 
 
@@ -423,7 +427,8 @@ async def get_analysis(
         created_at=analysis.created_at,
         completed_at=analysis.completed_at,
         time_range=analysis.time_range or 30,
-        analysis_data=analysis.results
+        analysis_data=analysis.results,
+        config=analysis.config
     )
 
 
@@ -494,7 +499,8 @@ async def get_analysis_by_identifier(
         created_at=analysis.created_at,
         completed_at=analysis.completed_at,
         time_range=analysis.time_range or 30,
-        analysis_data=analysis.results
+        analysis_data=analysis.results,
+        config=analysis.config
     )
 
 
