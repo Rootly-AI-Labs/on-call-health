@@ -190,22 +190,22 @@ export default function LandingPage() {
                 <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-purple-100">
                   <Brain className="w-8 h-8 text-purple-600" />
                 </div>
-                <h3 className="text-xl font-semibold text-slate-900 mb-4 text-center">Three-Dimensional Analysis</h3>
+                <h3 className="text-xl font-semibold text-slate-900 mb-4 text-center">Copenhagen Burnout Inventory</h3>
                 <p className="text-slate-600 leading-relaxed text-center mb-4">
-                  Scientific burnout assessment across key psychological dimensions
+                  Evidence-based burnout assessment using the scientifically validated CBI framework
                 </p>
                 <div className="space-y-2 text-sm">
                   <div className="flex items-center space-x-2">
                     <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                    <span className="text-slate-600"><strong>Emotional Exhaustion</strong> (40%)</span>
+                    <span className="text-slate-600"><strong>Personal Burnout</strong> (33.3%)</span>
                   </div>
                   <div className="flex items-center space-x-2">
                     <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                    <span className="text-slate-600"><strong>Depersonalization</strong> (30%)</span>
+                    <span className="text-slate-600"><strong>Work-Related Burnout</strong> (33.3%)</span>
                   </div>
                   <div className="flex items-center space-x-2">
                     <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span className="text-slate-600"><strong>Personal Accomplishment</strong> (30%)</span>
+                    <span className="text-slate-600"><strong>Accomplishment Burnout</strong> (33.4%)</span>
                   </div>
                 </div>
               </CardContent>

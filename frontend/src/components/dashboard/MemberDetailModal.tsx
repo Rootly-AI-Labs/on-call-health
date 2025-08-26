@@ -209,21 +209,21 @@ export function MemberDetailModal({
                         {(burnoutDimensions.personal_burnout * 10).toFixed(0)}%
                       </div>
                       <p className="text-sm font-medium text-red-800">Personal Burnout</p>
-                      <p className="text-xs text-red-600 mt-1">Physical & psychological exhaustion</p>
+                      <p className="text-xs text-red-600 mt-1">Workload overwhelm & boundary violations</p>
                     </div>
                     <div className="text-center p-3 rounded-lg bg-orange-50 border border-orange-100">
                       <div className="text-lg font-bold text-orange-600">
                         {(burnoutDimensions.work_related_burnout * 10).toFixed(0)}%
                       </div>
                       <p className="text-sm font-medium text-orange-800">Work-Related Burnout</p>
-                      <p className="text-xs text-orange-600 mt-1">Fatigue attributed to work</p>
+                      <p className="text-xs text-orange-600 mt-1">Process dysfunction & collaboration strain</p>
                     </div>
                     <div className="text-center p-3 rounded-lg bg-blue-50 border border-blue-100">
                       <div className="text-lg font-bold text-blue-600">
                         {(burnoutDimensions.accomplishment_burnout * 10).toFixed(0)}%
                       </div>
                       <p className="text-sm font-medium text-blue-800">Accomplishment Burnout</p>
-                      <p className="text-xs text-blue-600 mt-1">Reduced sense of accomplishment</p>
+                      <p className="text-xs text-blue-600 mt-1">Technical stagnation & reduced effectiveness</p>
                     </div>
                   </div>
                 </CardContent>
