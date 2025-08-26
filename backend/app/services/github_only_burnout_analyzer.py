@@ -408,6 +408,288 @@ class GitHubOnlyBurnoutAnalyzer:
         logger.debug(f"Personal Accomplishment components: {score_components}, total: {total_score}")
         return min(10, max(0, total_score))
     
+    # =============================================================================
+    # NEW CBI (Copenhagen Burnout Inventory) CALCULATION METHODS
+    # These methods implement proper CBI methodology alongside existing methods
+    # =============================================================================
+    
+    def _calculate_personal_burnout_cbi(
+        self,
+        metrics: Dict[str, Any], 
+        baselines: Dict[str, float],
+        time_range_days: int
+    ) -> float:
+        """
+        Calculate Personal Burnout using CBI methodology from GitHub data (0-10 scale).
+        
+        Personal Burnout focuses on physical and psychological exhaustion.
+        CBI indicators:
+        - Overwhelming workload patterns
+        - Sustained high-intensity activity  
+        - Loss of work-life boundaries
+        - Physical fatigue markers
+        """
+        score_components = []
+        
+        # 1. Workload overwhelm (30% weight)
+        commits_per_week = metrics.get("commits_per_week", 0)
+        baseline_commits = baselines.get("commits_per_week", self.industry_baselines["commits_per_week"])
+        
+        # CBI: Focus on sustained overload rather than peaks
+        workload_ratio = commits_per_week / baseline_commits if baseline_commits > 0 else 0
+        if workload_ratio >= 2.5:  # Consistently overwhelming
+            overwhelm_score = 10
+        elif workload_ratio >= 1.8:  # Heavy load
+            overwhelm_score = 6 + (workload_ratio - 1.8) * 5.7  # 6-10 range
+        elif workload_ratio >= 1.2:  # Above normal
+            overwhelm_score = 3 + (workload_ratio - 1.2) * 5  # 3-6 range
+        else:  # Normal or below
+            overwhelm_score = workload_ratio * 2.5  # 0-3 range
+            
+        score_components.append(("workload_overwhelm", overwhelm_score, 0.30))
+        
+        # 2. Boundary violations - after hours activity (25% weight)
+        after_hours_ratio = metrics.get("after_hours_commit_ratio", 0)
+        # CBI: Even small boundary violations accumulate to exhaustion
+        boundary_score = min(10, after_hours_ratio * 25)  # More sensitive to after-hours work
+        score_components.append(("boundary_violations", boundary_score, 0.25))
+        
+        # 3. Intensity patterns - large commits indicating rushed work (25% weight)
+        avg_lines_per_commit = metrics.get("avg_lines_per_commit", 0)
+        baseline_lines = baselines.get("avg_lines_per_commit", self.industry_baselines.get("avg_lines_per_commit", 50))
+        
+        intensity_ratio = avg_lines_per_commit / baseline_lines if baseline_lines > 0 else 0
+        # CBI: Large commits often indicate time pressure and exhaustion
+        if intensity_ratio >= 3.0:  # Very large commits
+            intensity_score = 10
+        elif intensity_ratio >= 2.0:  # Large commits
+            intensity_score = 5 + (intensity_ratio - 2.0) * 5  # 5-10 range
+        else:  # Normal range
+            intensity_score = intensity_ratio * 2.5  # 0-5 range
+            
+        score_components.append(("work_intensity", intensity_score, 0.25))
+        
+        # 4. Recovery absence - consistent daily activity without breaks (20% weight)
+        # Higher daily consistency can indicate lack of recovery time
+        daily_activity_variance = metrics.get("daily_commit_variance", 0.5)  # Default moderate variance
+        # Low variance (< 0.3) suggests no recovery days; high variance (> 0.8) is healthy
+        if daily_activity_variance < 0.2:  # Very consistent = no breaks
+            recovery_score = 10
+        elif daily_activity_variance < 0.4:  # Low variance
+            recovery_score = 5 + (0.4 - daily_activity_variance) * 25  # 5-10 range
+        else:  # Healthy variance
+            recovery_score = max(0, 5 - (daily_activity_variance - 0.4) * 12.5)  # 0-5 range
+            
+        score_components.append(("recovery_absence", recovery_score, 0.20))
+        
+        # Calculate weighted total
+        total_score = sum(score * weight for _, score, weight in score_components)
+        
+        logger.debug(f"Personal Burnout (CBI) components: {score_components}, total: {total_score}")
+        return min(10, max(0, total_score))
+    
+    def _calculate_work_burnout_cbi(
+        self,
+        metrics: Dict[str, Any],
+        baselines: Dict[str, float],
+        activity_data: Dict[str, Any]
+    ) -> float:
+        """
+        Calculate Work-Related Burnout using CBI methodology from GitHub data (0-10 scale).
+        
+        Work-Related Burnout focuses on fatigue specifically attributed to work.
+        CBI indicators:
+        - Work context frustration
+        - Inefficient work patterns
+        - Collaboration strain
+        - Work process dysfunction
+        """
+        score_components = []
+        
+        # 1. Work inefficiency - PR revision patterns (30% weight)
+        avg_pr_revisions = metrics.get("avg_pr_revisions", 2)
+        # CBI: High revisions indicate work process problems
+        if avg_pr_revisions >= 5:  # Many revisions = process issues
+            inefficiency_score = 10
+        elif avg_pr_revisions >= 3:  # Moderate revisions
+            inefficiency_score = 4 + (avg_pr_revisions - 3) * 3  # 4-10 range
+        else:  # Low revisions
+            inefficiency_score = avg_pr_revisions * 1.3  # 0-4 range
+            
+        score_components.append(("work_inefficiency", inefficiency_score, 0.30))
+        
+        # 2. Collaboration burden - review load vs capacity (25% weight)
+        reviews_per_week = metrics.get("reviews_per_week", 0)
+        prs_per_week = metrics.get("prs_per_week", 0)
+        
+        # CBI: Disproportionate review load indicates work distribution issues
+        if prs_per_week > 0:
+            review_ratio = reviews_per_week / prs_per_week
+            if review_ratio >= 3:  # Heavy review burden
+                collaboration_score = 8 + min(2, (review_ratio - 3) * 0.5)  # 8-10 range
+            elif review_ratio >= 1.5:  # Moderate burden
+                collaboration_score = 4 + (review_ratio - 1.5) * 2.7  # 4-8 range
+            else:  # Light burden
+                collaboration_score = review_ratio * 2.7  # 0-4 range
+        else:
+            collaboration_score = 5  # Default moderate score
+            
+        score_components.append(("collaboration_burden", collaboration_score, 0.25))
+        
+        # 3. Work fragmentation - commit frequency patterns (25% weight)
+        commits_per_week = metrics.get("commits_per_week", 0)
+        # CBI: Very high or very low commit frequency both indicate work problems
+        if commits_per_week >= 40:  # Fragmented work
+            fragmentation_score = 8 + min(2, (commits_per_week - 40) * 0.05)  # 8-10 range
+        elif commits_per_week <= 5 and commits_per_week > 0:  # Too few commits
+            fragmentation_score = 6 + (5 - commits_per_week) * 0.8  # 6-10 range
+        elif commits_per_week == 0:  # No activity
+            fragmentation_score = 10
+        else:  # Normal range (5-40)
+            # Find optimal around 15-25 commits/week
+            optimal_range = (15, 25)
+            if optimal_range[0] <= commits_per_week <= optimal_range[1]:
+                fragmentation_score = 0
+            elif commits_per_week < optimal_range[0]:
+                fragmentation_score = (optimal_range[0] - commits_per_week) * 0.3  # Slight penalty
+            else:  # commits_per_week > optimal_range[1]
+                fragmentation_score = (commits_per_week - optimal_range[1]) * 0.2  # Slight penalty
+                
+        score_components.append(("work_fragmentation", fragmentation_score, 0.25))
+        
+        # 4. Process dysfunction - merge rate and revert patterns (20% weight)
+        pr_merge_rate = metrics.get("pr_merge_rate", 0.8)
+        commit_revert_rate = metrics.get("commit_revert_rate", 0)
+        
+        # CBI: Poor merge rates and reverts indicate dysfunctional work processes
+        merge_dysfunction = (1 - pr_merge_rate) * 10  # Lower merge rate = higher dysfunction
+        revert_dysfunction = commit_revert_rate * 20  # Reverts indicate process issues
+        process_dysfunction_score = min(10, (merge_dysfunction + revert_dysfunction) / 2)
+        
+        score_components.append(("process_dysfunction", process_dysfunction_score, 0.20))
+        
+        # Calculate weighted total
+        total_score = sum(score * weight for _, score, weight in score_components)
+        
+        logger.debug(f"Work-Related Burnout (CBI) components: {score_components}, total: {total_score}")
+        return min(10, max(0, total_score))
+    
+    def _calculate_accomplishment_burnout_cbi(
+        self,
+        metrics: Dict[str, Any],
+        baselines: Dict[str, float], 
+        activity_data: Dict[str, Any]
+    ) -> float:
+        """
+        Calculate Accomplishment Burnout using CBI methodology from GitHub data (0-10 scale).
+        
+        Accomplishment Burnout focuses on reduced sense of effectiveness and achievement.
+        CBI indicators:
+        - Declining output quality
+        - Reduced meaningful contributions
+        - Loss of technical growth
+        - Diminished sense of progress
+        """
+        score_components = []
+        
+        # 1. Output quality decline (35% weight)
+        pr_merge_rate = metrics.get("pr_merge_rate", 0.8)
+        avg_pr_revisions = metrics.get("avg_pr_revisions", 2)
+        
+        # CBI: Quality issues indicate reduced sense of effectiveness
+        # Merge rate component
+        quality_merge_score = (1 - pr_merge_rate) * 10  # Lower merge rate = quality issues
+        
+        # Revision component (high revisions = quality struggles)
+        if avg_pr_revisions >= 4:
+            quality_revision_score = 6 + min(4, (avg_pr_revisions - 4) * 0.5)  # 6-10 range
+        else:
+            quality_revision_score = avg_pr_revisions * 1.5  # 0-6 range
+            
+        output_quality_score = (quality_merge_score + quality_revision_score) / 2
+        score_components.append(("output_quality_decline", output_quality_score, 0.35))
+        
+        # 2. Contribution meaningfulness - project diversity and impact (30% weight)
+        # Use commit size variance as proxy for varied, meaningful work
+        commit_size_variance = metrics.get("commit_size_variance", 0.5)
+        lines_per_commit = metrics.get("avg_lines_per_commit", 0)
+        
+        # CBI: Very low variance suggests repetitive, unmeaningful work
+        # Very high variance might suggest unfocused work
+        if commit_size_variance < 0.2:  # Too repetitive
+            meaningfulness_score = 8 + (0.2 - commit_size_variance) * 10  # 8-10 range
+        elif commit_size_variance > 2.0:  # Too chaotic
+            meaningfulness_score = 6 + min(4, (commit_size_variance - 2.0) * 0.5)  # 6-10 range
+        else:  # Good variance range (0.2-2.0)
+            # Optimal around 0.5-1.0
+            if 0.5 <= commit_size_variance <= 1.0:
+                meaningfulness_score = 0  # Best range
+            else:
+                # Distance from optimal range
+                distance = min(abs(commit_size_variance - 0.5), abs(commit_size_variance - 1.0))
+                meaningfulness_score = distance * 2  # 0-6 penalty
+                
+        # Adjust for absolute output (very low output suggests disengagement)
+        if lines_per_commit < 10:  # Very small commits
+            meaningfulness_score = min(10, meaningfulness_score + (10 - lines_per_commit) * 0.5)
+        
+        score_components.append(("contribution_meaningfulness", meaningfulness_score, 0.30))
+        
+        # 3. Technical growth stagnation (20% weight)
+        # Use project diversity (different repos/areas) as proxy for growth
+        # For now, use baseline comparison for commits as proxy
+        commits_per_week = metrics.get("commits_per_week", 0)
+        baseline_commits = baselines.get("commits_per_week", self.industry_baselines["commits_per_week"])
+        
+        activity_ratio = commits_per_week / baseline_commits if baseline_commits > 0 else 0
+        
+        # CBI: Both very low and very high activity can indicate stagnation
+        if activity_ratio < 0.5:  # Very low activity = disengagement
+            stagnation_score = 8 + (0.5 - activity_ratio) * 4  # 8-10 range
+        elif activity_ratio > 3.0:  # Very high activity = no time for growth
+            stagnation_score = 6 + min(4, (activity_ratio - 3.0) * 0.5)  # 6-10 range
+        else:  # Normal activity range
+            # Best range is 0.8-1.5 (slightly below to above baseline)
+            if 0.8 <= activity_ratio <= 1.5:
+                stagnation_score = 0
+            else:
+                # Distance from optimal range
+                if activity_ratio < 0.8:
+                    stagnation_score = (0.8 - activity_ratio) * 10  # 0-6 penalty
+                else:  # activity_ratio > 1.5
+                    stagnation_score = (activity_ratio - 1.5) * 4  # 0-6 penalty
+                    
+        score_components.append(("technical_stagnation", stagnation_score, 0.20))
+        
+        # 4. Progress perception - trend analysis (15% weight)
+        # Use PR creation rate vs completion rate as proxy for progress perception
+        prs_per_week = metrics.get("prs_per_week", 0)
+        
+        # CBI: Very low PR creation suggests reduced sense of making progress
+        if prs_per_week < 1:  # Less than 1 PR per week
+            progress_score = 8 + (1 - prs_per_week) * 2  # 8-10 range
+        elif prs_per_week > 10:  # Too many PRs might indicate rushed work
+            progress_score = 4 + min(6, (prs_per_week - 10) * 0.3)  # 4-10 range
+        else:  # Normal range (1-10 PRs/week)
+            # Optimal around 2-5 PRs/week
+            if 2 <= prs_per_week <= 5:
+                progress_score = 0
+            else:
+                distance = min(abs(prs_per_week - 2), abs(prs_per_week - 5))
+                progress_score = distance * 1  # 0-4 penalty
+                
+        score_components.append(("progress_perception", progress_score, 0.15))
+        
+        # Calculate weighted total
+        total_score = sum(score * weight for _, score, weight in score_components)
+        
+        logger.debug(f"Accomplishment Burnout (CBI) components: {score_components}, total: {total_score}")
+        return min(10, max(0, total_score))
+    
+    # =============================================================================
+    # END OF CBI METHODS
+    # =============================================================================
+    
     def _analyze_flow_state(
         self, 
         metrics: Dict[str, Any], 
