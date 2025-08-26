@@ -3072,15 +3072,18 @@ export default function Dashboard() {
               <BookOpen className={`w-4 h-4 ${sidebarCollapsed ? '' : 'mr-2'}`} />
               {!sidebarCollapsed && "Methodology"}
             </Button>
-            <Button 
-              variant="ghost" 
-              className={`w-full ${sidebarCollapsed ? 'p-2' : ''} justify-start text-gray-300 hover:text-white hover:bg-gray-800`}
-              onClick={() => router.push('/changelog')}
-              title="Changelog"
-            >
-              <FileText className={`w-4 h-4 ${sidebarCollapsed ? '' : 'mr-2'}`} />
-              {!sidebarCollapsed && "Changelog"}
-            </Button>
+            {/* Show changelog only in development */}
+            {process.env.NODE_ENV === 'development' && (
+              <Button 
+                variant="ghost" 
+                className={`w-full ${sidebarCollapsed ? 'p-2' : ''} justify-start text-gray-300 hover:text-white hover:bg-gray-800`}
+                onClick={() => router.push('/changelog')}
+                title="Changelog"
+              >
+                <FileText className={`w-4 h-4 ${sidebarCollapsed ? '' : 'mr-2'}`} />
+                {!sidebarCollapsed && "Changelog"}
+              </Button>
+            )}
             <Button 
               variant="ghost" 
               className={`w-full ${sidebarCollapsed ? 'p-2' : ''} justify-start text-gray-300 hover:text-white hover:bg-gray-800`}
