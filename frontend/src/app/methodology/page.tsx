@@ -202,7 +202,7 @@ export default function MethodologyPage() {
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center">
                   <Activity className="w-5 h-5 mr-2 text-green-500" />
-                  Accomplishment Burnout (34% weight)
+                  Accomplishment Burnout (33% weight)
                 </CardTitle>
                 <Badge variant="outline" className="border-green-500 text-green-700">Effectiveness Factor</Badge>
               </div>
