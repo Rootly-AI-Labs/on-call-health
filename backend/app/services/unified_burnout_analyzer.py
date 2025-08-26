@@ -50,7 +50,10 @@ class UnifiedBurnoutAnalyzer:
         self.slack_token = slack_token
         
         # Feature flag for CBI methodology (default: False to maintain existing behavior)
-        self.use_cbi_methodology = os.getenv('USE_CBI_METHODOLOGY', 'false').lower() == 'true'
+        cbi_env_value = os.getenv('USE_CBI_METHODOLOGY', 'false')
+        self.use_cbi_methodology = cbi_env_value.lower() == 'true'
+        logger.info(f"[DEBUG] CBI Environment variable raw value: '{cbi_env_value}'")
+        logger.info(f"[DEBUG] CBI Environment variable processed: {self.use_cbi_methodology}")
         logger.info(f"Unified analyzer initialized with CBI methodology: {self.use_cbi_methodology}")
         self.organization_name = organization_name
         
