@@ -1226,7 +1226,10 @@ export default function Dashboard() {
           }
         })
         
-        setInitialDataLoaded(true)
+        // Small delay to ensure state updates have propagated
+        setTimeout(() => {
+          setInitialDataLoaded(true)
+        }, 100)
       } catch (error) {
         console.error('Error loading initial data:', error)
         // Always set to true to prevent endless loading, even if some data fails
@@ -1236,11 +1239,11 @@ export default function Dashboard() {
     
     loadInitialData()
     
-    // Fallback timeout to prevent endless loading (max 10 seconds)
+    // Fallback timeout to prevent endless loading (max 15 seconds)
     const timeoutId = setTimeout(() => {
-      console.warn('Initial data loading timed out after 10 seconds')
+      console.warn('Initial data loading timed out after 15 seconds')
       setInitialDataLoaded(true)
-    }, 10000)
+    }, 15000)
 
     // Listen for localStorage changes (when integrations are updated on other pages)
     const handleStorageChange = (e: StorageEvent) => {
@@ -2823,7 +2826,11 @@ export default function Dashboard() {
   }
 
   // Show main page loader while initial data loads (but not if we have cached data)
-  if (!initialDataLoaded && !hasDataFromCache) {
+  // Also show loader if we haven't loaded analyses yet to prevent empty state flash
+  const showLoader = (!initialDataLoaded && !hasDataFromCache) || 
+                     (initialDataLoaded && previousAnalyses.length === 0 && !hasDataFromCache);
+  
+  if (showLoader) {
     return (
       <div className="flex h-screen bg-gray-50">
         <div className="flex-1 flex items-center justify-center">
@@ -2872,7 +2879,27 @@ export default function Dashboard() {
                 <p className="text-xs text-gray-400 uppercase tracking-wide px-2 py-1 mt-4">Recent</p>
               )}
               <div className="max-h-96 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">
-                {previousAnalyses.slice(0, 50).map((analysis) => {
+                {!initialDataLoaded && previousAnalyses.length === 0 ? (
+                  // Show loading state for analyses
+                  <div className="flex items-center justify-center py-8">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+                      {!sidebarCollapsed && (
+                        <span className="text-xs text-gray-400">Loading analyses...</span>
+                      )}
+                    </div>
+                  </div>
+                ) : previousAnalyses.length === 0 ? (
+                  // Show empty state
+                  !sidebarCollapsed && (
+                    <div className="text-center py-8 text-gray-400">
+                      <p className="text-xs">No analyses yet</p>
+                      <p className="text-xs mt-1">Start your first analysis above</p>
+                    </div>
+                  )
+                ) : (
+                  // Show analyses list
+                  previousAnalyses.slice(0, 50).map((analysis) => {
                 const analysisDate = new Date(analysis.created_at)
                 const timeStr = analysisDate.toLocaleTimeString([], { 
                   hour: 'numeric', 
@@ -3015,7 +3042,8 @@ export default function Dashboard() {
                     )}
                   </div>
                 )
-              })}
+                })
+                )}
               </div>
             </div>
             </div>

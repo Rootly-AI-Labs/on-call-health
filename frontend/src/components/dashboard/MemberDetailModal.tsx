@@ -456,7 +456,7 @@ export function MemberDetailModal({
         );
         })()}
         </>
-        );
+      );
         })()}
       </DialogContent>
     </Dialog>
