@@ -158,23 +158,23 @@ class GitHubOnlyBurnoutAnalyzer:
                 return None
             
             # Calculate burnout dimensions using GitHub data
-            emotional_exhaustion = self._calculate_emotional_exhaustion_github(
+            personal_burnout = self._calculate_personal_burnout_github(
                 metrics, baselines, time_range_days
             )
             
-            depersonalization = self._calculate_depersonalization_github(
+            work_related_burnout = self._calculate_work_burnout_github(
                 metrics, baselines, activity_data
             )
             
-            personal_accomplishment = self._calculate_personal_accomplishment_github(
+            accomplishment_burnout = self._calculate_accomplishment_burnout_github(
                 metrics, baselines, activity_data
             )
             
-            # Calculate overall burnout score using equal weights
+            # Calculate overall burnout score using equal weights (CBI methodology)
             burnout_score = (
-                emotional_exhaustion * 0.40 +
-                depersonalization * 0.35 + 
-                (10 - personal_accomplishment) * 0.25
+                personal_burnout * 0.333 +
+                work_related_burnout * 0.333 + 
+                accomplishment_burnout * 0.334
             )
             burnout_score = max(0, min(10, burnout_score))
             
@@ -194,9 +194,9 @@ class GitHubOnlyBurnoutAnalyzer:
                 "risk_level": risk_level,
                 "confidence_level": individual_confidence,
                 "burnout_dimensions": {
-                    "personal_burnout": round(emotional_exhaustion, 2),
-                    "work_related_burnout": round(depersonalization, 2),
-                    "accomplishment_burnout": round(personal_accomplishment, 2)
+                    "personal_burnout": round(personal_burnout, 2),
+                    "work_related_burnout": round(work_related_burnout, 2),
+                    "accomplishment_burnout": round(accomplishment_burnout, 2)
                 },
                 "github_metrics": metrics,
                 "flow_state_analysis": flow_state_analysis,
@@ -211,7 +211,7 @@ class GitHubOnlyBurnoutAnalyzer:
             logger.error(f"Error analyzing GitHub burnout for {email}: {e}")
             return None
     
-    def _calculate_emotional_exhaustion_github(
+    def _calculate_personal_burnout_github(
         self, 
         metrics: Dict[str, Any], 
         baselines: Dict[str, float],
@@ -272,7 +272,7 @@ class GitHubOnlyBurnoutAnalyzer:
         logger.debug(f"Emotional Exhaustion components: {score_components}, total: {total_score}")
         return min(10, max(0, total_score))
     
-    def _calculate_depersonalization_github(
+    def _calculate_work_burnout_github(
         self,
         metrics: Dict[str, Any],
         baselines: Dict[str, float], 
@@ -346,7 +346,7 @@ class GitHubOnlyBurnoutAnalyzer:
         logger.debug(f"Depersonalization components: {score_components}, total: {total_score}")
         return min(10, max(0, total_score))
     
-    def _calculate_personal_accomplishment_github(
+    def _calculate_accomplishment_burnout_github(
         self,
         metrics: Dict[str, Any],
         baselines: Dict[str, float],

@@ -977,13 +977,13 @@ class UnifiedBurnoutAnalyzer:
         # GitHub (15%) and Slack (15%) components to be added later
         
         # Personal Burnout (33.3% of final score)
-        personal_burnout = self._calculate_emotional_exhaustion_incident(metrics)
+        personal_burnout = self._calculate_personal_burnout_cbi(metrics)
         
         # Work-Related Burnout (33.3% of final score)  
-        work_related_burnout = self._calculate_depersonalization_incident(metrics)
+        work_related_burnout = self._calculate_work_burnout_cbi(metrics)
         
-        # Accomplishment-Related Burnout (33.4% of final score)
-        accomplishment_burnout = self._calculate_personal_accomplishment_incident(metrics)
+        # Accomplishment Burnout (33.4% of final score)
+        accomplishment_burnout = self._calculate_accomplishment_burnout_cbi(metrics)
         
         # Ensure all dimension values are numeric before rounding
         safe_personal_burnout = personal_burnout if personal_burnout is not None else 0.0
@@ -996,8 +996,8 @@ class UnifiedBurnoutAnalyzer:
             "accomplishment_burnout": round(safe_accomplishment_burnout, 2)
         }
     
-    def _calculate_emotional_exhaustion_incident(self, metrics: Dict[str, Any]) -> float:
-        """Calculate Emotional Exhaustion from incident data (0-10 scale)."""
+    def _calculate_personal_burnout_cbi(self, metrics: Dict[str, Any]) -> float:
+        """Calculate Personal Burnout from incident data using CBI methodology (0-10 scale)."""
         # Incident frequency score - more realistic thresholds
         ipw = metrics.get("incidents_per_week", 0)
         ipw = float(ipw) if ipw is not None else 0.0
@@ -1027,8 +1027,8 @@ class UnifiedBurnoutAnalyzer:
         # Weighted average with incident frequency as primary factor (50% weight)
         return (incident_frequency_score * 0.5 + after_hours_score * 0.2 + resolution_time_score * 0.2 + clustering_score * 0.1)
     
-    def _calculate_depersonalization_incident(self, metrics: Dict[str, Any]) -> float:
-        """Calculate Depersonalization from incident data (0-10 scale)."""
+    def _calculate_work_burnout_cbi(self, metrics: Dict[str, Any]) -> float:
+        """Calculate Work-Related Burnout from incident data using CBI methodology (0-10 scale)."""
         # Escalation score (using severity as proxy)
         severity_dist = metrics.get("severity_distribution", {}) or {}
         high_severity_count = severity_dist.get("high", 0) + severity_dist.get("critical", 0)
@@ -1052,8 +1052,8 @@ class UnifiedBurnoutAnalyzer:
         communication_safe = communication_score if communication_score is not None else 0.0
         return (escalation_safe + solo_safe + response_safe + communication_safe) / 4
     
-    def _calculate_personal_accomplishment_incident(self, metrics: Dict[str, Any]) -> float:
-        """Calculate Personal Accomplishment from incident data (0-10 scale)."""
+    def _calculate_accomplishment_burnout_cbi(self, metrics: Dict[str, Any]) -> float:
+        """Calculate Accomplishment Burnout from incident data using CBI methodology (0-10 scale)."""
         # Resolution success score (assume 80% success rate for now)
         resolution_success_score = 8.0  # Placeholder
         
