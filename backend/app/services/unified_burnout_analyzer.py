@@ -52,9 +52,9 @@ class UnifiedBurnoutAnalyzer:
         # Feature flag for CBI methodology (default: False to maintain existing behavior)
         cbi_env_value = os.getenv('USE_CBI_METHODOLOGY', 'false')
         self.use_cbi_methodology = cbi_env_value.lower() == 'true'
-        logger.info(f"[DEBUG] CBI Environment variable raw value: '{cbi_env_value}'")
-        logger.info(f"[DEBUG] CBI Environment variable processed: {self.use_cbi_methodology}")
-        logger.info(f"Unified analyzer initialized with CBI methodology: {self.use_cbi_methodology}")
+        logger.warning(f"🔬 CBI_DEBUG: Environment variable raw value: '{cbi_env_value}'")
+        logger.warning(f"🔬 CBI_DEBUG: Environment variable processed: {self.use_cbi_methodology}")
+        logger.warning(f"🔬 CBI_DEBUG: Unified analyzer initialized with CBI methodology: {self.use_cbi_methodology}")
         self.organization_name = organization_name
         
         # Determine which features are enabled
