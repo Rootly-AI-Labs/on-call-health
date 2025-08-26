@@ -165,34 +165,19 @@ class GitHubOnlyBurnoutAnalyzer:
                 logger.warning(f"No GitHub metrics for {email}")
                 return None
             
-            # Calculate burnout dimensions using GitHub data
-            # Use feature flag to choose between old methods and new CBI methods
-            if self.use_cbi_methodology:
-                logger.debug(f"Using CBI methodology for {email}")
-                personal_burnout = self._calculate_personal_burnout_cbi(
-                    metrics, baselines, time_range_days
-                )
-                
-                work_related_burnout = self._calculate_work_burnout_cbi(
-                    metrics, baselines, activity_data
-                )
-                
-                accomplishment_burnout = self._calculate_accomplishment_burnout_cbi(
-                    metrics, baselines, activity_data
-                )
-            else:
-                logger.debug(f"Using legacy methodology for {email}")
-                personal_burnout = self._calculate_personal_burnout_github(
-                    metrics, baselines, time_range_days
-                )
-                
-                work_related_burnout = self._calculate_work_burnout_github(
-                    metrics, baselines, activity_data
-                )
-                
-                accomplishment_burnout = self._calculate_accomplishment_burnout_github(
-                    metrics, baselines, activity_data
-                )
+            # Calculate burnout dimensions using CBI (Copenhagen Burnout Inventory) methodology
+            logger.debug(f"Using CBI methodology for {email}")
+            personal_burnout = self._calculate_personal_burnout_cbi(
+                metrics, baselines, time_range_days
+            )
+            
+            work_related_burnout = self._calculate_work_burnout_cbi(
+                metrics, baselines, activity_data
+            )
+            
+            accomplishment_burnout = self._calculate_accomplishment_burnout_cbi(
+                metrics, baselines, activity_data
+            )
             
             # Calculate overall burnout score using equal weights (CBI methodology)
             burnout_score = (
@@ -235,202 +220,6 @@ class GitHubOnlyBurnoutAnalyzer:
             logger.error(f"Error analyzing GitHub burnout for {email}: {e}")
             return None
     
-    def _calculate_personal_burnout_github(
-        self, 
-        metrics: Dict[str, Any], 
-        baselines: Dict[str, float],
-        time_range_days: int
-    ) -> float:
-        """
-        Calculate Emotional Exhaustion from GitHub data (0-10 scale).
-        
-        Key indicators:
-        - Commit frequency and intensity 
-        - After-hours coding activity
-        - Large commit patterns (rushed work)
-        - Sustained high activity without breaks
-        """
-        score_components = []
-        
-        # 1. Commit frequency score (40% of EE)
-        commits_per_week = metrics.get("commits_per_week", 0)
-        baseline_commits = baselines.get("commits_per_week", self.industry_baselines["commits_per_week"])
-        
-        # Scale relative to baseline with diminishing returns
-        commit_ratio = commits_per_week / baseline_commits if baseline_commits > 0 else 0
-        if commit_ratio <= 1.0:
-            commit_frequency_score = commit_ratio * 3  # 0-3 for normal range
-        elif commit_ratio <= 2.0:
-            commit_frequency_score = 3 + (commit_ratio - 1) * 4  # 3-7 for high range
-        else:
-            commit_frequency_score = 7 + min(3, (commit_ratio - 2) * 1.5)  # 7-10 for extreme
-        
-        score_components.append(("commit_frequency", commit_frequency_score, 0.40))
-        
-        # 2. After-hours activity score (25% of EE)
-        after_hours_pct = metrics.get("after_hours_commit_percentage", 0)
-        after_hours_score = min(10, (after_hours_pct / 0.3) * 10)  # Scale to 30% threshold
-        score_components.append(("after_hours", after_hours_score, 0.25))
-        
-        # 3. Weekend activity score (20% of EE)
-        weekend_pct = metrics.get("weekend_commit_percentage", 0)
-        weekend_score = min(10, (weekend_pct / 0.25) * 10)  # Scale to 25% threshold
-        score_components.append(("weekend", weekend_score, 0.20))
-        
-        # 4. Large commit pattern score (15% of EE) - indicates rushed work
-        avg_commit_size = metrics.get("avg_commit_size", 0)
-        large_commit_ratio = metrics.get("large_commits_ratio", 0)
-        
-        # Large commits can indicate either good chunking OR rushed work
-        # Use additional context to determine
-        if large_commit_ratio > 0.2 and avg_commit_size > 500:
-            large_commit_score = min(10, large_commit_ratio * 50)  # Penalize excessive large commits
-        else:
-            large_commit_score = 0
-        
-        score_components.append(("large_commits", large_commit_score, 0.15))
-        
-        # Calculate weighted average
-        total_score = sum(score * weight for _, score, weight in score_components)
-        
-        logger.debug(f"Emotional Exhaustion components: {score_components}, total: {total_score}")
-        return min(10, max(0, total_score))
-    
-    def _calculate_work_burnout_github(
-        self,
-        metrics: Dict[str, Any],
-        baselines: Dict[str, float], 
-        activity_data: Dict[str, Any]
-    ) -> float:
-        """
-        Calculate Depersonalization/Cynicism from GitHub data (0-10 scale).
-        
-        Key indicators:
-        - Declining code review participation
-        - Shorter, less descriptive commit messages
-        - Large, infrequent PRs (less collaboration)
-        - Reduced response to code review requests
-        """
-        score_components = []
-        
-        # 1. Code review participation decline (35% of Depersonalization)
-        review_participation = metrics.get("review_participation_rate", 1.0)
-        baseline_reviews = baselines.get("review_per_week", self.industry_baselines["review_per_week"])
-        reviews_per_week = metrics.get("reviews_per_week", 0)
-        
-        # Calculate participation score
-        if baseline_reviews > 0:
-            participation_ratio = reviews_per_week / baseline_reviews
-            participation_score = max(0, 10 - (participation_ratio * 10))  # Inverted - less participation = higher score
-        else:
-            participation_score = 5  # Neutral if no baseline
-            
-        score_components.append(("review_participation", participation_score, 0.35))
-        
-        # 2. Commit message quality decline (25% of Depersonalization)
-        avg_commit_msg_length = metrics.get("avg_commit_message_length", 50)
-        commit_msg_score = 0
-        if avg_commit_msg_length < 20:
-            commit_msg_score = 8  # Very short messages indicate disengagement
-        elif avg_commit_msg_length < 40:
-            commit_msg_score = 5  # Moderately short
-        else:
-            commit_msg_score = 2  # Good message length
-            
-        score_components.append(("commit_message_quality", commit_msg_score, 0.25))
-        
-        # 3. PR size and frequency patterns (25% of Depersonalization)
-        avg_pr_size = metrics.get("avg_pr_size", 200)
-        pr_per_week = metrics.get("prs_per_week", 0)
-        
-        # Large, infrequent PRs indicate reduced collaboration
-        if avg_pr_size > 1000 and pr_per_week < 2:
-            pr_pattern_score = 8  # Large, infrequent PRs
-        elif avg_pr_size > 500 and pr_per_week < 3:
-            pr_pattern_score = 5  # Moderate pattern
-        else:
-            pr_pattern_score = 2  # Healthy PR patterns
-            
-        score_components.append(("pr_patterns", pr_pattern_score, 0.25))
-        
-        # 4. Response time to reviews (15% of Depersonalization)
-        avg_review_response_time = metrics.get("avg_review_response_time_hours", 24)
-        if avg_review_response_time > 72:  # 3+ days
-            response_time_score = 8
-        elif avg_review_response_time > 48:  # 2+ days
-            response_time_score = 5
-        else:
-            response_time_score = 2
-            
-        score_components.append(("review_response_time", response_time_score, 0.15))
-        
-        # Calculate weighted average
-        total_score = sum(score * weight for _, score, weight in score_components)
-        
-        logger.debug(f"Depersonalization components: {score_components}, total: {total_score}")
-        return min(10, max(0, total_score))
-    
-    def _calculate_accomplishment_burnout_github(
-        self,
-        metrics: Dict[str, Any],
-        baselines: Dict[str, float],
-        activity_data: Dict[str, Any]
-    ) -> float:
-        """
-        Calculate Personal Accomplishment from GitHub data (0-10 scale).
-        Higher scores indicate better accomplishment (this gets inverted in final calculation).
-        
-        Key indicators:
-        - PR merge success rate
-        - Code review quality and helpfulness
-        - Knowledge sharing through documentation
-        - Collaboration and mentoring indicators
-        """
-        score_components = []
-        
-        # 1. PR merge success rate (30% of PA)
-        pr_merge_rate = metrics.get("pr_merge_rate", 0.8)
-        merge_score = pr_merge_rate * 10  # Direct scaling
-        score_components.append(("pr_merge_rate", merge_score, 0.30))
-        
-        # 2. Code review quality (25% of PA)
-        reviews_given = metrics.get("reviews_given", 0)
-        review_quality_indicators = {
-            "constructive_comments": metrics.get("constructive_review_ratio", 0.5),
-            "review_depth": min(1.0, metrics.get("avg_review_comments", 3) / 5),  # Normalize to 5 comments
-            "review_timeliness": max(0, 1 - (metrics.get("avg_review_response_time_hours", 24) / 48))
-        }
-        
-        review_quality_score = sum(review_quality_indicators.values()) / len(review_quality_indicators) * 10
-        score_components.append(("review_quality", review_quality_score, 0.25))
-        
-        # 3. Knowledge sharing and documentation (25% of PA)
-        knowledge_sharing_indicators = {
-            "readme_contributions": min(1.0, metrics.get("readme_updates", 0) / 5),
-            "documentation_commits": min(1.0, metrics.get("documentation_commit_ratio", 0) * 10),
-            "wiki_contributions": min(1.0, metrics.get("wiki_edits", 0) / 3),
-            "issue_participation": min(1.0, metrics.get("issue_comments", 0) / 10)
-        }
-        
-        knowledge_score = sum(knowledge_sharing_indicators.values()) / len(knowledge_sharing_indicators) * 10
-        score_components.append(("knowledge_sharing", knowledge_score, 0.25))
-        
-        # 4. Collaboration and mentoring (20% of PA)
-        collaboration_indicators = {
-            "cross_repo_activity": min(1.0, metrics.get("repos_contributed", 1) / 5),
-            "pair_programming": min(1.0, metrics.get("co_authored_commits", 0) / 10),
-            "issue_resolution": min(1.0, metrics.get("issues_closed", 0) / 15),
-            "release_participation": min(1.0, metrics.get("release_contributions", 0) / 3)
-        }
-        
-        collaboration_score = sum(collaboration_indicators.values()) / len(collaboration_indicators) * 10
-        score_components.append(("collaboration", collaboration_score, 0.20))
-        
-        # Calculate weighted average
-        total_score = sum(score * weight for _, score, weight in score_components)
-        
-        logger.debug(f"Personal Accomplishment components: {score_components}, total: {total_score}")
-        return min(10, max(0, total_score))
     
     # =============================================================================
     # NEW CBI (Copenhagen Burnout Inventory) CALCULATION METHODS
