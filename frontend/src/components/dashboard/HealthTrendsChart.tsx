@@ -1,7 +1,7 @@
 "use client"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from "recharts"
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell } from "recharts"
 
 interface HealthTrendsChartProps {
   currentAnalysis: any
@@ -15,9 +15,7 @@ export function HealthTrendsChart({
   loadingTrends
 }: HealthTrendsChartProps) {
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-      {/* Historical Burnout Score Graph */}
-      <Card>
+    <Card>
         <CardHeader>
           <CardTitle>Health Trends</CardTitle>
           <CardDescription>
@@ -92,10 +90,10 @@ export function HealthTrendsChart({
                     const hasRealData = incidentCount > 0; // True if incidents occurred on this day
                     
                     return {
-                      date: new Date(trend.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
+                      date: new Date(trend.date).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }),
                       // Convert burnout score (0-10) to health score (0-100)
                       // Higher burnout = lower health, so: health = (10 - burnout) * 10
-                      score: hasRealData ? Math.round((10 - trend.overall_score) * 10) : 0, 
+                      score: hasRealData ? Math.max(0, Math.min(100, Math.round((10 - (trend.overall_score || 0)) * 10))) : 0, 
                       // Calculate risk level based on the CONVERTED health score (0-100), not raw burnout
                       riskLevel: hasRealData ? (() => {
                         const healthScore = Math.round((10 - trend.overall_score) * 10);
@@ -140,18 +138,18 @@ export function HealthTrendsChart({
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart 
                     data={chartData} 
-                    margin={{ top: 20, right: 30, left: 0, bottom: 60 }}
-                    barCategoryGap="20%"
+                    margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
                   >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                     <XAxis 
                       dataKey="date" 
                       axisLine={false}
                       tickLine={false}
-                      tick={{ fontSize: 11, fill: '#6B7280' }}
+                      tick={{ fontSize: 10, fill: '#6B7280' }}
                       angle={-45}
                       textAnchor="end"
-                      height={80}
-                      interval={0}
+                      height={50}
+                      interval="preserveStartEnd"
                     />
                     <YAxis 
                       axisLine={false}
@@ -184,20 +182,16 @@ export function HealthTrendsChart({
                         return null;
                       }}
                     />
-                    <Bar dataKey="score" radius={[2, 2, 0, 0]}>
+                    <Bar dataKey="score" radius={[4, 4, 0, 0]}>
                       {chartData.map((entry: any, index: number) => (
-                        <Bar 
-                          key={`bar-${index}`}
+                        <Cell 
+                          key={`cell-${index}`}
                           fill={
                             !entry.hasRealData ? '#E5E7EB' :     // Gray for no data
                             entry.score >= 70 ? '#10B981' :      // Green for good health (70+)
                             entry.score >= 40 ? '#F59E0B' :      // Yellow for moderate health (40-69)
                             '#EF4444'                            // Red for poor health (<40)
                           }
-                          stroke={!entry.hasRealData ? '#9CA3AF' : undefined}
-                          strokeWidth={!entry.hasRealData ? 1 : 0}
-                          strokeDasharray={!entry.hasRealData ? '3,3' : undefined}
-                          opacity={!entry.hasRealData ? 0.6 : 1}
                         />
                       ))}
                     </Bar>
@@ -235,7 +229,6 @@ export function HealthTrendsChart({
             );
           })()}
         </CardContent>
-      </Card>
-    </div>
+    </Card>
   )
 }
