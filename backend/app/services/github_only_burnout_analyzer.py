@@ -30,12 +30,8 @@ class GitHubOnlyBurnoutAnalyzer:
     """
     
     def __init__(self):
-        # Feature flag for CBI methodology (default: False to maintain existing behavior)
-        cbi_env_value = os.getenv('USE_CBI_METHODOLOGY', 'false')
-        self.use_cbi_methodology = cbi_env_value.lower() == 'true'
-        logger.info(f"[DEBUG] CBI Environment variable raw value: '{cbi_env_value}'")
-        logger.info(f"[DEBUG] CBI Environment variable processed: {self.use_cbi_methodology}")
-        logger.info(f"GitHub analyzer initialized with CBI methodology: {self.use_cbi_methodology}")
+        # Using Copenhagen Burnout Inventory (CBI) methodology
+        logger.info("GitHub analyzer using Copenhagen Burnout Inventory methodology")
         
         # GitHub-specific thresholds for burnout detection
         self.thresholds = {
@@ -222,8 +218,8 @@ class GitHubOnlyBurnoutAnalyzer:
     
     
     # =============================================================================
-    # NEW CBI (Copenhagen Burnout Inventory) CALCULATION METHODS
-    # These methods implement proper CBI methodology alongside existing methods
+    # CBI (Copenhagen Burnout Inventory) CALCULATION METHODS
+    # Scientific burnout assessment using established CBI methodology
     # =============================================================================
     
     def _calculate_personal_burnout_cbi(

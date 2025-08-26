@@ -49,12 +49,8 @@ class UnifiedBurnoutAnalyzer:
         self.github_token = github_token
         self.slack_token = slack_token
         
-        # Feature flag for CBI methodology (default: False to maintain existing behavior)
-        cbi_env_value = os.getenv('USE_CBI_METHODOLOGY', 'false')
-        self.use_cbi_methodology = cbi_env_value.lower() == 'true'
-        logger.warning(f"🔬 CBI_DEBUG: Environment variable raw value: '{cbi_env_value}'")
-        logger.warning(f"🔬 CBI_DEBUG: Environment variable processed: {self.use_cbi_methodology}")
-        logger.warning(f"🔬 CBI_DEBUG: Unified analyzer initialized with CBI methodology: {self.use_cbi_methodology}")
+        # Using Copenhagen Burnout Inventory (CBI) methodology
+        logger.info("Unified analyzer using Copenhagen Burnout Inventory methodology")
         self.organization_name = organization_name
         
         # Determine which features are enabled
