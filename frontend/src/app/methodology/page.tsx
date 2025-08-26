@@ -32,7 +32,7 @@ export default function MethodologyPage() {
                 Burnout Score Methodology
               </h1>
               <p className="text-gray-600">
-                Understanding how we calculate team burnout risk using the Maslach Burnout Inventory
+                Understanding how we calculate team burnout risk using the Copenhagen Burnout Inventory
               </p>
             </div>
             <div className="flex flex-col items-center ml-8">
@@ -53,7 +53,7 @@ export default function MethodologyPage() {
           <CardHeader>
             <CardTitle>The Science Behind Our Scoring</CardTitle>
             <CardDescription>
-              Based on the Maslach Burnout Inventory (MBI), the gold standard for measuring burnout
+              Based on the Copenhagen Burnout Inventory (CBI), a scientifically validated framework for measuring burnout
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -81,26 +81,26 @@ export default function MethodologyPage() {
 
         {/* Three Dimensions */}
         <div className="space-y-6 mb-8">
-          <h2 className="text-2xl font-semibold text-gray-900">The Three Dimensions of Burnout</h2>
+          <h2 className="text-2xl font-semibold text-gray-900">The Three Dimensions of Copenhagen Burnout Inventory</h2>
           
-          {/* Emotional Exhaustion */}
+          {/* Personal Burnout */}
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center">
                   <TrendingUp className="w-5 h-5 mr-2 text-red-500" />
-                  Emotional Exhaustion (40% weight)
+                  Personal Burnout (33.3% weight)
                 </CardTitle>
                 <Badge variant="destructive">High Impact</Badge>
               </div>
               <CardDescription>
-                The depletion of emotional resources and feeling overwhelmed
+                Physical and psychological exhaustion from workload overwhelm and boundary violations
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 <p className="text-gray-700">
-                  We measure emotional exhaustion by analyzing:
+                  We measure personal burnout by analyzing:
                 </p>
                 <div className="grid gap-3">
                   <div className="flex items-start space-x-3">
@@ -143,24 +143,24 @@ export default function MethodologyPage() {
             </CardContent>
           </Card>
 
-          {/* Depersonalization */}
+          {/* Work-Related Burnout */}
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center">
                   <AlertTriangle className="w-5 h-5 mr-2 text-yellow-500" />
-                  Depersonalization (30% weight)
+                  Work-Related Burnout (33.3% weight)
                 </CardTitle>
                 <Badge variant="outline" className="border-yellow-500 text-yellow-700">Medium Impact</Badge>
               </div>
               <CardDescription>
-                Detachment from work and decreased empathy
+                Fatigue and dysfunction specifically attributed to work processes and collaboration
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 <p className="text-gray-700">
-                  We identify signs of depersonalization through:
+                  We identify work-related burnout through:
                 </p>
                 <div className="grid gap-3">
                   <div className="flex items-start space-x-3">
@@ -196,24 +196,24 @@ export default function MethodologyPage() {
             </CardContent>
           </Card>
 
-          {/* Personal Accomplishment */}
+          {/* Accomplishment Burnout */}
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center">
                   <Activity className="w-5 h-5 mr-2 text-green-500" />
-                  Personal Accomplishment (30% weight)
+                  Accomplishment Burnout (33.4% weight)
                 </CardTitle>
-                <Badge variant="outline" className="border-green-500 text-green-700">Protective Factor</Badge>
+                <Badge variant="outline" className="border-green-500 text-green-700">Effectiveness Factor</Badge>
               </div>
               <CardDescription>
-                Sense of achievement and effectiveness (inverted for scoring)
+                Reduced sense of technical effectiveness and professional accomplishment
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 <p className="text-gray-700">
-                  We measure personal accomplishment through:
+                  We measure accomplishment burnout through:
                 </p>
                 <div className="grid gap-3">
                   <div className="flex items-start space-x-3">
