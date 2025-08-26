@@ -89,7 +89,7 @@ export default function MethodologyPage() {
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center">
                   <TrendingUp className="w-5 h-5 mr-2 text-red-500" />
-                  Personal Burnout (33.3% weight)
+                  Personal Burnout (33% weight)
                 </CardTitle>
                 <Badge variant="destructive">High Impact</Badge>
               </div>
@@ -149,7 +149,7 @@ export default function MethodologyPage() {
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center">
                   <AlertTriangle className="w-5 h-5 mr-2 text-yellow-500" />
-                  Work-Related Burnout (33.3% weight)
+                  Work-Related Burnout (33% weight)
                 </CardTitle>
                 <Badge variant="outline" className="border-yellow-500 text-yellow-700">Medium Impact</Badge>
               </div>
@@ -202,7 +202,7 @@ export default function MethodologyPage() {
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center">
                   <Activity className="w-5 h-5 mr-2 text-green-500" />
-                  Accomplishment Burnout (33.4% weight)
+                  Accomplishment Burnout (34% weight)
                 </CardTitle>
                 <Badge variant="outline" className="border-green-500 text-green-700">Effectiveness Factor</Badge>
               </div>
