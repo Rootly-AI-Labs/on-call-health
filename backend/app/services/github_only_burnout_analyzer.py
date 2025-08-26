@@ -11,6 +11,7 @@ only available data source, with appropriate confidence intervals and baseline c
 import logging
 import math
 import statistics
+import os
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional, Tuple
 from collections import defaultdict
@@ -29,6 +30,10 @@ class GitHubOnlyBurnoutAnalyzer:
     """
     
     def __init__(self):
+        # Feature flag for CBI methodology (default: False to maintain existing behavior)
+        self.use_cbi_methodology = os.getenv('USE_CBI_METHODOLOGY', 'false').lower() == 'true'
+        logger.info(f"GitHub analyzer initialized with CBI methodology: {self.use_cbi_methodology}")
+        
         # GitHub-specific thresholds for burnout detection
         self.thresholds = {
             # Emotional Exhaustion indicators
@@ -158,17 +163,33 @@ class GitHubOnlyBurnoutAnalyzer:
                 return None
             
             # Calculate burnout dimensions using GitHub data
-            personal_burnout = self._calculate_personal_burnout_github(
-                metrics, baselines, time_range_days
-            )
-            
-            work_related_burnout = self._calculate_work_burnout_github(
-                metrics, baselines, activity_data
-            )
-            
-            accomplishment_burnout = self._calculate_accomplishment_burnout_github(
-                metrics, baselines, activity_data
-            )
+            # Use feature flag to choose between old methods and new CBI methods
+            if self.use_cbi_methodology:
+                logger.debug(f"Using CBI methodology for {email}")
+                personal_burnout = self._calculate_personal_burnout_cbi(
+                    metrics, baselines, time_range_days
+                )
+                
+                work_related_burnout = self._calculate_work_burnout_cbi(
+                    metrics, baselines, activity_data
+                )
+                
+                accomplishment_burnout = self._calculate_accomplishment_burnout_cbi(
+                    metrics, baselines, activity_data
+                )
+            else:
+                logger.debug(f"Using legacy methodology for {email}")
+                personal_burnout = self._calculate_personal_burnout_github(
+                    metrics, baselines, time_range_days
+                )
+                
+                work_related_burnout = self._calculate_work_burnout_github(
+                    metrics, baselines, activity_data
+                )
+                
+                accomplishment_burnout = self._calculate_accomplishment_burnout_github(
+                    metrics, baselines, activity_data
+                )
             
             # Calculate overall burnout score using equal weights (CBI methodology)
             burnout_score = (

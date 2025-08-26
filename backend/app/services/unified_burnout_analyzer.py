@@ -4,6 +4,7 @@ Replacement for both SimpleBurnoutAnalyzer and BurnoutAnalyzerService.
 """
 import logging
 import math
+import os
 import random
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
@@ -47,6 +48,10 @@ class UnifiedBurnoutAnalyzer:
         self.enable_ai = enable_ai
         self.github_token = github_token
         self.slack_token = slack_token
+        
+        # Feature flag for CBI methodology (default: False to maintain existing behavior)
+        self.use_cbi_methodology = os.getenv('USE_CBI_METHODOLOGY', 'false').lower() == 'true'
+        logger.info(f"Unified analyzer initialized with CBI methodology: {self.use_cbi_methodology}")
         self.organization_name = organization_name
         
         # Determine which features are enabled
