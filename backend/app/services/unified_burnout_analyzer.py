@@ -762,10 +762,10 @@ class UnifiedBurnoutAnalyzer:
                     "incident_load": 0,
                     "response_time": 0
                 },
-                "maslach_dimensions": {
-                    "emotional_exhaustion": 0,
-                    "depersonalization": 0,
-                    "personal_accomplishment": 10
+                "burnout_dimensions": {
+                    "personal_burnout": 0,
+                    "work_related_burnout": 0,
+                    "client_related_burnout": 0
                 },
                 "metrics": {
                     "incidents_per_week": 0,
@@ -784,18 +784,16 @@ class UnifiedBurnoutAnalyzer:
             include_weekends
         )
         
-        # Calculate Maslach dimensions
-        dimensions = self._calculate_maslach_dimensions(metrics)
+        # Calculate burnout dimensions  
+        dimensions = self._calculate_burnout_dimensions(metrics)
         
         # Calculate burnout factors for backward compatibility
         factors = self._calculate_burnout_factors(metrics)
         
-        # Calculate overall burnout score using Maslach methodology
-        # Ensure personal accomplishment is properly bounded to prevent negative scores
-        pa_score = min(10, max(0, dimensions["personal_accomplishment"]))
-        burnout_score = (dimensions["emotional_exhaustion"] * 0.4 + 
-                        dimensions["depersonalization"] * 0.3 + 
-                        (10 - pa_score) * 0.3)
+        # Calculate overall burnout score using three-factor methodology (equal weighting)
+        burnout_score = (dimensions["personal_burnout"] * 0.333 + 
+                        dimensions["work_related_burnout"] * 0.333 + 
+                        dimensions["accomplishment_burnout"] * 0.334)
         
         # Ensure overall score is never negative
         burnout_score = max(0, burnout_score)
@@ -811,7 +809,7 @@ class UnifiedBurnoutAnalyzer:
             "risk_level": risk_level,
             "incident_count": len(incidents),
             "factors": factors,
-            "maslach_dimensions": dimensions,
+            "burnout_dimensions": dimensions,
             "metrics": metrics
         }
         
@@ -973,29 +971,29 @@ class UnifiedBurnoutAnalyzer:
             "status_distribution": dict(status_counts)
         }
     
-    def _calculate_maslach_dimensions(self, metrics: Dict[str, Any]) -> Dict[str, float]:
-        """Calculate Maslach Burnout Inventory dimensions (0-10 scale each)."""
+    def _calculate_burnout_dimensions(self, metrics: Dict[str, Any]) -> Dict[str, float]:
+        """Calculate burnout dimensions (0-10 scale each)."""
         # Currently only implementing incident-based calculations (70% weight)
         # GitHub (15%) and Slack (15%) components to be added later
         
-        # Emotional Exhaustion (40% of final score)
-        emotional_exhaustion = self._calculate_emotional_exhaustion_incident(metrics)
+        # Personal Burnout (33.3% of final score)
+        personal_burnout = self._calculate_emotional_exhaustion_incident(metrics)
         
-        # Depersonalization (30% of final score)
-        depersonalization = self._calculate_depersonalization_incident(metrics)
+        # Work-Related Burnout (33.3% of final score)  
+        work_related_burnout = self._calculate_depersonalization_incident(metrics)
         
-        # Personal Accomplishment (30% of final score, inverted)
-        personal_accomplishment = self._calculate_personal_accomplishment_incident(metrics)
+        # Accomplishment-Related Burnout (33.4% of final score)
+        accomplishment_burnout = self._calculate_personal_accomplishment_incident(metrics)
         
         # Ensure all dimension values are numeric before rounding
-        safe_emotional_exhaustion = emotional_exhaustion if emotional_exhaustion is not None else 0.0
-        safe_depersonalization = depersonalization if depersonalization is not None else 0.0
-        safe_personal_accomplishment = personal_accomplishment if personal_accomplishment is not None else 0.0
+        safe_personal_burnout = personal_burnout if personal_burnout is not None else 0.0
+        safe_work_related_burnout = work_related_burnout if work_related_burnout is not None else 0.0
+        safe_accomplishment_burnout = accomplishment_burnout if accomplishment_burnout is not None else 0.0
         
         return {
-            "emotional_exhaustion": round(safe_emotional_exhaustion, 2),
-            "depersonalization": round(safe_depersonalization, 2),
-            "personal_accomplishment": round(safe_personal_accomplishment, 2)
+            "personal_burnout": round(safe_personal_burnout, 2),
+            "work_related_burnout": round(safe_work_related_burnout, 2),
+            "accomplishment_burnout": round(safe_accomplishment_burnout, 2)
         }
     
     def _calculate_emotional_exhaustion_incident(self, metrics: Dict[str, Any]) -> float:
@@ -1126,7 +1124,7 @@ class UnifiedBurnoutAnalyzer:
         return {k: round(v, 2) for k, v in factors.items()}
     
     def _calculate_burnout_score(self, factors: Dict[str, float]) -> float:
-        """Calculate overall burnout score using Maslach methodology."""
+        """Calculate overall burnout score using three-factor methodology."""
         # First get the metrics to calculate proper dimensions
         # For now, we'll use the factors to approximate dimensions
         
@@ -1144,7 +1142,7 @@ class UnifiedBurnoutAnalyzer:
                                        factors.get("workload", 0) * 0.6)
         personal_accomplishment = max(0, personal_accomplishment)
         
-        # Calculate final score using Maslach weights
+        # Calculate final score using equal weights
         # Ensure personal accomplishment is properly bounded to prevent negative scores
         pa_score = min(10, max(0, personal_accomplishment))
         burnout_score = (emotional_exhaustion * 0.4 + 
@@ -1296,7 +1294,7 @@ class UnifiedBurnoutAnalyzer:
         team_health: Dict[str, Any], 
         team_analysis: Dict[str, Any]
     ) -> List[Dict[str, Any]]:
-        """Generate actionable recommendations based on Christina Maslach methodology."""
+        """Generate actionable recommendations based on burnout research methodology."""
         recommendations = []
         members = team_analysis.get("members", []) if team_analysis else []
         
@@ -1404,7 +1402,7 @@ class UnifiedBurnoutAnalyzer:
                     "message": "Review alerting and escalation procedures to improve response times"
                 })
         
-        # Always include Christina Maslach-based recommendations
+        # Include research-based recommendations
         if health_status in ["excellent", "good"]:
             recommendations.append({
                 "type": "personal_accomplishment",
@@ -1412,7 +1410,7 @@ class UnifiedBurnoutAnalyzer:
                 "message": "Continue current practices and monitor for changes in team health metrics"
             })
         
-        # Add specific Maslach dimension recommendations
+        # Add specific dimension-based recommendations
         if members:
             high_burnout_members = [m for m in members if m.get("burnout_score", 0) >= 7.0]
             if high_burnout_members:
@@ -2282,7 +2280,7 @@ class UnifiedBurnoutAnalyzer:
     ) -> float:
         """
         Calculate burnout score based on GitHub activity patterns.
-        Based on Maslach dimensions but simplified for GitHub data.
+        Based on burnout research but simplified for GitHub data.
         """
         try:
             # Convert None values to 0 for safe calculations
@@ -2358,8 +2356,8 @@ class UnifiedBurnoutAnalyzer:
             elif commits_per_week > 30:
                 accomplishment_score = 6.0
             
-            # Calculate final burnout score using adjusted Maslach weighting
-            # Emotional Exhaustion (45%), Depersonalization (35%), Personal Accomplishment inverted (20%)
+            # Calculate final burnout score using equal weighting
+            # Personal Burnout (33.3%), Work-Related Burnout (33.3%), Client-Related Burnout (33.4%)
             # Slightly increased exhaustion weight for GitHub-based scoring
             burnout_score = (
                 exhaustion_score * 0.45 +

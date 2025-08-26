@@ -708,8 +708,8 @@ class AIBurnoutAnalyzerService:
             name = member.get("user_name", "Unknown")
             ai_insights = member.get("ai_insights", {})
             
-            # Analyze Maslach dimensions if available
-            maslach = ai_insights.get("maslach_analysis", {}) if ai_insights else {}
+            # Analyze burnout dimensions if available
+            burnout_dims = ai_insights.get("burnout_analysis", {}) if ai_insights else {}
             
             # After-hours analysis
             after_hours_pct = member.get("after_hours_percentage", 0)

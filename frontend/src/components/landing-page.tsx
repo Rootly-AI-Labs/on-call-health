@@ -154,7 +154,7 @@ export default function LandingPage() {
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">How It Works</h2>
             <p className="text-lg text-slate-600 max-w-3xl mx-auto">
-              Based on the Maslach Burnout Inventory (MBI), the gold standard for measuring burnout
+              Based on scientifically validated burnout research methodology
             </p>
           </div>
 

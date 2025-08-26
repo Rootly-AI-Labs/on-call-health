@@ -100,19 +100,19 @@ python -m pytest
 
 ## 📊 Burnout Analysis
 
-The application uses the **Maslach Burnout Inventory** methodology with three dimensions:
+The application uses a **three-factor burnout methodology** with equal weighting:
 
-1. **Emotional Exhaustion** (40% weight)
+1. **Personal Burnout** (33.3% weight)
    - Incident frequency and clustering
    - After-hours work patterns
    - Resolution time pressure
 
-2. **Depersonalization** (30% weight)
+2. **Work-Related Burnout** (33.3% weight)
    - Escalation patterns
    - Team collaboration metrics
    - Communication quality
 
-3. **Personal Accomplishment** (30% weight, inverted)
+3. **Accomplishment Burnout** (33.4% weight)
    - Resolution success rates
    - Knowledge sharing
    - Improvement trends

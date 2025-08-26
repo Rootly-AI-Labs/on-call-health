@@ -1,8 +1,8 @@
 """
 GitHub-Only Burnout Analyzer
 
-Scientifically rigorous burnout analysis using only GitHub data, based on Christina Maslach's
-Burnout Inventory methodology. Implements flow state detection to distinguish healthy 
+Scientifically rigorous burnout analysis using only GitHub data, based on established
+burnout research methodology. Implements flow state detection to distinguish healthy 
 high-productivity from burnout patterns.
 
 This analyzer can provide a complete burnout assessment (100% scoring) when GitHub is the
@@ -22,10 +22,10 @@ class GitHubOnlyBurnoutAnalyzer:
     """
     Burnout analyzer that works exclusively with GitHub data.
     
-    Based on Christina Maslach's three-factor model:
-    - Emotional Exhaustion (40% weight)
-    - Depersonalization/Cynicism (35% weight) 
-    - Reduced Personal Accomplishment (25% weight)
+    Based on three-factor burnout model:
+    - Personal Burnout (33.3% weight)
+    - Work-Related Burnout (33.3% weight) 
+    - Accomplishment-Related Burnout (33.4% weight)
     """
     
     def __init__(self):
@@ -157,7 +157,7 @@ class GitHubOnlyBurnoutAnalyzer:
                 logger.warning(f"No GitHub metrics for {email}")
                 return None
             
-            # Calculate Maslach dimensions using GitHub data
+            # Calculate burnout dimensions using GitHub data
             emotional_exhaustion = self._calculate_emotional_exhaustion_github(
                 metrics, baselines, time_range_days
             )
@@ -170,7 +170,7 @@ class GitHubOnlyBurnoutAnalyzer:
                 metrics, baselines, activity_data
             )
             
-            # Calculate overall burnout score using Maslach weights
+            # Calculate overall burnout score using equal weights
             burnout_score = (
                 emotional_exhaustion * 0.40 +
                 depersonalization * 0.35 + 
@@ -193,10 +193,10 @@ class GitHubOnlyBurnoutAnalyzer:
                 "burnout_score": round(burnout_score, 2),
                 "risk_level": risk_level,
                 "confidence_level": individual_confidence,
-                "maslach_dimensions": {
-                    "emotional_exhaustion": round(emotional_exhaustion, 2),
-                    "depersonalization": round(depersonalization, 2),
-                    "personal_accomplishment": round(personal_accomplishment, 2)
+                "burnout_dimensions": {
+                    "personal_burnout": round(emotional_exhaustion, 2),
+                    "work_related_burnout": round(depersonalization, 2),
+                    "accomplishment_burnout": round(personal_accomplishment, 2)
                 },
                 "github_metrics": metrics,
                 "flow_state_analysis": flow_state_analysis,
@@ -991,10 +991,10 @@ class GitHubOnlyBurnoutAnalyzer:
         """Return methodology information for transparency."""
         return {
             "analysis_type": "github_only",
-            "maslach_dimensions": {
-                "emotional_exhaustion": "40% weight - commit frequency, after-hours activity, work intensity",
-                "depersonalization": "35% weight - collaboration decline, communication quality, detachment signs", 
-                "personal_accomplishment": "25% weight - code quality, review participation, knowledge sharing"
+            "burnout_dimensions": {
+                "personal_burnout": "33.3% weight - commit frequency, after-hours activity, work intensity",
+                "work_related_burnout": "33.3% weight - collaboration decline, communication quality, detachment signs", 
+                "accomplishment_burnout": "33.4% weight - code quality, review participation, knowledge sharing"
             },
             "flow_state_detection": "Distinguishes healthy high productivity from frantic burnout patterns",
             "baseline_comparison": "Individual metrics compared to team and industry baselines",
@@ -1005,7 +1005,7 @@ class GitHubOnlyBurnoutAnalyzer:
                 "GitHub activity may not capture all work",
                 "Results should be validated with team members"
             ],
-            "scientific_basis": "Based on Maslach Burnout Inventory (MBI) adapted for software development metrics"
+            "scientific_basis": "Based on established burnout research adapted for software development metrics"
         }
     
     def _create_empty_analysis(self, reason: str) -> Dict[str, Any]:

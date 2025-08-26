@@ -69,8 +69,8 @@ export function MemberDetailModal({
             // Get the correct burnout score (handle both data formats)
             const burnoutScore = memberData?.burnout_score || (selectedMember.burnoutScore ? selectedMember.burnoutScore / 10 : 0) || 0;
             
-            // Use real Maslach dimensions from backend if available, otherwise show single burnout score  
-            const maslachDimensions = (memberData as any)?.maslach_dimensions || null;
+            // Use real burnout dimensions from backend if available, otherwise show single burnout score  
+            const burnoutDimensions = (memberData as any)?.burnout_dimensions || null;
           
           // Calculate overall burnout score (0-10 scale, higher = more burnout, consistent with dimensions)
           const overallBurnoutScore = Math.max(0, Math.min(10, burnoutScore || 0));
@@ -195,35 +195,35 @@ export function MemberDetailModal({
               </CardContent>
             </Card>
 
-            {/* Maslach Dimensions */}
-            {maslachDimensions && (
+            {/* Burnout Dimensions */}
+            {burnoutDimensions && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">Burnout Dimensions (Maslach Inventory)</CardTitle>
-                  <CardDescription>Clinical burnout assessment across three key dimensions</CardDescription>
+                  <CardTitle className="text-base">Burnout Dimensions</CardTitle>
+                  <CardDescription>Three-factor burnout assessment across key dimensions</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="text-center p-3 rounded-lg bg-red-50 border border-red-100">
                       <div className="text-lg font-bold text-red-600">
-                        {(maslachDimensions.exhaustion * 10).toFixed(0)}%
+                        {(burnoutDimensions.personal_burnout * 10).toFixed(0)}%
                       </div>
-                      <p className="text-sm font-medium text-red-800">Emotional Exhaustion</p>
-                      <p className="text-xs text-red-600 mt-1">Feeling emotionally drained</p>
+                      <p className="text-sm font-medium text-red-800">Personal Burnout</p>
+                      <p className="text-xs text-red-600 mt-1">Physical & psychological exhaustion</p>
                     </div>
                     <div className="text-center p-3 rounded-lg bg-orange-50 border border-orange-100">
                       <div className="text-lg font-bold text-orange-600">
-                        {(maslachDimensions.cynicism * 10).toFixed(0)}%
+                        {(burnoutDimensions.work_related_burnout * 10).toFixed(0)}%
                       </div>
-                      <p className="text-sm font-medium text-orange-800">Cynicism</p>
-                      <p className="text-xs text-orange-600 mt-1">Detached attitude toward work</p>
+                      <p className="text-sm font-medium text-orange-800">Work-Related Burnout</p>
+                      <p className="text-xs text-orange-600 mt-1">Fatigue attributed to work</p>
                     </div>
                     <div className="text-center p-3 rounded-lg bg-blue-50 border border-blue-100">
                       <div className="text-lg font-bold text-blue-600">
-                        {(10 - maslachDimensions.personal_accomplishment) * 10}%
+                        {(burnoutDimensions.accomplishment_burnout * 10).toFixed(0)}%
                       </div>
-                      <p className="text-sm font-medium text-blue-800">Reduced Accomplishment</p>
-                      <p className="text-xs text-blue-600 mt-1">Lower sense of effectiveness</p>
+                      <p className="text-sm font-medium text-blue-800">Accomplishment Burnout</p>
+                      <p className="text-xs text-blue-600 mt-1">Reduced sense of accomplishment</p>
                     </div>
                   </div>
                 </CardContent>
