@@ -74,35 +74,11 @@ export function GitHubIntegrationCard({
     return /^gh[prous]_[A-Za-z0-9]{36}$/.test(token) || /^github_pat_[A-Za-z0-9_]{22,}$/.test(token)
   }
 
-  // Fetch GitHub token permissions
-  const fetchPermissions = async () => {
-    if (!integration) return
-
-    setLoadingPermissions(true)
-    try {
-      const authToken = localStorage.getItem('auth_token')
-      if (!authToken) return
-
-      const response = await fetch('/api/github/token-permissions', {
-        headers: {
-          'Authorization': `Bearer ${authToken}`
-        }
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        setPermissions(data.permissions || [])
-      }
-    } catch (error) {
-      console.error('Failed to fetch GitHub permissions:', error)
-    } finally {
-      setLoadingPermissions(false)
-    }
-  }
-
   useEffect(() => {
     if (integration) {
-      fetchPermissions()
+      // For now, show a placeholder for permissions since we don't have the backend endpoint yet
+      // In the future, this will fetch actual token permissions from the backend
+      setPermissions(['read:user', 'repo']) // Placeholder - will be replaced with actual permissions
     }
   }, [integration])
 
