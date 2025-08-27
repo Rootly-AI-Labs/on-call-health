@@ -602,6 +602,62 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
     }
   }
 
+  // Clear all mappings function
+  const clearAllMappings = async () => {
+    if (!mappings.length) {
+      toast.info('No mappings to clear')
+      return
+    }
+
+    // Show confirmation dialog
+    const confirmed = window.confirm(
+      `Are you sure you want to remove ALL ${mappings.length} GitHub mappings? This action cannot be undone.`
+    )
+    
+    if (!confirmed) return
+
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) {
+        toast.error('Authentication required')
+        return
+      }
+
+      // Remove each mapping individually
+      const removePromises = mappings.map(mapping => 
+        fetch(`${API_BASE}/integrations/manual-mappings/${mapping.id}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${authToken}`
+          }
+        })
+      )
+
+      toast.info(`Removing ${mappings.length} mappings...`)
+      
+      const responses = await Promise.allSettled(removePromises)
+      
+      // Count successful removals
+      const successful = responses.filter(result => 
+        result.status === 'fulfilled' && result.value.ok
+      ).length
+      
+      const failed = mappings.length - successful
+
+      if (successful > 0) {
+        toast.success(`Successfully removed ${successful} mappings${failed > 0 ? ` (${failed} failed)` : ''}`)
+        await loadMappingData() // Refresh the list
+        onRefresh?.()
+      } else {
+        toast.error('Failed to remove mappings')
+      }
+
+    } catch (error) {
+      console.error('Error clearing all mappings:', error)
+      toast.error('Failed to clear mappings')
+    }
+  }
+
   const platformTitle = platform === 'github' ? 'GitHub' : 'Slack'
   const platformColor = platform === 'github' ? 'blue' : 'purple'
 
@@ -727,6 +783,15 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
                           className="text-xs"
                         >
                           🔍 Debug
+                        </Button>
+                        <Button
+                          onClick={clearAllMappings}
+                          variant="destructive"
+                          size="sm"
+                          disabled={!mappings.length}
+                        >
+                          <X className="w-4 h-4 mr-2" />
+                          Clear All ({mappings.length})
                         </Button>
                       </div>
                     )}
