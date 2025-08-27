@@ -62,40 +62,9 @@ class EnhancedGitHubMatcher:
         # Extract name parts from email
         email_parts = self._extract_name_from_email(email)
         
-        # Try strategies in order of accuracy - OPTIMIZED for speed
-        # Skip expensive strategies during analysis to improve performance
-        strategies = [
-            ("org_member_search", self._search_org_members),
-            ("exact_username_match", self._try_exact_username_patterns),
-            # Skip expensive strategies that cause slowdowns:
-            # ("commit_history", self._search_commit_history),  # Too many API calls
-            # ("fuzzy_name_match", self._fuzzy_name_match),     # Too many API calls
-        ]
-        
-        for strategy_name, strategy_func in strategies:
-            try:
-                logger.info(f"Trying {strategy_name} for {email}")
-                
-                # Add small delay to avoid hitting rate limits
-                import asyncio
-                await asyncio.sleep(0.1)  # 100ms delay between strategies
-                
-                if strategy_name == "direct_api_search":
-                    result = await strategy_func(email)
-                elif strategy_name in ["exact_username_match", "fuzzy_name_match"]:
-                    result = await strategy_func(email_parts, full_name)
-                else:
-                    result = await strategy_func(email, email_parts)
-                
-                if result:
-                    logger.info(f"✅ Found match via {strategy_name}: {email} -> {result}")
-                    self._email_cache[email_lower] = result
-                    return result
-                    
-            except Exception as e:
-                logger.error(f"Error in {strategy_name}: {e}")
-        
-        logger.warning(f"❌ No GitHub match found for {email}")
+        # OLD APPROACH DEPRECATED: This method should not be used anymore
+        # Instead use match_name_to_github() which is optimized
+        logger.warning(f"⚠️  match_email_to_github() is deprecated. Use match_name_to_github() instead for {email}")
         return None
     
     async def discover_accessible_organizations(self) -> List[str]:
@@ -476,52 +445,7 @@ class EnhancedGitHubMatcher:
         
         return True  # Default to True if we can't verify (don't be too strict)
     
-    def _extract_name_from_email(self, email: str) -> Dict[str, str]:
-        """Extract potential name components from email."""
-        local_part = email.split('@')[0]
-        
-        # Remove common prefixes/suffixes
-        for suffix in ['-rootly', '_rootly', '.rootly', '-admin', '_admin']:
-            if local_part.endswith(suffix):
-                local_part = local_part[:-len(suffix)]
-        
-        # Try different separators
-        parts = {}
-        
-        # Split by dots
-        if '.' in local_part:
-            dot_parts = local_part.split('.')
-            parts['firstname'] = dot_parts[0]
-            parts['lastname'] = dot_parts[-1] if len(dot_parts) > 1 else ''
-            parts['middlename'] = '.'.join(dot_parts[1:-1]) if len(dot_parts) > 2 else ''
-        
-        # Split by underscores
-        elif '_' in local_part:
-            underscore_parts = local_part.split('_')
-            parts['firstname'] = underscore_parts[0]
-            parts['lastname'] = underscore_parts[-1] if len(underscore_parts) > 1 else ''
-        
-        # Split by hyphens
-        elif '-' in local_part:
-            hyphen_parts = local_part.split('-')
-            parts['firstname'] = hyphen_parts[0]
-            parts['lastname'] = hyphen_parts[-1] if len(hyphen_parts) > 1 else ''
-        
-        # No separator - try camelCase
-        else:
-            # Look for capital letters
-            capitals = [(i, c) for i, c in enumerate(local_part) if c.isupper()]
-            if len(capitals) >= 2:
-                parts['firstname'] = local_part[:capitals[1][0]].lower()
-                parts['lastname'] = local_part[capitals[1][0]:].lower()
-            else:
-                parts['firstname'] = local_part
-                parts['lastname'] = ''
-        
-        parts['full'] = local_part
-        parts['email'] = email
-        
-        return parts
+    # OLD METHODS REMOVED - These are no longer used with the optimized approach
     
     async def _search_by_email_api(self, email: str) -> Optional[str]:
         """Search GitHub users by email using the search API."""
