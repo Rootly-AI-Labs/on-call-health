@@ -3,7 +3,7 @@
  * Supports both OAuth and manual token flows
  */
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -66,11 +66,45 @@ export function GitHubIntegrationCard({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showInstructions, setShowInstructions] = useState(false)
+  const [permissions, setPermissions] = useState<string[]>([])
+  const [loadingPermissions, setLoadingPermissions] = useState(false)
 
   const isValidGitHubToken = (token: string): boolean => {
     // GitHub personal access tokens start with ghp_, gho_, ghu_, ghs_, or ghr_
     return /^gh[prous]_[A-Za-z0-9]{36}$/.test(token) || /^github_pat_[A-Za-z0-9_]{22,}$/.test(token)
   }
+
+  // Fetch GitHub token permissions
+  const fetchPermissions = async () => {
+    if (!integration) return
+
+    setLoadingPermissions(true)
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) return
+
+      const response = await fetch('/api/github/token-permissions', {
+        headers: {
+          'Authorization': `Bearer ${authToken}`
+        }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setPermissions(data.permissions || [])
+      }
+    } catch (error) {
+      console.error('Failed to fetch GitHub permissions:', error)
+    } finally {
+      setLoadingPermissions(false)
+    }
+  }
+
+  useEffect(() => {
+    if (integration) {
+      fetchPermissions()
+    }
+  }, [integration])
 
   const handleOAuthConnect = async () => {
     try {
@@ -205,6 +239,45 @@ export function GitHubIntegrationCard({
               </div>
             </div>
           )}
+
+          {/* Token Permissions */}
+          <div>
+            <div className="text-sm font-medium mb-2 flex items-center space-x-2">
+              <Key className="w-4 h-4 text-gray-400" />
+              <span>Token Permissions</span>
+              {loadingPermissions && <Loader2 className="w-3 h-3 animate-spin" />}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {loadingPermissions ? (
+                <Badge variant="outline" className="text-xs">
+                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                  Loading...
+                </Badge>
+              ) : permissions.length > 0 ? (
+                permissions.map((permission) => {
+                  const isRequired = ['read:user', 'read:org', 'repo'].includes(permission)
+                  return (
+                    <Badge 
+                      key={permission} 
+                      variant={isRequired ? "default" : "outline"} 
+                      className={`text-xs ${isRequired ? 'bg-green-100 text-green-700 border-green-200' : ''}`}
+                    >
+                      {permission}
+                      {isRequired && <CheckCircle className="w-3 h-3 ml-1" />}
+                    </Badge>
+                  )
+                })
+              ) : (
+                <Badge variant="outline" className="text-xs text-red-600 border-red-200">
+                  <AlertCircle className="w-3 h-3 mr-1" />
+                  No permissions detected
+                </Badge>
+              )}
+            </div>
+            <div className="mt-1 text-xs text-gray-500">
+              Required for auto-mapping: <code className="bg-gray-100 px-1 rounded">read:user</code>, <code className="bg-gray-100 px-1 rounded">read:org</code>, <code className="bg-gray-100 px-1 rounded">repo</code>
+            </div>
+          </div>
 
           {/* Error Display */}
           {error && (
