@@ -342,6 +342,20 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
       const result = await response.json()
       console.log('✅ Auto-mapping result:', result)
       
+      // Enhanced logging for debugging
+      console.log(`📊 Mapping Summary:`)
+      console.log(`   • Total processed: ${result.total_processed}`)
+      console.log(`   • Successfully mapped: ${result.mapped}`)
+      console.log(`   • Not found: ${result.not_found}`)
+      console.log(`   • Errors: ${result.errors}`)
+      
+      if (result.results && result.results.length > 0) {
+        console.log('📋 Detailed Results:')
+        result.results.forEach((r, i) => {
+          console.log(`   ${i + 1}. ${r.email || 'No email'} → ${r.github_username || 'Not found'} (${r.status})`)
+        })
+      }
+      
       setMappingProgress({
         total: result.total_processed,
         processed: result.total_processed,
@@ -358,7 +372,10 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
         // Reload mapping data to show new mappings
         await loadMappingData()
       } else {
-        toast.info('No new mappings found')
+        const skippedMessage = result.total_processed > 0 
+          ? `Processed ${result.total_processed} users but found no valid email addresses for mapping`
+          : 'No users found to process'
+        toast.info(skippedMessage)
       }
       
     } catch (error) {
