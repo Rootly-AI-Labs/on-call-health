@@ -595,25 +595,26 @@ async def run_github_mapping(
             match_method = None
             
             try:
-                # Try email-based matching first if email exists
-                if user_email:
-                    logger.info(f"Trying email-based matching for {user_email}")
-                    github_username = await matcher.match_email_to_github(
-                        email=user_email,
-                        full_name=user_name
-                    )
-                    if github_username:
-                        match_method = "email"
-                
-                # If email matching failed and we have a name, try name-based matching
-                if not github_username and user_name:
-                    logger.info(f"Email matching failed for {user_name}, trying name-based matching")
+                # Skip email-based matching since GitHub emails are usually private
+                # Go directly to optimized name-based matching
+                if user_name:
+                    logger.info(f"Trying optimized name-based matching for '{user_name}'")
                     github_username = await matcher.match_name_to_github(
                         full_name=user_name,
                         fallback_email=user_email  # Use email as additional context if available
                     )
                     if github_username:
                         match_method = "name"
+                
+                # Only try email matching as fallback if name matching failed and we have email
+                elif user_email:
+                    logger.info(f"No name available, trying email-based matching for {user_email}")
+                    github_username = await matcher.match_email_to_github(
+                        email=user_email,
+                        full_name=user_name
+                    )
+                    if github_username:
+                        match_method = "email"
                 
                 if github_username:
                     # Use email as identifier if available, otherwise use name
@@ -626,6 +627,7 @@ async def run_github_mapping(
                         source_identifier=source_identifier,
                         target_platform="github",
                         target_identifier=github_username,
+                        created_by=current_user.id,
                         mapping_type="automated"
                     )
                     

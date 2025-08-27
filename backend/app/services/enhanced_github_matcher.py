@@ -3,6 +3,7 @@ Enhanced GitHub username matching algorithm with multiple strategies.
 """
 import re
 import logging
+import asyncio
 from typing import Optional, Dict, List, Set, Tuple
 from difflib import SequenceMatcher
 import aiohttp
