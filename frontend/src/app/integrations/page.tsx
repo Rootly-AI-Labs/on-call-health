@@ -3666,6 +3666,38 @@ export default function IntegrationsPage() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Token Permissions */}
+                  <div className="mt-6 pt-4 border-t border-green-200">
+                    <div className="text-sm font-medium mb-3 flex items-center space-x-2">
+                      <Key className="w-4 h-4 text-gray-400" />
+                      <span>Token Permissions</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {/* Placeholder permissions - will show that read:org is missing */}
+                      {['read:user', 'repo'].map((permission) => {
+                        const isRequired = ['read:user', 'read:org', 'repo'].includes(permission)
+                        return (
+                          <Badge 
+                            key={permission} 
+                            variant={isRequired ? "default" : "outline"} 
+                            className={`text-xs ${isRequired ? 'bg-green-100 text-green-700 border-green-200' : ''}`}
+                          >
+                            {permission}
+                            {isRequired && <CheckCircle className="w-3 h-3 ml-1" />}
+                          </Badge>
+                        )
+                      })}
+                      {/* Show missing read:org permission */}
+                      <Badge variant="outline" className="text-xs text-red-600 border-red-200">
+                        <AlertCircle className="w-3 h-3 mr-1" />
+                        read:org (missing)
+                      </Badge>
+                    </div>
+                    <div className="mt-2 text-xs text-gray-500">
+                      Required for auto-mapping: <code className="bg-gray-100 px-1 rounded">read:user</code>, <code className="bg-gray-100 px-1 rounded text-red-600">read:org</code>, <code className="bg-gray-100 px-1 rounded">repo</code>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             )}
