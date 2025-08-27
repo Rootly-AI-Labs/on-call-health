@@ -98,9 +98,51 @@ class EnhancedGitHubMatcher:
         logger.warning(f"❌ No GitHub match found for {email}")
         return None
     
+    async def discover_accessible_organizations(self) -> List[str]:
+        """
+        Discover GitHub organizations that the token has access to.
+        
+        Returns:
+            List of organization names the token can access
+        """
+        try:
+            async with aiohttp.ClientSession() as session:
+                # Get organizations the authenticated user belongs to
+                orgs_url = "https://api.github.com/user/orgs"
+                async with session.get(orgs_url, headers=self.headers) as resp:
+                    if resp.status == 200:
+                        orgs_data = await resp.json()
+                        org_names = [org['login'] for org in orgs_data]
+                        logger.info(f"🎯 Token has access to organizations: {org_names}")
+                        return org_names
+                    else:
+                        logger.warning(f"Failed to fetch user organizations: {resp.status}")
+                        
+                # If user orgs fails, try to get organizations the token can access via user
+                user_url = "https://api.github.com/user"
+                async with session.get(user_url, headers=self.headers) as resp:
+                    if resp.status == 200:
+                        user_data = await resp.json()
+                        username = user_data.get('login')
+                        if username:
+                            # Get organizations for this user
+                            user_orgs_url = f"https://api.github.com/users/{username}/orgs"
+                            async with session.get(user_orgs_url, headers=self.headers) as resp:
+                                if resp.status == 200:
+                                    orgs_data = await resp.json()
+                                    org_names = [org['login'] for org in orgs_data]
+                                    logger.info(f"🎯 Found user organizations: {org_names}")
+                                    return org_names
+                                    
+        except Exception as e:
+            logger.error(f"Error discovering organizations: {e}")
+            
+        logger.warning("Could not discover organizations from token")
+        return []
+    
     async def match_name_to_github(self, full_name: str, fallback_email: Optional[str] = None) -> Optional[str]:
         """
-        Match a full name to GitHub username using name-based strategies.
+        Match a full name to GitHub username by first fetching org members then matching.
         
         Args:
             full_name: Full name to match (e.g., "Spencer Cheng")
@@ -116,40 +158,111 @@ class EnhancedGitHubMatcher:
         full_name_clean = full_name.strip()
         logger.info(f"🔍 Starting name-based matching for: '{full_name_clean}'")
         
-        # Extract name parts for pattern matching
-        name_parts = self._extract_name_parts_from_full_name(full_name_clean)
-        
-        # Try name-based strategies
-        strategies = [
-            ("exact_name_patterns", self._try_name_username_patterns),
-            ("fuzzy_name_org_search", self._fuzzy_name_match_in_orgs),
-            ("github_profile_search", self._search_github_by_name),
-        ]
-        
-        for strategy_name, strategy_func in strategies:
-            try:
-                logger.info(f"Trying {strategy_name} for '{full_name_clean}'")
+        # OPTIMIZED APPROACH: Get all org members first, then match against them
+        try:
+            async with aiohttp.ClientSession() as session:
+                # Get all organization members
+                all_members = await self._get_all_org_members_with_profiles(session)
                 
-                # Add small delay to avoid hitting rate limits
-                import asyncio
-                await asyncio.sleep(0.1)
+                if not all_members:
+                    logger.warning("No organization members found to match against")
+                    return None
                 
-                result = await strategy_func(name_parts, full_name_clean, fallback_email)
+                logger.info(f"🎯 Matching '{full_name_clean}' against {len(all_members)} org members")
+                
+                # Try different matching strategies against the known member list
+                result = await self._match_name_against_members(full_name_clean, all_members, fallback_email)
                 
                 if result:
-                    logger.info(f"✅ Found match via {strategy_name}: '{full_name_clean}' -> {result}")
+                    logger.info(f"✅ Found match: '{full_name_clean}' -> {result}")
                     return result
                     
-            except Exception as e:
-                logger.error(f"Error in {strategy_name}: {e}")
+        except Exception as e:
+            logger.error(f"Error in optimized name matching: {e}")
         
         logger.warning(f"❌ No GitHub match found for name: '{full_name_clean}'")
         return None
     
+    async def _get_all_org_members_with_profiles(self, session) -> List[Dict]:
+        """Get all organization members with their profile information."""
+        all_members = []
+        
+        try:
+            for org in self.organizations:
+                logger.info(f"🔄 Fetching members from organization: {org}")
+                
+                # Get org members list
+                if org not in self._org_members_cache:
+                    members = await self._get_org_members(org, session)
+                    self._org_members_cache[org] = members
+                
+                # Get profiles for each member
+                for username in self._org_members_cache[org]:
+                    profile = await self._get_github_user_profile(username, session)
+                    if profile:
+                        all_members.append({
+                            'username': username,
+                            'name': profile.get('name', '').lower() if profile.get('name') else '',
+                            'email': profile.get('email', '').lower() if profile.get('email') else '',
+                            'organization': org
+                        })
+                        
+                logger.info(f"✅ Loaded {len(self._org_members_cache[org])} members from {org}")
+                
+        except Exception as e:
+            logger.error(f"Error fetching org members: {e}")
+            
+        return all_members
+    
+    async def _match_name_against_members(self, full_name: str, members: List[Dict], fallback_email: Optional[str] = None) -> Optional[str]:
+        """Match a name against the list of organization members."""
+        full_name_lower = full_name.lower()
+        
+        # Extract name parts for matching
+        name_parts = self._extract_name_parts_from_full_name(full_name)
+        first_name = name_parts.get('first', '').lower()
+        last_name = name_parts.get('last', '').lower()
+        
+        candidates = []
+        
+        # Strategy 1: Exact name match
+        for member in members:
+            if member['name'] and member['name'] == full_name_lower:
+                logger.info(f"🎯 EXACT name match: '{full_name}' == '{member['name']}' -> {member['username']}")
+                return member['username']
+        
+        # Strategy 2: Email match (if fallback email provided)
+        if fallback_email:
+            fallback_email_lower = fallback_email.lower()
+            for member in members:
+                if member['email'] and member['email'] == fallback_email_lower:
+                    logger.info(f"🎯 EMAIL match: {fallback_email} -> {member['username']}")
+                    return member['username']
+        
+        # Strategy 3: Fuzzy name matching
+        for member in members:
+            if not member['name']:
+                continue
+                
+            # Calculate similarity
+            similarity = self._calculate_name_similarity(full_name_lower, member['name'], first_name, last_name)
+            
+            if similarity > 0.7:  # 70% similarity threshold
+                candidates.append((member['username'], similarity, member['name']))
+        
+        # Return best fuzzy match if found
+        if candidates:
+            candidates.sort(key=lambda x: x[1], reverse=True)
+            best_match = candidates[0]
+            logger.info(f"🎯 FUZZY match: '{full_name}' ~= '{best_match[2]}' (score: {best_match[1]:.2f}) -> {best_match[0]}")
+            return best_match[0]
+            
+        return None
+    
     def _extract_name_parts_from_full_name(self, full_name: str) -> Dict[str, str]:
         """Extract name components from full name."""
-        # Clean the name
-        clean_name = re.sub(r'[^\w\s-.]', '', full_name.strip())
+        # Clean the name (allow word characters, spaces, hyphens, and dots)
+        clean_name = re.sub(r'[^\w\s\-\.]', '', full_name.strip())
         parts = clean_name.split()
         
         if len(parts) == 0:

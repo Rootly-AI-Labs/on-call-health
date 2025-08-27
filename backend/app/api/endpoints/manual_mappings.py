@@ -564,17 +564,25 @@ async def run_github_mapping(
             if user_email or user_name:
                 unmapped_users.append(user)
         
-        # Get GitHub organizations from integration settings
-        github_orgs = []
-        if hasattr(github_integration, 'github_organizations') and github_integration.github_organizations:
-            import json
-            try:
-                github_orgs = json.loads(github_integration.github_organizations)
-            except:
-                github_orgs = ["rootly-hq"]  # Default fallback
-        
-        if not github_orgs:
-            github_orgs = ["rootly-hq"]  # Default if not configured
+        # Discover GitHub organizations from the token instead of hardcoding
+        try:
+            from ...services.enhanced_github_matcher import EnhancedGitHubMatcher
+            temp_matcher = EnhancedGitHubMatcher(github_token, [])  # Empty org list initially
+            github_orgs = await temp_matcher.discover_accessible_organizations()
+            logger.info(f"🔍 Discovered {len(github_orgs)} accessible organizations: {github_orgs}")
+        except Exception as e:
+            logger.error(f"Failed to discover organizations from token, using fallback: {e}")
+            # Fallback to checking integration settings or defaults
+            github_orgs = []
+            if hasattr(github_integration, 'github_organizations') and github_integration.github_organizations:
+                import json
+                try:
+                    github_orgs = json.loads(github_integration.github_organizations)
+                except:
+                    github_orgs = ["Rootly-AI-Labs", "rootlyhq"]
+            
+            if not github_orgs:
+                github_orgs = ["Rootly-AI-Labs", "rootlyhq"]
             
         # Run matching process
         matcher = EnhancedGitHubMatcher(github_token, github_orgs)
