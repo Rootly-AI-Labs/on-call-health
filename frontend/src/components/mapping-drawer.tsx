@@ -603,6 +603,8 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
   }
 
   // Clear all mappings function
+  const [clearingAllMappings, setClearingAllMappings] = useState(false)
+  
   const clearAllMappings = async () => {
     if (!mappings.length) {
       toast.info('No mappings to clear')
@@ -611,50 +613,82 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
 
     // Show confirmation dialog
     const confirmed = window.confirm(
-      `Are you sure you want to remove ALL ${mappings.length} GitHub mappings? This action cannot be undone.`
+      `Are you sure you want to remove ALL ${mappings.length} GitHub mappings?\n\nThis action cannot be undone and will remove all user mappings from your account.`
     )
     
     if (!confirmed) return
+
+    setClearingAllMappings(true)
 
     try {
       const authToken = localStorage.getItem('auth_token')
       if (!authToken) {
         toast.error('Authentication required')
+        setClearingAllMappings(false)
         return
       }
+
+      console.log(`🗑️ Starting bulk removal of ${mappings.length} mappings`)
 
       // Remove each mapping individually
       const removePromises = mappings.map(mapping => 
         fetch(`${API_BASE}/integrations/manual-mappings/${mapping.id}`, {
           method: 'DELETE',
           headers: {
-            'Authorization': `Bearer ${authToken}`
+            'Authorization': `Bearer ${authToken}`,
+            'Content-Type': 'application/json'
           }
-        })
+        }).then(response => ({
+          id: mapping.id,
+          email: mapping.source_identifier,
+          success: response.ok,
+          status: response.status,
+          response
+        }))
       )
 
       toast.info(`Removing ${mappings.length} mappings...`)
       
-      const responses = await Promise.allSettled(removePromises)
+      const results = await Promise.allSettled(removePromises)
       
-      // Count successful removals
-      const successful = responses.filter(result => 
-        result.status === 'fulfilled' && result.value.ok
-      ).length
-      
-      const failed = mappings.length - successful
+      // Count successful and failed removals
+      let successful = 0
+      let failed = 0
+      const errors = []
 
+      results.forEach((result, index) => {
+        if (result.status === 'fulfilled' && result.value.success) {
+          successful++
+          console.log(`✅ Removed mapping ${result.value.id} (${result.value.email})`)
+        } else {
+          failed++
+          const error = result.status === 'fulfilled' 
+            ? `${result.value.email}: HTTP ${result.value.status}`
+            : `${mappings[index].source_identifier}: ${result.reason}`
+          errors.push(error)
+          console.log(`❌ Failed to remove mapping: ${error}`)
+        }
+      })
+
+      // Show results
       if (successful > 0) {
         toast.success(`Successfully removed ${successful} mappings${failed > 0 ? ` (${failed} failed)` : ''}`)
         await loadMappingData() // Refresh the list
         onRefresh?.()
       } else {
-        toast.error('Failed to remove mappings')
+        toast.error(`Failed to remove all ${mappings.length} mappings`)
+      }
+
+      // Log any errors for debugging
+      if (errors.length > 0) {
+        console.error('❌ Clear all mappings errors:', errors)
       }
 
     } catch (error) {
-      console.error('Error clearing all mappings:', error)
-      toast.error('Failed to clear mappings')
+      console.error('❌ Error clearing all mappings:', error)
+      toast.error('Network error occurred while clearing mappings')
+    } finally {
+      setClearingAllMappings(false)
     }
   }
 
@@ -788,10 +822,19 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
                           onClick={clearAllMappings}
                           variant="destructive"
                           size="sm"
-                          disabled={!mappings.length}
+                          disabled={!mappings.length || clearingAllMappings}
                         >
-                          <X className="w-4 h-4 mr-2" />
-                          Clear All ({mappings.length})
+                          {clearingAllMappings ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Removing...
+                            </>
+                          ) : (
+                            <>
+                              <X className="w-4 h-4 mr-2" />
+                              Clear All ({mappings.length})
+                            </>
+                          )}
                         </Button>
                       </div>
                     )}
