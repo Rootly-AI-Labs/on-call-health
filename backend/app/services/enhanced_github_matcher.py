@@ -203,11 +203,22 @@ class EnhancedGitHubMatcher:
         
         candidates = []
         
-        # Strategy 1: Exact name match
+        # Strategy 1: High similarity name matching (instead of exact)
         for member in members:
-            if member['name'] and member['name'] == full_name_lower:
-                logger.info(f"🎯 EXACT name match: '{full_name}' == '{member['name']}' -> {member['username']}")
+            if not member['name']:
+                continue
+                
+            # Calculate similarity between names
+            similarity = self._calculate_name_similarity(full_name_lower, member['name'], first_name, last_name)
+            
+            # Very high similarity (95%+) - likely the same person
+            if similarity > 0.95:
+                logger.info(f"🎯 HIGH SIMILARITY match: '{full_name}' ~= '{member['name']}' (score: {similarity:.2f}) -> {member['username']}")
                 return member['username']
+            
+            # Good similarity for candidate list
+            elif similarity > 0.6:
+                candidates.append((member['username'], similarity, member['name']))
         
         # Strategy 2: Username pattern matching (based on name parts)
         if first_name and last_name:
@@ -228,23 +239,30 @@ class EnhancedGitHubMatcher:
                         logger.info(f"🎯 USERNAME PATTERN match: '{full_name}' -> {pattern} -> {member['username']}")
                         return member['username']
         
-        # Strategy 3: Fuzzy name matching
-        for member in members:
-            if not member['name']:
-                continue
-                
-            # Calculate similarity
-            similarity = self._calculate_name_similarity(full_name_lower, member['name'], first_name, last_name)
-            
-            if similarity > 0.7:  # 70% similarity threshold
-                candidates.append((member['username'], similarity, member['name']))
-        
-        # Return best fuzzy match if found
+        # Strategy 3: Return best candidate if we have good matches
         if candidates:
+            # Sort by similarity score
             candidates.sort(key=lambda x: x[1], reverse=True)
+            
+            # Check if we have a clear winner (significantly better than others)
             best_match = candidates[0]
-            logger.info(f"🎯 FUZZY match: '{full_name}' ~= '{best_match[2]}' (score: {best_match[1]:.2f}) -> {best_match[0]}")
-            return best_match[0]
+            best_score = best_match[1]
+            
+            # If the best match is significantly better than the second best, return it
+            if len(candidates) == 1 or best_score - candidates[1][1] > 0.1:
+                if best_score > 0.7:  # Only return if good enough score
+                    logger.info(f"🎯 BEST CANDIDATE match: '{full_name}' ~= '{best_match[2]}' (score: {best_score:.2f}) -> {best_match[0]}")
+                    return best_match[0]
+            
+            # If we have multiple similar candidates, log them for debugging
+            logger.info(f"🤔 Multiple candidates for '{full_name}':")
+            for username, score, name in candidates[:3]:  # Show top 3
+                logger.info(f"   - {username}: '{name}' (score: {score:.2f})")
+                
+            # Return the best one if it's above threshold
+            if best_score > 0.8:  # Higher threshold for ambiguous cases
+                logger.info(f"🎯 AMBIGUOUS but choosing best: '{full_name}' -> {best_match[0]} (score: {best_score:.2f})")
+                return best_match[0]
             
         return None
     
@@ -417,19 +435,57 @@ class EnhancedGitHubMatcher:
         return None
     
     def _calculate_name_similarity(self, full_name1: str, full_name2: str, firstname: str = "", lastname: str = "") -> float:
-        """Calculate similarity between two full names."""
-        # Direct string similarity
-        direct_sim = SequenceMatcher(None, full_name1, full_name2).ratio()
+        """Calculate similarity between two full names with multiple strategies."""
+        if not full_name1 or not full_name2:
+            return 0.0
+            
+        # Normalize names for comparison
+        name1_clean = full_name1.lower().strip()
+        name2_clean = full_name2.lower().strip()
         
-        # Check if first/last names are contained in the GitHub name
-        firstname_match = firstname in full_name2 if firstname else 0
-        lastname_match = lastname in full_name2 if lastname else 0
+        # Strategy 1: Direct string similarity
+        direct_sim = SequenceMatcher(None, name1_clean, name2_clean).ratio()
         
-        # Combine different similarity measures
-        name_component_score = (firstname_match + lastname_match) / 2 if (firstname or lastname) else 0
+        # Strategy 2: Component-based matching
+        component_score = 0.0
+        if firstname and lastname:
+            # Check if both first and last names are present
+            has_firstname = firstname in name2_clean
+            has_lastname = lastname in name2_clean
+            
+            if has_firstname and has_lastname:
+                component_score = 1.0  # Both names found
+            elif has_firstname or has_lastname:
+                component_score = 0.6  # One name found
         
-        # Return weighted average
-        return (direct_sim * 0.6) + (name_component_score * 0.4)
+        # Strategy 3: Word-based similarity (handles reordering)
+        words1 = set(name1_clean.split())
+        words2 = set(name2_clean.split())
+        if words1 and words2:
+            word_intersection = len(words1.intersection(words2))
+            word_union = len(words1.union(words2))
+            word_similarity = word_intersection / word_union if word_union > 0 else 0
+        else:
+            word_similarity = 0
+        
+        # Strategy 4: Initial matching (handles abbreviated names like "Spencer C.")
+        initial_score = 0.0
+        if firstname and len(name2_clean.split()) >= 2:
+            name2_parts = name2_clean.split()
+            if (firstname == name2_parts[0] and 
+                lastname and len(name2_parts[1]) == 1 and 
+                lastname.startswith(name2_parts[1])):
+                initial_score = 0.8  # "Spencer Cheng" matches "spencer c"
+        
+        # Combine scores with weights
+        final_score = (
+            direct_sim * 0.3 +           # Direct string similarity
+            component_score * 0.4 +      # Component presence  
+            word_similarity * 0.2 +      # Word-based similarity
+            initial_score * 0.1          # Initial matching bonus
+        )
+        
+        return min(final_score, 1.0)  # Cap at 1.0
     
     async def _verify_username_matches_name(self, username: str, full_name: str) -> bool:
         """Verify that a username reasonably matches the given full name."""
