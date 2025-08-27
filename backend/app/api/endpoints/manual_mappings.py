@@ -521,8 +521,10 @@ async def run_github_mapping(
                 client = RootlyAPIClient(integration.api_token)
                 users_data = await client.get_users()
                 for user in users_data:
-                    email = user.get("email")
-                    name = user.get("full_name") or user.get("name")
+                    # Extract from nested attributes structure
+                    attributes = user.get("attributes", {})
+                    email = attributes.get("email")
+                    name = attributes.get("full_name") or attributes.get("name")
                     
                     # Include users with either email OR name
                     if (email and email.strip()) or (name and name.strip()):
