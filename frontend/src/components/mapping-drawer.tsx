@@ -317,6 +317,8 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
         return
       }
       
+      console.log('🔄 Starting GitHub auto-mapping...')
+      
       const response = await fetch(`${API_BASE}/integrations/manual-mappings/run-github-mapping`, {
         method: 'POST',
         headers: {
@@ -325,12 +327,16 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
         }
       })
       
+      console.log('🔄 Auto-mapping response status:', response.status)
+      
       if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.detail || 'Failed to run auto-mapping')
+        const error = await response.json().catch(() => ({}))
+        console.error('❌ Auto-mapping error:', error)
+        throw new Error(error.detail || error.message || `HTTP ${response.status}: Failed to run auto-mapping`)
       }
       
       const result = await response.json()
+      console.log('✅ Auto-mapping result:', result)
       
       setMappingProgress({
         total: result.total_processed,
