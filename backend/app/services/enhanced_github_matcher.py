@@ -11,6 +11,10 @@ from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
+# Global cache to persist across matcher instances
+_GLOBAL_ORG_CACHE = {}
+_GLOBAL_MEMBER_PROFILES_CACHE = {}
+
 class EnhancedGitHubMatcher:
     """
     Enhanced matcher that uses multiple strategies to correlate emails to GitHub usernames.
@@ -32,10 +36,10 @@ class EnhancedGitHubMatcher:
             'User-Agent': 'Rootly-Burnout-Detector'
         }
         
-        # Cache to avoid repeated API calls
+        # Use global cache to persist across instances
         self._user_cache = {}
         self._email_cache = {}
-        self._org_members_cache = {}
+        self._org_members_cache = _GLOBAL_ORG_CACHE
         
     async def match_email_to_github(self, email: str, full_name: Optional[str] = None) -> Optional[str]:
         """
@@ -132,14 +136,15 @@ class EnhancedGitHubMatcher:
             # Add timeout to prevent connection issues
             timeout = aiohttp.ClientTimeout(total=30, connect=10)
             async with aiohttp.ClientSession(timeout=timeout) as session:
-                # Get all organization members
+                # Get all organization members (with retry logic)
                 all_members = await self._get_all_org_members_with_profiles(session)
                 
                 if not all_members:
-                    logger.warning("No organization members found to match against")
+                    logger.warning(f"No organization members found to match against for '{full_name_clean}'. Orgs: {self.organizations}")
+                    logger.warning(f"Org cache status: {[(org, len(members) if members else 0) for org, members in self._org_members_cache.items()]}")
                     return None
                 
-                logger.info(f"🎯 Matching '{full_name_clean}' against {len(all_members)} org members")
+                logger.info(f"🎯 Matching '{full_name_clean}' against {len(all_members)} org members with profiles")
                 
                 # Try different matching strategies against the known member list
                 result = await self._match_name_against_members(full_name_clean, all_members, fallback_email)
@@ -159,36 +164,56 @@ class EnhancedGitHubMatcher:
         all_members = []
         
         try:
+            if not self.organizations:
+                logger.warning("No organizations configured for member fetching")
+                return all_members
+                
             for org in self.organizations:
-                logger.info(f"🔄 Fetching members from organization: {org}")
-                
-                # Get org members list
-                if org not in self._org_members_cache:
-                    members = await self._get_org_members(org, session)
-                    self._org_members_cache[org] = members
-                
-                # Get profiles for each member (with rate limiting)
-                member_count = 0
-                for username in self._org_members_cache[org]:
-                    # Add rate limiting to prevent API overload
-                    if member_count > 0 and member_count % 5 == 0:
-                        await asyncio.sleep(1)  # Pause every 5 requests
+                try:
+                    logger.info(f"🔄 Fetching members from organization: {org}")
                     
-                    profile = await self._get_github_user_profile(username, session)
-                    if profile:
-                        # Only store name, skip email since GitHub emails are often private
-                        profile_name = profile.get('name', '') or ''
-                        all_members.append({
-                            'username': username,
-                            'name': profile_name.lower() if profile_name else '',
-                            'organization': org
-                        })
-                    member_count += 1
-                        
-                logger.info(f"✅ Loaded {len(self._org_members_cache[org])} members from {org}")
+                    # Get org members list
+                    if org not in self._org_members_cache:
+                        members = await self._get_org_members(org, session)
+                        self._org_members_cache[org] = members
+                        logger.info(f"📥 Cached {len(members)} usernames for {org}")
+                    else:
+                        logger.info(f"📦 Using cached members for {org}: {len(self._org_members_cache[org])} members")
+                    
+                    # Get profiles for each member (with rate limiting)
+                    member_count = 0
+                    profiles_loaded = 0
+                    
+                    for username in self._org_members_cache[org]:
+                        try:
+                            # Add rate limiting to prevent API overload
+                            if member_count > 0 and member_count % 5 == 0:
+                                await asyncio.sleep(1)  # Pause every 5 requests
+                            
+                            profile = await self._get_github_user_profile(username, session)
+                            if profile:
+                                # Only store name, skip email since GitHub emails are often private
+                                profile_name = profile.get('name', '') or ''
+                                all_members.append({
+                                    'username': username,
+                                    'name': profile_name.lower() if profile_name else '',
+                                    'organization': org
+                                })
+                                profiles_loaded += 1
+                            member_count += 1
+                            
+                        except Exception as e:
+                            logger.debug(f"Error fetching profile for {username}: {e}")
+                            continue  # Skip this user and continue with others
+                            
+                    logger.info(f"✅ Loaded {profiles_loaded} profiles from {org} ({member_count} total members)")
+                    
+                except Exception as org_error:
+                    logger.error(f"Error fetching members for org {org}: {org_error}")
+                    continue  # Skip this org and continue with others
                 
         except Exception as e:
-            logger.error(f"Error fetching org members: {e}")
+            logger.error(f"Critical error in member fetching: {e}")
             
         return all_members
     
