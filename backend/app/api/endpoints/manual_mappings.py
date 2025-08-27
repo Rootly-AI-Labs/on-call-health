@@ -522,17 +522,19 @@ async def run_github_mapping(
                 users_data = await client.get_users()
                 for user in users_data:
                     email = user.get("email")
-                    # Skip users without valid email addresses
-                    if not email or not email.strip():
-                        logger.warning(f"Skipping user {user.get('name', 'Unknown')} - no email address")
+                    name = user.get("full_name") or user.get("name")
+                    
+                    # Include users with either email OR name
+                    if (email and email.strip()) or (name and name.strip()):
+                        all_users.append({
+                            "email": email.strip() if email else None,
+                            "name": name.strip() if name else None,
+                            "platform": "rootly",
+                            "integration_id": integration.id
+                        })
+                    else:
+                        logger.warning(f"Skipping user - no email or name: {user}")
                         continue
-                        
-                    all_users.append({
-                        "email": email.strip(),
-                        "name": user.get("full_name") or user.get("name"),
-                        "platform": "rootly",
-                        "integration_id": integration.id
-                    })
             # TODO: Add PagerDuty support
         
         # Get existing mappings
@@ -540,10 +542,25 @@ async def run_github_mapping(
             user_id=current_user.id,
             target_platform="github"
         )
-        mapped_emails = {m.source_identifier for m in existing_mappings if m.source_platform == "rootly"}
+        mapped_identifiers = {m.source_identifier for m in existing_mappings if m.source_platform == "rootly"}
         
-        # Filter unmapped users (with valid emails)
-        unmapped_users = [u for u in all_users if u["email"] and u["email"] not in mapped_emails]
+        # Filter unmapped users (check both email and name as identifiers)
+        unmapped_users = []
+        for user in all_users:
+            user_email = user.get("email")
+            user_name = user.get("name")
+            
+            # Skip if already mapped by email
+            if user_email and user_email in mapped_identifiers:
+                continue
+                
+            # Skip if already mapped by name (fallback identifier)
+            if user_name and user_name in mapped_identifiers:
+                continue
+                
+            # Include if has either email or name
+            if user_email or user_name:
+                unmapped_users.append(user)
         
         # Get GitHub organizations from integration settings
         github_orgs = []
@@ -562,45 +579,69 @@ async def run_github_mapping(
         results = []
         
         for i, user in enumerate(unmapped_users):
+            user_email = user.get("email")
+            user_name = user.get("name")
+            github_username = None
+            match_method = None
+            
             try:
-                # Send progress update via SSE or WebSocket (future enhancement)
-                github_username = await matcher.match_email_to_github(
-                    email=user["email"],
-                    full_name=user["name"]
-                )
+                # Try email-based matching first if email exists
+                if user_email:
+                    logger.info(f"Trying email-based matching for {user_email}")
+                    github_username = await matcher.match_email_to_github(
+                        email=user_email,
+                        full_name=user_name
+                    )
+                    if github_username:
+                        match_method = "email"
+                
+                # If email matching failed and we have a name, try name-based matching
+                if not github_username and user_name:
+                    logger.info(f"Email matching failed for {user_name}, trying name-based matching")
+                    github_username = await matcher.match_name_to_github(
+                        full_name=user_name,
+                        fallback_email=user_email  # Use email as additional context if available
+                    )
+                    if github_username:
+                        match_method = "name"
                 
                 if github_username:
+                    # Use email as identifier if available, otherwise use name
+                    source_identifier = user_email if user_email else user_name
+                    
                     # Create mapping
                     service.create_mapping(
                         user_id=current_user.id,
                         source_platform=user["platform"],
-                        source_identifier=user["email"],
+                        source_identifier=source_identifier,
                         target_platform="github",
                         target_identifier=github_username,
                         mapping_type="automated"
                     )
                     
                     results.append({
-                        "email": user["email"],
-                        "name": user["name"],
+                        "email": user_email,
+                        "name": user_name,
                         "github_username": github_username,
                         "status": "mapped",
-                        "platform": user["platform"]
+                        "platform": user["platform"],
+                        "match_method": match_method
                     })
                 else:
                     results.append({
-                        "email": user["email"],
-                        "name": user["name"],
+                        "email": user_email,
+                        "name": user_name,
                         "github_username": None,
                         "status": "not_found",
                         "platform": user["platform"]
                     })
                     
             except Exception as e:
-                logger.error(f"Error mapping {user['email']}: {e}")
+                identifier = user_email or user_name or "unknown user"
+                logger.error(f"Error mapping {identifier}: {e}")
                 results.append({
-                    "email": user["email"],
-                    "name": user["name"],
+                    "email": user_email,
+                    "name": user_name,
                     "github_username": None,
                     "status": "error",
                     "error": str(e),

@@ -87,14 +87,25 @@ class GitHubCollector:
             else:
                 logger.warning(f"No predefined mapping found for {email}")
             
-            # THIRD: Use enhanced matching algorithm (FAST MODE for analysis)
+            # THIRD: Use enhanced matching algorithm with name-based fallback
             try:
                 from .enhanced_github_matcher import EnhancedGitHubMatcher
                 matcher = EnhancedGitHubMatcher(token, self.organizations)
+                
+                # Try email-based matching first
                 username = await matcher.match_email_to_github(email, full_name)
                 if username:
-                    logger.info(f"Found GitHub correlation via ENHANCED matching: {email} -> {username}")
+                    logger.info(f"Found GitHub correlation via ENHANCED email matching: {email} -> {username}")
                     return username
+                
+                # If email matching failed and we have a name, try name-based matching
+                if not username and full_name:
+                    logger.info(f"Email matching failed for {email}, trying name-based matching for '{full_name}'")
+                    username = await matcher.match_name_to_github(full_name, fallback_email=email)
+                    if username:
+                        logger.info(f"Found GitHub correlation via ENHANCED name matching: '{full_name}' -> {username}")
+                        return username
+                
             except Exception as e:
                 logger.warning(f"Enhanced matcher failed, falling back to legacy: {e}")
                 # Don't continue with expensive legacy approaches during analysis

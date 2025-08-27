@@ -98,6 +98,251 @@ class EnhancedGitHubMatcher:
         logger.warning(f"❌ No GitHub match found for {email}")
         return None
     
+    async def match_name_to_github(self, full_name: str, fallback_email: Optional[str] = None) -> Optional[str]:
+        """
+        Match a full name to GitHub username using name-based strategies.
+        
+        Args:
+            full_name: Full name to match (e.g., "Spencer Cheng")
+            fallback_email: Optional email for additional context
+            
+        Returns:
+            GitHub username if found, None otherwise
+        """
+        if not full_name or not isinstance(full_name, str):
+            logger.warning(f"Invalid name provided: {full_name}")
+            return None
+            
+        full_name_clean = full_name.strip()
+        logger.info(f"🔍 Starting name-based matching for: '{full_name_clean}'")
+        
+        # Extract name parts for pattern matching
+        name_parts = self._extract_name_parts_from_full_name(full_name_clean)
+        
+        # Try name-based strategies
+        strategies = [
+            ("exact_name_patterns", self._try_name_username_patterns),
+            ("fuzzy_name_org_search", self._fuzzy_name_match_in_orgs),
+            ("github_profile_search", self._search_github_by_name),
+        ]
+        
+        for strategy_name, strategy_func in strategies:
+            try:
+                logger.info(f"Trying {strategy_name} for '{full_name_clean}'")
+                
+                # Add small delay to avoid hitting rate limits
+                import asyncio
+                await asyncio.sleep(0.1)
+                
+                result = await strategy_func(name_parts, full_name_clean, fallback_email)
+                
+                if result:
+                    logger.info(f"✅ Found match via {strategy_name}: '{full_name_clean}' -> {result}")
+                    return result
+                    
+            except Exception as e:
+                logger.error(f"Error in {strategy_name}: {e}")
+        
+        logger.warning(f"❌ No GitHub match found for name: '{full_name_clean}'")
+        return None
+    
+    def _extract_name_parts_from_full_name(self, full_name: str) -> Dict[str, str]:
+        """Extract name components from full name."""
+        # Clean the name
+        clean_name = re.sub(r'[^\w\s-.]', '', full_name.strip())
+        parts = clean_name.split()
+        
+        if len(parts) == 0:
+            return {}
+        elif len(parts) == 1:
+            return {
+                'first': parts[0].lower(),
+                'last': '',
+                'full_parts': parts
+            }
+        else:
+            return {
+                'first': parts[0].lower(),
+                'last': parts[-1].lower(),
+                'middle': ' '.join(parts[1:-1]).lower() if len(parts) > 2 else '',
+                'full_parts': parts
+            }
+    
+    async def _try_name_username_patterns(self, name_parts: Dict[str, str], full_name: str, fallback_email: Optional[str] = None) -> Optional[str]:
+        """Try common username patterns based on the full name."""
+        if not name_parts or not name_parts.get('first'):
+            return None
+            
+        firstname = name_parts.get('first', '')
+        lastname = name_parts.get('last', '')
+        
+        patterns = []
+        
+        if firstname and lastname:
+            patterns.extend([
+                f"{firstname}{lastname}",           # spencercheng
+                f"{firstname}.{lastname}",          # spencer.cheng
+                f"{firstname}-{lastname}",          # spencer-cheng  
+                f"{firstname}_{lastname}",          # spencer_cheng
+                f"{firstname[0]}{lastname}",        # scheng
+                f"{firstname}{lastname[0]}",        # spencerc
+                f"{lastname}{firstname}",           # chengspencer
+                f"{firstname[0]}.{lastname}",       # s.cheng
+                f"{firstname}.{lastname[0]}",       # spencer.c
+            ])
+        
+        if firstname:
+            patterns.extend([
+                firstname,                          # spencer
+                f"{firstname}dev",                  # spencerdev
+                f"{firstname}code",                 # spencercode
+                f"{firstname}123",                  # spencer123
+                f"{firstname}-dev",                 # spencer-dev
+            ])
+        
+        # Remove duplicates and empty strings
+        patterns = list(filter(None, list(dict.fromkeys(patterns))))
+        
+        # Check each pattern - limit for performance
+        for pattern in patterns[:8]:  # Limit to 8 API calls max
+            if await self._check_github_user_exists(pattern):
+                # Verify user is in our organizations
+                if await self._verify_user_in_organizations(pattern):
+                    # Optional: Additional verification using name similarity
+                    if await self._verify_username_matches_name(pattern, full_name):
+                        return pattern
+                
+        return None
+    
+    async def _fuzzy_name_match_in_orgs(self, name_parts: Dict[str, str], full_name: str, fallback_email: Optional[str] = None) -> Optional[str]:
+        """Search organization members using fuzzy name matching."""
+        if not self.organizations or not name_parts.get('first'):
+            return None
+            
+        try:
+            async with aiohttp.ClientSession() as session:
+                all_members = set()
+                
+                # Get all organization members
+                for org in self.organizations:
+                    if org not in self._org_members_cache:
+                        members = await self._get_org_members(org, session)
+                        self._org_members_cache[org] = members
+                    all_members.update(self._org_members_cache[org])
+                
+                if not all_members:
+                    return None
+                
+                # Get actual GitHub profiles to compare names
+                firstname = name_parts.get('first', '').lower()
+                lastname = name_parts.get('last', '').lower()
+                candidates = []
+                
+                for username in all_members:
+                    # Get user profile to check name
+                    user_profile = await self._get_github_user_profile(username, session)
+                    if not user_profile:
+                        continue
+                        
+                    github_name = user_profile.get('name', '').lower()
+                    if not github_name:
+                        continue
+                    
+                    # Calculate name similarity
+                    similarity_score = self._calculate_name_similarity(
+                        full_name.lower(), 
+                        github_name,
+                        firstname,
+                        lastname
+                    )
+                    
+                    if similarity_score > 0.6:  # 60% similarity threshold
+                        candidates.append((username, similarity_score, github_name))
+                
+                # Sort by similarity and return best match
+                if candidates:
+                    candidates.sort(key=lambda x: x[1], reverse=True)
+                    best_match = candidates[0]
+                    logger.info(f"🎯 Best name match: {best_match[0]} (score: {best_match[1]:.2f}, github_name: '{best_match[2]}')")
+                    return best_match[0]
+                        
+        except Exception as e:
+            logger.error(f"Error in fuzzy name match: {e}")
+            
+        return None
+    
+    async def _search_github_by_name(self, name_parts: Dict[str, str], full_name: str, fallback_email: Optional[str] = None) -> Optional[str]:
+        """Search GitHub users by name using the search API."""
+        try:
+            async with aiohttp.ClientSession() as session:
+                # Search for users by name
+                search_query = full_name.replace(' ', '+')
+                search_url = f"https://api.github.com/search/users?q={search_query}+in:fullname"
+                
+                async with session.get(search_url, headers=self.headers) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        if data.get('total_count', 0) > 0:
+                            # Check each result
+                            for item in data['items'][:5]:  # Check top 5 results
+                                username = item['login']
+                                
+                                # Verify user is in our organizations
+                                if await self._verify_user_in_organizations(username):
+                                    # Get full profile for name verification
+                                    user_profile = await self._get_github_user_profile(username, session)
+                                    if user_profile and user_profile.get('name'):
+                                        github_name = user_profile['name'].lower()
+                                        if self._calculate_name_similarity(full_name.lower(), github_name, 
+                                                                         name_parts.get('first', '').lower(),
+                                                                         name_parts.get('last', '').lower()) > 0.7:
+                                            return username
+                
+        except Exception as e:
+            logger.error(f"Error in GitHub name search: {e}")
+        
+        return None
+    
+    async def _get_github_user_profile(self, username: str, session) -> Optional[Dict]:
+        """Get GitHub user profile information."""
+        try:
+            url = f"https://api.github.com/users/{username}"
+            async with session.get(url, headers=self.headers) as resp:
+                if resp.status == 200:
+                    return await resp.json()
+        except Exception as e:
+            logger.debug(f"Error getting profile for {username}: {e}")
+        return None
+    
+    def _calculate_name_similarity(self, full_name1: str, full_name2: str, firstname: str = "", lastname: str = "") -> float:
+        """Calculate similarity between two full names."""
+        # Direct string similarity
+        direct_sim = SequenceMatcher(None, full_name1, full_name2).ratio()
+        
+        # Check if first/last names are contained in the GitHub name
+        firstname_match = firstname in full_name2 if firstname else 0
+        lastname_match = lastname in full_name2 if lastname else 0
+        
+        # Combine different similarity measures
+        name_component_score = (firstname_match + lastname_match) / 2 if (firstname or lastname) else 0
+        
+        # Return weighted average
+        return (direct_sim * 0.6) + (name_component_score * 0.4)
+    
+    async def _verify_username_matches_name(self, username: str, full_name: str) -> bool:
+        """Verify that a username reasonably matches the given full name."""
+        try:
+            async with aiohttp.ClientSession() as session:
+                user_profile = await self._get_github_user_profile(username, session)
+                if user_profile and user_profile.get('name'):
+                    github_name = user_profile['name'].lower()
+                    similarity = self._calculate_name_similarity(full_name.lower(), github_name)
+                    return similarity > 0.5  # 50% similarity threshold for verification
+        except Exception as e:
+            logger.debug(f"Error verifying name match for {username}: {e}")
+        
+        return True  # Default to True if we can't verify (don't be too strict)
+    
     def _extract_name_from_email(self, email: str) -> Dict[str, str]:
         """Extract potential name components from email."""
         local_part = email.split('@')[0]
