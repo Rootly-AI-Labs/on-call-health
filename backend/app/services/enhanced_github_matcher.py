@@ -64,9 +64,8 @@ class EnhancedGitHubMatcher:
         # Try strategies in order of accuracy - OPTIMIZED for speed
         # Skip expensive strategies during analysis to improve performance
         strategies = [
-            ("direct_api_search", self._search_by_email_api),
-            ("exact_username_match", self._try_exact_username_patterns),
             ("org_member_search", self._search_org_members),
+            ("exact_username_match", self._try_exact_username_patterns),
             # Skip expensive strategies that cause slowdowns:
             # ("commit_history", self._search_commit_history),  # Too many API calls
             # ("fuzzy_name_match", self._fuzzy_name_match),     # Too many API calls
@@ -160,7 +159,9 @@ class EnhancedGitHubMatcher:
         
         # OPTIMIZED APPROACH: Get all org members first, then match against them
         try:
-            async with aiohttp.ClientSession() as session:
+            # Add timeout to prevent connection issues
+            timeout = aiohttp.ClientTimeout(total=30, connect=10)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
                 # Get all organization members
                 all_members = await self._get_all_org_members_with_profiles(session)
                 
@@ -196,16 +197,23 @@ class EnhancedGitHubMatcher:
                     members = await self._get_org_members(org, session)
                     self._org_members_cache[org] = members
                 
-                # Get profiles for each member
+                # Get profiles for each member (with rate limiting)
+                member_count = 0
                 for username in self._org_members_cache[org]:
+                    # Add rate limiting to prevent API overload
+                    if member_count > 0 and member_count % 5 == 0:
+                        await asyncio.sleep(1)  # Pause every 5 requests
+                    
                     profile = await self._get_github_user_profile(username, session)
                     if profile:
+                        # Only store name, skip email since GitHub emails are often private
+                        profile_name = profile.get('name', '') or ''
                         all_members.append({
                             'username': username,
-                            'name': profile.get('name', '').lower() if profile.get('name') else '',
-                            'email': profile.get('email', '').lower() if profile.get('email') else '',
+                            'name': profile_name.lower() if profile_name else '',
                             'organization': org
                         })
+                    member_count += 1
                         
                 logger.info(f"✅ Loaded {len(self._org_members_cache[org])} members from {org}")
                 
@@ -231,13 +239,24 @@ class EnhancedGitHubMatcher:
                 logger.info(f"🎯 EXACT name match: '{full_name}' == '{member['name']}' -> {member['username']}")
                 return member['username']
         
-        # Strategy 2: Email match (if fallback email provided)
-        if fallback_email:
-            fallback_email_lower = fallback_email.lower()
-            for member in members:
-                if member['email'] and member['email'] == fallback_email_lower:
-                    logger.info(f"🎯 EMAIL match: {fallback_email} -> {member['username']}")
-                    return member['username']
+        # Strategy 2: Username pattern matching (based on name parts)
+        if first_name and last_name:
+            # Try common username patterns based on name
+            patterns = [
+                f"{first_name}{last_name}",           # spencercheng
+                f"{first_name}.{last_name}",          # spencer.cheng
+                f"{first_name}-{last_name}",          # spencer-cheng  
+                f"{first_name}_{last_name}",          # spencer_cheng
+                f"{first_name[0]}{last_name}",        # scheng
+                f"{first_name}{last_name[0]}",        # spencerc
+                f"{first_name}h{last_name}",          # spencerhcheng (for Spencer -> spencerhcheng)
+            ]
+            
+            for pattern in patterns:
+                for member in members:
+                    if member['username'].lower() == pattern:
+                        logger.info(f"🎯 USERNAME PATTERN match: '{full_name}' -> {pattern} -> {member['username']}")
+                        return member['username']
         
         # Strategy 3: Fuzzy name matching
         for member in members:
@@ -514,11 +533,10 @@ class EnhancedGitHubMatcher:
                         data = await resp.json()
                         if data.get('total_count', 0) > 0:
                             username = data['items'][0]['login']
-                            # Verify by checking user details and org membership
-                            if await self._verify_user_email(username, email):
-                                # CRITICAL: Verify user is actually in our organizations
-                                if await self._verify_user_in_organizations(username):
-                                    return username
+                            # Skip email verification since GitHub emails are usually private
+                            # Just verify org membership
+                            if await self._verify_user_in_organizations(username):
+                                return username
                 
                 # Try commits search
                 search_url = f"https://api.github.com/search/commits?q=author-email:{email}"
@@ -610,10 +628,8 @@ class EnhancedGitHubMatcher:
                         self._org_members_cache[org] = members
                     all_members.update(self._org_members_cache[org])
                 
-                # Check each member for email match
-                for username in all_members:
-                    if await self._verify_user_email(username, email):
-                        return username
+                # Skip email verification since GitHub emails are usually private
+                # Instead, focus on name and username pattern matching
                 
                 # Try fuzzy matching on usernames
                 firstname = email_parts.get('firstname', '').lower()
@@ -637,9 +653,8 @@ class EnhancedGitHubMatcher:
                 
                 # Return if we have a good match (>50% similarity)
                 if best_score > 0.5:
-                    # Verify with commit check
-                    if await self._check_user_commits_for_email(best_match, email):
-                        return best_match
+                    # Skip email verification, just return the best match
+                    return best_match
                         
         except Exception as e:
             logger.error(f"Error in org member search: {e}")
