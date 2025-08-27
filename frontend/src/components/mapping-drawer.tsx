@@ -301,11 +301,15 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
   }, [inlineEditingValue, platform, validateGitHubUsername])
 
   const runAutoMapping = async () => {
+    console.log('🎯 AUTO-MAPPING BUTTON CLICKED!')
+    
     if (platform !== 'github') {
+      console.log('❌ Platform is not GitHub:', platform)
       toast.error('Auto-mapping is only available for GitHub')
       return
     }
     
+    console.log('✅ Platform check passed, starting auto-mapping...')
     setRunningAutoMapping(true)
     setMappingProgress(null)
     setMappingResults([])
