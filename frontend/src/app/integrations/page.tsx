@@ -1383,7 +1383,17 @@ export default function IntegrationsPage() {
 
       if (response.ok) {
         const data = await response.json()
-        toast.success(`✅ GitHub test successful! Connected as ${data.user_info?.username || 'GitHub user'}. Integration is working properly.`)
+        // Show permissions info if available
+        if (data.permissions) {
+          const missingPerms = ['read:user', 'read:org', 'repo'].filter(p => !data.permissions.includes(p))
+          if (missingPerms.length > 0) {
+            toast.warning(`✅ Connected as ${data.user_info?.username || 'GitHub user'}, but missing permissions: ${missingPerms.join(', ')}`)
+          } else {
+            toast.success(`✅ GitHub test successful! Connected as ${data.user_info?.username || 'GitHub user'} with all required permissions.`)
+          }
+        } else {
+          toast.success(`✅ GitHub test successful! Connected as ${data.user_info?.username || 'GitHub user'}. Integration is working properly.`)
+        }
       } else {
         const errorData = await response.json().catch(() => ({}))
         throw new Error(errorData.detail || 'Connection test failed')
