@@ -491,6 +491,9 @@ async def run_github_mapping(
         from ...models import GitHubIntegration, RootlyIntegration
         import asyncio
         
+        # Set a timeout for the entire operation to prevent server timeouts
+        timeout_seconds = 45  # Railway/server timeout is usually 60s
+        
         # Get GitHub integration
         github_integration = db.query(GitHubIntegration).filter(
             GitHubIntegration.user_id == current_user.id,
@@ -584,75 +587,98 @@ async def run_github_mapping(
             if not github_orgs:
                 github_orgs = ["Rootly-AI-Labs", "rootlyhq"]
             
-        # Run matching process
-        matcher = EnhancedGitHubMatcher(github_token, github_orgs)
-        results = []
-        
-        for i, user in enumerate(unmapped_users):
-            user_email = user.get("email")
-            user_name = user.get("name")
-            github_username = None
-            match_method = None
+        # Run matching process with timeout protection
+        async def run_matching_with_timeout():
+            matcher = EnhancedGitHubMatcher(github_token, github_orgs)
+            results = []
             
-            try:
-                # Skip email-based matching since GitHub emails are usually private
-                # Go directly to optimized name-based matching
-                if user_name:
-                    logger.info(f"Trying optimized name-based matching for '{user_name}'")
-                    github_username = await matcher.match_name_to_github(
-                        full_name=user_name,
-                        fallback_email=user_email  # Use email as additional context if available
-                    )
+            # Limit to first 20 users to prevent timeouts
+            limited_users = unmapped_users[:20]
+            if len(unmapped_users) > 20:
+                logger.info(f"⏱️ Processing first 20 users out of {len(unmapped_users)} to prevent timeouts")
+            
+            for i, user in enumerate(limited_users):
+                user_email = user.get("email")
+                user_name = user.get("name")
+                github_username = None
+                match_method = None
+                
+                try:
+                    # Skip email-based matching since GitHub emails are usually private
+                    # Go directly to optimized name-based matching
+                    if user_name:
+                        logger.info(f"[{i+1}/{len(limited_users)}] Trying optimized name-based matching for '{user_name}'")
+                        github_username = await matcher.match_name_to_github(
+                            full_name=user_name,
+                            fallback_email=user_email  # Use email as additional context if available
+                        )
+                        if github_username:
+                            match_method = "name"
+                    
+                    # Skip old email-based matching entirely
+                    else:
+                        logger.info(f"[{i+1}/{len(limited_users)}] No name available for user, cannot perform matching")
+                    
                     if github_username:
-                        match_method = "name"
-                
-                # Skip old email-based matching entirely
-                else:
-                    logger.info(f"No name available for user, cannot perform matching")
-                
-                if github_username:
-                    # Use email as identifier if available, otherwise use name
-                    source_identifier = user_email if user_email else user_name
-                    
-                    # Create mapping
-                    service.create_mapping(
-                        user_id=current_user.id,
-                        source_platform=user["platform"],
-                        source_identifier=source_identifier,
-                        target_platform="github",
-                        target_identifier=github_username,
-                        created_by=current_user.id,
-                        mapping_type="automated"
-                    )
-                    
-                    results.append({
-                        "email": user_email,
-                        "name": user_name,
-                        "github_username": github_username,
-                        "status": "mapped",
-                        "platform": user["platform"],
-                        "match_method": match_method
-                    })
-                else:
+                        # Use email as identifier if available, otherwise use name
+                        source_identifier = user_email if user_email else user_name
+                        
+                        # Create mapping
+                        service.create_mapping(
+                            user_id=current_user.id,
+                            source_platform=user["platform"],
+                            source_identifier=source_identifier,
+                            target_platform="github",
+                            target_identifier=github_username,
+                            created_by=current_user.id,
+                            mapping_type="automated"
+                        )
+                        
+                        results.append({
+                            "email": user_email,
+                            "name": user_name,
+                            "github_username": github_username,
+                            "status": "mapped",
+                            "platform": user["platform"],
+                            "match_method": match_method
+                        })
+                    else:
+                        results.append({
+                            "email": user_email,
+                            "name": user_name,
+                            "github_username": None,
+                            "status": "not_found",
+                            "platform": user["platform"]
+                        })
+                        
+                except Exception as e:
+                    identifier = user_email or user_name or "unknown user"
+                    logger.error(f"Error mapping {identifier}: {e}")
                     results.append({
                         "email": user_email,
                         "name": user_name,
                         "github_username": None,
-                        "status": "not_found",
+                        "status": "error",
+                        "error": str(e),
                         "platform": user["platform"]
                     })
                     
-            except Exception as e:
-                identifier = user_email or user_name or "unknown user"
-                logger.error(f"Error mapping {identifier}: {e}")
-                results.append({
-                    "email": user_email,
-                    "name": user_name,
-                    "github_username": None,
-                    "status": "error",
-                    "error": str(e),
-                    "platform": user["platform"]
-                })
+            return results
+        
+        # Execute with timeout
+        try:
+            results = await asyncio.wait_for(run_matching_with_timeout(), timeout=timeout_seconds)
+        except asyncio.TimeoutError:
+            logger.error(f"GitHub mapping timed out after {timeout_seconds} seconds")
+            return {
+                "total_processed": 0,
+                "mapped": 0,
+                "not_found": 0,
+                "errors": 1,
+                "success_rate": 0,
+                "results": [],
+                "error": f"Request timed out after {timeout_seconds} seconds. Please try again with fewer users."
+            }
         
         # Calculate summary stats
         mapped_count = len([r for r in results if r["status"] == "mapped"])
