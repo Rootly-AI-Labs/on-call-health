@@ -76,6 +76,7 @@ export function GitHubIntegrationCard({
 
   useEffect(() => {
     if (integration) {
+      console.log('🔍 GitHub integration found, setting permissions:', integration)
       // For now, show a placeholder for permissions since we don't have the backend endpoint yet
       // In the future, this will fetch actual token permissions from the backend
       setPermissions(['read:user', 'repo']) // Placeholder - will be replaced with actual permissions
@@ -220,7 +221,7 @@ export function GitHubIntegrationCard({
           <div>
             <div className="text-sm font-medium mb-2 flex items-center space-x-2">
               <Key className="w-4 h-4 text-gray-400" />
-              <span>Token Permissions</span>
+              <span>Token Permissions ({permissions.length} found)</span>
               {loadingPermissions && <Loader2 className="w-3 h-3 animate-spin" />}
             </div>
             <div className="flex flex-wrap gap-2">
