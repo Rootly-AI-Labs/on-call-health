@@ -630,22 +630,56 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
 
       console.log(`🗑️ Starting bulk removal of ${mappings.length} mappings`)
 
-      // Remove each mapping individually
-      const removePromises = mappings.map(mapping => 
-        fetch(`${API_BASE}/integrations/manual-mappings/${mapping.id}`, {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${authToken}`,
-            'Content-Type': 'application/json'
+      // Remove each mapping individually (handle manual vs auto mappings)
+      const removePromises = mappings.map(async mapping => {
+        try {
+          let response
+          
+          if (mapping.is_manual) {
+            // Delete the manual mapping directly
+            response = await fetch(`${API_BASE}/integrations/manual-mappings/${mapping.id}`, {
+              method: 'DELETE',
+              headers: {
+                'Authorization': `Bearer ${authToken}`
+              }
+            })
+          } else {
+            // For auto mappings, create a manual "override" mapping with empty target
+            response = await fetch(`${API_BASE}/integrations/manual-mappings`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${authToken}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                source_platform: mapping.source_platform,
+                source_identifier: mapping.source_identifier,
+                target_platform: platform,
+                target_identifier: "", // Empty string to "clear" the mapping
+                is_removal_override: true // Flag to indicate this is removing an auto mapping
+              })
+            })
           }
-        }).then(response => ({
-          id: mapping.id,
-          email: mapping.source_identifier,
-          success: response.ok,
-          status: response.status,
-          response
-        }))
-      )
+
+          return {
+            id: mapping.id,
+            email: mapping.source_identifier,
+            isManual: mapping.is_manual,
+            success: response.ok,
+            status: response.status,
+            response
+          }
+        } catch (error) {
+          return {
+            id: mapping.id,
+            email: mapping.source_identifier,
+            isManual: mapping.is_manual,
+            success: false,
+            status: 0,
+            error: error.message
+          }
+        }
+      })
 
       toast.info(`Removing ${mappings.length} mappings...`)
       
@@ -659,12 +693,19 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
       results.forEach((result, index) => {
         if (result.status === 'fulfilled' && result.value.success) {
           successful++
-          console.log(`✅ Removed mapping ${result.value.id} (${result.value.email})`)
+          const type = result.value.isManual ? 'manual' : 'auto'
+          console.log(`✅ Removed ${type} mapping ${result.value.id} (${result.value.email})`)
         } else {
           failed++
-          const error = result.status === 'fulfilled' 
-            ? `${result.value.email}: HTTP ${result.value.status}`
-            : `${mappings[index].source_identifier}: ${result.reason}`
+          let error
+          if (result.status === 'fulfilled') {
+            const type = result.value.isManual ? 'manual' : 'auto'
+            error = result.value.error 
+              ? `${result.value.email} (${type}): ${result.value.error}`
+              : `${result.value.email} (${type}): HTTP ${result.value.status}`
+          } else {
+            error = `${mappings[index].source_identifier}: ${result.reason}`
+          }
           errors.push(error)
           console.log(`❌ Failed to remove mapping: ${error}`)
         }
