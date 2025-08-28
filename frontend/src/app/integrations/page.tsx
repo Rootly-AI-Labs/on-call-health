@@ -1376,7 +1376,7 @@ export default function IntegrationsPage() {
 
       toast.info("Testing GitHub connection...")
 
-      const response = await fetch(`${API_BASE}/integrations/github/test`, {
+      const response = await fetch(`${API_BASE}/github/test`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${authToken}`
@@ -1387,11 +1387,14 @@ export default function IntegrationsPage() {
         const data = await response.json()
         // Show permissions info if available
         if (data.permissions) {
-          const missingPerms = ['read:user', 'read:org', 'repo'].filter(p => !data.permissions.includes(p))
+          const missingPerms = []
+          if (!data.permissions.repo_access) missingPerms.push('repository access')
+          if (!data.permissions.org_access) missingPerms.push('organization access')
+          
           if (missingPerms.length > 0) {
-            toast.warning(`✅ Connected as ${data.user_info?.username || 'GitHub user'}, but missing permissions: ${missingPerms.join(', ')}`)
+            toast.warning(`✅ Connected as ${data.user_info?.username || 'GitHub user'}, but missing: ${missingPerms.join(', ')}`)
           } else {
-            toast.success(`✅ GitHub test successful! Connected as ${data.user_info?.username || 'GitHub user'} with all required permissions.`)
+            toast.success(`✅ GitHub test successful! Connected as ${data.user_info?.username || 'GitHub user'} with full access.`)
           }
         } else {
           toast.success(`✅ GitHub test successful! Connected as ${data.user_info?.username || 'GitHub user'}. Integration is working properly.`)
