@@ -397,14 +397,19 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
       setShowMappingResults(true)
       
       if (result.mapped > 0) {
-        toast.success(`Successfully mapped ${result.mapped} users to GitHub`)
+        toast.success(`✅ Successfully mapped ${result.mapped} users to GitHub`)
         // Reload mapping data to show new mappings
         await loadMappingData()
+      } else if (result.total_processed > 0) {
+        // Users were processed but none were successfully mapped
+        const failureReasons = []
+        if (result.not_found > 0) failureReasons.push(`${result.not_found} not found in GitHub`)
+        if (result.errors > 0) failureReasons.push(`${result.errors} errors occurred`)
+        
+        const reasonText = failureReasons.length > 0 ? ` (${failureReasons.join(', ')})` : ''
+        toast.warning(`⚠️ Processed ${result.total_processed} users but found no successful mappings${reasonText}`)
       } else {
-        const skippedMessage = result.total_processed > 0 
-          ? `Processed ${result.total_processed} users but found no valid email addresses for mapping`
-          : 'No users found to process'
-        toast.info(skippedMessage)
+        toast.info('ℹ️ No users found to process for auto-mapping')
       }
       
     } catch (error) {
@@ -1174,17 +1179,30 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
                         </div>
                         
                         <div className="space-y-1">
-                          {mapping.mapping_successful ? (
-                            <Badge variant="default" className="bg-green-100 text-green-800 border-green-200">
-                              <CheckCircle className="w-3 h-3 mr-1" />
-                              Success
-                            </Badge>
-                          ) : (
-                            <Badge variant="destructive" className="bg-red-100 text-red-800 border-red-200">
-                              <AlertCircle className="w-3 h-3 mr-1" />
-                              Failed
-                            </Badge>
-                          )}
+                          {(() => {
+                            // More accurate success determination
+                            const hasValidTarget = mapping.target_identifier && 
+                                                  mapping.target_identifier !== "unknown" && 
+                                                  mapping.target_identifier !== "";
+                            const isManualMapping = mapping.is_manual;
+                            const isSuccessful = hasValidTarget && (mapping.mapping_successful !== false);
+                            
+                            if (isSuccessful) {
+                              return (
+                                <Badge variant="default" className="bg-green-100 text-green-800 border-green-200">
+                                  <CheckCircle className="w-3 h-3 mr-1" />
+                                  {isManualMapping ? 'Mapped' : 'Success'}
+                                </Badge>
+                              );
+                            } else {
+                              return (
+                                <Badge variant="destructive" className="bg-red-100 text-red-800 border-red-200">
+                                  <AlertCircle className="w-3 h-3 mr-1" />
+                                  {hasValidTarget ? 'No Data' : 'Not Mapped'}
+                                </Badge>
+                              );
+                            }
+                          })()}
                           <div className="text-xs text-gray-500">
                             {mapping.data_points_count ? (
                               <span>{mapping.data_points_count} data points</span>
