@@ -151,7 +151,30 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
           hasName: !!m.source_name
         })))
         
-        setMappings(mappingsData)
+        // Deduplicate mappings by email, keeping the most recent or manual mapping
+        const deduplicatedMappings = mappingsData.reduce((acc: IntegrationMapping[], current: IntegrationMapping) => {
+          const existingIndex = acc.findIndex(m => m.source_identifier.toLowerCase() === current.source_identifier.toLowerCase())
+          
+          if (existingIndex === -1) {
+            // No duplicate found, add this mapping
+            acc.push(current)
+          } else {
+            const existing = acc[existingIndex]
+            // Prefer manual mappings over automated, and newer over older
+            const shouldReplace = 
+              (current.is_manual && !existing.is_manual) ||
+              (current.is_manual === existing.is_manual && current.id > existing.id)
+            
+            if (shouldReplace) {
+              acc[existingIndex] = current
+            }
+          }
+          return acc
+        }, [])
+        
+        console.log(`🚀 MappingDrawer: Deduplicated from ${mappingsData.length} to ${deduplicatedMappings.length} mappings`)
+        
+        setMappings(deduplicatedMappings)
         setMappingStats(statsData)
         console.log('🚀 MappingDrawer: Successfully set mappings and stats state')
       } else {
