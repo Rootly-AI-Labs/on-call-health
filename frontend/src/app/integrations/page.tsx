@@ -223,14 +223,16 @@ interface Integration {
 }
 
 interface GitHubIntegration {
-  id: number
+  id: number | string // Can be "beta-github" for beta integration
   github_username: string
   organizations: string[]
-  token_source: "oauth" | "manual"
+  token_source: "oauth" | "manual" | "beta"
   is_oauth: boolean
   supports_refresh: boolean
   connected_at: string
   last_updated: string
+  is_beta?: boolean // Optional flag for beta integrations
+  token_preview?: string // Token preview for display
 }
 
 interface SlackIntegration {
@@ -3196,8 +3198,19 @@ export default function IntegrationsPage() {
                   }}
                 >
                   {githubIntegration ? (
-                    <div className="absolute top-4 right-4">
-                      <Badge variant="secondary" className="bg-green-100 text-green-700">Connected</Badge>
+                    <div className="absolute top-4 right-4 flex flex-col items-end space-y-1">
+                      {githubIntegration.is_beta ? (
+                        <>
+                          <Badge variant="secondary" className="bg-blue-100 text-blue-700 border-blue-200">
+                            Beta Token
+                          </Badge>
+                          <span className="text-xs text-gray-500">Railway Shared</span>
+                        </>
+                      ) : (
+                        <Badge variant="secondary" className="bg-green-100 text-green-700">
+                          Connected
+                        </Badge>
+                      )}
                     </div>
                   ) : null}
                   {activeEnhancementTab === 'github' && (
@@ -3605,8 +3618,26 @@ export default function IntegrationsPage() {
                         />
                       </div>
                       <div>
-                        <CardTitle>GitHub Connected</CardTitle>
-                        <CardDescription>Username: {githubIntegration.github_username}</CardDescription>
+                        <CardTitle className="flex items-center space-x-2">
+                          <span>GitHub Connected</span>
+                          {githubIntegration.is_beta && (
+                            <Badge variant="secondary" className="bg-blue-100 text-blue-700 border-blue-200 text-xs">
+                              Beta Token
+                            </Badge>
+                          )}
+                        </CardTitle>
+                        <CardDescription>
+                          <div className="space-y-1">
+                            <div>Username: {githubIntegration.github_username}</div>
+                            {githubIntegration.is_beta ? (
+                              <div className="text-blue-600 text-sm">
+                                🚀 Using shared Railway token - No personal setup needed!
+                              </div>
+                            ) : (
+                              <div>Token: {githubIntegration.token_preview}</div>
+                            )}
+                          </div>
+                        </CardDescription>
                       </div>
                     </div>
                     <div className="flex items-center space-x-2">
@@ -3630,14 +3661,26 @@ export default function IntegrationsPage() {
                           </>
                         )}
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setGithubDisconnectDialogOpen(true)}
-                        className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                      {githubIntegration.is_beta ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={handleGitHubTest}
+                          className="text-blue-700 border-blue-200 hover:bg-blue-50"
+                        >
+                          <TestTube className="w-4 h-4 mr-1" />
+                          Test Beta Token
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setGithubDisconnectDialogOpen(true)}
+                          className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </CardHeader>
@@ -3647,7 +3690,14 @@ export default function IntegrationsPage() {
                       <Key className="w-4 h-4 text-gray-400" />
                       <div>
                         <div className="font-medium">Token Source</div>
-                        <div className="text-gray-600">{githubIntegration.token_source === "oauth" ? "OAuth" : "Personal Access Token"}</div>
+                        <div className="text-gray-600">
+                          {githubIntegration.is_beta 
+                            ? "Beta Token (Railway Shared)" 
+                            : githubIntegration.token_source === "oauth" 
+                              ? "OAuth" 
+                              : "Personal Access Token"
+                          }
+                        </div>
                       </div>
                     </div>
                     <div className="flex items-center space-x-2">
@@ -3676,6 +3726,25 @@ export default function IntegrationsPage() {
                       </div>
                     </div>
                   </div>
+                  
+                  {/* Beta Token Information */}
+                  {githubIntegration.is_beta && (
+                    <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                      <div className="flex items-start space-x-2">
+                        <div className="w-5 h-5 text-blue-600 mt-0.5">
+                          🚀
+                        </div>
+                        <div className="flex-1 text-sm">
+                          <div className="font-medium text-blue-800 mb-1">Beta Token Active</div>
+                          <div className="text-blue-700 space-y-1">
+                            <p>You're using a shared GitHub token provided by Railway for beta testing.</p>
+                            <p><strong>Benefits:</strong> No personal token setup required, immediate access to GitHub features.</p>
+                            <p><strong>Note:</strong> This token is shared among beta users and managed automatically.</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                 </CardContent>
               </Card>
