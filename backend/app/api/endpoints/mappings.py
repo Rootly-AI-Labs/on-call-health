@@ -489,13 +489,34 @@ async def validate_github_username(
     try:
         from ...models import GitHubIntegration
         
-        # Get GitHub integration for auth
+        # Get GitHub integration for auth - check personal first, then beta token
         integration = db.query(GitHubIntegration).filter(
             GitHubIntegration.user_id == current_user.id,
             GitHubIntegration.github_token.isnot(None)
         ).first()
         
-        if not integration or not integration.has_token:
+        github_token = None
+        if integration and integration.has_token:
+            # Decrypt personal GitHub token
+            try:
+                from ...api.endpoints.github import decrypt_token
+                github_token = decrypt_token(integration.github_token)
+            except Exception as e:
+                logger.error(f"Failed to decrypt GitHub token: {e}")
+                return {
+                    "valid": False,
+                    "error": "Failed to decrypt token",
+                    "message": "Token decryption error"
+                }
+        else:
+            # Try beta GitHub token from environment
+            import os
+            beta_github_token = os.getenv('GITHUB_TOKEN')
+            if beta_github_token:
+                github_token = beta_github_token
+                logger.info(f"Using beta GitHub token for validation by user {current_user.id}")
+        
+        if not github_token:
             return {
                 "valid": False,
                 "error": "No GitHub integration found",
@@ -504,27 +525,15 @@ async def validate_github_username(
         
         from ...services.github_api_manager import github_api_manager
         
-        # Decrypt the GitHub token
-        try:
-            from ...api.endpoints.github import decrypt_token
-            decrypted_token = decrypt_token(integration.github_token)
-        except Exception as e:
-            logger.error(f"Failed to decrypt GitHub token: {e}")
-            return {
-                "valid": False,
-                "error": "Token decryption failed",
-                "message": "Unable to decrypt GitHub token"
-            }
-        
         # Check if user exists
         user_info = await github_api_manager.fetch_user_info(
             username=username,
-            token=decrypted_token
+            token=github_token
         )
         
         if user_info and not user_info.get("error"):
             # Check organization membership if organizations are configured
-            if integration.organizations:
+            if integration and integration.organizations:
                 from ...services.enhanced_github_matcher import EnhancedGitHubMatcher
                 
                 try:
@@ -532,7 +541,7 @@ async def validate_github_username(
                     org_list = integration.organizations if isinstance(integration.organizations, list) else []
                     
                     if org_list:
-                        matcher = EnhancedGitHubMatcher(decrypted_token, org_list)
+                        matcher = EnhancedGitHubMatcher(github_token, org_list)
                         is_org_member = await matcher._verify_user_in_organizations(username)
                         
                         if not is_org_member:
