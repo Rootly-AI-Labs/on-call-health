@@ -3614,14 +3614,12 @@ export default function IntegrationsPage() {
                       </div>
                       <div>
                         <CardTitle>GitHub Connected</CardTitle>
-                        <CardDescription>
-                          <div className="space-y-1">
-                            <div>Username: {githubIntegration.github_username}</div>
-                            {!githubIntegration.is_beta && (
-                              <div>Token: {githubIntegration.token_preview}</div>
-                            )}
-                          </div>
-                        </CardDescription>
+                        <div className="space-y-1 text-sm text-muted-foreground">
+                          <div>Username: {githubIntegration.github_username}</div>
+                          {!githubIntegration.is_beta && (
+                            <div>Token: {githubIntegration.token_preview}</div>
+                          )}
+                        </div>
                       </div>
                     </div>
                     <div className="flex items-center space-x-2">

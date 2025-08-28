@@ -873,20 +873,14 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
                       <div className="flex space-x-2">
                         <Button
                           onClick={runAutoMapping}
-                          disabled={runningAutoMapping || githubOrganizations.length === 0}
-                          className="bg-blue-600 hover:bg-blue-700 text-white disabled:bg-gray-400 disabled:cursor-not-allowed"
+                          disabled={runningAutoMapping}
+                          className="bg-blue-600 hover:bg-blue-700 text-white"
                           size="sm"
-                          title={githubOrganizations.length === 0 ? "Connect GitHub integration first" : "Run auto-mapping"}
                         >
                           {runningAutoMapping ? (
                             <>
                               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                               Running Auto-Mapping...
-                            </>
-                          ) : githubOrganizations.length === 0 ? (
-                            <>
-                              <AlertCircle className="w-4 h-4 mr-2" />
-                              GitHub Not Connected
                             </>
                           ) : (
                             <>

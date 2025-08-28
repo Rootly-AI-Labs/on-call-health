@@ -494,18 +494,28 @@ async def run_github_mapping(
         # Set a timeout for the entire operation to prevent server timeouts
         timeout_seconds = 45  # Railway/server timeout is usually 60s
         
-        # Get GitHub integration
+        # Get GitHub integration - check personal first, then beta token
         github_integration = db.query(GitHubIntegration).filter(
             GitHubIntegration.user_id == current_user.id,
             GitHubIntegration.github_token.isnot(None)
         ).first()
         
-        if not github_integration:
-            raise HTTPException(status_code=400, detail="GitHub integration not found")
+        github_token = None
+        if github_integration:
+            # Decrypt personal GitHub token
+            from .github import decrypt_token
+            github_token = decrypt_token(github_integration.github_token)
+            logger.info(f"Using personal GitHub integration for user {current_user.id}")
+        else:
+            # Try beta GitHub token from environment
+            import os
+            beta_github_token = os.getenv('GITHUB_TOKEN')
+            if beta_github_token:
+                github_token = beta_github_token
+                logger.info(f"Using beta GitHub token for user {current_user.id}")
         
-        # Decrypt GitHub token
-        from .github import decrypt_token
-        github_token = decrypt_token(github_integration.github_token)
+        if not github_token:
+            raise HTTPException(status_code=400, detail="GitHub integration not found")
         
         # Get unmapped Rootly users
         service = ManualMappingService(db)
