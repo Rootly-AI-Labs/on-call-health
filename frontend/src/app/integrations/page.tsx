@@ -1376,7 +1376,7 @@ export default function IntegrationsPage() {
 
       toast.info("Testing GitHub connection...")
 
-      const response = await fetch(`${API_BASE}/github/test`, {
+      const response = await fetch(`${API_BASE}/integrations/github/test`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${authToken}`
