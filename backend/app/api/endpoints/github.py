@@ -6,6 +6,8 @@ from sqlalchemy.orm import Session
 from typing import Dict, Any
 import secrets
 import json
+import os
+import logging
 from cryptography.fernet import Fernet
 import base64
 from datetime import datetime
@@ -17,6 +19,7 @@ from ...auth.integration_oauth import github_integration_oauth
 from ...core.config import settings
 
 router = APIRouter(prefix="/github", tags=["github-integration"])
+logger = logging.getLogger(__name__)
 
 # Simple encryption for tokens (in production, use proper key management)
 def get_encryption_key():
@@ -233,40 +236,99 @@ async def get_github_status(
     db: Session = Depends(get_db)
 ):
     """
-    Get GitHub integration status for current user.
+    Get GitHub integration status for current user, including beta token access.
     """
+    # Check for user's personal integration first
     integration = db.query(GitHubIntegration).filter(
         GitHubIntegration.user_id == current_user.id
     ).first()
     
-    if not integration:
+    # Check for beta GitHub token from Railway environment
+    beta_github_token = os.getenv('GITHUB_TOKEN')
+    logger.info(f"Beta GitHub token check: exists={beta_github_token is not None}, length={len(beta_github_token) if beta_github_token else 0}")
+    
+    # If user has personal integration, return that
+    if integration:
+        # Get token preview
+        token_preview = None
+        try:
+            if integration.github_token:
+                decrypted_token = decrypt_token(integration.github_token)
+                token_preview = f"...{decrypted_token[-4:]}" if decrypted_token else None
+        except Exception:
+            pass  # Token preview is optional
+        
         return {
-            "connected": False,
-            "integration": None
+            "connected": True,
+            "integration": {
+                "id": integration.id,
+                "github_username": integration.github_username,
+                "organizations": integration.organizations,
+                "token_source": integration.token_source,
+                "is_oauth": integration.is_oauth,
+                "supports_refresh": integration.supports_refresh,
+                "connected_at": integration.created_at.isoformat(),
+                "last_updated": integration.updated_at.isoformat(),
+                "token_preview": token_preview,
+                "is_beta": False
+            }
         }
     
-    # Get token preview
-    token_preview = None
-    try:
-        if integration.github_token:
-            decrypted_token = decrypt_token(integration.github_token)
-            token_preview = f"...{decrypted_token[-4:]}" if decrypted_token else None
-    except Exception:
-        pass  # Token preview is optional
+    # If no personal integration but beta token exists, provide beta access
+    elif beta_github_token:
+        try:
+            # Test the beta token and get basic info
+            import httpx
+            headers = {
+                "Authorization": f"token {beta_github_token}",
+                "Accept": "application/json"
+            }
+            
+            async with httpx.AsyncClient() as client:
+                # Get user info
+                user_response = await client.get("https://api.github.com/user", headers=headers)
+                if user_response.status_code == 200:
+                    user_info = user_response.json()
+                    github_username = user_info.get("login", "beta-user")
+                    
+                    # Get organizations
+                    try:
+                        orgs_response = await client.get("https://api.github.com/user/orgs", headers=headers)
+                        if orgs_response.status_code == 200:
+                            orgs = orgs_response.json()
+                            org_names = [org.get("login") for org in orgs if org.get("login")]
+                        else:
+                            org_names = []
+                    except Exception:
+                        org_names = []
+                    
+                    logger.info(f"Beta GitHub token working: {github_username}, orgs: {org_names}")
+                    
+                    return {
+                        "connected": True,
+                        "integration": {
+                            "id": "beta-github",
+                            "github_username": github_username,
+                            "organizations": org_names,
+                            "token_source": "beta",
+                            "is_oauth": False,
+                            "supports_refresh": False,
+                            "connected_at": datetime.now().isoformat(),
+                            "last_updated": datetime.now().isoformat(),
+                            "token_preview": f"***{beta_github_token[-4:]}",
+                            "is_beta": True
+                        }
+                    }
+                else:
+                    logger.warning(f"Beta GitHub token test failed: {user_response.status_code}")
+                    
+        except Exception as e:
+            logger.error(f"Error testing beta GitHub token: {e}")
     
+    # No integration available
     return {
-        "connected": True,
-        "integration": {
-            "id": integration.id,
-            "github_username": integration.github_username,
-            "organizations": integration.organizations,
-            "token_source": integration.token_source,
-            "is_oauth": integration.is_oauth,
-            "supports_refresh": integration.supports_refresh,
-            "connected_at": integration.created_at.isoformat(),
-            "last_updated": integration.updated_at.isoformat(),
-            "token_preview": token_preview
-        }
+        "connected": False,
+        "integration": None
     }
 
 class TokenRequest(BaseModel):
