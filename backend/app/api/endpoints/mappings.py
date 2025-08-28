@@ -2,6 +2,8 @@
 API endpoints for integration mapping data.
 """
 import logging
+import os
+import re
 from datetime import datetime
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException
@@ -479,6 +481,41 @@ def _generate_cache_insights(cache_stats: dict) -> List[str]:
     
     return insights
 
+def _validate_github_username_format(username: str) -> bool:
+    """Validate GitHub username format."""
+    if not username or len(username) < 1 or len(username) > 39:
+        return False
+    # GitHub username rules: alphanumeric and hyphens, cannot start/end with hyphen
+    pattern = r'^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?$'
+    return bool(re.match(pattern, username))
+
+async def _get_beta_github_organizations(github_token: str) -> List[str]:
+    """Get organizations for beta GitHub token."""
+    try:
+        import httpx
+        headers = {
+            "Authorization": f"token {github_token}",
+            "Accept": "application/json"
+        }
+        
+        async with httpx.AsyncClient() as client:
+            # Get user's organizations
+            org_response = await client.get(
+                "https://api.github.com/user/orgs", 
+                headers=headers,
+                timeout=10.0
+            )
+            
+            if org_response.status_code == 200:
+                orgs = org_response.json()
+                return [org["login"] for org in orgs]
+            else:
+                logger.warning(f"Failed to get beta GitHub organizations: {org_response.status_code}")
+                return []
+    except Exception as e:
+        logger.error(f"Error getting beta GitHub organizations: {e}")
+        return []
+
 @router.get("/mappings/github/validate/{username}", summary="Validate GitHub username")
 async def validate_github_username(
     username: str,
@@ -487,6 +524,14 @@ async def validate_github_username(
 ) -> dict:
     """Validate if a GitHub username exists and is accessible."""
     try:
+        # Input validation
+        if not _validate_github_username_format(username):
+            return {
+                "valid": False,
+                "error": "Invalid username format",
+                "message": "GitHub username must be 1-39 characters, alphanumeric with hyphens, cannot start/end with hyphen"
+            }
+        
         from ...models import GitHubIntegration
         
         # Get GitHub integration for auth - check personal first, then beta token
@@ -496,11 +541,15 @@ async def validate_github_username(
         ).first()
         
         github_token = None
+        beta_organizations = []
+        is_beta_token = False
+        
         if integration and integration.has_token:
-            # Decrypt personal GitHub token
+            # Use personal GitHub token
             try:
                 from ...api.endpoints.github import decrypt_token
                 github_token = decrypt_token(integration.github_token)
+                logger.info(f"Using personal GitHub token for validation by user {current_user.id}")
             except Exception as e:
                 logger.error(f"Failed to decrypt GitHub token: {e}")
                 return {
@@ -510,11 +559,13 @@ async def validate_github_username(
                 }
         else:
             # Try beta GitHub token from environment
-            import os
             beta_github_token = os.getenv('GITHUB_TOKEN')
             if beta_github_token:
                 github_token = beta_github_token
-                logger.info(f"Using beta GitHub token for validation by user {current_user.id}")
+                is_beta_token = True
+                # Get organizations for beta token
+                beta_organizations = await _get_beta_github_organizations(github_token)
+                logger.info(f"Using beta GitHub token for validation by user {current_user.id}, orgs: {beta_organizations}")
         
         if not github_token:
             return {
@@ -532,25 +583,32 @@ async def validate_github_username(
         )
         
         if user_info and not user_info.get("error"):
-            # Check organization membership if organizations are configured
-            if integration and integration.organizations:
+            # Check organization membership
+            org_list = []
+            
+            if is_beta_token:
+                # For beta token, use the organizations from the beta token
+                org_list = beta_organizations
+            elif integration and integration.organizations:
+                # For personal token, use configured organizations
+                org_list = integration.organizations if isinstance(integration.organizations, list) else []
+            
+            # Perform organization check if we have organizations to check
+            if org_list:
                 from ...services.enhanced_github_matcher import EnhancedGitHubMatcher
                 
                 try:
-                    # EnhancedGitHubMatcher expects list of org names
-                    org_list = integration.organizations if isinstance(integration.organizations, list) else []
+                    matcher = EnhancedGitHubMatcher(github_token, org_list)
+                    is_org_member = await matcher._verify_user_in_organizations(username)
                     
-                    if org_list:
-                        matcher = EnhancedGitHubMatcher(github_token, org_list)
-                        is_org_member = await matcher._verify_user_in_organizations(username)
-                        
-                        if not is_org_member:
-                            org_names = ", ".join(org_list)
-                            return {
-                                "valid": False,
-                                "error": "Not in organization",
-                                "message": f"GitHub user '{username}' is not a member of your configured organizations: {org_names}"
-                            }
+                    if not is_org_member:
+                        org_names = ", ".join(org_list)
+                        token_type = "beta GitHub token" if is_beta_token else "your configured"
+                        return {
+                            "valid": False,
+                            "error": "Not in organization",
+                            "message": f"GitHub user '{username}' is not a member of {token_type} organizations: {org_names}"
+                        }
                 except Exception as e:
                     logger.warning(f"Organization verification failed, proceeding without check: {e}")
                     # Continue without org check if verification fails
