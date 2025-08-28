@@ -3199,18 +3199,10 @@ export default function IntegrationsPage() {
                 >
                   {githubIntegration ? (
                     <div className="absolute top-4 right-4 flex flex-col items-end space-y-1">
-                      {githubIntegration.is_beta ? (
-                        <>
-                          <Badge variant="secondary" className="bg-blue-100 text-blue-700 border-blue-200">
-                            Beta Token
-                          </Badge>
-                          <span className="text-xs text-gray-500">Railway Shared</span>
-                        </>
-                      ) : (
-                        <Badge variant="secondary" className="bg-green-100 text-green-700">
-                          Connected
-                        </Badge>
-                      )}
+                      <Badge variant="secondary" className="bg-green-100 text-green-700 border-green-200">
+                        <CheckCircle className="w-3 h-3 mr-1" />
+                        Connected
+                      </Badge>
                     </div>
                   ) : null}
                   {activeEnhancementTab === 'github' && (
@@ -3618,22 +3610,11 @@ export default function IntegrationsPage() {
                         />
                       </div>
                       <div>
-                        <CardTitle className="flex items-center space-x-2">
-                          <span>GitHub Connected</span>
-                          {githubIntegration.is_beta && (
-                            <Badge variant="secondary" className="bg-blue-100 text-blue-700 border-blue-200 text-xs">
-                              Beta Token
-                            </Badge>
-                          )}
-                        </CardTitle>
+                        <CardTitle>GitHub Connected</CardTitle>
                         <CardDescription>
                           <div className="space-y-1">
                             <div>Username: {githubIntegration.github_username}</div>
-                            {githubIntegration.is_beta ? (
-                              <div className="text-blue-600 text-sm">
-                                🚀 Using shared Railway token - No personal setup needed!
-                              </div>
-                            ) : (
+                            {!githubIntegration.is_beta && (
                               <div>Token: {githubIntegration.token_preview}</div>
                             )}
                           </div>
@@ -3666,10 +3647,9 @@ export default function IntegrationsPage() {
                           size="sm"
                           variant="outline"
                           onClick={handleGitHubTest}
-                          className="text-blue-700 border-blue-200 hover:bg-blue-50"
                         >
                           <TestTube className="w-4 h-4 mr-1" />
-                          Test Beta Token
+                          Test Connection
                         </Button>
                       ) : (
                         <Button
@@ -3692,7 +3672,7 @@ export default function IntegrationsPage() {
                         <div className="font-medium">Token Source</div>
                         <div className="text-gray-600">
                           {githubIntegration.is_beta 
-                            ? "Beta Token (Railway Shared)" 
+                            ? "Beta" 
                             : githubIntegration.token_source === "oauth" 
                               ? "OAuth" 
                               : "Personal Access Token"
@@ -3727,19 +3707,18 @@ export default function IntegrationsPage() {
                     </div>
                   </div>
                   
-                  {/* Beta Token Information */}
+                  {/* Beta Access Information */}
                   {githubIntegration.is_beta && (
                     <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
                       <div className="flex items-start space-x-2">
                         <div className="w-5 h-5 text-blue-600 mt-0.5">
-                          🚀
+                          <CheckCircle className="w-5 h-5" />
                         </div>
                         <div className="flex-1 text-sm">
-                          <div className="font-medium text-blue-800 mb-1">Beta Token Active</div>
-                          <div className="text-blue-700 space-y-1">
-                            <p>You're using a shared GitHub token provided by Railway for beta testing.</p>
-                            <p><strong>Benefits:</strong> No personal token setup required, immediate access to GitHub features.</p>
-                            <p><strong>Note:</strong> This token is shared among beta users and managed automatically.</p>
+                          <div className="font-medium text-blue-800 mb-1">Beta Access Enabled</div>
+                          <div className="text-blue-700">
+                            You're using a shared GitHub integration for testing purposes. 
+                            No personal token setup required.
                           </div>
                         </div>
                       </div>

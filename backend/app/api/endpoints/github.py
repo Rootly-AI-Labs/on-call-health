@@ -185,45 +185,120 @@ async def test_github_integration(
 ):
     """
     Test GitHub integration permissions and connectivity.
+    Supports both personal integrations and beta token.
     """
+    # Check for personal integration first
     integration = db.query(GitHubIntegration).filter(
         GitHubIntegration.user_id == current_user.id
     ).first()
     
-    if not integration or not integration.github_token:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="GitHub integration not found"
-        )
+    access_token = None
+    is_beta = False
+    
+    if integration and integration.github_token:
+        # User has personal integration
+        try:
+            access_token = decrypt_token(integration.github_token)
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to decrypt token: {str(e)}"
+            )
+    else:
+        # Check for beta GitHub token from Railway
+        beta_github_token = os.getenv('GITHUB_TOKEN')
+        if beta_github_token:
+            access_token = beta_github_token
+            is_beta = True
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No GitHub integration found"
+            )
     
     try:
-        # Decrypt token
-        access_token = decrypt_token(integration.github_token)
-        
-        # Test permissions
-        permissions = await github_integration_oauth.test_permissions(access_token)
-        
-        # Get basic user info
-        user_info = await github_integration_oauth.get_user_info(access_token)
-        
-        return {
-            "success": True,
-            "integration": {
-                "github_username": integration.github_username,
-                "organizations": integration.organizations,
-                "connected_at": integration.created_at.isoformat(),
-                "last_updated": integration.updated_at.isoformat()
-            },
-            "permissions": permissions,
-            "user_info": {
-                "username": user_info.get("login"),
-                "name": user_info.get("name"),
-                "public_repos": user_info.get("public_repos"),
-                "followers": user_info.get("followers"),
-                "following": user_info.get("following")
-            }
+        # Test token with GitHub API
+        import httpx
+        headers = {
+            "Authorization": f"token {access_token}",
+            "Accept": "application/json"
         }
         
+        async with httpx.AsyncClient() as client:
+            # Get user info
+            user_response = await client.get("https://api.github.com/user", headers=headers)
+            if user_response.status_code != 200:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"GitHub API error: {user_response.status_code}"
+                )
+            
+            user_info = user_response.json()
+            
+            # Test repository access
+            repos_response = await client.get("https://api.github.com/user/repos?per_page=1", headers=headers)
+            can_access_repos = repos_response.status_code == 200
+            
+            # Test organization access
+            orgs_response = await client.get("https://api.github.com/user/orgs", headers=headers)
+            can_access_orgs = orgs_response.status_code == 200
+            orgs = orgs_response.json() if can_access_orgs else []
+            
+            # Check rate limit
+            rate_limit_response = await client.get("https://api.github.com/rate_limit", headers=headers)
+            rate_limit_info = rate_limit_response.json() if rate_limit_response.status_code == 200 else {}
+            
+            permissions = {
+                "repo_access": can_access_repos,
+                "org_access": can_access_orgs,
+                "rate_limit": rate_limit_info.get("rate", {})
+            }
+        
+        if is_beta:
+            # Return beta token test results
+            return {
+                "success": True,
+                "integration": {
+                    "github_username": user_info.get("login"),
+                    "organizations": [org.get("login") for org in orgs],
+                    "token_source": "beta",
+                    "is_beta": True,
+                    "connected_at": datetime.now().isoformat(),
+                    "last_updated": datetime.now().isoformat()
+                },
+                "permissions": permissions,
+                "user_info": {
+                    "username": user_info.get("login"),
+                    "name": user_info.get("name"),
+                    "public_repos": user_info.get("public_repos"),
+                    "followers": user_info.get("followers"),
+                    "following": user_info.get("following")
+                }
+            }
+        else:
+            # Return personal integration test results
+            return {
+                "success": True,
+                "integration": {
+                    "github_username": integration.github_username,
+                    "organizations": integration.organizations,
+                    "token_source": integration.token_source,
+                    "is_beta": False,
+                    "connected_at": integration.created_at.isoformat(),
+                    "last_updated": integration.updated_at.isoformat()
+                },
+                "permissions": permissions,
+                "user_info": {
+                    "username": user_info.get("login"),
+                    "name": user_info.get("name"),
+                    "public_repos": user_info.get("public_repos"),
+                    "followers": user_info.get("followers"),
+                    "following": user_info.get("following")
+                }
+            }
+        
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
