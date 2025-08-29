@@ -692,10 +692,38 @@ class UnifiedBurnoutAnalyzer:
             incident_users = set()
             
             if self.platform == "pagerduty":
-                # PagerDuty normalized format
+                # PagerDuty normalized format - check multiple user involvement sources
+                
+                # 1. Assigned user (from assignments)
                 assigned_to = incident.get("assigned_to")
                 if assigned_to and assigned_to.get("id"):
                     incident_users.add(str(assigned_to["id"]))
+                
+                # 2. If no assigned user, check raw incident data for acknowledgments and assignments
+                if not incident_users and "raw_data" in incident:
+                    raw_incident = incident["raw_data"]
+                    
+                    # Check all assignments (not just first)
+                    assignments = raw_incident.get("assignments", [])
+                    for assignment in assignments:
+                        assignee = assignment.get("assignee", {})
+                        if assignee and assignee.get("id"):
+                            incident_users.add(str(assignee["id"]))
+                    
+                    # Check acknowledgments (who acknowledged the incident)
+                    acknowledgments = raw_incident.get("acknowledgments", [])
+                    for ack in acknowledgments:
+                        acknowledger = ack.get("acknowledger", {})
+                        if acknowledger and acknowledger.get("id"):
+                            incident_users.add(str(acknowledger["id"]))
+                    
+                    # Check escalation policy targets as fallback
+                    escalation_policy = raw_incident.get("escalation_policy", {})
+                    if escalation_policy and escalation_policy.get("escalation_rules"):
+                        for rule in escalation_policy.get("escalation_rules", []):
+                            for target in rule.get("targets", []):
+                                if target.get("type") == "user" and target.get("id"):
+                                    incident_users.add(str(target["id"]))
             else:
                 # Rootly format
                 attrs = incident.get("attributes", {}) if incident else {}

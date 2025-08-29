@@ -89,7 +89,7 @@ export default function MethodologyPage() {
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center">
                   <TrendingUp className="w-5 h-5 mr-2 text-red-500" />
-                  Personal Burnout (40% weight)
+                  Personal Burnout (50% weight)
                 </CardTitle>
                 <Badge variant="destructive">High Impact</Badge>
               </div>
@@ -149,7 +149,7 @@ export default function MethodologyPage() {
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center">
                   <AlertTriangle className="w-5 h-5 mr-2 text-yellow-500" />
-                  Work-Related Burnout (35% weight)
+                  Work-Related Burnout (50% weight)
                 </CardTitle>
                 <Badge variant="outline" className="border-yellow-500 text-yellow-700">Medium Impact</Badge>
               </div>
@@ -196,62 +196,6 @@ export default function MethodologyPage() {
             </CardContent>
           </Card>
 
-          {/* Accomplishment Burnout */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center">
-                  <Activity className="w-5 h-5 mr-2 text-green-500" />
-                  Accomplishment Burnout (25% weight)
-                </CardTitle>
-                <Badge variant="outline" className="border-green-500 text-green-700">Effectiveness Factor</Badge>
-              </div>
-              <CardDescription>
-                Emotional exhaustion and cynicism related to incident response and customer service
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <p className="text-gray-700">
-                  We measure client-related burnout through:
-                </p>
-                <div className="grid gap-3">
-                  <div className="flex items-start space-x-3">
-                    <div className="w-2 h-2 bg-green-500 rounded-full mt-1.5"></div>
-                    <div>
-                      <strong className="text-sm">Resolution Success Rate</strong>
-                      <p className="text-sm text-gray-600">Inverse of response time pressure - better response times indicate higher accomplishment</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start space-x-3">
-                    <div className="w-2 h-2 bg-green-500 rounded-full mt-1.5"></div>
-                    <div>
-                      <strong className="text-sm">Incident Load Management</strong>
-                      <p className="text-sm text-gray-600">Ability to handle incident volume effectively without degradation. The incident volume score combines:</p>
-                      <ul className="text-xs text-gray-500 mt-1 ml-4">
-                        <li>• Workload component (40%): Based on incidents per week per responder</li>
-                        <li>• Severity component (60%): Weighted by incident severity (SEV0-4)</li>
-                      </ul>
-                    </div>
-                  </div>
-                  <div className="flex items-start space-x-3">
-                    <div className="w-2 h-2 bg-green-500 rounded-full mt-1.5"></div>
-                    <div>
-                      <strong className="text-sm">Code Quality & Collaboration</strong>
-                      <p className="text-sm text-gray-600">PR merge success rate (&gt;80%), constructive code review quality, and knowledge sharing through documentation</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start space-x-3">
-                    <div className="w-2 h-2 bg-green-500 rounded-full mt-1.5"></div>
-                    <div>
-                      <strong className="text-sm">Communication Effectiveness</strong>
-                      <p className="text-sm text-gray-600">Positive sentiment and constructive communication patterns in Slack (when available)</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </div>
 
         {/* GitHub-Only Analysis Section */}

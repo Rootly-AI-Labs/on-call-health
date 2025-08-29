@@ -521,7 +521,8 @@ class PagerDutyAPIClient:
                 } if assigned_user else None,
                 "service": incident.get("service", {}).get("summary", "Unknown Service"),
                 "source": "pagerduty",
-                "url": incident.get("html_url")
+                "url": incident.get("html_url"),
+                "raw_data": incident  # Include raw incident data for enhanced assignment logic
             })
         
         return {

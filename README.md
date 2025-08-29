@@ -100,26 +100,31 @@ python -m pytest
 
 ## 📊 Burnout Analysis
 
-The application uses a **three-factor burnout methodology** with equal weighting:
+The application uses the **Copenhagen Burnout Inventory (CBI)** methodology - a scientifically validated approach to measuring burnout risk in professional settings.
 
-1. **Personal Burnout** (33.3% weight)
-   - Incident frequency and clustering
-   - After-hours work patterns
-   - Resolution time pressure
+### CBI Methodology
+Our implementation uses the two core CBI dimensions specifically validated for software engineering teams:
 
-2. **Work-Related Burnout** (33.3% weight)
-   - Escalation patterns
-   - Team collaboration metrics
-   - Communication quality
+1. **Personal Burnout** (50% weight)
+   - Physical and psychological fatigue from workload
+   - Work-life boundary violations (after-hours/weekend work)
+   - Temporal stress patterns and recovery time deficits
 
-3. **Accomplishment Burnout** (33.4% weight)
-   - Resolution success rates
-   - Knowledge sharing
-   - Improvement trends
+2. **Work-Related Burnout** (50% weight)
+   - Fatigue specifically tied to work processes
+   - Response time pressure and incident load
+   - Team collaboration stress and communication quality
+
+### Scoring System
+- **0-24**: Low risk (sustainable workload)
+- **25-49**: Moderate risk (monitor closely)
+- **50-74**: High risk (intervention recommended)
+- **75-100**: Critical risk (immediate action required)
 
 ### Enhanced Analysis (Optional)
-- **GitHub Integration**: Coding stress patterns
-- **Slack Integration**: Communication sentiment analysis
+- **GitHub Integration**: Development patterns and code review stress
+- **Slack Integration**: Communication sentiment and after-hours activity
+- **PagerDuty Integration**: Multi-platform incident correlation
 
 ## 🚢 Deployment
 
