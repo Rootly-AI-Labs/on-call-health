@@ -2311,8 +2311,8 @@ export default function IntegrationsPage() {
               </Card>
           )}
 
-          {/* PagerDuty Card */}
-          {loadingPagerDuty ? (
+          {/* PagerDuty Card - TEMPORARILY DISABLED */}
+          {false && (loadingPagerDuty ? (
             <Card className="border-2 border-gray-200 p-8 flex items-center justify-center relative h-32 animate-pulse">
               <div className="absolute top-4 right-4 w-6 h-6 bg-gray-300 rounded"></div>
               <div className="flex items-center space-x-2">
@@ -2352,7 +2352,7 @@ export default function IntegrationsPage() {
                 <span className="text-2xl font-bold text-slate-900">PagerDuty</span>
               </div>
             </Card>
-          )}
+          ))}
         </div>
 
         {/* Organization Selector */}
@@ -2438,8 +2438,8 @@ export default function IntegrationsPage() {
                         </>
                       )}
                       
-                      {/* PagerDuty Organizations */}
-                      {pagerdutyIntegrations.length > 0 && (
+                      {/* PagerDuty Organizations - TEMPORARILY DISABLED */}
+                      {false && pagerdutyIntegrations.length > 0 && (
                         <>
                           {rootlyIntegrations.length > 0 && (
                             <div className="my-1 border-t border-gray-200"></div>
@@ -2712,8 +2712,8 @@ export default function IntegrationsPage() {
               </Card>
             )}
 
-            {/* Add PagerDuty Integration Form */}
-            {addingPlatform === 'pagerduty' && (
+            {/* Add PagerDuty Integration Form - TEMPORARILY DISABLED */}
+            {false && addingPlatform === 'pagerduty' && (
               <Card className="border-green-200 max-w-2xl mx-auto">
                 <CardHeader className="p-8">
                   <div className="flex items-center space-x-3">

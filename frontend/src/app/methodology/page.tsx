@@ -89,7 +89,7 @@ export default function MethodologyPage() {
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center">
                   <TrendingUp className="w-5 h-5 mr-2 text-red-500" />
-                  Personal Burnout (33% weight)
+                  Personal Burnout (40% weight)
                 </CardTitle>
                 <Badge variant="destructive">High Impact</Badge>
               </div>
@@ -149,7 +149,7 @@ export default function MethodologyPage() {
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center">
                   <AlertTriangle className="w-5 h-5 mr-2 text-yellow-500" />
-                  Work-Related Burnout (33% weight)
+                  Work-Related Burnout (35% weight)
                 </CardTitle>
                 <Badge variant="outline" className="border-yellow-500 text-yellow-700">Medium Impact</Badge>
               </div>
@@ -202,18 +202,18 @@ export default function MethodologyPage() {
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center">
                   <Activity className="w-5 h-5 mr-2 text-green-500" />
-                  Accomplishment Burnout (33% weight)
+                  Client-Related Burnout (25% weight)
                 </CardTitle>
                 <Badge variant="outline" className="border-green-500 text-green-700">Effectiveness Factor</Badge>
               </div>
               <CardDescription>
-                Reduced sense of technical effectiveness and professional accomplishment
+                Emotional exhaustion and cynicism related to incident response and customer service
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 <p className="text-gray-700">
-                  We measure accomplishment burnout through:
+                  We measure client-related burnout through:
                 </p>
                 <div className="grid gap-3">
                   <div className="flex items-start space-x-3">
@@ -370,36 +370,49 @@ export default function MethodologyPage() {
                 <div className="flex-1">
                   <Progress value={30} className="h-3" />
                 </div>
-                <span className="text-sm font-medium">0-40%</span>
+                <span className="text-sm font-medium">0-24</span>
               </div>
               <p className="text-sm text-gray-600 ml-24">
-                Healthy work-life balance, sustainable incident load
+                Low risk - sustainable workload and healthy work-life balance
               </p>
               
               <div className="flex items-center space-x-4">
                 <div className="w-24">
-                  <Badge className="bg-yellow-500">Medium Risk</Badge>
+                  <Badge className="bg-yellow-500">Moderate Risk</Badge>
                 </div>
                 <div className="flex-1">
-                  <Progress value={60} className="h-3" />
+                  <Progress value={49} className="h-3" />
                 </div>
-                <span className="text-sm font-medium">40-70%</span>
+                <span className="text-sm font-medium">25-49</span>
               </div>
               <p className="text-sm text-gray-600 ml-24">
-                Showing signs of stress, intervention recommended
+                Monitor closely - some stress indicators present
+              </p>
+
+              <div className="flex items-center space-x-4">
+                <div className="w-24">
+                  <Badge className="bg-orange-500">High Risk</Badge>
+                </div>
+                <div className="flex-1">
+                  <Progress value={74} className="h-3" />
+                </div>
+                <span className="text-sm font-medium">50-74</span>
+              </div>
+              <p className="text-sm text-gray-600 ml-24">
+                Intervention recommended - significant burnout indicators
               </p>
               
               <div className="flex items-center space-x-4">
                 <div className="w-24">
-                  <Badge className="bg-red-500">High Risk</Badge>
+                  <Badge className="bg-red-500">Critical Risk</Badge>
                 </div>
                 <div className="flex-1">
                   <Progress value={85} className="h-3" />
                 </div>
-                <span className="text-sm font-medium">70-100%</span>
+                <span className="text-sm font-medium">75-100</span>
               </div>
               <p className="text-sm text-gray-600 ml-24">
-                Critical burnout indicators, immediate action needed
+                Immediate action required - severe burnout risk
               </p>
             </div>
           </CardContent>
