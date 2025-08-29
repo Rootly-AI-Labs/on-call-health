@@ -2608,7 +2608,8 @@ export default function Dashboard() {
     return members
       ?.filter((member) => {
         // Check if member has CBI score or legacy burnout score
-        const hasCbiScore = member.cbi_score !== undefined && member.cbi_score !== null && member.cbi_score > 0
+        const memberWithCbi = member as any;
+        const hasCbiScore = memberWithCbi.cbi_score !== undefined && memberWithCbi.cbi_score !== null && memberWithCbi.cbi_score > 0
         const hasLegacyScore = member.burnout_score !== undefined && member.burnout_score !== null && member.burnout_score > 0
         return (hasCbiScore || hasLegacyScore) && member.incident_count > 0 // DEMO MODE: Only include members with incidents
       })

@@ -1236,9 +1236,20 @@ class UnifiedBurnoutAnalyzer:
         # Calculate averages and distributions with null safety
         members_with_incidents = [m for m in member_analyses if m and isinstance(m, dict) and m.get("incident_count", 0) > 0]
         
-        # Calculate average burnout for ALL members (including GitHub-only burnout)
-        all_burnout_scores = [m.get("burnout_score", 0) for m in member_analyses if m and isinstance(m, dict) and m.get("burnout_score") is not None]
-        avg_burnout = sum(all_burnout_scores) / len(all_burnout_scores) if all_burnout_scores and len(all_burnout_scores) > 0 else 0
+        # Calculate average burnout for ALL members - prioritize CBI scores when available
+        cbi_scores = [m.get("cbi_score") for m in member_analyses if m and isinstance(m, dict) and m.get("cbi_score") is not None]
+        
+        if cbi_scores and len(cbi_scores) > 0:
+            # Use CBI scores (0-100 scale where higher = more burnout)
+            avg_burnout = sum(cbi_scores) / len(cbi_scores)
+            using_cbi = True
+            logger.info(f"Team health calculation using CBI scores: avg={avg_burnout:.1f}, count={len(cbi_scores)}")
+        else:
+            # Fallback to legacy burnout scores (0-10 scale where higher = more burnout)
+            legacy_scores = [m.get("burnout_score", 0) for m in member_analyses if m and isinstance(m, dict) and m.get("burnout_score") is not None]
+            avg_burnout = sum(legacy_scores) / len(legacy_scores) if legacy_scores and len(legacy_scores) > 0 else 0
+            using_cbi = False
+            logger.info(f"Team health calculation using legacy scores: avg={avg_burnout:.1f}, count={len(legacy_scores)}")
         
         # Count risk levels (updated for 4-tier system) - include ALL members (incidents + GitHub-only)
         risk_dist = {"low": 0, "medium": 0, "high": 0, "critical": 0}
@@ -1250,51 +1261,47 @@ class UnifiedBurnoutAnalyzer:
                 else:
                     risk_dist["low"] += 1
         
-        # Calculate overall health score (inverse of burnout)
-        # Use a more balanced approach that ensures reasonable health scores
-        # even for high burnout levels
-        
-        # Define key thresholds and their corresponding health scores
-        # This creates a piecewise linear function with gentler slopes
-        if avg_burnout <= 2:
-            # Low burnout (0-2) maps to excellent health (10-8.5)
-            # Slope: -0.75
-            overall_score = 10 - (avg_burnout * 0.75)
-        elif avg_burnout <= 4:
-            # Low-medium burnout (2-4) maps to good health (8.5-7)
-            # Slope: -0.75
-            overall_score = 8.5 - ((avg_burnout - 2) * 0.75)
-        elif avg_burnout <= 6:
-            # Medium burnout (4-6) maps to fair health (7-5)
-            # Slope: -1.0
-            overall_score = 7 - ((avg_burnout - 4) * 1.0)
-        elif avg_burnout <= 8:
-            # High burnout (6-8) maps to concerning health (5-3)
-            # Slope: -1.0
-            overall_score = 5 - ((avg_burnout - 6) * 1.0)
+        # Calculate overall health score using appropriate scale
+        if using_cbi:
+            # CBI scoring (0-100 where higher = more burnout)
+            # Store raw CBI score as overall_score for frontend consumption
+            overall_score = avg_burnout
+            logger.info(f"Using raw CBI score as overall_score: {overall_score}")
         else:
-            # Very high burnout (8-10) maps to poor health (3-2)
-            # Slope: -0.5 (gentler slope to avoid extremely low scores)
-            overall_score = 3 - ((avg_burnout - 8) * 0.5)
+            # Legacy scoring - convert 0-10 burnout to 0-10 health scale (inverse)
+            overall_score = 10 - avg_burnout
+            overall_score = max(0, overall_score)
+            logger.info(f"Using legacy health calculation: burnout={avg_burnout} -> health={overall_score}")
         
-        # Allow scores to reach 0 for accurate representation of team health
-        overall_score = max(0, overall_score)
-        
-        # Determine health status with more realistic thresholds
-        # 90%+ = Excellent, 80-89% = Good, 70-79% = Fair, 60-69% = Poor, <60% = Critical
-        if overall_score >= 9:  # 90%+
-            health_status = "excellent"
-        elif overall_score >= 8:  # 80-89%
-            health_status = "good"
-        elif overall_score >= 7:  # 70-79%
-            health_status = "fair"
-        elif overall_score >= 6:  # 60-69%
-            health_status = "poor"
-        else:  # <60%
-            health_status = "critical"
+        # Determine health status based on scoring method
+        if using_cbi:
+            # CBI scoring (0-100 where higher = more burnout)
+            if overall_score < 25:
+                health_status = "excellent"  # Low/minimal burnout
+            elif overall_score < 50:
+                health_status = "good"       # Mild burnout symptoms  
+            elif overall_score < 75:
+                health_status = "fair"       # Moderate burnout risk
+            else:
+                health_status = "poor"       # High/severe burnout risk
+            logger.info(f"CBI health status: score={overall_score} -> {health_status}")
+        else:
+            # Legacy scoring (0-10 health scale where higher = better health)
+            if overall_score >= 9:  # 90%+
+                health_status = "excellent"
+            elif overall_score >= 8:  # 80-89%
+                health_status = "good"
+            elif overall_score >= 7:  # 70-79%
+                health_status = "fair"
+            elif overall_score >= 6:  # 60-69%
+                health_status = "poor"
+            else:  # <60%
+                health_status = "critical"
+            logger.info(f"Legacy health status: score={overall_score} -> {health_status}")
         
         return {
             "overall_score": round(overall_score, 2),
+            "scoring_method": "CBI" if using_cbi else "Legacy",
             "risk_distribution": risk_dist,
             "average_burnout_score": round(avg_burnout, 2),
             "health_status": health_status,

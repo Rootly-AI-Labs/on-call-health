@@ -34,15 +34,18 @@ export function TeamHealthOverview({
   return (
     <>
       {/* Tooltip Portal */}
-      <div className="fixed z-[99999] invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gray-900 text-white text-xs rounded-lg p-3 w-64 shadow-lg pointer-events-none"
+      <div className="fixed z-[99999] invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gray-900 text-white text-xs rounded-lg p-3 w-72 shadow-lg pointer-events-none"
            id="health-score-tooltip"
            style={{ top: '-200px', left: '-200px' }}>
         <div className="space-y-2">
-          <div><strong className="text-green-400">Excellent (90-100%):</strong> Low stress, sustainable workload</div>
-          <div><strong className="text-blue-400">Good (70-89%):</strong> Manageable workload with minor stress</div>
-          <div><strong className="text-yellow-400">Fair (50-69%):</strong> Moderate stress, watch for trends</div>
-          <div><strong className="text-orange-400">Poor (30-49%):</strong> High stress, intervention needed</div>
-          <div><strong className="text-red-400">Critical (&lt;30%):</strong> Severe burnout risk</div>
+          <div className="text-purple-300 font-semibold mb-2">CBI Team Burnout Score</div>
+          <div><strong className="text-green-400">Healthy (0-24):</strong> Low/minimal burnout risk</div>
+          <div><strong className="text-yellow-400">Fair (25-49):</strong> Mild burnout symptoms</div>
+          <div><strong className="text-orange-400">Poor (50-74):</strong> Moderate burnout risk</div>
+          <div><strong className="text-red-400">Critical (75-100):</strong> High/severe burnout risk</div>
+          <div className="text-gray-300 text-xs mt-2 pt-2 border-t border-gray-600">
+            Average CBI score across team members (higher scores = more burnout)
+          </div>
         </div>
         <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-900"></div>
       </div>
@@ -62,6 +65,32 @@ export function TeamHealthOverview({
                 <div className="flex items-start space-x-3">
                   <div>
                     <div className="text-2xl font-bold text-gray-900">{(() => {
+                      // Helper function to calculate health score from team data
+                      const calculateHealthFromTeam = () => {
+                        const teamAnalysis = currentAnalysis?.analysis_data?.team_analysis;
+                        const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members;
+                        
+                        if (!members || members.length === 0) return null;
+                        
+                        // Check if we have CBI scores
+                        const cbiScores = members.map((m: any) => m.cbi_score).filter((s: any) => s !== undefined && s !== null);
+                        if (cbiScores.length > 0) {
+                          const avgCbiScore = cbiScores.reduce((a: number, b: number) => a + b, 0) / cbiScores.length;
+                          // CBI: Show raw CBI score (0-100 where higher = more burnout)
+                          return Math.round(avgCbiScore);
+                        }
+                        
+                        // Fallback to legacy burnout scores
+                        const legacyScores = members.map((m: any) => m.burnout_score).filter((s: any) => s !== undefined && s !== null);
+                        if (legacyScores.length > 0) {
+                          const avgLegacyScore = legacyScores.reduce((a: number, b: number) => a + b, 0) / legacyScores.length;
+                          // Legacy: 0-10 where higher = more burnout, convert to health score
+                          return Math.round((10 - avgLegacyScore) * 10);
+                        }
+                        
+                        return null;
+                      };
+                      
                       // Use the latest point from health trends for consistency with chart
                       if (historicalTrends?.daily_trends?.length > 0) {
                         const latestTrend = historicalTrends.daily_trends[historicalTrends.daily_trends.length - 1];
@@ -72,6 +101,13 @@ export function TeamHealthOverview({
                         const latestTrend = currentAnalysis.analysis_data.daily_trends[currentAnalysis.analysis_data.daily_trends.length - 1];
                         return `${Math.round(latestTrend.overall_score * 10)}%`;
                       }
+                      
+                      // Try to calculate from team CBI scores
+                      const teamCbiScore = calculateHealthFromTeam();
+                      if (teamCbiScore !== null) {
+                        return `${teamCbiScore}/100`;
+                      }
+                      
                       // Show real data from team_health if available
                       if (currentAnalysis?.analysis_data?.team_health) {
                         return `${Math.round(currentAnalysis.analysis_data.team_health.overall_score * 10)}%`;
@@ -95,27 +131,56 @@ export function TeamHealthOverview({
                   })() && (
                     <div className="border-l border-gray-200 pl-3">
                       <div className="text-2xl font-bold text-gray-900">{(() => {
+                        // Helper function to calculate health score from team data (reuse from current score)
+                        const calculateHealthFromTeam = () => {
+                          const teamAnalysis = currentAnalysis?.analysis_data?.team_analysis;
+                          const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members;
+                          
+                          if (!members || members.length === 0) return null;
+                          
+                          // Check if we have CBI scores
+                          const cbiScores = members.map((m: any) => m.cbi_score).filter((s: any) => s !== undefined && s !== null);
+                          if (cbiScores.length > 0) {
+                            const avgCbiScore = cbiScores.reduce((a: number, b: number) => a + b, 0) / cbiScores.length;
+                            // CBI: Show raw CBI score (0-100 where higher = more burnout)
+                            return Math.round(avgCbiScore);
+                          }
+                          
+                          // Fallback to legacy burnout scores
+                          const legacyScores = members.map((m: any) => m.burnout_score).filter((s: any) => s !== undefined && s !== null);
+                          if (legacyScores.length > 0) {
+                            const avgLegacyScore = legacyScores.reduce((a: number, b: number) => a + b, 0) / legacyScores.length;
+                            // Legacy: 0-10 where higher = more burnout, convert to health score
+                            return Math.round((10 - avgLegacyScore) * 10);
+                          }
+                          
+                          return null;
+                        };
+                        
                         // Calculate average directly from Health Trends chart data (same source as chart)
                         if (historicalTrends?.daily_trends?.length > 0) {
                           const dailyScores = historicalTrends.daily_trends.map((d: any) => d.overall_score);
                           const average = dailyScores.reduce((a: number, b: number) => a + b, 0) / dailyScores.length;
-                          console.log("Debug - calculated average from historicalTrends daily_trends:", average * 10);
                           return `${Math.round(average * 10)}%`; // Convert 0-10 to 0-100%
                         }
                         // Fallback: Calculate from current analysis daily trends
                         if (currentAnalysis?.analysis_data?.daily_trends?.length > 0) {
                           const dailyScores = currentAnalysis.analysis_data.daily_trends.map((d: any) => d.overall_score);
                           const average = dailyScores.reduce((a: number, b: number) => a + b, 0) / dailyScores.length;
-                          console.log("Debug - calculated average from currentAnalysis daily_trends:", average * 10);
                           return `${Math.round(average * 10)}%`; // Convert 0-10 to 0-100%
                         }
+                        
+                        // Try to use current CBI-based calculation as fallback for average
+                        const teamCbiScore = calculateHealthFromTeam();
+                        if (teamCbiScore !== null) {
+                          return `${teamCbiScore}/100`;
+                        }
+                        
                         // Use current score if daily trends are empty but historical available
                         if (historicalTrends?.daily_trends?.length > 0) {
                           const latestTrend = historicalTrends.daily_trends[historicalTrends.daily_trends.length - 1];
-                          console.log("Debug - using latest trend:", latestTrend.overall_score * 10);
                           return `${Math.round(latestTrend.overall_score * 10)}%`;
                         }
-                        console.log("Debug - no data available for average");
                         return "No data";
                       })()}</div>
                       <div className="text-xs text-gray-500">{currentAnalysis?.time_range || 30}-day avg</div>
@@ -124,28 +189,53 @@ export function TeamHealthOverview({
                 </div>
                 <div className="mt-2 flex items-center space-x-1">
                   <div className="text-sm font-medium text-purple-600">{(() => {
-                    // Use the same data source as current score for consistency
-                    let currentScore = 0;
+                    // Helper function to get current health percentage
+                    const getCurrentHealthPercentage = () => {
+                      const teamAnalysis = currentAnalysis?.analysis_data?.team_analysis;
+                      const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members;
+                      
+                      if (members && members.length > 0) {
+                        // Check if we have CBI scores
+                        const cbiScores = members.map((m: any) => m.cbi_score).filter((s: any) => s !== undefined && s !== null);
+                        if (cbiScores.length > 0) {
+                          const avgCbiScore = cbiScores.reduce((a: number, b: number) => a + b, 0) / cbiScores.length;
+                          // CBI: Return raw CBI score (0-100 where higher = more burnout)
+                          return avgCbiScore;
+                        }
+                        
+                        // Fallback to legacy burnout scores
+                        const legacyScores = members.map((m: any) => m.burnout_score).filter((s: any) => s !== undefined && s !== null);
+                        if (legacyScores.length > 0) {
+                          const avgLegacyScore = legacyScores.reduce((a: number, b: number) => a + b, 0) / legacyScores.length;
+                          // Legacy: 0-10 where higher = more burnout, convert to health percentage
+                          return (10 - avgLegacyScore) * 10;
+                        }
+                      }
+                      
+                      // Fallback to existing daily trends logic
+                      if (historicalTrends?.daily_trends?.length > 0) {
+                        const latestTrend = historicalTrends.daily_trends[historicalTrends.daily_trends.length - 1];
+                        return latestTrend.overall_score * 10;
+                      } else if (currentAnalysis?.analysis_data?.daily_trends?.length > 0) {
+                        const latestTrend = currentAnalysis.analysis_data.daily_trends[currentAnalysis.analysis_data.daily_trends.length - 1];
+                        return latestTrend.overall_score * 10;
+                      } else if (currentAnalysis?.analysis_data?.team_health) {
+                        return currentAnalysis.analysis_data.team_health.overall_score * 10;
+                      } else if (currentAnalysis?.analysis_data?.team_summary) {
+                        return currentAnalysis.analysis_data.team_summary.average_score * 10;
+                      }
+                      
+                      return 0;
+                    };
                     
-                    if (historicalTrends?.daily_trends?.length > 0) {
-                      const latestTrend = historicalTrends.daily_trends[historicalTrends.daily_trends.length - 1];
-                      currentScore = latestTrend.overall_score;
-                    } else if (currentAnalysis?.analysis_data?.daily_trends?.length > 0) {
-                      const latestTrend = currentAnalysis.analysis_data.daily_trends[currentAnalysis.analysis_data.daily_trends.length - 1];
-                      currentScore = latestTrend.overall_score;
-                    } else if (currentAnalysis?.analysis_data?.team_health) {
-                      currentScore = currentAnalysis.analysis_data.team_health.overall_score;
-                    } else if (currentAnalysis?.analysis_data?.team_summary) {
-                      currentScore = currentAnalysis.analysis_data.team_summary.average_score;
-                    }
+                    const cbiScore = getCurrentHealthPercentage();
                     
-                    // Convert to health status (0-10 scale, higher=better)
-                    // Match tooltip ranges exactly: Good (70-89%), Fair (50-69%), Poor (30-49%), Critical (<30%)
-                    if (currentScore >= 9) return 'Excellent';  // 90-100%
-                    if (currentScore >= 7) return 'Good';        // 70-89% - "Manageable workload with minor stress"
-                    if (currentScore >= 5) return 'Fair';        // 50-69% - "Moderate stress, watch for trends"  
-                    if (currentScore >= 3) return 'Poor';        // 30-49% - "High stress, intervention needed"
-                    return 'Critical';                           // <30% - "Severe burnout risk"
+                    // Convert to health status based on raw CBI score (0-100, higher=worse burnout)
+                    // Match CBI ranges: Healthy (0-24), Fair (25-49), Poor (50-74), Critical (75-100)
+                    if (cbiScore < 25) return 'Healthy';      // CBI 0-24 - Low/minimal burnout risk
+                    if (cbiScore < 50) return 'Fair';         // CBI 25-49 - Mild burnout symptoms 
+                    if (cbiScore < 75) return 'Poor';         // CBI 50-74 - Moderate burnout risk
+                    return 'Critical';                        // CBI 75-100 - High/severe burnout risk
                   })()}</div>
                   <Info className="w-3 h-3 text-purple-500" 
                           onMouseEnter={(e) => {
@@ -168,42 +258,50 @@ export function TeamHealthOverview({
                 </div>
                 <p className="text-xs text-gray-600 mt-1">
                   {(() => {
-                    const status = (currentAnalysis.analysis_data.team_health?.health_status || (() => {
-                      // Use the SAME score calculation logic as the percentage display for consistency
-                      let currentScore = 0;
-                      if (historicalTrends?.daily_trends?.length > 0) {
-                        const latestTrend = historicalTrends.daily_trends[historicalTrends.daily_trends.length - 1];
-                        currentScore = latestTrend.overall_score;
-                      } else if (currentAnalysis?.analysis_data?.daily_trends?.length > 0) {
-                        const latestTrend = currentAnalysis.analysis_data.daily_trends[currentAnalysis.analysis_data.daily_trends.length - 1];
-                        currentScore = latestTrend.overall_score;
-                      } else if (currentAnalysis?.analysis_data?.team_health) {
-                        currentScore = currentAnalysis.analysis_data.team_health.overall_score;
-                      } else if (currentAnalysis?.analysis_data?.team_summary) {
-                        currentScore = currentAnalysis.analysis_data.team_summary.average_score;
+                    // Use the same health calculation logic for consistency 
+                    const getCurrentHealthPercentage = () => {
+                      const teamAnalysis = currentAnalysis?.analysis_data?.team_analysis;
+                      const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members;
+                      
+                      if (members && members.length > 0) {
+                        // Check if we have CBI scores
+                        const cbiScores = members.map((m: any) => m.cbi_score).filter((s: any) => s !== undefined && s !== null);
+                        if (cbiScores.length > 0) {
+                          const avgCbiScore = cbiScores.reduce((a: number, b: number) => a + b, 0) / cbiScores.length;
+                          return avgCbiScore; // Return raw CBI score
+                        }
+                        
+                        // Fallback to legacy burnout scores
+                        const legacyScores = members.map((m: any) => m.burnout_score).filter((s: any) => s !== undefined && s !== null);
+                        if (legacyScores.length > 0) {
+                          const avgLegacyScore = legacyScores.reduce((a: number, b: number) => a + b, 0) / legacyScores.length;
+                          return (10 - avgLegacyScore) * 10; // Convert to health percentage
+                        }
                       }
                       
-                      // Convert to health status using exact tooltip ranges: Good (70-89%), Fair (50-69%), Poor (30-49%), Critical (<30%)
-                      if (!currentScore) return 'good';  // Default to good instead of excellent
-                      if (currentScore >= 9) return 'excellent';  // 90-100%
-                      if (currentScore >= 7) return 'good';       // 70-89% - "Manageable workload with minor stress"
-                      if (currentScore >= 5) return 'fair';       // 50-69% - "Moderate stress, watch for trends"
-                      if (currentScore >= 3) return 'poor';       // 30-49% - "High stress, intervention needed"
-                      return 'critical';                          // <30% - "Severe burnout risk"
-                    })()).toLowerCase()
-                    switch(status) {
-                      case 'excellent':
-                        return 'Low stress, sustainable workload'
-                      case 'good':
-                        return 'Manageable workload with minor stress'
-                      case 'fair':
-                        return 'Moderate stress, watch for trends'
-                      case 'poor':
-                        return 'High stress, intervention needed'
-                      case 'critical':
-                        return 'Severe burnout risk'
-                      default:
-                        return 'Measures team workload sustainability and burnout risk levels'
+                      // Fallback to legacy daily trends logic
+                      if (historicalTrends?.daily_trends?.length > 0) {
+                        const latestTrend = historicalTrends.daily_trends[historicalTrends.daily_trends.length - 1];
+                        return latestTrend.overall_score * 10;
+                      } else if (currentAnalysis?.analysis_data?.daily_trends?.length > 0) {
+                        const latestTrend = currentAnalysis.analysis_data.daily_trends[currentAnalysis.analysis_data.daily_trends.length - 1];
+                        return latestTrend.overall_score * 10;
+                      }
+                      
+                      return 50; // Default middle value
+                    };
+                    
+                    const cbiScore = getCurrentHealthPercentage();
+                    
+                    // Match CBI score ranges and descriptions (0-100, higher = more burnout)
+                    if (cbiScore < 25) {
+                      return 'Low/minimal burnout risk, sustainable workload'  // Healthy
+                    } else if (cbiScore < 50) {
+                      return 'Mild burnout symptoms, watch for trends'         // Fair
+                    } else if (cbiScore < 75) {
+                      return 'Moderate burnout risk, intervention recommended' // Poor
+                    } else {
+                      return 'High/severe burnout risk, urgent action needed'  // Critical
                     }
                   })()}
                 </p>
@@ -227,25 +325,103 @@ export function TeamHealthOverview({
             {currentAnalysis?.analysis_data?.team_health || (currentAnalysis?.analysis_data?.team_analysis && currentAnalysis?.status === 'completed') ? (
               <div>
                 <div className="space-y-1">
-                  {(currentAnalysis.analysis_data.team_health?.risk_distribution?.critical > 0 || currentAnalysis.analysis_data.team_summary?.risk_distribution?.critical > 0) && (
-                    <div className="flex items-center space-x-2">
-                      <div className="text-2xl font-bold text-red-800">{currentAnalysis.analysis_data.team_health?.risk_distribution?.critical || currentAnalysis.analysis_data.team_summary?.risk_distribution?.critical || 0}</div>
-                      <AlertTriangle className="w-6 h-6 text-red-700" />
-                      <span className="text-sm text-gray-600">Critical risk</span>
-                    </div>
-                  )}
-                  <div className="flex items-center space-x-2">
-                    <div className="text-2xl font-bold text-red-600">{currentAnalysis.analysis_data.team_health?.risk_distribution?.high || currentAnalysis.analysis_data.team_summary?.risk_distribution?.high || 0}</div>
-                    <AlertTriangle className="w-6 h-6 text-red-500" />
-                    <span className="text-sm text-gray-600">High risk</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="text-2xl font-bold text-orange-600">{currentAnalysis.analysis_data.team_health?.risk_distribution?.medium || currentAnalysis.analysis_data.team_summary?.risk_distribution?.medium || 0}</div>
-                    <div className="w-6 h-6 rounded-full bg-orange-500/20 flex items-center justify-center">
-                      <div className="w-3 h-3 rounded-full bg-orange-500"></div>
-                    </div>
-                    <span className="text-sm text-gray-600">Medium risk</span>
-                  </div>
+                  {(() => {
+                    // Calculate CBI-based risk distribution from team members
+                    const teamAnalysis = currentAnalysis?.analysis_data?.team_analysis;
+                    const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members;
+                    
+                    if (members && members.length > 0) {
+                      // Calculate risk levels based on CBI scores when available
+                      const riskCounts = { critical: 0, high: 0, medium: 0, low: 0 };
+                      
+                      members.forEach((member: any) => {
+                        if (member.cbi_score !== undefined && member.cbi_score !== null) {
+                          // Use CBI scoring (0-100, higher = worse)
+                          if (member.cbi_score >= 75) riskCounts.critical++;
+                          else if (member.cbi_score >= 50) riskCounts.high++;
+                          else if (member.cbi_score >= 25) riskCounts.medium++;
+                          else riskCounts.low++;
+                        } else {
+                          // Fallback to legacy risk_level from backend
+                          const riskLevel = member.risk_level?.toLowerCase() || 'low';
+                          if (riskLevel === 'critical') riskCounts.critical++;
+                          else if (riskLevel === 'high') riskCounts.high++;
+                          else if (riskLevel === 'medium') riskCounts.medium++;
+                          else riskCounts.low++;
+                        }
+                      });
+                      
+                      return (
+                        <>
+                          {riskCounts.critical > 0 && (
+                            <div className="flex items-center space-x-2">
+                              <div className="text-2xl font-bold text-red-800">{riskCounts.critical}</div>
+                              <AlertTriangle className="w-6 h-6 text-red-700" />
+                              <span className="text-sm text-gray-600">Critical (CBI 75-100)</span>
+                            </div>
+                          )}
+                          {riskCounts.high > 0 && (
+                            <div className="flex items-center space-x-2">
+                              <div className="text-2xl font-bold text-red-600">{riskCounts.high}</div>
+                              <AlertTriangle className="w-6 h-6 text-red-500" />
+                              <span className="text-sm text-gray-600">High (CBI 50-74)</span>
+                            </div>
+                          )}
+                          {riskCounts.medium > 0 && (
+                            <div className="flex items-center space-x-2">
+                              <div className="text-2xl font-bold text-orange-600">{riskCounts.medium}</div>
+                              <div className="w-6 h-6 rounded-full bg-orange-500/20 flex items-center justify-center">
+                                <div className="w-3 h-3 rounded-full bg-orange-500"></div>
+                              </div>
+                              <span className="text-sm text-gray-600">Medium (CBI 25-49)</span>
+                            </div>
+                          )}
+                          {/* Only show low risk count if it's the majority or no other risks */}
+                          {(riskCounts.low > 0 && (riskCounts.critical + riskCounts.high + riskCounts.medium === 0)) && (
+                            <div className="flex items-center space-x-2">
+                              <div className="text-2xl font-bold text-green-600">{riskCounts.low}</div>
+                              <div className="w-6 h-6 rounded-full bg-green-500/20 flex items-center justify-center">
+                                <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                              </div>
+                              <span className="text-sm text-gray-600">Low (CBI 0-24)</span>
+                            </div>
+                          )}
+                          {/* Show "Everyone healthy" message if all low risk */}
+                          {(riskCounts.critical + riskCounts.high + riskCounts.medium === 0) && (
+                            <div className="text-center py-2">
+                              <div className="text-sm text-green-700 font-medium">🎉 Team shows healthy burnout levels</div>
+                              <div className="text-xs text-green-600">{riskCounts.low} member{riskCounts.low !== 1 ? 's' : ''} with low burnout risk</div>
+                            </div>
+                          )}
+                        </>
+                      );
+                    }
+                    
+                    // Fallback to legacy risk distribution
+                    return (
+                      <>
+                        {(currentAnalysis.analysis_data.team_health?.risk_distribution?.critical > 0 || currentAnalysis.analysis_data.team_summary?.risk_distribution?.critical > 0) && (
+                          <div className="flex items-center space-x-2">
+                            <div className="text-2xl font-bold text-red-800">{currentAnalysis.analysis_data.team_health?.risk_distribution?.critical || currentAnalysis.analysis_data.team_summary?.risk_distribution?.critical || 0}</div>
+                            <AlertTriangle className="w-6 h-6 text-red-700" />
+                            <span className="text-sm text-gray-600">Critical risk</span>
+                          </div>
+                        )}
+                        <div className="flex items-center space-x-2">
+                          <div className="text-2xl font-bold text-red-600">{currentAnalysis.analysis_data.team_health?.risk_distribution?.high || currentAnalysis.analysis_data.team_summary?.risk_distribution?.high || 0}</div>
+                          <AlertTriangle className="w-6 h-6 text-red-500" />
+                          <span className="text-sm text-gray-600">High risk</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <div className="text-2xl font-bold text-orange-600">{currentAnalysis.analysis_data.team_health?.risk_distribution?.medium || currentAnalysis.analysis_data.team_summary?.risk_distribution?.medium || 0}</div>
+                          <div className="w-6 h-6 rounded-full bg-orange-500/20 flex items-center justify-center">
+                            <div className="w-3 h-3 rounded-full bg-orange-500"></div>
+                          </div>
+                          <span className="text-sm text-gray-600">Medium risk</span>
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
                 <p className="text-xs text-gray-600 mt-2">
                   Out of {Array.isArray(currentAnalysis.analysis_data.team_analysis) ? currentAnalysis.analysis_data.team_analysis.length : (currentAnalysis.analysis_data.team_analysis?.members?.length || 0)} members
