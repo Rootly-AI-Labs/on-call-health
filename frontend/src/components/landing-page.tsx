@@ -197,15 +197,11 @@ export default function LandingPage() {
                 <div className="space-y-2 text-sm">
                   <div className="flex items-center space-x-2">
                     <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                    <span className="text-slate-600"><strong>Personal Burnout</strong> (33.3%)</span>
+                    <span className="text-slate-600"><strong>Personal Burnout</strong> (50%)</span>
                   </div>
                   <div className="flex items-center space-x-2">
                     <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                    <span className="text-slate-600"><strong>Work-Related Burnout</strong> (33.3%)</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span className="text-slate-600"><strong>Accomplishment Burnout</strong> (33.4%)</span>
+                    <span className="text-slate-600"><strong>Work-Related Burnout</strong> (50%)</span>
                   </div>
                 </div>
               </CardContent>
@@ -223,15 +219,19 @@ export default function LandingPage() {
                 <div className="space-y-2 text-sm">
                   <div className="flex items-center space-x-2">
                     <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span className="text-slate-600"><strong>Low Risk:</strong> Maintain balance</span>
+                    <span className="text-slate-600"><strong>Low Risk (0-24):</strong> Maintain balance</span>
                   </div>
                   <div className="flex items-center space-x-2">
                     <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                    <span className="text-slate-600"><strong>Medium Risk:</strong> Early intervention</span>
+                    <span className="text-slate-600"><strong>Moderate Risk (25-49):</strong> Monitor closely</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                    <span className="text-slate-600"><strong>High Risk (50-74):</strong> Early intervention</span>
                   </div>
                   <div className="flex items-center space-x-2">
                     <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                    <span className="text-slate-600"><strong>High Risk:</strong> Immediate action</span>
+                    <span className="text-slate-600"><strong>Critical Risk (75-100):</strong> Immediate action</span>
                   </div>
                 </div>
               </CardContent>
