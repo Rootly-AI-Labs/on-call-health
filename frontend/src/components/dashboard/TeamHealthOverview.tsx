@@ -38,13 +38,12 @@ export function TeamHealthOverview({
            id="health-score-tooltip"
            style={{ top: '-200px', left: '-200px' }}>
         <div className="space-y-2">
-          <div className="text-purple-300 font-semibold mb-2">CBI Team Burnout Score</div>
-          <div><strong className="text-green-400">Healthy (0-24):</strong> Low/minimal burnout risk</div>
-          <div><strong className="text-yellow-400">Fair (25-49):</strong> Mild burnout symptoms</div>
-          <div><strong className="text-orange-400">Poor (50-74):</strong> Moderate burnout risk</div>
-          <div><strong className="text-red-400">Critical (75-100):</strong> High/severe burnout risk</div>
+          <div className="text-purple-300 font-semibold mb-2">Copenhagen Burnout Inventory (CBI)</div>
+          <div className="text-gray-300 text-sm">
+            CBI scores range from <strong>0 to 100</strong>, where higher scores indicate more burnout risk.
+          </div>
           <div className="text-gray-300 text-xs mt-2 pt-2 border-t border-gray-600">
-            Average CBI score across team members (higher scores = more burnout)
+            Scientifically validated burnout assessment methodology
           </div>
         </div>
         <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-900"></div>
@@ -103,15 +102,31 @@ export function TeamHealthOverview({
                       if (teamCbiScore !== null) {
                         console.log(`🚀 USING FRONTEND CBI: ${teamCbiScore}`);
                         return (
-                          <div className="flex items-baseline space-x-1">
+                          <>
                             <span>{teamCbiScore}</span>
                             <span 
-                              className="text-xs text-gray-500 cursor-help" 
-                              title="Copenhagen Burnout Inventory score (0-100 scale, higher = more burnout)"
+                              className="text-xs text-gray-500 cursor-help ml-1" 
+                              onMouseEnter={(e) => {
+                                const tooltip = document.getElementById('health-score-tooltip')
+                                if (tooltip) {
+                                  const rect = e.currentTarget.getBoundingClientRect()
+                                  tooltip.style.top = `${rect.top - 180}px`
+                                  tooltip.style.left = `${rect.left - 120}px`
+                                  tooltip.classList.remove('invisible', 'opacity-0')
+                                  tooltip.classList.add('visible', 'opacity-100')
+                                }
+                              }}
+                              onMouseLeave={() => {
+                                const tooltip = document.getElementById('health-score-tooltip')
+                                if (tooltip) {
+                                  tooltip.classList.add('invisible', 'opacity-0')
+                                  tooltip.classList.remove('visible', 'opacity-100')
+                                }
+                              }}
                             >
                               CBI
                             </span>
-                          </div>
+                          </>
                         );
                       }
                       
@@ -147,70 +162,78 @@ export function TeamHealthOverview({
                     console.log("Debug - period_summary:", currentAnalysis?.analysis_data?.period_summary);
                     console.log("Debug - daily_trends length:", currentAnalysis?.analysis_data?.daily_trends?.length);
                     console.log("Debug - team_health:", currentAnalysis?.analysis_data?.team_health);
-                    // Always show average section, handle fallbacks inside
-                    return true;
+                    // Show average if we have either historical data OR CBI scores (since we can compute meaningful averages from CBI)
+                    const teamAnalysis = currentAnalysis?.analysis_data?.team_analysis;
+                    const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members;
+                    const hasCBIScores = members && members.some((m: any) => m.cbi_score !== undefined && m.cbi_score !== null);
+                    const hasHistoricalData = (historicalTrends?.daily_trends?.length > 0) || 
+                                             (currentAnalysis?.analysis_data?.daily_trends?.length > 0);
+                    
+                    // Remove average section completely
+                    return false;
                   })() && (
-                    <div className="border-l border-gray-200 pl-3">
-                      <div className="text-2xl font-bold text-gray-900">{(() => {
-                        // Use the SAME frontend calculation function as current score
-                        const calculateCBIFromTeamAvg = () => {
-                          const teamAnalysis = currentAnalysis?.analysis_data?.team_analysis;
-                          const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members;
-                          
-                          if (!members || members.length === 0) return null;
-                          
-                          // ALWAYS calculate from individual member CBI scores first
+                    <div className="hidden">
+                      <div className="text-2xl font-bold text-gray-900 flex items-baseline space-x-1">{(() => {
+                        // PRIORITY 1: Use CBI scores for meaningful 30-day average (same as current calculation)
+                        const teamAnalysis = currentAnalysis?.analysis_data?.team_analysis;
+                        const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members;
+                        
+                        if (members && members.length > 0) {
                           const cbiScores = members
                             .map((m: any) => m.cbi_score)
                             .filter((s: any) => s !== undefined && s !== null && s > 0);
                           
                           if (cbiScores.length > 0) {
                             const avgCbiScore = cbiScores.reduce((a: number, b: number) => a + b, 0) / cbiScores.length;
-                            return Math.round(avgCbiScore * 10) / 10; // Round to 1 decimal
-                          }
-                          
-                          // If no CBI scores, fallback to legacy
-                          const legacyScores = members
-                            .map((m: any) => m.burnout_score)
-                            .filter((s: any) => s !== undefined && s !== null && s > 0);
+                            const roundedScore = Math.round(avgCbiScore * 10) / 10;
+                            console.log(`📊 30-DAY AVERAGE using CURRENT CBI scores: ${roundedScore} (${cbiScores.length} members)`);
                             
-                          if (legacyScores.length > 0) {
-                            const avgLegacyScore = legacyScores.reduce((a: number, b: number) => a + b, 0) / legacyScores.length;
-                            return avgLegacyScore * 10;
+                            return (
+                              <>
+                                <span>{roundedScore}</span>
+                                <span 
+                                  className="text-xs text-gray-500 cursor-help ml-1" 
+                                  onMouseEnter={(e) => {
+                                    const tooltip = document.getElementById('health-score-tooltip')
+                                    if (tooltip) {
+                                      const rect = e.currentTarget.getBoundingClientRect()
+                                      tooltip.style.top = `${rect.top - 180}px`
+                                      tooltip.style.left = `${rect.left - 120}px`
+                                      tooltip.classList.remove('invisible', 'opacity-0')
+                                      tooltip.classList.add('visible', 'opacity-100')
+                                    }
+                                  }}
+                                  onMouseLeave={() => {
+                                    const tooltip = document.getElementById('health-score-tooltip')
+                                    if (tooltip) {
+                                      tooltip.classList.add('invisible', 'opacity-0')
+                                      tooltip.classList.remove('visible', 'opacity-100')
+                                    }
+                                  }}
+                                >
+                                  CBI
+                                </span>
+                              </>
+                            );
                           }
-                          
-                          return null;
-                        };
-                        
-                        // FORCE FRONTEND CBI CALCULATION FOR AVERAGE TOO!
-                        const teamCbiScoreAvg = calculateCBIFromTeamAvg();
-                        if (teamCbiScoreAvg !== null) {
-                          console.log(`🚀 USING FRONTEND CBI FOR AVERAGE: ${teamCbiScoreAvg}`);
-                          return (
-                            <div className="flex items-baseline space-x-1">
-                              <span>{teamCbiScoreAvg}</span>
-                              <span 
-                                className="text-xs text-gray-500 cursor-help" 
-                                title="Copenhagen Burnout Inventory average (0-100 scale, higher = more burnout)"
-                              >
-                                CBI
-                              </span>
-                            </div>
-                          );
                         }
                         
-                        console.log("⚠️ NO CBI SCORES FOR AVERAGE - falling back to historical");
+                        // PRIORITY 2: Fallback to backend historical data if no CBI scores
+                        console.log("📊 CALCULATING 30-DAY AVERAGE from backend historical data (no CBI)");
                         
-                        // Calculate average directly from Health Trends chart data (same source as chart)
+                        // Calculate average from Health Trends chart data (legacy method)
                         if (historicalTrends?.daily_trends?.length > 0) {
                           const dailyScores = historicalTrends.daily_trends.map((d: any) => d.overall_score);
                           const average = dailyScores.reduce((a: number, b: number) => a + b, 0) / dailyScores.length;
+                          console.log(`📊 USING HISTORICAL AVERAGE: ${(average * 10).toFixed(1)}% (${dailyScores.length} days)`);
                           return `${Math.round(average * 10)}%`; // Convert 0-10 to 0-100%
                         }
-                        // Fallback: Calculate from current analysis daily trends
+                        
+                        // Fallback: Calculate from current analysis daily trends  
                         if (currentAnalysis?.analysis_data?.daily_trends?.length > 0) {
                           const dailyScores = currentAnalysis.analysis_data.daily_trends.map((d: any) => d.overall_score);
                           const average = dailyScores.reduce((a: number, b: number) => a + b, 0) / dailyScores.length;
+                          console.log(`📊 USING CURRENT ANALYSIS AVERAGE: ${(average * 10).toFixed(1)}% (${dailyScores.length} days)`);
                           return `${Math.round(average * 10)}%`; // Convert 0-10 to 0-100%
                         }
                         
