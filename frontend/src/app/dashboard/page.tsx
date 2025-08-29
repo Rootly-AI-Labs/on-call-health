@@ -2987,10 +2987,15 @@ export default function Dashboard() {
                   const analysisConfig = (analysis as any).analysis_data?.config || {};
                   const betaIntegrationId = analysisConfig.beta_integration_id;
                   
-                  if (betaIntegrationId === 'beta-rootly' || String(analysis.integration_id) === 'beta-rootly' || organizationName.includes('Rootly')) {
-                    platformColor = 'bg-purple-500'  // Rootly = Purple
-                  } else if (betaIntegrationId === 'beta-pagerduty' || String(analysis.integration_id) === 'beta-pagerduty' || organizationName.includes('PagerDuty')) {
+                  // Priority: betaIntegrationId first, then integration_id, then organization name
+                  if (betaIntegrationId === 'beta-pagerduty' || String(analysis.integration_id) === 'beta-pagerduty') {
                     platformColor = 'bg-green-500'   // PagerDuty = Green
+                  } else if (betaIntegrationId === 'beta-rootly' || String(analysis.integration_id) === 'beta-rootly') {
+                    platformColor = 'bg-purple-500'  // Rootly = Purple
+                  } else if (organizationName.includes('PagerDuty')) {
+                    platformColor = 'bg-green-500'   // PagerDuty = Green
+                  } else if (organizationName.includes('Rootly')) {
+                    platformColor = 'bg-purple-500'  // Rootly = Purple
                   }
                 }
                 return (

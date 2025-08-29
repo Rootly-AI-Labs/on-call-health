@@ -435,7 +435,7 @@ class PagerDutyAPIClient:
         for user in users:
             normalized_users.append({
                 "id": user.get("id"),
-                "name": user.get("name", "Unknown"),
+                "name": user.get("name") or user.get("summary", "Unknown"),
                 "email": user.get("email", ""),
                 "timezone": user.get("time_zone", "UTC"),
                 "role": user.get("role", "user"),
@@ -516,7 +516,7 @@ class PagerDutyAPIClient:
                 "time_to_acknowledge_minutes": time_to_ack_minutes,
                 "assigned_to": {
                     "id": assigned_user.get("id") if assigned_user else None,
-                    "name": assigned_user.get("summary") if assigned_user else None,
+                    "name": (assigned_user.get("name") or assigned_user.get("summary")) if assigned_user else None,
                     "email": assigned_user.get("email") if assigned_user else None
                 } if assigned_user else None,
                 "service": incident.get("service", {}).get("summary", "Unknown Service"),
