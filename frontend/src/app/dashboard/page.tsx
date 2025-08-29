@@ -2730,7 +2730,9 @@ export default function Dashboard() {
         if (workloadScores.length === 0) return 0;
         
         const sum = workloadScores.reduce((total, score) => total + score, 0);
-        return Number((sum / workloadScores.length).toFixed(1));
+        const average = sum / workloadScores.length;
+        // Convert 0-10 scale to CBI 0-100 scale (whole integer)
+        return Math.round(average * 10);
       })(),
       metrics: `Average workload factor from ${allActiveMembers.length} active team members`
     },
@@ -2747,7 +2749,9 @@ export default function Dashboard() {
         if (afterHoursScores.length === 0) return 0;
         
         const sum = afterHoursScores.reduce((total, score) => total + score, 0);
-        return Number((sum / afterHoursScores.length).toFixed(1));
+        const average = sum / afterHoursScores.length;
+        // Convert 0-10 scale to CBI 0-100 scale (whole integer)
+        return Math.round(average * 10);
       })(),
       metrics: `Average after-hours factor from ${allActiveMembers.length} active team members`
     },
@@ -2764,7 +2768,9 @@ export default function Dashboard() {
         if (weekendScores.length === 0) return 0;
         
         const sum = weekendScores.reduce((total, score) => total + score, 0);
-        return Number((sum / weekendScores.length).toFixed(1));
+        const average = sum / weekendScores.length;
+        // Convert 0-10 scale to CBI 0-100 scale (whole integer)
+        return Math.round(average * 10);
       })(),
       metrics: `Average weekend work factor from ${allActiveMembers.length} active team members`
     },
@@ -2781,7 +2787,9 @@ export default function Dashboard() {
         if (responseScores.length === 0) return 0;
         
         const sum = responseScores.reduce((total, score) => total + score, 0);
-        return Number((sum / responseScores.length).toFixed(1));
+        const average = sum / responseScores.length;
+        // Convert 0-10 scale to CBI 0-100 scale (whole integer)
+        return Math.round(average * 10);
       })(),
       metrics: `Average response time factor from ${allActiveMembers.length} active team members`
     },
@@ -2798,7 +2806,9 @@ export default function Dashboard() {
         if (incidentLoadScores.length === 0) return 0;
         
         const sum = incidentLoadScores.reduce((a: number, b: number) => a + b, 0);
-        return Number((sum / incidentLoadScores.length).toFixed(1));
+        const average = sum / incidentLoadScores.length;
+        // Convert 0-10 scale to CBI 0-100 scale (whole integer)
+        return Math.round(average * 10);
       })(),
       metrics: `Average incident load factor from ${allActiveMembers.length} active team members`
     },
@@ -2806,11 +2816,11 @@ export default function Dashboard() {
     ...factor,
     color: getFactorColor(factor.value!),
     recommendation: getRecommendation(factor.factor),
-    severity: factor.value! >= 7 ? 'Critical' : factor.value! >= 5 ? 'Poor' : factor.value! >= 3 ? 'Fair' : 'Good'
+    severity: factor.value! >= 70 ? 'Critical' : factor.value! >= 50 ? 'Poor' : factor.value! >= 30 ? 'Fair' : 'Good'
   })) : [];
   
-  // Get high-risk factors for emphasis (temporarily lowered threshold to test)
-  const highRiskFactors = burnoutFactors.filter(f => f.value >= 2).sort((a, b) => b.value - a.value);
+  // Get high-risk factors for emphasis (CBI scale 0-100)
+  const highRiskFactors = burnoutFactors.filter(f => f.value >= 50).sort((a, b) => b.value - a.value);
 
   // Debug log to check the actual values
   useEffect(() => {
@@ -3918,7 +3928,7 @@ export default function Dashboard() {
                             tickFormatter={formatRadarLabel}
                           />
                           <PolarRadiusAxis 
-                            domain={[0, 10]} 
+                            domain={[0, 100]} 
                             tick={{ fontSize: 11, fill: '#6B7280' }}
                             tickCount={6}
                             angle={270}
@@ -3938,11 +3948,11 @@ export default function Dashboard() {
                                 return (
                                   <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
                                     <p className="font-semibold text-gray-900">{label}</p>
-                                    <p className="text-purple-600">Score: {Math.round(data.value)}/10</p>
+                                    <p className="text-purple-600">Score: {Math.round(data.value)}/100</p>
                                     <p className="text-xs text-gray-500 mt-1">
-                                      {data.value <= 3 ? 'Low Risk' : 
-                                       data.value <= 5 ? 'Moderate Risk' : 
-                                       data.value <= 7 ? 'High Risk' : 'Critical Risk'}
+                                      {data.value < 30 ? 'Good' : 
+                                       data.value < 50 ? 'Fair' : 
+                                       data.value < 70 ? 'Poor' : 'Critical'}
                                     </p>
                                   </div>
                                 )
@@ -3983,7 +3993,7 @@ export default function Dashboard() {
                     
                     <CardContent>
                       <div className="space-y-4">
-                        {(highRiskFactors.length > 0 ? highRiskFactors : burnoutFactors.slice(0, 5)).map((factor, index) => (
+                        {burnoutFactors.map((factor, index) => (
                           <div key={factor.factor} className="relative">
                             <div className="flex items-center justify-between mb-2">
                               <div className="flex items-center space-x-2">
@@ -3998,20 +4008,20 @@ export default function Dashboard() {
                                 </span>
                               </div>
                               <span className="text-lg font-bold" style={{ color: factor.color }}>
-                                {factor.value}/10
+                                {factor.value}/100
                               </span>
                             </div>
                             <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
                               <div 
                                 className="h-2 rounded-full transition-all duration-500" 
                                 style={{ 
-                                  width: `${(factor.value / 10) * 100}%`,
+                                  width: `${factor.value}%`,
                                   backgroundColor: (() => {
-                                    // Standardize colors to match burnout risk levels
-                                    if (factor.value <= 3) return '#10B981'; // green-500 - Low Risk
-                                    if (factor.value <= 5) return '#F59E0B'; // yellow-500 - Moderate Risk
-                                    if (factor.value <= 7) return '#F97316'; // orange-500 - High Risk
-                                    return '#EF4444'; // red-500 - Critical Risk
+                                    // Standardize colors to match CBI burnout risk levels (0-100 scale)
+                                    if (factor.value < 30) return '#10B981'; // green-500 - Good
+                                    if (factor.value < 50) return '#F59E0B'; // yellow-500 - Fair
+                                    if (factor.value < 70) return '#F97316'; // orange-500 - Poor
+                                    return '#EF4444'; // red-500 - Critical
                                   })()
                                 }}
                               ></div>

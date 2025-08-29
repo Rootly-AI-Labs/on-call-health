@@ -79,7 +79,7 @@ export function TeamHealthOverview({
                         if (cbiScores.length > 0) {
                           const avgCbiScore = cbiScores.reduce((a: number, b: number) => a + b, 0) / cbiScores.length;
                           console.log(`🔥 FRONTEND CBI CALCULATION: ${cbiScores.length} members, avg CBI = ${avgCbiScore.toFixed(1)}`);
-                          return Math.round(avgCbiScore * 10) / 10; // Round to 1 decimal
+                          return Math.round(avgCbiScore); // Round to whole integer
                         }
                         
                         // If no CBI scores, fallback to legacy
@@ -91,7 +91,7 @@ export function TeamHealthOverview({
                           const avgLegacyScore = legacyScores.reduce((a: number, b: number) => a + b, 0) / legacyScores.length;
                           console.log(`🔥 FRONTEND LEGACY CALCULATION: ${legacyScores.length} members, avg legacy = ${avgLegacyScore.toFixed(1)}`);
                           // Convert legacy 0-10 burnout to 0-100 burnout scale for consistency
-                          return avgLegacyScore * 10;
+                          return Math.round(avgLegacyScore * 10);
                         }
                         
                         return null;
