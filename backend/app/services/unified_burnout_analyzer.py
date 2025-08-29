@@ -810,8 +810,15 @@ class UnifiedBurnoutAnalyzer:
         # Map existing metrics to CBI format with severity weighting
         severity_dist = metrics.get('severity_distribution', {})
         
-        # Calculate severity-weighted incident burden (SEV0 = 5x, SEV1 = 4x, etc.)
-        severity_weights = {'sev0': 5.0, 'sev1': 4.0, 'sev2': 2.0, 'sev3': 1.5, 'unknown': 1.0}
+        # Calculate severity-weighted incident burden 
+        # Handle both Rootly (sev0-sev4) and PagerDuty (sev1-sev5) severity mappings
+        if self.platform == "pagerduty":
+            # PagerDuty: SEV1=critical, SEV2=high, SEV3=medium, SEV4=low, SEV5=info
+            severity_weights = {'sev1': 5.0, 'sev2': 4.0, 'sev3': 2.0, 'sev4': 1.5, 'sev5': 1.0}
+        else:
+            # Rootly: SEV0=critical, SEV1=high, SEV2=medium, SEV3=low, SEV4=info
+            severity_weights = {'sev0': 5.0, 'sev1': 4.0, 'sev2': 2.0, 'sev3': 1.5, 'sev4': 1.0, 'unknown': 1.0}
+        
         weighted_incidents = sum(
             severity_dist.get(sev, 0) * weight 
             for sev, weight in severity_weights.items()
@@ -829,19 +836,29 @@ class UnifiedBurnoutAnalyzer:
         baseline_oncall_stress = 15 if is_oncall else 0  # Mild baseline stress
         weekend_oncall_multiplier = 1.5 if metrics.get('weekend_incidents', 0) > 0 else 1.0
         
+        # Get the highest severity incidents based on platform
+        if self.platform == "pagerduty":
+            # PagerDuty: sev1=critical, sev2=high
+            critical_incidents = severity_dist.get('sev1', 0)
+            high_incidents = severity_dist.get('sev2', 0)
+        else:
+            # Rootly: sev0=critical, sev1=high
+            critical_incidents = severity_dist.get('sev0', 0)
+            high_incidents = severity_dist.get('sev1', 0)
+        
         cbi_metrics = {
             # Personal burnout factors
             'work_hours_trend': metrics.get('avg_hours_per_day', 0) * 7,  # Convert to weekly
-            'weekend_work': (severity_dist.get('sev0', 0) * 25 + severity_dist.get('sev1', 0) * 20) * weekend_oncall_multiplier,  # Weekend multiplier
+            'weekend_work': (critical_incidents * 25 + high_incidents * 20) * weekend_oncall_multiplier,  # Weekend multiplier
             'after_hours_activity': metrics.get('after_hours_incidents', 0) * 20,  # Increased multiplier
             'vacation_usage': min(80, weighted_incidents * 5),  # Incident load affects vacation usage
-            'sleep_quality_proxy': (severity_dist.get('sev0', 0) * 15 + severity_dist.get('sev1', 0) * 10 + baseline_oncall_stress),  # Sleep disruption from anticipation
+            'sleep_quality_proxy': (critical_incidents * 15 + high_incidents * 10 + baseline_oncall_stress),  # Sleep disruption from anticipation
             
             # Work-related burnout factors  
             'sprint_completion': max(0, 100 - (metrics.get('avg_response_time', 30) / 15 * 100)),  # Faster response = more pressure
             'code_review_speed': resolution_stress,  # Resolution time pressure
             'pr_frequency': min(100, weighted_incidents * 8),  # Severity-weighted workload
-            'deployment_frequency': severity_dist.get('sev0', 0) * 20,  # Production pressure from SEV0s
+            'deployment_frequency': critical_incidents * 20,  # Production pressure from critical incidents
             'meeting_load': min(80, weighted_incidents * 6 + baseline_oncall_stress),  # Meetings + oncall overhead
             'oncall_burden': weighted_incidents + (baseline_oncall_stress * 0.5)  # Weighted incidents + baseline stress
         }
