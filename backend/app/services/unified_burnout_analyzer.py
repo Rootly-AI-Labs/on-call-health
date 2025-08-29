@@ -12,7 +12,7 @@ from collections import defaultdict
 
 from ..core.rootly_client import RootlyAPIClient
 from ..core.pagerduty_client import PagerDutyAPIClient
-from ..core.cbi_config import calculate_composite_cbi_score, calculate_personal_burnout, calculate_work_related_burnout
+from ..core.cbi_config import calculate_composite_cbi_score, calculate_personal_burnout, calculate_work_related_burnout, generate_cbi_score_reasoning
 from .ai_burnout_analyzer import get_ai_burnout_analyzer
 from .github_correlation_service import GitHubCorrelationService
 
@@ -851,6 +851,14 @@ class UnifiedBurnoutAnalyzer:
         work_cbi = calculate_work_related_burnout(cbi_metrics) 
         composite_cbi = calculate_composite_cbi_score(personal_cbi['score'], work_cbi['score'])
         
+        # Generate reasoning for the CBI scores
+        cbi_reasoning = generate_cbi_score_reasoning(
+            personal_cbi, 
+            work_cbi, 
+            composite_cbi,
+            metrics  # Pass original metrics for context
+        )
+        
         result = {
             "user_id": user_id,
             "user_name": user_name,
@@ -866,6 +874,7 @@ class UnifiedBurnoutAnalyzer:
                 "work_related": round(work_cbi['score'], 2),
                 "interpretation": composite_cbi['interpretation']
             },
+            "cbi_reasoning": cbi_reasoning,  # Add explanations for the score
             "metrics": metrics
         }
         

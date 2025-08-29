@@ -353,6 +353,104 @@ def validate_cbi_config(config: CBIConfig = None) -> Dict[str, bool]:
     return results
 
 
+def generate_cbi_score_reasoning(
+    personal_result: Dict[str, Any], 
+    work_result: Dict[str, Any], 
+    composite_result: Dict[str, Any],
+    raw_metrics: Dict[str, Any] = None
+) -> List[str]:
+    """
+    Generate human-readable explanations for why someone has their CBI score.
+    
+    Args:
+        personal_result: Personal burnout calculation result
+        work_result: Work-related burnout calculation result
+        composite_result: Composite CBI score result
+        raw_metrics: Original metrics data for context
+        
+    Returns:
+        List of reasoning strings explaining the score
+    """
+    reasons = []
+    personal_score = personal_result['score']
+    work_score = work_result['score']
+    composite_score = composite_result['composite_score']
+    
+    # Overall score context
+    if composite_score >= 75:
+        reasons.append(f"🚨 Critical burnout risk (CBI: {composite_score:.0f}/100) - immediate attention needed")
+    elif composite_score >= 50:
+        reasons.append(f"⚠️ High burnout risk (CBI: {composite_score:.0f}/100) - monitor closely")
+    elif composite_score >= 25:
+        reasons.append(f"⚡ Moderate stress levels (CBI: {composite_score:.0f}/100) - manageable with care")
+    else:
+        reasons.append(f"✅ Low burnout risk (CBI: {composite_score:.0f}/100) - healthy stress levels")
+    
+    # Personal burnout contributors
+    if personal_score > 50:
+        personal_components = personal_result.get('components', {})
+        top_personal = sorted(personal_components.items(), key=lambda x: x[1].get('weighted_score', 0), reverse=True)
+        
+        reasons.append("🧠 Personal burnout factors:")
+        for factor_name, factor_data in top_personal[:3]:  # Top 3 contributors
+            weighted_score = factor_data.get('weighted_score', 0)
+            if weighted_score > 5:  # Only show significant contributors
+                if factor_name == 'work_hours_trend':
+                    reasons.append(f"   • Excessive work hours contributing {weighted_score:.1f} points")
+                elif factor_name == 'weekend_work':
+                    reasons.append(f"   • Weekend incident work adding {weighted_score:.1f} points of stress")
+                elif factor_name == 'after_hours_activity':
+                    reasons.append(f"   • After-hours incidents disrupting work-life balance ({weighted_score:.1f} points)")
+                elif factor_name == 'vacation_usage':
+                    reasons.append(f"   • High incident load preventing proper recovery time ({weighted_score:.1f} points)")
+                elif factor_name == 'sleep_quality_proxy':
+                    reasons.append(f"   • Critical incidents and on-call stress affecting sleep quality ({weighted_score:.1f} points)")
+    
+    # Work-related burnout contributors  
+    if work_score > 50:
+        work_components = work_result.get('components', {})
+        top_work = sorted(work_components.items(), key=lambda x: x[1].get('weighted_score', 0), reverse=True)
+        
+        reasons.append("💼 Work-related burnout factors:")
+        for factor_name, factor_data in top_work[:3]:  # Top 3 contributors
+            weighted_score = factor_data.get('weighted_score', 0)
+            if weighted_score > 5:  # Only show significant contributors
+                if factor_name == 'sprint_completion':
+                    reasons.append(f"   • High-pressure response times creating stress ({weighted_score:.1f} points)")
+                elif factor_name == 'pr_frequency':
+                    reasons.append(f"   • Heavy severity-weighted incident workload ({weighted_score:.1f} points)")
+                elif factor_name == 'deployment_frequency':
+                    reasons.append(f"   • Critical production incidents adding deployment pressure ({weighted_score:.1f} points)")
+                elif factor_name == 'meeting_load':
+                    reasons.append(f"   • Incident response meetings and postmortem overhead ({weighted_score:.1f} points)")
+                elif factor_name == 'oncall_burden':
+                    reasons.append(f"   • Severity-weighted on-call burden with baseline stress ({weighted_score:.1f} points)")
+    
+    # Specific severity insights
+    if raw_metrics:
+        severity_dist = raw_metrics.get('severity_distribution', {})
+        sev0_count = severity_dist.get('sev0', 0)
+        sev1_count = severity_dist.get('sev1', 0)
+        
+        if sev0_count > 0:
+            reasons.append(f"🔥 Handled {sev0_count} critical SEV0 incident{'s' if sev0_count != 1 else ''} (5x burnout impact)")
+        if sev1_count > 0:
+            reasons.append(f"⚠️ Managed {sev1_count} high-impact SEV1 incident{'s' if sev1_count != 1 else ''} (4x burnout impact)")
+        
+        total_incidents = sum(severity_dist.values()) if severity_dist else 0
+        if total_incidents > 0:
+            reasons.append(f"📞 On-call baseline stress from handling {total_incidents} total incidents")
+    
+    # Dimensional comparison
+    if abs(personal_score - work_score) > 15:
+        if personal_score > work_score:
+            reasons.append("🏠 Personal stress significantly higher than work stress - focus on recovery and boundaries")
+        else:
+            reasons.append("💻 Work stress significantly higher than personal stress - address workload and processes")
+    
+    return reasons
+
+
 def get_cbi_recommendations(cbi_result: Dict[str, Any]) -> List[str]:
     """
     Generate actionable recommendations based on CBI scores.
