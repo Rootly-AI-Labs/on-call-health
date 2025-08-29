@@ -2292,14 +2292,10 @@ class UnifiedBurnoutAnalyzer:
                 score_source = "incident_based"  # Default score source
                 
                 if incident_count == 0 and github_burnout_score > 0:
-                    # DEMO MODE: Skip GitHub-only users (no incidents)
-                    logger.info(f"🎯 DEMO MODE: Skipping GitHub-only analysis for {member.get('user_email', 'unknown')} - no incidents")
-                    continue  # Skip this user entirely for demo
-                    # Original code (commented out for demo):
-                    # # User has no incidents but GitHub activity - use GitHub score
-                    # final_score = github_burnout_score
-                    # score_source = "github_based"
-                    # github_adjustments_made += 1
+                    # User has no incidents but GitHub activity - use GitHub score
+                    final_score = github_burnout_score
+                    score_source = "github_based"
+                    github_adjustments_made += 1
                 elif incident_count > 0 and github_burnout_score > 0:
                     # User has both incidents and GitHub activity - combine scores
                     # Weight: 70% incident-based, 30% GitHub-based for users with incidents
@@ -2307,12 +2303,8 @@ class UnifiedBurnoutAnalyzer:
                     score_source = "hybrid"
                     github_adjustments_made += 1
                 elif incident_count == 0 and github_burnout_score == 0:
-                    # DEMO MODE: Skip users with no incidents (even if no GitHub activity)
-                    logger.info(f"🎯 DEMO MODE: Skipping {member.get('user_email', 'unknown')} - no incidents")
-                    continue  # Skip this user entirely for demo
-                    # Original code (commented out for demo):
-                    # # User has no incidents and no GitHub activity
-                    # score_source = "incident_based"  # Keep as incident_based since that's the baseline
+                    # User has no incidents and no GitHub activity
+                    score_source = "incident_based"  # Keep as incident_based since that's the baseline
                 
                 # Update member with new score
                 updated_member = member.copy()

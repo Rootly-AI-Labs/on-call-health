@@ -504,15 +504,19 @@ function IndividualDailyHealthChart({ memberData, analysisId, currentAnalysis }:
           <div className="flex items-center space-x-4 text-xs text-gray-500">
             <div className="flex items-center space-x-1">
               <div className="w-3 h-3 bg-green-500 rounded"></div>
-              <span>Good (70+)</span>
+              <span>Healthy (0-24 CBI)</span>
             </div>
             <div className="flex items-center space-x-1">
               <div className="w-3 h-3 bg-yellow-500 rounded"></div>
-              <span>Moderate (40-70)</span>
+              <span>Fair (25-49 CBI)</span>
+            </div>
+            <div className="flex items-center space-x-1">
+              <div className="w-3 h-3 bg-orange-500 rounded"></div>
+              <span>Poor (50-74 CBI)</span>
             </div>
             <div className="flex items-center space-x-1">
               <div className="w-3 h-3 bg-red-500 rounded"></div>
-              <span>Poor (&lt;40)</span>
+              <span>Critical (75-100 CBI)</span>
             </div>
             <div className="flex items-center space-x-1">
               <div className="w-3 h-3 bg-gray-300 border border-gray-400 border-dashed rounded"></div>
@@ -2622,7 +2626,7 @@ export default function Dashboard() {
         const memberWithCbi = member as any;
         const hasCbiScore = memberWithCbi.cbi_score !== undefined && memberWithCbi.cbi_score !== null && memberWithCbi.cbi_score > 0
         const hasLegacyScore = member.burnout_score !== undefined && member.burnout_score !== null && member.burnout_score > 0
-        return (hasCbiScore || hasLegacyScore) && member.incident_count > 0 // DEMO MODE: Only include members with incidents
+        return (hasCbiScore || hasLegacyScore) // Include all members with valid scores
       })
       ?.map((member) => {
         // Use CBI score if available, otherwise fall back to legacy score
@@ -2710,7 +2714,7 @@ export default function Dashboard() {
   // Backend provides pre-calculated factors - frontend should ONLY display, never recalculate
   const membersWithGitHubData = members.filter((m: any) => 
     m?.github_activity && (m.github_activity.commits_count > 0 || m.github_activity.commits_per_week > 0));
-  const allActiveMembers = membersWithIncidents; // DEMO MODE: Only members with incidents
+  const allActiveMembers = members; // Include all team members
 
   const burnoutFactors = (allActiveMembers.length > 0) ? [
     { 
@@ -3659,7 +3663,8 @@ export default function Dashboard() {
                           // Transform data and detect standout events (same logic as chart)
                           const chartData = dailyTrends.map((trend: any, index: number) => ({
                             date: trend.date,
-                            score: Math.round(trend.overall_score * 10),
+                            // Use CBI score methodology (0-100, where higher = more burnout)
+                            score: Math.round(trend.overall_score * 10), // Convert 0-10 to 0-100 CBI scale
                             membersAtRisk: trend.members_at_risk,
                             totalMembers: trend.total_members,
                             incidentCount: trend.incident_count || 0,
@@ -3685,25 +3690,33 @@ export default function Dashboard() {
                               // Detect peaks (local maxima)
                               if (prev && next && point.score > prev.score && point.score > next.score && point.score >= 75) {
                                 eventType = 'peak';
-                                eventDescription = `Team wellness at peak (${point.score}% healthy) - ${point.incidentCount} incidents handled without stress signs`;
+                                // Convert health score to CBI score for display (100 - health_percentage = CBI score)
+                                const cbiScore = Math.round(100 - point.score);
+                                eventDescription = `Team wellness at peak (${cbiScore} CBI score) - ${point.incidentCount} incidents handled without stress signs`;
                                 significance = point.score >= 90 ? 3 : 2;
                               }
                               // Detect valleys (local minima)  
                               else if (prev && next && point.score < prev.score && point.score < next.score && point.score <= 60) {
                                 eventType = 'valley';
-                                eventDescription = `Team showing signs of strain (${point.score}% score) - ${point.incidentCount} incidents, ${point.membersAtRisk} team members need support`;
+                                // Convert health score to CBI score for display (100 - health_percentage = CBI score)
+                                const cbiScore = Math.round(100 - point.score);
+                                eventDescription = `Team showing signs of strain (${cbiScore} CBI score) - ${point.incidentCount} incidents, ${point.membersAtRisk} team members need support`;
                                 significance = point.score <= 40 ? 3 : 2;
                               }
                               // Detect sharp improvements
                               else if (prevChange >= 20) {
                                 eventType = 'recovery';
-                                eventDescription = `Great turnaround! Team wellness improved by ${prevChange}% - interventions working well`;
+                                // For improvement, show it as CBI score reduction (health increase = CBI decrease)
+                                const cbiImprovement = Math.abs(prevChange);
+                                eventDescription = `Great turnaround! Team burnout reduced by ${cbiImprovement} CBI points - interventions working well`;
                                 significance = prevChange >= 30 ? 3 : 2;
                               }
                               // Detect sharp declines
                               else if (prevChange <= -20) {
                                 eventType = 'decline';
-                                eventDescription = `Warning: Team wellness declined by ${Math.abs(prevChange)}% - immediate attention recommended`;
+                                // For decline, show it as CBI score increase (health decrease = CBI increase)
+                                const cbiIncrease = Math.abs(prevChange);
+                                eventDescription = `Warning: Team burnout increased by ${cbiIncrease} CBI points - immediate attention recommended`;
                                 significance = prevChange <= -30 ? 3 : 2;
                               }
                               // Detect high incident volume days
@@ -3715,7 +3728,9 @@ export default function Dashboard() {
                               // Detect critical health days
                               else if (point.score <= 45 && point.membersAtRisk >= 3) {
                                 eventType = 'critical';
-                                eventDescription = `URGENT: Team at burnout risk (${point.score}% wellness) - ${point.membersAtRisk} members need immediate support`;
+                                // Convert health score to CBI score for display (100 - health_percentage = CBI score)
+                                const cbiScore = Math.round(100 - point.score);
+                                eventDescription = `URGENT: Team at burnout risk (${cbiScore} CBI score) - ${point.membersAtRisk} members need immediate support`;
                                 significance = 3;
                               }
                               

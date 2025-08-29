@@ -91,15 +91,16 @@ export function HealthTrendsChart({
                     
                     return {
                       date: new Date(trend.date).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }),
-                      // Convert burnout score (0-10) to health score (0-100)
-                      // Higher burnout = lower health, so: health = (10 - burnout) * 10
-                      score: hasRealData ? Math.max(0, Math.min(100, Math.round((10 - (trend.overall_score || 0)) * 10))) : 0, 
-                      // Calculate risk level based on the CONVERTED health score (0-100), not raw burnout
+                      // Use CBI score methodology (0-100, where higher = more burnout)
+                      // Convert legacy burnout score (0-10) to CBI scale (0-100) if needed
+                      score: hasRealData ? Math.max(0, Math.min(100, Math.round(trend.overall_score * 10))) : 0, 
+                      // Calculate risk level based on CBI score (0-100, higher = more burnout)
                       riskLevel: hasRealData ? (() => {
-                        const healthScore = Math.round((10 - trend.overall_score) * 10);
-                        if (healthScore >= 70) return 'good';
-                        if (healthScore >= 40) return 'fair';
-                        return 'poor';
+                        const cbiScore = Math.round(trend.overall_score * 10);
+                        if (cbiScore < 25) return 'healthy';      // 0-24: Healthy
+                        if (cbiScore < 50) return 'fair';         // 25-49: Fair  
+                        if (cbiScore < 75) return 'poor';         // 50-74: Poor
+                        return 'critical';                        // 75-100: Critical
                       })() : null,
                       membersAtRisk: hasRealData ? trend.members_at_risk : null,
                       totalMembers: hasRealData ? trend.total_members : null,
