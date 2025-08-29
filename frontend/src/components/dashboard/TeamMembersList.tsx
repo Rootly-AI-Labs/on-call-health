@@ -48,7 +48,12 @@ export function TeamMembersList({
               const teamAnalysis = currentAnalysis?.analysis_data?.team_analysis
               const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members
               return members
-                ?.filter((member) => member.incident_count > 0) // DEMO MODE: Only show members with incidents
+                ?.filter((member) => {
+                  // Show all members with valid CBI or burnout scores (match chart filtering)
+                  const hasCbiScore = member.cbi_score !== undefined && member.cbi_score !== null && member.cbi_score > 0
+                  const hasLegacyScore = member.burnout_score !== undefined && member.burnout_score !== null && member.burnout_score > 0
+                  return (hasCbiScore || hasLegacyScore)
+                })
                 ?.sort((a, b) => {
                   // Use CBI score for sorting if available, fallback to legacy
                   const aScore = a.cbi_score !== undefined ? a.cbi_score : a.burnout_score * 10;
