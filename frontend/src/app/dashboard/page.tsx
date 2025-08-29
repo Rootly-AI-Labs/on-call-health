@@ -440,7 +440,6 @@ function IndividualDailyHealthChart({ memberData, analysisId, currentAnalysis }:
         }
       } catch (err) {
         console.error('Error fetching daily health:', err);
-        console.log('Attempting fallback calculation with analysis:', currentAnalysis?.id);
         
         // Fallback: Calculate daily health from existing analysis data
         if (currentAnalysis && currentAnalysis.results) {
@@ -449,7 +448,6 @@ function IndividualDailyHealthChart({ memberData, analysisId, currentAnalysis }:
             const memberEmail = memberData?.user_email?.toLowerCase();
             
             // Don't show fabricated data - only show if there's actual individual incident data
-            console.log(`No individual daily health data available for ${memberData?.user_email}`);
             setError('No individual daily health data available - this member had no incident involvement during the analysis period');
           } catch (fallbackErr) {
             console.error('Fallback calculation failed:', fallbackErr);
@@ -610,16 +608,13 @@ function GitHubCommitsTimeline({ analysisId, totalCommits, weekendPercentage }: 
   totalCommits: number
   weekendPercentage: number
 }) {
-  console.log('GitHubCommitsTimeline: Component rendering with props:', { analysisId, totalCommits, weekendPercentage })
   const [loading, setLoading] = useState(true)
   const [timelineData, setTimelineData] = useState<any[]>([])
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchTimelineData = async () => {
-      console.log('GitHubCommitsTimeline: Starting fetch for analysisId:', analysisId)
       if (!analysisId) {
-        console.log('GitHubCommitsTimeline: No analysisId provided, skipping fetch')
         return
       }
 
@@ -629,7 +624,6 @@ function GitHubCommitsTimeline({ analysisId, totalCommits, weekendPercentage }: 
       try {
         const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
         const url = `${API_BASE}/analyses/${analysisId}/github-commits-timeline`
-        console.log('GitHubCommitsTimeline: Fetching from URL:', url)
         
         const response = await fetch(url, {
           headers: {
@@ -638,20 +632,16 @@ function GitHubCommitsTimeline({ analysisId, totalCommits, weekendPercentage }: 
           }
         })
 
-        console.log('GitHubCommitsTimeline: Response status:', response.status)
 
         if (!response.ok) {
           throw new Error(`Failed to fetch GitHub timeline data: ${response.status}`)
         }
 
         const result = await response.json()
-        console.log('GitHubCommitsTimeline: API response:', result)
         
         if (result.status === 'success' && result.data?.daily_commits) {
-          console.log('GitHubCommitsTimeline: Setting timeline data with', result.data.daily_commits.length, 'days')
           setTimelineData(result.data.daily_commits)
         } else if (result.status === 'error') {
-          console.log('GitHubCommitsTimeline: API returned error:', result.message)
           setError(result.message || 'Failed to fetch timeline data')
         }
       } catch (err) {
@@ -1022,7 +1012,6 @@ export default function Dashboard() {
   const clearIntegrationCache = () => {
     localStorage.removeItem('all_integrations')
     localStorage.removeItem('all_integrations_timestamp')
-    console.log('Integration cache cleared')
   }
 
   const cancelRunningAnalysis = async () => {
