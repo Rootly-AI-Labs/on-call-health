@@ -27,7 +27,8 @@ class PagerDutyAPIClient:
         """Test the PagerDuty API connection and get account info."""
         try:
             # Test connection by fetching users (works with both user and account tokens)
-            async with aiohttp.ClientSession() as session:
+            timeout = aiohttp.ClientTimeout(total=30)  # 30 second timeout
+            async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.get(
                     f"{self.base_url}/users",
                     headers=self.headers,
@@ -86,8 +87,17 @@ class PagerDutyAPIClient:
                 }
                 
         except Exception as e:
-            logger.error(f"PagerDuty connection test failed: {e}")
-            return {"valid": False, "error": str(e)}
+            # Log with more specific error categorization
+            error_msg = str(e)
+            if "ssl" in error_msg.lower() or "cannot connect to host" in error_msg.lower():
+                logger.warning(f"PagerDuty connection failed (network/SSL): {error_msg[:100]}...")
+                return {"valid": False, "error": "Network connectivity issue - check internet connection"}
+            elif "timeout" in error_msg.lower():
+                logger.warning(f"PagerDuty connection timed out: {error_msg[:100]}...")
+                return {"valid": False, "error": "Connection timeout - PagerDuty may be temporarily unavailable"}
+            else:
+                logger.error(f"PagerDuty connection test failed: {error_msg}")
+                return {"valid": False, "error": error_msg}
     
     async def _get_total_count(self, resource: str) -> int:
         """Get total count of a resource (users, services, etc)."""

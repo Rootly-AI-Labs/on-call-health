@@ -398,7 +398,8 @@ async def get_github_status(
                     logger.warning(f"Beta GitHub token test failed: {user_response.status_code}")
                     
         except Exception as e:
-            logger.error(f"Error testing beta GitHub token: {e}")
+            # Only log as warning since this is just a connection test, not critical functionality
+            logger.warning(f"Beta GitHub token test failed: {str(e)[:100]}...")
     
     # No integration available
     return {

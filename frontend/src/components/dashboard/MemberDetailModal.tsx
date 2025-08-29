@@ -69,8 +69,7 @@ export function MemberDetailModal({
             // Get the correct burnout score (handle both data formats)
             const burnoutScore = memberData?.burnout_score || (selectedMember.burnoutScore ? selectedMember.burnoutScore / 10 : 0) || 0;
             
-            // Use real burnout dimensions from backend if available, otherwise show single burnout score  
-            const burnoutDimensions = (memberData as any)?.burnout_dimensions || null;
+            // Burnout dimensions no longer used - replaced with CBI scores
           
           // Calculate overall burnout score (0-10 scale, higher = more burnout, consistent with dimensions)
           const overallBurnoutScore = Math.max(0, Math.min(10, burnoutScore || 0));
@@ -173,70 +172,139 @@ export function MemberDetailModal({
               </Card>
             </div>
             
-            {/* Burnout Summary */}
+            {/* CBI Burnout Analysis */}
             <Card>
               <CardContent className="p-4">
                 <h4 className="font-semibold text-gray-900 mb-2">Burnout Analysis</h4>
-                <p className="text-sm text-gray-700 mb-3">{burnoutSummary.summary}</p>
-                {(burnoutSummary.concerns.length > 0 || burnoutSummary.metrics.length > 0) && (
-                  <div className="flex flex-wrap gap-2">
-                    {burnoutSummary.concerns.map((concern, i) => (
-                      <Badge key={i} variant="outline" className="text-xs bg-orange-50 text-orange-700">
-                        🔥 {concern}
-                      </Badge>
-                    ))}
-                    {burnoutSummary.metrics.map((metric, i) => (
-                      <Badge key={i} variant="outline" className="text-xs bg-blue-50 text-blue-700">
-                        📈 {metric}
-                      </Badge>
-                    ))}
+                {memberData?.cbi_reasoning ? (
+                  <div className="space-y-6">
+                    {/* CBI Score Summary */}
+                    <div className="flex items-center justify-between bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg p-4">
+                      <div>
+                        <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">CBI Assessment</div>
+                        <div className="text-lg font-bold text-gray-900 mt-1">
+                          {memberData.cbi_score?.toFixed(0)}/100
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-xs text-gray-500">Risk Level</div>
+                        <div className={`text-sm font-semibold mt-1 ${
+                          (memberData.cbi_score || 0) >= 75 ? 'text-red-600' :
+                          (memberData.cbi_score || 0) >= 50 ? 'text-orange-600' :
+                          'text-green-600'
+                        }`}>
+                          {memberData.cbi_breakdown?.interpretation?.charAt(0).toUpperCase() + 
+                           (memberData.cbi_breakdown?.interpretation?.slice(1) || 'Unknown')}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Contributing Factors */}
+                    <div className="space-y-3">
+                      <h5 className="text-sm font-semibold text-gray-900 mb-3 pb-1 border-b border-gray-200">
+                        Factors
+                      </h5>
+                      <div className="space-y-2">
+                        {memberData.cbi_reasoning.slice(1).map((reason: string, index: number) => {
+                          const cleanReason = reason.replace(/^[\s]*[•·\-*]\s*/, '').trim();
+                          
+                          // Skip section headers
+                          const isSectionHeader = cleanReason.endsWith(':');
+                          if (isSectionHeader) return null;
+                          
+                          return (
+                            <div key={index} className="px-3 py-2 bg-gray-50 rounded-md border text-sm text-gray-700">
+                              {cleanReason}
+                            </div>
+                          );
+                        }).filter(Boolean)}
+                      </div>
+                    </div>
+
+                    {/* Dimensional Breakdown */}
+                    {memberData.cbi_breakdown && (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-green-50 rounded-lg p-3">
+                          <div className="text-xs font-medium text-green-600 uppercase">Personal</div>
+                          <div className="text-lg font-bold text-green-700">
+                            {memberData.cbi_breakdown.personal?.toFixed(0)}/100
+                          </div>
+                        </div>
+                        <div className="bg-blue-50 rounded-lg p-3">
+                          <div className="text-xs font-medium text-blue-600 uppercase">Work-Related</div>
+                          <div className="text-lg font-bold text-blue-700">
+                            {memberData.cbi_breakdown.work_related?.toFixed(0)}/100
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
+                ) : (
+                  <p className="text-sm text-gray-500 italic">
+                    CBI burnout analysis not available. Run a new analysis to see detailed burnout factors.
+                  </p>
                 )}
               </CardContent>
             </Card>
 
-            {/* Burnout Dimensions */}
-            {burnoutDimensions && (
+            {/* CBI Scores */}
+            {memberData?.cbi_personal_score !== undefined && memberData?.cbi_work_score !== undefined && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">Burnout Dimensions</CardTitle>
-                  <CardDescription>Three-factor burnout assessment across key dimensions</CardDescription>
+                  <CardTitle className="text-base">CBI Scores</CardTitle>
+                  <CardDescription>Copenhagen Burnout Inventory dimensional assessment</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="text-center p-3 rounded-lg bg-red-50 border border-red-100">
-                      <div className="text-lg font-bold text-red-600">
-                        {(burnoutDimensions.personal_burnout * 10).toFixed(0)}%
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="text-center p-3 rounded-lg bg-blue-50 border border-blue-100">
+                      <div className="text-lg font-bold text-blue-600">
+                        {memberData.cbi_personal_score.toFixed(1)}/100
                       </div>
-                      <p className="text-sm font-medium text-red-800">Personal Burnout</p>
-                      <p className="text-xs text-red-600 mt-1">Workload overwhelm & boundary violations</p>
+                      <p className="text-sm font-medium text-blue-800">Personal Burnout</p>
+                      <p className="text-xs text-blue-600 mt-1">Physical and psychological fatigue</p>
                     </div>
                     <div className="text-center p-3 rounded-lg bg-orange-50 border border-orange-100">
                       <div className="text-lg font-bold text-orange-600">
-                        {(burnoutDimensions.work_related_burnout * 10).toFixed(0)}%
+                        {memberData.cbi_work_score.toFixed(1)}/100
                       </div>
                       <p className="text-sm font-medium text-orange-800">Work-Related Burnout</p>
-                      <p className="text-xs text-orange-600 mt-1">Process dysfunction & collaboration strain</p>
+                      <p className="text-xs text-orange-600 mt-1">Work-specific exhaustion and cynicism</p>
                     </div>
-                    <div className="text-center p-3 rounded-lg bg-blue-50 border border-blue-100">
-                      <div className="text-lg font-bold text-blue-600">
-                        {(burnoutDimensions.accomplishment_burnout * 10).toFixed(0)}%
-                      </div>
-                      <p className="text-sm font-medium text-blue-800">Accomplishment Burnout</p>
-                      <p className="text-xs text-blue-600 mt-1">Technical stagnation & reduced effectiveness</p>
+                  </div>
+                  <div className="mt-4 text-center">
+                    <div className="text-2xl font-bold text-gray-900">
+                      {memberData.cbi_score.toFixed(1)}/100
                     </div>
+                    <p className="text-sm text-gray-600">Composite CBI Score</p>
                   </div>
                 </CardContent>
               </Card>
             )}
 
             <Tabs defaultValue="factors" className="w-full">
-              <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="factors">Factors</TabsTrigger>
-                <TabsTrigger value="incidents">Incidents</TabsTrigger>
-                <TabsTrigger value="github">GitHub</TabsTrigger>
-                <TabsTrigger value="communication">Communication</TabsTrigger>
-              </TabsList>
+              {(() => {
+                // Check if GitHub data exists
+                const hasGitHubData = selectedMember.github_activity?.commits_count > 0 || 
+                                     selectedMember.github_activity?.pull_requests_count > 0;
+                
+                // Check if Slack data exists  
+                const hasSlackData = selectedMember.slack_activity?.messages_sent > 0 ||
+                                   selectedMember.slack_activity?.channels_active > 0;
+                
+                // Calculate grid columns based on available data
+                const tabCount = 2 + (hasGitHubData ? 1 : 0) + (hasSlackData ? 1 : 0);
+                const gridCols = tabCount === 2 ? 'grid-cols-2' :
+                                tabCount === 3 ? 'grid-cols-3' : 'grid-cols-4';
+                
+                return (
+                  <TabsList className={`grid w-full ${gridCols}`}>
+                    <TabsTrigger value="factors">Factors</TabsTrigger>
+                    <TabsTrigger value="incidents">Incidents</TabsTrigger>
+                    {hasGitHubData && <TabsTrigger value="github">GitHub</TabsTrigger>}
+                    {hasSlackData && <TabsTrigger value="communication">Communication</TabsTrigger>}
+                  </TabsList>
+                );
+              })()}
 
               <TabsContent value="factors" className="space-y-4">
                 <Card>

@@ -17,6 +17,23 @@ export function TeamMembersList({
   getRiskColor,
   getProgressColor
 }: TeamMembersListProps) {
+  // Official CBI 4-color system for progress bars (0-100 scale, higher = more burnout)
+  const getCBIProgressColor = (score: number) => {
+    const clampedScore = Math.max(0, Math.min(100, score));
+    
+    if (clampedScore < 25) return '#10b981';      // Green - Low/minimal burnout (0-24)
+    if (clampedScore < 50) return '#eab308';      // Yellow - Mild burnout symptoms (25-49)  
+    if (clampedScore < 75) return '#f97316';      // Orange - Moderate/significant burnout (50-74)
+    return '#dc2626';                             // Red - High/severe burnout (75-100)
+  };
+
+  // Official CBI 4-color system for text/badges
+  const getCBITextColor = (score: number) => {
+    if (score < 25) return '#10b981';       // Green - Low/minimal burnout
+    if (score < 50) return '#eab308';       // Yellow - Mild burnout symptoms
+    if (score < 75) return '#f97316';       // Orange - Moderate/significant burnout  
+    return '#dc2626';                       // Red - High/severe burnout
+  };
   return (
     <>
       {/* Organization Members Grid */}
@@ -32,7 +49,12 @@ export function TeamMembersList({
               const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members
               return members
                 ?.filter((member) => member.incident_count > 0) // DEMO MODE: Only show members with incidents
-                ?.sort((a, b) => b.burnout_score - a.burnout_score) // Sort by burnout score descending (highest risk first)
+                ?.sort((a, b) => {
+                  // Use CBI score for sorting if available, fallback to legacy
+                  const aScore = a.cbi_score !== undefined ? a.cbi_score : a.burnout_score * 10;
+                  const bScore = b.cbi_score !== undefined ? b.cbi_score : b.burnout_score * 10;
+                  return bScore - aScore; // Sort by score descending (highest risk first)
+                })
                 ?.map((member) => (
               <Card
                 key={member.user_id}
@@ -110,14 +132,28 @@ export function TeamMembersList({
                     )}
                   </div>
                   <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Burnout Score</span>
-                      <span className="font-medium">{((member?.burnout_score || 0) * 10).toFixed(1)}%</span>
-                    </div>
+                    {member?.cbi_score !== undefined ? (
+                      <div className="flex justify-between text-sm">
+                        <span>Burnout Score</span>
+                        <span className="font-bold text-black">
+                          {member.cbi_score.toFixed(1)}/100
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="flex justify-between text-sm">
+                        <span>Burnout Score (Legacy)</span>
+                        <span className="font-medium">{((member?.burnout_score || 0) * 10).toFixed(1)}%</span>
+                      </div>
+                    )}
                     <div className="relative h-2 w-full overflow-hidden rounded-full bg-gray-200">
                       <div 
-                        className={`h-full transition-all ${getProgressColor(member.risk_level)}`}
-                        style={{ width: `${member.burnout_score * 10}%` }}
+                        className="h-full transition-all"
+                        style={{ 
+                          width: `${member?.cbi_score !== undefined ? member.cbi_score : member.burnout_score * 10}%`,
+                          backgroundColor: member?.cbi_score !== undefined 
+                            ? getCBIProgressColor(member.cbi_score)
+                            : undefined
+                        }}
                       />
                     </div>
                     <div className="flex justify-between text-xs text-gray-500">

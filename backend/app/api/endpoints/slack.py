@@ -402,7 +402,8 @@ async def get_slack_status(
                     pass  # Fallback failed, keep original count
     except Exception as e:
         channels_error = str(e)
-        logging.getLogger(__name__).error(f"Slack API exception for channels: {channels_error}")
+        # Only log as warning since this is just a preview/test, not critical functionality
+        logging.getLogger(__name__).warning(f"Slack API preview failed for channels: {channels_error[:100]}...")
     
     response_data = {
         "connected": True,

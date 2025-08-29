@@ -2606,17 +2606,41 @@ export default function Dashboard() {
     const teamAnalysis = currentAnalysis?.analysis_data?.team_analysis
     const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members
     return members
-      ?.filter((member) => member.burnout_score !== undefined && member.burnout_score !== null && member.burnout_score > 0 && member.incident_count > 0) // DEMO MODE: Only include members with incidents
-      ?.map((member) => ({
-        name: member.user_name.split(" ")[0],
-        fullName: member.user_name,
-        score: (10 - member.burnout_score) * 10, // Convert 0-10 burnout to 0-100 health scale
-        riskLevel: member.risk_level,
-        fill: member.risk_level === "high" ? "#dc2626" :      // Red for high
-              member.risk_level === "medium" ? "#f59e0b" :    // Amber for medium
-              "#10b981",                                       // Green for low
-      }))
-      ?.sort((a, b) => b.score - a.score) // Sort by score descending (highest risk first)
+      ?.filter((member) => {
+        // Check if member has CBI score or legacy burnout score
+        const hasCbiScore = member.cbi_score !== undefined && member.cbi_score !== null && member.cbi_score > 0
+        const hasLegacyScore = member.burnout_score !== undefined && member.burnout_score !== null && member.burnout_score > 0
+        return (hasCbiScore || hasLegacyScore) && member.incident_count > 0 // DEMO MODE: Only include members with incidents
+      })
+      ?.map((member) => {
+        // Use CBI score if available, otherwise fall back to legacy score
+        const score = (member as any).cbi_score !== undefined 
+          ? (member as any).cbi_score // CBI: Use raw score (0-100, where higher = more burnout)
+          : (member.burnout_score * 10) // Legacy: Convert 0-10 burnout to 0-100 burnout scale
+        
+        const burnoutScore = Math.max(0, score);
+        
+        // Official CBI 4-color system based on burnout score (higher = worse)
+        const getRiskFromBurnoutScore = (burnoutScore: number) => {
+          if (burnoutScore < 25) return { level: 'low', color: '#10b981' };      // Green - Low/minimal burnout (0-24)
+          if (burnoutScore < 50) return { level: 'mild', color: '#eab308' };     // Yellow - Mild burnout symptoms (25-49)  
+          if (burnoutScore < 75) return { level: 'moderate', color: '#f97316' }; // Orange - Moderate/significant burnout (50-74)
+          return { level: 'high', color: '#dc2626' };                           // Red - High/severe burnout (75-100)
+        };
+        
+        const riskInfo = getRiskFromBurnoutScore(burnoutScore);
+        
+        return {
+          name: member.user_name.split(" ")[0],
+          fullName: member.user_name,
+          score: burnoutScore,
+          riskLevel: riskInfo.level,
+          backendRiskLevel: member.risk_level, // Keep original for reference
+          scoreType: (member as any).cbi_score !== undefined ? 'CBI' : 'Legacy',
+          fill: riskInfo.color,
+        }
+      })
+      ?.sort((a, b) => b.score - a.score) // Sort by score descending (highest burnout first)
       || []
   })();
   
@@ -3495,8 +3519,8 @@ export default function Dashboard() {
               {/* Organization Member Scores - Full Width */}
               <Card className="mb-6">
                 <CardHeader>
-                  <CardTitle>Individual Burnout Health Levels</CardTitle>
-                  <CardDescription>Team member wellness scores and incident response metrics</CardDescription>
+                  <CardTitle>Individual Burnout Scores</CardTitle>
+                  <CardDescription>Team member CBI burnout scores (higher = more burnout risk)</CardDescription>
                 </CardHeader>
                 <CardContent>
                   {memberBarData.length > 0 ? (
@@ -3516,9 +3540,18 @@ export default function Dashboard() {
                           <Tooltip 
                             formatter={(value, name, props) => {
                               const data = props.payload;
+                              const getRiskLabel = (level: string) => {
+                                switch(level) {
+                                  case 'low': return 'Low/Minimal Burnout';
+                                  case 'mild': return 'Mild Burnout Symptoms';
+                                  case 'moderate': return 'Moderate/Significant Burnout';
+                                  case 'high': return 'High/Severe Burnout';
+                                  default: return level;
+                                }
+                              };
                               return [
-                                `${Number(value).toFixed(2)}%`, 
-                                `Burnout Score (${data.riskLevel.charAt(0).toUpperCase() + data.riskLevel.slice(1)} Risk)`
+                                `${Number(value).toFixed(1)}/100`, 
+                                `${data.scoreType} Score (${getRiskLabel(data.riskLevel)})`
                               ];
                             }}
                             labelFormatter={(label, payload) => {
