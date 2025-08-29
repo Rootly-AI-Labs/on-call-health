@@ -24,11 +24,19 @@ class BurnoutConfig:
         'critical': (7.5, 10.0)   # 75-100% - Severe burnout indicators
     }
     
-    # Maslach Dimension Weights (must sum to 1.0)
+    # Copenhagen Burnout Inventory Dimension Weights (must sum to 1.0)
+    # Based on CBI methodology - only 2 dimensions for software engineers
+    CBI_WEIGHTS = {
+        'personal_burnout': 0.50,        # Physical/psychological fatigue and exhaustion
+        'work_related_burnout': 0.50     # Fatigue/exhaustion specifically tied to work
+        # Note: client_related_burnout omitted - not applicable to software engineers
+    }
+    
+    # Legacy Maslach weights (deprecated - will be removed in future version)
     MASLACH_WEIGHTS = {
-        'emotional_exhaustion': 0.40,    # Primary burnout dimension
-        'depersonalization': 0.35,       # Cynicism and detachment
-        'personal_accomplishment': 0.25  # Sense of effectiveness (inverted)
+        'emotional_exhaustion': 0.40,    # Maps to personal_burnout
+        'depersonalization': 0.35,       # Maps to work_related_burnout  
+        'personal_accomplishment': 0.25  # Removed - not in CBI framework
     }
     
     # Factor Calculation Weights
@@ -236,7 +244,11 @@ def validate_config(config: BurnoutConfig = None) -> Dict[str, bool]:
     
     results = {}
     
-    # Check Maslach weights sum to 1.0
+    # Check CBI weights sum to 1.0
+    cbi_sum = sum(config.CBI_WEIGHTS.values())
+    results['cbi_weights_sum'] = abs(cbi_sum - 1.0) < 0.001
+    
+    # Check Maslach weights sum to 1.0 (legacy)
     maslach_sum = sum(config.MASLACH_WEIGHTS.values())
     results['maslach_weights_sum'] = abs(maslach_sum - 1.0) < 0.001
     
@@ -259,6 +271,32 @@ def validate_config(config: BurnoutConfig = None) -> Dict[str, bool]:
     )
     
     return results
+
+
+def convert_cbi_to_legacy_scale(cbi_score: float) -> float:
+    """
+    Convert CBI score (0-100) to legacy Maslach scale (0-10) for compatibility.
+    
+    Args:
+        cbi_score: CBI score on 0-100 scale
+        
+    Returns:
+        Equivalent score on 0-10 scale
+    """
+    return (cbi_score / 100.0) * 10.0
+
+
+def convert_legacy_to_cbi_scale(legacy_score: float) -> float:
+    """
+    Convert legacy Maslach score (0-10) to CBI scale (0-100) for comparison.
+    
+    Args:
+        legacy_score: Legacy score on 0-10 scale
+        
+    Returns:
+        Equivalent score on 0-100 scale
+    """
+    return (legacy_score / 10.0) * 100.0
 
 
 # Global singleton instance

@@ -12,6 +12,7 @@ from collections import defaultdict
 
 from ..core.rootly_client import RootlyAPIClient
 from ..core.pagerduty_client import PagerDutyAPIClient
+from ..core.cbi_config import calculate_composite_cbi_score, calculate_personal_burnout, calculate_work_related_burnout
 from .ai_burnout_analyzer import get_ai_burnout_analyzer
 from .github_correlation_service import GitHubCorrelationService
 
@@ -805,15 +806,37 @@ class UnifiedBurnoutAnalyzer:
         # Determine risk level
         risk_level = self._determine_risk_level(burnout_score)
         
+        # Calculate CBI (Copenhagen Burnout Inventory) score
+        # Map existing metrics to CBI format for initial testing
+        cbi_metrics = {
+            'work_hours_trend': metrics.get('avg_hours_per_day', 0) * 7,  # Convert to weekly
+            'weekend_work': metrics.get('weekend_incidents', 0) * 10,     # Scale up weekend work
+            'after_hours_activity': metrics.get('after_hours_incidents', 0) * 15,  # Scale after hours
+            'sprint_completion': max(0, 100 - (metrics.get('avg_response_time', 30) / 60 * 100)),  # Invert response time
+            'meeting_load': min(50, metrics.get('total_incidents', 0) * 5),  # Use incidents as meeting proxy
+            'oncall_burden': metrics.get('total_incidents', 0)  # Direct mapping
+        }
+        
+        # Calculate CBI dimensions
+        personal_cbi = calculate_personal_burnout(cbi_metrics)
+        work_cbi = calculate_work_related_burnout(cbi_metrics) 
+        composite_cbi = calculate_composite_cbi_score(personal_cbi['score'], work_cbi['score'])
+        
         result = {
             "user_id": user_id,
             "user_name": user_name,
             "user_email": user_email,
             "burnout_score": round(burnout_score, 2),
+            "cbi_score": round(composite_cbi['composite_score'], 2),  # Add CBI score
             "risk_level": risk_level,
             "incident_count": len(incidents),
             "factors": factors,
             "burnout_dimensions": dimensions,
+            "cbi_breakdown": {  # Add CBI breakdown for comparison
+                "personal": round(personal_cbi['score'], 2),
+                "work_related": round(work_cbi['score'], 2),
+                "interpretation": composite_cbi['interpretation']
+            },
             "metrics": metrics
         }
         
