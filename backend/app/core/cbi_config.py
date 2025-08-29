@@ -378,20 +378,20 @@ def generate_cbi_score_reasoning(
     
     # Overall score context
     if composite_score >= 75:
-        reasons.append(f"🚨 Critical burnout risk (CBI: {composite_score:.0f}/100) - immediate attention needed")
+        reasons.append(f"Critical burnout risk (CBI: {composite_score:.0f}/100) - immediate attention needed")
     elif composite_score >= 50:
-        reasons.append(f"⚠️ High burnout risk (CBI: {composite_score:.0f}/100) - monitor closely")
+        reasons.append(f"High burnout risk (CBI: {composite_score:.0f}/100) - monitor closely")
     elif composite_score >= 25:
-        reasons.append(f"⚡ Moderate stress levels (CBI: {composite_score:.0f}/100) - manageable with care")
+        reasons.append(f"Moderate stress levels (CBI: {composite_score:.0f}/100) - manageable with care")
     else:
-        reasons.append(f"✅ Low burnout risk (CBI: {composite_score:.0f}/100) - healthy stress levels")
+        reasons.append(f"Low burnout risk (CBI: {composite_score:.0f}/100) - healthy stress levels")
     
     # Personal burnout contributors
     if personal_score > 50:
         personal_components = personal_result.get('components', {})
         top_personal = sorted(personal_components.items(), key=lambda x: x[1].get('weighted_score', 0), reverse=True)
         
-        reasons.append("🧠 Personal burnout factors:")
+        reasons.append("Personal burnout factors:")
         for factor_name, factor_data in top_personal[:3]:  # Top 3 contributors
             weighted_score = factor_data.get('weighted_score', 0)
             if weighted_score > 5:  # Only show significant contributors
@@ -411,7 +411,7 @@ def generate_cbi_score_reasoning(
         work_components = work_result.get('components', {})
         top_work = sorted(work_components.items(), key=lambda x: x[1].get('weighted_score', 0), reverse=True)
         
-        reasons.append("💼 Work-related burnout factors:")
+        reasons.append("Work-related burnout factors:")
         for factor_name, factor_data in top_work[:3]:  # Top 3 contributors
             weighted_score = factor_data.get('weighted_score', 0)
             if weighted_score > 5:  # Only show significant contributors
@@ -433,20 +433,20 @@ def generate_cbi_score_reasoning(
         sev1_count = severity_dist.get('sev1', 0)
         
         if sev0_count > 0:
-            reasons.append(f"🔥 Handled {sev0_count} critical SEV0 incident{'s' if sev0_count != 1 else ''} (5x burnout impact)")
+            reasons.append(f"Handled {sev0_count} critical SEV0 incident{'s' if sev0_count != 1 else ''} (5x burnout impact)")
         if sev1_count > 0:
-            reasons.append(f"⚠️ Managed {sev1_count} high-impact SEV1 incident{'s' if sev1_count != 1 else ''} (4x burnout impact)")
+            reasons.append(f"Managed {sev1_count} high-impact SEV1 incident{'s' if sev1_count != 1 else ''} (4x burnout impact)")
         
         total_incidents = sum(severity_dist.values()) if severity_dist else 0
         if total_incidents > 0:
-            reasons.append(f"📞 On-call baseline stress from handling {total_incidents} total incidents")
+            reasons.append(f"On-call baseline stress from handling {total_incidents} total incidents")
     
     # Dimensional comparison
     if abs(personal_score - work_score) > 15:
         if personal_score > work_score:
-            reasons.append("🏠 Personal stress significantly higher than work stress - focus on recovery and boundaries")
+            reasons.append("Personal stress significantly higher than work stress - focus on recovery and boundaries")
         else:
-            reasons.append("💻 Work stress significantly higher than personal stress - address workload and processes")
+            reasons.append("Work stress significantly higher than personal stress - address workload and processes")
     
     return reasons
 
