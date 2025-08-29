@@ -807,14 +807,43 @@ class UnifiedBurnoutAnalyzer:
         risk_level = self._determine_risk_level(burnout_score)
         
         # Calculate CBI (Copenhagen Burnout Inventory) score
-        # Map existing metrics to CBI format for initial testing
+        # Map existing metrics to CBI format with severity weighting
+        severity_dist = metrics.get('severity_distribution', {})
+        
+        # Calculate severity-weighted incident burden (SEV0 = 5x, SEV1 = 4x, etc.)
+        severity_weights = {'sev0': 5.0, 'sev1': 4.0, 'sev2': 2.0, 'sev3': 1.5, 'unknown': 1.0}
+        weighted_incidents = sum(
+            severity_dist.get(sev, 0) * weight 
+            for sev, weight in severity_weights.items()
+        )
+        
+        # Calculate resolution time stress (higher = more stressful)
+        avg_resolution_minutes = metrics.get('avg_resolution_time_minutes', 0)
+        resolution_stress = min(100, avg_resolution_minutes / 60)  # Hours to stress score
+        
+        # Calculate baseline on-call stress (research-based)
+        total_incidents = metrics.get('total_incidents', 0)
+        is_oncall = total_incidents > 0  # If handling incidents, they're likely on-call
+        
+        # Baseline stress from being on-call (even without incidents)
+        baseline_oncall_stress = 15 if is_oncall else 0  # Mild baseline stress
+        weekend_oncall_multiplier = 1.5 if metrics.get('weekend_incidents', 0) > 0 else 1.0
+        
         cbi_metrics = {
+            # Personal burnout factors
             'work_hours_trend': metrics.get('avg_hours_per_day', 0) * 7,  # Convert to weekly
-            'weekend_work': metrics.get('weekend_incidents', 0) * 10,     # Scale up weekend work
-            'after_hours_activity': metrics.get('after_hours_incidents', 0) * 15,  # Scale after hours
-            'sprint_completion': max(0, 100 - (metrics.get('avg_response_time', 30) / 60 * 100)),  # Invert response time
-            'meeting_load': min(50, metrics.get('total_incidents', 0) * 5),  # Use incidents as meeting proxy
-            'oncall_burden': metrics.get('total_incidents', 0)  # Direct mapping
+            'weekend_work': (severity_dist.get('sev0', 0) * 25 + severity_dist.get('sev1', 0) * 20) * weekend_oncall_multiplier,  # Weekend multiplier
+            'after_hours_activity': metrics.get('after_hours_incidents', 0) * 20,  # Increased multiplier
+            'vacation_usage': min(80, weighted_incidents * 5),  # Incident load affects vacation usage
+            'sleep_quality_proxy': (severity_dist.get('sev0', 0) * 15 + severity_dist.get('sev1', 0) * 10 + baseline_oncall_stress),  # Sleep disruption from anticipation
+            
+            # Work-related burnout factors  
+            'sprint_completion': max(0, 100 - (metrics.get('avg_response_time', 30) / 15 * 100)),  # Faster response = more pressure
+            'code_review_speed': resolution_stress,  # Resolution time pressure
+            'pr_frequency': min(100, weighted_incidents * 8),  # Severity-weighted workload
+            'deployment_frequency': severity_dist.get('sev0', 0) * 20,  # Production pressure from SEV0s
+            'meeting_load': min(80, weighted_incidents * 6 + baseline_oncall_stress),  # Meetings + oncall overhead
+            'oncall_burden': weighted_incidents + (baseline_oncall_stress * 0.5)  # Weighted incidents + baseline stress
         }
         
         # Calculate CBI dimensions
