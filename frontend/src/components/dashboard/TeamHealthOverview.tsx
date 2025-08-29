@@ -65,31 +65,58 @@ export function TeamHealthOverview({
                 <div className="flex items-start space-x-3">
                   <div>
                     <div className="text-2xl font-bold text-gray-900">{(() => {
-                      // Helper function to calculate health score from team data
-                      const calculateHealthFromTeam = () => {
+                      // Helper function to calculate CBI score from team data - FORCE FRONTEND CALCULATION
+                      const calculateCBIFromTeam = () => {
                         const teamAnalysis = currentAnalysis?.analysis_data?.team_analysis;
                         const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members;
                         
                         if (!members || members.length === 0) return null;
                         
-                        // Check if we have CBI scores
-                        const cbiScores = members.map((m: any) => m.cbi_score).filter((s: any) => s !== undefined && s !== null);
+                        // ALWAYS calculate from individual member CBI scores first
+                        const cbiScores = members
+                          .map((m: any) => m.cbi_score)
+                          .filter((s: any) => s !== undefined && s !== null && s > 0);
+                        
                         if (cbiScores.length > 0) {
                           const avgCbiScore = cbiScores.reduce((a: number, b: number) => a + b, 0) / cbiScores.length;
-                          // CBI: Show raw CBI score (0-100 where higher = more burnout)
-                          return Math.round(avgCbiScore);
+                          console.log(`🔥 FRONTEND CBI CALCULATION: ${cbiScores.length} members, avg CBI = ${avgCbiScore.toFixed(1)}`);
+                          return Math.round(avgCbiScore * 10) / 10; // Round to 1 decimal
                         }
                         
-                        // Fallback to legacy burnout scores
-                        const legacyScores = members.map((m: any) => m.burnout_score).filter((s: any) => s !== undefined && s !== null);
+                        // If no CBI scores, fallback to legacy
+                        const legacyScores = members
+                          .map((m: any) => m.burnout_score)
+                          .filter((s: any) => s !== undefined && s !== null && s > 0);
+                          
                         if (legacyScores.length > 0) {
                           const avgLegacyScore = legacyScores.reduce((a: number, b: number) => a + b, 0) / legacyScores.length;
-                          // Legacy: 0-10 where higher = more burnout, convert to health score
-                          return Math.round((10 - avgLegacyScore) * 10);
+                          console.log(`🔥 FRONTEND LEGACY CALCULATION: ${legacyScores.length} members, avg legacy = ${avgLegacyScore.toFixed(1)}`);
+                          // Convert legacy 0-10 burnout to 0-100 burnout scale for consistency
+                          return avgLegacyScore * 10;
                         }
                         
                         return null;
                       };
+                      
+                      // FORCE FRONTEND CBI CALCULATION FIRST - Don't trust backend at all!
+                      const teamCbiScore = calculateCBIFromTeam();
+                      if (teamCbiScore !== null) {
+                        console.log(`🚀 USING FRONTEND CBI: ${teamCbiScore}`);
+                        return (
+                          <div className="flex items-baseline space-x-1">
+                            <span>{teamCbiScore}</span>
+                            <span 
+                              className="text-xs text-gray-500 cursor-help" 
+                              title="Copenhagen Burnout Inventory score (0-100 scale, higher = more burnout)"
+                            >
+                              CBI
+                            </span>
+                          </div>
+                        );
+                      }
+                      
+                      // Only use backend data if we have no individual member scores
+                      console.log("⚠️ NO INDIVIDUAL CBI SCORES - falling back to backend");
                       
                       // Use the latest point from health trends for consistency with chart
                       if (historicalTrends?.daily_trends?.length > 0) {
@@ -100,12 +127,6 @@ export function TeamHealthOverview({
                       if (currentAnalysis?.analysis_data?.daily_trends?.length > 0) {
                         const latestTrend = currentAnalysis.analysis_data.daily_trends[currentAnalysis.analysis_data.daily_trends.length - 1];
                         return `${Math.round(latestTrend.overall_score * 10)}%`;
-                      }
-                      
-                      // Try to calculate from team CBI scores
-                      const teamCbiScore = calculateHealthFromTeam();
-                      if (teamCbiScore !== null) {
-                        return `${teamCbiScore}/100`;
                       }
                       
                       // Show real data from team_health if available
@@ -131,31 +152,54 @@ export function TeamHealthOverview({
                   })() && (
                     <div className="border-l border-gray-200 pl-3">
                       <div className="text-2xl font-bold text-gray-900">{(() => {
-                        // Helper function to calculate health score from team data (reuse from current score)
-                        const calculateHealthFromTeam = () => {
+                        // Use the SAME frontend calculation function as current score
+                        const calculateCBIFromTeamAvg = () => {
                           const teamAnalysis = currentAnalysis?.analysis_data?.team_analysis;
                           const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members;
                           
                           if (!members || members.length === 0) return null;
                           
-                          // Check if we have CBI scores
-                          const cbiScores = members.map((m: any) => m.cbi_score).filter((s: any) => s !== undefined && s !== null);
+                          // ALWAYS calculate from individual member CBI scores first
+                          const cbiScores = members
+                            .map((m: any) => m.cbi_score)
+                            .filter((s: any) => s !== undefined && s !== null && s > 0);
+                          
                           if (cbiScores.length > 0) {
                             const avgCbiScore = cbiScores.reduce((a: number, b: number) => a + b, 0) / cbiScores.length;
-                            // CBI: Show raw CBI score (0-100 where higher = more burnout)
-                            return Math.round(avgCbiScore);
+                            return Math.round(avgCbiScore * 10) / 10; // Round to 1 decimal
                           }
                           
-                          // Fallback to legacy burnout scores
-                          const legacyScores = members.map((m: any) => m.burnout_score).filter((s: any) => s !== undefined && s !== null);
+                          // If no CBI scores, fallback to legacy
+                          const legacyScores = members
+                            .map((m: any) => m.burnout_score)
+                            .filter((s: any) => s !== undefined && s !== null && s > 0);
+                            
                           if (legacyScores.length > 0) {
                             const avgLegacyScore = legacyScores.reduce((a: number, b: number) => a + b, 0) / legacyScores.length;
-                            // Legacy: 0-10 where higher = more burnout, convert to health score
-                            return Math.round((10 - avgLegacyScore) * 10);
+                            return avgLegacyScore * 10;
                           }
                           
                           return null;
                         };
+                        
+                        // FORCE FRONTEND CBI CALCULATION FOR AVERAGE TOO!
+                        const teamCbiScoreAvg = calculateCBIFromTeamAvg();
+                        if (teamCbiScoreAvg !== null) {
+                          console.log(`🚀 USING FRONTEND CBI FOR AVERAGE: ${teamCbiScoreAvg}`);
+                          return (
+                            <div className="flex items-baseline space-x-1">
+                              <span>{teamCbiScoreAvg}</span>
+                              <span 
+                                className="text-xs text-gray-500 cursor-help" 
+                                title="Copenhagen Burnout Inventory average (0-100 scale, higher = more burnout)"
+                              >
+                                CBI
+                              </span>
+                            </div>
+                          );
+                        }
+                        
+                        console.log("⚠️ NO CBI SCORES FOR AVERAGE - falling back to historical");
                         
                         // Calculate average directly from Health Trends chart data (same source as chart)
                         if (historicalTrends?.daily_trends?.length > 0) {
@@ -168,12 +212,6 @@ export function TeamHealthOverview({
                           const dailyScores = currentAnalysis.analysis_data.daily_trends.map((d: any) => d.overall_score);
                           const average = dailyScores.reduce((a: number, b: number) => a + b, 0) / dailyScores.length;
                           return `${Math.round(average * 10)}%`; // Convert 0-10 to 0-100%
-                        }
-                        
-                        // Try to use current CBI-based calculation as fallback for average
-                        const teamCbiScore = calculateHealthFromTeam();
-                        if (teamCbiScore !== null) {
-                          return `${teamCbiScore}/100`;
                         }
                         
                         // Use current score if daily trends are empty but historical available
