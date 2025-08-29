@@ -33,9 +33,9 @@ export function TeamHealthOverview({
 }: TeamHealthOverviewProps) {
   return (
     <>
-      {/* Tooltip Portal */}
+      {/* CBI Score Tooltip Portal */}
       <div className="fixed z-[99999] invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gray-900 text-white text-xs rounded-lg p-3 w-72 shadow-lg pointer-events-none"
-           id="health-score-tooltip"
+           id="cbi-score-tooltip"
            style={{ top: '-200px', left: '-200px' }}>
         <div className="space-y-2">
           <div className="text-purple-300 font-semibold mb-2">Copenhagen Burnout Inventory (CBI)</div>
@@ -44,6 +44,66 @@ export function TeamHealthOverview({
           </div>
           <div className="text-gray-300 text-xs mt-2 pt-2 border-t border-gray-600">
             Scientifically validated burnout assessment methodology
+          </div>
+        </div>
+        <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-900"></div>
+      </div>
+
+      {/* Info Icon Rubric Tooltip Portal */}
+      <div className="fixed z-[99999] invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gray-900 text-white text-xs rounded-lg p-4 w-80 shadow-lg pointer-events-none"
+           id="health-rubric-tooltip"
+           style={{ top: '-200px', left: '-200px' }}>
+        <div className="space-y-3">
+          <div className="text-purple-300 font-semibold text-sm mb-3">CBI Risk Level Scale</div>
+          
+          <div className="space-y-3">
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                  <span className="text-green-300 font-medium">Healthy</span>
+                </div>
+                <span className="text-gray-300">0-24</span>
+              </div>
+              <div className="text-gray-400 text-xs pl-5">No significant burnout symptoms</div>
+            </div>
+            
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                  <span className="text-yellow-300 font-medium">Fair</span>
+                </div>
+                <span className="text-gray-300">25-49</span>
+              </div>
+              <div className="text-gray-400 text-xs pl-5">Mild burnout symptoms, monitor trends</div>
+            </div>
+            
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
+                  <span className="text-orange-300 font-medium">Poor</span>
+                </div>
+                <span className="text-gray-300">50-74</span>
+              </div>
+              <div className="text-gray-400 text-xs pl-5">Moderate burnout, intervention recommended</div>
+            </div>
+            
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                  <span className="text-red-300 font-medium">Critical</span>
+                </div>
+                <span className="text-gray-300">75-100</span>
+              </div>
+              <div className="text-gray-400 text-xs pl-5">Severe burnout risk, immediate action needed</div>
+            </div>
+          </div>
+          
+          <div className="text-gray-400 text-xs pt-2 border-t border-gray-700">
+            Higher scores indicate greater burnout risk
           </div>
         </div>
         <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-900"></div>
@@ -107,7 +167,7 @@ export function TeamHealthOverview({
                             <span 
                               className="text-xs text-gray-500 cursor-help ml-1" 
                               onMouseEnter={(e) => {
-                                const tooltip = document.getElementById('health-score-tooltip')
+                                const tooltip = document.getElementById('cbi-score-tooltip')
                                 if (tooltip) {
                                   const rect = e.currentTarget.getBoundingClientRect()
                                   tooltip.style.top = `${rect.top - 180}px`
@@ -117,7 +177,7 @@ export function TeamHealthOverview({
                                 }
                               }}
                               onMouseLeave={() => {
-                                const tooltip = document.getElementById('health-score-tooltip')
+                                const tooltip = document.getElementById('cbi-score-tooltip')
                                 if (tooltip) {
                                   tooltip.classList.add('invisible', 'opacity-0')
                                   tooltip.classList.remove('visible', 'opacity-100')
@@ -194,7 +254,7 @@ export function TeamHealthOverview({
                                 <span 
                                   className="text-xs text-gray-500 cursor-help ml-1" 
                                   onMouseEnter={(e) => {
-                                    const tooltip = document.getElementById('health-score-tooltip')
+                                    const tooltip = document.getElementById('cbi-score-tooltip')
                                     if (tooltip) {
                                       const rect = e.currentTarget.getBoundingClientRect()
                                       tooltip.style.top = `${rect.top - 180}px`
@@ -204,7 +264,7 @@ export function TeamHealthOverview({
                                     }
                                   }}
                                   onMouseLeave={() => {
-                                    const tooltip = document.getElementById('health-score-tooltip')
+                                    const tooltip = document.getElementById('cbi-score-tooltip')
                                     if (tooltip) {
                                       tooltip.classList.add('invisible', 'opacity-0')
                                       tooltip.classList.remove('visible', 'opacity-100')
@@ -300,17 +360,17 @@ export function TeamHealthOverview({
                   })()}</div>
                   <Info className="w-3 h-3 text-purple-500" 
                           onMouseEnter={(e) => {
-                            const tooltip = document.getElementById('health-score-tooltip')
+                            const tooltip = document.getElementById('health-rubric-tooltip')
                             if (tooltip) {
                               const rect = e.currentTarget.getBoundingClientRect()
-                              tooltip.style.top = `${rect.top - 180}px`
-                              tooltip.style.left = `${rect.left - 120}px`
+                              tooltip.style.top = `${rect.top - 220}px`
+                              tooltip.style.left = `${rect.left - 160}px`
                               tooltip.classList.remove('invisible', 'opacity-0')
                               tooltip.classList.add('visible', 'opacity-100')
                             }
                           }}
                           onMouseLeave={() => {
-                            const tooltip = document.getElementById('health-score-tooltip')
+                            const tooltip = document.getElementById('health-rubric-tooltip')
                             if (tooltip) {
                               tooltip.classList.add('invisible', 'opacity-0')
                               tooltip.classList.remove('visible', 'opacity-100')

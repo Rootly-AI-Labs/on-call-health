@@ -81,7 +81,7 @@ export default function MethodologyPage() {
 
         {/* Three Dimensions */}
         <div className="space-y-6 mb-8">
-          <h2 className="text-2xl font-semibold text-gray-900">The Three Dimensions of Copenhagen Burnout Inventory</h2>
+          <h2 className="text-2xl font-semibold text-gray-900">The Two Dimensions of Copenhagen Burnout Inventory</h2>
           
           {/* Personal Burnout */}
           <Card>
@@ -202,7 +202,7 @@ export default function MethodologyPage() {
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center">
                   <Activity className="w-5 h-5 mr-2 text-green-500" />
-                  Client-Related Burnout (25% weight)
+                  Accomplishment Burnout (25% weight)
                 </CardTitle>
                 <Badge variant="outline" className="border-green-500 text-green-700">Effectiveness Factor</Badge>
               </div>

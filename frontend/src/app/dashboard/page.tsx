@@ -4407,54 +4407,7 @@ export default function Dashboard() {
                                     </div>
                                   </div>
 
-                                  {/* Sentiment Analysis */}
-                                  {slack?.sentiment_analysis && slack.sentiment_analysis.avg_sentiment !== null && (
-                                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                                      <h4 className="text-sm font-semibold text-blue-800 mb-2">Communication Health</h4>
-                                      <div className="flex items-center justify-between">
-                                        <span className="text-xs text-blue-700">Average Sentiment</span>
-                                        <div className="flex items-center space-x-2">
-                                          <span className={`text-lg font-bold ${
-                                            (slack.sentiment_analysis.avg_sentiment || 0) > 0.1 ? 'text-green-600' :
-                                            (slack.sentiment_analysis.avg_sentiment || 0) < -0.1 ? 'text-red-600' : 'text-yellow-600'
-                                          }`}>
-                                            {(slack.sentiment_analysis.avg_sentiment || 0) > 0.1 ? 'Positive' :
-                                             (slack.sentiment_analysis.avg_sentiment || 0) < -0.1 ? 'Negative' : 'Neutral'}
-                                          </span>
-                                          <span className="text-xs text-blue-600">
-                                            ({slack.sentiment_analysis.avg_sentiment?.toFixed(2) || 'N/A'})
-                                          </span>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  )}
 
-                                  {/* Burnout Indicators */}
-                                  {slack?.burnout_indicators && (
-                                    <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                                      <h4 className="text-sm font-semibold text-red-800 mb-2">Communication Risk Indicators</h4>
-                                      <div className="space-y-1 text-xs">
-                                        {slack.burnout_indicators.excessive_messaging > 0 && (
-                                          <div className="flex items-center space-x-2">
-                                            <AlertTriangle className="w-3 h-3 text-red-600" />
-                                            <span className="text-red-700">{slack.burnout_indicators.excessive_messaging} members with excessive messaging</span>
-                                          </div>
-                                        )}
-                                        {slack.burnout_indicators.poor_sentiment_users > 0 && (
-                                          <div className="flex items-center space-x-2">
-                                            <AlertTriangle className="w-3 h-3 text-red-600" />
-                                            <span className="text-red-700">{slack.burnout_indicators.poor_sentiment_users} members with poor sentiment</span>
-                                          </div>
-                                        )}
-                                        {slack.burnout_indicators.after_hours_communicators > 0 && (
-                                          <div className="flex items-center space-x-2">
-                                            <AlertTriangle className="w-3 h-3 text-red-600" />
-                                            <span className="text-red-700">{slack.burnout_indicators.after_hours_communicators} members communicating after hours</span>
-                                          </div>
-                                        )}
-                                      </div>
-                                    </div>
-                                  )}
                                 </>
                               )}
                             </>
