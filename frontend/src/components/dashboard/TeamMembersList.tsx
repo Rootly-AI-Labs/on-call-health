@@ -97,7 +97,29 @@ export function TeamMembersList({
                       </div>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <Badge className={getRiskColor(member.risk_level)}>{member.risk_level.toUpperCase()}</Badge>
+                      {(() => {
+                        // Calculate risk level based on CBI score when available
+                        const getCBIRiskLevel = (member: any) => {
+                          if (member.cbi_score !== undefined && member.cbi_score !== null) {
+                            // Use CBI scoring (0-100, higher = more burnout)
+                            if (member.cbi_score < 25) return 'healthy';      // 0-24: Low/minimal burnout
+                            if (member.cbi_score < 50) return 'fair';         // 25-49: Mild burnout symptoms
+                            if (member.cbi_score < 75) return 'poor';         // 50-74: Moderate burnout risk  
+                            return 'critical';                                // 75-100: High/severe burnout
+                          }
+                          // Fallback to legacy risk level
+                          return member.risk_level || 'low';
+                        };
+                        
+                        const riskLevel = getCBIRiskLevel(member);
+                        const displayLabel = riskLevel === 'healthy' ? 'HEALTHY' :
+                                           riskLevel === 'fair' ? 'FAIR' :
+                                           riskLevel === 'poor' ? 'POOR' :
+                                           riskLevel === 'critical' ? 'CRITICAL' :
+                                           riskLevel.toUpperCase();
+                        
+                        return <Badge className={getRiskColor(riskLevel)}>{displayLabel}</Badge>;
+                      })()}
                     </div>
                   </div>
                   

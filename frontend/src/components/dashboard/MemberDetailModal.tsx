@@ -139,14 +139,57 @@ export function MemberDetailModal({
               <Card>
                 <CardContent className="p-4 text-center">
                   <p className="text-sm text-gray-600 mb-2">Overall Risk Level</p>
-                  <Badge className={`px-3 py-1 ${healthColor}`}>
-                    {healthStatus}
-                  </Badge>
+                  {(() => {
+                    // Calculate CBI-based risk level when available
+                    const getCBIRiskLevel = () => {
+                      if (memberData?.cbi_score !== undefined && memberData?.cbi_score !== null) {
+                        // Use CBI scoring (0-100, higher = more burnout)
+                        if (memberData.cbi_score < 25) return { level: 'healthy', label: 'Healthy' };
+                        if (memberData.cbi_score < 50) return { level: 'fair', label: 'Fair' };
+                        if (memberData.cbi_score < 75) return { level: 'poor', label: 'Poor' };
+                        return { level: 'critical', label: 'Critical' };
+                      }
+                      // Fallback to legacy system
+                      return { level: selectedMember.riskLevel.toLowerCase(), label: healthStatus };
+                    };
+                    
+                    const riskInfo = getCBIRiskLevel();
+                    const getCBIColor = (level: string) => {
+                      switch(level) {
+                        case 'critical': return 'bg-red-100 text-red-800 border-red-300';
+                        case 'poor': return 'bg-red-50 text-red-600 border-red-200'; 
+                        case 'fair': return 'bg-yellow-50 text-yellow-600 border-yellow-200';
+                        case 'healthy': return 'bg-green-50 text-green-600 border-green-200';
+                        default: return healthColor;
+                      }
+                    };
+                    
+                    return (
+                      <Badge className={`px-3 py-1 ${getCBIColor(riskInfo.level)}`}>
+                        {riskInfo.label}
+                      </Badge>
+                    );
+                  })()}
                   <div className="mt-3">
-                    <div className="text-2xl font-bold text-gray-900">
-                      {(overallBurnoutScore * 10).toFixed(0)}%
+                    <div className={`text-2xl font-bold ${(() => {
+                      if (memberData?.cbi_score !== undefined) {
+                        // Color the CBI score based on risk level
+                        const score = memberData.cbi_score;
+                        if (score < 25) return 'text-green-600';      // Healthy
+                        if (score < 50) return 'text-yellow-600';     // Fair
+                        if (score < 75) return 'text-orange-600';     // Poor  
+                        return 'text-red-600';                       // Critical
+                      }
+                      return 'text-gray-900'; // Legacy fallback
+                    })()}`}>
+                      {memberData?.cbi_score !== undefined ? 
+                        `${memberData.cbi_score.toFixed(0)}/100` : 
+                        `${(overallBurnoutScore * 10).toFixed(0)}%`
+                      }
                     </div>
-                    <p className="text-xs text-gray-500">Burnout Risk Score</p>
+                    <p className="text-xs text-gray-500">
+                      {memberData?.cbi_score !== undefined ? 'CBI Score' : 'Burnout Risk Score'}
+                    </p>
                   </div>
                 </CardContent>
               </Card>
@@ -178,27 +221,6 @@ export function MemberDetailModal({
                 <h4 className="font-semibold text-gray-900 mb-2">Burnout Analysis</h4>
                 {memberData?.cbi_reasoning ? (
                   <div className="space-y-6">
-                    {/* CBI Score Summary */}
-                    <div className="flex items-center justify-between bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg p-4">
-                      <div>
-                        <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">CBI Assessment</div>
-                        <div className="text-lg font-bold text-gray-900 mt-1">
-                          {memberData.cbi_score?.toFixed(0)}/100
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-xs text-gray-500">Risk Level</div>
-                        <div className={`text-sm font-semibold mt-1 ${
-                          (memberData.cbi_score || 0) >= 75 ? 'text-red-600' :
-                          (memberData.cbi_score || 0) >= 50 ? 'text-orange-600' :
-                          'text-green-600'
-                        }`}>
-                          {memberData.cbi_breakdown?.interpretation?.charAt(0).toUpperCase() + 
-                           (memberData.cbi_breakdown?.interpretation?.slice(1) || 'Unknown')}
-                        </div>
-                      </div>
-                    </div>
-
                     {/* Contributing Factors */}
                     <div className="space-y-3">
                       <h5 className="text-sm font-semibold text-gray-900 mb-3 pb-1 border-b border-gray-200">

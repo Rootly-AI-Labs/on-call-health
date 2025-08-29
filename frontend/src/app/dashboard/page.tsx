@@ -2510,6 +2510,17 @@ export default function Dashboard() {
 
   const getRiskColor = (riskLevel: string) => {
     switch (riskLevel) {
+      // CBI 4-tier system
+      case "critical":
+        return "text-red-800 bg-red-100 border-red-300"    // Critical (75-100): Dark red
+      case "poor": 
+        return "text-red-600 bg-red-50 border-red-200"     // Poor (50-74): Red
+      case "fair":
+        return "text-yellow-600 bg-yellow-50 border-yellow-200" // Fair (25-49): Yellow  
+      case "healthy":
+        return "text-green-600 bg-green-50 border-green-200"    // Healthy (0-24): Green
+      
+      // Legacy 3-tier system fallback
       case "high":
         return "text-red-600 bg-red-50 border-red-200"
       case "medium":
