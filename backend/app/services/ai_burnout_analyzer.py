@@ -369,7 +369,8 @@ class AIBurnoutAnalyzerService:
                     "name": member_name,
                     "email": member_email,
                     "user_id": member.get("user_id"),
-                    "burnout_score": member.get("burnout_score", 0),
+                    "burnout_score": member.get("cbi_score") if member.get("cbi_score") is not None else member.get("burnout_score", 0),
+                    "scoring_type": "CBI" if member.get("cbi_score") is not None else "Legacy",
                     "incident_count": len(member.get("incidents", []))
                 })
             
@@ -609,41 +610,97 @@ class AIBurnoutAnalyzerService:
 
 
     def _generate_executive_summary(self, team_members: List[Dict[str, Any]], available_integrations: List[str]) -> Dict[str, Any]:
-        """Generate a comprehensive executive summary of team burnout status."""
+        """Generate a comprehensive executive summary of team burnout status using CBI methodology."""
         risk_dist = self._analyze_team_risk_distribution(team_members)
         total_incidents = sum(len(member.get("incidents", [])) for member in team_members)
-        avg_burnout_score = sum(member.get("burnout_score", 0) for member in team_members) / len(team_members) if team_members else 0
+        
+        # Use CBI scores if available, otherwise fall back to legacy scoring
+        cbi_scores = []
+        legacy_scores = []
+        
+        for member in team_members:
+            cbi_score = member.get("cbi_score")
+            if cbi_score is not None:
+                cbi_scores.append(cbi_score)
+            else:
+                legacy_score = member.get("burnout_score", 0)
+                legacy_scores.append(legacy_score)
+        
+        # Calculate average burnout level
+        if cbi_scores:
+            avg_cbi_score = sum(cbi_scores) / len(cbi_scores)
+            avg_legacy_score = 0  # Not used but defined for consistency
+            using_cbi = True
+            # For display, convert CBI to health score (100 - CBI score)
+            overall_health_score = round(100 - avg_cbi_score, 1)
+            avg_burnout_display = round(avg_cbi_score, 1)
+            trajectory_score = avg_cbi_score
+        else:
+            avg_legacy_score = sum(legacy_scores) / len(legacy_scores) if legacy_scores else 0
+            avg_cbi_score = 0  # Not used but defined for consistency
+            using_cbi = False
+            overall_health_score = round(100 - (avg_legacy_score * 10), 1)
+            avg_burnout_display = round(avg_legacy_score, 2)
+            trajectory_score = avg_legacy_score * 10  # Convert to 0-100 scale
         
         high_risk_count = risk_dist["distribution"]["high"] + risk_dist["distribution"]["critical"]
         medium_risk_count = risk_dist["distribution"]["medium"]
         
-        # Generate narrative summary
+        # Generate narrative summary using CBI terminology
         if high_risk_count > 0:
             urgency_level = "Critical"
-            primary_concern = f"{high_risk_count} team member(s) showing severe burnout symptoms requiring immediate intervention"
+            if using_cbi:
+                primary_concern = f"{high_risk_count} team member(s) showing severe CBI burnout symptoms (>75/100) requiring immediate intervention"
+            else:
+                primary_concern = f"{high_risk_count} team member(s) showing severe burnout symptoms requiring immediate intervention"
         elif medium_risk_count > len(team_members) * 0.5:
             urgency_level = "High"
             primary_concern = f"Over half the team ({medium_risk_count} members) showing elevated stress levels"
         elif medium_risk_count > 0:
             urgency_level = "Moderate"
-            primary_concern = f"{medium_risk_count} team member(s) showing early burnout warning signs"
+            if using_cbi:
+                primary_concern = f"{medium_risk_count} team member(s) showing moderate CBI burnout warning signs (25-74/100)"
+            else:
+                primary_concern = f"{medium_risk_count} team member(s) showing early burnout warning signs"
         else:
             urgency_level = "Low"
-            primary_concern = "Team appears to be managing workload effectively"
+            primary_concern = "Team appears to be managing workload effectively with healthy CBI scores" if using_cbi else "Team appears to be managing workload effectively"
         
         return {
             "urgency_level": urgency_level,
-            "overall_health_score": round(100 - (avg_burnout_score * 10), 1),
+            "overall_health_score": overall_health_score,
             "primary_concern": primary_concern,
             "key_metrics": {
                 "total_team_incidents": total_incidents,
-                "average_burnout_score": round(avg_burnout_score, 2),
+                "average_burnout_score": avg_burnout_display,
+                "scoring_methodology": "CBI (0-100)" if using_cbi else "Legacy (0-10)",
                 "high_risk_percentage": risk_dist["high_risk_percentage"],
                 "data_completeness": len(available_integrations)
             },
             "immediate_actions_needed": high_risk_count > 0,
-            "team_trajectory": "Declining" if avg_burnout_score > 5 else "Stable" if avg_burnout_score > 3 else "Healthy"
+            "team_trajectory": self._determine_team_trajectory(trajectory_score, using_cbi)
         }
+    
+    def _determine_team_trajectory(self, burnout_score: float, is_cbi: bool) -> str:
+        """Determine team trajectory based on burnout score and methodology."""
+        if is_cbi:
+            # CBI scoring: 0-100 where higher = more burnout
+            if burnout_score >= 75:
+                return "Critical Risk"
+            elif burnout_score >= 50:
+                return "Declining"
+            elif burnout_score >= 25:
+                return "Stable"
+            else:
+                return "Healthy"
+        else:
+            # Legacy scoring converted to 0-100 scale
+            if burnout_score >= 70:
+                return "Declining" 
+            elif burnout_score >= 30:
+                return "Stable"
+            else:
+                return "Healthy"
     
     def _generate_detailed_risk_analysis(self, team_members: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Generate detailed analysis of risk factors across the team."""
@@ -1008,9 +1065,10 @@ You are an expert burnout analyst reviewing a software team's health data. Gener
 **Analysis Timestamp:** {datetime.utcnow().isoformat()}
 
 **Team Data:**
-- Team Size: {team_data['team_size']} members
+- Team Size: {team_data['team_size']} members  
 - Active Incident Responders: {team_data['active_responders']} ({team_data['responder_percentage']:.1f}%)
-- Average Burnout Score: {team_data['avg_burnout_score']:.1f}/10
+- Average Burnout Score: {team_data['avg_burnout_score']:.1f} ({team_data['burnout_scale']})
+- Scoring Method: {team_data['scoring_explanation']}
 - Data Sources: {', '.join(available_integrations)}
 
 **Detailed Metrics:**
@@ -1024,8 +1082,11 @@ You are an expert burnout analyst reviewing a software team's health data. Gener
 
 **Additional Context:**
 - Analysis Period: Last 30 days
-- High Risk Members: {len([m for m in team_members if m.get('burnout_score', 0) >= 7])}
+- High Risk Members: {team_data['high_risk_count']} (using {team_data['risk_criteria']})
 - Total Incidents: {sum(m.get('incident_count', 0) for m in team_members)}
+
+**CRITICAL: Understand the Scoring System:**
+{team_data['scoring_explanation']}
 
 **CRITICAL REQUIREMENTS - Generate a UNIQUE analysis:**
 
@@ -1081,8 +1142,19 @@ You are an expert burnout analyst reviewing a software team's health data. Gener
         """Prepare detailed team data for LLM analysis."""
         active_responders = [m for m in team_members if m.get("incident_count", 0) > 0]
         
-        # Calculate comprehensive metrics
-        avg_burnout = sum(m.get("burnout_score", 0) for m in team_members) / len(team_members) if team_members else 0
+        # Calculate comprehensive metrics using CBI when available
+        cbi_scores = [m.get("cbi_score") for m in team_members if m.get("cbi_score") is not None]
+        legacy_scores = [m.get("burnout_score", 0) for m in team_members if m.get("cbi_score") is None]
+        
+        if cbi_scores:
+            avg_burnout = sum(cbi_scores) / len(cbi_scores)
+            using_cbi = True
+            burnout_scale = "CBI (0-100)"
+        else:
+            avg_burnout = sum(legacy_scores) / len(legacy_scores) if legacy_scores else 0
+            using_cbi = False  
+            burnout_scale = "Legacy (0-10)"
+            
         total_incidents = sum(m.get("incident_count", 0) for m in team_members)
         
         # Risk distribution
@@ -1133,25 +1205,41 @@ You are an expert burnout analyst reviewing a software team's health data. Gener
                 "sentiment_label": sentiment_label
             }
         
-        # Individual patterns with more detail
-        high_risk_members = sorted(
-            [m for m in team_members if m.get("burnout_score", 0) >= 7],
-            key=lambda x: x.get("burnout_score", 0),
-            reverse=True
-        )
+        # Individual patterns with more detail - use appropriate risk criteria
+        if using_cbi:
+            high_risk_members = sorted(
+                [m for m in team_members if m.get("cbi_score", 0) >= 75],
+                key=lambda x: x.get("cbi_score", 0),
+                reverse=True
+            )
+            risk_criteria = "CBI score ≥75/100 (severe burnout)"
+        else:
+            high_risk_members = sorted(
+                [m for m in team_members if m.get("burnout_score", 0) >= 7],
+                key=lambda x: x.get("burnout_score", 0),
+                reverse=True
+            )
+            risk_criteria = "Legacy score ≥7/10 (high burnout)"
         
         individual_insights = []
         for member in high_risk_members[:5]:  # Top 5 highest risk
             name = member.get("user_name", "Anonymous")
-            score = member.get("burnout_score", 0)
             incidents = member.get("incident_count", 0)
             risk_level = member.get("risk_level", "unknown")
+            
+            # Use appropriate scoring method
+            if using_cbi:
+                score = member.get("cbi_score", 0)
+                score_display = f"{score:.1f}/100 CBI"
+            else:
+                score = member.get("burnout_score", 0)
+                score_display = f"{score:.1f}/10 legacy"
             
             # Add more context about the member
             github_commits = member.get("github_activity", {}).get("commits_count", 0)
             after_hours_pct = member.get("after_hours_percentage", 0)
             
-            insight = f"{name}: {score:.1f}/10 burnout ({risk_level} risk), {incidents} incidents"
+            insight = f"{name}: {score_display} burnout ({risk_level} risk), {incidents} incidents"
             if github_commits > 0:
                 insight += f", {github_commits} commits ({after_hours_pct:.1f}% after hours)"
             
@@ -1189,6 +1277,10 @@ You are an expert burnout analyst reviewing a software team's health data. Gener
             "active_responders": len(active_responders),
             "responder_percentage": len(active_responders) / len(team_members) * 100 if team_members else 0,
             "avg_burnout_score": avg_burnout,
+            "burnout_scale": burnout_scale,
+            "scoring_explanation": self._get_scoring_explanation(using_cbi),
+            "high_risk_count": len(high_risk_members),
+            "risk_criteria": risk_criteria,
             "total_incidents": total_incidents,
             "risk_distribution": f"Critical: {risk_levels['critical']}, High: {risk_levels['high']}, Medium: {risk_levels['medium']}, Low: {risk_levels['low']}",
             "detailed_metrics": "; ".join(metrics_breakdown) if metrics_breakdown else "Limited metrics available",
@@ -1197,6 +1289,22 @@ You are an expert burnout analyst reviewing a software team's health data. Gener
             "github_stats": github_stats,
             "slack_stats": slack_stats
         }
+    
+    def _get_scoring_explanation(self, using_cbi: bool) -> str:
+        """Get explanation of the scoring methodology for the LLM."""
+        if using_cbi:
+            return """This team uses the Copenhagen Burnout Inventory (CBI) methodology:
+- Scale: 0-100 where HIGHER scores = MORE burnout (opposite of health scores)
+- 0-24: Low/minimal burnout (healthy)
+- 25-49: Mild burnout symptoms  
+- 50-74: Moderate/significant burnout
+- 75-100: High/severe burnout (critical intervention needed)
+- CBI is scientifically validated and measures Personal + Work-Related burnout dimensions"""
+        else:
+            return """This team uses legacy burnout scoring:
+- Scale: 0-10 where higher scores = more burnout
+- Converted to 0-100 scale for display (multiply by 10)
+- Less precise than CBI methodology"""
 
     def _call_anthropic_for_narrative(self, prompt: str, api_key: str) -> str:
         """Call Anthropic API for narrative generation."""
