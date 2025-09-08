@@ -994,7 +994,7 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
                           ({mappingStats.mapped_members || 0} of {mappingStats.total_attempts || 0} team members)
                         </span>
                       </div>
-                      {mappingStats.unmapped_members > 0 && (
+                      {(mappingStats.unmapped_members || 0) > 0 && (
                         <div className="text-sm text-orange-600">
                           {mappingStats.unmapped_members} members need GitHub usernames
                         </div>

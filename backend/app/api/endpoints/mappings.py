@@ -141,37 +141,11 @@ async def get_analysis_mappings(
         unique_mapped_emails = set(m["source_identifier"] for m in github_mappings)
         attempted_mappings = len(unique_mapped_emails)
         
-        # Get TRUE team member count from analysis results (includes ALL team members)
-        # This is the real team size that should be used for success rate calculation
-        total_team_members = attempted_mappings  # Fallback if no analysis found
+        # TEMPORARY FIX: Use attempted mappings as total team size to avoid math errors  
+        # This will show accurate success rate based on who we actually attempted to map
+        total_team_members = attempted_mappings  # Use consistent source
         
-        try:
-            # Get most recent analysis to find true team size
-            from ...models import Analysis
-            recent_analysis = db.query(Analysis).filter(
-                Analysis.user_id == current_user.id,
-                Analysis.status == "completed",
-                Analysis.results.isnot(None)
-            ).order_by(Analysis.created_at.desc()).first()
-            
-            if recent_analysis and recent_analysis.results:
-                import json
-                results = json.loads(recent_analysis.results) if isinstance(recent_analysis.results, str) else recent_analysis.results
-                team_analysis = results.get("team_analysis", {})
-                
-                if isinstance(team_analysis, dict) and "total_members" in team_analysis:
-                    # Use total_members from analysis (includes ALL team members)
-                    total_team_members = team_analysis["total_members"]
-                    logger.info(f"🎯 SUCCESS RATE FIX: Using true team size {total_team_members} from analysis instead of {attempted_mappings} attempted mappings")
-                elif isinstance(team_analysis, dict) and "members" in team_analysis:
-                    # Count members array as fallback
-                    members = team_analysis.get("members", [])
-                    if isinstance(members, list):
-                        total_team_members = len(members)
-                        logger.info(f"🎯 SUCCESS RATE FIX: Using member count {total_team_members} from analysis instead of {attempted_mappings} attempted mappings")
-        except Exception as e:
-            logger.warning(f"Could not get true team size from analysis: {e}")
-            # Keep fallback to attempted mappings count
+        logger.info(f"🚨 TEMP FIX (analysis): Using attempted mappings ({attempted_mappings}) as total team size to prevent math errors")
         
         # Count successful mappings (unique emails with successful mapping)
         successful_emails = set()
@@ -410,32 +384,12 @@ async def get_success_rates(
             successful_emails.add(email)  # Manual mappings are always successful
             # Manual mappings don't have data collection
         
-        # Get REAL team member count from recent analysis (same fix as analysis endpoint)
+        # TEMPORARY FIX: Use attempted mappings as total team size to avoid math errors
+        # This will show accurate success rate based on who we actually attempted to map
         attempted_mappings = len(unique_emails)
-        total_team_members = attempted_mappings  # Fallback
+        total_team_members = attempted_mappings  # Use consistent source to avoid math errors
         
-        try:
-            # Get most recent analysis to find true team size
-            recent_analysis = db.query(Analysis).filter(
-                Analysis.user_id == current_user.id,
-                Analysis.status == "completed",
-                Analysis.results.isnot(None)
-            ).order_by(Analysis.created_at.desc()).first()
-            
-            if recent_analysis and recent_analysis.results:
-                results = json.loads(recent_analysis.results) if isinstance(recent_analysis.results, str) else recent_analysis.results
-                team_analysis = results.get("team_analysis", {})
-                
-                if isinstance(team_analysis, dict) and "total_members" in team_analysis:
-                    total_team_members = team_analysis["total_members"]
-                    logger.info(f"🎯 SUCCESS RATE FIX (platform): Using true team size {total_team_members} from analysis instead of {attempted_mappings} attempted mappings")
-                elif isinstance(team_analysis, dict) and "members" in team_analysis:
-                    members = team_analysis.get("members", [])
-                    if isinstance(members, list):
-                        total_team_members = len(members)
-                        logger.info(f"🎯 SUCCESS RATE FIX (platform): Using member count {total_team_members} from analysis instead of {attempted_mappings} attempted mappings")
-        except Exception as e:
-            logger.warning(f"Could not get true team size from analysis: {e}")
+        logger.info(f"🚨 TEMP FIX: Using attempted mappings ({attempted_mappings}) as total team size to prevent negative numbers")
         
         total_successful = len(successful_emails)
         overall_success_rate = (total_successful / total_team_members * 100) if total_team_members > 0 else 0
