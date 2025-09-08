@@ -177,9 +177,17 @@ async def get_analysis_mappings(
         successful_emails = set()
         members_with_data = 0
         
-        for mapping in github_mappings:
-            if mapping["mapping_successful"] and mapping["target_identifier"] != "unknown":
-                successful_emails.add(mapping["source_identifier"])
+        logger.info(f"🔍 MAPPING DEBUG: Processing {len(github_mappings)} total mappings")
+        for i, mapping in enumerate(github_mappings):
+            email = mapping["source_identifier"] 
+            target = mapping.get("target_identifier", "")
+            is_successful = mapping["mapping_successful"]
+            is_valid_target = target and target != "unknown" and target.strip() != ""
+            
+            logger.info(f"🔍 MAPPING {i+1}: {email} -> {target} | successful:{is_successful} | valid_target:{is_valid_target}")
+            
+            if is_successful and is_valid_target:
+                successful_emails.add(email)
                 if mapping.get("data_points_count") and mapping["data_points_count"] > 0:
                     members_with_data += 1
         
@@ -188,15 +196,20 @@ async def get_analysis_mappings(
         # Calculate ACCURATE success rate based on TRUE team size, not just attempted mappings
         success_rate = (successful_mappings / total_team_members * 100) if total_team_members > 0 else 0
         
-        logger.info(f"🎯 SUCCESS RATE CALCULATION: {successful_mappings}/{total_team_members} = {success_rate:.1f}% (attempted: {attempted_mappings})")
+        logger.info(f"🎯 CALCULATION SUMMARY:")
+        logger.info(f"   - Total team members (from analysis): {total_team_members}")
+        logger.info(f"   - Attempted mappings (in DB): {attempted_mappings}") 
+        logger.info(f"   - Successful mappings (valid targets): {successful_mappings}")
+        logger.info(f"   - Success rate: {success_rate:.1f}%")
+        logger.info(f"   - Unmapped members: {total_team_members - attempted_mappings}")
         
         return {
             "mappings": all_mappings,
             "statistics": {
-                "total_team_members": total_team_members,
-                "successful_mappings": successful_mappings, 
+                "total_attempts": total_team_members,  # Match success-rate endpoint field name
+                "mapped_members": successful_mappings,  # Match success-rate endpoint field name
                 "members_with_data": members_with_data,
-                "success_rate": round(success_rate, 1),
+                "overall_success_rate": round(success_rate, 1),  # Match success-rate endpoint field name
                 "failed_mappings": total_team_members - successful_mappings,
                 "manual_mappings_count": len([m for m in all_mappings if m["is_manual"]]),
                 "attempted_mappings": attempted_mappings,  # Show how many actually had mapping attempts
@@ -427,7 +440,14 @@ async def get_success_rates(
         total_successful = len(successful_emails)
         overall_success_rate = (total_successful / total_team_members * 100) if total_team_members > 0 else 0
         
-        logger.info(f"🎯 SUCCESS RATE CALCULATION (platform): {total_successful}/{total_team_members} = {overall_success_rate:.1f}% (attempted: {attempted_mappings})")
+        logger.info(f"🎯 PLATFORM CALCULATION SUMMARY:")
+        logger.info(f"   - Total team members (from analysis): {total_team_members}")
+        logger.info(f"   - Attempted mappings (in DB): {attempted_mappings}") 
+        logger.info(f"   - Successful mappings: {total_successful}")
+        logger.info(f"   - Success rate: {overall_success_rate:.1f}%")
+        logger.info(f"   - Unmapped members: {total_team_members - attempted_mappings}")
+        logger.info(f"   - Integration mappings processed: {len(integration_mappings)}")
+        logger.info(f"   - Manual mappings processed: {len(manual_mappings)}")
         
         logger.info(f"🔍 DEBUG: Calculated stats - Total: {total_team_members}, Successful: {total_successful}, Success Rate: {overall_success_rate:.1f}%, With Data: {members_with_data}")
         logger.info(f"🔍 DEBUG: Unique emails: {list(unique_emails)}")
