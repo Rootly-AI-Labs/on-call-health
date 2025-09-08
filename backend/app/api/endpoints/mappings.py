@@ -166,28 +166,29 @@ async def get_analysis_mappings(
                     members_with_data += 1
         
         successful_mappings = len(successful_emails)
+        failed_mappings = attempted_mappings - successful_mappings  # Users with mapping attempts but no valid GitHub username
         
-        # Calculate ACCURATE success rate based on TRUE team size, not just attempted mappings
+        # Calculate success rate based on attempted mappings (consistent denominator)
         success_rate = (successful_mappings / total_team_members * 100) if total_team_members > 0 else 0
         
         logger.info(f"🎯 CALCULATION SUMMARY:")
-        logger.info(f"   - Total team members (from analysis): {total_team_members}")
-        logger.info(f"   - Attempted mappings (in DB): {attempted_mappings}") 
-        logger.info(f"   - Successful mappings (valid targets): {successful_mappings}")
+        logger.info(f"   - Total attempted mappings: {attempted_mappings}")
+        logger.info(f"   - Successful mappings (valid GitHub usernames): {successful_mappings}")
+        logger.info(f"   - Failed mappings (no GitHub username): {failed_mappings}")
         logger.info(f"   - Success rate: {success_rate:.1f}%")
-        logger.info(f"   - Unmapped members: {total_team_members - attempted_mappings}")
+        logger.info(f"   - Should show: {successful_mappings} mapped, {failed_mappings} unmapped")
         
         return {
             "mappings": all_mappings,
             "statistics": {
-                "total_attempts": total_team_members,  # Match success-rate endpoint field name
-                "mapped_members": successful_mappings,  # Match success-rate endpoint field name
+                "total_attempts": total_team_members,  # Total attempted (same as attempted_mappings with temp fix)
+                "mapped_members": successful_mappings,  # Users with valid GitHub usernames
                 "members_with_data": members_with_data,
-                "overall_success_rate": round(success_rate, 1),  # Match success-rate endpoint field name
-                "failed_mappings": total_team_members - successful_mappings,
+                "overall_success_rate": round(success_rate, 1),
+                "failed_mappings": failed_mappings,  # Users without valid GitHub usernames
                 "manual_mappings_count": len([m for m in all_mappings if m["is_manual"]]),
-                "attempted_mappings": attempted_mappings,  # Show how many actually had mapping attempts
-                "unmapped_members": total_team_members - attempted_mappings  # Team members never attempted
+                "attempted_mappings": attempted_mappings,
+                "unmapped_members": failed_mappings  # Show failed mappings as unmapped
             },
             "analysis_id": analysis_id
         }
@@ -392,6 +393,7 @@ async def get_success_rates(
         logger.info(f"🚨 TEMP FIX: Using attempted mappings ({attempted_mappings}) as total team size to prevent negative numbers")
         
         total_successful = len(successful_emails)
+        failed_mappings = attempted_mappings - total_successful  # Users with mapping attempts but no valid GitHub username
         overall_success_rate = (total_successful / total_team_members * 100) if total_team_members > 0 else 0
         
         logger.info(f"🎯 PLATFORM CALCULATION SUMMARY:")
@@ -409,13 +411,13 @@ async def get_success_rates(
         
         return {
             "overall_success_rate": round(overall_success_rate, 1),
-            "total_attempts": total_team_members,  # True team size
+            "total_attempts": total_team_members,
             "mapped_members": total_successful,
             "members_with_data": members_with_data,
             "manual_mappings_count": len(manual_mappings),
             "github_was_enabled": github_was_enabled if platform == "github" else None,
-            "attempted_mappings": attempted_mappings,  # How many had mapping attempts
-            "unmapped_members": total_team_members - attempted_mappings  # Never attempted
+            "attempted_mappings": attempted_mappings,
+            "unmapped_members": failed_mappings  # Users without valid GitHub usernames
         }
     except Exception as e:
         logger.error(f"Error fetching success rates: {e}")
