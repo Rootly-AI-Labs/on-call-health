@@ -57,6 +57,8 @@ interface MappingStatistics {
   members_with_data?: number
   manual_mappings_count?: number
   github_was_enabled?: boolean | null
+  attempted_mappings?: number
+  unmapped_members?: number
 }
 
 interface MappingDrawerProps {
@@ -941,13 +943,13 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
                       </div>
                     )}
                   </div>
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-4 gap-4">
                     <Card className="p-4 border-purple-200">
                       <div className="flex items-center space-x-2">
-                        <Users2 className="w-4 h-4 text-green-600" />
+                        <Users2 className="w-4 h-4 text-blue-600" />
                         <div>
-                          <div className="text-2xl font-bold">{mappingStats.mapped_members || mappingStats.total_attempts || 0}</div>
-                          <div className="text-sm text-gray-600">Mapped Members</div>
+                          <div className="text-2xl font-bold">{mappingStats.total_attempts || 0}</div>
+                          <div className="text-sm text-gray-600">Total Team</div>
                         </div>
                       </div>
                     </Card>
@@ -955,8 +957,17 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
                       <div className="flex items-center space-x-2">
                         <CheckCircle className="w-4 h-4 text-green-600" />
                         <div>
-                          <div className="text-2xl font-bold text-green-600">{mappingStats.overall_success_rate}%</div>
-                          <div className="text-sm text-gray-600">Success Rate</div>
+                          <div className="text-2xl font-bold text-green-600">{mappingStats.mapped_members || 0}</div>
+                          <div className="text-sm text-gray-600">Mapped</div>
+                        </div>
+                      </div>
+                    </Card>
+                    <Card className="p-4 border-purple-200">
+                      <div className="flex items-center space-x-2">
+                        <AlertCircle className="w-4 h-4 text-orange-600" />
+                        <div>
+                          <div className="text-2xl font-bold text-orange-600">{mappingStats.unmapped_members || 0}</div>
+                          <div className="text-sm text-gray-600">Unmapped</div>
                         </div>
                       </div>
                     </Card>
@@ -969,6 +980,26 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
                         </div>
                       </div>
                     </Card>
+                  </div>
+                  
+                  {/* Success Rate Summary */}
+                  <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <CheckCircle className="w-5 h-5 text-green-600" />
+                        <span className="font-medium text-gray-900">
+                          Success Rate: <span className="text-green-600">{mappingStats.overall_success_rate}%</span>
+                        </span>
+                        <span className="text-sm text-gray-500">
+                          ({mappingStats.mapped_members || 0} of {mappingStats.total_attempts || 0} team members)
+                        </span>
+                      </div>
+                      {mappingStats.unmapped_members > 0 && (
+                        <div className="text-sm text-orange-600">
+                          {mappingStats.unmapped_members} members need GitHub usernames
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}

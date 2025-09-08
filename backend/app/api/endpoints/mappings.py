@@ -137,9 +137,41 @@ async def get_analysis_mappings(
         # Calculate proper team member statistics (including manual mappings)
         github_mappings = [m for m in all_mappings if m["target_platform"] == "github"]
         
-        # Get unique team members (by email)
-        unique_emails = set(m["source_identifier"] for m in github_mappings)
-        total_team_members = len(unique_emails)
+        # Get unique team members from mappings (attempted mappings)
+        unique_mapped_emails = set(m["source_identifier"] for m in github_mappings)
+        attempted_mappings = len(unique_mapped_emails)
+        
+        # Get TRUE team member count from analysis results (includes ALL team members)
+        # This is the real team size that should be used for success rate calculation
+        total_team_members = attempted_mappings  # Fallback if no analysis found
+        
+        try:
+            # Get most recent analysis to find true team size
+            from ...models import Analysis
+            recent_analysis = db.query(Analysis).filter(
+                Analysis.user_id == current_user.id,
+                Analysis.status == "completed",
+                Analysis.results.isnot(None)
+            ).order_by(Analysis.created_at.desc()).first()
+            
+            if recent_analysis and recent_analysis.results:
+                import json
+                results = json.loads(recent_analysis.results) if isinstance(recent_analysis.results, str) else recent_analysis.results
+                team_analysis = results.get("team_analysis", {})
+                
+                if isinstance(team_analysis, dict) and "total_members" in team_analysis:
+                    # Use total_members from analysis (includes ALL team members)
+                    total_team_members = team_analysis["total_members"]
+                    logger.info(f"🎯 SUCCESS RATE FIX: Using true team size {total_team_members} from analysis instead of {attempted_mappings} attempted mappings")
+                elif isinstance(team_analysis, dict) and "members" in team_analysis:
+                    # Count members array as fallback
+                    members = team_analysis.get("members", [])
+                    if isinstance(members, list):
+                        total_team_members = len(members)
+                        logger.info(f"🎯 SUCCESS RATE FIX: Using member count {total_team_members} from analysis instead of {attempted_mappings} attempted mappings")
+        except Exception as e:
+            logger.warning(f"Could not get true team size from analysis: {e}")
+            # Keep fallback to attempted mappings count
         
         # Count successful mappings (unique emails with successful mapping)
         successful_emails = set()
@@ -153,18 +185,22 @@ async def get_analysis_mappings(
         
         successful_mappings = len(successful_emails)
         
-        # Calculate proper success rate based on team members, not API calls
+        # Calculate ACCURATE success rate based on TRUE team size, not just attempted mappings
         success_rate = (successful_mappings / total_team_members * 100) if total_team_members > 0 else 0
+        
+        logger.info(f"🎯 SUCCESS RATE CALCULATION: {successful_mappings}/{total_team_members} = {success_rate:.1f}% (attempted: {attempted_mappings})")
         
         return {
             "mappings": all_mappings,
             "statistics": {
                 "total_team_members": total_team_members,
-                "successful_mappings": successful_mappings,
+                "successful_mappings": successful_mappings, 
                 "members_with_data": members_with_data,
                 "success_rate": round(success_rate, 1),
                 "failed_mappings": total_team_members - successful_mappings,
-                "manual_mappings_count": len([m for m in all_mappings if m["is_manual"]])
+                "manual_mappings_count": len([m for m in all_mappings if m["is_manual"]]),
+                "attempted_mappings": attempted_mappings,  # Show how many actually had mapping attempts
+                "unmapped_members": total_team_members - attempted_mappings  # Team members never attempted
             },
             "analysis_id": analysis_id
         }
@@ -361,9 +397,37 @@ async def get_success_rates(
             successful_emails.add(email)  # Manual mappings are always successful
             # Manual mappings don't have data collection
         
-        total_team_members = len(unique_emails)
+        # Get REAL team member count from recent analysis (same fix as analysis endpoint)
+        attempted_mappings = len(unique_emails)
+        total_team_members = attempted_mappings  # Fallback
+        
+        try:
+            # Get most recent analysis to find true team size
+            recent_analysis = db.query(Analysis).filter(
+                Analysis.user_id == current_user.id,
+                Analysis.status == "completed",
+                Analysis.results.isnot(None)
+            ).order_by(Analysis.created_at.desc()).first()
+            
+            if recent_analysis and recent_analysis.results:
+                results = json.loads(recent_analysis.results) if isinstance(recent_analysis.results, str) else recent_analysis.results
+                team_analysis = results.get("team_analysis", {})
+                
+                if isinstance(team_analysis, dict) and "total_members" in team_analysis:
+                    total_team_members = team_analysis["total_members"]
+                    logger.info(f"🎯 SUCCESS RATE FIX (platform): Using true team size {total_team_members} from analysis instead of {attempted_mappings} attempted mappings")
+                elif isinstance(team_analysis, dict) and "members" in team_analysis:
+                    members = team_analysis.get("members", [])
+                    if isinstance(members, list):
+                        total_team_members = len(members)
+                        logger.info(f"🎯 SUCCESS RATE FIX (platform): Using member count {total_team_members} from analysis instead of {attempted_mappings} attempted mappings")
+        except Exception as e:
+            logger.warning(f"Could not get true team size from analysis: {e}")
+        
         total_successful = len(successful_emails)
         overall_success_rate = (total_successful / total_team_members * 100) if total_team_members > 0 else 0
+        
+        logger.info(f"🎯 SUCCESS RATE CALCULATION (platform): {total_successful}/{total_team_members} = {overall_success_rate:.1f}% (attempted: {attempted_mappings})")
         
         logger.info(f"🔍 DEBUG: Calculated stats - Total: {total_team_members}, Successful: {total_successful}, Success Rate: {overall_success_rate:.1f}%, With Data: {members_with_data}")
         logger.info(f"🔍 DEBUG: Unique emails: {list(unique_emails)}")
@@ -371,11 +435,13 @@ async def get_success_rates(
         
         return {
             "overall_success_rate": round(overall_success_rate, 1),
-            "total_attempts": total_team_members,
+            "total_attempts": total_team_members,  # True team size
             "mapped_members": total_successful,
             "members_with_data": members_with_data,
             "manual_mappings_count": len(manual_mappings),
-            "github_was_enabled": github_was_enabled if platform == "github" else None
+            "github_was_enabled": github_was_enabled if platform == "github" else None,
+            "attempted_mappings": attempted_mappings,  # How many had mapping attempts
+            "unmapped_members": total_team_members - attempted_mappings  # Never attempted
         }
     except Exception as e:
         logger.error(f"Error fetching success rates: {e}")
