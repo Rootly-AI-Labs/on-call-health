@@ -35,9 +35,9 @@ class AnalysisResponse(BaseModel):
     uuid: Optional[str]
     integration_id: Optional[int]
     
-    # NEW: Integration details stored directly with analysis
-    integration_name: Optional[str]  # "PagerDuty (Beta Access)", "Failwhale Tales", etc.
-    platform: Optional[str]          # "rootly", "pagerduty"
+    # NEW: Integration details stored directly with analysis (optional for backward compatibility)
+    integration_name: Optional[str] = None  # "PagerDuty (Beta Access)", "Failwhale Tales", etc.
+    platform: Optional[str] = None          # "rootly", "pagerduty"
     
     status: str
     created_at: datetime
@@ -274,6 +274,11 @@ async def run_burnout_analysis(
             id=analysis.id,
             uuid=getattr(analysis, 'uuid', None),
             integration_id=analysis.rootly_integration_id,
+            
+            # Include new integration fields
+            integration_name=analysis.integration_name,
+            platform=analysis.platform,
+            
             status=analysis.status,
             created_at=analysis.created_at,
             completed_at=analysis.completed_at,
@@ -336,12 +341,17 @@ async def list_analyses(
                 id=analysis.id,
                 uuid=getattr(analysis, 'uuid', None),
                 integration_id=analysis.rootly_integration_id,
+                
+                # Include new integration fields
+                integration_name=analysis.integration_name,
+                platform=analysis.platform,
+                
                 status=analysis.status,
                 created_at=analysis.created_at,
                 completed_at=analysis.completed_at,
                 time_range=analysis.time_range or 30,
                 analysis_data=analysis.results,
-        config=analysis.config
+                config=analysis.config
             )
         )
     
@@ -391,6 +401,11 @@ async def get_analysis_by_uuid(
         id=analysis.id,
         uuid=getattr(analysis, 'uuid', None),
         integration_id=analysis.rootly_integration_id,
+        
+        # Include new integration fields
+        integration_name=analysis.integration_name,
+        platform=analysis.platform,
+        
         status=analysis.status,
         created_at=analysis.created_at,
         completed_at=analysis.completed_at,
@@ -433,6 +448,11 @@ async def get_analysis(
         id=analysis.id,
         uuid=getattr(analysis, 'uuid', None),
         integration_id=analysis.rootly_integration_id,
+        
+        # Include new integration fields
+        integration_name=analysis.integration_name,
+        platform=analysis.platform,
+        
         status=analysis.status,
         created_at=analysis.created_at,
         completed_at=analysis.completed_at,
@@ -505,6 +525,11 @@ async def get_analysis_by_identifier(
         id=analysis.id,
         uuid=getattr(analysis, 'uuid', None),
         integration_id=analysis.rootly_integration_id,
+        
+        # Include new integration fields
+        integration_name=analysis.integration_name,
+        platform=analysis.platform,
+        
         status=analysis.status,
         created_at=analysis.created_at,
         completed_at=analysis.completed_at,
