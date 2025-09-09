@@ -1062,21 +1062,29 @@ class UnifiedBurnoutAnalyzer:
             critical_incidents = severity_dist.get('sev0', 0)
             high_incidents = severity_dist.get('sev1', 0)
         
+        # INDIVIDUALIZED CBI METRICS - No more hardcoded multipliers!
+        # Use actual incident patterns and response data to create unique profiles
+        
+        incidents_per_week = metrics.get('incidents_per_week', 0)
+        total_incidents = metrics.get('total_incidents', 0)
+        avg_response_minutes = metrics.get('avg_response_time_minutes', 0)
+        after_hours_pct = metrics.get('after_hours_percentage', 0)
+        
         cbi_metrics = {
-            # Personal burnout factors
-            'work_hours_trend': metrics.get('avg_hours_per_day', 0) * 7,  # Convert to weekly
-            'weekend_work': (critical_incidents * 25 + high_incidents * 20) * weekend_oncall_multiplier,  # Weekend multiplier
-            'after_hours_activity': metrics.get('after_hours_incidents', 0) * 20,  # Increased multiplier
-            'vacation_usage': min(80, weighted_incidents * 5),  # Incident load affects vacation usage
-            'sleep_quality_proxy': (critical_incidents * 15 + high_incidents * 10 + baseline_oncall_stress),  # Sleep disruption from anticipation
+            # Personal burnout factors - based on actual workload patterns
+            'work_hours_trend': min(100, incidents_per_week * 12),  # More incidents = longer hours
+            'weekend_work': after_hours_pct * 2,  # Use actual after-hours percentage  
+            'after_hours_activity': after_hours_pct,  # Direct mapping
+            'vacation_usage': min(100, total_incidents * 3),  # More incidents = less vacation
+            'sleep_quality_proxy': min(100, critical_incidents * 8 + high_incidents * 4),  # Sleep disruption from severity
             
-            # Work-related burnout factors  
-            'sprint_completion': max(0, 100 - (metrics.get('avg_response_time', 30) / 15 * 100)),  # Faster response = more pressure
-            'code_review_speed': resolution_stress,  # Resolution time pressure
-            'pr_frequency': min(100, weighted_incidents * 8),  # Severity-weighted workload
-            'deployment_frequency': critical_incidents * 20,  # Production pressure from critical incidents
-            'meeting_load': min(80, weighted_incidents * 6 + baseline_oncall_stress),  # Meetings + oncall overhead
-            'oncall_burden': weighted_incidents + (baseline_oncall_stress * 0.5)  # Weighted incidents + baseline stress
+            # Work-related burnout factors - based on performance metrics
+            'sprint_completion': min(100, avg_response_minutes / 2),  # Slower response = more pressure
+            'code_review_speed': min(100, avg_response_minutes / 3),  # Response time pressure
+            'pr_frequency': min(100, incidents_per_week * 15),  # Incident frequency workload
+            'deployment_frequency': min(100, critical_incidents * 12),  # Critical incident deployment pressure  
+            'meeting_load': min(100, total_incidents * 2 + incidents_per_week * 8),  # Incident coordination overhead
+            'oncall_burden': min(100, incidents_per_week * 10 + (critical_incidents * 5))  # On-call burden from incidents
         }
         
         # 🐛 DEBUG: Log CBI metrics for troubleshooting zero scores
