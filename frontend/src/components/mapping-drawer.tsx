@@ -185,17 +185,11 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
         setMappings(deduplicatedMappings)
         setMappingStats(frontendStats) // Use frontend calculated stats instead of backend
       } else {
-        console.error('🚀 MappingDrawer: Failed to load mapping data:', mappingsResponse.status, statsResponse.status)
-        const mappingsText = await mappingsResponse.text().catch(() => 'Could not read')
-        const statsText = await statsResponse.text().catch(() => 'Could not read') 
-        console.error('🚀 MappingDrawer: Response details:', { mappingsText, statsText })
         toast.error('Failed to load mapping data')
       }
     } catch (error) {
-      console.error('🚀 MappingDrawer: Error loading mapping data:', error)
       toast.error('Error loading mapping data')
     } finally {
-      console.log('🚀 MappingDrawer: Setting loading to false')
       setLoadingMappingData(false)
     }
   }, [isOpen, platform])
@@ -221,7 +215,6 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
         }
       }
     } catch (error) {
-      console.error('Error fetching GitHub organizations:', error)
     } finally {
       setLoadingGithubOrgs(false)
     }
@@ -313,7 +306,6 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
         return false
       }
     } catch (error) {
-      console.error('GitHub validation error:', error)
       setGithubValidation({ valid: false, message: 'Validation failed' })
       return false
     } finally {
@@ -346,7 +338,6 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
         return
       }
       
-      console.log('🔄 Starting GitHub auto-mapping...')
       
       const response = await fetch(`${API_BASE}/integrations/manual-mappings/run-github-mapping`, {
         method: 'POST',
@@ -356,11 +347,9 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
         }
       })
       
-      console.log('🔄 Auto-mapping response status:', response.status)
       
       if (!response.ok) {
         const error = await response.json().catch(() => ({}))
-        console.error('❌ Auto-mapping error:', error)
         
         if (error.detail === 'GitHub integration not found') {
           toast.error('Please connect a GitHub integration first before running auto-mapping')
@@ -371,21 +360,6 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
       }
       
       const result = await response.json()
-      console.log('✅ Auto-mapping result:', result)
-      
-      // Enhanced logging for debugging
-      console.log(`📊 Mapping Summary:`)
-      console.log(`   • Total processed: ${result.total_processed}`)
-      console.log(`   • Successfully mapped: ${result.mapped}`)
-      console.log(`   • Not found: ${result.not_found}`)
-      console.log(`   • Errors: ${result.errors}`)
-      
-      if (result.results && result.results.length > 0) {
-        console.log('📋 Detailed Results:')
-        result.results.forEach((r, i) => {
-          console.log(`   ${i + 1}. ${r.email || 'No email'} → ${r.github_username || 'Not found'} (${r.status})`)
-        })
-      }
       
       setMappingProgress({
         total: result.total_processed,
@@ -415,7 +389,6 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
       }
       
     } catch (error) {
-      console.error('Error running auto-mapping:', error)
       toast.error(error instanceof Error ? error.message : 'Failed to run auto-mapping')
     } finally {
       setRunningAutoMapping(false)
@@ -427,33 +400,8 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
       const authToken = localStorage.getItem('auth_token')
       if (!authToken) return
       
-      mappings.forEach((mapping, index) => {
-        console.log(`  ${index + 1}. ID:${mapping.id} | ${mapping.source_platform}:${mapping.source_identifier} -> ${mapping.target_identifier} | Type:${mapping.mapping_type} | Manual:${mapping.is_manual}`)
-      })
-      
-      // Find potential duplicates client-side
-      const emailGroups = mappings.reduce((acc, mapping) => {
-        const email = mapping.source_identifier
-        if (!acc[email]) acc[email] = []
-        acc[email].push(mapping)
-        return acc
-      }, {} as Record<string, any[]>)
-      
-      console.log('🔍 Email groups:')
-      Object.entries(emailGroups).forEach(([email, group]) => {
-        if (group.length > 1) {
-          console.log(`  📧 ${email}: ${group.length} mappings`)
-          group.forEach(m => console.log(`    - ID:${m.id} ${m.source_platform} -> ${m.target_identifier}`))
-        }
-      })
-      
-      // Find test emails
-      const testEmails = mappings.filter(m => m.source_identifier.includes('+'))
-      console.log('🔍 Test emails found:', testEmails.length)
-      testEmails.forEach(m => console.log(`  📧 ${m.source_identifier} -> ${m.target_identifier}`))
       
     } catch (error) {
-      console.error('Debug error:', error)
     }
   }
 
@@ -469,7 +417,6 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
       }
       
       const url = `${API_BASE}/integrations/manual-mappings/cleanup-duplicates?target_platform=${platform}&dry_run=${dryRun}&remove_test_emails=true`
-      console.log('🧹 Cleanup URL:', url)
       
       const response = await fetch(url, {
         method: 'POST',
@@ -478,7 +425,6 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
         }
       })
       
-      console.log('🧹 Cleanup response status:', response.status)
       
       if (!response.ok) {
         const error = await response.json()
@@ -486,21 +432,6 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
       }
       
       const result = await response.json()
-      console.log('🧹 Cleanup result:', result)
-      
-      // Log detailed cleanup plan
-      if (result.cleanup_plan) {
-        result.cleanup_plan.forEach((plan, index) => {
-          console.log(`🧹 Cleanup Plan ${index + 1}:`, plan)
-          if (plan.type === 'duplicate') {
-            console.log(`  📧 Email: ${plan.source_identifier}`)
-            console.log(`  ✅ Keep:`, plan.keep)
-            console.log(`  ❌ Remove:`, plan.remove)
-          } else if (plan.type === 'test_emails') {
-            console.log(`  📧 Test emails to remove:`, plan.remove)
-          }
-        })
-      }
       setCleanupResults(result)
       
       if (result.total_to_remove === 0) {
@@ -514,7 +445,6 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
       }
       
     } catch (error) {
-      console.error('Error cleaning up duplicates:', error)
       toast.error(error instanceof Error ? error.message : 'Failed to clean up duplicates')
     } finally {
       setRunningCleanup(false)
@@ -571,7 +501,6 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
         onRefresh?.()
       } else {
         const errorData = await response.json().catch(() => ({}))
-        console.error('Remove mapping error:', errorData)
         
         // Handle different error response formats
         let errorMessage = 'Failed to remove mapping'
@@ -589,7 +518,6 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
         toast.error(errorMessage)
       }
     } catch (error) {
-      console.error('Error removing mapping:', error)
       toast.error('Network error occurred')
     } finally {
       setRemovingMappingId(null)
@@ -657,7 +585,6 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
         toast.error(errorData.detail || 'Failed to save mapping')
       }
     } catch (error) {
-      console.error('Error saving mapping:', error)
       toast.error('Network error occurred')
     } finally {
       setSavingInlineMapping(false)
@@ -690,7 +617,6 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
         return
       }
 
-      console.log(`🗑️ Starting bulk removal of ${mappings.length} mappings`)
 
       // Remove each mapping individually (handle manual vs auto mappings)
       const removePromises = mappings.map(async mapping => {
@@ -755,8 +681,6 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
       results.forEach((result, index) => {
         if (result.status === 'fulfilled' && result.value.success) {
           successful++
-          const type = result.value.isManual ? 'manual' : 'auto'
-          console.log(`✅ Removed ${type} mapping ${result.value.id} (${result.value.email})`)
         } else {
           failed++
           let error
@@ -769,7 +693,6 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
             error = `${mappings[index].source_identifier}: ${result.reason}`
           }
           errors.push(error)
-          console.log(`❌ Failed to remove mapping: ${error}`)
         }
       })
 
@@ -782,13 +705,8 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
         toast.error(`Failed to remove all ${mappings.length} mappings`)
       }
 
-      // Log any errors for debugging
-      if (errors.length > 0) {
-        console.error('❌ Clear all mappings errors:', errors)
-      }
 
     } catch (error) {
-      console.error('❌ Error clearing all mappings:', error)
       toast.error('Network error occurred while clearing mappings')
     } finally {
       setClearingAllMappings(false)
@@ -818,15 +736,6 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
     return null
   }
 
-  // Group mappings by source identifier to detect users in multiple platforms
-  const groupedMappings = sortedMappings.reduce((acc, mapping) => {
-    const key = mapping.source_identifier
-    if (!acc[key]) {
-      acc[key] = []
-    }
-    acc[key].push(mapping)
-    return acc
-  }, {} as Record<string, IntegrationMapping[]>)
 
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>

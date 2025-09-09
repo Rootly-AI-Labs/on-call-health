@@ -34,7 +34,6 @@ export function usePerformanceMonitor() {
       startTime: performance.now()
     }
     metricsRef.current.push(metric)
-    console.log(`🚀 PERF: Started timing ${name}`)
     return name
   }, [])
 
@@ -46,7 +45,6 @@ export function usePerformanceMonitor() {
     if (metric) {
       metric.endTime = endTime
       metric.duration = endTime - metric.startTime
-      console.log(`✅ PERF: ${name} took ${metric.duration.toFixed(2)}ms`)
       
       // Update performance data
       switch (name) {
@@ -71,7 +69,6 @@ export function usePerformanceMonitor() {
   const trackCacheHit = useCallback(() => {
     const current = performanceDataRef.current
     current.cacheHitRate = (current.cacheHitRate * current.totalApiCalls + 1) / (current.totalApiCalls + 1)
-    console.log(`📊 PERF: Cache hit rate: ${(current.cacheHitRate * 100).toFixed(1)}%`)
   }, [])
 
   // Get performance summary
@@ -95,15 +92,6 @@ export function usePerformanceMonitor() {
     if (process.env.NODE_ENV === 'development') {
       const timer = setTimeout(() => {
         const summary = getPerformanceSummary()
-        console.group('🎯 PERFORMANCE SUMMARY')
-        console.log('Page Load:', `${summary.pageLoadTime.toFixed(2)}ms`)
-        console.log('Cache Load:', `${summary.cacheHitTime.toFixed(2)}ms`)
-        console.log('Total API Time:', `${summary.apiCallTime.toFixed(2)}ms`)
-        console.log('Render Time:', `${summary.renderTime.toFixed(2)}ms`)
-        console.log('Total API Calls:', summary.totalApiCalls)
-        console.log('Cache Hit Rate:', `${(summary.cacheHitRate * 100).toFixed(1)}%`)
-        console.log('Overall Efficiency:', summary.summary.cacheEfficiency)
-        console.groupEnd()
       }, 5000) // Log summary after 5 seconds
 
       return () => clearTimeout(timer)

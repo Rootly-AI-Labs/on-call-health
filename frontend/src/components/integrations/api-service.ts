@@ -64,7 +64,7 @@ export class IntegrationsAPIService {
       
       return cacheAge <= maxCacheAge
     } catch (error) {
-      console.error('🚀 DEBUG: Error loading cache:', error)
+      
       return false
     }
   }
@@ -189,7 +189,7 @@ export class IntegrationsAPIService {
   static async backgroundRefresh(): Promise<void> {
     try {
       await this.loadAllIntegrations()
-      console.log('🚀 Background refresh completed')
+      
     } catch (error) {
       console.error('Background refresh failed:', error)
       throw error

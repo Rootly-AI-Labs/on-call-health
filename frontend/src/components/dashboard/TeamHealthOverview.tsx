@@ -1,9 +1,9 @@
 "use client"
 
-import { 
-  Heart, 
-  Shield, 
-  BarChart3, 
+import {
+  Heart,
+  Shield,
+  BarChart3,
   Database,
   CheckCircle,
   Minus,
@@ -35,8 +35,8 @@ export function TeamHealthOverview({
     <>
       {/* CBI Score Tooltip Portal */}
       <div className="fixed z-[99999] invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gray-900 text-white text-xs rounded-lg p-3 w-72 shadow-lg pointer-events-none"
-           id="cbi-score-tooltip"
-           style={{ top: '-200px', left: '-200px' }}>
+        id="cbi-score-tooltip"
+        style={{ top: '-200px', left: '-200px' }}>
         <div className="space-y-2">
           <div className="text-purple-300 font-semibold mb-2">Copenhagen Burnout Inventory (CBI)</div>
           <div className="text-gray-300 text-sm">
@@ -51,11 +51,11 @@ export function TeamHealthOverview({
 
       {/* Info Icon Rubric Tooltip Portal */}
       <div className="fixed z-[99999] invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gray-900 text-white text-xs rounded-lg p-4 w-80 shadow-lg pointer-events-none"
-           id="health-rubric-tooltip"
-           style={{ top: '-200px', left: '-200px' }}>
+        id="health-rubric-tooltip"
+        style={{ top: '-200px', left: '-200px' }}>
         <div className="space-y-3">
           <div className="text-purple-300 font-semibold text-sm mb-3">CBI Risk Level Scale</div>
-          
+
           <div className="space-y-3">
             <div>
               <div className="flex items-center justify-between mb-1">
@@ -67,7 +67,7 @@ export function TeamHealthOverview({
               </div>
               <div className="text-gray-400 text-xs pl-5">No significant burnout symptoms</div>
             </div>
-            
+
             <div>
               <div className="flex items-center justify-between mb-1">
                 <div className="flex items-center space-x-2">
@@ -78,7 +78,7 @@ export function TeamHealthOverview({
               </div>
               <div className="text-gray-400 text-xs pl-5">Mild burnout symptoms, monitor trends</div>
             </div>
-            
+
             <div>
               <div className="flex items-center justify-between mb-1">
                 <div className="flex items-center space-x-2">
@@ -89,7 +89,7 @@ export function TeamHealthOverview({
               </div>
               <div className="text-gray-400 text-xs pl-5">Moderate burnout, intervention recommended</div>
             </div>
-            
+
             <div>
               <div className="flex items-center justify-between mb-1">
                 <div className="flex items-center space-x-2">
@@ -101,7 +101,7 @@ export function TeamHealthOverview({
               <div className="text-gray-400 text-xs pl-5">Severe burnout risk, immediate action needed</div>
             </div>
           </div>
-          
+
           <div className="text-gray-400 text-xs pt-2 border-t border-gray-700">
             Higher scores indicate greater burnout risk
           </div>
@@ -128,44 +128,40 @@ export function TeamHealthOverview({
                       const calculateCBIFromTeam = () => {
                         const teamAnalysis = currentAnalysis?.analysis_data?.team_analysis;
                         const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members;
-                        
+
                         if (!members || members.length === 0) return null;
-                        
+
                         // ALWAYS calculate from individual member CBI scores first
                         const cbiScores = members
                           .map((m: any) => m.cbi_score)
                           .filter((s: any) => s !== undefined && s !== null && s > 0);
-                        
+
                         if (cbiScores.length > 0) {
                           const avgCbiScore = cbiScores.reduce((a: number, b: number) => a + b, 0) / cbiScores.length;
-                          console.log(`🔥 FRONTEND CBI CALCULATION: ${cbiScores.length} members, avg CBI = ${avgCbiScore.toFixed(1)}`);
                           return Math.round(avgCbiScore); // Round to whole integer
                         }
-                        
+
                         // If no CBI scores, fallback to legacy
                         const legacyScores = members
                           .map((m: any) => m.burnout_score)
                           .filter((s: any) => s !== undefined && s !== null && s > 0);
-                          
+
                         if (legacyScores.length > 0) {
                           const avgLegacyScore = legacyScores.reduce((a: number, b: number) => a + b, 0) / legacyScores.length;
-                          console.log(`🔥 FRONTEND LEGACY CALCULATION: ${legacyScores.length} members, avg legacy = ${avgLegacyScore.toFixed(1)}`);
-                          // Convert legacy 0-10 burnout to 0-100 burnout scale for consistency
                           return Math.round(avgLegacyScore * 10);
                         }
-                        
+
                         return null;
                       };
-                      
+
                       // FORCE FRONTEND CBI CALCULATION FIRST - Don't trust backend at all!
                       const teamCbiScore = calculateCBIFromTeam();
                       if (teamCbiScore !== null) {
-                        console.log(`🚀 USING FRONTEND CBI: ${teamCbiScore}`);
                         return (
                           <>
                             <span>{teamCbiScore}</span>
-                            <span 
-                              className="text-xs text-gray-500 cursor-help ml-1" 
+                            <span
+                              className="text-xs text-gray-500 cursor-help ml-1"
                               onMouseEnter={(e) => {
                                 const tooltip = document.getElementById('cbi-score-tooltip')
                                 if (tooltip) {
@@ -189,10 +185,8 @@ export function TeamHealthOverview({
                           </>
                         );
                       }
-                      
-                      // Only use backend data if we have no individual member scores
-                      console.log("⚠️ NO INDIVIDUAL CBI SCORES - falling back to backend");
-                      
+
+
                       // Use the latest point from health trends for consistency with chart
                       if (historicalTrends?.daily_trends?.length > 0) {
                         const latestTrend = historicalTrends.daily_trends[historicalTrends.daily_trends.length - 1];
@@ -203,7 +197,7 @@ export function TeamHealthOverview({
                         const latestTrend = currentAnalysis.analysis_data.daily_trends[currentAnalysis.analysis_data.daily_trends.length - 1];
                         return `${Math.round(latestTrend.overall_score * 10)}%`;
                       }
-                      
+
                       // Show real data from team_health if available
                       if (currentAnalysis?.analysis_data?.team_health) {
                         return `${Math.round(currentAnalysis.analysis_data.team_health.overall_score * 10)}%`;
@@ -221,87 +215,85 @@ export function TeamHealthOverview({
                     const teamAnalysis = currentAnalysis?.analysis_data?.team_analysis;
                     const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members;
                     const hasCBIScores = members && members.some((m: any) => m.cbi_score !== undefined && m.cbi_score !== null);
-                    const hasHistoricalData = (historicalTrends?.daily_trends?.length > 0) || 
-                                             (currentAnalysis?.analysis_data?.daily_trends?.length > 0);
-                    
+                    const hasHistoricalData = (historicalTrends?.daily_trends?.length > 0) ||
+                      (currentAnalysis?.analysis_data?.daily_trends?.length > 0);
+
                     // Remove average section completely
                     return false;
                   })() && (
-                    <div className="hidden">
-                      <div className="text-2xl font-bold text-gray-900 flex items-baseline space-x-1">{(() => {
-                        // PRIORITY 1: Use CBI scores for meaningful 30-day average (same as current calculation)
-                        const teamAnalysis = currentAnalysis?.analysis_data?.team_analysis;
-                        const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members;
-                        
-                        if (members && members.length > 0) {
-                          const cbiScores = members
-                            .map((m: any) => m.cbi_score)
-                            .filter((s: any) => s !== undefined && s !== null && s > 0);
-                          
-                          if (cbiScores.length > 0) {
-                            const avgCbiScore = cbiScores.reduce((a: number, b: number) => a + b, 0) / cbiScores.length;
-                            const roundedScore = Math.round(avgCbiScore * 10) / 10;
-                            console.log(`📊 30-DAY AVERAGE using CURRENT CBI scores: ${roundedScore} (${cbiScores.length} members)`);
-                            
-                            return (
-                              <>
-                                <span>{roundedScore}</span>
-                                <span 
-                                  className="text-xs text-gray-500 cursor-help ml-1" 
-                                  onMouseEnter={(e) => {
-                                    const tooltip = document.getElementById('cbi-score-tooltip')
-                                    if (tooltip) {
-                                      const rect = e.currentTarget.getBoundingClientRect()
-                                      tooltip.style.top = `${rect.top - 180}px`
-                                      tooltip.style.left = `${rect.left - 120}px`
-                                      tooltip.classList.remove('invisible', 'opacity-0')
-                                      tooltip.classList.add('visible', 'opacity-100')
-                                    }
-                                  }}
-                                  onMouseLeave={() => {
-                                    const tooltip = document.getElementById('cbi-score-tooltip')
-                                    if (tooltip) {
-                                      tooltip.classList.add('invisible', 'opacity-0')
-                                      tooltip.classList.remove('visible', 'opacity-100')
-                                    }
-                                  }}
-                                >
-                                  CBI
-                                </span>
-                              </>
-                            );
+                      <div className="hidden">
+                        <div className="text-2xl font-bold text-gray-900 flex items-baseline space-x-1">{(() => {
+                          // PRIORITY 1: Use CBI scores for meaningful 30-day average (same as current calculation)
+                          const teamAnalysis = currentAnalysis?.analysis_data?.team_analysis;
+                          const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members;
+
+                          if (members && members.length > 0) {
+                            const cbiScores = members
+                              .map((m: any) => m.cbi_score)
+                              .filter((s: any) => s !== undefined && s !== null && s > 0);
+
+                            if (cbiScores.length > 0) {
+                              const avgCbiScore = cbiScores.reduce((a: number, b: number) => a + b, 0) / cbiScores.length;
+                              const roundedScore = Math.round(avgCbiScore * 10) / 10;
+
+                              return (
+                                <>
+                                  <span>{roundedScore}</span>
+                                  <span
+                                    className="text-xs text-gray-500 cursor-help ml-1"
+                                    onMouseEnter={(e) => {
+                                      const tooltip = document.getElementById('cbi-score-tooltip')
+                                      if (tooltip) {
+                                        const rect = e.currentTarget.getBoundingClientRect()
+                                        tooltip.style.top = `${rect.top - 180}px`
+                                        tooltip.style.left = `${rect.left - 120}px`
+                                        tooltip.classList.remove('invisible', 'opacity-0')
+                                        tooltip.classList.add('visible', 'opacity-100')
+                                      }
+                                    }}
+                                    onMouseLeave={() => {
+                                      const tooltip = document.getElementById('cbi-score-tooltip')
+                                      if (tooltip) {
+                                        tooltip.classList.add('invisible', 'opacity-0')
+                                        tooltip.classList.remove('visible', 'opacity-100')
+                                      }
+                                    }}
+                                  >
+                                    CBI
+                                  </span>
+                                </>
+                              );
+                            }
                           }
-                        }
-                        
-                        // PRIORITY 2: Fallback to backend historical data if no CBI scores
-                        console.log("📊 CALCULATING 30-DAY AVERAGE from backend historical data (no CBI)");
-                        
-                        // Calculate average from Health Trends chart data (legacy method)
-                        if (historicalTrends?.daily_trends?.length > 0) {
-                          const dailyScores = historicalTrends.daily_trends.map((d: any) => d.overall_score);
-                          const average = dailyScores.reduce((a: number, b: number) => a + b, 0) / dailyScores.length;
-                          console.log(`📊 USING HISTORICAL AVERAGE: ${(average * 10).toFixed(1)}% (${dailyScores.length} days)`);
-                          return `${Math.round(average * 10)}%`; // Convert 0-10 to 0-100%
-                        }
-                        
-                        // Fallback: Calculate from current analysis daily trends  
-                        if (currentAnalysis?.analysis_data?.daily_trends?.length > 0) {
-                          const dailyScores = currentAnalysis.analysis_data.daily_trends.map((d: any) => d.overall_score);
-                          const average = dailyScores.reduce((a: number, b: number) => a + b, 0) / dailyScores.length;
-                          console.log(`📊 USING CURRENT ANALYSIS AVERAGE: ${(average * 10).toFixed(1)}% (${dailyScores.length} days)`);
-                          return `${Math.round(average * 10)}%`; // Convert 0-10 to 0-100%
-                        }
-                        
-                        // Use current score if daily trends are empty but historical available
-                        if (historicalTrends?.daily_trends?.length > 0) {
-                          const latestTrend = historicalTrends.daily_trends[historicalTrends.daily_trends.length - 1];
-                          return `${Math.round(latestTrend.overall_score * 10)}%`;
-                        }
-                        return "No data";
-                      })()}</div>
-                      <div className="text-xs text-gray-500">{currentAnalysis?.time_range || 30}-day avg</div>
-                    </div>
-                  )}
+
+                          // PRIORITY 2: Fallback to backend historical data if no CBI scores
+
+                          // Calculate average from Health Trends chart data (legacy method)
+                          if (historicalTrends?.daily_trends?.length > 0) {
+                            const dailyScores = historicalTrends.daily_trends.map((d: any) => d.overall_score);
+                            const average = dailyScores.reduce((a: number, b: number) => a + b, 0) / dailyScores.length;
+
+                            return `${Math.round(average * 10)}%`; // Convert 0-10 to 0-100%
+                          }
+
+                          // Fallback: Calculate from current analysis daily trends  
+                          if (currentAnalysis?.analysis_data?.daily_trends?.length > 0) {
+                            const dailyScores = currentAnalysis.analysis_data.daily_trends.map((d: any) => d.overall_score);
+                            const average = dailyScores.reduce((a: number, b: number) => a + b, 0) / dailyScores.length;
+
+                            return `${Math.round(average * 10)}%`; // Convert 0-10 to 0-100%
+                          }
+
+                          // Use current score if daily trends are empty but historical available
+                          if (historicalTrends?.daily_trends?.length > 0) {
+                            const latestTrend = historicalTrends.daily_trends[historicalTrends.daily_trends.length - 1];
+                            return `${Math.round(latestTrend.overall_score * 10)}%`;
+                          }
+                          return "No data";
+                        })()}</div>
+                        <div className="text-xs text-gray-500">{currentAnalysis?.time_range || 30}-day avg</div>
+                      </div>
+                    )}
                 </div>
                 <div className="mt-2 flex items-center space-x-1">
                   <div className="text-sm font-medium text-purple-600">{(() => {
@@ -309,7 +301,7 @@ export function TeamHealthOverview({
                     const getCurrentHealthPercentage = () => {
                       const teamAnalysis = currentAnalysis?.analysis_data?.team_analysis;
                       const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members;
-                      
+
                       if (members && members.length > 0) {
                         // Check if we have CBI scores
                         const cbiScores = members.map((m: any) => m.cbi_score).filter((s: any) => s !== undefined && s !== null);
@@ -318,7 +310,7 @@ export function TeamHealthOverview({
                           // CBI: Return raw CBI score (0-100 where higher = more burnout)
                           return avgCbiScore;
                         }
-                        
+
                         // Fallback to legacy burnout scores
                         const legacyScores = members.map((m: any) => m.burnout_score).filter((s: any) => s !== undefined && s !== null);
                         if (legacyScores.length > 0) {
@@ -327,7 +319,7 @@ export function TeamHealthOverview({
                           return (10 - avgLegacyScore) * 10;
                         }
                       }
-                      
+
                       // Fallback to existing daily trends logic
                       if (historicalTrends?.daily_trends?.length > 0) {
                         const latestTrend = historicalTrends.daily_trends[historicalTrends.daily_trends.length - 1];
@@ -340,12 +332,12 @@ export function TeamHealthOverview({
                       } else if (currentAnalysis?.analysis_data?.team_summary) {
                         return currentAnalysis.analysis_data.team_summary.average_score * 10;
                       }
-                      
+
                       return 0;
                     };
-                    
+
                     const cbiScore = getCurrentHealthPercentage();
-                    
+
                     // Convert to health status based on raw CBI score (0-100, higher=worse burnout)
                     // Match CBI ranges: Healthy (0-24), Fair (25-49), Poor (50-74), Critical (75-100)
                     if (cbiScore < 25) return 'Healthy';      // CBI 0-24 - Low/minimal burnout risk
@@ -353,24 +345,24 @@ export function TeamHealthOverview({
                     if (cbiScore < 75) return 'Poor';         // CBI 50-74 - Moderate burnout risk
                     return 'Critical';                        // CBI 75-100 - High/severe burnout risk
                   })()}</div>
-                  <Info className="w-3 h-3 text-purple-500" 
-                          onMouseEnter={(e) => {
-                            const tooltip = document.getElementById('health-rubric-tooltip')
-                            if (tooltip) {
-                              const rect = e.currentTarget.getBoundingClientRect()
-                              tooltip.style.top = `${rect.top - 220}px`
-                              tooltip.style.left = `${rect.left - 160}px`
-                              tooltip.classList.remove('invisible', 'opacity-0')
-                              tooltip.classList.add('visible', 'opacity-100')
-                            }
-                          }}
-                          onMouseLeave={() => {
-                            const tooltip = document.getElementById('health-rubric-tooltip')
-                            if (tooltip) {
-                              tooltip.classList.add('invisible', 'opacity-0')
-                              tooltip.classList.remove('visible', 'opacity-100')
-                            }
-                          }} />
+                  <Info className="w-3 h-3 text-purple-500"
+                    onMouseEnter={(e) => {
+                      const tooltip = document.getElementById('health-rubric-tooltip')
+                      if (tooltip) {
+                        const rect = e.currentTarget.getBoundingClientRect()
+                        tooltip.style.top = `${rect.top - 220}px`
+                        tooltip.style.left = `${rect.left - 160}px`
+                        tooltip.classList.remove('invisible', 'opacity-0')
+                        tooltip.classList.add('visible', 'opacity-100')
+                      }
+                    }}
+                    onMouseLeave={() => {
+                      const tooltip = document.getElementById('health-rubric-tooltip')
+                      if (tooltip) {
+                        tooltip.classList.add('invisible', 'opacity-0')
+                        tooltip.classList.remove('visible', 'opacity-100')
+                      }
+                    }} />
                 </div>
                 <p className="text-xs text-gray-600 mt-1">
                   {(() => {
@@ -378,7 +370,7 @@ export function TeamHealthOverview({
                     const getCurrentHealthPercentage = () => {
                       const teamAnalysis = currentAnalysis?.analysis_data?.team_analysis;
                       const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members;
-                      
+
                       if (members && members.length > 0) {
                         // Check if we have CBI scores
                         const cbiScores = members.map((m: any) => m.cbi_score).filter((s: any) => s !== undefined && s !== null);
@@ -386,7 +378,7 @@ export function TeamHealthOverview({
                           const avgCbiScore = cbiScores.reduce((a: number, b: number) => a + b, 0) / cbiScores.length;
                           return avgCbiScore; // Return raw CBI score
                         }
-                        
+
                         // Fallback to legacy burnout scores
                         const legacyScores = members.map((m: any) => m.burnout_score).filter((s: any) => s !== undefined && s !== null);
                         if (legacyScores.length > 0) {
@@ -394,7 +386,7 @@ export function TeamHealthOverview({
                           return (10 - avgLegacyScore) * 10; // Convert to health percentage
                         }
                       }
-                      
+
                       // Fallback to legacy daily trends logic
                       if (historicalTrends?.daily_trends?.length > 0) {
                         const latestTrend = historicalTrends.daily_trends[historicalTrends.daily_trends.length - 1];
@@ -403,12 +395,12 @@ export function TeamHealthOverview({
                         const latestTrend = currentAnalysis.analysis_data.daily_trends[currentAnalysis.analysis_data.daily_trends.length - 1];
                         return latestTrend.overall_score * 10;
                       }
-                      
+
                       return 50; // Default middle value
                     };
-                    
+
                     const cbiScore = getCurrentHealthPercentage();
-                    
+
                     // Match CBI score ranges and descriptions (0-100, higher = more burnout)
                     if (cbiScore < 25) {
                       return 'Low/minimal burnout risk, sustainable workload'  // Healthy
@@ -445,11 +437,11 @@ export function TeamHealthOverview({
                     // Calculate CBI-based risk distribution from team members
                     const teamAnalysis = currentAnalysis?.analysis_data?.team_analysis;
                     const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members;
-                    
+
                     if (members && members.length > 0) {
                       // Calculate risk levels based on CBI scores when available
                       const riskCounts = { critical: 0, high: 0, medium: 0, low: 0 };
-                      
+
                       members.forEach((member: any) => {
                         if (member.cbi_score !== undefined && member.cbi_score !== null) {
                           // Use CBI scoring (0-100, higher = worse)
@@ -466,7 +458,7 @@ export function TeamHealthOverview({
                           else riskCounts.low++;
                         }
                       });
-                      
+
                       return (
                         <>
                           {riskCounts.critical > 0 && (
@@ -512,7 +504,7 @@ export function TeamHealthOverview({
                         </>
                       );
                     }
-                    
+
                     // Fallback to legacy risk distribution
                     return (
                       <>
@@ -560,11 +552,11 @@ export function TeamHealthOverview({
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-gray-900">
-              {(currentAnalysis.analysis_data as any)?.metadata?.total_incidents !== undefined 
+              {(currentAnalysis.analysis_data as any)?.metadata?.total_incidents !== undefined
                 ? (currentAnalysis.analysis_data as any).metadata.total_incidents
                 : (currentAnalysis.analysis_data as any)?.team_analysis?.total_incidents !== undefined
-                ? (currentAnalysis.analysis_data as any).team_analysis.total_incidents
-                : currentAnalysis.analysis_data?.partial_data?.incidents?.length || 0}
+                  ? (currentAnalysis.analysis_data as any).team_analysis.total_incidents
+                  : currentAnalysis.analysis_data?.partial_data?.incidents?.length || 0}
             </div>
             <p className="text-xs text-gray-600 mt-1">
               In the last {currentAnalysis.time_range || 30} days
@@ -625,12 +617,12 @@ export function TeamHealthOverview({
             <div className="space-y-3">
               {/* Incident Data */}
               <div className="space-y-2">
-                <div 
+                <div
                   className="flex items-center cursor-pointer hover:bg-gray-50 rounded px-1 py-0.5 transition-colors"
                   onClick={() => setExpandedDataSources(prev => ({ ...prev, incident: !prev.incident }))}
                 >
-                  {expandedDataSources.incident ? 
-                    <ChevronDown className="w-3 h-3 mr-1 text-gray-500" /> : 
+                  {expandedDataSources.incident ?
+                    <ChevronDown className="w-3 h-3 mr-1 text-gray-500" /> :
                     <ChevronRight className="w-3 h-3 mr-1 text-gray-500" />
                   }
                   <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
@@ -644,15 +636,15 @@ export function TeamHealthOverview({
                   </div>
                 )}
               </div>
-              
+
               {/* GitHub Data */}
               <div className="space-y-2">
-                <div 
+                <div
                   className="flex items-center cursor-pointer hover:bg-gray-50 rounded px-1 py-0.5 transition-colors"
                   onClick={() => setExpandedDataSources(prev => ({ ...prev, github: !prev.github }))}
                 >
-                  {expandedDataSources.github ? 
-                    <ChevronDown className="w-3 h-3 mr-1 text-gray-500" /> : 
+                  {expandedDataSources.github ?
+                    <ChevronDown className="w-3 h-3 mr-1 text-gray-500" /> :
                     <ChevronRight className="w-3 h-3 mr-1 text-gray-500" />
                   }
                   <div className="w-2 h-2 bg-gray-900 rounded-full mr-2"></div>
@@ -670,15 +662,15 @@ export function TeamHealthOverview({
                   </div>
                 )}
               </div>
-              
+
               {/* Slack Data */}
               <div className="space-y-2">
-                <div 
+                <div
                   className="flex items-center cursor-pointer hover:bg-gray-50 rounded px-1 py-0.5 transition-colors"
                   onClick={() => setExpandedDataSources(prev => ({ ...prev, slack: !prev.slack }))}
                 >
-                  {expandedDataSources.slack ? 
-                    <ChevronDown className="w-3 h-3 mr-1 text-gray-500" /> : 
+                  {expandedDataSources.slack ?
+                    <ChevronDown className="w-3 h-3 mr-1 text-gray-500" /> :
                     <ChevronRight className="w-3 h-3 mr-1 text-gray-500" />
                   }
                   <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>

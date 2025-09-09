@@ -51,12 +51,10 @@ import {
   ArrowLeft,
   Building,
   Calendar,
-  ChevronRight,
   ChevronDown,
   Clock,
   Edit3,
   Key,
-  MoreVertical,
   Plus,
   Settings,
   Shield,
@@ -89,7 +87,6 @@ import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { useBackendHealth } from "@/hooks/use-backend-health"
 import { MappingDrawer } from "@/components/mapping-drawer"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -404,7 +401,6 @@ export default function IntegrationsPage() {
 
   useEffect(() => {
     // ✨ PHASE 1 OPTIMIZATION: Re-enabled with API endpoint fixes
-    console.log('✨ PHASE 1 RE-ENABLED: Using optimized loading with correct API endpoints')
     loadAllIntegrationsOptimized()
     
     // 🚨 ROLLBACK: Individual loading functions (fallback disabled)
@@ -425,15 +421,6 @@ export default function IntegrationsPage() {
     const userEmail = localStorage.getItem('user_email')
     const userAvatar = localStorage.getItem('user_avatar')
     
-    console.log('Debug: User info from localStorage:', { 
-      userName, 
-      userEmail, 
-      userAvatar,
-      userNameType: typeof userName,
-      userEmailType: typeof userEmail,
-      userNameTruthy: !!userName,
-      userEmailTruthy: !!userEmail
-    })
     
     // Check for valid, non-empty strings (not "null", "undefined", or empty)
     const validUserName = userName && userName !== 'null' && userName !== 'undefined' && userName.trim() !== ''
@@ -445,19 +432,11 @@ export default function IntegrationsPage() {
         email: userEmail,
         avatar: (userAvatar && userAvatar !== 'null' && userAvatar !== 'undefined') ? userAvatar : undefined
       })
-      console.log('Debug: User info set:', { name: userName, email: userEmail, avatar: userAvatar })
     } else {
-      console.log('Debug: No valid user info found in localStorage', { 
-        validUserName, 
-        validUserEmail, 
-        userName, 
-        userEmail 
-      })
       
       // Try to fetch user info from API as fallback
       const authToken = localStorage.getItem('auth_token')
       if (authToken) {
-        console.log('Debug: Attempting to fetch user info from API')
         const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
         fetch(`${API_BASE}/auth/user/me`, {
           headers: { 
@@ -468,7 +447,6 @@ export default function IntegrationsPage() {
         })
         .then(response => response.json())
         .then(userData => {
-          console.log('Debug: User data from API:', userData)
           if (userData.name && userData.email) {
             setUserInfo({
               name: userData.name,
@@ -484,7 +462,6 @@ export default function IntegrationsPage() {
           }
         })
         .catch(error => {
-          console.log('Debug: Failed to fetch user info from API:', error)
         })
       }
     }
@@ -667,40 +644,29 @@ export default function IntegrationsPage() {
   // Synchronous cache reading for instant display
   const loadFromCacheSync = () => {
     try {
-      console.log('🚀 DEBUG: Reading cache from localStorage')
       const cachedIntegrations = localStorage.getItem('all_integrations')
       const cachedGithub = localStorage.getItem('github_integration')
       const cachedSlack = localStorage.getItem('slack_integration')
       
-      console.log('🚀 DEBUG: Cache items found:', {
-        cachedIntegrations: !!cachedIntegrations,
-        cachedGithub: !!cachedGithub,
-        cachedSlack: !!cachedSlack
-      })
       
       if (cachedIntegrations) {
         const parsedIntegrations = JSON.parse(cachedIntegrations)
         setIntegrations(parsedIntegrations)
-        console.log('✨ INSTANT CACHE: Loaded', parsedIntegrations.length, 'integrations immediately')
       }
       
       if (cachedGithub) {
         const githubData = JSON.parse(cachedGithub)
         setGithubIntegration(githubData.connected ? githubData.integration : null)
-        console.log('🚀 DEBUG: Loaded GitHub cache')
       }
       
       if (cachedSlack) {
         const slackData = JSON.parse(cachedSlack)
         setSlackIntegration(slackData.integration)
-        console.log('🚀 DEBUG: Loaded Slack cache')
       }
       
       const hasAllCache = !!(cachedIntegrations && cachedGithub && cachedSlack)
-      console.log('🚀 DEBUG: Has all cache?', hasAllCache)
       return hasAllCache
     } catch (error) {
-      console.error('🚀 DEBUG: Error loading cache:', error)
       return false
     }
   }
@@ -709,9 +675,7 @@ export default function IntegrationsPage() {
   const refreshInBackground = async () => {
     setRefreshingInBackground(true)
     try {
-      console.log('🚀 DEBUG: Background refresh starting (no loading state changes)')
       await loadAllIntegrationsAPIBackground()
-      console.log('✨ BACKGROUND REFRESH: Completed')
     } catch (error) {
       console.error('Background refresh failed:', error)
     } finally {
@@ -721,11 +685,9 @@ export default function IntegrationsPage() {
 
   // Background API loading - does NOT change loading states (for silent refresh)
   const loadAllIntegrationsAPIBackground = async () => {
-    console.log('🚀 DEBUG: loadAllIntegrationsAPIBackground starting (no skeleton changes)')
     try {
       const authToken = localStorage.getItem('auth_token')
       if (!authToken) {
-        console.log('🚀 DEBUG: No auth token, skipping background refresh')
         return
       }
 
@@ -767,9 +729,7 @@ export default function IntegrationsPage() {
       localStorage.setItem('github_integration', JSON.stringify(githubData))
       localStorage.setItem('slack_integration', JSON.stringify(slackData))
 
-      console.log('🚀 DEBUG: Background refresh completed, cache updated')
     } catch (error) {
-      console.error('🚀 DEBUG: Error in background refresh:', error)
     }
   }
   
@@ -785,17 +745,13 @@ export default function IntegrationsPage() {
   
   // New optimized loading function with instant cache + background refresh
   const loadAllIntegrationsOptimized = async (forceRefresh = false) => {
-    console.log('🚀 DEBUG: Starting optimized integration loading, forceRefresh=', forceRefresh)
     
     try {
       // Step 1: Always show cached data instantly (0ms)
-      console.log('🚀 DEBUG: Calling loadFromCacheSync()')
       const hasCachedData = loadFromCacheSync()
-      console.log('🚀 DEBUG: hasCachedData =', hasCachedData)
       
       // Step 2: If we have cached data and it's not forced refresh, show it immediately
       if (hasCachedData && !forceRefresh) {
-        console.log('🚀 DEBUG: Has cached data, setting loading states to false')
         setLoadingRootly(false) // Hide skeleton immediately
         setLoadingPagerDuty(false)
         setLoadingGitHub(false)
@@ -803,23 +759,17 @@ export default function IntegrationsPage() {
         
         // Step 3: Check if cache is stale and refresh in background if needed
         const cacheIsStale = isCacheStale()
-        console.log('🚀 DEBUG: Cache is stale?', cacheIsStale)
         if (cacheIsStale) {
-          console.log('✨ CACHE STALE: Starting background refresh')
           // Non-blocking background refresh
           setTimeout(() => refreshInBackground(), 100)
         } else {
-          console.log('✨ CACHE FRESH: No refresh needed')
         }
         return
       }
       
       // Step 4: If no cache or forced refresh, fall back to normal loading
-      console.log('🚀 DEBUG: No cache or forced refresh, calling loadAllIntegrationsAPI()')
       await loadAllIntegrationsAPI()
-      console.log('🚀 DEBUG: loadAllIntegrationsAPI() completed')
     } catch (error) {
-      console.error('🚀 DEBUG: Error in loadAllIntegrationsOptimized:', error)
       // Fallback: set loading states to false to prevent infinite loading
       setLoadingRootly(false)
       setLoadingPagerDuty(false)
@@ -830,13 +780,11 @@ export default function IntegrationsPage() {
   
   // Original API loading logic (extracted for reuse)
   const loadAllIntegrationsAPI = async () => {
-    console.log('🚀 DEBUG: loadAllIntegrationsAPI starting')
     // Set individual loading states to true
     setLoadingRootly(true)
     setLoadingPagerDuty(true)
     setLoadingGitHub(true)
     setLoadingSlack(true)
-    console.log('🚀 DEBUG: Set all loading states to true')
     try {
       const authToken = localStorage.getItem('auth_token')
       if (!authToken) {
@@ -890,16 +838,13 @@ export default function IntegrationsPage() {
         // Otherwise keep backUrl empty to hide the back button
       }
     } catch (error) {
-      console.error('🚀 DEBUG: Error in loadAllIntegrationsAPI:', error)
       toast.error("Failed to load integrations. Please try refreshing the page.")
     } finally {
-      console.log('🚀 DEBUG: loadAllIntegrationsAPI finally block - setting loading states to false')
       // Set all integration loading states to false
       setLoadingRootly(false)
       setLoadingPagerDuty(false)
       setLoadingGitHub(false)
       setLoadingSlack(false)
-      console.log('🚀 DEBUG: All loading states set to false')
     }
   }
 
@@ -1040,7 +985,6 @@ export default function IntegrationsPage() {
   }
 
   const testConnection = async (platform: "rootly" | "pagerduty", token: string) => {
-    console.log('testConnection called for platform:', platform)
     setIsTestingConnection(true)
     setConnectionStatus('idle')
     setPreviewData(null)
@@ -1049,7 +993,6 @@ export default function IntegrationsPage() {
     try {
       const authToken = localStorage.getItem('auth_token')
       if (!authToken) {
-        console.log('No auth token found')
         throw new Error('No authentication token found')
       }
 
@@ -1057,7 +1000,6 @@ export default function IntegrationsPage() {
         ? `${API_BASE}/rootly/token/test`
         : `${API_BASE}/pagerduty/token/test`
       
-      console.log('Making request to:', endpoint)
 
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -1072,9 +1014,6 @@ export default function IntegrationsPage() {
 
       const data = await response.json()
       
-      console.log('Response status:', response.status)
-      console.log('Response ok:', response.ok) 
-      console.log('Response data:', data)
 
       if (response.ok && (data.valid || data.status === 'success')) {
         setConnectionStatus('success')
@@ -1494,7 +1433,6 @@ export default function IntegrationsPage() {
 
       if (response.ok) {
         const data = await response.json()
-        console.log('Full Slack test response:', data)
         setSlackPermissions(data.permissions)
         
         // Store channels list if available
@@ -1533,8 +1471,6 @@ export default function IntegrationsPage() {
 
       if (response.ok) {
         const data = await response.json()
-        console.log('Slack permissions API response:', data)
-        console.log('Permissions object:', data.permissions)
         setSlackPermissions(data.permissions)
       }
     } catch (error) {
@@ -1547,30 +1483,22 @@ export default function IntegrationsPage() {
   // Mapping data handlers
   // Function to open the reusable MappingDrawer
   const openMappingDrawer = (platform: 'github' | 'slack') => {
-    console.log(`🎯 Integrations: openMappingDrawer called with platform: ${platform}`)
     setMappingDrawerPlatform(platform)
     setMappingDrawerOpen(true)
   }
 
   const loadMappingData = async (platform: 'github' | 'slack') => {
-    console.log('🔴 loadMappingData called with platform:', platform)
     setLoadingMappingData(true)
     setSelectedMappingPlatform(platform)
     
     try {
       const authToken = localStorage.getItem('auth_token')
       if (!authToken) {
-        console.error('🔴 No auth token found')
         toast.error('Please log in to view mapping data')
         return
       }
 
       // Use the existing working endpoints
-      console.log(`🔍 DEBUG: Fetching mapping data for platform: ${platform}`)
-      console.log(`🔍 DEBUG: API URLs:`, {
-        mappings: `${API_BASE}/integrations/mappings/platform/${platform}`,
-        stats: `${API_BASE}/integrations/mappings/success-rate?platform=${platform}`
-      })
       
       const [mappingsResponse, statsResponse] = await Promise.all([
         fetch(`${API_BASE}/integrations/mappings/platform/${platform}`, {
@@ -1581,10 +1509,6 @@ export default function IntegrationsPage() {
         })
       ])
 
-      console.log('🔍 API Response statuses:', {
-        mappings: mappingsResponse.status,
-        stats: statsResponse.status
-      })
 
       if (mappingsResponse.ok && statsResponse.ok) {
         const mappings = await mappingsResponse.json()
@@ -1593,23 +1517,6 @@ export default function IntegrationsPage() {
         const failedMappings = mappings.filter(m => !m.target_identifier)
         const successfulMappings = mappings.filter(m => m.target_identifier)
         
-        console.log(`🔍 DEBUG: Received data for ${platform}:`, {
-          mappings: mappings.length,
-          stats: stats,
-          failed_mappings: failedMappings.length,
-          successful_mappings: successfulMappings.length,
-          sample_failed: failedMappings.slice(0, 2).map(m => ({
-            email: m.source_identifier,
-            target: m.target_identifier,
-            successful: m.mapping_successful,
-            error: m.error_message
-          })),
-          sample_successful: successfulMappings.slice(0, 2).map(m => ({
-            email: m.source_identifier,
-            target: m.target_identifier,
-            successful: m.mapping_successful
-          }))
-        })
         
         setMappingData(mappings)
         setMappingStats(stats)
@@ -1617,26 +1524,17 @@ export default function IntegrationsPage() {
         setCurrentAnalysisId(null)
         setShowMappingDialog(true)
         
-        console.log('🔍 Successfully set all state, opening dialog')
         
         // Show success message only if dialog is already open (refresh action)
         if (showMappingDialog) {
           toast.success(`${platform === 'github' ? 'GitHub' : 'Slack'} mapping data refreshed successfully`)
         }
       } else {
-        console.error('🔴 API responses not OK:', {
-          mappingsStatus: mappingsResponse.status,
-          statsStatus: statsResponse.status,
-          mappingsText: await mappingsResponse.text().catch(() => 'Could not read response'),
-          statsText: await statsResponse.text().catch(() => 'Could not read response')
-        })
         throw new Error(`Failed to fetch mapping data - Mappings: ${mappingsResponse.status}, Stats: ${statsResponse.status}`)
       }
     } catch (error) {
-      console.error('🔴 Error loading mapping data:', error)
       toast.error(`Failed to load mapping data: ${error.message}`)
     } finally {
-      console.log('🔍 Setting loadingMappingData to false')
       setLoadingMappingData(false)
     }
   }
@@ -1673,11 +1571,6 @@ export default function IntegrationsPage() {
       })
       
       const data = await response.json()
-      console.log('🔍 GitHub validation response:', {
-        status: response.status,
-        data: data,
-        url: response.url
-      })
       
       if (response.ok && data.valid) {
         setGithubValidation({ valid: true, message: `Found: ${data.name || data.username}` })
@@ -1685,7 +1578,6 @@ export default function IntegrationsPage() {
       } else {
         const errorMsg = data.message || data.error || `API Error (${response.status})`
         setGithubValidation({ valid: false, message: errorMsg })
-        console.error('❌ GitHub validation failed:', errorMsg)
         return false
       }
     } catch (error) {
@@ -4113,7 +4005,6 @@ export default function IntegrationsPage() {
                 variant="outline"
                 size="sm"
                 onClick={() => {
-                  console.log('🔴 REFRESH BUTTON CLICKED!', selectedMappingPlatform)
                   selectedMappingPlatform && loadMappingData(selectedMappingPlatform)
                 }}
                 disabled={loadingMappingData}
@@ -4232,13 +4123,6 @@ export default function IntegrationsPage() {
                   </div>
                   <div className="divide-y max-h-96 overflow-y-auto">
                     {sortedMappings.length > 0 ? sortedMappings.map((mapping) => {
-                      console.log('🔍 Mapping row:', {
-                        id: mapping.id,
-                        email: mapping.source_identifier,
-                        target: mapping.target_identifier,
-                        successful: mapping.mapping_successful,
-                        hasTarget: !!mapping.target_identifier
-                      })
                       return (
                       <div key={mapping.id} className="px-4 py-3">
                         <div className="grid grid-cols-4 gap-4 text-sm">
@@ -4279,16 +4163,6 @@ export default function IntegrationsPage() {
                           </div>
                           <div className="truncate" title={mapping.target_identifier || mapping.error_message || ''}>
                             {(() => {
-                              console.log('🔍 Button logic for', mapping.source_identifier, {
-                                hasTarget: !!mapping.target_identifier,
-                                target: mapping.target_identifier,
-                                isEditing: inlineEditingId === mapping.id,
-                                shouldShowPlusButton: !mapping.target_identifier && inlineEditingId !== mapping.id,
-                                mapping_successful: mapping.mapping_successful,
-                                error_message: mapping.error_message,
-                                full_mapping: mapping,
-                                is_manual: mapping.is_manual
-                              })
                               return mapping.target_identifier ? (
                                 inlineEditingId === mapping.id ? (
                                   // Show edit form for existing mapping
@@ -4517,7 +4391,6 @@ export default function IntegrationsPage() {
         platform={mappingDrawerPlatform}
         onRefresh={() => {
           // Optional: Refresh any parent data if needed
-          console.log(`Refreshed ${mappingDrawerPlatform} mapping data from integrations page`)
         }}
       />
 

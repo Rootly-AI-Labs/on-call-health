@@ -58,14 +58,14 @@ export default function IntegrationsLayout() {
 
   // Optimized data loading with performance tracking
   const loadIntegrationsOptimized = async (forceRefresh = false) => {
-    console.log('🚀 Starting optimized integration loading')
+    
     
     try {
       startTiming('cache_load')
       
       // Step 1: Check cache first
       if (!forceRefresh && IntegrationsAPIService.loadFromCacheSync()) {
-        console.log('✅ Using cached data')
+        
         trackCacheHit()
         endTiming('cache_load')
         
@@ -81,7 +81,7 @@ export default function IntegrationsLayout() {
         
         // Background refresh if cache is stale
         if (IntegrationsAPIService.isCacheStale()) {
-          console.log('🔄 Cache is stale, refreshing in background')
+          
           state.setStatus({ refreshingInBackground: true })
           setTimeout(async () => {
             try {
@@ -102,7 +102,7 @@ export default function IntegrationsLayout() {
       
       // Step 2: Load from API
       startTiming('api_call')
-      console.log('🌐 Loading fresh data from API')
+      
       
       const data = await IntegrationsAPIService.loadAllIntegrations()
       
@@ -112,7 +112,7 @@ export default function IntegrationsLayout() {
       state.setLoading({ rootly: false, pagerDuty: false, github: false, slack: false })
       
       endTiming('api_call')
-      console.log('✅ Fresh data loaded successfully')
+      
       
     } catch (error) {
       console.error('❌ Failed to load integrations:', error)

@@ -1,13 +1,12 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { MappingDrawer } from "@/components/mapping-drawer"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
@@ -15,8 +14,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import {
-  Line,
-  LineChart,
   Area,
   AreaChart,
   Bar,
@@ -65,7 +62,6 @@ import { MemberDetailModal } from "@/components/dashboard/MemberDetailModal"
 import Image from "next/image"
 import { useRouter, useSearchParams } from "next/navigation"
 import { toast } from "sonner"
-import { useBackendHealth } from "@/hooks/use-backend-health"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -439,7 +435,7 @@ function IndividualDailyHealthChart({ memberData, analysisId, currentAnalysis }:
           setError(result.message || 'No daily health data available');
         }
       } catch (err) {
-        console.error('Error fetching daily health:', err);
+;
         
         // Fallback: Calculate daily health from existing analysis data
         if (currentAnalysis && currentAnalysis.results) {
@@ -450,7 +446,7 @@ function IndividualDailyHealthChart({ memberData, analysisId, currentAnalysis }:
             // Don't show fabricated data - only show if there's actual individual incident data
             setError('No individual daily health data available - this member had no incident involvement during the analysis period');
           } catch (fallbackErr) {
-            console.error('Fallback calculation failed:', fallbackErr);
+    ;
             setError('Failed to load daily health data');
           }
         } else {
@@ -649,8 +645,7 @@ function GitHubCommitsTimeline({ analysisId, totalCommits, weekendPercentage }: 
           setError(result.message || 'Failed to fetch timeline data')
         }
       } catch (err) {
-        console.error('GitHubCommitsTimeline: Error fetching timeline:', err)
-        setError('Unable to load timeline data')
+          setError('Unable to load timeline data')
       } finally {
         setLoading(false)
       }
@@ -810,7 +805,6 @@ function GitHubActivityChart({ userEmail, analysisId, memberData }: {
           setError(result.message || 'Failed to fetch data')
         }
       } catch (err) {
-        console.error('Error fetching GitHub daily commits:', err)
         setError('Unable to load daily commit data')
       } finally {
         setLoading(false)
@@ -1033,7 +1027,6 @@ export default function Dashboard() {
         }
       }
     } catch (error) {
-      console.warn('Failed to delete cancelled analysis:', error)
     } finally {
       // Reset all analysis state
       setAnalysisRunning(false)
@@ -1168,8 +1161,7 @@ export default function Dashboard() {
             }
           }
         } catch (e) {
-          console.error('Failed to parse cached integrations:', e)
-        }
+          }
         
         // Set loading to false when using cache
         setLoadingIntegrations(false)
@@ -1211,8 +1203,7 @@ export default function Dashboard() {
         results.forEach((result, index) => {
           const functionNames = ['loadPreviousAnalyses', 'loadIntegrations', 'loadHistoricalTrends']
           if (result.status === 'rejected') {
-            console.error(`${functionNames[index]} failed:`, result.reason)
-          }
+            }
         })
         
         // Small delay to ensure state updates have propagated
@@ -1220,7 +1211,6 @@ export default function Dashboard() {
           setInitialDataLoaded(true)
         }, 100)
       } catch (error) {
-        console.error('Error loading initial data:', error)
         // Always set to true to prevent endless loading, even if some data fails
         setInitialDataLoaded(true)
       }
@@ -1230,14 +1220,12 @@ export default function Dashboard() {
     
     // Fallback timeout to prevent endless loading (max 15 seconds)
     const timeoutId = setTimeout(() => {
-      console.warn('Initial data loading timed out after 15 seconds')
       setInitialDataLoaded(true)
     }, 15000)
 
     // Listen for localStorage changes (when integrations are updated on other pages)
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'all_integrations' && e.newValue) {
-        console.log('Detected integration cache update, refreshing...')
         try {
           const updatedIntegrations = JSON.parse(e.newValue)
           setIntegrations(updatedIntegrations)
@@ -1256,7 +1244,6 @@ export default function Dashboard() {
             setSlackIntegration(slackData.integration)
           }
         } catch (e) {
-          console.error('Failed to parse updated integrations:', e)
         }
       }
     }
@@ -1286,7 +1273,6 @@ export default function Dashboard() {
       
       // If this ID doesn't exist, show loader immediately
       if (!analysisExists) {
-        console.log(`Analysis ${analysisId} not found in loaded analyses, showing redirect loader`)
         setRedirectingToSuggested(true)
       }
     }
@@ -1302,11 +1288,9 @@ export default function Dashboard() {
       const loadAnalysisWithDelay = () => {
         const authToken = localStorage.getItem('auth_token')
         if (authToken) {
-          console.log('Loading specific analysis from URL:', analysisId)
           loadSpecificAnalysis(analysisId)
         } else {
-          console.warn('Auth token not yet available, retrying in 500ms...')
-          // Retry after another short delay
+            // Retry after another short delay
           setTimeout(loadAnalysisWithDelay, 500)
         }
       }
@@ -1353,11 +1337,9 @@ export default function Dashboard() {
     try {
       const authToken = localStorage.getItem('auth_token')
       if (!authToken) {
-        console.warn('No auth token found, skipping previous analyses load')
         return
       }
 
-      console.log('Loading previous analyses...')
       let response
       try {
         response = await fetch(`${API_BASE}/analyses`, {
@@ -1366,14 +1348,11 @@ export default function Dashboard() {
           }
         })
       } catch (networkError) {
-        console.error('Network error loading analyses:', networkError)
         throw new Error('Cannot connect to backend server')
       }
 
       if (response.ok) {
         const data = await response.json()
-        console.log('Loaded analyses:', data.analyses?.length || 0, 'analyses')
-        console.log('Previous analyses data:', data.analyses)
         setPreviousAnalyses(data.analyses || [])
         
         // If no specific analysis is loaded and we have analyses, load the most recent one
@@ -1382,16 +1361,13 @@ export default function Dashboard() {
         
         if (!analysisId && data.analyses && data.analyses.length > 0 && !currentAnalysis) {
           const mostRecentAnalysis = data.analyses[0] // Analyses should be ordered by created_at desc
-          console.log('Auto-loading most recent analysis:', mostRecentAnalysis.id)
           setCurrentAnalysis(mostRecentAnalysis)
           // Fetch platform mappings (same as integrations page)
           fetchPlatformMappings()
         }
       } else {
-        console.error('Failed to load analyses, status:', response.status)
       }
     } catch (error) {
-      console.error('Failed to load previous analyses:', error)
       
       // Check if this is a network connectivity issue
       const isNetworkError = error instanceof Error && (
@@ -1411,7 +1387,6 @@ export default function Dashboard() {
     try {
       const authToken = localStorage.getItem('auth_token')
       if (!authToken) {
-        console.warn('loadSpecificAnalysis called but no auth token available')
         return
       }
 
@@ -1421,7 +1396,6 @@ export default function Dashboard() {
       // Use the unified endpoint that handles both UUIDs and integer IDs
       const endpoint = `${API_BASE}/analyses/by-id/${analysisId}`
       
-      console.log(`Making API call to load analysis: ${endpoint}`)
       const response = await fetch(endpoint, {
         headers: {
           'Authorization': `Bearer ${authToken}`
@@ -1430,7 +1404,6 @@ export default function Dashboard() {
 
       if (response.ok) {
         const analysis = await response.json()
-        console.log('Loaded specific analysis from URL:', analysis.uuid || analysis.id)
         setCurrentAnalysis(analysis)
         // Fetch platform mappings (same as integrations page)
         fetchPlatformMappings()
@@ -1441,27 +1414,22 @@ export default function Dashboard() {
           updateURLWithAnalysis(analysis.uuid || analysis.id)
         }
       } else {
-        console.error('Failed to load analysis:', analysisId, 'Status:', response.status)
         
         // Show user-friendly error message and handle suggested redirect
         if (response.status === 404) {
           try {
             const errorData = await response.json()
-            console.warn(`Analysis ${analysisId} not found:`, errorData.detail)
-            console.log('Attempting to parse suggestion from error response:', errorData)
             
             // Check if backend provided a suggested analysis ID
             const suggestionMatch = errorData.detail?.match(/Most recent analysis available: (.+)$/)
             if (suggestionMatch && suggestionMatch[1]) {
               const suggestedId = suggestionMatch[1]
-              console.log(`Backend suggested redirecting to analysis: ${suggestedId}`)
               
               // Set redirect state to show loader instead of error (don't clear analysis yet)
               setRedirectingToSuggested(true)
               
               // Auto-redirect to suggested analysis after a brief delay
               setTimeout(() => {
-                console.log(`Auto-redirecting to suggested analysis: ${suggestedId}`)
                 updateURLWithAnalysis(suggestedId)
                 loadSpecificAnalysis(suggestedId)
                 setRedirectingToSuggested(false)
@@ -1470,7 +1438,6 @@ export default function Dashboard() {
               return // Exit early to prevent clearing analysis state
             }
           } catch (parseError) {
-            console.warn(`Analysis ${analysisId} not found. Please select a valid analysis from the history.`)
           }
         }
         
@@ -1481,7 +1448,6 @@ export default function Dashboard() {
         updateURLWithAnalysis(null)
       }
     } catch (error) {
-      console.error('Error loading specific analysis:', error)
     }
   }
 
@@ -1489,35 +1455,26 @@ export default function Dashboard() {
     try {
       const authToken = localStorage.getItem('auth_token')
       if (!authToken) {
-        console.error('No auth token found in localStorage')
         return
       }
       
-      console.log('Auth token found:', authToken ? `${authToken.substring(0, 10)}...` : 'null')
 
       setLoadingTrends(true)
-      console.log('Loading historical trends...')
       
       // Use 30 days to get more historical data points for all integrations
       const params = new URLSearchParams({ days_back: '30' })
       // No integration filtering - show data from all integrations
 
       const fullUrl = `${API_BASE}/analyses/trends/historical?${params}`
-      console.log('Making request to:', fullUrl)
-      console.log('API_BASE:', API_BASE)
-      console.log('Params:', params.toString())
       
       // Test the main analyses endpoint with same auth token to verify auth works
-      console.log('Testing main analyses endpoint with same token...')
       try {
         const testResponse = await fetch(`${API_BASE}/analyses`, {
           headers: {
             'Authorization': `Bearer ${authToken}`
           }
         })
-        console.log('Main analyses endpoint test status:', testResponse.status)
       } catch (testError) {
-        console.log('Main analyses endpoint test error:', testError)
       }
       
       let response
@@ -1528,23 +1485,16 @@ export default function Dashboard() {
           }
         })
       } catch (networkError) {
-        console.error('Network error loading trends:', networkError)
         throw new Error('Cannot connect to backend server')
       }
 
       if (response.ok) {
         const data = await response.json()
-        console.log('Loaded historical trends:', data)
         setHistoricalTrends(data)
       } else {
-        console.error('Failed to load trends, status:', response.status)
-        console.error('Response URL:', response.url)
-        console.error('Response headers:', [...response.headers.entries()])
         const errorText = await response.text()
-        console.error('Response body:', errorText)
       }
     } catch (error) {
-      console.error('Failed to load historical trends:', error)
     } finally {
       setLoadingTrends(false)
     }
@@ -1563,7 +1513,6 @@ export default function Dashboard() {
       const authToken = localStorage.getItem('auth_token')
       if (!authToken) return
 
-      console.log('Deleting analysis:', analysisToDelete.id)
       
       const response = await fetch(`${API_BASE}/analyses/${analysisToDelete.id}`, {
         method: 'DELETE',
@@ -1572,27 +1521,20 @@ export default function Dashboard() {
         }
       })
 
-      console.log('Delete response status:', response.status)
 
       if (response.ok) {
-        console.log('Delete successful, updating local state...')
-        console.log('Current analyses before delete:', previousAnalyses.map(a => ({id: a.id, integration_id: a.integration_id})))
-        console.log('Deleting analysis with ID:', analysisToDelete.id, 'type:', typeof analysisToDelete.id)
         
         // Immediately remove from local state - be more explicit about ID matching
         setPreviousAnalyses(prev => {
           const filtered = prev.filter(a => {
             const match = a.id === analysisToDelete.id || String(a.id) === String(analysisToDelete.id)
-            console.log(`Comparing ${a.id} (${typeof a.id}) with ${analysisToDelete.id} (${typeof analysisToDelete.id}): ${match ? 'REMOVE' : 'KEEP'}`)
             return !match
           })
-          console.log('Filtered analyses:', filtered.map(a => ({id: a.id, integration_id: a.integration_id})))
           return filtered
         })
         
         // If the deleted analysis was currently selected, clear it
         if (currentAnalysis?.id === analysisToDelete.id) {
-          console.log('Clearing currently selected analysis')
           setCurrentAnalysis(null)
           updateURLWithAnalysis(null)
         }
@@ -1604,16 +1546,13 @@ export default function Dashboard() {
         setAnalysisToDelete(null)
         
         // Also reload from server to ensure consistency
-        console.log('Reloading analyses list from server...')
         setTimeout(() => loadPreviousAnalyses(), 500)
         
       } else {
         const errorData = await response.json()
-        console.error('Delete failed:', errorData)
         throw new Error(errorData.detail || 'Failed to delete analysis')
       }
     } catch (error) {
-      console.error('Delete error:', error)
       toast.error(error instanceof Error ? error.message : "Failed to delete analysis")
       setDeleteDialogOpen(false)
       setAnalysisToDelete(null)
@@ -1640,27 +1579,22 @@ export default function Dashboard() {
       
       if (githubResponse.ok) {
         const githubMappings = await githubResponse.json()
-        console.log('📊 GitHub mappings from platform endpoint:', githubMappings)
         allMappings = allMappings.concat(githubMappings)
       }
       
       if (slackResponse.ok) {
         const slackMappings = await slackResponse.json()
-        console.log('📊 Slack mappings from platform endpoint:', slackMappings)
         allMappings = allMappings.concat(slackMappings)
       }
       
-      console.log('📊 All platform mappings loaded (same as integrations page):', allMappings)
       setAnalysisMappings({ mappings: allMappings })
     } catch (error) {
-      console.error('Error fetching platform mappings:', error)
     }
   }
 
   // Helper function to check if user has GitHub mapping (only if actually mapped)
   const hasGitHubMapping = (userEmail: string) => {
     if (!analysisMappings?.mappings) {
-      console.log('🔍 No mappings data available yet for', userEmail)
       return false
     }
     
@@ -1672,7 +1606,6 @@ export default function Dashboard() {
       mapping.target_identifier.trim() !== "" // Must not be empty
     )
     
-    console.log(`🔍 GitHub mapping check for ${userEmail}:`, hasMapping)
     return hasMapping
   }
 
@@ -1691,10 +1624,8 @@ export default function Dashboard() {
 
   // Functions to open mapping drawer
   const openMappingDrawer = (platform: 'github' | 'slack') => {
-    console.log(`🎯 Dashboard: openMappingDrawer called with platform: ${platform}`)
     setMappingDrawerPlatform(platform)
     setMappingDrawerOpen(true)
-    console.log(`🎯 Dashboard: Set mappingDrawerPlatform to ${platform} and mappingDrawerOpen to true`)
   }
 
   const loadIntegrations = async (forceRefresh = false, showGlobalLoading = true) => {
@@ -1758,8 +1689,7 @@ export default function Dashboard() {
             
             return
           } catch (error) {
-            console.error('Failed to parse cached integrations:', error)
-            // Continue to fetch fresh data
+              // Continue to fetch fresh data
           }
         }
       }
@@ -1778,12 +1708,6 @@ export default function Dashboard() {
       }
 
       // Load both Rootly, PagerDuty, GitHub, and Slack integrations
-      console.log('Fetching integrations from:', {
-        rootlyUrl: `${API_BASE}/rootly/integrations`,
-        pagerdutyUrl: `${API_BASE}/pagerduty/integrations`,
-        githubUrl: `${API_BASE}/integrations/github/status`,
-        slackUrl: `${API_BASE}/integrations/slack/status`
-      })
       
       let rootlyResponse, pagerdutyResponse, githubResponse, slackResponse
       try {
@@ -1802,7 +1726,6 @@ export default function Dashboard() {
           })
         ])
       } catch (networkError) {
-        console.error('Network error fetching integrations:', networkError)
         throw new Error('Cannot connect to backend server. Please check if the backend is running and try again.')
       }
 
@@ -1811,16 +1734,6 @@ export default function Dashboard() {
       const githubData = githubResponse.ok ? await githubResponse.json() : { connected: false, integration: null }
       const slackData = slackResponse.ok ? await slackResponse.json() : { connected: false, integration: null }
 
-      console.log('Raw API responses:', {
-        rootlyResponse: { ok: rootlyResponse.ok, status: rootlyResponse.status },
-        pagerdutyResponse: { ok: pagerdutyResponse.ok, status: pagerdutyResponse.status },
-        githubResponse: { ok: githubResponse.ok, status: githubResponse.status },
-        slackResponse: { ok: slackResponse.ok, status: slackResponse.status },
-        rootlyData: rootlyData,
-        pagerdutyData: pagerdutyData,
-        githubData: githubData,
-        slackData: slackData
-      })
 
       // Set GitHub and Slack integration states
       if (githubData.connected && githubData.integration) {
@@ -1841,23 +1754,14 @@ export default function Dashboard() {
 
       // Ensure platform is set
       const rootlyIntegrations = (rootlyData.integrations || []).map((i: Integration, index: number) => {
-        console.log(`Rootly integration ${index}:`, { id: i.id, name: i.name, originalPlatform: i.platform })
         return { ...i, platform: 'rootly' as const }
       })
       const pagerdutyIntegrations = (pagerdutyData.integrations || []).map((i: Integration, index: number) => {
-        console.log(`PagerDuty integration ${index}:`, { id: i.id, name: i.name, originalPlatform: i.platform })
         return { ...i, platform: 'pagerduty' as const }
       })
       
       const allIntegrations = [...rootlyIntegrations, ...pagerdutyIntegrations]
       
-      console.log('Processed integrations:', {
-        rootlyCount: rootlyIntegrations.length,
-        pagerdutyCount: pagerdutyIntegrations.length,
-        totalCount: allIntegrations.length,
-        rootlyIntegrations: rootlyIntegrations.map(i => ({ id: i.id, name: i.name, platform: i.platform })),
-        pagerdutyIntegrations: pagerdutyIntegrations.map(i => ({ id: i.id, name: i.name, platform: i.platform }))
-      })
       setIntegrations(allIntegrations)
       
       // Cache the integrations
@@ -1875,7 +1779,6 @@ export default function Dashboard() {
         }
       }
     } catch (error) {
-      console.error('Failed to load integrations:', error)
       
       // Check if this is a network connectivity issue
       const isNetworkError = error instanceof Error && (
@@ -2049,7 +1952,6 @@ export default function Dashboard() {
           }
         })
       } catch (networkError) {
-        console.error('Network error loading LLM config:', networkError)
         throw new Error('Cannot connect to backend server')
       }
 
@@ -2058,7 +1960,6 @@ export default function Dashboard() {
         setLlmConfig(config)
       }
     } catch (error) {
-      console.error('Failed to load LLM config:', error)
       
       // Check if this is a network connectivity issue
       const isNetworkError = error instanceof Error && (
@@ -2084,8 +1985,7 @@ export default function Dashboard() {
       if (cachedIntegrations && cacheTimestamp) {
         const cacheAge = Date.now() - parseInt(cacheTimestamp)
         if (cacheAge < 5 * 60 * 1000) { // 5 minutes
-          console.log('🔍 DEBUG: Using cached integrations data for modal')
-          // Load from cache without API call
+              // Load from cache without API call
           const cached = JSON.parse(cachedIntegrations)
           const rootlyIntegrations = Array.isArray(cached.rootly) ? cached.rootly : []
           const pagerdutyIntegrations = Array.isArray(cached.pagerduty) ? cached.pagerduty : []
@@ -2094,12 +1994,10 @@ export default function Dashboard() {
           setSlackIntegration(cached.slack?.integration || null)
         } else {
           // Cache is stale, need to load fresh data
-          console.log('🔍 DEBUG: Cache is stale, loading fresh integrations data')
           await loadIntegrations(true, false) // Force refresh but don't show global loading
         }
       } else {
         // No cache, need to load fresh data  
-        console.log('🔍 DEBUG: No cache found, loading fresh integrations data')
         await loadIntegrations(true, false) // Force refresh but don't show global loading
       }
       
@@ -2108,7 +2006,6 @@ export default function Dashboard() {
         return
       }
     } else {
-      console.log('🔍 DEBUG: Using existing integrations data, no loading needed')
     }
 
     // If no integration selected but we have integrations available, auto-select the first one
@@ -2143,16 +2040,14 @@ export default function Dashboard() {
         try {
           setGithubIntegration(JSON.parse(cachedGitHub))
         } catch (e) {
-          console.error('Error parsing cached GitHub integration:', e)
-        }
+          }
       }
       
       if (cachedSlack && !slackIntegration) {
         try {
           setSlackIntegration(JSON.parse(cachedSlack))
         } catch (e) {
-          console.error('Error parsing cached Slack integration:', e)
-        }
+          }
       }
     }
 
@@ -2171,22 +2066,18 @@ export default function Dashboard() {
       
       const promises = []
       if (needsGitHubSlackData) {
-        console.log('🔍 DEBUG: Loading GitHub/Slack data for toggle switches')
         promises.push(loadIntegrations(true, false)) // Refresh integrations without showing loading
       }
       if (needsLlmConfig) {
-        console.log('🔍 DEBUG: Loading LLM config')
         promises.push(loadLlmConfig())
       }
       
       Promise.all(promises).then(() => {
         setIsLoadingGitHubSlack(false)
       }).catch(err => {
-        console.error('Error loading modal data:', err)
         setIsLoadingGitHubSlack(false)
       })
     } else {
-      console.log('🔍 DEBUG: GitHub/Slack/LLM data available, no loading needed')
     }
   }
 
@@ -2234,15 +2125,6 @@ export default function Dashboard() {
         enable_ai: enableAI  // User can toggle, uses Railway token when enabled
       }
       
-      console.log('DEBUG: Analysis request data:', requestData)
-      console.log('DEBUG: State values:', {
-        githubIntegration,
-        slackIntegration,
-        includeGithub,
-        includeSlack,
-        enableAI,
-        llmConfig
-      })
 
       // Start the analysis
       let response
@@ -2256,7 +2138,6 @@ export default function Dashboard() {
           body: JSON.stringify(requestData),
         })
       } catch (networkError) {
-        console.error('Network error:', networkError)
         throw new Error('Cannot connect to backend server. Please check if the backend is running and try again.')
       }
 
@@ -2268,7 +2149,6 @@ export default function Dashboard() {
       try {
         responseData = await response.json()
       } catch (parseError) {
-        console.error('JSON parse error:', parseError)
         throw new Error(`Server returned invalid response (${response.status}). The backend may be experiencing issues.`)
       }
       
@@ -2283,7 +2163,6 @@ export default function Dashboard() {
         throw new Error('No analysis ID returned from server')
       }
 
-      console.log('Started analysis with ID:', analysis_id)
       
       // Refresh the analyses list to show the new running analysis in sidebar
       await loadPreviousAnalyses()
@@ -2299,7 +2178,6 @@ export default function Dashboard() {
       const pollAnalysis = async () => {
         try {
           if (!analysis_id) {
-            console.error('Analysis ID is undefined, stopping polling')
             setAnalysisRunning(false)
       setCurrentRunningAnalysisId(null)
             setCurrentRunningAnalysisId(null)
@@ -2314,7 +2192,6 @@ export default function Dashboard() {
               }
             })
           } catch (networkError) {
-            console.error('Network error during polling:', networkError)
             throw new Error('Cannot connect to backend server during polling')
           }
 
@@ -2322,7 +2199,6 @@ export default function Dashboard() {
             // Response is OK, continue to process
           } else if (pollResponse.status === 404) {
             // Analysis was deleted during polling - stop immediately
-            console.warn(`Analysis ${analysis_id} was deleted during polling`)
             setAnalysisRunning(false)
             setCurrentRunningAnalysisId(null)
             toast.error("Analysis was deleted or no longer exists")
@@ -2340,10 +2216,6 @@ export default function Dashboard() {
             analysisData = await pollResponse.json()
             
             if (analysisData.status === 'completed') {
-              console.log('Analysis completed. Full data structure:', analysisData)
-              console.log('analysis_data:', analysisData.analysis_data)
-              console.log('metadata:', analysisData.analysis_data?.metadata)
-              console.log('total_incidents from metadata:', analysisData.analysis_data?.metadata?.total_incidents)
               
               // Set progress to 95% first, then jump to 100% right before showing data
               setTargetProgress(95)
@@ -2385,21 +2257,14 @@ export default function Dashboard() {
               return
             } else if (analysisData.status === 'running') {
               // Update progress through stages based on analysis status
-              console.log('Analysis running, checking progress...', {
-                hasProgress: analysisData.progress !== undefined,
-                hasStage: !!analysisData.stage,
-                status: analysisData.status
-              })
               
               // Check if we have progress information from the API
               if (analysisData.progress !== undefined) {
-                console.log('Using API progress:', analysisData.progress)
                 setTargetProgress(Math.min(analysisData.progress, 85))
               } else if (analysisData.stage) {
                 // If the API provides a stage, use it
                 const stageData = getAnalysisStages().find(s => s.key === analysisData.stage)
                 if (stageData) {
-                  console.log('Using API stage:', analysisData.stage, 'progress:', stageData.progress)
                   setAnalysisStage(analysisData.stage as AnalysisStage)
                   
                   // If we're fetching users and have progress info
@@ -2420,14 +2285,12 @@ export default function Dashboard() {
                 }
               } else {
                 // Simulate progress through stages - advance conservatively with random increments
-                console.log('Using simulated progress, advancing stages...')
                 setCurrentStageIndex(prevIndex => {
                   // Allow simulation to progress further while waiting for API
                   const currentStages = getAnalysisStages()
                   const maxSimulatedIndex = currentStages.length - 2 // Stop before final stage
                   const stageIndex = Math.min(prevIndex, currentStages.length - 1)
                   const stage = currentStages[stageIndex]
-                  console.log('Advancing to stage:', stage.key, 'progress:', stage.progress, 'index:', prevIndex)
                   setAnalysisStage(stage.key as AnalysisStage)
                   
                   // Add some randomness to the target progress but respect stage boundaries
@@ -2453,15 +2316,12 @@ export default function Dashboard() {
                   
                   // Log timing for this stage
                   const timing = stageTimings[stage.key] || 2000
-                  console.log(`Stage "${stage.key}" will advance in ~${timing}ms`)
                   
                   // Only advance if we haven't reached the max simulated stage
                   if (prevIndex < maxSimulatedIndex) {
                     const nextIndex = prevIndex + 1
-                    console.log('Next stage index will be:', nextIndex)
                     return nextIndex
                   } else {
-                    console.log('Reached max simulated progress, waiting for API confirmation...')
                     return prevIndex
                   }
                 })
@@ -2475,16 +2335,13 @@ export default function Dashboard() {
             setTimeout(pollAnalysis, 2000)
           } else {
             // Analysis is complete - stop polling
-            console.log('Analysis completed, stopping polling')
             setAnalysisRunning(false)
             setCurrentRunningAnalysisId(null)
           }
         } catch (error) {
-          console.error('Polling error:', error)
           pollRetryCount++
           
           if (pollRetryCount >= maxRetries) {
-            console.error('Max polling retries reached, stopping analysis')
             setAnalysisRunning(false)
       setCurrentRunningAnalysisId(null)
             setCurrentRunningAnalysisId(null)
@@ -2501,7 +2358,6 @@ export default function Dashboard() {
       setTimeout(pollAnalysis, 1000)
 
     } catch (error) {
-      console.error('Analysis error:', error)
       setAnalysisRunning(false)
       setCurrentRunningAnalysisId(null)
       toast.error(error instanceof Error ? error.message : "Failed to run analysis")
@@ -2937,7 +2793,6 @@ export default function Dashboard() {
                       variant="ghost" 
                       className={`w-full justify-start text-gray-300 hover:text-white hover:bg-gray-800 py-2 h-auto ${isSelected ? 'bg-gray-800 text-white' : ''}`}
                       onClick={async () => {
-                        console.log('Clicking historical analysis:', analysis.id)
                         
                         // If analysis doesn't have full data, fetch it
                         if (!analysis.analysis_data || !analysis.analysis_data.team_analysis) {
@@ -2945,7 +2800,6 @@ export default function Dashboard() {
                             const authToken = localStorage.getItem('auth_token')
                             if (!authToken) return
                             
-                            console.log('Fetching full analysis details for:', analysis.id)
                             const response = await fetch(`${API_BASE}/analyses/${analysis.id}`, {
                               headers: {
                                 'Authorization': `Bearer ${authToken}`
@@ -2954,32 +2808,20 @@ export default function Dashboard() {
                             
                             if (response.ok) {
                               const fullAnalysis = await response.json()
-                              console.log('Fetched full analysis:', {
-                                id: fullAnalysis.id,
-                                hasAnalysisData: !!fullAnalysis.analysis_data,
-                                hasTeamAnalysis: !!fullAnalysis.analysis_data?.team_analysis,
-                                memberCount: fullAnalysis.analysis_data?.team_analysis?.members?.length || 0
-                              })
                               setCurrentAnalysis(fullAnalysis)
                               setRedirectingToSuggested(false) // Turn off redirect loader
                               updateURLWithAnalysis(fullAnalysis.uuid || fullAnalysis.id)
                             } else {
-                              console.error('Failed to fetch full analysis')
                               setCurrentAnalysis(analysis)
                               setRedirectingToSuggested(false) // Turn off redirect loader
                               updateURLWithAnalysis(analysis.uuid || analysis.id)
                             }
                           } catch (error) {
-                            console.error('Error fetching full analysis:', error)
-                            setCurrentAnalysis(analysis)
+                                                setCurrentAnalysis(analysis)
                             setRedirectingToSuggested(false) // Turn off redirect loader
                             updateURLWithAnalysis(analysis.uuid || analysis.id)
                           }
                         } else {
-                          console.log('Analysis already has data:', {
-                            hasTeamAnalysis: !!analysis.analysis_data.team_analysis,
-                            memberCount: Array.isArray(analysis.analysis_data.team_analysis) ? analysis.analysis_data.team_analysis.length : (analysis.analysis_data.team_analysis?.members?.length || 0)
-                          })
                           setCurrentAnalysis(analysis)
                           setRedirectingToSuggested(false) // Turn off redirect loader
                           updateURLWithAnalysis(analysis.uuid || analysis.id)
