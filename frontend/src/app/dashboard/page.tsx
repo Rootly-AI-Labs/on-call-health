@@ -2927,36 +2927,24 @@ export default function Dashboard() {
                 const matchingIntegration = integrations.find(i => i.id === Number(analysis.integration_id)) || 
                                           integrations.find(i => String(i.id) === String(analysis.integration_id))
                 
-                // Use same logic as integrations page - prefer integration.name (user-defined name)
-                let organizationName = matchingIntegration?.name || 
-                                      (analysis as any).analysis_data?.metadata?.organization_name || 
-                                      (analysis as any).config?.organization_name ||
-                                      // Handle beta integrations by looking at config
-                                      ((analysis as any).config?.beta_integration_id === 'beta-rootly' ? 'Rootly' : 
-                                       (analysis as any).config?.beta_integration_id === 'beta-pagerduty' ? 'PagerDuty' : 
-                                       (analysis.integration_id && String(analysis.integration_id) !== 'null' ? `Integration ${analysis.integration_id}` : 'Unknown Integration'))
-                
-                // Special handling for beta integrations during running state
-                if (!matchingIntegration && typeof analysis.integration_id === 'string') {
-                  if (String(analysis.integration_id) === 'beta-rootly') {
-                    organizationName = integrations.find(i => String(i.id) === 'beta-rootly')?.name || 'Rootly'
-                  } else if (String(analysis.integration_id) === 'beta-pagerduty') {
-                    organizationName = integrations.find(i => String(i.id) === 'beta-pagerduty')?.name || 'PagerDuty'
-                  }
+                // Debug: Log integration matching issues
+                if (!matchingIntegration) {
+                  console.log(`No matching integration for analysis ${analysis.id}:`, {
+                    analysis_integration_id: analysis.integration_id,
+                    analysis_integration_id_type: typeof analysis.integration_id,
+                    available_integration_ids: integrations.map(i => ({ id: i.id, type: typeof i.id, name: i.name, platform: i.platform }))
+                  })
                 }
+                
+                // ALWAYS use backend integration data - no hardcoded names
+                const organizationName = matchingIntegration?.name || 'Unknown Integration'
                 const isSelected = currentAnalysis?.id === analysis.id
                 
-                // Use platform field from backend (not inferred from name)
-                let platformColor = 'bg-gray-500' // default
+                // ALWAYS use backend platform data - no hardcoded colors
+                let platformColor = 'bg-gray-500' // default for unknown
                 if (matchingIntegration?.platform === 'rootly') {
                   platformColor = 'bg-purple-500'  // Rootly = Purple
                 } else if (matchingIntegration?.platform === 'pagerduty') {
-                  platformColor = 'bg-green-500'   // PagerDuty = Green
-                }
-                // For beta integrations, fallback to ID-based detection
-                else if (String(analysis.integration_id) === 'beta-rootly') {
-                  platformColor = 'bg-purple-500'  // Rootly = Purple
-                } else if (String(analysis.integration_id) === 'beta-pagerduty') {
                   platformColor = 'bg-green-500'   // PagerDuty = Green
                 }
                 return (
@@ -3020,7 +3008,8 @@ export default function Dashboard() {
                         <div className="flex flex-col items-start w-full text-xs pr-8">
                           <div className="flex justify-between items-center w-full mb-1">
                             <div className="flex items-center space-x-2">
-                              {(matchingIntegration || platformColor !== 'bg-gray-500') && (
+                              {/* Always show platform dot if we have a color */}
+                              {platformColor !== 'bg-gray-500' && (
                                 <div className={`w-2 h-2 rounded-full ${platformColor}`}></div>
                               )}
                               <span className="font-medium">{organizationName}</span>
