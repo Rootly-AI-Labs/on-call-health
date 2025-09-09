@@ -1030,7 +1030,6 @@ export default function Dashboard() {
               'Authorization': `Bearer ${authToken}`
             }
           })
-          console.log(`Deleted cancelled analysis ${currentRunningAnalysisId}`)
         }
       }
     } catch (error) {
@@ -1061,7 +1060,6 @@ export default function Dashboard() {
     if (currentAnalysis.status === 'completed') {
       // Check if analysis_data is completely missing
       if (!currentAnalysis.analysis_data) {
-        console.log('Analysis has no analysis_data - showing insufficient data card')
         return true
       }
       
@@ -1112,7 +1110,6 @@ export default function Dashboard() {
       const lastRefresh = localStorage.getItem('last_integrations_refresh')
       const now = Date.now()
       if (!lastRefresh || now - parseInt(lastRefresh) > 30000) {
-        console.log('Page focused, refreshing integrations (30s throttle)')
         localStorage.setItem('last_integrations_refresh', now.toString())
         loadIntegrations(true, false)
       }
@@ -1131,7 +1128,6 @@ export default function Dashboard() {
         try {
           const parsed = JSON.parse(cachedIntegrations)
           setIntegrations(parsed)
-          console.log('🚀 DASHBOARD CACHE: Loaded', parsed.length, 'integrations from cache instantly')
           
           // Also load GitHub and Slack from cache if available
           const cachedGithub = localStorage.getItem('github_integration')
