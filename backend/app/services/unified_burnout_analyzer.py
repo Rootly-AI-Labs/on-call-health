@@ -882,11 +882,37 @@ class UnifiedBurnoutAnalyzer:
         
         # If no incidents, return minimal analysis
         if not incidents:
+            # Calculate zero-incident CBI metrics for consistency
+            zero_cbi_metrics = {
+                'incident_frequency': 0,
+                'incident_severity': 0,
+                'response_urgency': 0,
+                'team_coordination': 0,
+                'escalation_frequency': 0,
+                'after_hours_work': 0,
+                'meeting_load': 0,
+                'oncall_burden': 0
+            }
+            
+            # Calculate CBI dimensions for zero incidents
+            personal_cbi = calculate_personal_burnout(zero_cbi_metrics)
+            work_cbi = calculate_work_related_burnout(zero_cbi_metrics) 
+            composite_cbi = calculate_composite_cbi_score(personal_cbi['score'], work_cbi['score'])
+            
+            # Generate reasoning for zero-incident CBI scores
+            cbi_reasoning = generate_cbi_score_reasoning(
+                personal_cbi, 
+                work_cbi, 
+                composite_cbi,
+                zero_cbi_metrics
+            )
+            
             return {
                 "user_id": user_id,
                 "user_name": user_name,
                 "user_email": user_email,
                 "burnout_score": 0,
+                "cbi_score": round(composite_cbi['composite_score'], 2),  # ✅ Add CBI score for consistency
                 "risk_level": "low",
                 "incident_count": 0,
                 "factors": {
@@ -901,6 +927,12 @@ class UnifiedBurnoutAnalyzer:
                     "work_related_burnout": 0,
                     "client_related_burnout": 0
                 },
+                "cbi_breakdown": {  # ✅ Add CBI breakdown for consistency
+                    "personal": round(personal_cbi['score'], 2),
+                    "work_related": round(work_cbi['score'], 2),
+                    "interpretation": composite_cbi['interpretation']
+                },
+                "cbi_reasoning": cbi_reasoning,  # ✅ Add explanations
                 "metrics": {
                     "incidents_per_week": 0,
                     "after_hours_percentage": 0,
