@@ -1117,7 +1117,7 @@ class UnifiedBurnoutAnalyzer:
         # 🐛 DEBUG: Log CBI metrics for troubleshooting zero scores
         logger.info(f"🐛 CBI METRICS DEBUG for {user_name}:")
         logger.info(f"   - Incidents: {len(incidents)}")
-        logger.info(f"   - weighted_incidents: {weighted_incidents}")
+        logger.info(f"   - incidents_per_week: {incidents_per_week}")
         logger.info(f"   - critical_incidents: {critical_incidents}, high_incidents: {high_incidents}")
         logger.info(f"   - severity_dist: {severity_dist}")
         logger.info(f"   - CBI metrics: {cbi_metrics}")
