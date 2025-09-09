@@ -23,6 +23,11 @@ class PagerDutyAPIClient:
             "Content-Type": "application/json"
         }
         
+        # 🎯 RAILWAY DEBUG: Token identification for debugging
+        token_suffix = api_token[-4:] if len(api_token) > 4 else "***"
+        logger.info(f"🎯 PAGERDUTY CLIENT: Initialized with token ending in {token_suffix}")
+        logger.info(f"🎯 PAGERDUTY CLIENT: Enhanced normalization version ACTIVE")
+        
     async def test_connection(self) -> Dict[str, Any]:
         """Test the PagerDuty API connection and get account info."""
         try:
@@ -887,31 +892,71 @@ class PagerDutyDataCollector:
         
     async def collect_all_data(self, days_back: int = 30) -> Dict[str, Any]:
         """Collect all necessary data for burnout analysis."""
-        logger.info(f"Starting PagerDuty data collection for last {days_back} days")
+        # 🎯 RAILWAY DEBUG: Collection start
+        token_suffix = self.client.api_token[-4:] if len(self.client.api_token) > 4 else "***"
+        logger.info(f"🎯 PAGERDUTY COLLECTION: Starting {days_back}-day collection with token ending in {token_suffix}")
         
         # Calculate date range
         until = datetime.now(pytz.UTC)
         since = until - timedelta(days=days_back)
         
+        logger.info(f"🎯 PAGERDUTY COLLECTION: Date range {since.isoformat()} to {until.isoformat()}")
+        
         # Fetch data in parallel (no limits for complete data collection)
         users_task = self.client.get_users(limit=1000)
         incidents_task = self.client.get_incidents(since=since, until=until)
         
+        logger.info(f"🎯 PAGERDUTY COLLECTION: Starting parallel API calls...")
         users, incidents = await asyncio.gather(users_task, incidents_task)
         
-        logger.info(f"Collected {len(users)} users and {len(incidents)} incidents from PagerDuty")
+        logger.info(f"🎯 PAGERDUTY COLLECTION: Collected {len(users)} users and {len(incidents)} incidents")
         
-        # Normalize to common format
+        # 🎯 RAILWAY DEBUG: Pre-normalization data check
+        if users:
+            sample_user = users[0]
+            logger.info(f"🎯 PAGERDUTY COLLECTION: Sample user keys: {list(sample_user.keys())}")
+            logger.info(f"🎯 PAGERDUTY COLLECTION: Sample user email: {sample_user.get('email', 'NO_EMAIL')}")
+        
+        if incidents:
+            sample_incident = incidents[0]
+            assignments = sample_incident.get("assignments", [])
+            logger.info(f"🎯 PAGERDUTY COLLECTION: Sample incident has {len(assignments)} assignments")
+            if assignments:
+                assignee = assignments[0].get("assignee", {})
+                logger.info(f"🎯 PAGERDUTY COLLECTION: Sample assignee: {assignee.get('id', 'NO_ID')} - {assignee.get('summary', 'NO_NAME')}")
+        
+        # 🚀 ENHANCED NORMALIZATION
+        logger.info(f"🚀 PAGERDUTY COLLECTION: Starting ENHANCED normalization process...")
         normalized_data = self.client.normalize_to_common_format(incidents, users)
         
-        # Add collection metadata
+        # 🎯 RAILWAY DEBUG: Post-normalization validation
+        normalized_incidents = normalized_data.get("incidents", [])
+        if normalized_incidents:
+            sample_normalized = normalized_incidents[0]
+            assigned_to = sample_normalized.get("assigned_to")
+            logger.info(f"🚀 PAGERDUTY COLLECTION: Sample normalized incident assigned_to: {assigned_to}")
+            if assigned_to:
+                logger.info(f"🚀 PAGERDUTY COLLECTION: Assigned user email: {assigned_to.get('email', 'NO_EMAIL')}")
+        
+        incidents_with_emails = len([i for i in normalized_incidents if i.get("assigned_to") and i.get("assigned_to", {}).get("email")])
+        logger.info(f"🚀 PAGERDUTY COLLECTION: {incidents_with_emails}/{len(normalized_incidents)} incidents have emails")
+        
+        # Add enhanced collection metadata
+        metadata = normalized_data.get("metadata", {})
         normalized_data["collection_metadata"] = {
             "timestamp": datetime.now().isoformat(),
             "days_analyzed": days_back,
             "date_range": {
                 "start": since.isoformat(),
                 "end": until.isoformat()
-            }
+            },
+            "enhancement_applied": metadata.get("enhancement_applied", False),
+            "enhancement_timestamp": metadata.get("enhancement_timestamp"),
+            "assignment_stats": metadata.get("assignment_stats", {}),
+            "total_incidents": len(incidents),
+            "total_users": len(users),
+            "incidents_with_valid_emails": incidents_with_emails
         }
         
+        logger.info(f"🎯 PAGERDUTY COLLECTION: COMPLETE - Returning enhanced data")
         return normalized_data
