@@ -105,54 +105,32 @@ async def run_burnout_analysis(
             beta_pagerduty_token = os.getenv('PAGERDUTY_API_TOKEN')
             
             if request.integration_id == "beta-rootly" and beta_rootly_token:
-                # Get REAL organization name from Railway Rootly token (same as integrations page)
+                # Use EXACT same name as /rootly/integrations endpoint - do NOT override with API call
                 from types import SimpleNamespace
-                from ...core.rootly_client import RootlyAPIClient
                 
-                real_org_name = "Rootly"  # Fallback
-                try:
-                    client = RootlyAPIClient(beta_rootly_token)
-                    test_result = await client.test_connection()
-                    if test_result.get("status") == "success":
-                        account_info = test_result.get("account_info", {})
-                        api_org_name = account_info.get("organization_name")
-                        if api_org_name:
-                            real_org_name = api_org_name
-                            logger.info(f"Got real Rootly org name: {real_org_name}")
-                except Exception as e:
-                    logger.warning(f"Failed to get Rootly org name, using fallback: {str(e)}")
+                # Use the exact same hardcoded name that appears in the integrations dropdown
+                integration_display_name = "Rootly (Beta Access)"
                 
                 integration = SimpleNamespace(
                     id="beta-rootly",
                     api_token=beta_rootly_token,
                     platform="rootly",
-                    name=real_org_name,  # Use REAL organization name
-                    organization_name=real_org_name
+                    name=integration_display_name,  # Use exact same name as frontend
+                    organization_name=integration_display_name
                 )
             elif request.integration_id == "beta-pagerduty" and beta_pagerduty_token:
-                # Get REAL organization name from Railway PagerDuty token
+                # Use EXACT same name as /pagerduty/integrations endpoint - do NOT override with API call
                 from types import SimpleNamespace
-                from ...core.pagerduty_client import PagerDutyAPIClient
                 
-                real_org_name = "PagerDuty"  # Fallback
-                try:
-                    client = PagerDutyAPIClient(beta_pagerduty_token)
-                    test_result = await client.test_connection()
-                    if test_result.get("valid"):
-                        account_info = test_result.get("account_info", {})
-                        api_org_name = account_info.get("organization_name")
-                        if api_org_name:
-                            real_org_name = api_org_name
-                            logger.info(f"Got real PagerDuty org name: {real_org_name}")
-                except Exception as e:
-                    logger.warning(f"Failed to get PagerDuty org name, using fallback: {str(e)}")
+                # Use the exact same hardcoded name that appears in the integrations dropdown
+                integration_display_name = "PagerDuty (Beta Access)"
                 
                 integration = SimpleNamespace(
                     id="beta-pagerduty",
                     api_token=beta_pagerduty_token,
                     platform="pagerduty",
-                    name=real_org_name,  # Use REAL organization name
-                    organization_name=real_org_name
+                    name=integration_display_name,  # Use exact same name as frontend
+                    organization_name=integration_display_name
                 )
             
             if not integration:
