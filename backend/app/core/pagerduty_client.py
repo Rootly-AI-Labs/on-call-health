@@ -447,7 +447,7 @@ class PagerDutyDataCollector:
         
         # 🚀 ENHANCED NORMALIZATION
         logger.info(f"🚀 PAGERDUTY COLLECTION: Starting ENHANCED normalization process...")
-        normalized_data = self.client.normalize_to_common_format(incidents, users)
+        normalized_data = self._normalize_with_enhanced_assignment_extraction(incidents, users)
         
         # 🎯 RAILWAY DEBUG: Post-normalization validation
         normalized_incidents = normalized_data.get("incidents", [])
@@ -480,3 +480,252 @@ class PagerDutyDataCollector:
         
         logger.info(f"🎯 PAGERDUTY COLLECTION: COMPLETE - Returning enhanced data")
         return normalized_data
+    
+    def _normalize_with_enhanced_assignment_extraction(
+        self, 
+        incidents: List[Dict[str, Any]], 
+        users: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """
+        🚀 ENHANCED PagerDuty data normalization with comprehensive assignment extraction.
+        
+        IMPROVEMENTS:
+        - User ID to email lookup mapping (fixes email: None issue)
+        - Multi-source assignment extraction (assignments + acknowledgments + status changes)
+        - Priority-based assignment selection
+        - Comprehensive validation and logging
+        - Performance optimization with caching
+        """
+        
+        logger.info(f"🚀 PD NORMALIZE ENHANCED: Starting comprehensive normalization")
+        logger.info(f"   - Input: {len(users)} users, {len(incidents)} incidents")
+        
+        # 🎯 STEP 1: Create optimized user lookup maps
+        user_id_to_email = {}
+        user_id_to_name = {}
+        user_id_to_full_data = {}
+        
+        logger.info(f"🚀 PD NORMALIZE: Building user lookup maps...")
+        for user in users:
+            user_id = user.get("id")
+            if user_id:
+                user_id_to_email[user_id] = user.get("email", "")
+                user_id_to_name[user_id] = user.get("name") or user.get("summary", "Unknown")
+                user_id_to_full_data[user_id] = user
+        
+        logger.info(f"🚀 PD NORMALIZE: Lookup maps created:")
+        logger.info(f"   - Users with emails: {len([e for e in user_id_to_email.values() if e])}/{len(user_id_to_email)}")
+        logger.info(f"   - Sample email mapping: {dict(list(user_id_to_email.items())[:3])}")
+        
+        # 🎯 STEP 2: Normalize users with enhanced data
+        normalized_users = []
+        for user in users:
+            normalized_user = {
+                "id": user.get("id"),
+                "name": user.get("name") or user.get("summary", "Unknown"),
+                "email": user.get("email", ""),
+                "timezone": user.get("time_zone", "UTC"),
+                "role": user.get("role", "user"),
+                "source": "pagerduty",
+                # Enhanced fields
+                "job_title": user.get("job_title", ""),
+                "teams": [team.get("summary", "") for team in user.get("teams", [])],
+                "contact_methods_count": len(user.get("contact_methods", []))
+            }
+            normalized_users.append(normalized_user)
+        
+        # 🎯 STEP 3: Enhanced incident normalization with multi-source assignment extraction
+        logger.info(f"🚀 PD NORMALIZE: Starting ENHANCED incident processing...")
+        
+        normalized_incidents = []
+        assignment_stats = {
+            "from_assignments": 0,
+            "from_acknowledgments": 0, 
+            "from_responders": 0,
+            "from_status_changes": 0,
+            "no_assignment": 0,
+            "assignment_methods": []
+        }
+        
+        incidents_with_emails = 0
+        
+        for i, incident in enumerate(incidents):
+            # 🚀 ENHANCED ASSIGNMENT EXTRACTION with priority system
+            assigned_user_info = self._extract_incident_assignment_enhanced(
+                incident, user_id_to_email, user_id_to_name
+            )
+            
+            if assigned_user_info:
+                method = assigned_user_info.get("assignment_method", "unknown")
+                assignment_stats[f"from_{method}"] = assignment_stats.get(f"from_{method}", 0) + 1
+                assignment_stats["assignment_methods"].append(method)
+                
+                if assigned_user_info.get("email"):
+                    incidents_with_emails += 1
+            else:
+                assignment_stats["no_assignment"] += 1
+            
+            # Create normalized incident
+            normalized_incident = {
+                "id": incident.get("id"),
+                "title": incident.get("title", ""),
+                "description": incident.get("description", ""),
+                "status": incident.get("status", "open"),
+                "severity": self._map_priority_to_severity(incident),
+                "created_at": incident.get("created_at"),
+                "updated_at": incident.get("last_status_change_at") or incident.get("updated_at"),
+                "resolved_at": incident.get("resolved_at") if incident.get("status") == "resolved" else None,
+                "assigned_to": assigned_user_info,
+                "service": incident.get("service", {}).get("summary", ""),
+                "urgency": incident.get("urgency", "low"),
+                "source": "pagerduty",
+                "raw_data": incident,  # Keep for debugging
+                # Enhanced fields
+                "incident_number": incident.get("incident_number"),
+                "escalation_policy": incident.get("escalation_policy", {}).get("summary", ""),
+                "teams": [team.get("summary", "") for team in incident.get("teams", [])],
+                "priority_name": incident.get("priority", {}).get("summary", "") if incident.get("priority") else ""
+            }
+            
+            normalized_incidents.append(normalized_incident)
+            
+            # Log progress for first few incidents
+            if i < 3:
+                user_email = assigned_user_info.get("email", "None") if assigned_user_info else "None"
+                logger.info(f"🚀 PD INCIDENT #{i}: '{normalized_incident['title'][:50]}' -> {user_email}")
+        
+        # 🎯 STEP 4: Calculate success statistics
+        total_incidents = len(incidents)
+        assigned_incidents = total_incidents - assignment_stats["no_assignment"]
+        
+        logger.info(f"🚀 PD NORMALIZE: ASSIGNMENT EXTRACTION RESULTS:")
+        logger.info(f"   - Total incidents processed: {total_incidents}")
+        logger.info(f"   - Incidents with assignments: {assigned_incidents} ({assigned_incidents/total_incidents*100:.1f}%)")
+        logger.info(f"   - Incidents with valid emails: {incidents_with_emails} ({incidents_with_emails/total_incidents*100:.1f}%)")
+        logger.info(f"   - Assignment sources:")
+        for method, count in assignment_stats.items():
+            if method.startswith("from_") and count > 0:
+                logger.info(f"     • {method.replace('from_', '').title()}: {count}")
+        
+        # 🎯 STEP 5: Build final normalized data structure
+        normalized_data = {
+            "users": normalized_users,
+            "incidents": normalized_incidents,
+            "total_incidents": total_incidents,
+            "total_users": len(users),
+            "metadata": {
+                "source": "pagerduty",
+                "enhancement_applied": True,
+                "enhancement_timestamp": datetime.utcnow().isoformat(),
+                "assignment_extraction_stats": assignment_stats,
+                "email_success_rate": f"{incidents_with_emails}/{total_incidents} ({incidents_with_emails/total_incidents*100:.1f}%)"
+            }
+        }
+        
+        logger.info(f"🚀 PD NORMALIZE ENHANCED: COMPLETE!")
+        logger.info(f"   - SUCCESS: {incidents_with_emails}/{total_incidents} incidents have user emails")
+        
+        return normalized_data
+    
+    def _extract_incident_assignment_enhanced(
+        self, 
+        incident: Dict[str, Any], 
+        user_id_to_email: Dict[str, str],
+        user_id_to_name: Dict[str, str]
+    ) -> Optional[Dict[str, Any]]:
+        """
+        🚀 ENHANCED assignment extraction with multi-source priority system.
+        
+        Priority order:
+        1. Direct assignments (highest confidence)
+        2. Acknowledgments (user actively engaged) 
+        3. Incident responders (user involved in response)
+        4. Status changes (user interacted with incident)
+        """
+        
+        # Priority 1: Direct assignments
+        assignments = incident.get("assignments", [])
+        if assignments:
+            assignee = assignments[0].get("assignee", {})  # Take first assignment
+            user_id = assignee.get("id")
+            if user_id:
+                return {
+                    "id": user_id,
+                    "name": user_id_to_name.get(user_id, assignee.get("summary", "Unknown")),
+                    "email": user_id_to_email.get(user_id, ""),
+                    "assignment_method": "assignments",
+                    "confidence": "high"
+                }
+        
+        # Priority 2: Acknowledgments
+        acknowledgments = incident.get("acknowledgements", []) or incident.get("acknowledgments", [])
+        if acknowledgments:
+            acknowledger = acknowledgments[0].get("acknowledger", {})  # Take first acknowledgment
+            user_id = acknowledger.get("id")
+            if user_id and acknowledger.get("type") == "user_reference":
+                return {
+                    "id": user_id,
+                    "name": user_id_to_name.get(user_id, acknowledger.get("summary", "Unknown")),
+                    "email": user_id_to_email.get(user_id, ""),
+                    "assignment_method": "acknowledgments",
+                    "confidence": "medium"
+                }
+        
+        # Priority 3: Incident responders
+        responders = incident.get("incidents_responders", [])
+        if responders:
+            for responder in responders:
+                user_ref = responder.get("user")
+                if user_ref and user_ref.get("type") == "user_reference":
+                    user_id = user_ref.get("id")
+                    if user_id:
+                        return {
+                            "id": user_id,
+                            "name": user_id_to_name.get(user_id, user_ref.get("summary", "Unknown")),
+                            "email": user_id_to_email.get(user_id, ""),
+                            "assignment_method": "responders",
+                            "confidence": "medium"
+                        }
+        
+        # Priority 4: Last status change (fallback)
+        status_changer = incident.get("last_status_change_by", {})
+        if status_changer and status_changer.get("type") == "user_reference":
+            user_id = status_changer.get("id")
+            if user_id:
+                return {
+                    "id": user_id,
+                    "name": user_id_to_name.get(user_id, status_changer.get("summary", "Unknown")),
+                    "email": user_id_to_email.get(user_id, ""),
+                    "assignment_method": "status_changes",
+                    "confidence": "low"
+                }
+        
+        return None  # No assignment found
+    
+    def _map_priority_to_severity(self, incident: Dict[str, Any]) -> str:
+        """Map PagerDuty priority/urgency to severity level."""
+        urgency = incident.get("urgency", "low").lower()
+        
+        # Check priority first for more specific classification
+        priority = incident.get("priority")
+        if priority and isinstance(priority, dict):
+            priority_name = priority.get("summary", "").lower()
+            if not priority_name:
+                priority_name = priority.get("name", "").lower()
+                
+            if "p1" in priority_name or "critical" in priority_name:
+                return "sev1"
+            elif "p2" in priority_name or "high" in priority_name:
+                return "sev2" 
+            elif "p3" in priority_name or "medium" in priority_name:
+                return "sev3"
+            elif "p4" in priority_name or "low" in priority_name:
+                return "sev4"
+            elif "p5" in priority_name or "info" in priority_name:
+                return "sev5"
+        
+        # Fallback to urgency mapping
+        if urgency == "high":
+            return "sev1"
+        else:
+            return "sev4"  # Default for low/unknown urgency
