@@ -405,63 +405,42 @@ class PagerDutyAPIClient:
             all_shifts = []
             
             async with aiohttp.ClientSession() as session:
-                # Get all schedules first
-                schedules_response = await session.get(
-                    f"{self.base_url}/schedules",
+                # Use PagerDuty oncalls API directly - much more efficient
+                # This gets all on-call shifts for the time period across all schedules
+                logger.info(f"Fetching all on-call shifts for period {start_str} to {end_str}")
+                
+                oncalls_response = await session.get(
+                    f"{self.base_url}/oncalls",
                     headers=self.headers,
-                    params={"limit": 100}
+                    params={
+                        "since": start_str,
+                        "until": end_str,
+                        "include[]": "users",
+                        "limit": 100
+                    }
                 )
                 
-                if schedules_response.status != 200:
-                    logger.error(f"Failed to fetch schedules: {schedules_response.status}")
+                if oncalls_response.status != 200:
+                    logger.error(f"Failed to fetch oncalls: {oncalls_response.status} - {await oncalls_response.text()}")
                     return []
                 
-                schedules_data = await schedules_response.json()
-                schedules = schedules_data.get("schedules", [])
+                oncalls_data = await oncalls_response.json()
+                oncalls = oncalls_data.get("oncalls", [])
                 
-                logger.info(f"Found {len(schedules)} schedules, fetching shifts for period {start_str} to {end_str}")
+                logger.info(f"Found {len(oncalls)} on-call shifts from PagerDuty")
                 
-                # For each schedule, get the shifts during our time period
-                for schedule in schedules:
-                    schedule_id = schedule.get("id")
-                    if not schedule_id:
-                        continue
-                    
-                    try:
-                        # Get schedule entries (shifts) for this time period
-                        shifts_response = await session.get(
-                            f"{self.base_url}/schedules/{schedule_id}/entries",
-                            headers=self.headers,
-                            params={
-                                "since": start_str,
-                                "until": end_str,
-                                "overflow": "true",  # Include shifts that span the time period
-                                "include[]": "users"
-                            }
-                        )
-                        
-                        if shifts_response.status == 200:
-                            shifts_data = await shifts_response.json()
-                            entries = shifts_data.get("entries", [])
-                            
-                            # Transform PagerDuty entries to match our format
-                            for entry in entries:
-                                shift = {
-                                    "id": f"{schedule_id}_{entry.get('start')}",
-                                    "schedule_id": schedule_id,
-                                    "schedule_name": schedule.get("name", ""),
-                                    "start_time": entry.get("start"),
-                                    "end_time": entry.get("end"),
-                                    "user": entry.get("user", {}),
-                                    "source": "pagerduty"
-                                }
-                                all_shifts.append(shift)
-                        else:
-                            logger.warning(f"Failed to fetch shifts for schedule {schedule_id}: {shifts_response.status}")
-                    
-                    except Exception as e:
-                        logger.warning(f"Error fetching shifts for schedule {schedule_id}: {e}")
-                        continue
+                # Convert PagerDuty oncalls to our shift format
+                for oncall in oncalls:
+                    shift = {
+                        "id": f"pd_{oncall.get('start', '')}_{oncall.get('user', {}).get('id', '')}",
+                        "schedule_id": oncall.get("schedule", {}).get("id", ""),
+                        "schedule_name": oncall.get("schedule", {}).get("summary", ""),
+                        "start_time": oncall.get("start"),
+                        "end_time": oncall.get("end"),
+                        "user": oncall.get("user", {}),
+                        "source": "pagerduty"
+                    }
+                    all_shifts.append(shift)
                 
                 logger.info(f"Retrieved {len(all_shifts)} on-call shifts for period {start_str} to {end_str}")
                 return all_shifts
