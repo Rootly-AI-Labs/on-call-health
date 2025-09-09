@@ -2923,38 +2923,16 @@ export default function Dashboard() {
                   timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
                 })
                 
-                // Try to find matching integration by ID first
-                let matchingIntegration = integrations.find(i => i.id === Number(analysis.integration_id)) || 
-                                        integrations.find(i => String(i.id) === String(analysis.integration_id))
-                
-                // FALLBACK: If no integration ID match, try to match by organization name from analysis metadata
-                if (!matchingIntegration) {
-                  const analysisOrgName = (analysis as any).analysis_data?.metadata?.organization_name || 
-                                         (analysis as any).config?.organization_name
-                  
-                  if (analysisOrgName) {
-                    // Try to find integration with matching name
-                    matchingIntegration = integrations.find(i => 
-                      i.name === analysisOrgName || 
-                      i.organization_name === analysisOrgName ||
-                      i.name?.toLowerCase().includes(analysisOrgName.toLowerCase()) ||
-                      analysisOrgName.toLowerCase().includes(i.name?.toLowerCase() || '')
-                    )
-                  }
-                }
-                
-                // Use backend integration data if found, otherwise fall back to analysis metadata
-                const organizationName = matchingIntegration?.name || 
-                                        (analysis as any).analysis_data?.metadata?.organization_name || 
-                                        (analysis as any).config?.organization_name ||
-                                        'Unknown Integration'
+                // SIMPLE: Use integration name and platform stored directly with analysis
+                const organizationName = (analysis as any).integration_name || 'Unknown Integration'
+                const analysisPlatform = (analysis as any).platform
                 const isSelected = currentAnalysis?.id === analysis.id
                 
-                // ALWAYS use backend platform data - no hardcoded colors
+                // Use stored platform data for colors
                 let platformColor = 'bg-gray-500' // default for unknown
-                if (matchingIntegration?.platform === 'rootly') {
+                if (analysisPlatform === 'rootly') {
                   platformColor = 'bg-purple-500'  // Rootly = Purple
-                } else if (matchingIntegration?.platform === 'pagerduty') {
+                } else if (analysisPlatform === 'pagerduty') {
                   platformColor = 'bg-green-500'   // PagerDuty = Green
                 }
                 return (
