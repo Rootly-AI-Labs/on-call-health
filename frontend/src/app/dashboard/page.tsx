@@ -2956,15 +2956,14 @@ export default function Dashboard() {
                 const matchingIntegration = integrations.find(i => i.id === Number(analysis.integration_id)) || 
                                           integrations.find(i => String(i.id) === String(analysis.integration_id))
                 
-                // Use organization name from analysis results if available, fall back to integration name
-                let organizationName = (analysis as any).analysis_data?.metadata?.organization_name || 
+                // Use same logic as integrations page - prefer integration.name (user-defined name)
+                let organizationName = matchingIntegration?.name || 
+                                      (analysis as any).analysis_data?.metadata?.organization_name || 
                                       (analysis as any).config?.organization_name ||
-                                      matchingIntegration?.name || 
-                                      matchingIntegration?.organization_name ||
                                       // Handle beta integrations by looking at config
                                       ((analysis as any).config?.beta_integration_id === 'beta-rootly' ? 'Rootly' : 
                                        (analysis as any).config?.beta_integration_id === 'beta-pagerduty' ? 'PagerDuty' : 
-                                       (analysis.integration_id && String(analysis.integration_id) !== 'null' ? `Organization ${analysis.integration_id}` : 'Unknown Organization'))
+                                       (analysis.integration_id && String(analysis.integration_id) !== 'null' ? `Integration ${analysis.integration_id}` : 'Unknown Integration'))
                 
                 // Special handling for beta integrations during running state
                 if (!matchingIntegration && typeof analysis.integration_id === 'string') {
@@ -2976,27 +2975,18 @@ export default function Dashboard() {
                 }
                 const isSelected = currentAnalysis?.id === analysis.id
                 
-                // Determine platform color from integration or analysis data
+                // Use platform field from backend (not inferred from name)
                 let platformColor = 'bg-gray-500' // default
                 if (matchingIntegration?.platform === 'rootly') {
                   platformColor = 'bg-purple-500'  // Rootly = Purple
                 } else if (matchingIntegration?.platform === 'pagerduty') {
                   platformColor = 'bg-green-500'   // PagerDuty = Green
-                } else {
-                  // For beta integrations or analyses, check multiple sources
-                  const analysisConfig = (analysis as any).analysis_data?.config || {};
-                  const betaIntegrationId = analysisConfig.beta_integration_id;
-                  
-                  // Priority: betaIntegrationId first, then integration_id, then organization name
-                  if (betaIntegrationId === 'beta-pagerduty' || String(analysis.integration_id) === 'beta-pagerduty') {
-                    platformColor = 'bg-green-500'   // PagerDuty = Green
-                  } else if (betaIntegrationId === 'beta-rootly' || String(analysis.integration_id) === 'beta-rootly') {
-                    platformColor = 'bg-purple-500'  // Rootly = Purple
-                  } else if (organizationName.includes('PagerDuty')) {
-                    platformColor = 'bg-green-500'   // PagerDuty = Green
-                  } else if (organizationName.includes('Rootly')) {
-                    platformColor = 'bg-purple-500'  // Rootly = Purple
-                  }
+                }
+                // For beta integrations, fallback to ID-based detection
+                else if (String(analysis.integration_id) === 'beta-rootly') {
+                  platformColor = 'bg-purple-500'  // Rootly = Purple
+                } else if (String(analysis.integration_id) === 'beta-pagerduty') {
+                  platformColor = 'bg-green-500'   // PagerDuty = Green
                 }
                 return (
                   <div key={analysis.id} className={`relative group ${isSelected ? 'bg-gray-800' : ''} rounded`}>
@@ -4608,14 +4598,29 @@ export default function Dashboard() {
                 {(() => {
                   const selected = integrations.find(i => i.id.toString() === dialogSelectedIntegration)
                   if (selected) {
+                    // Use same logic as integrations page - show integration.name
+                    const organizationName = selected.name
+                    
+                    // Use platform field from backend (not inferred from name)
+                    let platformColor = 'bg-gray-500' // default
+                    if (selected.platform === 'rootly') {
+                      platformColor = 'bg-purple-500'  // Rootly = Purple
+                    } else if (selected.platform === 'pagerduty') {
+                      platformColor = 'bg-green-500'   // PagerDuty = Green
+                    }
+                    // For beta integrations, fallback to ID-based detection
+                    else if (String(selected.id) === 'beta-rootly') {
+                      platformColor = 'bg-purple-500'  // Rootly = Purple
+                    } else if (String(selected.id) === 'beta-pagerduty') {
+                      platformColor = 'bg-green-500'   // PagerDuty = Green
+                    }
+                    
                     return (
                       <div>
                         <div className="flex items-center">
-                          <div className={`w-2 h-2 rounded-full mr-2 ${
-                            selected.platform === 'rootly' ? 'bg-purple-500' : 'bg-green-500'
-                          }`}></div>
+                          <div className={`w-2 h-2 rounded-full mr-2 ${platformColor}`}></div>
                           <span className="font-medium">
-                            {selected.organization_name || selected.name || `${selected.platform === 'rootly' ? 'Rootly' : 'PagerDuty'} Integration`}
+                            {organizationName}
                           </span>
                           <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 ml-auto" />
                         </div>
