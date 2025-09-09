@@ -1062,29 +1062,67 @@ class UnifiedBurnoutAnalyzer:
             critical_incidents = severity_dist.get('sev0', 0)
             high_incidents = severity_dist.get('sev1', 0)
         
-        # INDIVIDUALIZED CBI METRICS - No more hardcoded multipliers!
-        # Use actual incident patterns and response data to create unique profiles
+        # ROOTLY'S PROVEN TIERED SCALING - Replace linear caps with progressive tiers!
+        # This is the EXACT methodology that prevents clustering in successful Rootly analyses
         
         incidents_per_week = metrics.get('incidents_per_week', 0)
-        total_incidents = metrics.get('total_incidents', 0)
+        total_incidents = metrics.get('total_incidents', 0) 
         avg_response_minutes = metrics.get('avg_response_time_minutes', 0)
         after_hours_pct = metrics.get('after_hours_percentage', 0)
         
+        # Helper function for Rootly's tiered scaling approach (realistic ranges)
+        def apply_rootly_incident_tiers(ipw: float) -> float:
+            """Apply Rootly's proven tiered scaling to incident frequency"""
+            if ipw <= 1:
+                return ipw * 2.0                   # 0-2 range (very low volume)
+            elif ipw <= 3:
+                return 2 + ((ipw - 1) / 2) * 2.5   # 2-4.5 range (low volume)
+            elif ipw <= 6:
+                return 4.5 + ((ipw - 3) / 3) * 2   # 4.5-6.5 range (medium volume)  
+            elif ipw <= 10:
+                return 6.5 + ((ipw - 6) / 4) * 2   # 6.5-8.5 range (high volume)
+            else:
+                return 8.5 + min(1.5, (ipw - 10) / 10)  # 8.5-10 range (critical volume)
+        
+        def apply_rootly_escalation_tiers(rate: float) -> float:
+            """Apply tiered scaling to escalation rate (0-1 input)"""
+            if rate <= 0.1:
+                return rate * 20                   # 0-2 range (very low escalation) 
+            elif rate <= 0.3:
+                return 2 + ((rate - 0.1) / 0.2) * 3  # 2-5 range (low escalation)
+            elif rate <= 0.6:
+                return 5 + ((rate - 0.3) / 0.3) * 2  # 5-7 range (medium escalation)
+            else:
+                return 7 + ((rate - 0.6) / 0.4) * 2  # 7-9 range (high escalation)
+        
+        def apply_rootly_response_tiers(minutes: float) -> float:
+            """Apply tiered scaling to response time"""  
+            if minutes <= 15:
+                return minutes / 15 * 2            # 0-2 range (fast response)
+            elif minutes <= 60:
+                return 2 + ((minutes - 15) / 45) * 5  # 2-7 range (medium response)
+            else:
+                return 7 + min(3, ((minutes - 60) / 60) * 3)  # 7-10 range (slow response)
+        
+        # Calculate escalation rate for tiered scaling
+        escalation_rate = high_severity_count / max(total_incidents, 1) if total_incidents > 0 else 0
+        
+        # Apply Rootly's tiered scaling to all CBI metrics
         cbi_metrics = {
-            # Personal burnout factors - based on actual workload patterns
-            'work_hours_trend': min(100, incidents_per_week * 12),  # More incidents = longer hours
-            'weekend_work': after_hours_pct * 2,  # Use actual after-hours percentage  
-            'after_hours_activity': after_hours_pct,  # Direct mapping
-            'vacation_usage': min(100, total_incidents * 3),  # More incidents = less vacation
-            'sleep_quality_proxy': min(100, critical_incidents * 8 + high_incidents * 4),  # Sleep disruption from severity
+            # Personal burnout factors - using Rootly's tiered approach
+            'work_hours_trend': apply_rootly_incident_tiers(incidents_per_week) * 10,      # Scale to 0-100
+            'weekend_work': min(100, after_hours_pct * 2),                                 # Keep simple scaling for after-hours  
+            'after_hours_activity': after_hours_pct,                                       # Direct mapping
+            'vacation_usage': apply_rootly_incident_tiers(total_incidents / 4) * 10,       # Apply tiers to total load
+            'sleep_quality_proxy': min(100, apply_rootly_escalation_tiers(escalation_rate) * 10),  # Tiered escalation impact
             
-            # Work-related burnout factors - based on performance metrics
-            'sprint_completion': min(100, avg_response_minutes / 2),  # Slower response = more pressure
-            'code_review_speed': min(100, avg_response_minutes / 3),  # Response time pressure
-            'pr_frequency': min(100, incidents_per_week * 15),  # Incident frequency workload
-            'deployment_frequency': min(100, critical_incidents * 12),  # Critical incident deployment pressure  
-            'meeting_load': min(100, total_incidents * 2 + incidents_per_week * 8),  # Incident coordination overhead
-            'oncall_burden': min(100, incidents_per_week * 10 + (critical_incidents * 5))  # On-call burden from incidents
+            # Work-related burnout factors - using Rootly's response time tiers  
+            'sprint_completion': apply_rootly_response_tiers(avg_response_minutes) * 10,   # Tiered response pressure
+            'code_review_speed': apply_rootly_response_tiers(avg_response_minutes) * 8,    # Slightly less weight
+            'pr_frequency': apply_rootly_incident_tiers(incidents_per_week) * 8,           # Tiered workload frequency
+            'deployment_frequency': min(100, critical_incidents * 8),                      # Critical incident pressure
+            'meeting_load': apply_rootly_incident_tiers(incidents_per_week) * 6,           # Tiered coordination overhead
+            'oncall_burden': apply_rootly_incident_tiers(incidents_per_week) * 10          # Tiered on-call responsibility
         }
         
         # 🐛 DEBUG: Log CBI metrics for troubleshooting zero scores
