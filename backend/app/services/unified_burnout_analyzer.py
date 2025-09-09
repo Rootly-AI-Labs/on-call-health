@@ -111,6 +111,12 @@ class UnifiedBurnoutAnalyzer:
         analysis_start_time = datetime.now()
         logger.info(f"🔍 BURNOUT ANALYSIS START: Beginning {time_range_days}-day burnout analysis at {analysis_start_time.isoformat()}")
         
+        # IMMEDIATE DEBUG - This should show up in Railway logs RIGHT AWAY
+        print(f"🚨 RAILWAY DEBUG: Analysis starting at {analysis_start_time}")
+        print(f"🚨 RAILWAY DEBUG: Platform = {self.platform}")
+        print(f"🚨 RAILWAY DEBUG: NEW SCORING ALGORITHM ACTIVE")
+        logger.error(f"🚨 RAILWAY FORCE LOG: NEW SCORING ALGORITHM DEPLOYED - {analysis_start_time}")
+        
         try:
             # Fetch data from Rootly
             data_fetch_start = datetime.now()
@@ -994,6 +1000,8 @@ class UnifiedBurnoutAnalyzer:
         factors = self._calculate_burnout_factors(metrics)
         
         # CBI DEBUG LOGGING - Track score calculation
+        print(f"🐛 CBI RAILWAY DEBUG - User: {user_email}")
+        print(f"🐛 CBI RAILWAY DEBUG - Personal: {dimensions['personal_burnout']}, Work: {dimensions['work_related_burnout']}, Accomplishment: {dimensions['accomplishment_burnout']}")
         logger.info(f"🐛 CBI METRICS DEBUG - User: {user_email}")
         logger.info(f"🐛 CBI METRICS DEBUG - Input metrics: {metrics}")
         logger.info(f"🐛 CBI METRICS DEBUG - Personal burnout: {dimensions['personal_burnout']}")
@@ -1008,6 +1016,7 @@ class UnifiedBurnoutAnalyzer:
         # Ensure overall score is never negative
         burnout_score = max(0, burnout_score)
         
+        print(f"🐛 CBI RAILWAY DEBUG - Final score: {burnout_score} (was using HARDCODED PLACEHOLDERS before!)")
         logger.info(f"🐛 CBI METRICS DEBUG - Final burnout score: {burnout_score}")
         logger.info(f"🐛 CBI METRICS DEBUG - CBI composite score: {round(composite_cbi['composite_score'], 2)}")
         
