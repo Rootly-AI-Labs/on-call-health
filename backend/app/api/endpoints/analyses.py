@@ -164,14 +164,24 @@ async def run_burnout_analysis(
             check_token = beta_pagerduty_token
         
         try:
-            from ...core.rootly_client import RootlyAPIClient
-            client = RootlyAPIClient(check_token)
-            permissions = await client.check_permissions()
+            # Check permissions based on platform
+            if integration.platform == "rootly":
+                from ...core.rootly_client import RootlyAPIClient
+                client = RootlyAPIClient(check_token)
+                permissions = await client.check_permissions()
+            elif integration.platform == "pagerduty":
+                from ...core.pagerduty_client import PagerDutyAPIClient
+                client = PagerDutyAPIClient(check_token)
+                permissions = await client.check_permissions()
+            else:
+                # Unsupported platform
+                permission_warnings = [f"Unknown platform: {integration.platform}"]
+                permissions = {}
             
             # Check if incidents permission is missing
-            if not permissions.get("incidents", {}).get("access", False):
+            if permissions and not permissions.get("incidents", {}).get("access", False):
                 incidents_error = permissions.get("incidents", {}).get("error", "Unknown permission error")
-                logger.warning(f"Analysis {integration.id} starting with incidents permission issue: {incidents_error}")
+                logger.warning(f"Analysis {integration.id} ({integration.platform}) starting with incidents permission issue: {incidents_error}")
                 
                 # Still allow analysis to proceed but with warning in config
                 permission_warnings = [f"Incidents API: {incidents_error}"]

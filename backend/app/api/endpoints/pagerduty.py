@@ -106,7 +106,7 @@ async def get_pagerduty_integrations(
     
     result_integrations = []
     for i in integrations:
-        result_integrations.append({
+        integration_data = {
             "id": i.id,
             "name": i.name,
             "organization_name": i.organization_name,
@@ -116,7 +116,23 @@ async def get_pagerduty_integrations(
             "last_used_at": i.last_used_at.isoformat() if i.last_used_at else None,
             "token_suffix": f"****{i.api_token[-4:]}" if i.api_token and len(i.api_token) >= 4 else "****",
             "platform": i.platform
-        })
+        }
+        
+        # Check permissions for this integration
+        if i.api_token:
+            try:
+                client = PagerDutyAPIClient(i.api_token)
+                permissions = await client.check_permissions()
+                integration_data["permissions"] = permissions
+            except Exception as e:
+                logger.warning(f"Failed to check permissions for integration {i.id}: {e}")
+                # If we can't check permissions, include a note
+                integration_data["permissions"] = {
+                    "users": {"access": False, "error": f"Permission check failed: {str(e)}"},
+                    "incidents": {"access": False, "error": f"Permission check failed: {str(e)}"}
+                }
+        
+        result_integrations.append(integration_data)
     
     # Add beta fallback integration if available
     beta_pagerduty_token = os.getenv('PAGERDUTY_API_TOKEN')
@@ -132,6 +148,15 @@ async def get_pagerduty_integrations(
             if test_result.get("valid"):
                 account_info = test_result.get("account_info", {})
                 logger.info(f"Beta PagerDuty account_info: {account_info}")
+                
+                # Check permissions for the beta token
+                try:
+                    permissions = await client.check_permissions()
+                    logger.info(f"Beta PagerDuty permissions: {permissions}")
+                except Exception as e:
+                    logger.warning(f"Failed to check beta PagerDuty permissions: {e}")
+                    permissions = {}
+                
                 beta_integration = {
                     "id": "beta-pagerduty",  # Special ID for beta integration
                     "name": "PagerDuty (Beta Access)",
@@ -142,7 +167,8 @@ async def get_pagerduty_integrations(
                     "created_at": datetime.now().isoformat(),
                     "last_used_at": None,
                     "token_suffix": f"***{beta_pagerduty_token[-4:]}",
-                    "platform": "pagerduty"
+                    "platform": "pagerduty",
+                    "permissions": permissions  # Add permission info for frontend display
                 }
                 
                 # Add beta integration at the beginning of the list

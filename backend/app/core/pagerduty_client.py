@@ -372,6 +372,108 @@ class PagerDutyAPIClient:
             logger.error(f"Error fetching PagerDuty incidents: {e}")
             return all_incidents if 'all_incidents' in locals() else []
     
+    async def check_permissions(self) -> Dict[str, Any]:
+        """
+        Check API token permissions for PagerDuty endpoints.
+        Similar to Rootly's check_permissions method.
+        """
+        permissions = {
+            "users": {"access": False, "error": None},
+            "incidents": {"access": False, "error": None},
+            "services": {"access": False, "error": None},
+            "oncalls": {"access": False, "error": None}
+        }
+        
+        timeout = aiohttp.ClientTimeout(total=30)
+        
+        try:
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                # Test users endpoint
+                try:
+                    async with session.get(
+                        f"{self.base_url}/users",
+                        headers=self.headers,
+                        params={"limit": 1}
+                    ) as response:
+                        if response.status == 200:
+                            permissions["users"]["access"] = True
+                        elif response.status == 401:
+                            permissions["users"]["error"] = "Unauthorized - check API token"
+                        elif response.status == 403:
+                            permissions["users"]["error"] = "Token needs 'users:read' permission"
+                        else:
+                            permissions["users"]["error"] = f"HTTP {response.status}"
+                except Exception as e:
+                    permissions["users"]["error"] = f"Connection error: {str(e)}"
+                
+                # Test incidents endpoint (CRITICAL for burnout analysis)
+                try:
+                    async with session.get(
+                        f"{self.base_url}/incidents",
+                        headers=self.headers,
+                        params={"limit": 1, "total": "true"}
+                    ) as response:
+                        if response.status == 200:
+                            permissions["incidents"]["access"] = True
+                        elif response.status == 401:
+                            permissions["incidents"]["error"] = "Unauthorized - check API token"
+                        elif response.status == 403:
+                            permissions["incidents"]["error"] = "Token needs 'incidents:read' permission"
+                        else:
+                            permissions["incidents"]["error"] = f"HTTP {response.status}"
+                except Exception as e:
+                    permissions["incidents"]["error"] = f"Connection error: {str(e)}"
+                
+                # Test services endpoint
+                try:
+                    async with session.get(
+                        f"{self.base_url}/services",
+                        headers=self.headers,
+                        params={"limit": 1}
+                    ) as response:
+                        if response.status == 200:
+                            permissions["services"]["access"] = True
+                        elif response.status == 401:
+                            permissions["services"]["error"] = "Unauthorized - check API token"
+                        elif response.status == 403:
+                            permissions["services"]["error"] = "Token needs 'services:read' permission"
+                        else:
+                            permissions["services"]["error"] = f"HTTP {response.status}"
+                except Exception as e:
+                    permissions["services"]["error"] = f"Connection error: {str(e)}"
+                
+                # Test oncalls endpoint (for on-call filtering)
+                try:
+                    async with session.get(
+                        f"{self.base_url}/oncalls",
+                        headers=self.headers,
+                        params={"limit": 1}
+                    ) as response:
+                        if response.status == 200:
+                            permissions["oncalls"]["access"] = True
+                        elif response.status == 401:
+                            permissions["oncalls"]["error"] = "Unauthorized - check API token"
+                        elif response.status == 403:
+                            permissions["oncalls"]["error"] = "Token needs 'oncalls:read' permission"
+                        else:
+                            permissions["oncalls"]["error"] = f"HTTP {response.status}"
+                except Exception as e:
+                    permissions["oncalls"]["error"] = f"Connection error: {str(e)}"
+                
+        except Exception as e:
+            # If session creation fails, mark all as connection errors
+            error_msg = f"Connection error: {str(e)}"
+            for endpoint in permissions:
+                permissions[endpoint]["error"] = error_msg
+        
+        # Log permission check results
+        logger.info("🔑 PAGERDUTY PERMISSIONS CHECK:")
+        for endpoint, perm in permissions.items():
+            status = "✅ GRANTED" if perm["access"] else f"❌ {perm['error']}"
+            logger.info(f"   - {endpoint.upper()}: {status}")
+        
+        return permissions
+    
     async def get_services(self, limit: int = 100) -> List[Dict[str, Any]]:
         """Fetch services from PagerDuty."""
         try:
