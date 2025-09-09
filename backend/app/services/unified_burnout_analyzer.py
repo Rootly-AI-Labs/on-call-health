@@ -1155,7 +1155,7 @@ class UnifiedBurnoutAnalyzer:
                 # PagerDuty normalized format
                 created_at = incident.get("created_at")
                 acknowledged_at = incident.get("acknowledged_at")
-                severity = incident.get("severity_level", "unknown")
+                severity = incident.get("severity", "unknown")
                 status = incident.get("status", "unknown")
             else:
                 # Rootly format
