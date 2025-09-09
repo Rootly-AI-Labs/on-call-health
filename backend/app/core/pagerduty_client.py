@@ -27,7 +27,8 @@ class PagerDutyAPIClient:
         token_suffix = api_token[-4:] if len(api_token) > 4 else "***"
         logger.info(f"🎯 PAGERDUTY CLIENT: Initialized with token ending in {token_suffix}")
         logger.info(f"🎯 PAGERDUTY CLIENT: Enhanced normalization version ACTIVE - Build 875bd95")
-        logger.info(f"🎯 PAGERDUTY CLIENT: Force rebuild to ensure Railway deployment")
+        import time
+        logger.info(f"🎯 PAGERDUTY CLIENT: On-call methods deployed - Build {int(time.time())}")
         
     async def test_connection(self) -> Dict[str, Any]:
         """Test the PagerDuty API connection and get account info."""
