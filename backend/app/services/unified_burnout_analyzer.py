@@ -195,12 +195,21 @@ class UnifiedBurnoutAnalyzer:
                     logger.warning(f"   - Users and incidents have completely different ID spaces")
                     logger.warning(f"   - This will cause ALL users to show 0 incidents")
             
-            # No fake data generation - if API returns 0 incidents, we show the real state
+            # FAIL FAST: Never show fake data - fail the analysis when API permissions are missing
             if len(incidents) == 0 and len(users) > 0:
                 expected_incidents = metadata.get("total_incidents", 0)
                 if expected_incidents > 0:
-                    logger.warning(f"🔍 DATA ISSUE: API returned 0 incidents but metadata shows {expected_incidents} incidents. This indicates API permission issues.")
-                    logger.info(f"🔍 DATA TRANSPARENCY: Showing real state - no incidents available for daily trends")
+                    logger.error(f"🚨 API PERMISSION ERROR: Expected {expected_incidents} incidents but got 0. API token lacks incidents:read permission.")
+                    error_msg = (
+                        f"API Permission Error: Cannot access incident data. "
+                        f"Your {self.platform.title()} API token lacks 'incidents:read' permission. "
+                        f"Expected {expected_incidents} incidents but received 0. "
+                        f"Please update your API token with proper permissions."
+                    )
+                    return self._create_error_response(error_msg)
+                elif len(users) > 0:
+                    logger.warning(f"🔍 NO INCIDENTS: No incidents found in the last {time_range_days} days - this may be normal.")
+                    # Continue with analysis - this might be a quiet period
             
             extraction_duration = (datetime.now() - extraction_start).total_seconds()
             logger.info(f"🔍 BURNOUT ANALYSIS: Step 2 completed in {extraction_duration:.3f}s - {len(users)} users, {len(incidents)} incidents")
@@ -2812,4 +2821,25 @@ class UnifiedBurnoutAnalyzer:
             elif "full_name" in user:
                 return user["full_name"]
         return "Unknown User"
+    
+    def _create_error_response(self, error_message: str) -> Dict[str, Any]:
+        """Create a standardized error response for failed analysis."""
+        return {
+            "status": "error",
+            "error_message": error_message,
+            "team_analysis": {"members": []},
+            "team_health": {
+                "overall_score": None,
+                "health_status": "error",
+                "members_at_risk": 0,
+                "risk_distribution": {"low": 0, "medium": 0, "high": 0},
+                "error": error_message
+            },
+            "daily_trends": [],
+            "metadata": {
+                "error": True,
+                "error_message": error_message,
+                "timestamp": datetime.now().isoformat()
+            }
+        }
 
