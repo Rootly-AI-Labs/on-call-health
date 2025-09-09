@@ -526,23 +526,53 @@ class PagerDutyAPIClient:
                     logger.error(f"Failed to fetch oncalls: {oncalls_response.status} - {await oncalls_response.text()}")
                     return []
                 
-                oncalls_data = await oncalls_response.json()
-                oncalls = oncalls_data.get("oncalls", [])
+                try:
+                    oncalls_data = await oncalls_response.json()
+                    if oncalls_data is None:
+                        logger.warning("PagerDuty oncalls response is None")
+                        return []
+                    
+                    oncalls = oncalls_data.get("oncalls", [])
+                    if oncalls is None:
+                        logger.warning("PagerDuty oncalls data is None")
+                        return []
+                        
+                except Exception as json_error:
+                    logger.error(f"Failed to parse PagerDuty oncalls JSON response: {json_error}")
+                    return []
                 
                 logger.info(f"Found {len(oncalls)} on-call shifts from PagerDuty")
                 
                 # Convert PagerDuty oncalls to our shift format
                 for oncall in oncalls:
-                    shift = {
-                        "id": f"pd_{oncall.get('start', '')}_{oncall.get('user', {}).get('id', '')}",
-                        "schedule_id": oncall.get("schedule", {}).get("id", ""),
-                        "schedule_name": oncall.get("schedule", {}).get("summary", ""),
-                        "start_time": oncall.get("start"),
-                        "end_time": oncall.get("end"),
-                        "user": oncall.get("user", {}),
-                        "source": "pagerduty"
-                    }
-                    all_shifts.append(shift)
+                    try:
+                        if oncall is None:
+                            logger.warning("Skipping None oncall entry")
+                            continue
+                            
+                        # Safely extract data with null checks
+                        user_data = oncall.get("user") if oncall else {}
+                        if user_data is None:
+                            user_data = {}
+                            
+                        schedule_data = oncall.get("schedule") if oncall else {}
+                        if schedule_data is None:
+                            schedule_data = {}
+                        
+                        shift = {
+                            "id": f"pd_{oncall.get('start', '')}_{user_data.get('id', '')}",
+                            "schedule_id": schedule_data.get("id", ""),
+                            "schedule_name": schedule_data.get("summary", ""),
+                            "start_time": oncall.get("start"),
+                            "end_time": oncall.get("end"),
+                            "user": user_data,
+                            "source": "pagerduty"
+                        }
+                        all_shifts.append(shift)
+                        
+                    except Exception as shift_error:
+                        logger.warning(f"Error processing oncall shift: {shift_error}, skipping shift")
+                        continue
                 
                 logger.info(f"Retrieved {len(all_shifts)} on-call shifts for period {start_str} to {end_str}")
                 return all_shifts
@@ -556,17 +586,25 @@ class PagerDutyAPIClient:
         Extract unique user emails from PagerDuty shifts data.
         Returns set of user emails who were on-call during the period.
         """
-        if not shifts:
+        if not shifts or shifts is None:
+            logger.info("🗓️ PAGERDUTY ON_CALL: No shifts provided for user extraction")
             return set()
         
         on_call_user_emails = set()
         
         for shift in shifts:
             try:
-                user = shift.get("user", {})
+                if shift is None:
+                    logger.warning("Skipping None shift in user extraction")
+                    continue
+                    
+                user = shift.get("user") if shift else {}
+                if user is None:
+                    user = {}
+                    
                 email = user.get("email")
                 
-                if email:
+                if email and isinstance(email, str):
                     on_call_user_emails.add(email.lower().strip())
                     
             except Exception as e:
