@@ -250,7 +250,13 @@ class PagerDutyAPIClient:
                         
                         if response.status != 200:
                             error_text = await response.text()
-                            logger.error(f"🔍 PD GET_INCIDENTS: API ERROR - HTTP {response.status}: {error_text}")
+                            token_suffix = self.api_token[-4:] if len(self.api_token) > 4 else "***"
+                            logger.error(f"🚨 PD GET_INCIDENTS: API ERROR - HTTP {response.status}")
+                            logger.error(f"🚨 PD GET_INCIDENTS: Token ending in {token_suffix}")
+                            logger.error(f"🚨 PD GET_INCIDENTS: URL: {self.base_url}/incidents")
+                            logger.error(f"🚨 PD GET_INCIDENTS: Headers: {dict(self.headers)}")
+                            logger.error(f"🚨 PD GET_INCIDENTS: Params: since={since_str}, until={until_str}")
+                            logger.error(f"🚨 PD GET_INCIDENTS: Response: {error_text}")
                             break
                             
                         data = await response.json()
