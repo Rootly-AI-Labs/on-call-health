@@ -1018,7 +1018,6 @@ class UnifiedBurnoutAnalyzer:
         
         print(f"🐛 CBI RAILWAY DEBUG - Final score: {burnout_score} (was using HARDCODED PLACEHOLDERS before!)")
         logger.info(f"🐛 CBI METRICS DEBUG - Final burnout score: {burnout_score}")
-        logger.info(f"🐛 CBI METRICS DEBUG - CBI composite score: {round(composite_cbi['composite_score'], 2)}")
         
         # Determine risk level
         risk_level = self._determine_risk_level(burnout_score)
@@ -1099,6 +1098,10 @@ class UnifiedBurnoutAnalyzer:
         personal_cbi = calculate_personal_burnout(cbi_metrics)
         work_cbi = calculate_work_related_burnout(cbi_metrics) 
         composite_cbi = calculate_composite_cbi_score(personal_cbi['score'], work_cbi['score'])
+        
+        # CBI DEBUG - Now we have composite_cbi calculated
+        print(f"🐛 CBI RAILWAY DEBUG - CBI composite score: {round(composite_cbi['composite_score'], 2)}")
+        logger.info(f"🐛 CBI METRICS DEBUG - CBI composite score: {round(composite_cbi['composite_score'], 2)}")
         
         # Generate reasoning for the CBI scores
         cbi_reasoning = generate_cbi_score_reasoning(
