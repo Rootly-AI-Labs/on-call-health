@@ -16,21 +16,17 @@ export default function AuthSuccessPage() {
       try {
         const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
         
-        // Debug: Log API base URL (will work in production)
-        console.log('🔍 Production Debug: API_BASE =', API_BASE);
         
         // Step 1: Extract authorization code from URL parameters
         const urlParams = new URLSearchParams(window.location.search);
         const authCode = urlParams.get('code');
         
-        console.log('🔍 Frontend Debug: Auth code from URL:', authCode?.slice(0, 20) + '...');
         
         if (!authCode) {
           throw new Error('No authorization code received from OAuth callback');
         }
         
         // Step 2: Exchange authorization code for JWT token
-        console.log('🔍 Frontend Debug: Exchanging auth code for JWT token...');
         const tokenResponse = await fetch(`${API_BASE}/auth/exchange-token?code=${authCode}`, {
           method: 'POST',
           headers: {
@@ -46,7 +42,6 @@ export default function AuthSuccessPage() {
         const tokenData = await tokenResponse.json();
         const jwtToken = tokenData.access_token;
         
-        console.log('🔍 Frontend Debug: Successfully received JWT token');
         
         // Step 3: Clear any existing user data and store new JWT token
         // Clear all user-specific cached data to prevent cross-user data leakage
@@ -71,7 +66,6 @@ export default function AuthSuccessPage() {
         }
         
         // Remove all cached user data
-        console.log('🔍 Frontend Debug: Clearing cached user data:', keysToRemove)
         keysToRemove.forEach(key => localStorage.removeItem(key))
         
         // Additional explicit clearing of potential problematic keys
@@ -81,7 +75,6 @@ export default function AuthSuccessPage() {
         ]
         explicitKeysToRemove.forEach(key => {
           if (localStorage.getItem(key)) {
-            console.log('🔍 Frontend Debug: Explicitly removing:', key)
             localStorage.removeItem(key)
           }
         })
@@ -93,7 +86,6 @@ export default function AuthSuccessPage() {
         window.history.replaceState(null, '', window.location.pathname);
         
         // Step 4: Verify authentication with the JWT token
-        console.log('🔍 Frontend Debug: Verifying authentication with JWT token...');
         const verifyResponse = await fetch(`${API_BASE}/auth/user/me`, {
           method: 'GET',
           headers: {
@@ -107,7 +99,6 @@ export default function AuthSuccessPage() {
         }
         
         const userData = await verifyResponse.json()
-        console.log('🔍 Frontend Debug: Authentication successful for user:', userData.email)
         
         // Store fresh user data immediately to prevent cross-user contamination
         if (userData.name && userData.email) {
@@ -116,11 +107,6 @@ export default function AuthSuccessPage() {
           if (userData.avatar) {
             localStorage.setItem('user_avatar', userData.avatar)
           }
-          console.log('🔍 Frontend Debug: Stored fresh user data:', {
-            name: userData.name,
-            email: userData.email,
-            avatar: userData.avatar
-          })
         }
         
         // Set success status

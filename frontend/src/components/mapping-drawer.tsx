@@ -111,25 +111,18 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
   const [showMappingResults, setShowMappingResults] = useState(false)
 
   const loadMappingData = useCallback(async () => {
-    console.log(`🚀 MappingDrawer: loadMappingData called - isOpen: ${isOpen}, platform: ${platform}`)
     if (!isOpen) {
-      console.log('🚀 MappingDrawer: Skipping load because drawer is not open')
       return
     }
     
     try {
-      console.log('🚀 MappingDrawer: Starting to load mapping data...')
       setLoadingMappingData(true)
       const authToken = localStorage.getItem('auth_token')
       
       if (!authToken) {
-        console.error('🚀 MappingDrawer: No auth token found')
         toast.error('Authentication required')
         return
       }
-
-      console.log(`🚀 MappingDrawer: Fetching mapping data for platform: ${platform}`)
-      console.log(`🚀 MappingDrawer: API Base: ${API_BASE}`)
       
       const [mappingsResponse, statsResponse] = await Promise.all([
         fetch(`${API_BASE}/integrations/mappings/platform/${platform}`, {
@@ -140,18 +133,9 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
         })
       ])
 
-      console.log(`🚀 MappingDrawer: API Response statuses - mappings: ${mappingsResponse.status}, stats: ${statsResponse.status}`)
-
       if (mappingsResponse.ok && statsResponse.ok) {
         const mappingsData = await mappingsResponse.json()
         const statsData = await statsResponse.json()
-        
-        console.log(`🚀 MappingDrawer: Received ${mappingsData.length} mappings and stats:`, statsData)
-        console.log('🚀 MappingDrawer: First few mappings with names:', mappingsData.slice(0, 3).map((m: IntegrationMapping) => ({
-          email: m.source_identifier,
-          name: m.source_name,
-          hasName: !!m.source_name
-        })))
         
         // Deduplicate mappings by email, keeping the most recent or manual mapping
         const deduplicatedMappings = mappingsData.reduce((acc: IntegrationMapping[], current: IntegrationMapping) => {
@@ -174,7 +158,6 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
           return acc
         }, [])
         
-        console.log(`🚀 MappingDrawer: Deduplicated from ${mappingsData.length} to ${deduplicatedMappings.length} mappings`)
         
         // Calculate stats from deduplicated mappings (frontend truth)
         const totalAttempts = deduplicatedMappings.length
@@ -199,12 +182,8 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
           manual_mappings_count: deduplicatedMappings.filter(m => m.is_manual).length
         }
         
-        console.log('🚀 MappingDrawer: Frontend calculated stats:', frontendStats)
-        console.log('🚀 MappingDrawer: Backend provided stats:', statsData)
-        
         setMappings(deduplicatedMappings)
         setMappingStats(frontendStats) // Use frontend calculated stats instead of backend
-        console.log('🚀 MappingDrawer: Successfully set mappings and frontend stats')
       } else {
         console.error('🚀 MappingDrawer: Failed to load mapping data:', mappingsResponse.status, statsResponse.status)
         const mappingsText = await mappingsResponse.text().catch(() => 'Could not read')
@@ -352,15 +331,10 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
   }, [inlineEditingValue, platform, validateGitHubUsername])
 
   const runAutoMapping = async () => {
-    console.log('🎯 AUTO-MAPPING BUTTON CLICKED!')
-    
     if (platform !== 'github') {
-      console.log('❌ Platform is not GitHub:', platform)
       toast.error('Auto-mapping is only available for GitHub')
       return
     }
-    
-    console.log('✅ Platform check passed, starting auto-mapping...')
     setRunningAutoMapping(true)
     setMappingProgress(null)
     setMappingResults([])

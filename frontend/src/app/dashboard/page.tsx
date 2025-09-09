@@ -2822,35 +2822,6 @@ export default function Dashboard() {
   // Get high-risk factors for emphasis (CBI scale 0-100)
   const highRiskFactors = burnoutFactors.filter(f => f.value >= 50).sort((a, b) => b.value - a.value);
 
-  // Debug log to check the actual values
-  useEffect(() => {
-    console.log('🔍 DEBUG: Radar chart burnout factors:', burnoutFactors)
-    console.log('🔍 DEBUG: Members raw factors:', (members as any[]).map((m: any) => ({ name: m.user_name, factors: m.factors })))
-    console.log('🔍 DEBUG: Organization burnout score:', membersWithIncidents.length > 0 ? (membersWithIncidents as any[]).reduce((avg: number, m: any) => avg + (m.burnout_score || 0), 0) / membersWithIncidents.length * 10 : 0, '%')
-    console.log('🔍 DEBUG: Members with incidents:', membersWithIncidents.length, '/', members.length)
-    console.log('🔍 DEBUG: Selected member factors:', selectedMember ? selectedMember.factors : 'None selected')
-    console.log('🔍 DEBUG: Selected member slack activity:', selectedMember?.slack_activity)
-    console.log('🔍 DEBUG: Selected member github activity:', selectedMember?.github_activity)
-    
-    // Additional debugging for radar chart zeros
-    if (members.length > 0) {
-      console.log('🔍 RADAR DEBUG: First member structure:', JSON.stringify(members[0], null, 2))
-      const firstMember = members[0] as any
-      console.log('🔍 RADAR DEBUG: First member factors check:', {
-        hasFactors: !!firstMember?.factors,
-        workload: firstMember?.factors?.workload,
-        afterHours: firstMember?.factors?.after_hours,
-        weekendWork: firstMember?.factors?.weekend_work,
-        incidentLoad: firstMember?.factors?.incident_load,
-        responseTime: firstMember?.factors?.response_time
-      })
-      console.log('🔍 RADAR DEBUG: Team analysis structure keys:', Object.keys(currentAnalysis?.analysis_data?.team_analysis || {}))
-      if (currentAnalysis?.analysis_data?.team_analysis && !Array.isArray(currentAnalysis.analysis_data.team_analysis)) {
-        console.log('🔍 RADAR DEBUG: Team analysis object keys:', Object.keys(currentAnalysis.analysis_data.team_analysis))
-        console.log('🔍 RADAR DEBUG: Team analysis members array length:', currentAnalysis.analysis_data.team_analysis.members?.length || 0)
-      }
-    }
-  }, [burnoutFactors, members, selectedMember, currentAnalysis])
 
   // Show full-screen loading when loading integrations
   if (loadingIntegrations) {
