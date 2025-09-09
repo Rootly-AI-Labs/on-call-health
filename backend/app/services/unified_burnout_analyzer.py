@@ -1024,6 +1024,21 @@ class UnifiedBurnoutAnalyzer:
             'oncall_burden': weighted_incidents + (baseline_oncall_stress * 0.5)  # Weighted incidents + baseline stress
         }
         
+        # 🐛 DEBUG: Log CBI metrics for troubleshooting zero scores
+        logger.info(f"🐛 CBI METRICS DEBUG for {user_name}:")
+        logger.info(f"   - Incidents: {len(incidents)}")
+        logger.info(f"   - weighted_incidents: {weighted_incidents}")
+        logger.info(f"   - critical_incidents: {critical_incidents}, high_incidents: {high_incidents}")
+        logger.info(f"   - severity_dist: {severity_dist}")
+        logger.info(f"   - CBI metrics: {cbi_metrics}")
+        
+        # Check if all CBI metrics are 0
+        non_zero_metrics = {k: v for k, v in cbi_metrics.items() if v > 0}
+        if not non_zero_metrics:
+            logger.warning(f"🐛 WARNING: ALL CBI metrics are 0 for {user_name} with {len(incidents)} incidents!")
+        else:
+            logger.info(f"🐛 Non-zero CBI metrics: {non_zero_metrics}")
+        
         # Calculate CBI dimensions
         personal_cbi = calculate_personal_burnout(cbi_metrics)
         work_cbi = calculate_work_related_burnout(cbi_metrics) 
