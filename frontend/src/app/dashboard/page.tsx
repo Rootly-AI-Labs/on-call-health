@@ -2923,21 +2923,31 @@ export default function Dashboard() {
                   timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
                 })
                 
-                // Load integrations if needed for team name display
-                const matchingIntegration = integrations.find(i => i.id === Number(analysis.integration_id)) || 
-                                          integrations.find(i => String(i.id) === String(analysis.integration_id))
+                // Try to find matching integration by ID first
+                let matchingIntegration = integrations.find(i => i.id === Number(analysis.integration_id)) || 
+                                        integrations.find(i => String(i.id) === String(analysis.integration_id))
                 
-                // Debug: Log integration matching issues
+                // FALLBACK: If no integration ID match, try to match by organization name from analysis metadata
                 if (!matchingIntegration) {
-                  console.log(`No matching integration for analysis ${analysis.id}:`, {
-                    analysis_integration_id: analysis.integration_id,
-                    analysis_integration_id_type: typeof analysis.integration_id,
-                    available_integration_ids: integrations.map(i => ({ id: i.id, type: typeof i.id, name: i.name, platform: i.platform }))
-                  })
+                  const analysisOrgName = (analysis as any).analysis_data?.metadata?.organization_name || 
+                                         (analysis as any).config?.organization_name
+                  
+                  if (analysisOrgName) {
+                    // Try to find integration with matching name
+                    matchingIntegration = integrations.find(i => 
+                      i.name === analysisOrgName || 
+                      i.organization_name === analysisOrgName ||
+                      i.name?.toLowerCase().includes(analysisOrgName.toLowerCase()) ||
+                      analysisOrgName.toLowerCase().includes(i.name?.toLowerCase() || '')
+                    )
+                  }
                 }
                 
-                // ALWAYS use backend integration data - no hardcoded names
-                const organizationName = matchingIntegration?.name || 'Unknown Integration'
+                // Use backend integration data if found, otherwise fall back to analysis metadata
+                const organizationName = matchingIntegration?.name || 
+                                        (analysis as any).analysis_data?.metadata?.organization_name || 
+                                        (analysis as any).config?.organization_name ||
+                                        'Unknown Integration'
                 const isSelected = currentAnalysis?.id === analysis.id
                 
                 // ALWAYS use backend platform data - no hardcoded colors
