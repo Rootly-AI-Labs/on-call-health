@@ -1035,22 +1035,8 @@ class UnifiedBurnoutAnalyzer:
             # Rootly: SEV0=critical, SEV1=high, SEV2=medium, SEV3=low, SEV4=info
             severity_weights = {'sev0': 5.0, 'sev1': 4.0, 'sev2': 2.0, 'sev3': 1.5, 'sev4': 1.0, 'unknown': 1.0}
         
-        weighted_incidents = sum(
-            severity_dist.get(sev, 0) * weight 
-            for sev, weight in severity_weights.items()
-        )
-        
-        # Calculate resolution time stress (higher = more stressful)
-        avg_resolution_minutes = metrics.get('avg_resolution_time_minutes', 0)
-        resolution_stress = min(100, avg_resolution_minutes / 60)  # Hours to stress score
-        
-        # Calculate baseline on-call stress (research-based)
+        # Variables for tiered scaling calculations
         total_incidents = metrics.get('total_incidents', 0)
-        is_oncall = total_incidents > 0  # If handling incidents, they're likely on-call
-        
-        # Baseline stress from being on-call (even without incidents)
-        baseline_oncall_stress = 15 if is_oncall else 0  # Mild baseline stress
-        weekend_oncall_multiplier = 1.5 if metrics.get('weekend_incidents', 0) > 0 else 1.0
         
         # Get the highest severity incidents based on platform
         if self.platform == "pagerduty":
@@ -1086,6 +1072,9 @@ class UnifiedBurnoutAnalyzer:
         
         def apply_rootly_escalation_tiers(rate: float) -> float:
             """Apply tiered scaling to escalation rate (0-1 input)"""
+            # Clamp rate to 0-1 range for safety
+            rate = max(0.0, min(1.0, rate))
+            
             if rate <= 0.1:
                 return rate * 20                   # 0-2 range (very low escalation) 
             elif rate <= 0.3:
@@ -1093,7 +1082,7 @@ class UnifiedBurnoutAnalyzer:
             elif rate <= 0.6:
                 return 5 + ((rate - 0.3) / 0.3) * 2  # 5-7 range (medium escalation)
             else:
-                return 7 + ((rate - 0.6) / 0.4) * 2  # 7-9 range (high escalation)
+                return 7 + min(2, ((rate - 0.6) / 0.4) * 2)  # 7-9 range (high escalation)
         
         def apply_rootly_response_tiers(minutes: float) -> float:
             """Apply tiered scaling to response time"""  
