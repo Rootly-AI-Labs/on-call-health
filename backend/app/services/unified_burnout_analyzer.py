@@ -1547,8 +1547,13 @@ class UnifiedBurnoutAnalyzer:
         # Calculate averages and distributions with null safety
         members_with_incidents = [m for m in member_analyses if m and isinstance(m, dict) and m.get("incident_count", 0) > 0]
         
-        # Calculate average burnout for ALL members - prioritize CBI scores when available
-        cbi_scores = [m.get("cbi_score") for m in member_analyses if m and isinstance(m, dict) and m.get("cbi_score") is not None]
+        # CRITICAL FIX: Only include members with incidents OR who were on-call in team score calculation
+        # This prevents dilution from inactive team members
+        eligible_members = members_with_incidents  # Only those with actual incident activity
+        logger.info(f"🏥 TEAM_HEALTH: Filtering to {len(eligible_members)} members with incidents (from {len(member_analyses)} total)")
+        
+        # Calculate average burnout for ELIGIBLE members only - prioritize CBI scores when available  
+        cbi_scores = [m.get("cbi_score") for m in eligible_members if m and isinstance(m, dict) and m.get("cbi_score") is not None]
         
         if cbi_scores and len(cbi_scores) > 0:
             # Use CBI scores (0-100 scale where higher = more burnout)
@@ -1557,14 +1562,14 @@ class UnifiedBurnoutAnalyzer:
             logger.info(f"Team health calculation using CBI scores: avg={avg_burnout:.1f}, count={len(cbi_scores)}")
         else:
             # Fallback to legacy burnout scores (0-10 scale where higher = more burnout)
-            legacy_scores = [m.get("burnout_score", 0) for m in member_analyses if m and isinstance(m, dict) and m.get("burnout_score") is not None]
+            legacy_scores = [m.get("burnout_score", 0) for m in eligible_members if m and isinstance(m, dict) and m.get("burnout_score") is not None]
             avg_burnout = sum(legacy_scores) / len(legacy_scores) if legacy_scores and len(legacy_scores) > 0 else 0
             using_cbi = False
             logger.info(f"Team health calculation using legacy scores: avg={avg_burnout:.1f}, count={len(legacy_scores)}")
         
-        # Count risk levels (updated for 4-tier system) - include ALL members (incidents + GitHub-only)
+        # Count risk levels (updated for 4-tier system) - ONLY include eligible members with incidents
         risk_dist = {"low": 0, "medium": 0, "high": 0, "critical": 0}
-        for member in member_analyses:
+        for member in eligible_members:
             if member and isinstance(member, dict):
                 risk_level = member.get("risk_level", "low")
                 if risk_level in risk_dist:
