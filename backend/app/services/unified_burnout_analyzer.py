@@ -993,6 +993,13 @@ class UnifiedBurnoutAnalyzer:
         # Calculate burnout factors for backward compatibility
         factors = self._calculate_burnout_factors(metrics)
         
+        # CBI DEBUG LOGGING - Track score calculation
+        logger.info(f"🐛 CBI METRICS DEBUG - User: {user_email}")
+        logger.info(f"🐛 CBI METRICS DEBUG - Input metrics: {metrics}")
+        logger.info(f"🐛 CBI METRICS DEBUG - Personal burnout: {dimensions['personal_burnout']}")
+        logger.info(f"🐛 CBI METRICS DEBUG - Work burnout: {dimensions['work_related_burnout']}")
+        logger.info(f"🐛 CBI METRICS DEBUG - Accomplishment burnout: {dimensions['accomplishment_burnout']}")
+        
         # Calculate overall burnout score using three-factor methodology (equal weighting)
         burnout_score = (dimensions["personal_burnout"] * 0.333 + 
                         dimensions["work_related_burnout"] * 0.333 + 
@@ -1000,6 +1007,9 @@ class UnifiedBurnoutAnalyzer:
         
         # Ensure overall score is never negative
         burnout_score = max(0, burnout_score)
+        
+        logger.info(f"🐛 CBI METRICS DEBUG - Final burnout score: {burnout_score}")
+        logger.info(f"🐛 CBI METRICS DEBUG - CBI composite score: {round(composite_cbi['composite_score'], 2)}")
         
         # Determine risk level
         risk_level = self._determine_risk_level(burnout_score)
@@ -1316,11 +1326,12 @@ class UnifiedBurnoutAnalyzer:
         art = float(art) if art is not None else 0.0
         resolution_time_score = min(10, (art / 60) * 10) if art > 0 else 0  # Normalize to hours
         
-        # Clustering score (simplified - assume 20% clustering for now)
-        clustering_score = min(10, 0.2 * 15)  # Placeholder
+        # Use actual data only - NO PLACEHOLDERS
+        # Weighted average focusing on real incident data
+        total_weight = 0.7 + 0.3  # frequency + after_hours + resolution_time
+        weighted_score = (incident_frequency_score * 0.7 + after_hours_score * 0.3)
         
-        # Weighted average with incident frequency as primary factor (50% weight)
-        return (incident_frequency_score * 0.5 + after_hours_score * 0.2 + resolution_time_score * 0.2 + clustering_score * 0.1)
+        return weighted_score
     
     def _calculate_work_burnout_cbi(self, metrics: Dict[str, Any]) -> float:
         """Calculate Work-Related Burnout from incident data using CBI methodology (0-10 scale)."""
@@ -1331,46 +1342,45 @@ class UnifiedBurnoutAnalyzer:
         escalation_rate = high_severity_count / max(total_incidents, 1)
         escalation_score = min(10, escalation_rate * 10)
         
-        # Solo work score (assume 30% solo work for now)
-        solo_work_score = min(10, 0.3 * 10)  # Placeholder
+        # Use only REAL data - calculate based on actual incident patterns
+        # Response time variability (higher = more stress)
+        art = metrics.get("avg_response_time_minutes", 0)
+        art = float(art) if art is not None else 0.0
+        response_stress = min(10, art / 30) if art > 0 else 0  # Scale based on 30min target
         
-        # Response trend score (assume stable for now)
-        response_trend_score = 0  # Placeholder
+        # Incident volume stress 
+        incidents_per_week = metrics.get("incidents_per_week", 0)
+        incidents_per_week = float(incidents_per_week) if incidents_per_week is not None else 0.0
+        volume_stress = min(10, incidents_per_week * 1.5)  # More incidents = more work stress
         
-        # Communication score (assume average communication for now)
-        communication_score = 5  # Placeholder
-        
-        # Mean of all components - ensure all values are numeric
-        escalation_safe = escalation_score if escalation_score is not None else 0.0
-        solo_safe = solo_work_score if solo_work_score is not None else 0.0
-        response_safe = response_trend_score if response_trend_score is not None else 0.0
-        communication_safe = communication_score if communication_score is not None else 0.0
-        return (escalation_safe + solo_safe + response_safe + communication_safe) / 4
+        # Use real metrics only
+        return (escalation_score * 0.4 + response_stress * 0.3 + volume_stress * 0.3)
     
     def _calculate_accomplishment_burnout_cbi(self, metrics: Dict[str, Any]) -> float:
         """Calculate Accomplishment Burnout from incident data using CBI methodology (0-10 scale)."""
-        # Resolution success score (assume 80% success rate for now)
-        resolution_success_score = 8.0  # Placeholder
+        # Use REAL data only - calculate based on actual performance
+        # Resolution effectiveness based on incident data
+        total_incidents = metrics.get("total_incidents", 0) 
+        incidents_per_week = metrics.get("incidents_per_week", 0)
+        incidents_per_week = float(incidents_per_week) if incidents_per_week is not None else 0.0
         
-        # Improvement score (assume stable performance for now)
-        improvement_score = 5.0  # Placeholder
+        # Higher incident load = lower sense of accomplishment
+        workload_impact = min(10, incidents_per_week * 2)  # Inverse relationship
         
-        # Complexity score (using severity distribution)
+        # Severity handling capability (higher complexity handled = better accomplishment)
         severity_dist = metrics.get("severity_distribution", {}) or {}
         high_severity_count = severity_dist.get("high", 0) + severity_dist.get("critical", 0)
         total_incidents = sum(severity_dist.values()) if severity_dist else 1
         high_severity_rate = high_severity_count / max(total_incidents, 1)
-        complexity_score = high_severity_rate * 10
+        complexity_handling = high_severity_rate * 10  # Higher complexity handled = higher accomplishment
         
-        # Knowledge sharing score (assume minimal for now)
-        knowledge_sharing_score = 2.0  # Placeholder
+        # Response time as performance indicator
+        art = metrics.get("avg_response_time_minutes", 0)
+        art = float(art) if art is not None else 0.0
+        response_performance = max(0, 10 - (art / 30)) if art > 0 else 5  # Better response = higher accomplishment
         
-        # Mean of all components - ensure all values are numeric
-        resolution_safe = resolution_success_score if resolution_success_score is not None else 0.0
-        improvement_safe = improvement_score if improvement_score is not None else 0.0
-        complexity_safe = complexity_score if complexity_score is not None else 0.0
-        knowledge_safe = knowledge_sharing_score if knowledge_sharing_score is not None else 0.0
-        return (resolution_safe + improvement_safe + complexity_safe + knowledge_safe) / 4
+        # Real accomplishment calculation (lower = better sense of accomplishment)
+        return (workload_impact * 0.5 + complexity_handling * 0.3 + (10 - response_performance) * 0.2)
     
     def _calculate_burnout_factors(self, metrics: Dict[str, Any]) -> Dict[str, float]:
         """Calculate individual burnout factors for UI display."""
