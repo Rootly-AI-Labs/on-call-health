@@ -176,9 +176,35 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
         
         console.log(`🚀 MappingDrawer: Deduplicated from ${mappingsData.length} to ${deduplicatedMappings.length} mappings`)
         
+        // Calculate stats from deduplicated mappings (frontend truth)
+        const totalAttempts = deduplicatedMappings.length
+        const mappedMembers = deduplicatedMappings.filter(m => {
+          const hasValidTarget = m.target_identifier && 
+                                 m.target_identifier.trim() !== '' && 
+                                 m.target_identifier !== 'unknown'
+          return m.mapping_successful && hasValidTarget
+        }).length
+        const unmappedMembers = totalAttempts - mappedMembers
+        const membersWithData = deduplicatedMappings.filter(m => 
+          m.data_collected && m.data_points_count > 0
+        ).length
+        const successRate = totalAttempts > 0 ? (mappedMembers / totalAttempts * 100) : 0
+        
+        const frontendStats = {
+          total_attempts: totalAttempts,
+          mapped_members: mappedMembers,
+          unmapped_members: unmappedMembers,
+          members_with_data: membersWithData,
+          overall_success_rate: Math.round(successRate * 10) / 10,
+          manual_mappings_count: deduplicatedMappings.filter(m => m.is_manual).length
+        }
+        
+        console.log('🚀 MappingDrawer: Frontend calculated stats:', frontendStats)
+        console.log('🚀 MappingDrawer: Backend provided stats:', statsData)
+        
         setMappings(deduplicatedMappings)
-        setMappingStats(statsData)
-        console.log('🚀 MappingDrawer: Successfully set mappings and stats state')
+        setMappingStats(frontendStats) // Use frontend calculated stats instead of backend
+        console.log('🚀 MappingDrawer: Successfully set mappings and frontend stats')
       } else {
         console.error('🚀 MappingDrawer: Failed to load mapping data:', mappingsResponse.status, statsResponse.status)
         const mappingsText = await mappingsResponse.text().catch(() => 'Could not read')
