@@ -213,8 +213,15 @@ class UnifiedBurnoutAnalyzer:
                 # Get on-call schedule data for the analysis period
                 start_date = datetime.now() - timedelta(days=time_range_days)
                 end_date = datetime.now()
+                logger.info(f"🗓️ ON_CALL_FILTERING: Attempting to fetch on-call shifts from {start_date.isoformat()} to {end_date.isoformat()}")
+                logger.info(f"🗓️ ON_CALL_FILTERING: Client type: {type(self.client).__name__}, Platform: {self.platform}")
+                
                 on_call_shifts = await self.client.get_on_call_shifts(start_date, end_date)
+                logger.info(f"🗓️ ON_CALL_FILTERING: Retrieved {len(on_call_shifts)} on-call shifts")
+                
                 on_call_user_emails = await self.client.extract_on_call_users_from_shifts(on_call_shifts)
+                logger.info(f"🗓️ ON_CALL_FILTERING: Extracted {len(on_call_user_emails)} unique on-call user emails")
+                logger.info(f"🗓️ ON_CALL_FILTERING: On-call emails: {list(on_call_user_emails)[:5]}{'...' if len(on_call_user_emails) > 5 else ''}")
                 
                 logger.info(f"🗓️ ON_CALL_FILTERING: Found {len(on_call_user_emails)} users who were on-call during the {time_range_days}-day period")
                 logger.info(f"🗓️ ON_CALL_FILTERING: Total team members: {len(users)}, On-call members: {len(on_call_user_emails)}")
@@ -224,23 +231,44 @@ class UnifiedBurnoutAnalyzer:
                     original_user_count = len(users)
                     filtered_users = []
                     
+                    # Debug: Log all user emails for comparison
+                    all_user_emails = []
                     for user in users:
                         user_email = self._get_user_email_from_user(user)
+                        all_user_emails.append(user_email)
                         if user_email and user_email.lower() in on_call_user_emails:
                             filtered_users.append(user)
+                    
+                    logger.info(f"🗓️ ON_CALL_FILTERING: All user emails in team: {all_user_emails[:5]}{'...' if len(all_user_emails) > 5 else ''}")
                     
                     users = filtered_users
                     logger.info(f"🗓️ ON_CALL_FILTERING: Filtered from {original_user_count} total users to {len(users)} on-call users")
                     
-                    # Log the on-call users for verification
-                    oncall_names = [self._get_user_name_from_user(user) for user in users]
-                    logger.info(f"🗓️ ON_CALL_FILTERING: On-call users being analyzed: {', '.join(oncall_names[:10])}{'...' if len(oncall_names) > 10 else ''}")
+                    if len(users) == 0:
+                        logger.error(f"🗓️ ON_CALL_FILTERING: CRITICAL - No matching users found between team emails and on-call emails!")
+                        logger.error(f"🗓️ ON_CALL_FILTERING: Team emails: {all_user_emails}")
+                        logger.error(f"🗓️ ON_CALL_FILTERING: On-call emails: {list(on_call_user_emails)}")
+                        logger.error(f"🗓️ ON_CALL_FILTERING: Falling back to all users to prevent empty analysis")
+                        users = []  # Reset to original users list (will be handled below)
+                    else:
+                        # Log the on-call users for verification
+                        oncall_names = [self._get_user_name_from_user(user) for user in users]
+                        logger.info(f"🗓️ ON_CALL_FILTERING: On-call users being analyzed: {', '.join(oncall_names[:10])}{'...' if len(oncall_names) > 10 else ''}")
                 else:
                     logger.warning(f"🗓️ ON_CALL_FILTERING: No on-call shifts found for the period, analyzing all users as fallback")
                     
             except Exception as e:
                 logger.error(f"🗓️ ON_CALL_FILTERING: Error fetching on-call data: {e}")
+                logger.error(f"🗓️ ON_CALL_FILTERING: Exception type: {type(e).__name__}")
+                logger.error(f"🗓️ ON_CALL_FILTERING: Exception details: {str(e)}")
+                import traceback
+                logger.error(f"🗓️ ON_CALL_FILTERING: Stack trace: {traceback.format_exc()}")
                 logger.warning(f"🗓️ ON_CALL_FILTERING: Falling back to analyzing all users (original behavior)")
+            
+            # If filtering failed or resulted in no users, use all users as fallback
+            if len(users) == 0:
+                logger.warning(f"🗓️ ON_CALL_FILTERING: Using all users as fallback due to empty filtered list")
+                users = data.get("users", [])
             
             oncall_filter_duration = (datetime.now() - oncall_filter_start).total_seconds()
             logger.info(f"🔍 BURNOUT ANALYSIS: Step 2.5 completed in {oncall_filter_duration:.3f}s - Now analyzing {len(users)} on-call users")
@@ -1417,7 +1445,20 @@ class UnifiedBurnoutAnalyzer:
     
     def _calculate_team_health(self, member_analyses: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Calculate overall team health metrics."""
+        logger.info(f"🏥 TEAM_HEALTH: Calculating health for {len(member_analyses)} team members")
+        
+        # Log member details for debugging
+        if member_analyses:
+            member_names = []
+            for member in member_analyses[:10]:  # Log first 10 members
+                if member and isinstance(member, dict):
+                    name = member.get("name", "Unknown")
+                    email = member.get("email", "no-email")
+                    member_names.append(f"{name} ({email})")
+            logger.info(f"🏥 TEAM_HEALTH: Members being analyzed: {', '.join(member_names)}{'...' if len(member_analyses) > 10 else ''}")
+        
         if not member_analyses:
+            logger.warning(f"🏥 TEAM_HEALTH: No member analyses provided, returning neutral baseline")
             return {
                 "overall_score": 6.5,  # Neutral baseline if no data (not perfect health)
                 "risk_distribution": {"low": 0, "medium": 0, "high": 0},
