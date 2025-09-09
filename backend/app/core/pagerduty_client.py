@@ -391,6 +391,109 @@ class PagerDutyAPIClient:
             logger.error(f"Error fetching PagerDuty services: {e}")
             return []
     
+    async def get_on_call_shifts(self, start_date: datetime, end_date: datetime) -> List[Dict[str, Any]]:
+        """
+        Get on-call shifts for a specific time period from PagerDuty.
+        Returns list of shifts with user information for the exact analysis timeframe.
+        """
+        try:
+            # Format dates for API (PagerDuty expects ISO format with timezone)
+            start_str = start_date.astimezone(pytz.UTC).strftime('%Y-%m-%dT%H:%M:%SZ')
+            end_str = end_date.astimezone(pytz.UTC).strftime('%Y-%m-%dT%H:%M:%SZ')
+            
+            all_shifts = []
+            
+            async with aiohttp.ClientSession() as session:
+                # Get all schedules first
+                schedules_response = await session.get(
+                    f"{self.base_url}/schedules",
+                    headers=self.headers,
+                    params={"limit": 100}
+                )
+                
+                if schedules_response.status != 200:
+                    logger.error(f"Failed to fetch schedules: {schedules_response.status}")
+                    return []
+                
+                schedules_data = await schedules_response.json()
+                schedules = schedules_data.get("schedules", [])
+                
+                logger.info(f"Found {len(schedules)} schedules, fetching shifts for period {start_str} to {end_str}")
+                
+                # For each schedule, get the shifts during our time period
+                for schedule in schedules:
+                    schedule_id = schedule.get("id")
+                    if not schedule_id:
+                        continue
+                    
+                    try:
+                        # Get schedule entries (shifts) for this time period
+                        shifts_response = await session.get(
+                            f"{self.base_url}/schedules/{schedule_id}/entries",
+                            headers=self.headers,
+                            params={
+                                "since": start_str,
+                                "until": end_str,
+                                "overflow": "true",  # Include shifts that span the time period
+                                "include[]": "users"
+                            }
+                        )
+                        
+                        if shifts_response.status == 200:
+                            shifts_data = await shifts_response.json()
+                            entries = shifts_data.get("entries", [])
+                            
+                            # Transform PagerDuty entries to match our format
+                            for entry in entries:
+                                shift = {
+                                    "id": f"{schedule_id}_{entry.get('start')}",
+                                    "schedule_id": schedule_id,
+                                    "schedule_name": schedule.get("name", ""),
+                                    "start_time": entry.get("start"),
+                                    "end_time": entry.get("end"),
+                                    "user": entry.get("user", {}),
+                                    "source": "pagerduty"
+                                }
+                                all_shifts.append(shift)
+                        else:
+                            logger.warning(f"Failed to fetch shifts for schedule {schedule_id}: {shifts_response.status}")
+                    
+                    except Exception as e:
+                        logger.warning(f"Error fetching shifts for schedule {schedule_id}: {e}")
+                        continue
+                
+                logger.info(f"Retrieved {len(all_shifts)} on-call shifts for period {start_str} to {end_str}")
+                return all_shifts
+                
+        except Exception as e:
+            logger.error(f"Error fetching on-call shifts: {e}")
+            return []
+    
+    async def extract_on_call_users_from_shifts(self, shifts: List[Dict[str, Any]]) -> set:
+        """
+        Extract unique user emails from PagerDuty shifts data.
+        Returns set of user emails who were on-call during the period.
+        """
+        if not shifts:
+            return set()
+        
+        on_call_user_emails = set()
+        
+        for shift in shifts:
+            try:
+                user = shift.get("user", {})
+                email = user.get("email")
+                
+                if email:
+                    on_call_user_emails.add(email.lower().strip())
+                    
+            except Exception as e:
+                logger.warning(f"Error extracting user email from shift: {e}")
+                continue
+        
+        logger.info(f"Successfully extracted {len(on_call_user_emails)} on-call user emails from PagerDuty")
+        return on_call_user_emails
+
     async def collect_analysis_data(self, days_back: int = 30) -> Dict[str, Any]:
         """🚀 ENHANCED: Collect all data needed for burnout analysis with enhanced normalization."""
         # 🎯 CRITICAL FIX: This method was using old normalization - now using enhanced version
