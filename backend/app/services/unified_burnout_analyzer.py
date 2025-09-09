@@ -131,6 +131,70 @@ class UnifiedBurnoutAnalyzer:
             incidents = data.get("incidents", []) if data else []
             metadata = data.get("collection_metadata", {}) if data else {}
             
+            # COMPREHENSIVE DATA VALIDATION AND ANALYSIS
+            logger.info(f"🔍 UNIFIED ANALYZER: DATA VALIDATION for {self.platform.upper()}")
+            logger.info(f"   - Platform: {self.platform}")
+            logger.info(f"   - Raw data keys: {list(data.keys()) if data else 'None'}")
+            logger.info(f"   - Users extracted: {len(users)}")
+            logger.info(f"   - Incidents extracted: {len(incidents)}")
+            logger.info(f"   - Metadata keys: {list(metadata.keys()) if metadata else 'None'}")
+            
+            # Validate user data structure
+            if users:
+                sample_user = users[0]
+                logger.info(f"🔍 UNIFIED ANALYZER: Sample user structure:")
+                logger.info(f"   - Keys: {list(sample_user.keys()) if isinstance(sample_user, dict) else 'Not a dict'}")
+                logger.info(f"   - Sample: ID={sample_user.get('id')}, Name={sample_user.get('name')}, Email={sample_user.get('email')}")
+            
+            # Validate incident data structure and assignments
+            if incidents:
+                logger.info(f"🔍 UNIFIED ANALYZER: Incident assignment analysis:")
+                incidents_with_assignments = 0
+                sample_incident = incidents[0]
+                
+                logger.info(f"   - Sample incident structure:")
+                logger.info(f"     - Keys: {list(sample_incident.keys()) if isinstance(sample_incident, dict) else 'Not a dict'}")
+                logger.info(f"     - ID: {sample_incident.get('id')}")
+                logger.info(f"     - Title: {sample_incident.get('title', 'No title')[:50]}")
+                logger.info(f"     - Assigned_to: {sample_incident.get('assigned_to')}")
+                
+                # Count incidents with assignments across all incidents
+                for i, incident in enumerate(incidents[:10]):  # Check first 10
+                    assigned_to = incident.get("assigned_to")
+                    if assigned_to and assigned_to.get("id"):
+                        incidents_with_assignments += 1
+                        if i < 3:  # Log first 3 assignments
+                            logger.info(f"     - Incident #{i+1} assigned to: {assigned_to.get('name')} (ID: {assigned_to.get('id')})")
+                
+                logger.info(f"   - Incidents with assignments: {incidents_with_assignments}/{min(len(incidents), 10)} (first 10 checked)")
+                
+                if incidents_with_assignments == 0:
+                    logger.warning(f"🔍 UNIFIED ANALYZER: ❌ CRITICAL ISSUE - NO INCIDENTS HAVE ASSIGNMENTS!")
+                    logger.warning(f"   - This will result in ALL users showing 0 incidents")
+                    logger.warning(f"   - Root cause: Incident normalization or API data structure issue")
+            
+            # Cross-reference user IDs between users and incidents
+            if users and incidents:
+                user_ids_from_users = {str(user.get("id")) for user in users if user.get("id")}
+                incident_user_ids = set()
+                
+                for incident in incidents:
+                    assigned_to = incident.get("assigned_to")
+                    if assigned_to and assigned_to.get("id"):
+                        incident_user_ids.add(str(assigned_to["id"]))
+                
+                matching_user_ids = user_ids_from_users.intersection(incident_user_ids)
+                
+                logger.info(f"🔍 UNIFIED ANALYZER: User ID Cross-Reference:")
+                logger.info(f"   - User IDs from users list: {len(user_ids_from_users)} ({list(user_ids_from_users)[:5]})")
+                logger.info(f"   - User IDs from incident assignments: {len(incident_user_ids)} ({list(incident_user_ids)[:5]})")
+                logger.info(f"   - Matching user IDs: {len(matching_user_ids)} ({list(matching_user_ids)[:5]})")
+                
+                if len(matching_user_ids) == 0:
+                    logger.warning(f"🔍 UNIFIED ANALYZER: ❌ CRITICAL ISSUE - NO MATCHING USER IDs!")
+                    logger.warning(f"   - Users and incidents have completely different ID spaces")
+                    logger.warning(f"   - This will cause ALL users to show 0 incidents")
+            
             # No fake data generation - if API returns 0 incidents, we show the real state
             if len(incidents) == 0 and len(users) > 0:
                 expected_incidents = metadata.get("total_incidents", 0)
@@ -208,27 +272,64 @@ class UnifiedBurnoutAnalyzer:
                 team_names = []
                 email_to_name = {}  # Map emails to full names for better GitHub matching
                 
-                for user in users:
-                    if isinstance(user, dict) and "attributes" in user:
+                # COMPREHENSIVE EMAIL EXTRACTION WITH PLATFORM-SPECIFIC VALIDATION
+                logger.info(f"🔍 EMAIL EXTRACTION: Processing {len(users)} users for {self.platform.upper()}")
+                
+                for i, user in enumerate(users):
+                    if not isinstance(user, dict):
+                        logger.warning(f"🔍 EMAIL EXTRACTION: User #{i+1} is not a dict: {type(user)}")
+                        continue
+                    
+                    email = None
+                    name = None
+                    
+                    # Log first few users for structure analysis
+                    if i < 3:
+                        logger.info(f"🔍 EMAIL EXTRACTION: User #{i+1} structure:")
+                        logger.info(f"   - Keys: {list(user.keys())}")
+                        logger.info(f"   - Has 'attributes': {'attributes' in user}")
+                        logger.info(f"   - Direct email: {user.get('email')}")
+                        logger.info(f"   - Direct name: {user.get('name')}")
+                    
+                    if "attributes" in user:
+                        # JSONAPI format (Rootly style)
                         attrs = user["attributes"]
                         email = attrs.get("email")
                         name = attrs.get("full_name") or attrs.get("name")
-                        if email:
-                            team_emails.append(email)
-                            if name:
-                                email_to_name[email] = name
-                        if name:
-                            team_names.append(name)
-                    elif isinstance(user, dict):
-                        # Fallback for non-JSONAPI format
+                        if i < 3:
+                            logger.info(f"   - JSONAPI format: email={email}, name={name}")
+                    else:
+                        # Direct format (PagerDuty normalized format)
                         email = user.get("email")
-                        name = user.get("full_name") or user.get("name")
-                        if email:
-                            team_emails.append(email)
-                            if name:
-                                email_to_name[email] = name
+                        name = user.get("name") or user.get("full_name")
+                        if i < 3:
+                            logger.info(f"   - Direct format: email={email}, name={name}")
+                    
+                    if email:
+                        team_emails.append(email)
                         if name:
-                            team_names.append(name)
+                            email_to_name[email] = name
+                    if name:
+                        team_names.append(name)
+                
+                # COMPREHENSIVE EMAIL EXTRACTION ANALYSIS
+                logger.info(f"🔍 EMAIL EXTRACTION: RESULTS for {self.platform.upper()}:")
+                logger.info(f"   - Total users processed: {len(users)}")
+                logger.info(f"   - Emails extracted: {len(team_emails)}")
+                logger.info(f"   - Names extracted: {len(team_names)}")
+                logger.info(f"   - Email-to-name mappings: {len(email_to_name)}")
+                
+                if team_emails:
+                    logger.info(f"   - Sample emails: {team_emails[:5]}")
+                else:
+                    logger.warning(f"🔍 EMAIL EXTRACTION: ❌ NO EMAILS EXTRACTED!")
+                    logger.warning(f"   - This will prevent GitHub and Slack data collection")
+                    logger.warning(f"   - Root cause: User data structure mismatch for {self.platform}")
+                
+                if len(team_emails) < len(users) * 0.5:  # Less than 50% success rate
+                    logger.warning(f"🔍 EMAIL EXTRACTION: ⚠️ LOW EXTRACTION RATE!")
+                    logger.warning(f"   - Only {len(team_emails)}/{len(users)} users have emails ({len(team_emails)/len(users)*100:.1f}%)")
+                    logger.warning(f"   - Check if {self.platform} data structure matches expectation")
                 
                 if self.features['github']:
                     logger.info(f"🔍 UNIFIED ANALYZER: Collecting GitHub data for {len(team_emails)} team members")
