@@ -78,6 +78,31 @@ async def add_integration_fields_migration(db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Migration failed: {str(e)}")
 
+@router.get("/debug-recent-analysis")
+async def debug_recent_analysis(db: Session = Depends(get_db)):
+    """Debug what's in the most recent analysis"""
+    try:
+        from ...models.analysis import Analysis
+        
+        # Get the most recent analysis
+        recent_analysis = db.execute(text("""
+            SELECT id, integration_name, platform, status, created_at
+            FROM analyses 
+            ORDER BY id DESC 
+            LIMIT 3
+        """))
+        
+        analyses = [dict(row._mapping) for row in recent_analysis.fetchall()]
+        
+        return {
+            "recent_analyses": analyses,
+            "message": "Most recent 3 analyses with integration data"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error debugging recent analysis: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Debug failed: {str(e)}")
+
 @router.get("/check-integration-fields")
 async def check_integration_fields(db: Session = Depends(get_db)):
     """Check if migration has been run"""
