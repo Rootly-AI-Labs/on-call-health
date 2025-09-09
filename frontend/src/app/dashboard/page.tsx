@@ -2481,10 +2481,12 @@ export default function Dashboard() {
         return (hasCbiScore || hasLegacyScore) // Include all members with valid scores
       })
       ?.map((member) => {
-        // Use CBI score if available, otherwise fall back to legacy score
-        const score = (member as any).cbi_score !== undefined 
-          ? (member as any).cbi_score // CBI: Use raw score (0-100, where higher = more burnout)
-          : (member.burnout_score * 10) // Legacy: Convert 0-10 burnout to 0-100 burnout scale
+        // Use NEW individualized burnout scores (0-10 scale) converted to 0-100 scale
+        // New algorithm: 2.17 -> 21.7, 3.08 -> 30.8, 6.33 -> 63.3 (individualized!)
+        // CBI system: 60.0, 60.0, 24.34 (clustered - avoid using)
+        const score = member.burnout_score !== undefined && member.burnout_score > 0
+          ? (member.burnout_score * 10) // Convert 0-10 scale to 0-100 scale  
+          : ((member as any).cbi_score || 0) // Only use CBI as fallback
         
         const burnoutScore = Math.max(0, score);
         
@@ -2504,7 +2506,7 @@ export default function Dashboard() {
           score: burnoutScore,
           riskLevel: riskInfo.level,
           backendRiskLevel: member.risk_level, // Keep original for reference
-          scoreType: (member as any).cbi_score !== undefined ? 'CBI' : 'Legacy',
+          scoreType: member.burnout_score !== undefined && member.burnout_score > 0 ? 'NEW' : 'CBI_Fallback',
           fill: riskInfo.color,
         }
       })
