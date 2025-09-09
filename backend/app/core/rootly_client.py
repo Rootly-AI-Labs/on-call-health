@@ -315,14 +315,23 @@ class RootlyAPIClient:
         Extract unique user emails from shifts data.
         Returns set of user emails who were on-call during the period.
         """
-        if not shifts:
+        if not shifts or shifts is None:
+            logger.info(f"🗓️ ROOTLY ON_CALL: No shifts provided for user extraction")
             return set()
             
         # Step 1: Extract unique user IDs from shifts
         user_ids = set()
         for shift in shifts:
             try:
+                if not shift or not isinstance(shift, dict):
+                    logger.warning(f"🗓️ ROOTLY ON_CALL: Invalid shift data: {type(shift)}")
+                    continue
+                    
                 relationships = shift.get('relationships', {})
+                if not relationships:
+                    logger.debug(f"🗓️ ROOTLY ON_CALL: No relationships in shift")
+                    continue
+                    
                 user_data = relationships.get('user', {}).get('data', {})
                 
                 if user_data and user_data.get('type') == 'users':
@@ -331,7 +340,8 @@ class RootlyAPIClient:
                         user_ids.add(user_id)
                         
             except Exception as e:
-                logger.warning(f"Error extracting user ID from shift: {e}")
+                logger.warning(f"🗓️ ROOTLY ON_CALL: Error extracting user ID from shift: {e}")
+                logger.warning(f"🗓️ ROOTLY ON_CALL: Problematic shift data: {shift}")
                 continue
         
         logger.info(f"Found {len(user_ids)} unique user IDs from {len(shifts)} shifts")
