@@ -427,7 +427,6 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
       const authToken = localStorage.getItem('auth_token')
       if (!authToken) return
       
-      console.log('🔍 All mappings for debugging:')
       mappings.forEach((mapping, index) => {
         console.log(`  ${index + 1}. ID:${mapping.id} | ${mapping.source_platform}:${mapping.source_identifier} -> ${mapping.target_identifier} | Type:${mapping.mapping_type} | Manual:${mapping.is_manual}`)
       })

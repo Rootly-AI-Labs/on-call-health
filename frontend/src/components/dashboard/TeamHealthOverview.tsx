@@ -217,11 +217,6 @@ export function TeamHealthOverview({
                     <div className="text-xs text-gray-500">Current</div>
                   </div>
                   {(() => {
-                    // Debug: Log what data is available
-                    console.log("Debug - historicalTrends:", historicalTrends);
-                    console.log("Debug - period_summary:", currentAnalysis?.analysis_data?.period_summary);
-                    console.log("Debug - daily_trends length:", currentAnalysis?.analysis_data?.daily_trends?.length);
-                    console.log("Debug - team_health:", currentAnalysis?.analysis_data?.team_health);
                     // Show average if we have either historical data OR CBI scores (since we can compute meaningful averages from CBI)
                     const teamAnalysis = currentAnalysis?.analysis_data?.team_analysis;
                     const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members;
