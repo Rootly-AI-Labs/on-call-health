@@ -209,6 +209,12 @@ async def run_burnout_analysis(
         # For beta integrations, store a special marker in the integration_id field
         db_integration_id = None if isinstance(integration.id, str) else integration.id
         
+        # DEBUG: Log what integration data we're storing
+        logger.info(f"🔍 STORING INTEGRATION DATA: name='{integration.name}', platform='{integration.platform}', id='{integration.id}'")
+        logger.info(f"🔍 Integration object type: {type(integration)}, has organization_name: {hasattr(integration, 'organization_name')}")
+        if hasattr(integration, 'organization_name'):
+            logger.info(f"🔍 Integration organization_name: '{integration.organization_name}'")
+        
         analysis = Analysis(
             user_id=current_user.id,
             rootly_integration_id=db_integration_id,  # Null for beta integrations
