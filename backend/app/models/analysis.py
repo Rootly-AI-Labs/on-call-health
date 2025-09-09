@@ -14,6 +14,11 @@ class Analysis(Base):
     uuid = Column(String(36), unique=True, index=True, nullable=False, default=lambda: str(uuid.uuid4()))
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     rootly_integration_id = Column(Integer, ForeignKey("rootly_integrations.id"), nullable=True)
+    
+    # NEW: Store integration details directly to avoid complex matching
+    integration_name = Column(String(255), nullable=True)  # "PagerDuty (Beta Access)", "Failwhale Tales", etc.
+    platform = Column(String(50), nullable=True)  # "rootly", "pagerduty"
+    
     time_range = Column(Integer, default=30)  # Time range in days
     status = Column(String(50), default="pending")  # pending, running, completed, failed
     config = Column(JSON, nullable=True)  # Analysis configuration (additional settings)

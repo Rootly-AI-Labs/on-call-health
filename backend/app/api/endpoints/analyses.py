@@ -34,6 +34,11 @@ class AnalysisResponse(BaseModel):
     id: int
     uuid: Optional[str]
     integration_id: Optional[int]
+    
+    # NEW: Integration details stored directly with analysis
+    integration_name: Optional[str]  # "PagerDuty (Beta Access)", "Failwhale Tales", etc.
+    platform: Optional[str]          # "rootly", "pagerduty"
+    
     status: str
     created_at: datetime
     completed_at: Optional[datetime]
@@ -207,6 +212,11 @@ async def run_burnout_analysis(
         analysis = Analysis(
             user_id=current_user.id,
             rootly_integration_id=db_integration_id,  # Null for beta integrations
+            
+            # NEW: Store integration details directly for simple frontend display
+            integration_name=integration.name,  # "PagerDuty (Beta Access)", "Failwhale Tales", etc.
+            platform=integration.platform,      # "rootly", "pagerduty"
+            
             time_range=request.time_range,
             status="pending",
             config={
