@@ -1060,8 +1060,8 @@ class UnifiedBurnoutAnalyzer:
         after_hours_pct = metrics.get('after_hours_percentage', 0)
         
         # Helper function for Rootly's tiered scaling approach (highly sensitive to extreme volumes)
-        def apply_rootly_incident_tiers(ipw: float) -> float:
-            """Apply aggressive tiered scaling - Quentin with ~11 IPW should hit near-max"""
+        def apply_incident_tiers(ipw: float) -> float:
+            """Apply aggressive tiered scaling for extreme incident volumes"""
             if ipw <= 0.5:
                 return ipw * 4.0                   # 0-2.0 range (very low volume)
             elif ipw <= 1.5:
@@ -1071,7 +1071,7 @@ class UnifiedBurnoutAnalyzer:
             elif ipw <= 7.0:
                 return 8.0 + ((ipw - 3.5) / 3.5) * 1.5   # 8.0-9.5 range (high volume)
             else:
-                # For extreme cases like Quentin (11+ IPW), push to maximum
+                # For extreme cases (11+ IPW), push to maximum
                 return 9.5 + min(0.5, (ipw - 7.0) / 4.0)  # 9.5-10.0 range (critical volume)
         
         def apply_rootly_escalation_tiers(rate: float) -> float:
@@ -1104,10 +1104,10 @@ class UnifiedBurnoutAnalyzer:
         # Apply Rootly's tiered scaling to all CBI metrics
         cbi_metrics = {
             # Personal burnout factors - using Rootly's tiered approach
-            'work_hours_trend': apply_rootly_incident_tiers(incidents_per_week) * 10,      # Scale to 0-100
+            'work_hours_trend': apply_incident_tiers(incidents_per_week) * 10,      # Scale to 0-100
             'weekend_work': min(100, after_hours_pct * 2),                                 # Keep simple scaling for after-hours  
             'after_hours_activity': after_hours_pct,                                       # Direct mapping
-            'vacation_usage': apply_rootly_incident_tiers(total_incidents / 4) * 10,       # Apply tiers to total load
+            'vacation_usage': apply_incident_tiers(total_incidents / 4) * 10,       # Apply tiers to total load
             'sleep_quality_proxy': min(100, apply_rootly_escalation_tiers(escalation_rate) * 10),  # Tiered escalation impact
             
             # Work-related burnout factors - using Rootly's response time tiers  
@@ -1360,7 +1360,7 @@ class UnifiedBurnoutAnalyzer:
         ipw = metrics.get("incidents_per_week", 0)
         ipw = float(ipw) if ipw is not None else 0.0
         
-        # Research-based scaling: 2+ IPW = high stress, 11+ IPW = critical (Quentin level)
+        # Research-based scaling: 2+ IPW = high stress, 11+ IPW = critical level
         if ipw <= 1:
             incident_frequency_score = ipw * 2.0  # 0-2 range (low)
         elif ipw <= 3:
@@ -1409,8 +1409,8 @@ class UnifiedBurnoutAnalyzer:
                 total_severity_impact += count * weight
                 total_incidents += count
         
-        # Scale to 0-10 range - for someone like Quentin (46 SEV1s), this should hit near max
-        # 46 SEV1 incidents * 12.0 weight = 552 points
+        # Scale to 0-10 range - high-volume severe incident cases should hit near max
+        # Example: 46 SEV1 incidents × 12.0 weight = 552 severity impact points
         # Scale: 100+ points should be near maximum (8-10)
         if total_severity_impact >= 200:  # Very high severity load
             escalation_score = 9.0 + min(1.0, (total_severity_impact - 200) / 300)

@@ -102,7 +102,7 @@ class BurnoutConfig:
         'incidents_per_week': {
             'moderate': 1.0,      # Even 1/week is notable workload
             'high': 2.0,          # 2+ incidents/week is high stress  
-            'excessive': 3.5      # 3.5+ incidents/week is excessive (Quentin has ~11/week!)
+            'excessive': 3.5      # 3.5+ incidents/week is excessive
         },
         'response_time_minutes': {
             'acceptable': 15,     # <15 min
@@ -131,7 +131,7 @@ class BurnoutConfig:
             'critical_overload': 2.0      # 6+ incidents per shift (+100% stress)  
         },
         'team_size_modifiers': {
-            'understaffed': 1.3,          # <5 people (Google minimum: 8 for single-site)
+            'understaffed': 1.3,          # <5 people (SRE research: 8 for single-site)
             'minimal': 1.1,               # 5-7 people (approaching minimum)
             'adequate': 1.0               # 8+ people (meets guidelines)
         }
