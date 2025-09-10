@@ -9,6 +9,7 @@ import { Progress } from "@/components/ui/progress"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts"
+import { Info } from "lucide-react"
 
 interface MemberDetailModalProps {
   selectedMember: any | null
@@ -135,7 +136,7 @@ export function MemberDetailModal({
         return (
           <div className="mt-4 space-y-6">
             {/* Overall Burnout Assessment */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Card>
                 <CardContent className="p-4 text-center">
                   <p className="text-sm text-gray-600 mb-2">Overall Risk Level</p>
@@ -204,15 +205,6 @@ export function MemberDetailModal({
                 </CardContent>
               </Card>
               
-              <Card>
-                <CardContent className="p-4 text-center">
-                  <p className="text-sm text-gray-600 mb-2">Response Time</p>
-                  <div className="text-2xl font-bold text-purple-600">
-                    {Math.round(memberData?.metrics?.avg_response_time_minutes || 0)}m
-                  </div>
-                  <p className="text-xs text-gray-500">Average</p>
-                </CardContent>
-              </Card>
             </div>
             
             {/* CBI Burnout Analysis */}
@@ -247,13 +239,33 @@ export function MemberDetailModal({
                     {memberData.cbi_breakdown && (
                       <div className="grid grid-cols-2 gap-4">
                         <div className="bg-green-50 rounded-lg p-3">
-                          <div className="text-xs font-medium text-green-600 uppercase">Personal</div>
+                          <div className="flex items-center space-x-1 mb-1">
+                            <div className="text-xs font-medium text-green-600 uppercase">Personal</div>
+                            <div className="relative group">
+                              <Info className="w-3 h-3 text-green-500 cursor-help" />
+                              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg w-72 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                                <div className="font-semibold mb-1">Personal Burnout - What We Measure</div>
+                                <div>• Incident frequency (incidents per week)<br/>• After-hours work patterns<br/>• Weekend activity levels<br/>• Sleep disruption indicators<br/>• Overall workload intensity relative to team baseline</div>
+                                <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-900"></div>
+                              </div>
+                            </div>
+                          </div>
                           <div className="text-lg font-bold text-green-700">
                             {memberData.cbi_breakdown.personal?.toFixed(0)}/100
                           </div>
                         </div>
                         <div className="bg-blue-50 rounded-lg p-3">
-                          <div className="text-xs font-medium text-blue-600 uppercase">Work-Related</div>
+                          <div className="flex items-center space-x-1 mb-1">
+                            <div className="text-xs font-medium text-blue-600 uppercase">Work-Related</div>
+                            <div className="relative group">
+                              <Info className="w-3 h-3 text-blue-500 cursor-help" />
+                              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg w-72 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                                <div className="font-semibold mb-1">Work-Related Burnout - What We Measure</div>
+                                <div>• Incident response time patterns<br/>• Severity-weighted incident load<br/>• GitHub commit activity and timing<br/>• Slack communication patterns<br/>• Work-life boundary violations (late night/weekend work)</div>
+                                <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-900"></div>
+                              </div>
+                            </div>
+                          </div>
                           <div className="text-lg font-bold text-blue-700">
                             {memberData.cbi_breakdown.work_related?.toFixed(0)}/100
                           </div>

@@ -1030,10 +1030,10 @@ class UnifiedBurnoutAnalyzer:
         # Handle both Rootly (sev0-sev4) and PagerDuty (sev1-sev5) severity mappings
         if self.platform == "pagerduty":
             # PagerDuty: SEV1=critical, SEV2=high, SEV3=medium, SEV4=low, SEV5=info
-            severity_weights = {'sev1': 5.0, 'sev2': 4.0, 'sev3': 2.0, 'sev4': 1.5, 'sev5': 1.0}
+            severity_weights = {'sev1': 8.0, 'sev2': 6.0, 'sev3': 3.5, 'sev4': 2.0, 'sev5': 1.2}
         else:
             # Rootly: SEV0=critical, SEV1=high, SEV2=medium, SEV3=low, SEV4=info
-            severity_weights = {'sev0': 5.0, 'sev1': 4.0, 'sev2': 2.0, 'sev3': 1.5, 'sev4': 1.0, 'unknown': 1.0}
+            severity_weights = {'sev0': 8.0, 'sev1': 6.0, 'sev2': 3.5, 'sev3': 2.0, 'sev4': 1.2, 'unknown': 1.2}
         
         # Variables for tiered scaling calculations
         total_incidents = metrics.get('total_incidents', 0)
@@ -1057,19 +1057,19 @@ class UnifiedBurnoutAnalyzer:
         avg_response_minutes = metrics.get('avg_response_time_minutes', 0)
         after_hours_pct = metrics.get('after_hours_percentage', 0)
         
-        # Helper function for Rootly's tiered scaling approach (realistic ranges)
+        # Helper function for Rootly's tiered scaling approach (more sensitive to high volumes)
         def apply_rootly_incident_tiers(ipw: float) -> float:
-            """Apply Rootly's proven tiered scaling to incident frequency"""
-            if ipw <= 1:
-                return ipw * 2.0                   # 0-2 range (very low volume)
-            elif ipw <= 3:
-                return 2 + ((ipw - 1) / 2) * 2.5   # 2-4.5 range (low volume)
-            elif ipw <= 6:
-                return 4.5 + ((ipw - 3) / 3) * 2   # 4.5-6.5 range (medium volume)  
-            elif ipw <= 10:
-                return 6.5 + ((ipw - 6) / 4) * 2   # 6.5-8.5 range (high volume)
+            """Apply enhanced tiered scaling to incident frequency - more sensitive to high volumes"""
+            if ipw <= 0.5:
+                return ipw * 3.0                   # 0-1.5 range (very low volume)
+            elif ipw <= 2:
+                return 1.5 + ((ipw - 0.5) / 1.5) * 3.5   # 1.5-5.0 range (low volume)
+            elif ipw <= 5:
+                return 5.0 + ((ipw - 2) / 3) * 3   # 5.0-8.0 range (medium volume)  
+            elif ipw <= 8:
+                return 8.0 + ((ipw - 5) / 3) * 1.5   # 8.0-9.5 range (high volume)
             else:
-                return 8.5 + min(1.5, (ipw - 10) / 10)  # 8.5-10 range (critical volume)
+                return 9.5 + min(0.5, (ipw - 8) / 5)  # 9.5-10.0 range (critical volume)
         
         def apply_rootly_escalation_tiers(rate: float) -> float:
             """Apply tiered scaling to escalation rate (0-1 input)"""
@@ -1257,7 +1257,8 @@ class UnifiedBurnoutAnalyzer:
                 # Rootly format
                 attrs = incident.get("attributes", {})
                 created_at = attrs.get("created_at")
-                acknowledged_at = attrs.get("started_at")
+                # Try multiple timestamp fields for response time calculation
+                acknowledged_at = attrs.get("acknowledged_at") or attrs.get("started_at") or attrs.get("mitigated_at")
                 
                 # Severity with null safety
                 severity = "unknown"
@@ -2230,11 +2231,11 @@ class UnifiedBurnoutAnalyzer:
                             daily_data[date_str]["incident_count"] += 1
                             
                             # Add severity weight - handle both platforms
-                            severity_weight = 1.0
+                            severity_weight = 1.2  # Updated baseline for low severity
                             if self.platform == "pagerduty":
                                 urgency = incident.get("urgency", "low")
                                 if urgency == "high":
-                                    severity_weight = 2.0
+                                    severity_weight = 6.0  # Increased from 2.0
                                     daily_data[date_str]["high_severity_count"] += 1
                             else:  # Rootly
                                 attrs = incident.get("attributes", {})
@@ -2245,16 +2246,16 @@ class UnifiedBurnoutAnalyzer:
                                         severity_attrs = severity_data["attributes"]
                                         severity_name = severity_attrs.get("name", "medium").lower()
                                         if "sev0" in severity_name:
-                                            severity_weight = 5.0
+                                            severity_weight = 8.0  # Increased from 5.0
                                             daily_data[date_str]["high_severity_count"] += 1
                                         elif "critical" in severity_name or "sev1" in severity_name:
-                                            severity_weight = 3.0
+                                            severity_weight = 6.0  # Increased from 3.0
                                             daily_data[date_str]["high_severity_count"] += 1
                                         elif "high" in severity_name or "sev2" in severity_name:
-                                            severity_weight = 2.0
+                                            severity_weight = 3.5  # Increased from 2.0
                                             daily_data[date_str]["high_severity_count"] += 1
                                         elif "medium" in severity_name or "sev3" in severity_name:
-                                            severity_weight = 1.5
+                                            severity_weight = 2.0  # Increased from 1.5
                             
                             daily_data[date_str]["severity_weighted_count"] += severity_weight
                             

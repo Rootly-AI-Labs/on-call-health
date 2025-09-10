@@ -100,9 +100,9 @@ class BurnoutConfig:
     # Incident Analysis Thresholds
     INCIDENT_THRESHOLDS = {
         'incidents_per_week': {
-            'moderate': 2.0,
-            'high': 5.0,
-            'excessive': 8.0
+            'moderate': 1.5,      # Lower threshold - even 1.5/week is concerning
+            'high': 3.0,          # Reduced from 5.0 - 3+ incidents/week is high stress
+            'excessive': 5.0      # Reduced from 8.0 - 5+ incidents/week is excessive
         },
         'response_time_minutes': {
             'acceptable': 15,     # <15 min
@@ -110,11 +110,11 @@ class BurnoutConfig:
             'excessive': 120      # >120 min
         },
         'severity_weights': {
-            'SEV0': 5.0,         # Critical outage
-            'SEV1': 4.0,         # High business impact
-            'SEV2': 2.0,         # Moderate impact
-            'SEV3': 1.5,         # Low impact
-            'SEV4': 1.0          # Minimal impact
+            'SEV0': 8.0,         # Critical outage - increased impact
+            'SEV1': 6.0,         # High business impact - increased impact
+            'SEV2': 3.5,         # Moderate impact - increased impact
+            'SEV3': 2.0,         # Low impact - increased impact
+            'SEV4': 1.2          # Minimal impact - slight increase
         }
     }
     
