@@ -1044,9 +1044,10 @@ class UnifiedBurnoutAnalyzer:
             critical_incidents = severity_dist.get('sev1', 0)
             high_incidents = severity_dist.get('sev2', 0)
         else:
-            # Rootly: sev0=critical, sev1=high
-            critical_incidents = severity_dist.get('sev0', 0)
-            high_incidents = severity_dist.get('sev1', 0)
+            # Rootly: CRITICAL FIX - SEV1 incidents ARE critical in Rootly (not sev0)
+            # Based on rootly_client.py mapping: "critical": "sev1"
+            critical_incidents = severity_dist.get('sev1', 0) + severity_dist.get('sev0', 0)  # sev1 + any sev0
+            high_incidents = severity_dist.get('sev2', 0)
         
         # ROOTLY'S PROVEN TIERED SCALING - Replace linear caps with progressive tiers!
         # This is the EXACT methodology that prevents clustering in successful Rootly analyses
