@@ -1356,18 +1356,21 @@ class UnifiedBurnoutAnalyzer:
     
     def _calculate_personal_burnout_cbi(self, metrics: Dict[str, Any]) -> float:
         """Calculate Personal Burnout from incident data using CBI methodology (0-10 scale)."""
-        # Incident frequency score - more realistic thresholds
+        # NEW: Much more aggressive incident frequency scaling based on research
         ipw = metrics.get("incidents_per_week", 0)
         ipw = float(ipw) if ipw is not None else 0.0
-        # Scale: 0-2 incidents/week = 0-3, 2-5 = 3-7, 5-8 = 7-10, 8+ = 10
-        if ipw <= 2:
-            incident_frequency_score = ipw * 1.5  # 0-3 range
-        elif ipw <= 5:
-            incident_frequency_score = 3 + ((ipw - 2) / 3) * 4 if ipw >= 2 else 3  # 3-7 range
-        elif ipw <= 8:
-            incident_frequency_score = 7 + ((ipw - 5) / 3) * 3 if ipw >= 5 else 7  # 7-10 range
-        else:
-            incident_frequency_score = 10  # 8+ incidents per week = maximum burnout
+        
+        # Research-based scaling: 2+ IPW = high stress, 11+ IPW = critical (Quentin level)
+        if ipw <= 1:
+            incident_frequency_score = ipw * 2.0  # 0-2 range (low)
+        elif ipw <= 3:
+            incident_frequency_score = 2 + ((ipw - 1) / 2) * 3  # 2-5 range (moderate) 
+        elif ipw <= 7:
+            incident_frequency_score = 5 + ((ipw - 3) / 4) * 3  # 5-8 range (high)
+        else:  # 7+ IPW = critical burnout risk
+            incident_frequency_score = 8 + min(2.0, (ipw - 7) / 4)  # 8-10 range (critical)
+            
+        self.logger.info(f"Personal burnout CBI: {ipw} IPW → frequency_score={incident_frequency_score}")
         
         # After hours score
         ahp = metrics.get("after_hours_percentage", 0)
@@ -1388,12 +1391,44 @@ class UnifiedBurnoutAnalyzer:
     
     def _calculate_work_burnout_cbi(self, metrics: Dict[str, Any]) -> float:
         """Calculate Work-Related Burnout from incident data using CBI methodology (0-10 scale)."""
-        # Escalation score (using severity as proxy)
+        # Use the NEW research-based severity weights
         severity_dist = metrics.get("severity_distribution", {}) or {}
-        high_severity_count = severity_dist.get("high", 0) + severity_dist.get("critical", 0)
-        total_incidents = sum(severity_dist.values()) if severity_dist else 1
-        escalation_rate = high_severity_count / max(total_incidents, 1)
-        escalation_score = min(10, escalation_rate * 10)
+        
+        # Apply research-based severity weights (SEV0=15.0, SEV1=12.0, etc.)
+        if self.platform == "pagerduty":
+            severity_weights = {'sev1': 15.0, 'sev2': 12.0, 'sev3': 6.0, 'sev4': 3.0, 'sev5': 1.5}
+        else:
+            severity_weights = {'sev0': 15.0, 'sev1': 12.0, 'sev2': 6.0, 'sev3': 3.0, 'sev4': 1.5, 'unknown': 1.5}
+        
+        # Calculate weighted severity impact using NEW weights
+        total_severity_impact = 0.0
+        total_incidents = 0
+        for severity, count in severity_dist.items():
+            if count > 0:
+                weight = severity_weights.get(severity.lower(), 1.5)
+                total_severity_impact += count * weight
+                total_incidents += count
+        
+        # Scale to 0-10 range - for someone like Quentin (46 SEV1s), this should hit near max
+        # 46 SEV1 incidents * 12.0 weight = 552 points
+        # Scale: 100+ points should be near maximum (8-10)
+        if total_severity_impact >= 200:  # Very high severity load
+            escalation_score = 9.0 + min(1.0, (total_severity_impact - 200) / 300)
+        elif total_severity_impact >= 100:  # High severity load  
+            escalation_score = 7.0 + ((total_severity_impact - 100) / 100) * 2
+        elif total_severity_impact >= 50:   # Moderate severity load
+            escalation_score = 4.0 + ((total_severity_impact - 50) / 50) * 3
+        else:  # Low severity load
+            escalation_score = min(4.0, total_severity_impact / 12.5)
+            
+        self.logger.info(f"Work burnout CBI: {total_incidents} incidents, "
+                        f"severity_impact={total_severity_impact}, escalation_score={escalation_score}")
+        
+        # Remove the old logic below and use the new severity-weighted calculation
+        # high_severity_count = severity_dist.get("high", 0) + severity_dist.get("critical", 0)
+        # total_incidents = sum(severity_dist.values()) if severity_dist else 1
+        # escalation_rate = high_severity_count / max(total_incidents, 1)
+        # escalation_score = min(10, escalation_rate * 10)
         
         # Use only REAL data - calculate based on actual incident patterns
         # Response time variability (higher = more stress)
