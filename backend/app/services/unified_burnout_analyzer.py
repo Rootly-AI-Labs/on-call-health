@@ -1095,6 +1095,7 @@ class UnifiedBurnoutAnalyzer:
                 return 7 + min(3, ((minutes - 60) / 60) * 3)  # 7-10 range (slow response)
         
         # Calculate escalation rate for tiered scaling
+        high_severity_count = critical_incidents + high_incidents  # CRITICAL FIX: Define the variable!
         escalation_rate = high_severity_count / max(total_incidents, 1) if total_incidents > 0 else 0
         
         # Apply Rootly's tiered scaling to all CBI metrics
