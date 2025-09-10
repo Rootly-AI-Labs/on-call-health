@@ -8,8 +8,199 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Progress } from "@/components/ui/progress"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts"
-import { Info } from "lucide-react"
+import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, Cell } from "recharts"
+import { Info, RefreshCw, BarChart3 } from "lucide-react"
+import { useState, useEffect } from "react"
+
+// Individual Daily Health Chart component
+function IndividualDailyHealthChart({ memberData, analysisId, currentAnalysis }: {
+  memberData: any
+  analysisId?: number | string
+  currentAnalysis?: any
+}) {
+  const [dailyHealthData, setDailyHealthData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch daily health data for this member
+  useEffect(() => {
+    const fetchDailyHealth = async () => {
+      if (!memberData?.user_email || !analysisId) return;
+      
+      setLoading(true);
+      setError(null);
+      
+      try {
+        const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+        const response = await fetch(
+          `${API_BASE}/analyses/${analysisId}/members/${encodeURIComponent(memberData.user_email)}/daily-health`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const result = await response.json();
+        
+        if (result.status === 'success' && result.data?.daily_health) {
+          // Format the data for the chart
+          const formattedData = result.data.daily_health.map((day: any) => ({
+            date: day.date,
+            health_score: day.health_score,
+            incident_count: day.incident_count,
+            team_health: day.team_health,
+            day_name: new Date(day.date).toLocaleDateString('en-US', { 
+              weekday: 'short', month: 'short', day: 'numeric' 
+            }),
+            factors: day.factors,
+            has_data: day.incident_count > 0
+          }));
+          
+          setDailyHealthData(formattedData);
+        } else {
+          setError(result.message || 'No daily health data available');
+        }
+      } catch (err) {
+        console.error('Error fetching daily health:', err);
+        setError('No individual daily health data available - this member had no incident involvement during the analysis period');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchDailyHealth();
+  }, [memberData?.user_email, analysisId]);
+
+  if (loading) {
+    return (
+      <Card>
+        <CardContent className="p-6 text-center">
+          <RefreshCw className="w-8 h-8 animate-spin text-gray-400 mx-auto mb-2" />
+          <p className="text-sm text-gray-600">Loading daily health data...</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error || !dailyHealthData || dailyHealthData.length === 0) {
+    return (
+      <Card>
+        <CardContent className="p-6 text-center">
+          <BarChart3 className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+          <p className="text-gray-500 mb-2">{error || 'No daily health data available'}</p>
+          <p className="text-sm text-gray-600">
+            Daily health scores are calculated for days when incidents occur
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Daily Health Timeline</CardTitle>
+        <CardDescription>
+          Individual daily burnout risk over the analysis period
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="mb-4 flex flex-wrap items-center gap-4 text-xs text-gray-500">
+          <div className="flex items-center space-x-1">
+            <div className="w-3 h-3 bg-green-500 rounded"></div>
+            <span>Healthy (70-100)</span>
+          </div>
+          <div className="flex items-center space-x-1">
+            <div className="w-3 h-3 bg-yellow-500 rounded"></div>
+            <span>Fair (40-69)</span>
+          </div>
+          <div className="flex items-center space-x-1">
+            <div className="w-3 h-3 bg-red-500 rounded"></div>
+            <span>Poor (0-39)</span>
+          </div>
+          <div className="flex items-center space-x-1">
+            <div className="w-3 h-3 bg-gray-300 border border-gray-400 border-dashed rounded"></div>
+            <span>No Data</span>
+          </div>
+        </div>
+        
+        <div style={{ width: '100%', height: '250px' }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart
+              data={dailyHealthData}
+              margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+            >
+              <XAxis 
+                dataKey="day_name" 
+                fontSize={10}
+                tick={{ fill: '#6B7280' }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis 
+                domain={[0, 100]}
+                fontSize={10}
+                tick={{ fill: '#6B7280' }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <Tooltip 
+                content={({ active, payload }) => {
+                  if (active && payload && payload[0]) {
+                    const data = payload[0].payload;
+                    return (
+                      <div className="bg-white p-3 border rounded-lg shadow-lg text-sm">
+                        <p className="font-semibold text-gray-800">{data.day_name}</p>
+                        {data.has_data ? (
+                          <>
+                            <p className="text-blue-600">Health Score: {data.health_score}/100</p>
+                            <p className="text-gray-600">Incidents: {data.incident_count}</p>
+                            <p className="text-green-600">Team Avg: {data.team_health}/100</p>
+                          </>
+                        ) : (
+                          <p className="text-gray-500 italic">No incident involvement</p>
+                        )}
+                      </div>
+                    );
+                  }
+                  return null;
+                }}
+              />
+              <Bar 
+                dataKey="health_score" 
+                radius={[2, 2, 0, 0]}
+              >
+                {dailyHealthData.map((entry, index) => (
+                  <Cell 
+                    key={`cell-${index}`} 
+                    fill={
+                      !entry.has_data ? '#E5E7EB' :
+                      entry.health_score >= 70 ? '#10B981' : 
+                      entry.health_score >= 40 ? '#F59E0B' : '#EF4444'
+                    }
+                    stroke={!entry.has_data ? '#9CA3AF' : undefined}
+                    strokeWidth={!entry.has_data ? 1 : 0}
+                    strokeDasharray={!entry.has_data ? '3,3' : undefined}
+                    opacity={!entry.has_data ? 0.6 : 1}
+                  />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+        
+        <div className="mt-3 text-xs text-gray-500 space-y-1">
+          <p>• Scores shown only for days with incident involvement</p>
+          <p>• Grey bars indicate no incident activity that day</p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 interface MemberDetailModalProps {
   selectedMember: any | null
@@ -325,15 +516,17 @@ export function MemberDetailModal({
                 const hasSlackData = selectedMember.slack_activity?.messages_sent > 0 ||
                                    selectedMember.slack_activity?.channels_active > 0;
                 
-                // Calculate grid columns based on available data
-                const tabCount = 2 + (hasGitHubData ? 1 : 0) + (hasSlackData ? 1 : 0);
-                const gridCols = tabCount === 2 ? 'grid-cols-2' :
-                                tabCount === 3 ? 'grid-cols-3' : 'grid-cols-4';
+                // Calculate grid columns based on available data (including Daily Health tab)
+                const tabCount = 3 + (hasGitHubData ? 1 : 0) + (hasSlackData ? 1 : 0);
+                const gridCols = tabCount === 3 ? 'grid-cols-3' :
+                                tabCount === 4 ? 'grid-cols-4' : 
+                                tabCount === 5 ? 'grid-cols-5' : 'grid-cols-3';
                 
                 return (
                   <TabsList className={`grid w-full ${gridCols}`}>
                     <TabsTrigger value="factors">Factors</TabsTrigger>
                     <TabsTrigger value="incidents">Incidents</TabsTrigger>
+                    <TabsTrigger value="daily">Daily Health</TabsTrigger>
                     {hasGitHubData && <TabsTrigger value="github">GitHub</TabsTrigger>}
                     {hasSlackData && <TabsTrigger value="communication">Communication</TabsTrigger>}
                   </TabsList>
@@ -415,6 +608,14 @@ export function MemberDetailModal({
                     </CardContent>
                   </Card>
                 </div>
+              </TabsContent>
+
+              <TabsContent value="daily" className="space-y-4">
+                <IndividualDailyHealthChart 
+                  memberData={memberData}
+                  analysisId={selectedMember.analysisId}
+                  currentAnalysis={selectedMember.currentAnalysis}
+                />
               </TabsContent>
 
               <TabsContent value="github" className="space-y-4">
