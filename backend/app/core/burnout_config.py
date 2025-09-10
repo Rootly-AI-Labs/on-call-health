@@ -100,9 +100,9 @@ class BurnoutConfig:
     # Incident Analysis Thresholds
     INCIDENT_THRESHOLDS = {
         'incidents_per_week': {
-            'moderate': 1.5,      # Lower threshold - even 1.5/week is concerning
-            'high': 3.0,          # Reduced from 5.0 - 3+ incidents/week is high stress
-            'excessive': 5.0      # Reduced from 8.0 - 5+ incidents/week is excessive
+            'moderate': 1.0,      # Even 1/week is notable workload
+            'high': 2.0,          # 2+ incidents/week is high stress  
+            'excessive': 3.5      # 3.5+ incidents/week is excessive (Quentin has ~11/week!)
         },
         'response_time_minutes': {
             'acceptable': 15,     # <15 min
@@ -110,11 +110,30 @@ class BurnoutConfig:
             'excessive': 120      # >120 min
         },
         'severity_weights': {
-            'SEV0': 8.0,         # Critical outage - increased impact
-            'SEV1': 6.0,         # High business impact - increased impact
-            'SEV2': 3.5,         # Moderate impact - increased impact
-            'SEV3': 2.0,         # Low impact - increased impact
-            'SEV4': 1.2          # Minimal impact - slight increase
+            'SEV0': 15.0,        # Life-defining events, PTSD risk, press attention (research-based)
+            'SEV1': 12.0,        # Critical business impact, executive involvement (research-based)
+            'SEV2': 6.0,         # Significant user impact, team-wide response
+            'SEV3': 3.0,         # Moderate impact, standard response
+            'SEV4': 1.5          # Minimal impact, routine handling
+        }
+    }
+    
+    # On-Call Burden Scoring (Research-based: 70% sleep disruption, anticipatory anxiety)
+    ON_CALL_BURDEN = {
+        'base_stress': {
+            'weekly_rotation': 20.0,      # High frequency = higher anticipatory stress
+            'bi_weekly_rotation': 15.0,   # Moderate frequency
+            'monthly_rotation': 10.0      # Lower frequency rotation
+        },
+        'incident_overload_multipliers': {
+            'manageable': 1.0,            # 0-2 incidents per shift (Google SRE guideline)
+            'overwhelmed': 1.5,           # 3-5 incidents per shift (+50% stress)
+            'critical_overload': 2.0      # 6+ incidents per shift (+100% stress)  
+        },
+        'team_size_modifiers': {
+            'understaffed': 1.3,          # <5 people (Google minimum: 8 for single-site)
+            'minimal': 1.1,               # 5-7 people (approaching minimum)
+            'adequate': 1.0               # 8+ people (meets guidelines)
         }
     }
     
