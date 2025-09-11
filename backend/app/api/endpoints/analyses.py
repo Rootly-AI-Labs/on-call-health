@@ -1865,12 +1865,12 @@ async def get_member_daily_health(
                 user_involved = False
                 incident_date = None
                 
-                # Check various fields where user might be assigned
+                # Check Rootly structure: assigned_to
                 assigned_to = incident.get("assigned_to", {})
                 if isinstance(assigned_to, dict) and assigned_to.get("email", "").lower() == member_email.lower():
                     user_involved = True
                 
-                # Also check attributes.assigned_to if it exists
+                # Check Rootly attributes.assigned_to
                 attrs = incident.get("attributes", {})
                 if attrs and not user_involved:
                     assigned_attrs = attrs.get("assigned_to", {})
@@ -1878,6 +1878,23 @@ async def get_member_daily_health(
                         email_data = assigned_attrs.get("data", {})
                         if email_data.get("email", "").lower() == member_email.lower():
                             user_involved = True
+                
+                # Check PagerDuty structure: assignees array
+                if not user_involved:
+                    assignees = incident.get("assignees", [])
+                    for assignee in assignees:
+                        if isinstance(assignee, dict) and assignee.get("email", "").lower() == member_email.lower():
+                            user_involved = True
+                            break
+                
+                # Check PagerDuty assignments array
+                if not user_involved:
+                    assignments = incident.get("assignments", [])
+                    for assignment in assignments:
+                        assignee = assignment.get("assignee", {})
+                        if isinstance(assignee, dict) and assignee.get("email", "").lower() == member_email.lower():
+                            user_involved = True
+                            break
                 
                 if user_involved:
                     # Get incident date
@@ -1902,9 +1919,15 @@ async def get_member_daily_health(
                                 user_daily_data[day_key]["has_data"] = True
                                 incidents_processed += 1
                                 
-                                # Add severity weighting if available
-                                severity = incident.get("attributes", {}).get("severity", "")
-                                severity_weight = {"sev0": 15, "sev1": 12, "sev2": 8, "sev3": 5, "sev4": 2}.get(severity.lower(), 5)
+                                # Add severity weighting - handle both Rootly and PagerDuty formats
+                                severity = incident.get("attributes", {}).get("severity", "") or incident.get("severity", {}).get("name", "")
+                                if not severity:
+                                    # PagerDuty might have urgency instead of severity
+                                    urgency = incident.get("urgency", {}).get("name", "").lower()
+                                    severity_map = {"high": "sev1", "low": "sev3"}
+                                    severity = severity_map.get(urgency, "sev3")
+                                
+                                severity_weight = {"sev0": 15, "sev1": 12, "sev2": 8, "sev3": 5, "sev4": 2, "critical": 15, "high": 12, "medium": 8, "low": 5, "info": 2}.get(severity.lower(), 5)
                                 user_daily_data[day_key]["severity_weighted_count"] += severity_weight
                                 
                                 # Check for after-hours (simple check - before 8am or after 6pm)
