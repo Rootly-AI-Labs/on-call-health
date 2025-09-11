@@ -149,8 +149,8 @@ def calculate_personal_burnout(metrics: Dict[str, float], config: CBIConfig = No
         if factor_name in metrics:
             raw_value = max(0.0, metrics[factor_name])  # Ensure non-negative
             
-            # Normalize to 0-100 scale based on factor's scale_max
-            normalized_score = min(100.0, (raw_value / factor_config['scale_max']) * 100.0)
+            # Calculate score based on factor's scale_max (NO ARTIFICIAL CAP!)
+            normalized_score = (raw_value / factor_config['scale_max']) * 100.0
             
             # Apply weight
             weighted_score = normalized_score * factor_config['weight']
@@ -203,8 +203,8 @@ def calculate_work_related_burnout(metrics: Dict[str, float], config: CBIConfig 
         if factor_name in metrics:
             raw_value = max(0.0, metrics[factor_name])  # Ensure non-negative
             
-            # Normalize to 0-100 scale based on factor's scale_max
-            normalized_score = min(100.0, (raw_value / factor_config['scale_max']) * 100.0)
+            # Calculate score based on factor's scale_max (NO ARTIFICIAL CAP!)
+            normalized_score = (raw_value / factor_config['scale_max']) * 100.0
             
             # Apply weight
             weighted_score = normalized_score * factor_config['weight']

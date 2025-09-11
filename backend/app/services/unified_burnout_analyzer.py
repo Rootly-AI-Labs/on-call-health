@@ -966,7 +966,7 @@ class UnifiedBurnoutAnalyzer:
                 "user_name": user_name,
                 "user_email": user_email,
                 "burnout_score": 0,
-                "cbi_score": round(composite_cbi['composite_score'], 2),  # ✅ Add CBI score for consistency
+                "cbi_score": round(min(100, composite_cbi['composite_score']), 2),  # Cap display at 100 for UI
                 "risk_level": "low",
                 "incident_count": 0,
                 "factors": {
@@ -1138,16 +1138,16 @@ class UnifiedBurnoutAnalyzer:
         cbi_metrics = {
             # Personal burnout factors - using Rootly's tiered approach
             'work_hours_trend': apply_incident_tiers(incidents_per_week) * 10,      # Scale to 0-100
-            'weekend_work': min(100, after_hours_pct * 2),                                 # Keep simple scaling for after-hours  
+            'weekend_work': after_hours_pct * 2,                                           # NO CAP: Extreme after-hours can exceed 100%
             'after_hours_activity': after_hours_pct,                                       # Direct mapping
-            'vacation_usage': min(100, (severity_weighted_per_week / 20) * 100),    # ENHANCED: SEV1s prevent recovery
-            'sleep_quality_proxy': min(100, apply_rootly_incident_tiers(severity_weighted_per_week) * 8),  # ENHANCED: SEV1 incidents disrupt sleep
+            'vacation_usage': (severity_weighted_per_week / 20) * 100,                     # NO CAP: Extreme SEV1s prevent recovery completely
+            'sleep_quality_proxy': apply_rootly_incident_tiers(severity_weighted_per_week) * 8,  # NO CAP: SEV1s can destroy sleep
             
             # Work-related burnout factors - using Rootly's response time tiers  
             'sprint_completion': apply_rootly_response_tiers(avg_response_minutes) * 10,   # Tiered response pressure
             'code_review_speed': apply_rootly_response_tiers(avg_response_minutes) * 8,    # Slightly less weight
             'pr_frequency': apply_rootly_incident_tiers(incidents_per_week) * 8,           # Tiered workload frequency
-            'deployment_frequency': min(100, critical_incidents * 8),                      # Critical incident pressure
+            'deployment_frequency': critical_incidents * 8,                                # NO CAP: Extreme critical incidents can exceed 100%
             'meeting_load': apply_rootly_incident_tiers(incidents_per_week) * 6,           # Tiered coordination overhead
             'oncall_burden': apply_rootly_incident_tiers(severity_weighted_per_week) * 10  # FIXED: Use severity-weighted incidents for proper SEV1 impact
         }
@@ -1189,7 +1189,7 @@ class UnifiedBurnoutAnalyzer:
             "user_name": user_name,
             "user_email": user_email,
             "burnout_score": round(burnout_score, 2),
-            "cbi_score": round(composite_cbi['composite_score'], 2),  # Add CBI score
+            "cbi_score": round(min(100, composite_cbi['composite_score']), 2),  # Cap display at 100 for UI
             "risk_level": risk_level,
             "incident_count": len(incidents),
             "factors": factors,
