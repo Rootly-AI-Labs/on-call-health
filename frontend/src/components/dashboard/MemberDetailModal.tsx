@@ -235,7 +235,10 @@ export function MemberDetailModal({
 
   return (
     <Dialog open={!!selectedMember} onOpenChange={() => setSelectedMember(null)}>
-      <DialogContent className="max-w-5xl max-h-[80vh] overflow-y-auto">
+      <DialogContent 
+        className="max-w-5xl max-h-[80vh] overflow-y-auto"
+        aria-describedby="member-detail-description"
+      >
         {selectedMember && (() => {
           // Find the correct member data from the analysis (consistent with dashboard)
           const memberData = members?.find(m => m.user_name === selectedMember.name);
@@ -274,6 +277,12 @@ export function MemberDetailModal({
                   </div>
                 </DialogTitle>
               </DialogHeader>
+
+          {/* Hidden description for accessibility */}
+          <div id="member-detail-description" className="sr-only">
+            Detailed burnout analysis and daily health timeline for team member. 
+            Shows burnout risk factors, incident response metrics, and daily health scores.
+          </div>
           
           {(() => {
             // Get the correct burnout score (handle both data formats)
