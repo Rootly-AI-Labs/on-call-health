@@ -303,12 +303,15 @@ export function TeamHealthOverview({
                       const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members;
 
                       if (members && members.length > 0) {
-                        // Check if we have CBI scores
-                        const cbiScores = members.map((m: any) => m.cbi_score).filter((s: any) => s !== undefined && s !== null);
-                        if (cbiScores.length > 0) {
-                          const avgCbiScore = cbiScores.reduce((a: number, b: number) => a + b, 0) / cbiScores.length;
-                          // CBI: Return raw CBI score (0-100 where higher = more burnout)
-                          return avgCbiScore;
+                        // Only include on-call members (those with incidents during the analysis period)
+                        const onCallMembers = members.filter((m: any) => m.incident_count > 0);
+                        if (onCallMembers.length > 0) {
+                          const cbiScores = onCallMembers.map((m: any) => m.cbi_score).filter((s: any) => s !== undefined && s !== null);
+                          if (cbiScores.length > 0) {
+                            const avgCbiScore = cbiScores.reduce((a: number, b: number) => a + b, 0) / cbiScores.length;
+                            // CBI: Return raw CBI score (0-100 where higher = more burnout)
+                            return avgCbiScore;
+                          }
                         }
 
                         // Fallback to legacy burnout scores
@@ -339,9 +342,6 @@ export function TeamHealthOverview({
                     const cbiScore = getCurrentHealthPercentage();
 
                     // Convert to health status based on raw CBI score (0-100, higher=worse burnout)
-                    // DEBUG: Log the actual score being evaluated
-                    console.log(`CBI Score for status evaluation: ${cbiScore}`);
-                    
                     // Match CBI ranges: Healthy (0-24), Fair (25-49), Poor (50-74), Critical (75-100)
                     if (cbiScore < 25) return 'Healthy';      // CBI 0-24 - Low/minimal burnout risk
                     if (cbiScore < 50) return 'Fair';         // CBI 25-49 - Mild burnout symptoms 
@@ -375,11 +375,14 @@ export function TeamHealthOverview({
                       const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members;
 
                       if (members && members.length > 0) {
-                        // Check if we have CBI scores
-                        const cbiScores = members.map((m: any) => m.cbi_score).filter((s: any) => s !== undefined && s !== null);
-                        if (cbiScores.length > 0) {
-                          const avgCbiScore = cbiScores.reduce((a: number, b: number) => a + b, 0) / cbiScores.length;
-                          return avgCbiScore; // Return raw CBI score
+                        // Only include on-call members (those with incidents during the analysis period)
+                        const onCallMembers = members.filter((m: any) => m.incident_count > 0);
+                        if (onCallMembers.length > 0) {
+                          const cbiScores = onCallMembers.map((m: any) => m.cbi_score).filter((s: any) => s !== undefined && s !== null);
+                          if (cbiScores.length > 0) {
+                            const avgCbiScore = cbiScores.reduce((a: number, b: number) => a + b, 0) / cbiScores.length;
+                            return avgCbiScore; // Return raw CBI score
+                          }
                         }
 
                         // Fallback to legacy burnout scores
@@ -442,10 +445,11 @@ export function TeamHealthOverview({
                     const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members;
 
                     if (members && members.length > 0) {
-                      // Calculate risk levels based on CBI scores when available
+                      // Only include on-call members (those with incidents during the analysis period)
+                      const onCallMembers = members.filter((m: any) => m.incident_count > 0);
                       const riskCounts = { critical: 0, high: 0, medium: 0, low: 0 };
 
-                      members.forEach((member: any) => {
+                      onCallMembers.forEach((member: any) => {
                         if (member.cbi_score !== undefined && member.cbi_score !== null) {
                           // Use CBI scoring (0-100, higher = worse)
                           if (member.cbi_score >= 75) riskCounts.critical++;
