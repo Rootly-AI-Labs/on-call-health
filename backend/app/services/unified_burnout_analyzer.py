@@ -523,6 +523,17 @@ class UnifiedBurnoutAnalyzer:
             daily_trends = self._generate_daily_trends(incidents, team_analysis["members"], metadata, team_health)
             logger.info(f"🔍 MAIN_ANALYSIS_DEBUG: Generated {len(daily_trends)} daily trends for final result")
             
+            # Get individual daily data with debug logging
+            individual_daily_data = getattr(self, 'individual_daily_data', {})
+            logger.info(f"🔍 INDIVIDUAL_DAILY_STORAGE: Storing individual_daily_data for {len(individual_daily_data)} users")
+            if individual_daily_data:
+                sample_user = list(individual_daily_data.keys())[0]
+                sample_data = individual_daily_data[sample_user]
+                days_with_data = sum(1 for day_data in sample_data.values() if day_data.get('has_data', False))
+                logger.info(f"🔍 INDIVIDUAL_DAILY_STORAGE: Sample user {sample_user} has {days_with_data} days with incident data out of {len(sample_data)} total days")
+            else:
+                logger.error(f"🚨 INDIVIDUAL_DAILY_STORAGE: individual_daily_data is EMPTY! This will cause 'No daily health data available' errors")
+
             result = {
                 "analysis_timestamp": datetime.now().isoformat(),
                 "metadata": {
@@ -539,7 +550,7 @@ class UnifiedBurnoutAnalyzer:
                 "insights": insights,
                 "recommendations": self._generate_recommendations(team_health, team_analysis),
                 "daily_trends": daily_trends,
-                "individual_daily_data": getattr(self, 'individual_daily_data', {}),  # Include individual daily tracking
+                "individual_daily_data": individual_daily_data,
                 "period_summary": {
                     "average_score": round(period_average_score, 2),
                     "days_analyzed": time_range_days,
@@ -1112,6 +1123,17 @@ class UnifiedBurnoutAnalyzer:
         high_severity_count = critical_incidents + high_incidents  # CRITICAL FIX: Define the variable!
         escalation_rate = high_severity_count / max(total_incidents, 1) if total_incidents > 0 else 0
         
+        # Calculate severity-weighted incidents per week for proper burnout assessment
+        severity_weighted_total = 0.0
+        for severity_level, count in severity_dist.items():
+            weight = severity_weights.get(severity_level, 1.5)  # Default weight for unknown severities
+            severity_weighted_total += count * weight
+            
+        # Convert to per-week basis (assuming 30-day analysis period)
+        severity_weighted_per_week = severity_weighted_total / 4.3  # 30 days ≈ 4.3 weeks
+        
+        logger.info(f"🔍 SEVERITY_WEIGHTED: User has {severity_weighted_total:.1f} severity-weighted incidents total ({severity_weighted_per_week:.1f}/week)")
+        
         # Apply Rootly's tiered scaling to all CBI metrics
         cbi_metrics = {
             # Personal burnout factors - using Rootly's tiered approach
@@ -1127,7 +1149,7 @@ class UnifiedBurnoutAnalyzer:
             'pr_frequency': apply_rootly_incident_tiers(incidents_per_week) * 8,           # Tiered workload frequency
             'deployment_frequency': min(100, critical_incidents * 8),                      # Critical incident pressure
             'meeting_load': apply_rootly_incident_tiers(incidents_per_week) * 6,           # Tiered coordination overhead
-            'oncall_burden': apply_rootly_incident_tiers(incidents_per_week) * 10          # Tiered on-call responsibility
+            'oncall_burden': apply_rootly_incident_tiers(severity_weighted_per_week) * 10  # FIXED: Use severity-weighted incidents for proper SEV1 impact
         }
         
         # 🐛 DEBUG: Log CBI metrics for troubleshooting zero scores

@@ -96,16 +96,16 @@ class CBIConfig:
             'scale_max': 100  # Failed deploys + high frequency = stress
         },
         'meeting_load': {
-            'weight': 0.20,
+            'weight': 0.10,  # Reduced weight to accommodate increased oncall_burden weight
             'description': 'Context switching burden',
             'calculation': 'meeting_density_impact',
             'scale_max': 80  # >80% day in meetings = 100 burnout
         },
         'oncall_burden': {
-            'weight': 0.15,
-            'description': 'Work-related stress from incident response',
-            'calculation': 'incident_response_frequency',
-            'scale_max': 10  # >10 incidents/week = 100 burnout
+            'weight': 0.25,  # Increased weight for incident response stress
+            'description': 'Work-related stress from incident response (severity-weighted)',
+            'calculation': 'incident_response_frequency_with_severity',
+            'scale_max': 30  # >30 severity-weighted incidents/week = 100 burnout (accounts for SEV0/1 multipliers)
         }
     }
     
