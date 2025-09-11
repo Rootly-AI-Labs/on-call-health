@@ -339,6 +339,9 @@ export function TeamHealthOverview({
                     const cbiScore = getCurrentHealthPercentage();
 
                     // Convert to health status based on raw CBI score (0-100, higher=worse burnout)
+                    // DEBUG: Log the actual score being evaluated
+                    console.log(`CBI Score for status evaluation: ${cbiScore}`);
+                    
                     // Match CBI ranges: Healthy (0-24), Fair (25-49), Poor (50-74), Critical (75-100)
                     if (cbiScore < 25) return 'Healthy';      // CBI 0-24 - Low/minimal burnout risk
                     if (cbiScore < 50) return 'Fair';         // CBI 25-49 - Mild burnout symptoms 
