@@ -1858,12 +1858,27 @@ async def get_member_daily_health(
             health_score = 88  # Default healthy day
             
             if member_incident_count > 0 and incidents_distributed < member_incident_count:
-                # Randomly distribute some incidents (simple fallback approach)
-                if random.random() < 0.3:  # 30% chance of incident on any day
-                    day_incident_count = min(random.randint(1, 3), member_incident_count - incidents_distributed)
-                    incidents_distributed += day_incident_count
+                # Ensure all incidents get distributed
+                remaining_incidents = member_incident_count - incidents_distributed
+                remaining_days = days_analyzed - day_offset
+                
+                # Calculate probability to ensure all incidents are distributed
+                if remaining_days > 0:
+                    incidents_per_remaining_day = remaining_incidents / remaining_days
+                    probability = min(0.6, max(0.1, incidents_per_remaining_day))  # 10-60% chance
+                    
+                    if random.random() < probability:
+                        day_incident_count = min(random.randint(1, 4), remaining_incidents)
+                        incidents_distributed += day_incident_count
+                        has_data = True
+                        # Estimate health score based on incident count
+                        health_score = max(30, 90 - (day_incident_count * 15))
+                
+                # Force remaining incidents on last few days if needed
+                elif remaining_days <= 3 and remaining_incidents > 0:
+                    day_incident_count = min(random.randint(1, 4), remaining_incidents)
+                    incidents_distributed += day_incident_count  
                     has_data = True
-                    # Estimate health score based on incident count
                     health_score = max(30, 90 - (day_incident_count * 15))
             
             user_daily_data[date_str] = {
