@@ -1837,8 +1837,9 @@ async def get_member_daily_health(
         print(f"🚨 Daily Data Incidents: {total_incidents_daily}")
         logger.error(f"🚨 DATA_INCONSISTENCY: {member_email} - Team: {team_incident_count}, Daily: {total_incidents_daily}")
         
-        # Fix inconsistent data by using REAL incident timestamps
-        if total_incidents_daily != team_incident_count and team_incident_count > 0:
+        # TEMPORARILY DISABLE: Fix inconsistent data by using REAL incident timestamps
+        # This was causing analysis to hang at 88% - re-enable after optimization
+        if False and total_incidents_daily != team_incident_count and team_incident_count > 0:
             print(f"🚨 FIXING_DATA_INCONSISTENCY: Using real incident timestamps for {member_email}")
             logger.error(f"🚨 REBUILDING_FROM_REAL_DATA: {member_email} - {team_incident_count} incidents")
             
