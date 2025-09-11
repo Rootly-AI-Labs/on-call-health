@@ -228,13 +228,23 @@ export function TeamHealthOverview({
                           const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members;
 
                           if (members && members.length > 0) {
-                            const cbiScores = members
+                            // Only include on-call members (those with incidents during the analysis period)
+                            const onCallMembers = members.filter((m: any) => m.incident_count > 0);
+                            console.log('📊 MAIN DISPLAY - On-call members for CBI display:', onCallMembers.length, '/', members.length);
+                            
+                            const cbiScores = onCallMembers
                               .map((m: any) => m.cbi_score)
                               .filter((s: any) => s !== undefined && s !== null && s > 0);
+                            console.log('📊 MAIN DISPLAY - CBI scores for display:', cbiScores);
 
                             if (cbiScores.length > 0) {
                               const avgCbiScore = cbiScores.reduce((a: number, b: number) => a + b, 0) / cbiScores.length;
                               const roundedScore = Math.round(avgCbiScore * 10) / 10;
+                              console.log('📊 MAIN DISPLAY - Final CBI for display:', {
+                                avgCbiScore,
+                                roundedScore,
+                                displayValue: roundedScore
+                              });
 
                               return (
                                 <>
@@ -303,15 +313,42 @@ export function TeamHealthOverview({
                       const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members;
 
                       if (members && members.length > 0) {
+                        // DEBUG: Log all members
+                        console.log('🔍 All team members:', members.map(m => ({
+                          name: m.user_name,
+                          email: m.user_email,
+                          incident_count: m.incident_count,
+                          cbi_score: m.cbi_score
+                        })));
+                        
                         // Only include on-call members (those with incidents during the analysis period)
                         const onCallMembers = members.filter((m: any) => m.incident_count > 0);
+                        console.log('👥 On-call members (incident_count > 0):', onCallMembers.length, '/', members.length);
+                        console.log('👥 On-call member details:', onCallMembers.map(m => ({
+                          name: m.user_name,
+                          incident_count: m.incident_count,
+                          cbi_score: m.cbi_score
+                        })));
+                        
                         if (onCallMembers.length > 0) {
                           const cbiScores = onCallMembers.map((m: any) => m.cbi_score).filter((s: any) => s !== undefined && s !== null);
+                          console.log('📊 CBI scores from on-call members:', cbiScores);
+                          
                           if (cbiScores.length > 0) {
                             const avgCbiScore = cbiScores.reduce((a: number, b: number) => a + b, 0) / cbiScores.length;
+                            console.log('📊 Average CBI score calculation:', {
+                              scores: cbiScores,
+                              sum: cbiScores.reduce((a: number, b: number) => a + b, 0),
+                              count: cbiScores.length,
+                              average: avgCbiScore
+                            });
                             // CBI: Return raw CBI score (0-100 where higher = more burnout)
                             return avgCbiScore;
+                          } else {
+                            console.log('⚠️ No valid CBI scores found from on-call members');
                           }
+                        } else {
+                          console.log('⚠️ No on-call members found (all have 0 incidents)');
                         }
 
                         // Fallback to legacy burnout scores
@@ -377,10 +414,15 @@ export function TeamHealthOverview({
                       if (members && members.length > 0) {
                         // Only include on-call members (those with incidents during the analysis period)
                         const onCallMembers = members.filter((m: any) => m.incident_count > 0);
+                        console.log('📝 Description CBI - On-call members:', onCallMembers.length, '/', members.length);
+                        
                         if (onCallMembers.length > 0) {
                           const cbiScores = onCallMembers.map((m: any) => m.cbi_score).filter((s: any) => s !== undefined && s !== null);
+                          console.log('📝 Description CBI scores:', cbiScores);
+                          
                           if (cbiScores.length > 0) {
                             const avgCbiScore = cbiScores.reduce((a: number, b: number) => a + b, 0) / cbiScores.length;
+                            console.log('📝 Description CBI average:', avgCbiScore);
                             return avgCbiScore; // Return raw CBI score
                           }
                         }
@@ -447,6 +489,13 @@ export function TeamHealthOverview({
                     if (members && members.length > 0) {
                       // Only include on-call members (those with incidents during the analysis period)
                       const onCallMembers = members.filter((m: any) => m.incident_count > 0);
+                      console.log('🚨 At Risk - On-call members for risk calculation:', onCallMembers.length, '/', members.length);
+                      console.log('🚨 At Risk - Member risk breakdown:', onCallMembers.map(m => ({
+                        name: m.user_name,
+                        cbi_score: m.cbi_score,
+                        risk_category: m.cbi_score >= 75 ? 'critical' : m.cbi_score >= 50 ? 'high' : m.cbi_score >= 25 ? 'medium' : 'low'
+                      })));
+                      
                       const riskCounts = { critical: 0, high: 0, medium: 0, low: 0 };
 
                       onCallMembers.forEach((member: any) => {
@@ -465,6 +514,9 @@ export function TeamHealthOverview({
                           else riskCounts.low++;
                         }
                       });
+
+                      console.log('🚨 Final risk counts:', riskCounts);
+                      console.log('🚨 Total at-risk members (medium+high+critical):', riskCounts.medium + riskCounts.high + riskCounts.critical);
 
                       return (
                         <>
