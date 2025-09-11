@@ -534,6 +534,12 @@ class UnifiedBurnoutAnalyzer:
             else:
                 logger.error(f"🚨 INDIVIDUAL_DAILY_STORAGE: individual_daily_data is EMPTY! This will cause 'No daily health data available' errors")
 
+            # Store raw incident data for individual daily health reconstruction
+            logger.info(f"🔍 RAW_INCIDENT_STORAGE: Storing {len(incidents)} raw incidents in analysis results")
+            if incidents:
+                sample_incident = incidents[0]
+                logger.info(f"🔍 RAW_INCIDENT_SAMPLE: {sample_incident.get('id', 'no-id')} created at {sample_incident.get('created_at', 'no-timestamp')}")
+            
             result = {
                 "analysis_timestamp": datetime.now().isoformat(),
                 "metadata": {
@@ -551,6 +557,7 @@ class UnifiedBurnoutAnalyzer:
                 "recommendations": self._generate_recommendations(team_health, team_analysis),
                 "daily_trends": daily_trends,
                 "individual_daily_data": individual_daily_data,
+                "raw_incident_data": incidents,  # Store complete incident data for individual daily health reconstruction
                 "period_summary": {
                     "average_score": round(period_average_score, 2),
                     "days_analyzed": time_range_days,
