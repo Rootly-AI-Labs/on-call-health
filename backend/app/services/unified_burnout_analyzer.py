@@ -2341,12 +2341,24 @@ class UnifiedBurnoutAnalyzer:
             individual_daily_data = {}  # New: track per-user daily data
             
             # PRE-INITIALIZE individual_daily_data with all team members
+            # Also create user ID to email mapping for incident processing
+            user_id_to_email = {}
+            for user in team_analysis:
+                if user.get('user_email') and user.get('user_id'):
+                    user_key = user['user_email'].lower()
+                    individual_daily_data[user_key] = {}
+                    # Create ID to email mapping for incident processing
+                    user_id_to_email[str(user['user_id'])] = user['user_email']
+            
+            logger.error(f"🔥 USER_ID_MAPPING: Created mapping for {len(user_id_to_email)} users")
+            if user_id_to_email:
+                sample_mapping = list(user_id_to_email.items())[:3]
+                logger.error(f"🔥 USER_ID_MAPPING: Sample mappings: {sample_mapping}")
+            
+            # Pre-create all date entries for each user
             for user in team_analysis:
                 if user.get('user_email'):
                     user_key = user['user_email'].lower()
-                    individual_daily_data[user_key] = {}
-                    
-                    # Pre-create all date entries for this user
                     for day_offset in range(days_analyzed):
                         date_obj = datetime.now() - timedelta(days=days_analyzed - day_offset - 1)
                         date_str = date_obj.strftime('%Y-%m-%d')
@@ -2447,16 +2459,21 @@ class UnifiedBurnoutAnalyzer:
                                     if user_id:
                                         daily_data[date_str]["users_involved"].add(user_id)
                             else:  # Rootly
-                                # Rootly format
+                                # Rootly format - Extract user ID and map to email
                                 attrs = incident.get("attributes", {})
                                 if attrs:
                                     user_info = attrs.get("user", {})
                                     if isinstance(user_info, dict) and "data" in user_info:
                                         user_data = user_info.get("data", {})
                                         user_id = user_data.get("id")
-                                        user_email = user_data.get("email")
+                                        # Use ID-to-email mapping instead of direct email extraction
+                                        user_email = user_id_to_email.get(str(user_id)) if user_id else None
                                         if user_id:
                                             daily_data[date_str]["users_involved"].add(user_id)
+                                            
+                                        # DEBUG: Log user extraction for first few incidents
+                                        if len(daily_data) <= 3:
+                                            logger.error(f"🔥 USER_EXTRACTION: incident user_id={user_id}, mapped_email={user_email}")
                             
                             # Track individual user daily data - now updating pre-initialized structure
                             if user_email:
@@ -2749,6 +2766,10 @@ class UnifiedBurnoutAnalyzer:
         Based on Copenhagen Burnout Inventory methodology and research on 
         incident response psychological impact. CONSISTENT with CBI scoring.
         """
+        # CRITICAL DEBUG: Log every call to this method
+        if user_email == "andre@rootly.com":
+            logger.error(f"🔥 BURNOUT_METHOD_CALLED: {user_email} on {date_obj.strftime('%Y-%m-%d')} - daily_data: {daily_data}")
+        
         try:
             # Start with low burnout baseline
             base_burnout = 0
@@ -2841,6 +2862,10 @@ class UnifiedBurnoutAnalyzer:
             # Apply bounds (0-100 range, higher = more burnout)
             final_burnout_score = max(0, min(100, int(final_burnout_score)))
             
+            # CRITICAL DEBUG: Log every return for Andre
+            if user_email == "andre@rootly.com":
+                logger.error(f"🔥 RETURNING_SCORE: {user_email} - incident_count={incident_count}, final_score={final_burnout_score}")
+            
             # FOCUSED DEBUG: Only log when score seems wrong 
             if incident_count > 0 and final_burnout_score < 10:
                 logger.error(f"🚨 LOW_SCORE_BUG: {user_email} has {incident_count} incidents but score only {final_burnout_score}")
@@ -2850,8 +2875,11 @@ class UnifiedBurnoutAnalyzer:
             
         except Exception as e:
             logger.error(f"Error calculating individual daily burnout score for {user_email}: {e}")
-            # Fallback: if we have incidents, assume moderate burnout; if not, assume low burnout
-            return 40 if daily_data.get("incident_count", 0) > 0 else 0
+            fallback_score = 40 if daily_data.get("incident_count", 0) > 0 else 0
+            # CRITICAL DEBUG: Log fallback for Andre
+            if user_email == "andre@rootly.com":
+                logger.error(f"🔥 FALLBACK_SCORE: {user_email} - exception fallback returning {fallback_score}")
+            return fallback_score
     
     def _determine_health_status_from_score(self, score: float) -> str:
         """Determine health status from burnout score (SimpleBurnoutAnalyzer approach)."""
