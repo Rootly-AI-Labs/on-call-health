@@ -2371,7 +2371,24 @@ class UnifiedBurnoutAnalyzer:
                             "response_times": [],
                             "has_data": False,
                             "incidents": [],
-                            "high_severity_count": 0
+                            "high_severity_count": 0,
+                            # Enhanced severity breakdown
+                            "severity_breakdown": {
+                                "sev0": 0,     # Critical/Emergency (15.0 weight)
+                                "sev1": 0,     # High/Critical (12.0 weight) 
+                                "sev2": 0,     # Medium/High (6.0 weight)
+                                "sev3": 0,     # Low/Medium (3.0 weight)
+                                "low": 0       # Low (1.5 weight)
+                            },
+                            # Daily summary for tooltips
+                            "daily_summary": {
+                                "total_incidents": 0,
+                                "highest_severity": None,
+                                "after_hours_incidents": 0,
+                                "weekend_work": False,
+                                "peak_hour": None,
+                                "incident_titles": []
+                            }
                         }
             
             # Process incidents to populate daily data - only for days with incidents
@@ -2508,7 +2525,20 @@ class UnifiedBurnoutAnalyzer:
                                             "response_times": [],
                                             "has_data": False,
                                             "incidents": [],
-                                            "high_severity_count": 0
+                                            "high_severity_count": 0,
+                                            # Enhanced severity breakdown
+                                            "severity_breakdown": {
+                                                "sev0": 0, "sev1": 0, "sev2": 0, "sev3": 0, "low": 0
+                                            },
+                                            # Daily summary for tooltips
+                                            "daily_summary": {
+                                                "total_incidents": 0,
+                                                "highest_severity": None,
+                                                "after_hours_incidents": 0,
+                                                "weekend_work": False,
+                                                "peak_hour": None,
+                                                "incident_titles": []
+                                            }
                                         }
                                     # Now process the incident
                                     user_day_data = individual_daily_data[user_key][date_str]
@@ -2516,10 +2546,61 @@ class UnifiedBurnoutAnalyzer:
                                     user_day_data["severity_weighted_count"] += severity_weight
                                     user_day_data["has_data"] = True
                                 
+                                # Determine severity level for breakdown
+                                severity_level = "low"  # default
+                                if self.platform == "pagerduty":
+                                    urgency = incident.get("urgency", "low")
+                                    if urgency == "high":
+                                        severity_level = "sev1"
+                                else:  # Rootly
+                                    attrs = incident.get("attributes", {})
+                                    severity_info = attrs.get("severity", {}) if attrs else {}
+                                    if isinstance(severity_info, dict) and "data" in severity_info:
+                                        severity_data = severity_info.get("data", {})
+                                        if isinstance(severity_data, dict) and "attributes" in severity_data:
+                                            severity_attrs = severity_data["attributes"]
+                                            severity_name = severity_attrs.get("name", "medium").lower()
+                                            if "sev0" in severity_name:
+                                                severity_level = "sev0"
+                                            elif "critical" in severity_name or "sev1" in severity_name:
+                                                severity_level = "sev1"
+                                            elif "high" in severity_name or "sev2" in severity_name:
+                                                severity_level = "sev2"
+                                            elif "medium" in severity_name or "sev3" in severity_name:
+                                                severity_level = "sev3"
+                                
+                                # Update severity breakdown
+                                user_day_data["severity_breakdown"][severity_level] += 1
+                                
+                                # Update daily summary
+                                summary = user_day_data["daily_summary"]
+                                summary["total_incidents"] += 1
+                                
+                                # Track highest severity for the day
+                                severity_priority = {"sev0": 5, "sev1": 4, "sev2": 3, "sev3": 2, "low": 1}
+                                current_priority = severity_priority.get(severity_level, 1)
+                                if summary["highest_severity"] is None or current_priority > severity_priority.get(summary["highest_severity"], 1):
+                                    summary["highest_severity"] = severity_level
+                                
+                                # Track after hours
+                                if incident_hour < 8 or incident_hour > 18:
+                                    summary["after_hours_incidents"] += 1
+                                
+                                # Track weekend work
+                                if incident_date.weekday() >= 5:  # Saturday=5, Sunday=6
+                                    summary["weekend_work"] = True
+                                
+                                # Track incident titles (limit to 3 for tooltip)
+                                incident_title = incident.get("title", "Untitled Incident")
+                                if len(summary["incident_titles"]) < 3:
+                                    summary["incident_titles"].append(incident_title)
+                                
                                 # Store incident details for individual analysis
                                 user_day_data["incidents"].append({
                                     "id": incident.get("id", "unknown"),
+                                    "title": incident_title,
                                     "severity": severity_weight,
+                                    "severity_level": severity_level,
                                     "after_hours": incident_hour < 8 or incident_hour > 18,
                                     "hour": incident_hour,
                                     "created_at": created_at

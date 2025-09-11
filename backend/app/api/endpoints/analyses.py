@@ -1738,6 +1738,44 @@ async def get_analysis_github_commits_timeline(
 
 
 @router.get("/{analysis_id}/members/{member_email}/daily-health")
+def _generate_daily_tooltip(incident_count, severity_breakdown, daily_summary, day_name):
+    """Generate a tooltip summary for a day's incident data."""
+    if incident_count == 0:
+        return f"{day_name}: No incidents - Quiet day"
+    
+    # Build severity summary
+    severity_parts = []
+    severity_labels = {
+        "sev0": "SEV0", "sev1": "SEV1", "sev2": "SEV2", "sev3": "SEV3", "low": "Low"
+    }
+    
+    for sev_level, count in severity_breakdown.items():
+        if count > 0:
+            label = severity_labels.get(sev_level, sev_level.upper())
+            severity_parts.append(f"{count} {label}")
+    
+    severity_text = ", ".join(severity_parts) if severity_parts else f"{incident_count} incident{'s' if incident_count > 1 else ''}"
+    
+    # Add context details
+    details = []
+    if daily_summary.get("after_hours_incidents", 0) > 0:
+        details.append(f"{daily_summary['after_hours_incidents']} after-hours")
+    if daily_summary.get("weekend_work", False):
+        details.append("weekend work")
+    
+    # Add incident titles (first 2)
+    titles = daily_summary.get("incident_titles", [])
+    if titles:
+        title_text = titles[0]
+        if len(titles) > 1:
+            title_text += f" + {len(titles)-1} more"
+        details.append(f"'{title_text}'")
+    
+    context = f" ({', '.join(details)})" if details else ""
+    
+    return f"{day_name}: {severity_text}{context}"
+
+
 async def get_member_daily_health(
     analysis_id: int,
     member_email: str,
@@ -2222,6 +2260,10 @@ async def get_member_daily_health(
         if member_email == "andre@rootly.com" and health_score != 0:
             logger.error(f"🚨 ANDRE_SCORE: {date_str} - health_score={health_score}, incident_count={incident_count}, has_data={has_data}")
         
+        # Extract enhanced data if available
+        severity_breakdown = day_data.get("severity_breakdown", {})
+        daily_summary = day_data.get("daily_summary", {})
+        
         daily_health_scores.append({
             "date": date_str,
             "health_score": health_score,
@@ -2229,7 +2271,12 @@ async def get_member_daily_health(
             "team_health": team_health,
             "day_name": day_name,
             "factors": factors,
-            "has_data": has_data
+            "has_data": has_data,
+            # Enhanced data for tooltips
+            "severity_breakdown": severity_breakdown,
+            "daily_summary": daily_summary,
+            # Tooltip text summary
+            "tooltip_summary": _generate_daily_tooltip(incident_count, severity_breakdown, daily_summary, day_name)
         })
     
     # Sort by date and take last 30 days (now includes no-data days)
