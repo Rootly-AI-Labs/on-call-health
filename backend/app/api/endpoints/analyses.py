@@ -2241,12 +2241,24 @@ async def get_member_daily_health(
     days_without_data = [d for d in daily_health_scores if not d["has_data"]]
     
     # Debug logging for API response
-    logger.info(f"🔍 INDIVIDUAL_DAILY_API_RESPONSE: Returning {len(daily_health_scores)} days total")
-    logger.info(f"🔍 INDIVIDUAL_DAILY_API_RESPONSE: {len(days_with_data)} days WITH data, {len(days_without_data)} days WITHOUT data")
-    if days_with_data:
-        logger.info(f"🔍 INDIVIDUAL_DAILY_API_RESPONSE: Sample day with data: {days_with_data[0]}")
-    if days_without_data:
-        logger.info(f"🔍 INDIVIDUAL_DAILY_API_RESPONSE: Sample day without data: {days_without_data[0]}")
+    # COMPREHENSIVE FRONTEND LOGGING: Show exact data sent to frontend
+    logger.error(f"🔥 FRONTEND_DATA for {member_email}:")
+    logger.error(f"   Total days: {len(daily_health_scores)}")
+    logger.error(f"   Days with incidents: {len(days_with_data)}")
+    
+    # Log first 5 days to see the pattern
+    for i, day in enumerate(daily_health_scores[:5]):
+        logger.error(f"   Day {i+1}: {day['date']} - incidents:{day['incident_count']} score:{day['health_score']} has_data:{day['has_data']}")
+    
+    if len(daily_health_scores) > 5:
+        logger.error(f"   ... (showing first 5 of {len(daily_health_scores)} days)")
+        
+    # Show any days with incidents or non-zero scores
+    problem_days = [day for day in daily_health_scores if day['incident_count'] > 0 or day['health_score'] > 0]
+    if problem_days:
+        logger.error(f"🚨 DAYS WITH INCIDENTS OR NON-ZERO SCORES:")
+        for day in problem_days[:10]:  # Show up to 10
+            logger.error(f"     {day['date']}: incidents={day['incident_count']}, score={day['health_score']}")
     
     return {
         "status": "success",
