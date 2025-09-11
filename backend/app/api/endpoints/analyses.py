@@ -1737,7 +1737,6 @@ async def get_analysis_github_commits_timeline(
     }
 
 
-@router.get("/{analysis_id}/members/{member_email}/daily-health")
 def _generate_daily_tooltip(incident_count, severity_breakdown, daily_summary, day_name):
     """Generate a tooltip summary for a day's incident data."""
     if incident_count == 0:
@@ -1776,6 +1775,7 @@ def _generate_daily_tooltip(incident_count, severity_breakdown, daily_summary, d
     return f"{day_name}: {severity_text}{context}"
 
 
+@router.get("/{analysis_id}/members/{member_email}/daily-health")
 async def get_member_daily_health(
     analysis_id: int,
     member_email: str,
