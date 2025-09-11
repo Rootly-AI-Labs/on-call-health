@@ -2347,10 +2347,12 @@ class UnifiedBurnoutAnalyzer:
             
             # PRE-INITIALIZE individual_daily_data with all team members
             # This is critical - users must exist in the structure before incident processing
+            logger.info(f"🔍 INDIVIDUAL_INIT: Initializing individual_daily_data from {len(team_analysis)} team members")
             for user in team_analysis:
                 if user.get('user_email'):  # team_analysis uses user_email, not email
                     user_key = user['user_email'].lower()
                     individual_daily_data[user_key] = {}
+                    logger.info(f"🔍 INDIVIDUAL_INIT: Added user_key: '{user_key}'")
                     
                     # Pre-create all date entries for this user
                     for day_offset in range(days_analyzed):
@@ -2467,9 +2469,11 @@ class UnifiedBurnoutAnalyzer:
                             # Track individual user daily data - now updating pre-initialized structure
                             if user_email:
                                 user_key = user_email.lower()
+                                logger.info(f"🔍 INCIDENT_PROCESSING: Processing incident for user_key: '{user_key}' on {date_str}")
                                 
                                 # User should already exist in our pre-initialized structure
                                 if user_key in individual_daily_data and date_str in individual_daily_data[user_key]:
+                                    logger.info(f"🔍 INCIDENT_PROCESSING: ✅ Found user_key '{user_key}' in individual_daily_data")
                                     # Update the existing entry (already initialized with defaults)
                                     user_day_data = individual_daily_data[user_key][date_str]
                                     user_day_data["incident_count"] += 1
@@ -2484,7 +2488,9 @@ class UnifiedBurnoutAnalyzer:
                                         user_day_data["weekend_count"] += 1
                                 else:
                                     # Fallback: user not in our initialized structure (shouldn't happen after pre-initialization)
-                                    logger.error(f"🚨 CRITICAL: User {user_key} not found in pre-initialized individual_daily_data for date {date_str}. Available users: {list(individual_daily_data.keys())[:5]}")
+                                    logger.error(f"🚨 CRITICAL: User '{user_key}' not found in pre-initialized individual_daily_data for date {date_str}")
+                                    logger.error(f"🚨 CRITICAL: Available individual_daily_data keys: {list(individual_daily_data.keys())}")
+                                    logger.error(f"🚨 CRITICAL: This will cause fake health scores!")
                                     # Create the missing user structure on-the-fly as emergency fallback
                                     if user_key not in individual_daily_data:
                                         individual_daily_data[user_key] = {}
@@ -2678,6 +2684,7 @@ class UnifiedBurnoutAnalyzer:
                     
                     # If user has data for this day, copy it over and mark as has_data
                     if user_email in individual_daily_data and date_str in individual_daily_data[user_email]:
+                        logger.info(f"🔍 HEALTH_CALC: ✅ Found real data for {user_email} on {date_str}")
                         original_data = individual_daily_data[user_email][date_str]
                         complete_individual_data[user_email][date_str].update(original_data)
                         complete_individual_data[user_email][date_str]["has_data"] = True
@@ -2690,11 +2697,13 @@ class UnifiedBurnoutAnalyzer:
                             team_analysis
                         )
                         complete_individual_data[user_email][date_str]["health_score"] = health_score
+                        logger.info(f"🔍 HEALTH_CALC: Real health score for {user_email}: {health_score}")
                     else:
-                        # No incidents = healthy day (high score with slight randomization for realism)
-                        import random
-                        healthy_score = 85 + random.randint(-3, 8)  # 82-93 range for no-incident days
-                        complete_individual_data[user_email][date_str]["health_score"] = min(100, healthy_score)
+                        logger.warning(f"🚨 HEALTH_CALC: NO DATA found for {user_email} on {date_str} - using baseline healthy score")
+                        logger.warning(f"🚨 HEALTH_CALC: individual_daily_data keys: {list(individual_daily_data.keys())}")
+                        # NO FAKE DATA: Only calculate health scores from real incident data
+                        # If no incidents found for this user/date, use baseline healthy score (no randomization)
+                        complete_individual_data[user_email][date_str]["health_score"] = 100
             
             # Calculate team average health scores for each day and add to individual data
             for day_offset in range(days_analyzed):
