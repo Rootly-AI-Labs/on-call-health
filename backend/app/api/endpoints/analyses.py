@@ -1837,32 +1837,109 @@ async def get_member_daily_health(
         print(f"🚨 Daily Data Incidents: {total_incidents_daily}")
         logger.error(f"🚨 DATA_INCONSISTENCY: {member_email} - Team: {team_incident_count}, Daily: {total_incidents_daily}")
         
-        # Fix inconsistent data by redistributing incidents properly
+        # Fix inconsistent data by using REAL incident timestamps
         if total_incidents_daily != team_incident_count and team_incident_count > 0:
-            print(f"🚨 FIXING_DATA_INCONSISTENCY: Redistributing {team_incident_count} incidents across days")
-            logger.error(f"🚨 FIXING_DATA_INCONSISTENCY: Redistributing {team_incident_count} incidents for {member_email}")
+            print(f"🚨 FIXING_DATA_INCONSISTENCY: Using real incident timestamps for {member_email}")
+            logger.error(f"🚨 REBUILDING_FROM_REAL_DATA: {member_email} - {team_incident_count} incidents")
             
-            # Clear existing incident counts
+            # Get raw incident data from analysis
+            raw_incidents = analysis.results.get("raw_incidents", [])
+            if not raw_incidents:
+                raw_incidents = analysis.results.get("incidents", [])
+            
+            print(f"🚨 RAW_INCIDENT_DATA: Found {len(raw_incidents)} total raw incidents in analysis")
+            logger.error(f"🚨 RAW_INCIDENT_DATA: Found {len(raw_incidents)} total raw incidents")
+            
+            # Clear existing data
             for day_data in user_daily_data.values():
                 day_data["incident_count"] = 0
                 day_data["has_data"] = False
+                day_data["severity_weighted_count"] = 0
+                day_data["after_hours_count"] = 0
+                day_data["weekend_count"] = 0
             
-            # Redistribute incidents evenly across available days
-            days_list = list(user_daily_data.keys())
-            incidents_per_day = team_incident_count // len(days_list)
-            remaining_incidents = team_incident_count % len(days_list)
-            
-            for i, day_key in enumerate(days_list):
-                base_incidents = incidents_per_day
-                if i < remaining_incidents:  # Distribute remainder
-                    base_incidents += 1
+            # Process real incidents for this user
+            incidents_processed = 0
+            for incident in raw_incidents:
+                # Check if this incident involves the current user
+                user_involved = False
+                incident_date = None
                 
-                if base_incidents > 0:
-                    user_daily_data[day_key]["incident_count"] = base_incidents
-                    user_daily_data[day_key]["has_data"] = True
-                    # Recalculate health score based on incident load
-                    incident_penalty = base_incidents * 8  # Same formula as original
-                    user_daily_data[day_key]["health_score"] = max(10, 100 - incident_penalty)
+                # Check various fields where user might be assigned
+                assigned_to = incident.get("assigned_to", {})
+                if isinstance(assigned_to, dict) and assigned_to.get("email", "").lower() == member_email.lower():
+                    user_involved = True
+                
+                # Also check attributes.assigned_to if it exists
+                attrs = incident.get("attributes", {})
+                if attrs and not user_involved:
+                    assigned_attrs = attrs.get("assigned_to", {})
+                    if isinstance(assigned_attrs, dict):
+                        email_data = assigned_attrs.get("data", {})
+                        if email_data.get("email", "").lower() == member_email.lower():
+                            user_involved = True
+                
+                if user_involved:
+                    # Get incident date
+                    incident_date = incident.get("created_at") or incident.get("attributes", {}).get("created_at")
+                    if incident_date:
+                        # Parse date to get day
+                        from datetime import datetime
+                        try:
+                            if isinstance(incident_date, str):
+                                # Handle different date formats
+                                if 'T' in incident_date:
+                                    incident_dt = datetime.fromisoformat(incident_date.replace('Z', '+00:00'))
+                                else:
+                                    incident_dt = datetime.strptime(incident_date, '%Y-%m-%d')
+                            else:
+                                incident_dt = incident_date
+                            
+                            day_key = incident_dt.strftime('%Y-%m-%d')
+                            
+                            if day_key in user_daily_data:
+                                user_daily_data[day_key]["incident_count"] += 1
+                                user_daily_data[day_key]["has_data"] = True
+                                incidents_processed += 1
+                                
+                                # Add severity weighting if available
+                                severity = incident.get("attributes", {}).get("severity", "")
+                                severity_weight = {"sev0": 15, "sev1": 12, "sev2": 8, "sev3": 5, "sev4": 2}.get(severity.lower(), 5)
+                                user_daily_data[day_key]["severity_weighted_count"] += severity_weight
+                                
+                                # Check for after-hours (simple check - before 8am or after 6pm)
+                                hour = incident_dt.hour
+                                if hour < 8 or hour > 18:
+                                    user_daily_data[day_key]["after_hours_count"] += 1
+                                
+                                # Check for weekend
+                                if incident_dt.weekday() >= 5:  # Saturday=5, Sunday=6
+                                    user_daily_data[day_key]["weekend_count"] += 1
+                                
+                                print(f"🚨 REAL_INCIDENT_MAPPED: {day_key} - {severity} severity at {incident_dt.hour}:00")
+                                
+                        except Exception as e:
+                            logger.error(f"Error parsing incident date {incident_date}: {e}")
+                            continue
+            
+            # Recalculate health scores for days with real incident data
+            for day_key, day_data in user_daily_data.items():
+                if day_data["has_data"]:
+                    incident_count = day_data["incident_count"]
+                    severity_weighted = day_data["severity_weighted_count"]
+                    after_hours = day_data["after_hours_count"]
+                    
+                    # Calculate health score based on real incident load
+                    base_health = 100
+                    incident_penalty = incident_count * 15  # Base penalty per incident
+                    severity_penalty = severity_weighted * 2  # Additional severity penalty
+                    after_hours_penalty = after_hours * 10  # After-hours penalty
+                    
+                    health_score = base_health - incident_penalty - severity_penalty - after_hours_penalty
+                    day_data["health_score"] = max(10, health_score)  # Floor at 10
+            
+            print(f"🚨 REAL_DATA_PROCESSED: {incidents_processed} incidents mapped to actual dates")
+            logger.error(f"🚨 REAL_DATA_COMPLETE: {incidents_processed}/{team_incident_count} incidents processed")
         
     if user_key not in individual_daily_data:
         
