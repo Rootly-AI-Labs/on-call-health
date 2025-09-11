@@ -2084,15 +2084,18 @@ async def get_member_daily_health(
                         day_incident_count = min(random.randint(1, 4), remaining_incidents)
                         incidents_distributed += day_incident_count
                         has_data = True
-                        # Estimate health score based on incident count
-                        health_score = max(30, 90 - (day_incident_count * 15))
+                        # Calculate burnout score based on incident count (CONSISTENT with CBI)
+                        # Higher incidents = higher burnout score
+                        health_score = min(70, day_incident_count * 15)
                 
                 # Force remaining incidents on last few days if needed
                 elif remaining_days <= 3 and remaining_incidents > 0:
                     day_incident_count = min(random.randint(1, 4), remaining_incidents)
                     incidents_distributed += day_incident_count  
                     has_data = True
-                    health_score = max(30, 90 - (day_incident_count * 15))
+                    # Calculate burnout score based on incident count (CONSISTENT with CBI)  
+                    # Higher incidents = higher burnout score
+                    health_score = min(70, day_incident_count * 15)
             
             user_daily_data[date_str] = {
                 "date": date_str,
@@ -2193,8 +2196,9 @@ async def get_member_daily_health(
                 health_score = round(daily_health_score * 10)
             else:
                 # NO FAKE DATA: Only use real incident data
-                # If no incidents, use baseline healthy score (no randomization)
-                health_score = 100
+                # If no incidents, use baseline low burnout score (no randomization)
+                # CONSISTENT with CBI methodology: higher = more burnout
+                health_score = 0
                 
             # Calculate team health (fallback)
             team_health_by_date = {}
