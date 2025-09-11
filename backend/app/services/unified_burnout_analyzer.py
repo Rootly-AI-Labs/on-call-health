@@ -1370,7 +1370,7 @@ class UnifiedBurnoutAnalyzer:
         else:  # 7+ IPW = critical burnout risk
             incident_frequency_score = 8 + min(2.0, (ipw - 7) / 4)  # 8-10 range (critical)
             
-        self.logger.info(f"Personal burnout CBI: {ipw} IPW → frequency_score={incident_frequency_score}")
+        logger.info(f"Personal burnout CBI: {ipw} IPW → frequency_score={incident_frequency_score}")
         
         # After hours score
         ahp = metrics.get("after_hours_percentage", 0)
@@ -1421,7 +1421,7 @@ class UnifiedBurnoutAnalyzer:
         else:  # Low severity load
             escalation_score = min(4.0, total_severity_impact / 12.5)
             
-        self.logger.info(f"Work burnout CBI: {total_incidents} incidents, "
+        logger.info(f"Work burnout CBI: {total_incidents} incidents, "
                         f"severity_impact={total_severity_impact}, escalation_score={escalation_score}")
         
         # Remove the old logic below and use the new severity-weighted calculation
@@ -1526,7 +1526,7 @@ class UnifiedBurnoutAnalyzer:
             
         final_score = base_stress * team_modifier
         
-        self.logger.info(f"On-call burden for {user_email}: {len(user_shifts)} shifts, "
+        logger.info(f"On-call burden for {user_email}: {len(user_shifts)} shifts, "
                         f"{total_shift_hours:.1f}h total, base={base_stress}, "
                         f"team_modifier={team_modifier}, final={final_score}")
         
