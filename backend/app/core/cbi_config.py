@@ -72,37 +72,37 @@ class CBIConfig:
     # Maps current metrics to CBI Work-Related Burnout items (0-100 scale)
     WORK_RELATED_BURNOUT_FACTORS = {
         'sprint_completion': {
-            'weight': 0.15,  # Reduced from 0.20
+            'weight': 0.08,  # Drastically reduced for oncall_burden dominance
             'description': 'Work pressure from missed deadlines',
             'calculation': 'missed_deadline_percentage',
             'scale_max': 50  # >50% missed deadlines = 100 burnout
         },
         'code_review_speed': {
-            'weight': 0.10,  # Reduced from 0.15
+            'weight': 0.05,  # Drastically reduced for oncall_burden dominance
             'description': 'Workload sustainability pressure',
             'calculation': 'review_turnaround_stress',
             'scale_max': 120  # >120 hour avg turnaround = 100 burnout
         },
         'pr_frequency': {
-            'weight': 0.10,  # Reduced from 0.15
+            'weight': 0.05,  # Drastically reduced for oncall_burden dominance
             'description': 'Work intensity from PR volume',
             'calculation': 'pr_volume_stress_score',
             'scale_max': 100  # Excessive or insufficient PRs = stress
         },
         'deployment_frequency': {
-            'weight': 0.20,  # Increased back to handle critical incident impact
+            'weight': 0.10,  # Reduced for oncall_burden dominance
             'description': 'Delivery pressure from deployment stress',
             'calculation': 'deployment_pressure_score',
             'scale_max': 100  # Failed deploys + high frequency = stress
         },
         'meeting_load': {
-            'weight': 0.05,  # Further reduced to accommodate oncall_burden weight increase
+            'weight': 0.02,  # Minimized for oncall_burden dominance
             'description': 'Context switching burden',
             'calculation': 'meeting_density_impact',
             'scale_max': 80  # >80% day in meetings = 100 burnout
         },
         'oncall_burden': {
-            'weight': 0.40,  # CRITICAL: Dominant weight for incident response stress (Ed's case)
+            'weight': 0.70,  # EXTREME: Overwhelming weight for incident response stress 
             'description': 'Work-related stress from incident response (severity-weighted)',
             'calculation': 'incident_response_frequency_with_severity',
             'scale_max': 50  # >50 severity-weighted incidents/week = 100 burnout (handles extreme SEV1 loads)
