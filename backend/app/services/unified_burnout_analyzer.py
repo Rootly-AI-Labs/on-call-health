@@ -1097,6 +1097,17 @@ class UnifiedBurnoutAnalyzer:
             else:
                 return 7 + min(3, ((minutes - 60) / 60) * 3)  # 7-10 range (slow response)
         
+        def apply_rootly_incident_tiers(incidents_per_week: float) -> float:
+            """Apply tiered scaling to incident frequency (similar to apply_incident_tiers)"""
+            if incidents_per_week <= 0.5:
+                return incidents_per_week * 4.0                   # 0-2.0 range (very low volume)
+            elif incidents_per_week <= 1.5:
+                return 2.0 + ((incidents_per_week - 0.5) / 1.0) * 3.0   # 2.0-5.0 range (low volume)
+            elif incidents_per_week <= 3.0:
+                return 5.0 + ((incidents_per_week - 1.5) / 1.5) * 3.0   # 5.0-8.0 range (moderate volume)
+            else:
+                return 8.0 + min(2.0, ((incidents_per_week - 3.0) / 2.0) * 2.0)  # 8.0-10.0 range (high volume)
+        
         # Calculate escalation rate for tiered scaling
         high_severity_count = critical_incidents + high_incidents  # CRITICAL FIX: Define the variable!
         escalation_rate = high_severity_count / max(total_incidents, 1) if total_incidents > 0 else 0
