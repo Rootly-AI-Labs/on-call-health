@@ -22,7 +22,6 @@ function IndividualDailyHealthChart({ memberData, analysisId, currentAnalysis }:
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch daily health data for this member
   useEffect(() => {
     const fetchDailyHealth = async () => {
       if (!memberData?.user_email || !analysisId) return;
@@ -47,17 +46,16 @@ function IndividualDailyHealthChart({ memberData, analysisId, currentAnalysis }:
         const result = await response.json();
         
         if (result.status === 'success' && result.data?.daily_health) {
-          // Format the data for the chart
           const formattedData = result.data.daily_health.map((day: any) => ({
             date: day.date,
             health_score: day.health_score,
             incident_count: day.incident_count,
             team_health: day.team_health,
-            day_name: new Date(day.date).toLocaleDateString('en-US', { 
+            day_name: day.day_name || new Date(day.date).toLocaleDateString('en-US', { 
               weekday: 'short', month: 'short', day: 'numeric' 
             }),
             factors: day.factors,
-            has_data: day.incident_count > 0
+            has_data: day.has_data !== undefined ? day.has_data : day.incident_count > 0
           }));
           
           setDailyHealthData(formattedData);
@@ -112,31 +110,38 @@ function IndividualDailyHealthChart({ memberData, analysisId, currentAnalysis }:
         <div className="mb-4 flex flex-wrap items-center gap-4 text-xs text-gray-500">
           <div className="flex items-center space-x-1">
             <div className="w-3 h-3 bg-green-500 rounded"></div>
-            <span>Healthy (70-100)</span>
+            <span>Healthy (80-100)</span>
           </div>
           <div className="flex items-center space-x-1">
             <div className="w-3 h-3 bg-yellow-500 rounded"></div>
-            <span>Fair (40-69)</span>
+            <span>Fair (60-79)</span>
+          </div>
+          <div className="flex items-center space-x-1">
+            <div className="w-3 h-3 bg-orange-500 rounded"></div>
+            <span>Concerning (40-59)</span>
           </div>
           <div className="flex items-center space-x-1">
             <div className="w-3 h-3 bg-red-500 rounded"></div>
             <span>Poor (0-39)</span>
           </div>
           <div className="flex items-center space-x-1">
-            <div className="w-3 h-3 bg-gray-300 border border-gray-400 border-dashed rounded"></div>
-            <span>No Data</span>
+            <div className="w-3 h-3 bg-gray-300 border-2 border-gray-400 border-dashed rounded"></div>
+            <span>No Incidents</span>
           </div>
         </div>
         
-        <div style={{ width: '100%', height: '250px' }}>
+        <div style={{ width: '100%', height: '300px' }}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={dailyHealthData}
-              margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+              margin={{ top: 20, right: 30, left: 40, bottom: 80 }}
             >
               <XAxis 
                 dataKey="day_name" 
-                fontSize={10}
+                fontSize={9}
+                angle={-45}
+                textAnchor="end"
+                height={80}
                 tick={{ fill: '#6B7280' }}
                 axisLine={false}
                 tickLine={false}
@@ -147,22 +152,31 @@ function IndividualDailyHealthChart({ memberData, analysisId, currentAnalysis }:
                 tick={{ fill: '#6B7280' }}
                 axisLine={false}
                 tickLine={false}
+                label={{ 
+                  value: 'Health Score', 
+                  angle: -90, 
+                  position: 'insideLeft',
+                  style: { textAnchor: 'middle', fill: '#6B7280', fontSize: '11px' }
+                }}
               />
               <Tooltip 
                 content={({ active, payload }) => {
                   if (active && payload && payload[0]) {
                     const data = payload[0].payload;
                     return (
-                      <div className="bg-white p-3 border rounded-lg shadow-lg text-sm">
-                        <p className="font-semibold text-gray-800">{data.day_name}</p>
+                      <div className="bg-white p-3 border rounded-lg shadow-lg text-sm max-w-xs">
+                        <p className="font-semibold text-gray-800 mb-2">{data.day_name}</p>
                         {data.has_data ? (
                           <>
-                            <p className="text-blue-600">Health Score: {data.health_score}/100</p>
-                            <p className="text-gray-600">Incidents: {data.incident_count}</p>
-                            <p className="text-green-600">Team Avg: {data.team_health}/100</p>
+                            <p className="text-blue-600 font-medium">Health Score: {data.health_score}/100</p>
+                            <p className="text-red-600">Incidents: {data.incident_count}</p>
+                            <p className="text-green-600">Team Average: {data.team_health}/100</p>
                           </>
                         ) : (
-                          <p className="text-gray-500 italic">No incident involvement</p>
+                          <>
+                            <p className="text-gray-600 font-medium">No Incidents</p>
+                            <p className="text-gray-500 text-xs italic">Healthy day - no incident involvement</p>
+                          </>
                         )}
                       </div>
                     );
@@ -172,20 +186,23 @@ function IndividualDailyHealthChart({ memberData, analysisId, currentAnalysis }:
               />
               <Bar 
                 dataKey="health_score" 
-                radius={[2, 2, 0, 0]}
+                radius={[4, 4, 0, 0]}
+                maxBarSize={40}
               >
                 {dailyHealthData.map((entry, index) => (
                   <Cell 
                     key={`cell-${index}`} 
                     fill={
-                      !entry.has_data ? '#E5E7EB' :
-                      entry.health_score >= 70 ? '#10B981' : 
-                      entry.health_score >= 40 ? '#F59E0B' : '#EF4444'
+                      !entry.has_data ? '#D1D5DB' :        // Light grey for no incidents
+                      entry.health_score >= 80 ? '#10B981' : // Green for healthy (80-100)
+                      entry.health_score >= 60 ? '#F59E0B' : // Yellow for fair (60-79)
+                      entry.health_score >= 40 ? '#F97316' : // Orange for concerning (40-59)
+                      '#EF4444'                             // Red for poor (0-39)
                     }
-                    stroke={!entry.has_data ? '#9CA3AF' : undefined}
-                    strokeWidth={!entry.has_data ? 1 : 0}
-                    strokeDasharray={!entry.has_data ? '3,3' : undefined}
-                    opacity={!entry.has_data ? 0.6 : 1}
+                    stroke={!entry.has_data ? '#9CA3AF' : 'none'}
+                    strokeWidth={!entry.has_data ? 2 : 0}
+                    strokeDasharray={!entry.has_data ? '4,4' : 'none'}
+                    opacity={!entry.has_data ? 0.7 : 1}
                   />
                 ))}
               </Bar>
@@ -193,9 +210,10 @@ function IndividualDailyHealthChart({ memberData, analysisId, currentAnalysis }:
           </ResponsiveContainer>
         </div>
         
-        <div className="mt-3 text-xs text-gray-500 space-y-1">
-          <p>• Scores shown only for days with incident involvement</p>
-          <p>• Grey bars indicate no incident activity that day</p>
+        <div className="mt-4 text-xs text-gray-500 space-y-1">
+          <p>• Health scores calculated based on incident load, severity, and timing</p>
+          <p>• Grey dashed bars represent days with no incident involvement</p>
+          <p>• Higher scores indicate better work-life balance and lower stress</p>
         </div>
       </CardContent>
     </Card>
@@ -506,255 +524,243 @@ export function MemberDetailModal({
               </Card>
             )}
 
-            <Tabs defaultValue="factors" className="w-full">
-              {(() => {
-                // Check if GitHub data exists
-                const hasGitHubData = selectedMember.github_activity?.commits_count > 0 || 
-                                     selectedMember.github_activity?.pull_requests_count > 0;
-                
-                // Check if Slack data exists  
-                const hasSlackData = selectedMember.slack_activity?.messages_sent > 0 ||
-                                   selectedMember.slack_activity?.channels_active > 0;
-                
-                // Calculate grid columns based on available data (including Daily Health tab)
-                const tabCount = 3 + (hasGitHubData ? 1 : 0) + (hasSlackData ? 1 : 0);
-                const gridCols = tabCount === 3 ? 'grid-cols-3' :
-                                tabCount === 4 ? 'grid-cols-4' : 
-                                tabCount === 5 ? 'grid-cols-5' : 'grid-cols-3';
-                
-                return (
-                  <TabsList className={`grid w-full ${gridCols}`}>
-                    <TabsTrigger value="factors">Factors</TabsTrigger>
-                    <TabsTrigger value="incidents">Incidents</TabsTrigger>
-                    <TabsTrigger value="daily">Daily Health</TabsTrigger>
+            {/* Burnout Risk Factors - Always Visible */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Burnout Risk Factors</CardTitle>
+                <CardDescription>Key factors contributing to burnout risk</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RadarChart data={[
+                      { 
+                        factor: 'Workload', 
+                        value: selectedMember.factors?.workload || 0
+                      },
+                      { 
+                        factor: 'After Hours', 
+                        value: selectedMember.factors?.afterHours || 0
+                      },
+                      { 
+                        factor: 'Weekend Work', 
+                        value: selectedMember.factors?.weekendWork || 0
+                      },
+                      { 
+                        factor: 'Incident Load', 
+                        value: selectedMember.factors?.incidentLoad || 0
+                      },
+                      { 
+                        factor: 'Response Time', 
+                        value: selectedMember.factors?.responseTime || 0
+                      }
+                    ]}>
+                      <PolarGrid />
+                      <PolarAngleAxis dataKey="factor" tick={{ fontSize: 11 }} />
+                      <PolarRadiusAxis domain={[0, 10]} tick={{ fontSize: 9 }} />
+                      <Radar
+                        name="Risk Level"
+                        dataKey="value"
+                        stroke="#8b5cf6"
+                        fill="#8b5cf6"
+                        fillOpacity={0.3}
+                        strokeWidth={2}
+                      />
+                    </RadarChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Incident Response Metrics */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Incident Response Metrics</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-sm">Total Incidents</span>
+                  <span className="font-medium">{selectedMember.incidentsHandled}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm">After Hours Work</span>
+                  <span className="font-medium">{(memberData?.metrics?.after_hours_percentage || 0).toFixed(1)}%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm">Weekend Work</span>
+                  <span className="font-medium">{(memberData?.metrics?.weekend_percentage || 0).toFixed(1)}%</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Daily Health Chart - Full Width */}
+            <IndividualDailyHealthChart 
+              memberData={memberData}
+              analysisId={selectedMember.analysisId}
+              currentAnalysis={selectedMember.currentAnalysis}
+            />
+
+            {/* Conditional Tabs for GitHub/Slack Data - Only show if data exists */}
+            {(() => {
+              // Check if GitHub data exists
+              const hasGitHubData = selectedMember.github_activity?.commits_count > 0 || 
+                                   selectedMember.github_activity?.pull_requests_count > 0;
+              
+              // Check if Slack data exists  
+              const hasSlackData = selectedMember.slack_activity?.messages_sent > 0 ||
+                                 selectedMember.slack_activity?.channels_active > 0;
+              
+              // Only show tabs if there's GitHub or Slack data
+              if (!hasGitHubData && !hasSlackData) {
+                return null;
+              }
+              
+              return (
+                <Tabs defaultValue={hasGitHubData ? "github" : "communication"} className="w-full">
+                  <TabsList className={`grid w-full ${(hasGitHubData && hasSlackData) ? 'grid-cols-2' : 'grid-cols-1'}`}>
                     {hasGitHubData && <TabsTrigger value="github">GitHub</TabsTrigger>}
                     {hasSlackData && <TabsTrigger value="communication">Communication</TabsTrigger>}
                   </TabsList>
-                );
-              })()}
 
-              <TabsContent value="factors" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base">Burnout Risk Factors</CardTitle>
-                    <CardDescription>Key factors contributing to burnout risk</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="h-64">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <RadarChart data={[
-                          { 
-                            factor: 'Workload', 
-                            value: selectedMember.factors?.workload || 0
-                          },
-                          { 
-                            factor: 'After Hours', 
-                            value: selectedMember.factors?.afterHours || 0
-                          },
-                          { 
-                            factor: 'Weekend Work', 
-                            value: selectedMember.factors?.weekendWork || 0
-                          },
-                          { 
-                            factor: 'Incident Load', 
-                            value: selectedMember.factors?.incidentLoad || 0
-                          },
-                          { 
-                            factor: 'Response Time', 
-                            value: selectedMember.factors?.responseTime || 0
-                          }
-                        ]}>
-                          <PolarGrid />
-                          <PolarAngleAxis dataKey="factor" tick={{ fontSize: 11 }} />
-                          <PolarRadiusAxis domain={[0, 10]} tick={{ fontSize: 9 }} />
-                          <Radar
-                            name="Risk Level"
-                            dataKey="value"
-                            stroke="#8b5cf6"
-                            fill="#8b5cf6"
-                            fillOpacity={0.3}
-                            strokeWidth={2}
-                          />
-                        </RadarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="incidents" className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-sm">Incident Response Metrics</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <div className="flex justify-between">
-                        <span className="text-sm">Total Incidents</span>
-                        <span className="font-medium">{selectedMember.incidentsHandled}</span>
+                  <TabsContent value="github" className="space-y-4">
+                    {selectedMember.github_activity ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <Card>
+                          <CardHeader>
+                            <CardTitle className="text-sm">Development Activity</CardTitle>
+                          </CardHeader>
+                          <CardContent className="space-y-3">
+                            <div className="flex justify-between">
+                              <span className="text-sm">Commits</span>
+                              <span className="font-medium">{selectedMember.github_activity?.commits_count || 0}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-sm">Commits/Week</span>
+                              <span className="font-medium">{selectedMember.github_activity?.commits_per_week?.toFixed(1) || '0.0'}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-sm">After Hours Commits</span>
+                              <span className="font-medium">{selectedMember.github_activity?.after_hours_commits || 0}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-sm">Weekend Activity</span>
+                              <span className="font-medium">{selectedMember.github_activity?.weekend_commits || 0}</span>
+                            </div>
+                          </CardContent>
+                        </Card>
+                        
+                        {selectedMember.github_activity?.daily_commits && (
+                          <Card>
+                            <CardHeader>
+                              <CardTitle className="text-sm">Commit Pattern (Last 30 Days)</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="h-32">
+                                <ResponsiveContainer width="100%" height="100%">
+                                  <AreaChart data={selectedMember.github_activity.daily_commits}>
+                                    <XAxis 
+                                      dataKey="date" 
+                                      fontSize={10}
+                                      tick={{ fontSize: 10 }}
+                                      domain={[0, 'dataMax']}
+                                    />
+                                    <YAxis 
+                                      fontSize={10}
+                                      tick={{ fontSize: 10 }}
+                                      domain={[0, 'dataMax']}
+                                    />
+                                    <Tooltip 
+                                      content={({ payload, label }) => {
+                                        if (payload && payload.length > 0) {
+                                          const data = payload[0].payload;
+                                          return (
+                                            <div className="bg-white p-2 border border-gray-200 rounded-lg shadow-lg">
+                                              <p className="text-xs font-semibold text-gray-900">{label}</p>
+                                              <p className="text-xs text-indigo-600">
+                                                {data.commits} commits
+                                                {data.isWeekend && <span className="text-gray-500 ml-1">(Weekend)</span>}
+                                              </p>
+                                              {data.afterHours > 0 && (
+                                                <p className="text-xs text-gray-500">
+                                                  {data.afterHours} after hours
+                                                </p>
+                                              )}
+                                            </div>
+                                          );
+                                        }
+                                        return null;
+                                      }}
+                                    />
+                                    <Area 
+                                      type="monotone" 
+                                      dataKey="commits" 
+                                      stroke="#6366F1" 
+                                      strokeWidth={2}
+                                      fillOpacity={1} 
+                                      fill="url(#colorCommits)" 
+                                    />
+                                  </AreaChart>
+                                </ResponsiveContainer>
+                              </div>
+                              <div className="mt-2 text-xs text-indigo-600 text-center">
+                                Average: {selectedMember.github_activity.commits_per_week?.toFixed(1) || '0'} commits/week
+                                {selectedMember.github_activity.after_hours_commits > 0 && (
+                                  <span className="ml-2">
+                                    • {((selectedMember.github_activity.after_hours_commits / selectedMember.github_activity.commits_count) * 100).toFixed(0)}% after hours
+                                  </span>
+                                )}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        )}
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-sm">Avg Response Time</span>
-                        <span className="font-medium">{selectedMember.avgResponseTime}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-sm">After Hours Work</span>
-                        <span className="font-medium">{(memberData?.metrics?.after_hours_percentage || 0).toFixed(1)}%</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-sm">Weekend Work</span>
-                        <span className="font-medium">{(memberData?.metrics?.weekend_percentage || 0).toFixed(1)}%</span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="daily" className="space-y-4">
-                <IndividualDailyHealthChart 
-                  memberData={memberData}
-                  analysisId={selectedMember.analysisId}
-                  currentAnalysis={selectedMember.currentAnalysis}
-                />
-              </TabsContent>
-
-              <TabsContent value="github" className="space-y-4">
-                {selectedMember.github_activity ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-sm">Development Activity</CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-3">
-                        <div className="flex justify-between">
-                          <span className="text-sm">Commits</span>
-                          <span className="font-medium">{selectedMember.github_activity?.commits_count || 0}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-sm">Commits/Week</span>
-                          <span className="font-medium">{selectedMember.github_activity?.commits_per_week?.toFixed(1) || '0.0'}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-sm">After Hours Commits</span>
-                          <span className="font-medium">{selectedMember.github_activity?.after_hours_commits || 0}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-sm">Weekend Activity</span>
-                          <span className="font-medium">{selectedMember.github_activity?.weekend_commits || 0}</span>
-                        </div>
-                      </CardContent>
-                    </Card>
-                    
-                    {selectedMember.github_activity?.daily_commits && (
+                    ) : (
                       <Card>
-                        <CardHeader>
-                          <CardTitle className="text-sm">Commit Pattern (Last 30 Days)</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="h-32">
-                            <ResponsiveContainer width="100%" height="100%">
-                              <AreaChart data={selectedMember.github_activity.daily_commits}>
-                                <XAxis 
-                                  dataKey="date" 
-                                  fontSize={10}
-                                  tick={{ fontSize: 10 }}
-                                  domain={[0, 'dataMax']}
-                                />
-                                <YAxis 
-                                  fontSize={10}
-                                  tick={{ fontSize: 10 }}
-                                  domain={[0, 'dataMax']}
-                                />
-                                <Tooltip 
-                                  content={({ payload, label }) => {
-                                    if (payload && payload.length > 0) {
-                                      const data = payload[0].payload;
-                                      return (
-                                        <div className="bg-white p-2 border border-gray-200 rounded-lg shadow-lg">
-                                          <p className="text-xs font-semibold text-gray-900">{label}</p>
-                                          <p className="text-xs text-indigo-600">
-                                            {data.commits} commits
-                                            {data.isWeekend && <span className="text-gray-500 ml-1">(Weekend)</span>}
-                                          </p>
-                                          {data.afterHours > 0 && (
-                                            <p className="text-xs text-gray-500">
-                                              {data.afterHours} after hours
-                                            </p>
-                                          )}
-                                        </div>
-                                      );
-                                    }
-                                    return null;
-                                  }}
-                                />
-                                <Area 
-                                  type="monotone" 
-                                  dataKey="commits" 
-                                  stroke="#6366F1" 
-                                  strokeWidth={2}
-                                  fillOpacity={1} 
-                                  fill="url(#colorCommits)" 
-                                />
-                              </AreaChart>
-                            </ResponsiveContainer>
-                          </div>
-                          <div className="mt-2 text-xs text-indigo-600 text-center">
-                            Average: {selectedMember.github_activity.commits_per_week?.toFixed(1) || '0'} commits/week
-                            {selectedMember.github_activity.after_hours_commits > 0 && (
-                              <span className="ml-2">
-                                • {((selectedMember.github_activity.after_hours_commits / selectedMember.github_activity.commits_count) * 100).toFixed(0)}% after hours
-                              </span>
-                            )}
-                          </div>
+                        <CardContent className="p-6 text-center">
+                          <p className="text-gray-500">No GitHub activity data available</p>
                         </CardContent>
                       </Card>
                     )}
-                  </div>
-                ) : (
-                  <Card>
-                    <CardContent className="p-6 text-center">
-                      <p className="text-gray-500">No GitHub activity data available</p>
-                    </CardContent>
-                  </Card>
-                )}
-              </TabsContent>
+                  </TabsContent>
 
-              <TabsContent value="communication" className="space-y-4">
-                {selectedMember.slack_activity ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-sm">Communication Activity</CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-3">
-                        <div className="flex justify-between">
-                          <span className="text-sm">Messages Sent</span>
-                          <span className="font-medium">{selectedMember.slack_activity?.messages_sent || 0}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-sm">Active Channels</span>
-                          <span className="font-medium">{selectedMember.slack_activity?.channels_active || 0}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-sm">After Hours Messages</span>
-                          <span className="font-medium">{selectedMember.slack_activity?.after_hours_messages || 0}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-sm">Sentiment Score</span>
-                          <span className="font-medium">{selectedMember.slack_activity?.sentiment_score || 'N/A'}</span>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-                ) : (
-                  <Card>
-                    <CardContent className="p-6 text-center">
-                      <p className="text-gray-500">No Slack activity data available</p>
-                    </CardContent>
-                  </Card>
-                )}
-              </TabsContent>
-            </Tabs>
+                  <TabsContent value="communication" className="space-y-4">
+                    {selectedMember.slack_activity ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <Card>
+                          <CardHeader>
+                            <CardTitle className="text-sm">Communication Activity</CardTitle>
+                          </CardHeader>
+                          <CardContent className="space-y-3">
+                            <div className="flex justify-between">
+                              <span className="text-sm">Messages Sent</span>
+                              <span className="font-medium">{selectedMember.slack_activity?.messages_sent || 0}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-sm">Active Channels</span>
+                              <span className="font-medium">{selectedMember.slack_activity?.channels_active || 0}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-sm">After Hours Messages</span>
+                              <span className="font-medium">{selectedMember.slack_activity?.after_hours_messages || 0}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-sm">Sentiment Score</span>
+                              <span className="font-medium">{selectedMember.slack_activity?.sentiment_score || 'N/A'}</span>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </div>
+                    ) : (
+                      <Card>
+                        <CardContent className="p-6 text-center">
+                          <p className="text-gray-500">No Slack activity data available</p>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </TabsContent>
+                </Tabs>
+              );
+            })()}
           </div>
         );
         })()}
