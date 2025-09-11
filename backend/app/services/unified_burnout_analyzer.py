@@ -1140,8 +1140,8 @@ class UnifiedBurnoutAnalyzer:
             'work_hours_trend': apply_incident_tiers(incidents_per_week) * 10,      # Scale to 0-100
             'weekend_work': min(100, after_hours_pct * 2),                                 # Keep simple scaling for after-hours  
             'after_hours_activity': after_hours_pct,                                       # Direct mapping
-            'vacation_usage': apply_incident_tiers(total_incidents / 4) * 10,       # Apply tiers to total load
-            'sleep_quality_proxy': min(100, apply_rootly_escalation_tiers(escalation_rate) * 10),  # Tiered escalation impact
+            'vacation_usage': min(100, (severity_weighted_per_week / 20) * 100),    # ENHANCED: SEV1s prevent recovery
+            'sleep_quality_proxy': min(100, apply_rootly_incident_tiers(severity_weighted_per_week) * 8),  # ENHANCED: SEV1 incidents disrupt sleep
             
             # Work-related burnout factors - using Rootly's response time tiers  
             'sprint_completion': apply_rootly_response_tiers(avg_response_minutes) * 10,   # Tiered response pressure

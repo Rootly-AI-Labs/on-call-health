@@ -37,7 +37,7 @@ class CBIConfig:
     # Maps current metrics to CBI Personal Burnout items (0-100 scale)
     PERSONAL_BURNOUT_FACTORS = {
         'work_hours_trend': {
-            'weight': 0.25,
+            'weight': 0.15,  # Reduced to accommodate increased sleep_quality_proxy weight
             'description': 'Physical fatigue from excessive work hours',
             'calculation': 'hours_over_45_per_week',
             'scale_max': 100  # Hours >60/week = 100 burnout
@@ -61,10 +61,10 @@ class CBIConfig:
             'scale_max': 80  # 80%+ unused PTO = 100 burnout
         },
         'sleep_quality_proxy': {
-            'weight': 0.20,
-            'description': 'Energy level estimation from late night activity',
-            'calculation': 'late_night_commits_frequency',
-            'scale_max': 30  # >30% commits after 10pm = 100 burnout
+            'weight': 0.30,  # Increased weight - SEV1 incidents often happen at night
+            'description': 'Energy level estimation from late night activity and incident stress',
+            'calculation': 'late_night_commits_frequency_and_incident_stress',
+            'scale_max': 20  # >20% commits after 10pm OR high incident stress = 100 burnout
         }
     }
     
@@ -72,40 +72,40 @@ class CBIConfig:
     # Maps current metrics to CBI Work-Related Burnout items (0-100 scale)
     WORK_RELATED_BURNOUT_FACTORS = {
         'sprint_completion': {
-            'weight': 0.20,
+            'weight': 0.15,  # Reduced from 0.20
             'description': 'Work pressure from missed deadlines',
             'calculation': 'missed_deadline_percentage',
             'scale_max': 50  # >50% missed deadlines = 100 burnout
         },
         'code_review_speed': {
-            'weight': 0.15,
+            'weight': 0.10,  # Reduced from 0.15
             'description': 'Workload sustainability pressure',
             'calculation': 'review_turnaround_stress',
             'scale_max': 120  # >120 hour avg turnaround = 100 burnout
         },
         'pr_frequency': {
-            'weight': 0.15,
+            'weight': 0.10,  # Reduced from 0.15
             'description': 'Work intensity from PR volume',
             'calculation': 'pr_volume_stress_score',
             'scale_max': 100  # Excessive or insufficient PRs = stress
         },
         'deployment_frequency': {
-            'weight': 0.15,
+            'weight': 0.20,  # Increased back to handle critical incident impact
             'description': 'Delivery pressure from deployment stress',
             'calculation': 'deployment_pressure_score',
             'scale_max': 100  # Failed deploys + high frequency = stress
         },
         'meeting_load': {
-            'weight': 0.10,  # Reduced weight to accommodate increased oncall_burden weight
+            'weight': 0.05,  # Further reduced to accommodate oncall_burden weight increase
             'description': 'Context switching burden',
             'calculation': 'meeting_density_impact',
             'scale_max': 80  # >80% day in meetings = 100 burnout
         },
         'oncall_burden': {
-            'weight': 0.25,  # Increased weight for incident response stress
+            'weight': 0.40,  # CRITICAL: Dominant weight for incident response stress (Ed's case)
             'description': 'Work-related stress from incident response (severity-weighted)',
             'calculation': 'incident_response_frequency_with_severity',
-            'scale_max': 30  # >30 severity-weighted incidents/week = 100 burnout (accounts for SEV0/1 multipliers)
+            'scale_max': 50  # >50 severity-weighted incidents/week = 100 burnout (handles extreme SEV1 loads)
         }
     }
     
