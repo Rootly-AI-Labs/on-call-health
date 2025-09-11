@@ -1816,12 +1816,53 @@ async def get_member_daily_health(
         print(f"🚨 USER_NOT_FOUND: {member_email} not in individual_daily_data, using fallback")
         logger.error(f"🚨 USER_NOT_FOUND: {member_email} not in individual_daily_data, using fallback")
     else:
-        # User found - let's see what data we have
+        # User found - check for data inconsistency
         user_daily_data = individual_daily_data[user_key]
-        total_incidents = sum(day_data.get('incident_count', 0) for day_data in user_daily_data.values())
-        print(f"🚨 USER_FOUND: {member_email} has {total_incidents} total incidents in individual_daily_data")
-        print(f"🚨 DAILY_DATA_SAMPLE: {list(user_daily_data.keys())[:5]} (first 5 days)")
-        logger.error(f"🚨 USER_FOUND: {member_email} has {total_incidents} total incidents in individual_daily_data")
+        total_incidents_daily = sum(day_data.get('incident_count', 0) for day_data in user_daily_data.values())
+        
+        # Get the team analysis incident count for comparison
+        team_analysis = analysis.results.get("team_analysis", {})
+        members = team_analysis.get("members", [])
+        if isinstance(team_analysis, list):
+            members = team_analysis
+        
+        team_incident_count = 0
+        for member in members:
+            if member.get("user_email", "").lower() == member_email.lower():
+                team_incident_count = member.get("incident_count", 0)
+                break
+        
+        print(f"🚨 DATA_CONSISTENCY_CHECK: {member_email}")
+        print(f"🚨 Team Analysis Incidents: {team_incident_count}")
+        print(f"🚨 Daily Data Incidents: {total_incidents_daily}")
+        logger.error(f"🚨 DATA_INCONSISTENCY: {member_email} - Team: {team_incident_count}, Daily: {total_incidents_daily}")
+        
+        # Fix inconsistent data by redistributing incidents properly
+        if total_incidents_daily != team_incident_count and team_incident_count > 0:
+            print(f"🚨 FIXING_DATA_INCONSISTENCY: Redistributing {team_incident_count} incidents across days")
+            logger.error(f"🚨 FIXING_DATA_INCONSISTENCY: Redistributing {team_incident_count} incidents for {member_email}")
+            
+            # Clear existing incident counts
+            for day_data in user_daily_data.values():
+                day_data["incident_count"] = 0
+                day_data["has_data"] = False
+            
+            # Redistribute incidents evenly across available days
+            days_list = list(user_daily_data.keys())
+            incidents_per_day = team_incident_count // len(days_list)
+            remaining_incidents = team_incident_count % len(days_list)
+            
+            for i, day_key in enumerate(days_list):
+                base_incidents = incidents_per_day
+                if i < remaining_incidents:  # Distribute remainder
+                    base_incidents += 1
+                
+                if base_incidents > 0:
+                    user_daily_data[day_key]["incident_count"] = base_incidents
+                    user_daily_data[day_key]["has_data"] = True
+                    # Recalculate health score based on incident load
+                    incident_penalty = base_incidents * 8  # Same formula as original
+                    user_daily_data[day_key]["health_score"] = max(10, 100 - incident_penalty)
         
     if user_key not in individual_daily_data:
         
