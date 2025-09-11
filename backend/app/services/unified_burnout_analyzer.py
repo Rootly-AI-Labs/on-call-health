@@ -164,13 +164,32 @@ class UnifiedBurnoutAnalyzer:
                 logger.info(f"     - Title: {sample_incident.get('title', 'No title')[:50]}")
                 logger.info(f"     - Assigned_to: {sample_incident.get('assigned_to')}")
                 
-                # Count incidents with assignments across all incidents
+                # Count incidents with assignments across all incidents (use platform-specific logic)
                 for i, incident in enumerate(incidents[:10]):  # Check first 10
-                    assigned_to = incident.get("assigned_to")
-                    if assigned_to and assigned_to.get("id"):
+                    user_id = None
+                    user_name = None
+                    
+                    if self.platform == "pagerduty":
+                        # PagerDuty format
+                        assignments = incident.get("assignments", [])
+                        if assignments:
+                            assignee = assignments[0].get("assignee", {})
+                            user_id = assignee.get("id")
+                            user_name = assignee.get("name")
+                    else:  # Rootly
+                        # Rootly format - same as team analysis logic
+                        attrs = incident.get("attributes", {})
+                        if attrs:
+                            user_info = attrs.get("user", {})
+                            if isinstance(user_info, dict) and "data" in user_info:
+                                user_data = user_info.get("data", {})
+                                user_id = user_data.get("id")
+                                user_name = user_data.get("name") or user_data.get("full_name")
+                    
+                    if user_id:
                         incidents_with_assignments += 1
                         if i < 3:  # Log first 3 assignments
-                            logger.info(f"     - Incident #{i+1} assigned to: {assigned_to.get('name')} (ID: {assigned_to.get('id')})")
+                            logger.info(f"     - Incident #{i+1} assigned to: {user_name} (ID: {user_id})")
                 
                 logger.info(f"   - Incidents with assignments: {incidents_with_assignments}/{min(len(incidents), 10)} (first 10 checked)")
                 
@@ -185,9 +204,25 @@ class UnifiedBurnoutAnalyzer:
                 incident_user_ids = set()
                 
                 for incident in incidents:
-                    assigned_to = incident.get("assigned_to")
-                    if assigned_to and assigned_to.get("id"):
-                        incident_user_ids.add(str(assigned_to["id"]))
+                    user_id = None
+                    
+                    if self.platform == "pagerduty":
+                        # PagerDuty format
+                        assignments = incident.get("assignments", [])
+                        if assignments:
+                            assignee = assignments[0].get("assignee", {})
+                            user_id = assignee.get("id")
+                    else:  # Rootly
+                        # Rootly format - same as team analysis logic
+                        attrs = incident.get("attributes", {})
+                        if attrs:
+                            user_info = attrs.get("user", {})
+                            if isinstance(user_info, dict) and "data" in user_info:
+                                user_data = user_info.get("data", {})
+                                user_id = user_data.get("id")
+                    
+                    if user_id:
+                        incident_user_ids.add(str(user_id))
                 
                 matching_user_ids = user_ids_from_users.intersection(incident_user_ids)
                 
