@@ -4668,6 +4668,8 @@ export default function Dashboard() {
         selectedMember={selectedMember}
         setSelectedMember={setSelectedMember}
         members={members}
+        analysisId={currentAnalysis?.id || currentAnalysis?.uuid}
+        currentAnalysis={currentAnalysis}
       />
 
       {/* Delete Confirmation Dialog */}

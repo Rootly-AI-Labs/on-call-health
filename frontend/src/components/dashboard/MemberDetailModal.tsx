@@ -24,28 +24,49 @@ function IndividualDailyHealthChart({ memberData, analysisId, currentAnalysis }:
 
   useEffect(() => {
     const fetchDailyHealth = async () => {
-      if (!memberData?.user_email || !analysisId) return;
+      console.log('📊 Daily Health - Starting fetch for:', {
+        memberEmail: memberData?.user_email,
+        analysisId: analysisId,
+        hasAuth: !!localStorage.getItem('auth_token')
+      });
+      
+      if (!memberData?.user_email || !analysisId) {
+        console.log('❌ Daily Health - Missing required data:', {
+          hasEmail: !!memberData?.user_email,
+          hasAnalysisId: !!analysisId
+        });
+        return;
+      }
       
       setLoading(true);
       setError(null);
       
       try {
         const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-        const response = await fetch(
-          `${API_BASE}/analyses/${analysisId}/members/${encodeURIComponent(memberData.user_email)}/daily-health`, {
+        const url = `${API_BASE}/analyses/${analysisId}/members/${encodeURIComponent(memberData.user_email)}/daily-health`;
+        console.log('📊 Daily Health - Fetching from URL:', url);
+        
+        const response = await fetch(url, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
             'Content-Type': 'application/json'
           }
         });
         
+        console.log('📊 Daily Health - Response status:', response.status);
+        
         if (!response.ok) {
+          const errorText = await response.text();
+          console.log('❌ Daily Health - Error response:', errorText);
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
         
         const result = await response.json();
+        console.log('📊 Daily Health - API result:', result);
         
         if (result.status === 'success' && result.data?.daily_health) {
+          console.log('📊 Daily Health - Raw daily health data:', result.data.daily_health);
+          
           const formattedData = result.data.daily_health.map((day: any) => ({
             date: day.date,
             health_score: day.health_score,
@@ -58,8 +79,10 @@ function IndividualDailyHealthChart({ memberData, analysisId, currentAnalysis }:
             has_data: day.has_data !== undefined ? day.has_data : day.incident_count > 0
           }));
           
+          console.log('📊 Daily Health - Formatted data:', formattedData);
           setDailyHealthData(formattedData);
         } else {
+          console.log('❌ Daily Health - No data or failure:', result);
           setError(result.message || 'No daily health data available');
         }
       } catch (err) {
@@ -224,12 +247,16 @@ interface MemberDetailModalProps {
   selectedMember: any | null
   setSelectedMember: (member: any | null) => void
   members: any[]
+  analysisId?: number | string
+  currentAnalysis?: any
 }
 
 export function MemberDetailModal({
   selectedMember,
   setSelectedMember,
-  members
+  members,
+  analysisId,
+  currentAnalysis
 }: MemberDetailModalProps) {
   if (!selectedMember) return null
 
@@ -603,11 +630,21 @@ export function MemberDetailModal({
             </Card>
 
             {/* Daily Health Chart - Full Width */}
-            <IndividualDailyHealthChart 
-              memberData={memberData}
-              analysisId={selectedMember.analysisId}
-              currentAnalysis={selectedMember.currentAnalysis}
-            />
+            {(() => {
+              console.log('📊 Daily Health - Rendering with props:', {
+                memberData: memberData,
+                selectedMember: selectedMember,
+                analysisId: analysisId,
+                hasCurrentAnalysis: !!currentAnalysis
+              });
+              return (
+                <IndividualDailyHealthChart 
+                  memberData={memberData}
+                  analysisId={analysisId}
+                  currentAnalysis={currentAnalysis}
+                />
+              );
+            })()}
 
             {/* Conditional Tabs for GitHub/Slack Data - Only show if data exists */}
             {(() => {
