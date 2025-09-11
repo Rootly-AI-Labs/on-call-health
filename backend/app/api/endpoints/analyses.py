@@ -2193,6 +2193,7 @@ async def get_member_daily_health(
                 # If no incidents, use baseline low burnout score (no randomization)
                 # CONSISTENT with CBI methodology: higher = more burnout
                 health_score = 0
+                logger.error(f"🚨 FALLBACK_SCORE: {member_email} on {date_str} - no incidents, using score 0")
                 
             # Calculate team health (fallback)
             team_health_by_date = {}
@@ -2216,6 +2217,10 @@ async def get_member_daily_health(
             "after_hours": min(100, int(after_hours_count * 25)) if has_data else 0,
             "weekend_work": min(100, int(weekend_count * 30)) if has_data else 0
         } if has_data else None
+        
+        # FOCUSED DEBUG: Log what we're returning for Andre specifically  
+        if member_email == "andre@rootly.com" and health_score != 0:
+            logger.error(f"🚨 ANDRE_SCORE: {date_str} - health_score={health_score}, incident_count={incident_count}, has_data={has_data}")
         
         daily_health_scores.append({
             "date": date_str,
