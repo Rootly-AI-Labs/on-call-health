@@ -1813,7 +1813,17 @@ async def get_member_daily_health(
     
     if user_key not in individual_daily_data:
         # FALLBACK: Generate individual daily data for old analyses from daily_trends
-        logger.warning(f"🔍 User {member_email} not found in individual_daily_data, generating fallback from daily_trends")
+        print(f"🚨 USER_NOT_FOUND: {member_email} not in individual_daily_data, using fallback")
+        logger.error(f"🚨 USER_NOT_FOUND: {member_email} not in individual_daily_data, using fallback")
+    else:
+        # User found - let's see what data we have
+        user_daily_data = individual_daily_data[user_key]
+        total_incidents = sum(day_data.get('incident_count', 0) for day_data in user_daily_data.values())
+        print(f"🚨 USER_FOUND: {member_email} has {total_incidents} total incidents in individual_daily_data")
+        print(f"🚨 DAILY_DATA_SAMPLE: {list(user_daily_data.keys())[:5]} (first 5 days)")
+        logger.error(f"🚨 USER_FOUND: {member_email} has {total_incidents} total incidents in individual_daily_data")
+        
+    if user_key not in individual_daily_data:
         
         # Get team member data to check if this user has incidents
         team_analysis = analysis.results.get("team_analysis", {})
