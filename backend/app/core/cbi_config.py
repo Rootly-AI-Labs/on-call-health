@@ -37,10 +37,10 @@ class CBIConfig:
     # Maps current metrics to CBI Personal Burnout items (0-100 scale)
     PERSONAL_BURNOUT_FACTORS = {
         'work_hours_trend': {
-            'weight': 0.15,  # Reduced to accommodate increased sleep_quality_proxy weight
+            'weight': 0.20,
             'description': 'Physical fatigue from excessive work hours',
             'calculation': 'hours_over_45_per_week',
-            'scale_max': 100  # Hours >60/week = 100 burnout
+            'scale_max': 100
         },
         'weekend_work': {
             'weight': 0.20,
@@ -61,10 +61,10 @@ class CBIConfig:
             'scale_max': 80  # 80%+ unused PTO = 100 burnout
         },
         'sleep_quality_proxy': {
-            'weight': 0.30,  # Increased weight - SEV1 incidents often happen at night
+            'weight': 0.25,
             'description': 'Energy level estimation from late night activity and incident stress',
             'calculation': 'late_night_commits_frequency_and_incident_stress',
-            'scale_max': 20  # >20% commits after 10pm OR high incident stress = 100 burnout
+            'scale_max': 30
         }
     }
     
@@ -72,40 +72,40 @@ class CBIConfig:
     # Maps current metrics to CBI Work-Related Burnout items (0-100 scale)
     WORK_RELATED_BURNOUT_FACTORS = {
         'sprint_completion': {
-            'weight': 0.08,  # Drastically reduced for oncall_burden dominance
+            'weight': 0.15,  # Restored to reasonable level
             'description': 'Work pressure from missed deadlines',
             'calculation': 'missed_deadline_percentage',
             'scale_max': 50  # >50% missed deadlines = 100 burnout
         },
         'code_review_speed': {
-            'weight': 0.05,  # Drastically reduced for oncall_burden dominance
+            'weight': 0.15,  # Restored to reasonable level
             'description': 'Workload sustainability pressure',
             'calculation': 'review_turnaround_stress',
             'scale_max': 120  # >120 hour avg turnaround = 100 burnout
         },
         'pr_frequency': {
-            'weight': 0.05,  # Drastically reduced for oncall_burden dominance
+            'weight': 0.10,  # Restored to reasonable level
             'description': 'Work intensity from PR volume',
             'calculation': 'pr_volume_stress_score',
             'scale_max': 100  # Excessive or insufficient PRs = stress
         },
         'deployment_frequency': {
-            'weight': 0.10,  # Reduced for oncall_burden dominance
+            'weight': 0.15,  # Restored to reasonable level
             'description': 'Delivery pressure from deployment stress',
             'calculation': 'deployment_pressure_score',
             'scale_max': 100  # Failed deploys + high frequency = stress
         },
         'meeting_load': {
-            'weight': 0.02,  # Minimized for oncall_burden dominance
+            'weight': 0.10,  # Restored to reasonable level
             'description': 'Context switching burden',
             'calculation': 'meeting_density_impact',
             'scale_max': 80  # >80% day in meetings = 100 burnout
         },
         'oncall_burden': {
-            'weight': 0.70,  # EXTREME: Overwhelming weight for incident response stress 
+            'weight': 0.35,  # BALANCED: Important but not overwhelming
             'description': 'Work-related stress from incident response (severity-weighted)',
             'calculation': 'incident_response_frequency_with_severity',
-            'scale_max': 50  # >50 severity-weighted incidents/week = 100 burnout (handles extreme SEV1 loads)
+            'scale_max': 100  # >100 severity-weighted incidents/week = 100% baseline (handles extreme loads)
         }
     }
     
@@ -149,8 +149,8 @@ def calculate_personal_burnout(metrics: Dict[str, float], config: CBIConfig = No
         if factor_name in metrics:
             raw_value = max(0.0, metrics[factor_name])  # Ensure non-negative
             
-            # Calculate score based on factor's scale_max (NO ARTIFICIAL CAP!)
-            normalized_score = (raw_value / factor_config['scale_max']) * 100.0
+            # Calculate score with reasonable cap (allow 150% for extreme cases)
+            normalized_score = min(150.0, (raw_value / factor_config['scale_max']) * 100.0)
             
             # Apply weight
             weighted_score = normalized_score * factor_config['weight']
@@ -203,8 +203,8 @@ def calculate_work_related_burnout(metrics: Dict[str, float], config: CBIConfig 
         if factor_name in metrics:
             raw_value = max(0.0, metrics[factor_name])  # Ensure non-negative
             
-            # Calculate score based on factor's scale_max (NO ARTIFICIAL CAP!)
-            normalized_score = (raw_value / factor_config['scale_max']) * 100.0
+            # Calculate score with reasonable cap (allow 150% for extreme cases)
+            normalized_score = min(150.0, (raw_value / factor_config['scale_max']) * 100.0)
             
             # Apply weight
             weighted_score = normalized_score * factor_config['weight']
