@@ -1754,6 +1754,9 @@ async def get_member_daily_health(
     - Slack communication patterns
     - After-hours and weekend work
     """
+    print(f"🚨 DAILY_HEALTH_API_CALLED: analysis_id={analysis_id}, member_email={member_email}")
+    logger.error(f"🚨 DAILY_HEALTH_API_CALLED: analysis_id={analysis_id}, member_email={member_email}")
+    
     # Get the analysis
     analysis = db.query(Analysis).filter(
         Analysis.id == analysis_id,
@@ -1833,6 +1836,10 @@ async def get_member_daily_health(
                 "message": f"Member {member_email} not found in analysis results",
                 "data": None
             }
+        
+        # Log the member data we found to check incident count
+        print(f"🚨 FOUND_MEMBER_DATA: {member_email} has {member_data.get('incident_count', 0)} incidents")
+        logger.error(f"🚨 FOUND_MEMBER_DATA: {member_email} has {member_data.get('incident_count', 0)} incidents")
         
         # Create fallback daily structure with realistic data
         days_analyzed = analysis.results.get("period_summary", {}).get("days_analyzed", 30)
