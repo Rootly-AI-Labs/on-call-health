@@ -2135,19 +2135,13 @@ async def get_member_daily_health(
         for day_data in user_daily_data.values()
     )
     
-    logger.info(f"🔍 DAILY_HEALTH_API: User {member_email} has_precalculated_scores: {has_precalculated_scores}")
-    
-    # Debug: Check what's in user_daily_data
-    if user_daily_data:
-        sample_day = list(user_daily_data.keys())[0]
-        sample_data = user_daily_data[sample_day]
-        logger.warning(f"🚨 DAILY_HEALTH_DEBUG: Sample day {sample_day} for {member_email}:")
-        logger.warning(f"🚨 DAILY_HEALTH_DEBUG: Keys: {list(sample_data.keys())}")
-        logger.warning(f"🚨 DAILY_HEALTH_DEBUG: incident_count: {sample_data.get('incident_count', 'MISSING')}")
-        logger.warning(f"🚨 DAILY_HEALTH_DEBUG: health_score: {sample_data.get('health_score', 'MISSING')}")
-        logger.warning(f"🚨 DAILY_HEALTH_DEBUG: has_data: {sample_data.get('has_data', 'MISSING')}")
-    else:
-        logger.error(f"🚨 DAILY_HEALTH_DEBUG: user_daily_data is EMPTY for {member_email}!")
+    # FOCUSED DEBUG: Check if user has incidents but wrong scores
+    total_incidents = sum(day_data.get("incident_count", 0) for day_data in user_daily_data.values())
+    if total_incidents > 0:
+        sample_scores = [day_data.get("health_score") for day_data in user_daily_data.values() if day_data.get("health_score") is not None]
+        if sample_scores and all(score < 10 for score in sample_scores[:5]):
+            logger.error(f"🚨 SCORE_BUG: {member_email} has {total_incidents} total incidents but all scores are low: {sample_scores[:5]}")
+            logger.error(f"   has_precalculated_scores: {has_precalculated_scores}")
     
     for date_str, day_data in user_daily_data.items():
         incident_count = day_data.get("incident_count", 0)

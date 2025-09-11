@@ -556,7 +556,6 @@ class UnifiedBurnoutAnalyzer:
             
             # Generate daily trends from incident data
             daily_trends = self._generate_daily_trends(incidents, team_analysis["members"], metadata, team_health)
-            logger.info(f"🔍 MAIN_ANALYSIS_DEBUG: Generated {len(daily_trends)} daily trends for final result")
             
             # Get individual daily data with debug logging
             individual_daily_data = getattr(self, 'individual_daily_data', {})
@@ -701,10 +700,6 @@ class UnifiedBurnoutAnalyzer:
                 logger.warning(f"Error logging success metrics: {metrics_error}")
             
             # Debug: Log final result structure
-            logger.info(f"🔍 FINAL_RESULT_DEBUG: Final result keys: {list(result.keys())}")
-            logger.info(f"🔍 FINAL_RESULT_DEBUG: daily_trends in result: {'daily_trends' in result}, length: {len(result.get('daily_trends', []))}")
-            if result.get('daily_trends'):
-                logger.info(f"🔍 FINAL_RESULT_DEBUG: Sample daily_trends entry: {result['daily_trends'][0]}")
                 
             return result
             
@@ -2346,13 +2341,10 @@ class UnifiedBurnoutAnalyzer:
             individual_daily_data = {}  # New: track per-user daily data
             
             # PRE-INITIALIZE individual_daily_data with all team members
-            # This is critical - users must exist in the structure before incident processing
-            logger.info(f"🔍 INDIVIDUAL_INIT: Initializing individual_daily_data from {len(team_analysis)} team members")
             for user in team_analysis:
-                if user.get('user_email'):  # team_analysis uses user_email, not email
+                if user.get('user_email'):
                     user_key = user['user_email'].lower()
                     individual_daily_data[user_key] = {}
-                    logger.info(f"🔍 INDIVIDUAL_INIT: Added user_key: '{user_key}'")
                     
                     # Pre-create all date entries for this user
                     for day_offset in range(days_analyzed):
@@ -2469,11 +2461,9 @@ class UnifiedBurnoutAnalyzer:
                             # Track individual user daily data - now updating pre-initialized structure
                             if user_email:
                                 user_key = user_email.lower()
-                                logger.info(f"🔍 INCIDENT_PROCESSING: Processing incident for user_key: '{user_key}' on {date_str}")
                                 
                                 # User should already exist in our pre-initialized structure
                                 if user_key in individual_daily_data and date_str in individual_daily_data[user_key]:
-                                    logger.info(f"🔍 INCIDENT_PROCESSING: ✅ Found user_key '{user_key}' in individual_daily_data")
                                     # Update the existing entry (already initialized with defaults)
                                     user_day_data = individual_daily_data[user_key][date_str]
                                     user_day_data["incident_count"] += 1
@@ -2487,10 +2477,7 @@ class UnifiedBurnoutAnalyzer:
                                     if incident_date.weekday() >= 5:  # Saturday=5, Sunday=6
                                         user_day_data["weekend_count"] += 1
                                 else:
-                                    # Fallback: user not in our initialized structure (shouldn't happen after pre-initialization)
-                                    logger.error(f"🚨 CRITICAL: User '{user_key}' not found in pre-initialized individual_daily_data for date {date_str}")
-                                    logger.error(f"🚨 CRITICAL: Available individual_daily_data keys: {list(individual_daily_data.keys())}")
-                                    logger.error(f"🚨 CRITICAL: This will cause fake health scores!")
+                                    # Fallback: user not in our initialized structure
                                     # Create the missing user structure on-the-fly as emergency fallback
                                     if user_key not in individual_daily_data:
                                         individual_daily_data[user_key] = {}
@@ -2684,7 +2671,6 @@ class UnifiedBurnoutAnalyzer:
                     
                     # If user has data for this day, copy it over and mark as has_data
                     if user_email in individual_daily_data and date_str in individual_daily_data[user_email]:
-                        logger.info(f"🔍 HEALTH_CALC: ✅ Found real data for {user_email} on {date_str}")
                         original_data = individual_daily_data[user_email][date_str]
                         complete_individual_data[user_email][date_str].update(original_data)
                         complete_individual_data[user_email][date_str]["has_data"] = True
@@ -2697,12 +2683,15 @@ class UnifiedBurnoutAnalyzer:
                             team_analysis
                         )
                         complete_individual_data[user_email][date_str]["health_score"] = burnout_score
-                        logger.info(f"🔍 BURNOUT_CALC: Real burnout score for {user_email}: {burnout_score}")
+                        
+                        # FOCUSED DEBUG: Log score calculation for users with incidents
+                        if original_data.get("incident_count", 0) > 0:
+                            logger.warning(f"🔍 SCORE_DEBUG: {user_email} on {date_str}")
+                            logger.warning(f"   incidents: {original_data.get('incident_count', 0)}")  
+                            logger.warning(f"   severity_weighted: {original_data.get('severity_weighted_count', 0)}")
+                            logger.warning(f"   calculated_score: {burnout_score}")
                     else:
-                        logger.warning(f"🚨 HEALTH_CALC: NO DATA found for {user_email} on {date_str} - using baseline low burnout score")
-                        logger.warning(f"🚨 HEALTH_CALC: individual_daily_data keys: {list(individual_daily_data.keys())}")
-                        # NO FAKE DATA: Only calculate burnout scores from real incident data
-                        # If no incidents found for this user/date, use baseline low burnout score (no randomization)
+                        # No incidents = low burnout (score 0)
                         complete_individual_data[user_email][date_str]["health_score"] = 0
             
             # Calculate team average health scores for each day and add to individual data
@@ -2734,25 +2723,9 @@ class UnifiedBurnoutAnalyzer:
             logger.info(f"Generated {len(daily_trends)} daily trend data points with actual incident data for {days_analyzed}-day analysis")
             logger.info(f"Individual daily data collected for {len(complete_individual_data)} users with complete {days_analyzed}-day coverage")
             
-            # Debug: Log sample data for troubleshooting
-            if daily_trends:
-                logger.info(f"🔍 DAILY_TRENDS_DEBUG: Sample trend data - First entry: {daily_trends[0]}")
-                logger.info(f"🔍 DAILY_TRENDS_DEBUG: Date range: {daily_trends[0]['date']} to {daily_trends[-1]['date']}")
-                logger.info(f"🔍 DAILY_TRENDS_DEBUG: Score range: {min(d['overall_score'] for d in daily_trends):.2f} to {max(d['overall_score'] for d in daily_trends):.2f}")
-            else:
-                logger.warning(f"🔍 DAILY_TRENDS_DEBUG: No incident data available - returning empty trends")
+            # Store the complete individual daily data
+            self.individual_daily_data = complete_individual_data
             
-            # Debug individual data
-            if individual_daily_data:
-                sample_user = list(individual_daily_data.keys())[0]
-                sample_days = len(individual_daily_data[sample_user])
-                users_with_data = sum(1 for user_data in individual_daily_data.values() 
-                                    for day_data in user_data.values() 
-                                    if day_data.get('has_data', False))
-                logger.info(f"🔍 INDIVIDUAL_DATA_DEBUG: {len(individual_daily_data)} users initialized, sample user {sample_user} has {sample_days} days. {users_with_data} user-days have actual incident data.")
-            else:
-                logger.warning(f"🔍 INDIVIDUAL_DATA_DEBUG: individual_daily_data is empty! Team analysis had {len(team_analysis)} members.")
-                
             return daily_trends
             
         except Exception as e:
@@ -2868,13 +2841,10 @@ class UnifiedBurnoutAnalyzer:
             # Apply bounds (0-100 range, higher = more burnout)
             final_burnout_score = max(0, min(100, int(final_burnout_score)))
             
-            # Log detailed calculation for debugging (only for high-impact days)
-            if incident_count > 0 or final_burnout_score > 30:
-                logger.info(f"🩺 BURNOUT_CALC for {user_email} on {date_obj.strftime('%Y-%m-%d')}: "
-                           f"incidents={incident_count}, severity_wt={severity_weighted:.1f}, "
-                           f"after_hours={after_hours_count}, weekend={weekend_count}, "
-                           f"burnout: inc={incident_burnout}, sev={severity_burnout}, ah={after_hours_burnout}, we={weekend_burnout}, "
-                           f"multiplier={critical_multiplier:.2f}, final_score={final_burnout_score}")
+            # FOCUSED DEBUG: Only log when score seems wrong 
+            if incident_count > 0 and final_burnout_score < 10:
+                logger.error(f"🚨 LOW_SCORE_BUG: {user_email} has {incident_count} incidents but score only {final_burnout_score}")
+                logger.error(f"   severity_weighted={severity_weighted}, incident_burnout={incident_burnout}, severity_burnout={severity_burnout}")
             
             return final_burnout_score
             
