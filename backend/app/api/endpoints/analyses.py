@@ -2256,9 +2256,6 @@ async def get_member_daily_health(
             "weekend_work": min(100, int(weekend_count * 30)) if has_data else 0
         } if has_data else None
         
-        # FOCUSED DEBUG: Log what we're returning for Andre specifically  
-        if member_email == "andre@rootly.com" and health_score != 0:
-            logger.error(f"🚨 ANDRE_SCORE: {date_str} - health_score={health_score}, incident_count={incident_count}, has_data={has_data}")
         
         # Extract enhanced data if available
         severity_breakdown = day_data.get("severity_breakdown", {})
@@ -2287,25 +2284,6 @@ async def get_member_daily_health(
     days_with_data = [d for d in daily_health_scores if d["has_data"]]
     days_without_data = [d for d in daily_health_scores if not d["has_data"]]
     
-    # Debug logging for API response
-    # COMPREHENSIVE FRONTEND LOGGING: Show exact data sent to frontend
-    logger.error(f"🔥 FRONTEND_DATA for {member_email}:")
-    logger.error(f"   Total days: {len(daily_health_scores)}")
-    logger.error(f"   Days with incidents: {len(days_with_data)}")
-    
-    # Log first 5 days to see the pattern
-    for i, day in enumerate(daily_health_scores[:5]):
-        logger.error(f"   Day {i+1}: {day['date']} - incidents:{day['incident_count']} score:{day['health_score']} has_data:{day['has_data']}")
-    
-    if len(daily_health_scores) > 5:
-        logger.error(f"   ... (showing first 5 of {len(daily_health_scores)} days)")
-        
-    # Show any days with incidents or non-zero scores
-    problem_days = [day for day in daily_health_scores if day['incident_count'] > 0 or day['health_score'] > 0]
-    if problem_days:
-        logger.error(f"🚨 DAYS WITH INCIDENTS OR NON-ZERO SCORES:")
-        for day in problem_days[:10]:  # Show up to 10
-            logger.error(f"     {day['date']}: incidents={day['incident_count']}, score={day['health_score']}")
     
     return {
         "status": "success",

@@ -2350,10 +2350,7 @@ class UnifiedBurnoutAnalyzer:
                     # Create ID to email mapping for incident processing
                     user_id_to_email[str(user['user_id'])] = user['user_email']
             
-            logger.error(f"🔥 USER_ID_MAPPING: Created mapping for {len(user_id_to_email)} users")
-            if user_id_to_email:
-                sample_mapping = list(user_id_to_email.items())[:3]
-                logger.error(f"🔥 USER_ID_MAPPING: Sample mappings: {sample_mapping}")
+            logger.info(f"Created user ID mapping for {len(user_id_to_email)} users")
             
             # Pre-create all date entries for each user
             for user in team_analysis:
@@ -2490,7 +2487,7 @@ class UnifiedBurnoutAnalyzer:
                                             
                                         # DEBUG: Log user extraction for first few incidents
                                         if len(daily_data) <= 3:
-                                            logger.error(f"🔥 USER_EXTRACTION: incident user_id={user_id}, mapped_email={user_email}")
+                                            logger.debug(f"Processing incident for user {user_email} (ID: {user_id})")
                             
                             # Track individual user daily data - now updating pre-initialized structure
                             if user_email:
@@ -2782,12 +2779,6 @@ class UnifiedBurnoutAnalyzer:
                         )
                         complete_individual_data[user_email][date_str]["health_score"] = burnout_score
                         
-                        # FOCUSED DEBUG: Log score calculation for users with incidents
-                        if original_data.get("incident_count", 0) > 0:
-                            logger.warning(f"🔍 SCORE_DEBUG: {user_email} on {date_str}")
-                            logger.warning(f"   incidents: {original_data.get('incident_count', 0)}")  
-                            logger.warning(f"   severity_weighted: {original_data.get('severity_weighted_count', 0)}")
-                            logger.warning(f"   calculated_score: {burnout_score}")
                     else:
                         # No incidents = low burnout score (0 = good health in CBI system)
                         complete_individual_data[user_email][date_str]["health_score"] = 0
@@ -2847,9 +2838,6 @@ class UnifiedBurnoutAnalyzer:
         Based on Copenhagen Burnout Inventory methodology and research on 
         incident response psychological impact. CONSISTENT with CBI scoring.
         """
-        # CRITICAL DEBUG: Log every call to this method
-        if user_email == "andre@rootly.com":
-            logger.error(f"🔥 BURNOUT_METHOD_CALLED: {user_email} on {date_obj.strftime('%Y-%m-%d')} - daily_data: {daily_data}")
         
         try:
             # Start with low burnout baseline
@@ -2946,14 +2934,6 @@ class UnifiedBurnoutAnalyzer:
             # KEEP BURNOUT SCORING: High scores = bad health (matches CBI system like Team Health)
             # Team Health shows "54 CBI" as "Poor" - so high CBI = poor health
             
-            # CRITICAL DEBUG: Log every return for Andre
-            if user_email == "andre@rootly.com":
-                logger.error(f"🔥 RETURNING_SCORE: {user_email} - incident_count={incident_count}, final_score={final_burnout_score}")
-            
-            # FOCUSED DEBUG: Only log when score seems wrong 
-            if incident_count > 0 and final_burnout_score < 10:
-                logger.error(f"🚨 LOW_SCORE_BUG: {user_email} has {incident_count} incidents but score only {final_burnout_score}")
-                logger.error(f"   severity_weighted={severity_weighted}, incident_burnout={incident_burnout}, severity_burnout={severity_burnout}")
             
             return final_burnout_score
             
@@ -2961,9 +2941,6 @@ class UnifiedBurnoutAnalyzer:
             logger.error(f"Error calculating individual daily burnout score for {user_email}: {e}")
             # BURNOUT FALLBACK: High incidents = high burnout score (matches CBI system)
             fallback_score = 40 if daily_data.get("incident_count", 0) > 0 else 0
-            # CRITICAL DEBUG: Log fallback for Andre
-            if user_email == "andre@rootly.com":
-                logger.error(f"🔥 FALLBACK_SCORE: {user_email} - exception fallback returning {fallback_score}")
             return fallback_score
     
     def _determine_health_status_from_score(self, score: float) -> str:
