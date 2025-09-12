@@ -948,6 +948,9 @@ export default function Dashboard() {
   const [targetProgress, setTargetProgress] = useState(0)
   const [currentAnalysis, setCurrentAnalysis] = useState<AnalysisResult | null>(null)
   const [previousAnalyses, setPreviousAnalyses] = useState<AnalysisResult[]>([])
+  const [hasMoreAnalyses, setHasMoreAnalyses] = useState(true)
+  const [loadingMoreAnalyses, setLoadingMoreAnalyses] = useState(false)
+  const [totalAnalysesCount, setTotalAnalysesCount] = useState(0)
   const [selectedMember, setSelectedMember] = useState<OrganizationMember | null>(null)
   const [timeRange, setTimeRange] = useState("30")
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -1333,16 +1336,22 @@ export default function Dashboard() {
     fetchPlatformMappings()
   }, [])
 
-  const loadPreviousAnalyses = async () => {
+  const loadPreviousAnalyses = async (append = false) => {
     try {
       const authToken = localStorage.getItem('auth_token')
       if (!authToken) {
         return
       }
 
+      if (append) {
+        setLoadingMoreAnalyses(true)
+      }
+
       let response
       try {
-        response = await fetch(`${API_BASE}/analyses`, {
+        const limit = 3
+        const offset = append ? previousAnalyses.length : 0
+        response = await fetch(`${API_BASE}/analyses?limit=${limit}&offset=${offset}`, {
           headers: {
             'Authorization': `Bearer ${authToken}`
           }
@@ -1353,7 +1362,16 @@ export default function Dashboard() {
 
       if (response.ok) {
         const data = await response.json()
-        setPreviousAnalyses(data.analyses || [])
+        const newAnalyses = data.analyses || []
+        
+        if (append) {
+          setPreviousAnalyses(prev => [...prev, ...newAnalyses])
+        } else {
+          setPreviousAnalyses(newAnalyses)
+        }
+        
+        setTotalAnalysesCount(data.total || newAnalyses.length)
+        setHasMoreAnalyses(newAnalyses.length === 3 && (!data.total || previousAnalyses.length + newAnalyses.length < data.total))
         
         // If no specific analysis is loaded and we have analyses, load the most recent one
         const urlParams = new URLSearchParams(window.location.search)
@@ -1379,6 +1397,10 @@ export default function Dashboard() {
       
       if (isNetworkError) {
         toast.error("Cannot connect to backend")
+      }
+    } finally {
+      if (append) {
+        setLoadingMoreAnalyses(false)
       }
     }
   }
@@ -2783,7 +2805,7 @@ export default function Dashboard() {
                   )
                 ) : (
                   // Show analyses list
-                  previousAnalyses.slice(0, 50).map((analysis) => {
+                  previousAnalyses.map((analysis) => {
                 const analysisDate = new Date(analysis.created_at)
                 const timeStr = analysisDate.toLocaleTimeString([], { 
                   hour: 'numeric', 
@@ -2885,6 +2907,28 @@ export default function Dashboard() {
                   </div>
                 )
                 })
+                )}
+                
+                {/* Load More Button */}
+                {hasMoreAnalyses && !sidebarCollapsed && (
+                  <div className="px-3 py-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => loadPreviousAnalyses(true)}
+                      disabled={loadingMoreAnalyses}
+                      className="w-full border-gray-600 text-gray-300 hover:bg-gray-800 hover:text-white text-xs"
+                    >
+                      {loadingMoreAnalyses ? (
+                        <>
+                          <div className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin mr-2" />
+                          Loading...
+                        </>
+                      ) : (
+                        <>Load {Math.min(3, totalAnalysesCount - previousAnalyses.length)} more</>
+                      )}
+                    </Button>
+                  </div>
                 )}
               </div>
             </div>
