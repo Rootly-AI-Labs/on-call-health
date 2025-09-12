@@ -2350,7 +2350,9 @@ class UnifiedBurnoutAnalyzer:
                     # Create ID to email mapping for incident processing
                     user_id_to_email[str(user['user_id'])] = user['user_email']
             
-            logger.info(f"Created user ID mapping for {len(user_id_to_email)} users")
+            logger.info(f"Created user ID mapping for {len(user_id_to_email)} users from {self.platform} team analysis")
+            if len(user_id_to_email) <= 3:  # Show sample mappings for small teams
+                logger.info(f"Sample mappings: {dict(list(user_id_to_email.items())[:3])}")
             
             # Pre-create all date entries for each user
             for user in team_analysis:
@@ -2464,12 +2466,21 @@ class UnifiedBurnoutAnalyzer:
                             user_email = None
                             
                             if self.platform == "pagerduty":
-                                # PagerDuty format
+                                # PagerDuty format - Extract user ID and map to email (same as Rootly)
                                 assignments = incident.get("assignments", [])
                                 if assignments:
                                     assignee = assignments[0].get("assignee", {})
                                     user_id = assignee.get("id")
-                                    user_email = assignee.get("email")
+                                    # Use ID-to-email mapping for consistency with Rootly approach
+                                    user_email = user_id_to_email.get(str(user_id)) if user_id else None
+                                    
+                                    # DEBUG: Log PagerDuty user mapping for first few incidents
+                                    if user_id and len(daily_data) <= 3:
+                                        if user_email:
+                                            logger.info(f"✅ PagerDuty user mapped: {user_email} (ID: {user_id})")
+                                        else:
+                                            logger.warning(f"❌ PagerDuty user ID {user_id} not found in mapping - available: {list(user_id_to_email.keys())[:3]}")
+                                    
                                     if user_id:
                                         daily_data[date_str]["users_involved"].add(user_id)
                             else:  # Rootly
@@ -2500,6 +2511,10 @@ class UnifiedBurnoutAnalyzer:
                                     user_day_data["incident_count"] += 1
                                     user_day_data["severity_weighted_count"] += severity_weight
                                     user_day_data["has_data"] = True  # Mark as having real data
+                                    
+                                    # DEBUG: Log individual daily data updates for PagerDuty
+                                    if self.platform == "pagerduty" and user_day_data["incident_count"] <= 2:
+                                        logger.info(f"📊 PagerDuty daily update: {user_email} on {date_str} - incidents: {user_day_data['incident_count']}")
                                     
                                     if incident_hour < 8 or incident_hour > 18:
                                         user_day_data["after_hours_count"] += 1
