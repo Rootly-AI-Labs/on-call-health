@@ -170,12 +170,11 @@ class UnifiedBurnoutAnalyzer:
                     user_name = None
                     
                     if self.platform == "pagerduty":
-                        # PagerDuty format
-                        assignments = incident.get("assignments", [])
-                        if assignments:
-                            assignee = assignments[0].get("assignee", {})
-                            user_id = assignee.get("id")
-                            user_name = assignee.get("name")
+                        # PagerDuty format - Use enhanced assignment extraction results
+                        assigned_to = incident.get("assigned_to", {})
+                        if assigned_to and isinstance(assigned_to, dict):
+                            user_id = assigned_to.get("id")
+                            user_name = assigned_to.get("name")
                     else:  # Rootly
                         # Rootly format - same as team analysis logic
                         attrs = incident.get("attributes", {})
@@ -207,11 +206,10 @@ class UnifiedBurnoutAnalyzer:
                     user_id = None
                     
                     if self.platform == "pagerduty":
-                        # PagerDuty format
-                        assignments = incident.get("assignments", [])
-                        if assignments:
-                            assignee = assignments[0].get("assignee", {})
-                            user_id = assignee.get("id")
+                        # PagerDuty format - Use enhanced assignment extraction results
+                        assigned_to = incident.get("assigned_to", {})
+                        if assigned_to and isinstance(assigned_to, dict):
+                            user_id = assigned_to.get("id")
                     else:  # Rootly
                         # Rootly format - same as team analysis logic
                         attrs = incident.get("attributes", {})
@@ -565,6 +563,16 @@ class UnifiedBurnoutAnalyzer:
                 sample_data = individual_daily_data[sample_user]
                 days_with_data = sum(1 for day_data in sample_data.values() if day_data.get('has_data', False))
                 logger.info(f"🔍 INDIVIDUAL_DAILY_STORAGE: Sample user {sample_user} has {days_with_data} days with incident data out of {len(sample_data)} total days")
+                
+                # Additional PagerDuty-specific logging
+                if self.platform == "pagerduty":
+                    users_with_data = sum(1 for user_data in individual_daily_data.values() 
+                                        if any(day.get('has_data', False) for day in user_data.values()))
+                    logger.info(f"🎯 PAGERDUTY DAILY HEALTH: {users_with_data}/{len(individual_daily_data)} users have daily incident data")
+                    if users_with_data > 0:
+                        logger.info(f"🎯 PAGERDUTY DAILY HEALTH: Individual daily health timeline should work for PagerDuty users!")
+                    else:
+                        logger.warning(f"🚨 PAGERDUTY DAILY HEALTH: No users have daily incident data - assignment extraction may have failed")
             else:
                 logger.error(f"🚨 INDIVIDUAL_DAILY_STORAGE: individual_daily_data is EMPTY! This will cause 'No daily health data available' errors")
 
@@ -2466,20 +2474,20 @@ class UnifiedBurnoutAnalyzer:
                             user_email = None
                             
                             if self.platform == "pagerduty":
-                                # PagerDuty format - Extract user ID and map to email (same as Rootly)
-                                assignments = incident.get("assignments", [])
-                                if assignments:
-                                    assignee = assignments[0].get("assignee", {})
-                                    user_id = assignee.get("id")
-                                    # Use ID-to-email mapping for consistency with Rootly approach
-                                    user_email = user_id_to_email.get(str(user_id)) if user_id else None
+                                # PagerDuty format - Use enhanced assignment extraction results
+                                assigned_to = incident.get("assigned_to", {})
+                                if assigned_to and isinstance(assigned_to, dict):
+                                    user_id = assigned_to.get("id")
+                                    user_email = assigned_to.get("email")
                                     
                                     # DEBUG: Log PagerDuty user mapping for first few incidents
                                     if user_id and len(daily_data) <= 3:
+                                        assignment_method = assigned_to.get("assignment_method", "unknown")
+                                        confidence = assigned_to.get("confidence", "unknown")
                                         if user_email:
-                                            logger.info(f"✅ PagerDuty user mapped: {user_email} (ID: {user_id})")
+                                            logger.info(f"✅ PagerDuty ENHANCED user mapped: {user_email} (ID: {user_id}) via {assignment_method} [{confidence}]")
                                         else:
-                                            logger.warning(f"❌ PagerDuty user ID {user_id} not found in mapping - available: {list(user_id_to_email.keys())[:3]}")
+                                            logger.warning(f"❌ PagerDuty ENHANCED user ID {user_id} has no email - method: {assignment_method}")
                                     
                                     if user_id:
                                         daily_data[date_str]["users_involved"].add(user_id)
