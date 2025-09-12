@@ -132,24 +132,20 @@ function IndividualDailyHealthChart({ memberData, analysisId, currentAnalysis }:
       <CardContent>
         <div className="mb-4 flex flex-wrap items-center gap-4 text-xs text-gray-500">
           <div className="flex items-center space-x-1">
-            <div className="w-3 h-3 bg-green-500 rounded"></div>
-            <span>Healthy (80-100)</span>
-          </div>
-          <div className="flex items-center space-x-1">
-            <div className="w-3 h-3 bg-yellow-500 rounded"></div>
-            <span>Fair (60-79)</span>
+            <div className="w-3 h-3 bg-red-500 rounded"></div>
+            <span>Poor (80-100)</span>
           </div>
           <div className="flex items-center space-x-1">
             <div className="w-3 h-3 bg-orange-500 rounded"></div>
-            <span>Concerning (40-59)</span>
+            <span>Concerning (40-79)</span>
           </div>
           <div className="flex items-center space-x-1">
-            <div className="w-3 h-3 bg-red-500 rounded"></div>
-            <span>Poor (0-39)</span>
+            <div className="w-3 h-3 bg-yellow-500 rounded"></div>
+            <span>Fair (20-39)</span>
           </div>
           <div className="flex items-center space-x-1">
-            <div className="w-3 h-3 bg-gray-300 border-2 border-gray-400 border-dashed rounded"></div>
-            <span>No Incidents</span>
+            <div className="w-3 h-3 bg-green-500 rounded"></div>
+            <span>Healthy (0-19)</span>
           </div>
         </div>
         
@@ -217,10 +213,10 @@ function IndividualDailyHealthChart({ memberData, analysisId, currentAnalysis }:
                     key={`cell-${index}`} 
                     fill={
                       !entry.has_data ? '#D1D5DB' :        // Light grey for no incidents
-                      entry.health_score >= 80 ? '#10B981' : // Green for healthy (80-100)
-                      entry.health_score >= 60 ? '#F59E0B' : // Yellow for fair (60-79)
-                      entry.health_score >= 40 ? '#F97316' : // Orange for concerning (40-59)
-                      '#EF4444'                             // Red for poor (0-39)
+                      entry.health_score >= 80 ? '#EF4444' : // Red for poor (80-100) - HIGH BURNOUT
+                      entry.health_score >= 40 ? '#F97316' : // Orange for concerning (40-79)
+                      entry.health_score >= 20 ? '#F59E0B' : // Yellow for fair (20-39)
+                      '#10B981'                             // Green for healthy (0-19) - LOW BURNOUT
                     }
                     stroke={!entry.has_data ? '#9CA3AF' : 'none'}
                     strokeWidth={!entry.has_data ? 2 : 0}

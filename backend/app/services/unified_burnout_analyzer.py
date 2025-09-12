@@ -2789,7 +2789,7 @@ class UnifiedBurnoutAnalyzer:
                             logger.warning(f"   severity_weighted: {original_data.get('severity_weighted_count', 0)}")
                             logger.warning(f"   calculated_score: {burnout_score}")
                     else:
-                        # No incidents = low burnout (score 0)
+                        # No incidents = low burnout score (0 = good health in CBI system)
                         complete_individual_data[user_email][date_str]["health_score"] = 0
             
             # Calculate team average health scores for each day and add to individual data
@@ -2940,8 +2940,11 @@ class UnifiedBurnoutAnalyzer:
             
             final_burnout_score = base_burnout + total_burnout
             
-            # Apply bounds (0-100 range, higher = more burnout)
+            # Apply bounds (0-100 range, higher = more burnout/worse health)
             final_burnout_score = max(0, min(100, int(final_burnout_score)))
+            
+            # KEEP BURNOUT SCORING: High scores = bad health (matches CBI system like Team Health)
+            # Team Health shows "54 CBI" as "Poor" - so high CBI = poor health
             
             # CRITICAL DEBUG: Log every return for Andre
             if user_email == "andre@rootly.com":
@@ -2956,6 +2959,7 @@ class UnifiedBurnoutAnalyzer:
             
         except Exception as e:
             logger.error(f"Error calculating individual daily burnout score for {user_email}: {e}")
+            # BURNOUT FALLBACK: High incidents = high burnout score (matches CBI system)
             fallback_score = 40 if daily_data.get("incident_count", 0) > 0 else 0
             # CRITICAL DEBUG: Log fallback for Andre
             if user_email == "andre@rootly.com":
