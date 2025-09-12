@@ -2917,15 +2917,15 @@ export default function Dashboard() {
                       size="sm"
                       onClick={() => loadPreviousAnalyses(true)}
                       disabled={loadingMoreAnalyses}
-                      className="w-full border-gray-600 text-gray-300 hover:bg-gray-800 hover:text-white text-xs"
+                      className="w-full border-gray-500 bg-gray-800 text-gray-200 hover:bg-gray-700 hover:text-white hover:border-gray-400 text-xs"
                     >
                       {loadingMoreAnalyses ? (
                         <>
-                          <div className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin mr-2" />
+                          <div className="w-3 h-3 border border-gray-300 border-t-transparent rounded-full animate-spin mr-2" />
                           Loading...
                         </>
                       ) : (
-                        <>Load {Math.min(3, totalAnalysesCount - previousAnalyses.length)} more</>
+                        <>+ {Math.min(3, totalAnalysesCount - previousAnalyses.length)} more</>
                       )}
                     </Button>
                   </div>
