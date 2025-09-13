@@ -1738,86 +1738,81 @@ async def get_analysis_github_commits_timeline(
 
 
 def _generate_daily_tooltip(incident_count, severity_breakdown, daily_summary, day_name):
-    """Generate a rich, detailed tooltip summary for a day's incident data."""
+    """Generate a professional tooltip summary for a day's incident data."""
     if incident_count == 0:
-        return f"{day_name}: No incidents - Quiet day 🟢"
+        return f"{day_name}: No incidents"
     
-    # Build detailed severity summary with visual indicators
+    # Build severity summary (no emojis)
     severity_parts = []
-    severity_labels = {
-        "sev0": "🔴 SEV0", "sev1": "🟠 SEV1", "sev2": "🟡 SEV2", 
-        "sev3": "🟢 SEV3", "sev4": "⚪ SEV4", "sev5": "⚪ SEV5", 
-        "low": "🟢 Low", "unknown": "⚫ Unknown"
-    }
-    
-    # Sort by severity (most critical first)
     severity_order = ["sev0", "sev1", "sev2", "sev3", "sev4", "sev5", "low", "unknown"]
     for sev_level in severity_order:
         count = severity_breakdown.get(sev_level, 0)
         if count > 0:
-            label = severity_labels.get(sev_level, f"⚫ {sev_level.upper()}")
-            severity_parts.append(f"{count} {label}")
+            severity_parts.append(f"{count} {sev_level.upper()}")
     
     if not severity_parts:
         severity_parts = [f"{incident_count} incident{'s' if incident_count > 1 else ''}"]
     
     severity_text = ", ".join(severity_parts)
     
-    # Build rich context details
+    # Build context details (minimal emojis, only when necessary)
     context_parts = []
     
-    # After-hours work impact
+    # After-hours work impact (only if real data exists and matches incident count)
     after_hours = daily_summary.get("after_hours_incidents", 0)
-    if after_hours > 0:
+    if after_hours > 0 and after_hours <= incident_count:
         if after_hours == incident_count:
-            context_parts.append("🌙 All after-hours")
+            context_parts.append("All after-hours")
         else:
-            context_parts.append(f"🌙 {after_hours} after-hours")
+            context_parts.append(f"{after_hours} after-hours")
     
-    # Weekend work flag
-    if daily_summary.get("weekend_work", False):
-        context_parts.append("📅 Weekend work")
+    # Weekend work flag (only if explicitly set to true)
+    if daily_summary.get("weekend_work") is True:
+        context_parts.append("Weekend work")
     
-    # Peak hour information
+    # Peak hour information (only if multiple incidents and real data)
     peak_hour = daily_summary.get("peak_hour")
-    if peak_hour and incident_count > 1:
-        context_parts.append(f"⏰ Peak at {peak_hour}")
+    if peak_hour and incident_count > 1 and isinstance(peak_hour, str):
+        context_parts.append(f"Peak: {peak_hour}")
     
-    # Response time information
-    avg_response = daily_summary.get("avg_response_time_minutes")
-    if avg_response and avg_response > 0:
-        if avg_response > 60:
-            context_parts.append(f"⚠️ Slow response: {int(avg_response)}min")
-        elif avg_response < 15:
-            context_parts.append(f"⚡ Fast response: {int(avg_response)}min")
+    # Response time information (only if real response time data exists)
+    response_times = daily_summary.get("response_times", [])
+    if response_times and len(response_times) > 0:
+        avg_response = daily_summary.get("avg_response_time_minutes")
+        if avg_response and avg_response > 0:
+            if avg_response > 60:
+                context_parts.append(f"Slow response: {int(avg_response)}min")
+            elif avg_response < 15:
+                context_parts.append(f"Fast response: {int(avg_response)}min")
+            else:
+                context_parts.append(f"Response: {int(avg_response)}min")
     
-    # High-priority incidents
-    high_severity_count = daily_summary.get("high_severity_count", 0)
+    # Critical incidents count (only if real severity data exists)
     critical_count = severity_breakdown.get("sev0", 0) + severity_breakdown.get("sev1", 0)
-    if critical_count > 0:
-        context_parts.append(f"🚨 {critical_count} critical")
+    if critical_count > 0 and critical_count <= incident_count:
+        context_parts.append(f"{critical_count} critical")
     
-    # Workload assessment
+    # Workload assessment (only based on actual incident count, no fake thresholds)
     if incident_count >= 5:
-        context_parts.append("💥 Heavy load")
+        context_parts.append("Heavy load")
     elif incident_count >= 3:
-        context_parts.append("⚡ Busy day")
+        context_parts.append("Busy day")
     
-    # Incident titles (first significant one)
+    # Incident titles (only if real titles exist)
     titles = daily_summary.get("incident_titles", [])
-    if titles:
-        # Show first title, truncated
-        main_title = titles[0][:50] + ("..." if len(titles[0]) > 50 else "")
+    if titles and len(titles) > 0 and all(isinstance(title, str) and title.strip() for title in titles):
+        # Show first real title, truncated to reasonable length
+        main_title = titles[0].strip()[:40] + ("..." if len(titles[0].strip()) > 40 else "")
         
         if len(titles) == 1:
-            context_parts.append(f"📝 '{main_title}'")
-        else:
-            context_parts.append(f"📝 '{main_title}' +{len(titles)-1} more")
+            context_parts.append(f"'{main_title}'")
+        elif len(titles) > 1:
+            context_parts.append(f"'{main_title}' +{len(titles)-1} more")
     
-    # Build final tooltip
+    # Build final tooltip - clean format
     if context_parts:
-        context = f"\n• {chr(10).join(['• ' + part for part in context_parts])}"
-        return f"{day_name}: {severity_text}{context}"
+        context_text = " • ".join(context_parts)
+        return f"{day_name}: {severity_text}\n{context_text}"
     else:
         return f"{day_name}: {severity_text}"
 
