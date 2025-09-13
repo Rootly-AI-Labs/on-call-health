@@ -187,12 +187,12 @@ function IndividualDailyHealthChart({ memberData, analysisId, currentAnalysis }:
                     // Use rich tooltip summary from backend if available
                     if (data.tooltip_summary) {
                       return (
-                        <div className="bg-white p-3 border rounded-lg shadow-lg text-sm max-w-sm">
-                          <div className="whitespace-pre-line text-gray-800">
+                        <div className="bg-white p-4 border border-gray-300 rounded-lg shadow-xl text-sm max-w-sm">
+                          <div className="whitespace-pre-line text-gray-900 font-medium leading-relaxed">
                             {data.tooltip_summary}
                           </div>
-                          <div className="mt-2 pt-2 border-t border-gray-200 text-xs text-gray-600">
-                            <div className="flex justify-between">
+                          <div className="mt-3 pt-3 border-t border-gray-300 text-xs">
+                            <div className="flex justify-between text-gray-700 font-semibold">
                               <span>Health Score: {data.health_score}/100</span>
                               <span>Team Avg: {data.team_health}/100</span>
                             </div>
@@ -203,18 +203,18 @@ function IndividualDailyHealthChart({ memberData, analysisId, currentAnalysis }:
                     
                     // Fallback to basic tooltip if no rich summary
                     return (
-                      <div className="bg-white p-3 border rounded-lg shadow-lg text-sm max-w-xs">
-                        <p className="font-semibold text-gray-800 mb-2">{data.day_name}</p>
+                      <div className="bg-white p-4 border border-gray-300 rounded-lg shadow-xl text-sm max-w-xs">
+                        <p className="font-bold text-gray-900 mb-3">{data.day_name}</p>
                         {data.has_data ? (
                           <>
-                            <p className="text-blue-600 font-medium">Health Score: {data.health_score}/100</p>
-                            <p className="text-red-600">Incidents: {data.incident_count}</p>
-                            <p className="text-green-600">Team Average: {data.team_health}/100</p>
+                            <p className="text-blue-700 font-semibold mb-1">Health Score: {data.health_score}/100</p>
+                            <p className="text-red-700 font-semibold mb-1">Incidents: {data.incident_count}</p>
+                            <p className="text-green-700 font-semibold">Team Average: {data.team_health}/100</p>
                           </>
                         ) : (
                           <>
-                            <p className="text-gray-600 font-medium">No Incidents</p>
-                            <p className="text-gray-500 text-xs italic">Healthy day - no incident involvement</p>
+                            <p className="text-gray-800 font-semibold">No Incidents</p>
+                            <p className="text-gray-600 text-xs font-medium mt-1">Healthy day - no incident involvement</p>
                           </>
                         )}
                       </div>
