@@ -2524,12 +2524,52 @@ class UnifiedBurnoutAnalyzer:
                                     if self.platform == "pagerduty" and user_day_data["incident_count"] <= 2:
                                         logger.info(f"📊 PagerDuty daily update: {user_email} on {date_str} - incidents: {user_day_data['incident_count']}")
                                     
+                                    # Enhanced daily summary data collection
+                                    daily_summary = user_day_data["daily_summary"]
+                                    daily_summary["total_incidents"] = user_day_data["incident_count"]
+                                    
+                                    # Track after-hours and weekend work
                                     if incident_hour < 8 or incident_hour > 18:
                                         user_day_data["after_hours_count"] += 1
+                                        daily_summary["after_hours_incidents"] = user_day_data["after_hours_count"]
                                     
                                     # Store weekend incidents
                                     if incident_date.weekday() >= 5:  # Saturday=5, Sunday=6
                                         user_day_data["weekend_count"] += 1
+                                        daily_summary["weekend_work"] = True
+                                    
+                                    # Track incident titles and metadata
+                                    incident_title = self._extract_incident_title(incident)
+                                    if incident_title:
+                                        if len(daily_summary["incident_titles"]) < 5:  # Limit to 5 titles
+                                            daily_summary["incident_titles"].append(incident_title)
+                                    
+                                    # Track peak hour (most frequent incident hour)
+                                    hour_key = f"{incident_hour:02d}:00"
+                                    if "incident_hours" not in daily_summary:
+                                        daily_summary["incident_hours"] = {}
+                                    daily_summary["incident_hours"][hour_key] = daily_summary["incident_hours"].get(hour_key, 0) + 1
+                                    
+                                    # Update peak hour
+                                    if daily_summary["incident_hours"]:
+                                        peak_hour = max(daily_summary["incident_hours"], key=daily_summary["incident_hours"].get)
+                                        daily_summary["peak_hour"] = peak_hour
+                                    
+                                    # Track highest severity
+                                    current_severity = self._get_severity_level(incident)
+                                    if not daily_summary["highest_severity"] or self._compare_severity(current_severity, daily_summary["highest_severity"]) > 0:
+                                        daily_summary["highest_severity"] = current_severity
+                                    
+                                    # Track response time if available
+                                    response_time = self._extract_response_time(incident)
+                                    if response_time and response_time > 0:
+                                        if "response_times" not in daily_summary:
+                                            daily_summary["response_times"] = []
+                                        daily_summary["response_times"].append(response_time)
+                                        
+                                        # Calculate average response time
+                                        avg_response = sum(daily_summary["response_times"]) / len(daily_summary["response_times"])
+                                        daily_summary["avg_response_time_minutes"] = avg_response
                                 else:
                                     # Fallback: user not in our initialized structure
                                     # Create the missing user structure on-the-fly as emergency fallback
@@ -3347,4 +3387,100 @@ class UnifiedBurnoutAnalyzer:
                 "timestamp": datetime.now().isoformat()
             }
         }
+    
+    def _extract_incident_title(self, incident: Dict[str, Any]) -> str:
+        """Extract incident title from platform-specific incident data."""
+        try:
+            if self.platform == "pagerduty":
+                # PagerDuty format
+                return incident.get("title", incident.get("summary", "Untitled incident"))
+            else:
+                # Rootly format
+                attrs = incident.get("attributes", {})
+                return attrs.get("title", attrs.get("summary", "Untitled incident"))
+        except Exception:
+            return "Untitled incident"
+    
+    def _get_severity_level(self, incident: Dict[str, Any]) -> str:
+        """Extract severity level from platform-specific incident data."""
+        try:
+            if self.platform == "pagerduty":
+                # PagerDuty format
+                urgency = incident.get("urgency", "low")
+                priority = incident.get("priority", {})
+                if isinstance(priority, dict):
+                    priority_name = priority.get("summary", "").lower()
+                    if "p1" in priority_name or urgency == "high":
+                        return "sev1"
+                    elif "p2" in priority_name:
+                        return "sev2"
+                    elif "p3" in priority_name:
+                        return "sev3"
+                    else:
+                        return "sev4"
+                return "sev3"  # default
+            else:
+                # Rootly format
+                attrs = incident.get("attributes", {})
+                severity_info = attrs.get("severity", {})
+                if isinstance(severity_info, dict) and "data" in severity_info:
+                    severity_data = severity_info["data"]
+                    if isinstance(severity_data, dict) and "attributes" in severity_data:
+                        severity_name = severity_data["attributes"].get("name", "medium").lower()
+                        if "sev0" in severity_name or "critical" in severity_name:
+                            return "sev0"
+                        elif "sev1" in severity_name or "high" in severity_name:
+                            return "sev1"
+                        elif "sev2" in severity_name or "medium" in severity_name:
+                            return "sev2"
+                        elif "sev3" in severity_name or "low" in severity_name:
+                            return "sev3"
+                        else:
+                            return "sev4"
+                return "sev3"  # default
+        except Exception:
+            return "unknown"
+    
+    def _compare_severity(self, sev1: str, sev2: str) -> int:
+        """Compare two severity levels. Returns: 1 if sev1 > sev2, -1 if sev1 < sev2, 0 if equal."""
+        severity_order = ["sev0", "sev1", "sev2", "sev3", "sev4", "sev5", "low", "unknown"]
+        try:
+            idx1 = severity_order.index(sev1) if sev1 in severity_order else len(severity_order)
+            idx2 = severity_order.index(sev2) if sev2 in severity_order else len(severity_order)
+            
+            if idx1 < idx2:
+                return 1  # sev1 is more severe (lower index = higher severity)
+            elif idx1 > idx2:
+                return -1  # sev1 is less severe
+            else:
+                return 0  # equal severity
+        except Exception:
+            return 0
+    
+    def _extract_response_time(self, incident: Dict[str, Any]) -> float:
+        """Extract response time in minutes from platform-specific incident data."""
+        try:
+            if self.platform == "pagerduty":
+                # PagerDuty format
+                created_at = incident.get("created_at")
+                acknowledged_at = incident.get("acknowledged_at")
+                if created_at and acknowledged_at:
+                    created = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                    acknowledged = datetime.fromisoformat(acknowledged_at.replace('Z', '+00:00'))
+                    delta = acknowledged - created
+                    return delta.total_seconds() / 60.0  # Convert to minutes
+            else:
+                # Rootly format
+                attrs = incident.get("attributes", {})
+                created_at = attrs.get("created_at")
+                acknowledged_at = attrs.get("acknowledged_at") or attrs.get("started_at")
+                if created_at and acknowledged_at:
+                    created = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                    acknowledged = datetime.fromisoformat(acknowledged_at.replace('Z', '+00:00'))
+                    delta = acknowledged - created
+                    return delta.total_seconds() / 60.0  # Convert to minutes
+            
+            return None
+        except Exception:
+            return None
 

@@ -1738,41 +1738,88 @@ async def get_analysis_github_commits_timeline(
 
 
 def _generate_daily_tooltip(incident_count, severity_breakdown, daily_summary, day_name):
-    """Generate a tooltip summary for a day's incident data."""
+    """Generate a rich, detailed tooltip summary for a day's incident data."""
     if incident_count == 0:
-        return f"{day_name}: No incidents - Quiet day"
+        return f"{day_name}: No incidents - Quiet day 🟢"
     
-    # Build severity summary
+    # Build detailed severity summary with visual indicators
     severity_parts = []
     severity_labels = {
-        "sev0": "SEV0", "sev1": "SEV1", "sev2": "SEV2", "sev3": "SEV3", "low": "Low"
+        "sev0": "🔴 SEV0", "sev1": "🟠 SEV1", "sev2": "🟡 SEV2", 
+        "sev3": "🟢 SEV3", "sev4": "⚪ SEV4", "sev5": "⚪ SEV5", 
+        "low": "🟢 Low", "unknown": "⚫ Unknown"
     }
     
-    for sev_level, count in severity_breakdown.items():
+    # Sort by severity (most critical first)
+    severity_order = ["sev0", "sev1", "sev2", "sev3", "sev4", "sev5", "low", "unknown"]
+    for sev_level in severity_order:
+        count = severity_breakdown.get(sev_level, 0)
         if count > 0:
-            label = severity_labels.get(sev_level, sev_level.upper())
+            label = severity_labels.get(sev_level, f"⚫ {sev_level.upper()}")
             severity_parts.append(f"{count} {label}")
     
-    severity_text = ", ".join(severity_parts) if severity_parts else f"{incident_count} incident{'s' if incident_count > 1 else ''}"
+    if not severity_parts:
+        severity_parts = [f"{incident_count} incident{'s' if incident_count > 1 else ''}"]
     
-    # Add context details
-    details = []
-    if daily_summary.get("after_hours_incidents", 0) > 0:
-        details.append(f"{daily_summary['after_hours_incidents']} after-hours")
+    severity_text = ", ".join(severity_parts)
+    
+    # Build rich context details
+    context_parts = []
+    
+    # After-hours work impact
+    after_hours = daily_summary.get("after_hours_incidents", 0)
+    if after_hours > 0:
+        if after_hours == incident_count:
+            context_parts.append("🌙 All after-hours")
+        else:
+            context_parts.append(f"🌙 {after_hours} after-hours")
+    
+    # Weekend work flag
     if daily_summary.get("weekend_work", False):
-        details.append("weekend work")
+        context_parts.append("📅 Weekend work")
     
-    # Add incident titles (first 2)
+    # Peak hour information
+    peak_hour = daily_summary.get("peak_hour")
+    if peak_hour and incident_count > 1:
+        context_parts.append(f"⏰ Peak at {peak_hour}")
+    
+    # Response time information
+    avg_response = daily_summary.get("avg_response_time_minutes")
+    if avg_response and avg_response > 0:
+        if avg_response > 60:
+            context_parts.append(f"⚠️ Slow response: {int(avg_response)}min")
+        elif avg_response < 15:
+            context_parts.append(f"⚡ Fast response: {int(avg_response)}min")
+    
+    # High-priority incidents
+    high_severity_count = daily_summary.get("high_severity_count", 0)
+    critical_count = severity_breakdown.get("sev0", 0) + severity_breakdown.get("sev1", 0)
+    if critical_count > 0:
+        context_parts.append(f"🚨 {critical_count} critical")
+    
+    # Workload assessment
+    if incident_count >= 5:
+        context_parts.append("💥 Heavy load")
+    elif incident_count >= 3:
+        context_parts.append("⚡ Busy day")
+    
+    # Incident titles (first significant one)
     titles = daily_summary.get("incident_titles", [])
     if titles:
-        title_text = titles[0]
-        if len(titles) > 1:
-            title_text += f" + {len(titles)-1} more"
-        details.append(f"'{title_text}'")
+        # Show first title, truncated
+        main_title = titles[0][:50] + ("..." if len(titles[0]) > 50 else "")
+        
+        if len(titles) == 1:
+            context_parts.append(f"📝 '{main_title}'")
+        else:
+            context_parts.append(f"📝 '{main_title}' +{len(titles)-1} more")
     
-    context = f" ({', '.join(details)})" if details else ""
-    
-    return f"{day_name}: {severity_text}{context}"
+    # Build final tooltip
+    if context_parts:
+        context = f"\n• {chr(10).join(['• ' + part for part in context_parts])}"
+        return f"{day_name}: {severity_text}{context}"
+    else:
+        return f"{day_name}: {severity_text}"
 
 
 @router.get("/{analysis_id}/members/{member_email}/daily-health")
