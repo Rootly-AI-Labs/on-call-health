@@ -1798,16 +1798,21 @@ def _generate_daily_tooltip(incident_count, severity_breakdown, daily_summary, d
     elif incident_count >= 3:
         context_parts.append("Busy day")
     
-    # Incident titles (only if real titles exist)
+    # Incident titles (only if real titles exist) - show all titles, no truncation
     titles = daily_summary.get("incident_titles", [])
     if titles and len(titles) > 0 and all(isinstance(title, str) and title.strip() for title in titles):
-        # Show first real title, truncated to reasonable length
-        main_title = titles[0].strip()[:40] + ("..." if len(titles[0].strip()) > 40 else "")
+        # Show all titles, truncated individually but don't hide any
+        formatted_titles = []
+        for title in titles[:5]:  # Limit to 5 titles max to prevent overly long tooltips
+            clean_title = title.strip()[:50] + ("..." if len(title.strip()) > 50 else "")
+            formatted_titles.append(f"'{clean_title}'")
         
-        if len(titles) == 1:
-            context_parts.append(f"'{main_title}'")
-        elif len(titles) > 1:
-            context_parts.append(f"'{main_title}' +{len(titles)-1} more")
+        if len(titles) > 5:
+            formatted_titles.append(f"...and {len(titles)-5} more")
+        
+        # Add each title as separate context item for better readability
+        for formatted_title in formatted_titles:
+            context_parts.append(formatted_title)
     
     # Build final tooltip - bullet format with each detail on separate line
     if context_parts:
