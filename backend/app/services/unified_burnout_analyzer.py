@@ -2866,26 +2866,27 @@ class UnifiedBurnoutAnalyzer:
                 date_obj = datetime.now() - timedelta(days=days_analyzed - day_offset - 1)
                 date_str = date_obj.strftime('%Y-%m-%d')
                 
-                # Calculate team average health score for this day
-                daily_health_scores = []
+                # Calculate team average CBI burnout score for this day
+                daily_cbi_scores = []
                 for user_email in complete_individual_data:
                     if date_str in complete_individual_data[user_email]:
-                        user_health_score = complete_individual_data[user_email][date_str].get("health_score")
-                        if user_health_score is not None:
-                            daily_health_scores.append(user_health_score)
+                        user_cbi_score = complete_individual_data[user_email][date_str].get("health_score")
+                        if user_cbi_score is not None:
+                            daily_cbi_scores.append(user_cbi_score)
                 
                 # Calculate team average from actual data (no hardcoded fallback)
-                if daily_health_scores:
-                    team_avg_health = int(sum(daily_health_scores) / len(daily_health_scores))
+                if daily_cbi_scores:
+                    team_avg_cbi = int(sum(daily_cbi_scores) / len(daily_cbi_scores))
                 else:
                     # If no data, calculate from team incident load
                     team_avg_incidents = sum(m.get("incident_count", 0) for m in team_analysis) / len(team_analysis) if team_analysis else 0
-                    team_avg_health = max(70, int(100 - (team_avg_incidents * 2)))
+                    team_health_baseline = max(70, int(100 - (team_avg_incidents * 2)))
+                    team_avg_cbi = 100 - team_health_baseline  # Convert health to CBI burnout score
                 
                 # Add team average to each user's data for this day
                 for user_email in complete_individual_data:
                     if date_str in complete_individual_data[user_email]:
-                        complete_individual_data[user_email][date_str]["team_health"] = team_avg_health
+                        complete_individual_data[user_email][date_str]["team_health"] = team_avg_cbi
                         
                         # Add formatted day name for frontend display
                         complete_individual_data[user_email][date_str]["day_name"] = date_obj.strftime("%a, %b %d")
@@ -2918,10 +2919,15 @@ class UnifiedBurnoutAnalyzer:
         team_analysis: List[Dict[str, Any]]
     ) -> int:
         """
-        Calculate individual daily health score (0-100 scale, higher = better health).
+        Calculate individual daily CBI burnout score (0-100 scale, higher = worse burnout).
         
-        Based on inverted Copenhagen Burnout Inventory methodology - calculates wellness
-        instead of burnout. NO hardcoded values, all calculated from real data.
+        Aligned with main CBI Risk Level Scale:
+        - 0-24: Healthy (green)
+        - 25-49: Fair (yellow) 
+        - 50-74: Poor (orange)
+        - 75-100: Critical (red)
+        
+        Based on Copenhagen Burnout Inventory methodology. NO hardcoded values.
         """
         
         try:
@@ -3014,14 +3020,19 @@ class UnifiedBurnoutAnalyzer:
             # Apply bounds (0-100 range, higher = better health)
             final_health_score = max(0, min(100, int(final_health_score)))
             
-            return final_health_score
+            # Convert health score to CBI burnout score for alignment with main chart
+            # Health: 100 = excellent, 0 = poor → CBI: 0 = healthy, 100 = critical
+            cbi_burnout_score = 100 - final_health_score
+            
+            return cbi_burnout_score
             
         except Exception as e:
             logger.error(f"Error calculating individual daily health score for {user_email}: {e}")
-            # HEALTH FALLBACK: Calculate from incident count (no hardcoded values)
+            # CBI FALLBACK: Calculate from incident count (no hardcoded values)
             incident_count = daily_data.get("incident_count", 0)
-            fallback_health = max(20, 90 - (incident_count * 15))  # Dynamic fallback
-            return fallback_health
+            fallback_health = max(20, 90 - (incident_count * 15))  # Dynamic health fallback
+            fallback_cbi = 100 - fallback_health  # Convert to CBI burnout score
+            return fallback_cbi
     
     def _determine_health_status_from_score(self, score: float) -> str:
         """Determine health status from burnout score (SimpleBurnoutAnalyzer approach)."""
