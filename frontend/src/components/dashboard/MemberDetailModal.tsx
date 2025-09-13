@@ -76,7 +76,8 @@ function IndividualDailyHealthChart({ memberData, analysisId, currentAnalysis }:
               weekday: 'short', month: 'short', day: 'numeric' 
             }),
             factors: day.factors,
-            has_data: day.has_data !== undefined ? day.has_data : day.incident_count > 0
+            has_data: day.has_data !== undefined ? day.has_data : day.incident_count > 0,
+            tooltip_summary: day.tooltip_summary // Include rich text summary from backend
           }));
           
           console.log('📊 Daily Health - Formatted data:', formattedData);
@@ -182,6 +183,25 @@ function IndividualDailyHealthChart({ memberData, analysisId, currentAnalysis }:
                 content={({ active, payload }) => {
                   if (active && payload && payload[0]) {
                     const data = payload[0].payload;
+                    
+                    // Use rich tooltip summary from backend if available
+                    if (data.tooltip_summary) {
+                      return (
+                        <div className="bg-white p-3 border rounded-lg shadow-lg text-sm max-w-sm">
+                          <div className="whitespace-pre-line text-gray-800">
+                            {data.tooltip_summary}
+                          </div>
+                          <div className="mt-2 pt-2 border-t border-gray-200 text-xs text-gray-600">
+                            <div className="flex justify-between">
+                              <span>Health Score: {data.health_score}/100</span>
+                              <span>Team Avg: {data.team_health}/100</span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+                    
+                    // Fallback to basic tooltip if no rich summary
                     return (
                       <div className="bg-white p-3 border rounded-lg shadow-lg text-sm max-w-xs">
                         <p className="font-semibold text-gray-800 mb-2">{data.day_name}</p>
