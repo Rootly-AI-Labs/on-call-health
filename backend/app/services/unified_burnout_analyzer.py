@@ -2911,34 +2911,14 @@ class UnifiedBurnoutAnalyzer:
                     incident_penalty += (incident_count - 2) * 3  # Moderate escalation
             
             # 2. SEVERITY-WEIGHTED HEALTH PENALTIES (Psychological Impact)
-            # Use platform-specific severity weights for consistency with main CBI calculation
+            # Convert severity weight directly to health penalty (platform-agnostic)
             severity_penalty = 0
             if severity_weighted > 0:
-                # Get platform-specific severity weights (same as CBI calculation)
-                if self.platform == "pagerduty":
-                    # PagerDuty: SEV1=critical, SEV2=high, SEV3=medium, SEV4=low, SEV5=info
-                    if severity_weighted >= 15:      # SEV1 incident (critical)
-                        severity_penalty = 25         # Major health impact
-                    elif severity_weighted >= 12:    # SEV2 incident (high)  
-                        severity_penalty = 20         # High health impact
-                    elif severity_weighted >= 6:     # SEV3 incident (medium)
-                        severity_penalty = 12         # Moderate health impact
-                    elif severity_weighted >= 3:     # SEV4 incident (low)
-                        severity_penalty = 6          # Low health impact
-                    else:                             # SEV5 incident (info)
-                        severity_penalty = 3          # Minimal health impact
-                else:
-                    # Rootly: SEV0=critical, SEV1=high, SEV2=medium, SEV3=low, SEV4=info
-                    if severity_weighted >= 15:      # SEV0 incident (critical)
-                        severity_penalty = 25         # Major health impact
-                    elif severity_weighted >= 12:    # SEV1 incident (high)
-                        severity_penalty = 20         # High health impact
-                    elif severity_weighted >= 6:     # SEV2 incident (medium)
-                        severity_penalty = 12         # Moderate health impact
-                    elif severity_weighted >= 3:     # SEV3 incident (low)
-                        severity_penalty = 6          # Low health impact
-                    else:                             # SEV4/unknown incident (info)
-                        severity_penalty = 3          # Minimal health impact
+                # Scale severity weight to health penalty: multiply by 1.5 for impact
+                # This automatically handles platform differences:
+                # PagerDuty SEV1 (15.0) → 22.5 penalty, SEV2 (12.0) → 18 penalty
+                # Rootly SEV0 (15.0) → 22.5 penalty, SEV1 (12.0) → 18 penalty  
+                severity_penalty = min(25, severity_weighted * 1.5)  # Cap at 25 for extreme cases
             
             # 3. WORK-LIFE BALANCE HEALTH PENALTIES
             after_hours_penalty = after_hours_count * 8  # 8 point penalty per after-hours incident
