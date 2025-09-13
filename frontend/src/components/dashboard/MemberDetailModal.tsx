@@ -305,17 +305,6 @@ export function MemberDetailModal({
                         <h2 className="text-xl font-semibold">{selectedMember?.name}</h2>
                         <p className="text-gray-600">{selectedMember?.role || selectedMember?.email}</p>
                       </div>
-                      {memberData && 'github_burnout_breakdown' in memberData && memberData.github_burnout_breakdown && (
-                        <span className={`text-xs font-semibold px-3 py-1 rounded-full ${
-                          (memberData.github_burnout_breakdown as any).score_source === 'github_based' ? 'bg-blue-100 text-blue-800' :
-                          (memberData.github_burnout_breakdown as any).score_source === 'hybrid' ? 'bg-purple-100 text-purple-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {(memberData.github_burnout_breakdown as any).score_source === 'github_based' ? 'GitHub Activity Only' :
-                           (memberData.github_burnout_breakdown as any).score_source === 'hybrid' ? 'GitHub + Incidents Combined' :
-                           'Incident-Based Only'}
-                        </span>
-                      )}
                     </div>
                   </div>
                 </DialogTitle>
