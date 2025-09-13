@@ -1809,10 +1809,10 @@ def _generate_daily_tooltip(incident_count, severity_breakdown, daily_summary, d
         elif len(titles) > 1:
             context_parts.append(f"'{main_title}' +{len(titles)-1} more")
     
-    # Build final tooltip - clean format
+    # Build final tooltip - bullet format with each detail on separate line
     if context_parts:
-        context_text = " • ".join(context_parts)
-        return f"{day_name}: {severity_text}\n{context_text}"
+        bullet_lines = "\n".join([f"• {part}" for part in context_parts])
+        return f"{day_name}: {severity_text}\n{bullet_lines}"
     else:
         return f"{day_name}: {severity_text}"
 
