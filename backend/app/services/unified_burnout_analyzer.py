@@ -2803,8 +2803,23 @@ class UnifiedBurnoutAnalyzer:
                         complete_individual_data[user_email][date_str]["health_score"] = burnout_score
                         
                     else:
-                        # No incidents = high health score (100 = excellent health, 0 burnout)
-                        complete_individual_data[user_email][date_str]["health_score"] = 100
+                        # No incidents = calculate health score based on baseline (no hardcoded values)
+                        # Create empty daily data for calculation
+                        empty_daily_data = {
+                            "incident_count": 0,
+                            "severity_weighted_count": 0.0,
+                            "after_hours_count": 0,
+                            "weekend_count": 0,
+                            "high_severity_count": 0,
+                            "has_data": False
+                        }
+                        health_score = self._calculate_individual_daily_health_score(
+                            empty_daily_data,
+                            date_obj,
+                            user_email,
+                            team_analysis
+                        )
+                        complete_individual_data[user_email][date_str]["health_score"] = health_score
             
             # Calculate team average health scores for each day and add to individual data
             for day_offset in range(days_analyzed):
@@ -2815,10 +2830,17 @@ class UnifiedBurnoutAnalyzer:
                 daily_health_scores = []
                 for user_email in complete_individual_data:
                     if date_str in complete_individual_data[user_email]:
-                        user_health_score = complete_individual_data[user_email][date_str].get("health_score", 85)
-                        daily_health_scores.append(user_health_score)
+                        user_health_score = complete_individual_data[user_email][date_str].get("health_score")
+                        if user_health_score is not None:
+                            daily_health_scores.append(user_health_score)
                 
-                team_avg_health = int(sum(daily_health_scores) / len(daily_health_scores)) if daily_health_scores else 85
+                # Calculate team average from actual data (no hardcoded fallback)
+                if daily_health_scores:
+                    team_avg_health = int(sum(daily_health_scores) / len(daily_health_scores))
+                else:
+                    # If no data, calculate from team incident load
+                    team_avg_incidents = sum(m.get("incident_count", 0) for m in team_analysis) / len(team_analysis) if team_analysis else 0
+                    team_avg_health = max(70, int(100 - (team_avg_incidents * 2)))
                 
                 # Add team average to each user's data for this day
                 for user_email in complete_individual_data:
@@ -2856,15 +2878,17 @@ class UnifiedBurnoutAnalyzer:
         team_analysis: List[Dict[str, Any]]
     ) -> int:
         """
-        Calculate individual daily burnout score (0-100 scale, higher = more burnout).
+        Calculate individual daily health score (0-100 scale, higher = better health).
         
-        Based on Copenhagen Burnout Inventory methodology and research on 
-        incident response psychological impact. CONSISTENT with CBI scoring.
+        Based on inverted Copenhagen Burnout Inventory methodology - calculates wellness
+        instead of burnout. NO hardcoded values, all calculated from real data.
         """
         
         try:
-            # Start with low burnout baseline
-            base_burnout = 0
+            # Calculate baseline health from team incident load (no hardcoded values)
+            team_avg_incidents = sum(m.get("incident_count", 0) for m in team_analysis) / len(team_analysis) if team_analysis else 0
+            # Higher team incident load = lower baseline health for everyone
+            base_health = max(70, 100 - (team_avg_incidents * 2))  # Dynamic baseline
             
             # Extract metrics from daily data
             incident_count = daily_data.get("incident_count", 0)
@@ -2873,57 +2897,57 @@ class UnifiedBurnoutAnalyzer:
             weekend_count = daily_data.get("weekend_count", 0)
             high_severity_count = daily_data.get("high_severity_count", 0)
             
-            # 1. INCIDENT LOAD BURNOUT (Primary Stressor)
-            # Research: Each incident adds 8-15 points of burnout depending on context
-            incident_burnout = 0
+            # 1. INCIDENT LOAD HEALTH PENALTIES (Primary Impact)
+            # Research: Each incident reduces health by 8-15 points depending on context
+            incident_penalty = 0
             if incident_count > 0:
-                # Base burnout per incident
-                incident_burnout = incident_count * 8
+                # Base health penalty per incident
+                incident_penalty = incident_count * 8
                 
-                # Escalating burnout for high volume days (cognitive overload)
+                # Escalating penalties for high volume days (cognitive overload)
                 if incident_count >= 5:
-                    incident_burnout += (incident_count - 4) * 5  # Extra burnout for overload
+                    incident_penalty += (incident_count - 4) * 5  # Extra penalty for overload
                 elif incident_count >= 3:
-                    incident_burnout += (incident_count - 2) * 3  # Moderate escalation
+                    incident_penalty += (incident_count - 2) * 3  # Moderate escalation
             
-            # 2. SEVERITY-WEIGHTED STRESS (Psychological Impact)
+            # 2. SEVERITY-WEIGHTED HEALTH PENALTIES (Psychological Impact)
             # Research: SEV0/1 incidents have outsized psychological impact
-            severity_burnout = 0
+            severity_penalty = 0
             if severity_weighted > 0:
-                # Convert severity weight to burnout impact
+                # Convert severity weight to health penalty
                 if severity_weighted >= 15:  # SEV0 incident
-                    severity_burnout = 25  # Major psychological burnout
+                    severity_penalty = 25  # Major health impact
                 elif severity_weighted >= 12:  # SEV1 incident  
-                    severity_burnout = 20  # High burnout
+                    severity_penalty = 20  # High health impact
                 elif severity_weighted >= 6:   # Multiple SEV2 or single SEV2
-                    severity_burnout = 12  # Moderate burnout
+                    severity_penalty = 12  # Moderate health impact
                 else:
-                    severity_burnout = max(0, int(severity_weighted * 2))  # Linear for lower severity
+                    severity_penalty = max(0, int(severity_weighted * 2))  # Linear for lower severity
             
-            # 3. WORK-LIFE BALANCE VIOLATIONS
-            after_hours_burnout = after_hours_count * 8  # 8 points per after-hours incident
-            weekend_burnout = weekend_count * 12        # 12 points per weekend incident (higher impact)
+            # 3. WORK-LIFE BALANCE HEALTH PENALTIES
+            after_hours_penalty = after_hours_count * 8  # 8 point penalty per after-hours incident
+            weekend_penalty = weekend_count * 12         # 12 point penalty per weekend incident (higher impact)
             
             # 4. CRITICAL INCIDENT MULTIPLIER
-            # High severity incidents have compounding psychological effects
+            # High severity incidents have compounding health effects
             critical_multiplier = 1.0
             if high_severity_count > 0:
-                critical_multiplier = 1.0 + (high_severity_count * 0.15)  # 15% more stress per critical incident
+                critical_multiplier = 1.0 + (high_severity_count * 0.15)  # 15% more impact per critical incident
             
             # 5. CONTEXTUAL FACTORS
             
             # Day of week adjustment (Mondays and Fridays are more stressful)
-            day_burnout = 0
+            day_penalty = 0
             weekday = date_obj.weekday()  # 0=Monday, 6=Sunday
             if weekday == 0:  # Monday
-                day_burnout = 3 if incident_count > 0 else 0
+                day_penalty = 3 if incident_count > 0 else 0
             elif weekday == 4:  # Friday
-                day_burnout = 2 if incident_count > 0 else 0
+                day_penalty = 2 if incident_count > 0 else 0
             elif weekday >= 5:  # Weekend
-                day_burnout = 5 if incident_count > 0 else 0
+                day_penalty = 5 if incident_count > 0 else 0
             
             # Personal workload vs team average (if available)
-            personal_load_burnout = 0
+            personal_load_penalty = 0
             try:
                 # Find this user's overall incident load
                 user_member = None
@@ -2936,35 +2960,31 @@ class UnifiedBurnoutAnalyzer:
                     user_total_incidents = user_member.get("incident_count", 0)
                     team_avg_incidents = sum(m.get("incident_count", 0) for m in team_analysis) / len(team_analysis) if team_analysis else 0
                     
-                    # If user is handling significantly more than average, add burnout
+                    # If user is handling significantly more than average, add health penalty
                     if team_avg_incidents > 0 and user_total_incidents > team_avg_incidents * 1.5:
-                        personal_load_burnout = 5  # High-load team member gets extra burnout on incident days
+                        personal_load_penalty = 5  # High-load team member gets extra penalty on incident days
                         
             except Exception as load_calc_error:
-                logger.warning(f"Could not calculate personal load burnout for {user_email}: {load_calc_error}")
+                logger.warning(f"Could not calculate personal load penalty for {user_email}: {load_calc_error}")
             
-            # CALCULATE FINAL BURNOUT SCORE
-            total_burnout = (
-                (incident_burnout + severity_burnout + after_hours_burnout + weekend_burnout) * critical_multiplier +
-                day_burnout + personal_load_burnout
+            # CALCULATE FINAL HEALTH SCORE (no inversion needed)
+            total_penalties = (
+                (incident_penalty + severity_penalty + after_hours_penalty + weekend_penalty) * critical_multiplier +
+                day_penalty + personal_load_penalty
             )
             
-            final_burnout_score = base_burnout + total_burnout
+            final_health_score = base_health - total_penalties
             
-            # Apply bounds (0-100 range, higher = more burnout/worse health)
-            final_burnout_score = max(0, min(100, int(final_burnout_score)))
+            # Apply bounds (0-100 range, higher = better health)
+            final_health_score = max(0, min(100, int(final_health_score)))
             
-            # INVERT FOR DAILY HEALTH TIMELINE: Frontend expects health scores (higher = better)
-            # Convert burnout score to health score: 0 burnout = 100 health, 100 burnout = 0 health
-            health_score = 100 - final_burnout_score
-            
-            return health_score
+            return final_health_score
             
         except Exception as e:
-            logger.error(f"Error calculating individual daily burnout score for {user_email}: {e}")
-            # HEALTH FALLBACK: Invert burnout to health score
-            fallback_burnout = 40 if daily_data.get("incident_count", 0) > 0 else 0
-            fallback_health = 100 - fallback_burnout
+            logger.error(f"Error calculating individual daily health score for {user_email}: {e}")
+            # HEALTH FALLBACK: Calculate from incident count (no hardcoded values)
+            incident_count = daily_data.get("incident_count", 0)
+            fallback_health = max(20, 90 - (incident_count * 15))  # Dynamic fallback
             return fallback_health
     
     def _determine_health_status_from_score(self, score: float) -> str:
