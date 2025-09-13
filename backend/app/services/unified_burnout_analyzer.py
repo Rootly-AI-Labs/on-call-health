@@ -2803,8 +2803,8 @@ class UnifiedBurnoutAnalyzer:
                         complete_individual_data[user_email][date_str]["health_score"] = burnout_score
                         
                     else:
-                        # No incidents = low burnout score (0 = good health in CBI system)
-                        complete_individual_data[user_email][date_str]["health_score"] = 0
+                        # No incidents = high health score (100 = excellent health, 0 burnout)
+                        complete_individual_data[user_email][date_str]["health_score"] = 100
             
             # Calculate team average health scores for each day and add to individual data
             for day_offset in range(days_analyzed):
@@ -2815,10 +2815,10 @@ class UnifiedBurnoutAnalyzer:
                 daily_health_scores = []
                 for user_email in complete_individual_data:
                     if date_str in complete_individual_data[user_email]:
-                        user_health_score = complete_individual_data[user_email][date_str].get("health_score", 88)
+                        user_health_score = complete_individual_data[user_email][date_str].get("health_score", 85)
                         daily_health_scores.append(user_health_score)
                 
-                team_avg_health = int(sum(daily_health_scores) / len(daily_health_scores)) if daily_health_scores else 88
+                team_avg_health = int(sum(daily_health_scores) / len(daily_health_scores)) if daily_health_scores else 85
                 
                 # Add team average to each user's data for this day
                 for user_email in complete_individual_data:
@@ -2954,17 +2954,18 @@ class UnifiedBurnoutAnalyzer:
             # Apply bounds (0-100 range, higher = more burnout/worse health)
             final_burnout_score = max(0, min(100, int(final_burnout_score)))
             
-            # KEEP BURNOUT SCORING: High scores = bad health (matches CBI system like Team Health)
-            # Team Health shows "54 CBI" as "Poor" - so high CBI = poor health
+            # INVERT FOR DAILY HEALTH TIMELINE: Frontend expects health scores (higher = better)
+            # Convert burnout score to health score: 0 burnout = 100 health, 100 burnout = 0 health
+            health_score = 100 - final_burnout_score
             
-            
-            return final_burnout_score
+            return health_score
             
         except Exception as e:
             logger.error(f"Error calculating individual daily burnout score for {user_email}: {e}")
-            # BURNOUT FALLBACK: High incidents = high burnout score (matches CBI system)
-            fallback_score = 40 if daily_data.get("incident_count", 0) > 0 else 0
-            return fallback_score
+            # HEALTH FALLBACK: Invert burnout to health score
+            fallback_burnout = 40 if daily_data.get("incident_count", 0) > 0 else 0
+            fallback_health = 100 - fallback_burnout
+            return fallback_health
     
     def _determine_health_status_from_score(self, score: float) -> str:
         """Determine health status from burnout score (SimpleBurnoutAnalyzer approach)."""
