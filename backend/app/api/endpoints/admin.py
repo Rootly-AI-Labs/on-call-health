@@ -38,8 +38,8 @@ async def fix_null_organizations(db: Session = Depends(get_db)) -> Dict[str, Any
             if rootly_result.get("status") == "success":
                 account_info = rootly_result.get("account_info", {})
                 rootly_org_name = account_info.get("organization_name")
-    except Exception as e:
-        print(f"Failed to get Rootly org name: {e}")
+    except Exception:
+        pass
         
     try:
         if beta_pagerduty_token:
@@ -48,8 +48,8 @@ async def fix_null_organizations(db: Session = Depends(get_db)) -> Dict[str, Any
             if pagerduty_result.get("valid"):
                 account_info = pagerduty_result.get("account_info", {})
                 pagerduty_org_name = account_info.get("organization_name")
-    except Exception as e:
-        print(f"Failed to get PagerDuty org name: {e}")
+    except Exception:
+        pass
     
     # Find and fix analyses with null organization names
     analyses = db.query(Analysis).filter(

@@ -2,7 +2,7 @@
 FastAPI main application for Rootly Burnout Detector.
 """
 import os
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi.errors import RateLimitExceeded
 from .models import create_tables
@@ -66,8 +66,6 @@ def get_cors_origins():
     # Remove duplicates while preserving order
     origins = list(dict.fromkeys(origins))
     
-    # Log allowed origins for debugging
-    print(f"🔒 CORS Security: Allowing origins: {origins}")
     
     return origins
 
