@@ -1,0 +1,98 @@
+"use client"
+
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import { AlertTriangle } from "lucide-react"
+
+interface Integration {
+  id: number
+  name: string
+}
+
+interface AnalysisResult {
+  id: string
+  integration_id: number
+  created_at: string
+  time_range?: number
+}
+
+interface DeleteAnalysisDialogProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  analysisToDelete: AnalysisResult | null
+  integrations: Integration[]
+  onConfirmDelete: () => Promise<void>
+  onCancel: () => void
+}
+
+export function DeleteAnalysisDialog({
+  open,
+  onOpenChange,
+  analysisToDelete,
+  integrations,
+  onConfirmDelete,
+  onCancel
+}: DeleteAnalysisDialogProps) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center space-x-2">
+            <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+              <AlertTriangle className="w-4 h-4 text-red-600" />
+            </div>
+            <span>Delete Analysis</span>
+          </DialogTitle>
+          <DialogDescription className="text-gray-600 mt-2">
+            Are you sure you want to delete this analysis? This action cannot be undone and will permanently remove all data associated with this analysis.
+          </DialogDescription>
+        </DialogHeader>
+
+        {analysisToDelete && (
+          <div className="my-4 p-3 bg-gray-50 rounded-lg border">
+            <div className="flex items-center justify-between text-sm">
+              <div className="flex flex-col">
+                <span className="font-medium text-gray-900">
+                  {integrations.find(i => i.id === Number(analysisToDelete.integration_id))?.name ||
+                   integrations.find(i => String(i.id) === String(analysisToDelete.integration_id))?.name ||
+                   `Organization ${analysisToDelete.integration_id}`}
+                </span>
+                <span className="text-gray-500">
+                  {new Date(analysisToDelete.created_at).toLocaleString([], {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true,
+                    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+                  })}
+                </span>
+              </div>
+              <span className="text-gray-400 text-xs">
+                {analysisToDelete.time_range || 30} days
+              </span>
+            </div>
+          </div>
+        )}
+
+        <DialogFooter className="flex space-x-2">
+          <Button
+            variant="outline"
+            onClick={onCancel}
+            className="flex-1"
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={onConfirmDelete}
+            className="flex-1 bg-red-600 hover:bg-red-700"
+          >
+            Delete Analysis
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}

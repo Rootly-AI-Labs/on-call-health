@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { MappingDrawer } from "@/components/mapping-drawer"
-import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -11,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import {
   Bar,
@@ -49,7 +48,6 @@ import {
   Star,
   Info,
   BarChart3,
-  Sparkles,
 } from "lucide-react"
 import { TeamHealthOverview } from "@/components/dashboard/TeamHealthOverview"
 import { AnalysisProgressSection } from "@/components/dashboard/AnalysisProgressSection"
@@ -57,6 +55,8 @@ import { TeamMembersList } from "@/components/dashboard/TeamMembersList"
 import { HealthTrendsChart } from "@/components/dashboard/HealthTrendsChart"
 import { MemberDetailModal } from "@/components/dashboard/MemberDetailModal"
 import { GitHubCommitsTimeline } from "@/components/dashboard/charts/GitHubCommitsTimeline"
+import { AIInsightsCard } from "@/components/dashboard/insights/AIInsightsCard"
+import { DeleteAnalysisDialog } from "@/components/dashboard/dialogs/DeleteAnalysisDialog"
 import Image from "next/image"
 import { useRouter, useSearchParams } from "next/navigation"
 import { toast } from "sonner"
@@ -2676,71 +2676,8 @@ export default function Dashboard() {
                 setExpandedDataSources={setExpandedDataSources}
               />
 
-              {/* AI Insights Card - Text-based summary */}
-              {currentAnalysis?.analysis_data?.ai_team_insights?.available && (
-                <Card className="mb-6 bg-gradient-to-br from-blue-50 via-white to-indigo-50 border-blue-200 shadow-sm">
-                  <CardHeader>
-                    <div className="flex items-center space-x-2">
-                      <CardTitle>AI Team Insights</CardTitle>
-                      <Badge variant="secondary" className="text-xs">AI Enhanced</Badge>
-                    </div>
-                    <CardDescription>
-                      Analysis generated from {currentAnalysis.analysis_data.ai_team_insights.insights?.team_size || 0} team members
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="prose prose-sm max-w-none">
-                    {(() => {
-                      const aiInsights = currentAnalysis.analysis_data.ai_team_insights.insights;
-                      
-                      // Check if we have LLM-generated narrative
-                      if (aiInsights?.llm_team_analysis) {
-                        return (
-                          <div className="space-y-4">
-                            <div 
-                              className="leading-relaxed text-gray-800"
-                              dangerouslySetInnerHTML={{ 
-                                __html: aiInsights.llm_team_analysis
-                                  .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                                  .replace(/\n\n/g, '</p><p class="mt-4">')
-                                  .replace(/^/, '<p>')
-                                  .replace(/$/, '</p>')
-                              }}
-                            />
-                          </div>
-                        );
-                      }
-                      
-                      // No LLM-generated content available
-                      const isAnalysisRunning = currentAnalysis?.status === 'running' || currentAnalysis?.status === 'pending';
-                      
-                      if (isAnalysisRunning) {
-                        return (
-                          <div className="text-center py-12 text-gray-500">
-                            <Sparkles className="h-10 w-10 mx-auto mb-4 opacity-40 animate-pulse" />
-                            <h4 className="font-medium text-gray-700 mb-2">Generating AI Insights</h4>
-                            <p className="text-sm">AI analysis is being generated...</p>
-                          </div>
-                        )
-                      } else {
-                        return (
-                          <div className="text-center py-12 text-gray-500">
-                            <Sparkles className="h-10 w-10 mx-auto mb-4 opacity-40" />
-                            <h4 className="font-medium text-gray-700 mb-2">AI Insights Unavailable</h4>
-                            <p className="text-sm mb-4">Configure your AI token to enable intelligent team insights</p>
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => router.push('/settings')}
-                            >
-                              Configure AI Settings
-                            </Button>
-                          </div>
-                        )
-                      }
-                    })()}
-                  </CardContent>
-                </Card>
-              )}
+              {/* AI Insights Card */}
+              <AIInsightsCard currentAnalysis={currentAnalysis} />
 
               {/* Partial Data Warning */}
               {currentAnalysis?.analysis_data?.error && currentAnalysis?.analysis_data?.partial_data && (
@@ -4137,70 +4074,18 @@ export default function Dashboard() {
         currentAnalysis={currentAnalysis}
       />
 
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
-                <AlertTriangle className="w-4 h-4 text-red-600" />
-              </div>
-              <span>Delete Analysis</span>
-            </DialogTitle>
-            <DialogDescription className="text-gray-600 mt-2">
-              Are you sure you want to delete this analysis? This action cannot be undone and will permanently remove all data associated with this analysis.
-            </DialogDescription>
-          </DialogHeader>
-          
-          {analysisToDelete && (
-            <div className="my-4 p-3 bg-gray-50 rounded-lg border">
-              <div className="flex items-center justify-between text-sm">
-                <div className="flex flex-col">
-                  <span className="font-medium text-gray-900">
-                    {integrations.find(i => i.id === Number(analysisToDelete.integration_id))?.name || 
-                     integrations.find(i => String(i.id) === String(analysisToDelete.integration_id))?.name || 
-                     `Organization ${analysisToDelete.integration_id}`}
-                  </span>
-                  <span className="text-gray-500">
-                    {new Date(analysisToDelete.created_at).toLocaleString([], { 
-                      month: 'short', 
-                      day: 'numeric', 
-                      year: 'numeric',
-                      hour: 'numeric',
-                      minute: '2-digit',
-                      hour12: true,
-                      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
-                    })}
-                  </span>
-                </div>
-                <span className="text-gray-400 text-xs">
-                  {analysisToDelete.time_range || 30} days
-                </span>
-              </div>
-            </div>
-          )}
-
-          <DialogFooter className="flex space-x-2">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setDeleteDialogOpen(false)
-                setAnalysisToDelete(null)
-              }}
-              className="flex-1"
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={confirmDeleteAnalysis}
-              className="flex-1 bg-red-600 hover:bg-red-700"
-            >
-              Delete Analysis
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Delete Analysis Dialog */}
+      <DeleteAnalysisDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        analysisToDelete={analysisToDelete}
+        integrations={integrations}
+        onConfirmDelete={confirmDeleteAnalysis}
+        onCancel={() => {
+          setDeleteDialogOpen(false)
+          setAnalysisToDelete(null)
+        }}
+      />
 
       {/* Mapping Drawer */}
       <MappingDrawer
