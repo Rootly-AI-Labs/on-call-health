@@ -616,11 +616,6 @@ export default function Dashboard() {
     router.push(`/dashboard?${params.toString()}`, { scroll: false })
   }
 
-  // Function to clear integration cache
-  const clearIntegrationCache = () => {
-    localStorage.removeItem('all_integrations')
-    localStorage.removeItem('all_integrations_timestamp')
-  }
 
   const cancelRunningAnalysis = async () => {
     try {
@@ -1723,7 +1718,7 @@ export default function Dashboard() {
       
       Promise.all(promises).then(() => {
         setIsLoadingGitHubSlack(false)
-      }).catch(err => {
+      }).catch(_ => {
         setIsLoadingGitHubSlack(false)
       })
     } else {
