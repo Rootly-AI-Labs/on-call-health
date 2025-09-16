@@ -25,6 +25,7 @@ export function TeamMembersList({
   // Check if data is still loading
   const isLoading = !currentAnalysis || !currentAnalysis.analysis_data;
 
+
   // Official CBI 4-color system for progress bars (0-100 scale, higher = more burnout)
   const getCBIProgressColor = (score: number) => {
     const clampedScore = Math.max(0, Math.min(100, score));
@@ -51,7 +52,7 @@ export function TeamMembersList({
         id: member.user_id || '',
         name: member.user_name || 'Unknown',
         email: member.user_email || '',
-        burnoutScore: ((10 - (member.burnout_score || 0)) * 10), // Convert 0-10 burnout to 0-100 health scale
+        burnoutScore: member.cbi_score || 0, // Use CBI score directly
         riskLevel: (member.risk_level || 'low') as 'high' | 'medium' | 'low',
         trend: 'stable' as const,
         incidentsHandled: member.incident_count || 0,
@@ -95,8 +96,8 @@ export function TeamMembersList({
                   if (member.cbi_score < 75) return 'poor';         // 50-74: Moderate burnout risk  
                   return 'critical';                                // 75-100: High/severe burnout
                 }
-                // Fallback to legacy risk level
-                return member.risk_level || 'low';
+                // No CBI score available - default to low risk
+                return 'low';
               };
               
               const riskLevel = getCBIRiskLevel(member);
@@ -149,15 +150,15 @@ export function TeamMembersList({
             </div>
           ) : (
             <div className="flex justify-between text-sm">
-              <span>Burnout Score (Legacy)</span>
-              <span className="font-medium">{((member?.burnout_score || 0) * 10).toFixed(1)}%</span>
+              <span>No CBI Score Available</span>
+              <span className="font-medium text-gray-500">-</span>
             </div>
           )}
           <div className="relative h-2 w-full overflow-hidden rounded-full bg-gray-200">
             <div 
               className="h-full transition-all"
               style={{ 
-                width: `${member?.cbi_score !== undefined ? member.cbi_score : member.burnout_score * 10}%`,
+                width: `${member?.cbi_score || 0}%`,
                 backgroundColor: member?.cbi_score !== undefined 
                   ? getCBIProgressColor(member.cbi_score)
                   : undefined
@@ -205,20 +206,19 @@ export function TeamMembersList({
             
             // Filter members with valid scores
             const validMembers = allMembers.filter((member) => {
-              const hasCbiScore = member.cbi_score !== undefined && member.cbi_score !== null
-              const hasLegacyScore = member.burnout_score !== undefined && member.burnout_score !== null
-              return (hasCbiScore || hasLegacyScore)
+              // Only include members with CBI scores
+              return member.cbi_score !== undefined && member.cbi_score !== null && member.cbi_score > 0
             })
             
             // Separate members with and without incidents
             const membersWithIncidents = validMembers.filter(member => (member.incident_count || 0) > 0)
             const membersWithoutIncidents = validMembers.filter(member => (member.incident_count || 0) === 0)
+
             
             // Sort members by score (highest risk first)
             const sortMembers = (members: any[]) => members.sort((a, b) => {
-              const aScore = a.cbi_score !== undefined ? a.cbi_score : a.burnout_score * 10;
-              const bScore = b.cbi_score !== undefined ? b.cbi_score : b.burnout_score * 10;
-              return bScore - aScore;
+              // Sort by CBI score only (higher score = higher risk)
+              return (b.cbi_score || 0) - (a.cbi_score || 0);
             })
 
             return (

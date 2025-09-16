@@ -317,19 +317,8 @@ export function MemberDetailModal({
           </div>
           
           {(() => {
-            // Get the correct burnout score (handle both data formats)
-            const burnoutScore = memberData?.burnout_score || (selectedMember.burnoutScore ? selectedMember.burnoutScore / 10 : 0) || 0;
-            
-            // Burnout dimensions no longer used - replaced with CBI scores
-          
-          // Calculate overall burnout score (0-10 scale, higher = more burnout, consistent with dimensions)
-          const overallBurnoutScore = Math.max(0, Math.min(10, burnoutScore || 0));
-          const healthStatus = overallBurnoutScore <= 3 ? 'Low Risk' : 
-                             overallBurnoutScore <= 5 ? 'Moderate Risk' : 
-                             overallBurnoutScore <= 7 ? 'High Risk' : 'Critical Risk';
-          const healthColor = overallBurnoutScore <= 3 ? 'text-green-700 bg-green-100 font-medium' : 
-                            overallBurnoutScore <= 5 ? 'text-amber-700 bg-amber-100 font-medium' : 
-                            overallBurnoutScore <= 7 ? 'text-orange-700 bg-orange-100 font-medium' : 'text-red-700 bg-red-100 font-medium';
+            // Use only CBI scores - no legacy fallbacks
+            // Health status determined from CBI scores in getCBIRiskLevel function
                             
           // Generate burnout summary highlighting concrete metrics and patterns
           const burnoutSummary = (() => {
@@ -400,8 +389,8 @@ export function MemberDetailModal({
                         if (memberData.cbi_score < 75) return { level: 'poor', label: 'Poor' };
                         return { level: 'critical', label: 'Critical' };
                       }
-                      // Fallback to legacy system
-                      return { level: selectedMember.riskLevel.toLowerCase(), label: healthStatus };
+                      // No CBI score available - default to unknown risk
+                      return { level: 'unknown', label: 'Unknown Risk' };
                     };
                     
                     const riskInfo = getCBIRiskLevel();
@@ -411,7 +400,7 @@ export function MemberDetailModal({
                         case 'poor': return 'bg-red-50 text-red-600 border-red-200'; 
                         case 'fair': return 'bg-yellow-50 text-yellow-600 border-yellow-200';
                         case 'healthy': return 'bg-green-50 text-green-600 border-green-200';
-                        default: return healthColor;
+                        default: return 'bg-gray-50 text-gray-600 border-gray-200';
                       }
                     };
                     
@@ -433,13 +422,13 @@ export function MemberDetailModal({
                       }
                       return 'text-gray-900'; // Legacy fallback
                     })()}`}>
-                      {memberData?.cbi_score !== undefined ? 
-                        `${memberData.cbi_score.toFixed(0)}/100` : 
-                        `${(overallBurnoutScore * 10).toFixed(0)}%`
+                      {memberData?.cbi_score !== undefined ?
+                        `${memberData.cbi_score.toFixed(0)}/100` :
+                        'No Score Available'
                       }
                     </div>
                     <p className="text-xs text-gray-500">
-                      {memberData?.cbi_score !== undefined ? 'CBI Score' : 'Burnout Risk Score'}
+                      {memberData?.cbi_score !== undefined ? 'CBI Score' : 'No Score Available'}
                     </p>
                   </div>
                 </CardContent>

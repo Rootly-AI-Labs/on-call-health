@@ -110,9 +110,9 @@ interface OrganizationMember {
   email: string
   role?: string
   avatar?: string
-  burnoutScore: number
-  burnout_score?: number // API returns snake_case
-  riskLevel: 'high' | 'medium' | 'low'
+  cbiScore: number // CBI score (0-100)
+  cbi_score?: number // API returns snake_case
+  riskLevel: 'critical' | 'poor' | 'fair' | 'healthy' // CBI-based risk levels
   trend: 'up' | 'down' | 'stable'
   incidentsHandled: number
   incident_count?: number // API returns this
@@ -238,8 +238,8 @@ interface AnalysisResult {
         user_id: string
         user_name: string
         user_email: string
-        burnout_score: number
-        risk_level: string
+        cbi_score: number  // CBI score (0-100)
+        risk_level?: string // Optional legacy field
         factors: {
           workload: number
           after_hours: number
@@ -261,8 +261,8 @@ interface AnalysisResult {
       user_id: string
       user_name: string
       user_email: string
-      burnout_score: number
-      risk_level: string
+      cbi_score: number  // CBI score (0-100)
+      risk_level?: string // Optional legacy field
       incident_count: number
       key_metrics?: {
         incidents_per_week: number
@@ -2516,19 +2516,13 @@ export default function Dashboard() {
     const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members
     return members
       ?.filter((member) => {
-        // Check if member has CBI score or legacy burnout score
+        // Only include members with CBI scores
         const memberWithCbi = member as any;
-        const hasCbiScore = memberWithCbi.cbi_score !== undefined && memberWithCbi.cbi_score !== null && memberWithCbi.cbi_score > 0
-        const hasLegacyScore = member.burnout_score !== undefined && member.burnout_score !== null && member.burnout_score > 0
-        return (hasCbiScore || hasLegacyScore) // Include all members with valid scores
+        return memberWithCbi.cbi_score !== undefined && memberWithCbi.cbi_score !== null && memberWithCbi.cbi_score > 0
       })
       ?.map((member) => {
-        // Use NEW individualized burnout scores (0-10 scale) converted to 0-100 scale
-        // New algorithm: 2.17 -> 21.7, 3.08 -> 30.8, 6.33 -> 63.3 (individualized!)
-        // CBI system: 60.0, 60.0, 24.34 (clustered - avoid using)
-        const score = member.burnout_score !== undefined && member.burnout_score > 0
-          ? (member.burnout_score * 10) // Convert 0-10 scale to 0-100 scale  
-          : ((member as any).cbi_score || 0) // Only use CBI as fallback
+        // Use CBI scoring system (0-100 scale, higher = more burnout)
+        const score = (member as any).cbi_score || 0
         
         const burnoutScore = Math.max(0, score);
         
@@ -2548,7 +2542,7 @@ export default function Dashboard() {
           score: burnoutScore,
           riskLevel: riskInfo.level,
           backendRiskLevel: member.risk_level, // Keep original for reference
-          scoreType: member.burnout_score !== undefined && member.burnout_score > 0 ? 'NEW' : 'CBI_Fallback',
+          scoreType: 'CBI',
           fill: riskInfo.color,
         }
       })
@@ -2590,8 +2584,9 @@ export default function Dashboard() {
   // NO FALLBACK DATA: Only show burnout factors if we have REAL API data
   // Include ALL members with burnout scores, not just those with incidents
   // Members with high GitHub activity but no incidents should still be included
-  const membersWithBurnoutScores = members.filter((m: any) => 
-    m?.burnout_score !== undefined && m?.burnout_score !== null && m?.burnout_score > 0
+  // Filter members with CBI scores only
+  const membersWithCbiScores = members.filter((m: any) =>
+    m?.cbi_score !== undefined && m?.cbi_score !== null && m?.cbi_score > 0
   );
   
   // For backward compatibility, keep membersWithIncidents for other parts of the code
@@ -2610,7 +2605,7 @@ export default function Dashboard() {
   // Backend provides pre-calculated factors - frontend should ONLY display, never recalculate
   const membersWithGitHubData = members.filter((m: any) => 
     m?.github_activity && (m.github_activity.commits_count > 0 || m.github_activity.commits_per_week > 0));
-  const allActiveMembers = members; // Include all team members
+  const allActiveMembers = membersWithCbiScores; // Only include members with CBI scores
 
   const burnoutFactors = (allActiveMembers.length > 0) ? [
     { 
@@ -2916,10 +2911,10 @@ export default function Dashboard() {
                       variant="outline"
                       size="sm"
                       onClick={() => loadPreviousAnalyses(true)}
-                      disabled={loadingMoreAnalyses}
+                      disabled={loadingMoreAnalyses || analysisRunning}
                       className="w-full border-gray-500 bg-gray-800 text-gray-200 hover:bg-gray-700 hover:text-white hover:border-gray-400 text-xs"
                     >
-                      {loadingMoreAnalyses ? (
+                      {(loadingMoreAnalyses || analysisRunning) ? (
                         <>
                           <div className="w-3 h-3 border border-gray-300 border-t-transparent rounded-full animate-spin mr-2" />
                           Loading...
@@ -4249,7 +4244,7 @@ export default function Dashboard() {
                 </div>
               )}
 
-              <TeamMembersList 
+              <TeamMembersList
                 currentAnalysis={currentAnalysis}
                 setSelectedMember={setSelectedMember}
                 getRiskColor={getRiskColor}

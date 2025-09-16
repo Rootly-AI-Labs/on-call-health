@@ -141,16 +141,7 @@ export function TeamHealthOverview({
                           return Math.round(avgCbiScore); // Round to whole integer
                         }
 
-                        // If no CBI scores, fallback to legacy
-                        const legacyScores = members
-                          .map((m: any) => m.burnout_score)
-                          .filter((s: any) => s !== undefined && s !== null && s > 0);
-
-                        if (legacyScores.length > 0) {
-                          const avgLegacyScore = legacyScores.reduce((a: number, b: number) => a + b, 0) / legacyScores.length;
-                          return Math.round(avgLegacyScore * 10);
-                        }
-
+                        // No CBI scores available - return null
                         return null;
                       };
 
@@ -319,13 +310,7 @@ export function TeamHealthOverview({
                           }
                         }
 
-                        // Fallback to legacy burnout scores
-                        const legacyScores = members.map((m: any) => m.burnout_score).filter((s: any) => s !== undefined && s !== null);
-                        if (legacyScores.length > 0) {
-                          const avgLegacyScore = legacyScores.reduce((a: number, b: number) => a + b, 0) / legacyScores.length;
-                          // Legacy: 0-10 where higher = more burnout, convert to health percentage
-                          return (10 - avgLegacyScore) * 10;
-                        }
+                        // No CBI scores - no health percentage available
                       }
 
                       // Fallback to existing daily trends logic
@@ -392,12 +377,7 @@ export function TeamHealthOverview({
                           }
                         }
 
-                        // Fallback to legacy burnout scores
-                        const legacyScores = members.map((m: any) => m.burnout_score).filter((s: any) => s !== undefined && s !== null);
-                        if (legacyScores.length > 0) {
-                          const avgLegacyScore = legacyScores.reduce((a: number, b: number) => a + b, 0) / legacyScores.length;
-                          return (10 - avgLegacyScore) * 10; // Convert to health percentage
-                        }
+                        // No CBI scores - return null
                       }
 
                       // Fallback to legacy daily trends logic
@@ -464,14 +444,8 @@ export function TeamHealthOverview({
                           else if (member.cbi_score >= 50) riskCounts.high++;
                           else if (member.cbi_score >= 25) riskCounts.medium++;
                           else riskCounts.low++;
-                        } else {
-                          // Fallback to legacy risk_level from backend
-                          const riskLevel = member.risk_level?.toLowerCase() || 'low';
-                          if (riskLevel === 'critical') riskCounts.critical++;
-                          else if (riskLevel === 'high') riskCounts.high++;
-                          else if (riskLevel === 'medium') riskCounts.medium++;
-                          else riskCounts.low++;
                         }
+                        // No fallback - only count members with CBI scores
                       });
 
                       return (
