@@ -380,9 +380,6 @@ interface AnalysisResult {
 
 type AnalysisStage = "loading" | "connecting" | "fetching_users" | "fetching" | "fetching_github" | "fetching_slack" | "calculating" | "analyzing" | "preparing" | "complete"
 
-// Mock data generator function removed - following "NO FALLBACK DATA" principle
-// All dashboard components now only display real analysis data from the API
-
 // Component for individual daily health tracking
 function IndividualDailyHealthChart({ memberData, analysisId, currentAnalysis }: {
   memberData: any
@@ -990,10 +987,6 @@ export default function Dashboard() {
   const searchParams = useSearchParams()
   
   // Backend health monitoring - temporarily disabled
-  // const { isHealthy, healthStatus } = useBackendHealth({
-  //   showToasts: true,
-  //   autoStart: true,
-  // })
 
   // Function to update URL with analysis ID (UUID)
   const updateURLWithAnalysis = (analysisId: string | null) => {
