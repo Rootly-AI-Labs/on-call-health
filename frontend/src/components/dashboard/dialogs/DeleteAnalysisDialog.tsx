@@ -2,7 +2,7 @@
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { AlertTriangle } from "lucide-react"
+import { AlertTriangle, Loader2 } from "lucide-react"
 
 interface Integration {
   id: number
@@ -23,6 +23,7 @@ interface DeleteAnalysisDialogProps {
   integrations: Integration[]
   onConfirmDelete: () => Promise<void>
   onCancel: () => void
+  isDeleting?: boolean
 }
 
 export function DeleteAnalysisDialog({
@@ -31,7 +32,8 @@ export function DeleteAnalysisDialog({
   analysisToDelete,
   integrations,
   onConfirmDelete,
-  onCancel
+  onCancel,
+  isDeleting = false
 }: DeleteAnalysisDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -81,6 +83,7 @@ export function DeleteAnalysisDialog({
             variant="outline"
             onClick={onCancel}
             className="flex-1"
+            disabled={isDeleting}
           >
             Cancel
           </Button>
@@ -88,8 +91,16 @@ export function DeleteAnalysisDialog({
             variant="destructive"
             onClick={onConfirmDelete}
             className="flex-1 bg-red-600 hover:bg-red-700"
+            disabled={isDeleting}
           >
-            Delete Analysis
+            {isDeleting ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Deleting...
+              </>
+            ) : (
+              "Delete Analysis"
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

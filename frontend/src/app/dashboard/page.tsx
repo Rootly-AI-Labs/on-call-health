@@ -402,6 +402,7 @@ export default function Dashboard() {
   const [timeRange, setTimeRange] = useState("30")
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [analysisToDelete, setAnalysisToDelete] = useState<AnalysisResult | null>(null)
+  const [deletingAnalysis, setDeletingAnalysis] = useState(false)
   const [debugSectionOpen, setDebugSectionOpen] = useState(false)
   // Removed member view mode - only showing radar chart now
   const [historicalTrends, setHistoricalTrends] = useState<any>(null)
@@ -969,6 +970,7 @@ export default function Dashboard() {
   const confirmDeleteAnalysis = async () => {
     if (!analysisToDelete) return
 
+    setDeletingAnalysis(true)
     try {
       const authToken = localStorage.getItem('auth_token')
       if (!authToken) return
@@ -1016,6 +1018,8 @@ export default function Dashboard() {
       toast.error(error instanceof Error ? error.message : "Failed to delete analysis")
       setDeleteDialogOpen(false)
       setAnalysisToDelete(null)
+    } finally {
+      setDeletingAnalysis(false)
     }
   }
 
@@ -4081,6 +4085,7 @@ export default function Dashboard() {
         analysisToDelete={analysisToDelete}
         integrations={integrations}
         onConfirmDelete={confirmDeleteAnalysis}
+        isDeleting={deletingAnalysis}
         onCancel={() => {
           setDeleteDialogOpen(false)
           setAnalysisToDelete(null)
