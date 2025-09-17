@@ -2353,10 +2353,10 @@ export default function Dashboard() {
                       variant="outline"
                       size="sm"
                       onClick={() => loadPreviousAnalyses(true)}
-                      disabled={loadingMoreAnalyses || analysisRunning}
+                      disabled={loadingMoreAnalyses || analysisRunning || !initialDataLoaded}
                       className="w-full border-gray-500 bg-gray-800 text-gray-200 hover:bg-gray-700 hover:text-white hover:border-gray-400 text-xs"
                     >
-                      {(loadingMoreAnalyses || analysisRunning) ? (
+                      {(loadingMoreAnalyses || analysisRunning || !initialDataLoaded) ? (
                         <>
                           <div className="w-3 h-3 border border-gray-300 border-t-transparent rounded-full animate-spin mr-2" />
                           Loading...
