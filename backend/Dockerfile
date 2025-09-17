@@ -19,8 +19,7 @@ COPY . .
 # Expose port
 EXPOSE 8000
 
-# Copy and set up startup script
-COPY start.sh .
+# Set up startup script permissions
 RUN chmod +x start.sh
 
 # Command to run migrations and start the application
