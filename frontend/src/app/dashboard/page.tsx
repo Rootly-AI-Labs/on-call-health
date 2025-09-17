@@ -2168,10 +2168,9 @@ export default function Dashboard() {
     );
   }
 
-  // Show main page loader while initial data loads (but not if we have cached data)
-  // Also show loader if we haven't loaded analyses yet to prevent empty state flash
-  const showLoader = (!initialDataLoaded && !hasDataFromCache) || 
-                     (initialDataLoaded && previousAnalyses.length === 0 && !hasDataFromCache);
+  // Show main page loader ONLY while initial data loads (and no cached data)
+  // Once data is loaded, show proper empty state or analysis content
+  const showLoader = !initialDataLoaded && !hasDataFromCache;
   
   if (showLoader) {
     return (
