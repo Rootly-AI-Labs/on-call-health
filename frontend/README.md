@@ -90,4 +90,4 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 For production:
 ```bash
 NEXT_PUBLIC_API_URL=https://your-backend-domain.railway.app
-```
+```# Force new deployment
