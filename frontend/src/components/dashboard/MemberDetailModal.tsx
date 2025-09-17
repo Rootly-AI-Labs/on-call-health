@@ -134,18 +134,18 @@ function IndividualDailyHealthChart({ memberData, analysisId, currentAnalysis }:
           </div>
         </div>
         
-        <div style={{ width: '100%', height: '300px' }}>
+        <div style={{ width: '100%', height: '250px' }}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={dailyHealthData}
-              margin={{ top: 20, right: 30, left: 40, bottom: 80 }}
+              margin={{ top: 20, right: 30, left: 40, bottom: 60 }}
             >
-              <XAxis 
-                dataKey="day_name" 
+              <XAxis
+                dataKey="day_name"
                 fontSize={9}
                 angle={-45}
                 textAnchor="end"
-                height={80}
+                height={60}
                 tick={{ fill: '#6B7280' }}
                 axisLine={false}
                 tickLine={false}
@@ -739,7 +739,7 @@ export function MemberDetailModal({
                   <TabsContent value="communication" className="space-y-4">
                     {selectedMember.slack_activity ? (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <Card>
+                        <Card className="border border-gray-200">
                           <CardHeader>
                             <CardTitle className="text-sm">Communication Activity</CardTitle>
                           </CardHeader>
