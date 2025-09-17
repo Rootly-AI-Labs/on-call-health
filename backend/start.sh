@@ -29,12 +29,14 @@ for attempt in range(max_attempts):
         time.sleep(2)
 "
 
-# Run all database migrations using the migration runner
+# Run database migrations using simple migration runner
 echo "🔄 Running database migrations..."
-if python migrations/migration_runner.py; then
+echo "📂 Current directory: $(pwd)"
+
+if python simple_migration.py; then
     echo "✅ All migrations completed successfully!"
 else
-    echo "⚠️  Some migrations failed, but continuing startup..."
+    echo "⚠️  Migration failed, but continuing startup..."
     echo "   Check logs above for details"
 fi
 

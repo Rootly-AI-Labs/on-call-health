@@ -12,12 +12,26 @@ import logging
 from datetime import datetime
 from typing import List, Dict
 
-# Add the app directory to Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'app'))
+# Add the correct paths for Docker environment
+current_dir = os.path.dirname(os.path.abspath(__file__))
+backend_dir = os.path.dirname(current_dir)
+app_dir = os.path.join(backend_dir, 'app')
 
-from app.models import get_db
-from sqlalchemy import text, create_engine
-from sqlalchemy.exc import SQLAlchemyError
+# Add both backend and app directories to Python path
+sys.path.insert(0, backend_dir)
+sys.path.insert(0, app_dir)
+
+try:
+    from app.models import get_db
+    from sqlalchemy import text, create_engine
+    from sqlalchemy.exc import SQLAlchemyError
+except ImportError as e:
+    # Fallback for Docker environment
+    sys.path.insert(0, '/app')
+    sys.path.insert(0, '/app/app')
+    from app.models import get_db
+    from sqlalchemy import text, create_engine
+    from sqlalchemy.exc import SQLAlchemyError
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
