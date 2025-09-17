@@ -118,19 +118,19 @@ function IndividualDailyHealthChart({ memberData, analysisId, currentAnalysis }:
         <div className="mb-4 flex flex-wrap items-center gap-4 text-xs text-gray-500">
           <div className="flex items-center space-x-1">
             <div className="w-3 h-3 bg-red-500 rounded"></div>
-            <span>Poor (80-100)</span>
+            <span>Critical (75-100)</span>
           </div>
           <div className="flex items-center space-x-1">
             <div className="w-3 h-3 bg-orange-500 rounded"></div>
-            <span>Concerning (40-79)</span>
+            <span>Poor (50-74)</span>
           </div>
           <div className="flex items-center space-x-1">
             <div className="w-3 h-3 bg-yellow-500 rounded"></div>
-            <span>Fair (20-39)</span>
+            <span>Fair (25-49)</span>
           </div>
           <div className="flex items-center space-x-1">
             <div className="w-3 h-3 bg-green-500 rounded"></div>
-            <span>Healthy (0-19)</span>
+            <span>Healthy (0-24)</span>
           </div>
         </div>
         
@@ -217,10 +217,10 @@ function IndividualDailyHealthChart({ memberData, analysisId, currentAnalysis }:
                     key={`cell-${index}`} 
                     fill={
                       !entry.has_data ? '#D1D5DB' :        // Light grey for no incidents
-                      entry.health_score >= 80 ? '#EF4444' : // Red for poor (80-100) - HIGH BURNOUT
-                      entry.health_score >= 40 ? '#F97316' : // Orange for concerning (40-79)
-                      entry.health_score >= 20 ? '#F59E0B' : // Yellow for fair (20-39)
-                      '#10B981'                             // Green for healthy (0-19) - LOW BURNOUT
+                      entry.health_score >= 75 ? '#EF4444' : // Red for critical (75-100) - HIGH BURNOUT
+                      entry.health_score >= 50 ? '#F97316' : // Orange for poor (50-74)
+                      entry.health_score >= 25 ? '#F59E0B' : // Yellow for fair (25-49)
+                      '#10B981'                             // Green for healthy (0-24) - LOW BURNOUT
                     }
                     stroke={!entry.has_data ? '#9CA3AF' : 'none'}
                     strokeWidth={!entry.has_data ? 2 : 0}
