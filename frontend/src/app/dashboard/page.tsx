@@ -3721,11 +3721,24 @@ export default function Dashboard() {
             </Card>
           )}
 
-          {/* Empty State */}
+          {/* Empty State or Loading State */}
           {!analysisRunning && !currentAnalysis && !searchParams.get('analysis') && (
             <>
-              {/* Check if integrations exist */}
-              {integrations.length === 0 ? (
+              {/* Show loading state if initial data hasn't loaded yet */}
+              {!initialDataLoaded ? (
+                <Card className="text-center p-8">
+                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <div className="w-8 h-8 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+                  </div>
+                  <h3 className="text-lg font-semibold mb-2">Loading Your Analyses</h3>
+                  <p className="text-gray-600 mb-4">
+                    We're checking for your previous burnout analyses...
+                  </p>
+                </Card>
+              ) : (
+                <>
+                  {/* Check if integrations exist */}
+                  {integrations.length === 0 ? (
                 <Card className="text-center p-8">
                   <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
                     <Settings className="w-8 h-8 text-blue-600" />
@@ -3790,6 +3803,8 @@ export default function Dashboard() {
                       New Analysis
                     </Button>
                   </Card>
+                </>
+              )}
                 </>
               )}
             </>
