@@ -233,11 +233,6 @@ function IndividualDailyHealthChart({ memberData, analysisId, currentAnalysis }:
           </ResponsiveContainer>
         </div>
         
-        <div className="mt-4 text-xs text-gray-500 space-y-1">
-          <p>• Health scores calculated based on incident load, severity, and timing</p>
-          <p>• Grey dashed bars represent days with no incident involvement</p>
-          <p>• Higher scores indicate better work-life balance and lower stress</p>
-        </div>
       </CardContent>
     </Card>
   );
