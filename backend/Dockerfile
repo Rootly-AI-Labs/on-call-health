@@ -19,5 +19,9 @@ COPY . .
 # Expose port
 EXPOSE 8000
 
-# Command to run the application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Copy and set up startup script
+COPY start.sh .
+RUN chmod +x start.sh
+
+# Command to run migrations and start the application
+CMD ["./start.sh"]
