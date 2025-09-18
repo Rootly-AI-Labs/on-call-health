@@ -12,10 +12,11 @@ from .user_correlation import UserCorrelation
 from .integration_mapping import IntegrationMapping
 from .user_mapping import UserMapping
 from .user_burnout_report import UserBurnoutReport
+from .slack_workspace_mapping import SlackWorkspaceMapping
 
 __all__ = [
     "Base", "get_db", "create_tables", "SessionLocal", "User", "Analysis",
     "RootlyIntegration", "OAuthProvider", "UserEmail", "GitHubIntegration",
     "SlackIntegration", "UserCorrelation", "IntegrationMapping", "UserMapping",
-    "UserBurnoutReport"
+    "UserBurnoutReport", "SlackWorkspaceMapping"
 ]

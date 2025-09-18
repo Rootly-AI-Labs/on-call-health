@@ -12,7 +12,7 @@ import base64
 from datetime import datetime
 from pydantic import BaseModel
 
-from ...models import get_db, User, SlackIntegration, UserCorrelation, UserBurnoutReport, Analysis
+from ...models import get_db, User, SlackIntegration, UserCorrelation, UserBurnoutReport, Analysis, SlackWorkspaceMapping
 from ...auth.dependencies import get_current_user
 from ...auth.integration_oauth import slack_integration_oauth
 from ...core.config import settings
