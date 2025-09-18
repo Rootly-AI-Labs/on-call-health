@@ -9,7 +9,7 @@ from .models import create_tables
 from .core.config import settings
 from .core.rate_limiting import limiter, custom_rate_limit_exceeded_handler
 from .middleware.security import security_middleware
-from .api.endpoints import auth, rootly, analysis, analyses, pagerduty, github, slack, llm, mappings, manual_mappings, debug_mappings, migrate
+from .api.endpoints import auth, rootly, analysis, analyses, pagerduty, github, slack, llm, mappings, manual_mappings, debug_mappings, migrate, admin, notifications
 
 # Create FastAPI application
 app = FastAPI(
@@ -113,3 +113,5 @@ app.include_router(mappings.router, prefix="/integrations", tags=["integration-m
 app.include_router(manual_mappings.router, prefix="/integrations", tags=["manual-mappings"])
 app.include_router(debug_mappings.router, prefix="/api", tags=["debug"])
 app.include_router(migrate.router, prefix="/api/migrate", tags=["migration"])
+app.include_router(admin.router, prefix="/api", tags=["admin"])
+app.include_router(notifications.router, prefix="/api", tags=["notifications"])
