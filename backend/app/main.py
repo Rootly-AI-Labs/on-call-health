@@ -98,6 +98,45 @@ async def health():
 @app.on_event("startup")
 async def startup_event():
     create_tables()
+
+    # Run organizations migration if needed
+    try:
+        import sys
+        import os
+        sys.path.append(os.path.dirname(__file__))
+
+        # Import migration function
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+        from migrate_organizations_mvp import main as run_migration
+
+        # Check if migration already ran by checking if organizations table exists
+        from .models import SessionLocal
+        from sqlalchemy import text
+
+        db = SessionLocal()
+        try:
+            result = db.execute(text("SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'organizations'"))
+            table_exists = result.scalar() > 0
+
+            if not table_exists:
+                print("🔄 Running organizations migration on startup...")
+                success = run_migration()
+                if success:
+                    print("✅ Organizations migration completed successfully!")
+                else:
+                    print("❌ Organizations migration failed!")
+            else:
+                print("✅ Organizations table already exists, skipping migration.")
+
+        except Exception as e:
+            print(f"⚠️ Could not check migration status: {e}")
+        finally:
+            db.close()
+
+    except Exception as e:
+        print(f"⚠️ Could not run organizations migration: {e}")
+        # Don't fail startup if migration fails
+        pass
     
 
 # Include API routers
