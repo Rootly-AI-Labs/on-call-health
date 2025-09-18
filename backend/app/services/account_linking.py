@@ -63,7 +63,12 @@ class AccountLinkingService:
             # Check if user needs organization assignment (for existing users after migration)
             user = existing_oauth.user
             if not user.organization_id:
-                self._assign_user_to_organization(user, user.email)
+                try:
+                    self._assign_user_to_organization(user, user.email)
+                except Exception as e:
+                    logger.error(f"Error assigning user to organization: {e}")
+                    # Don't fail the OAuth flow if organization assignment fails
+                    pass
 
             self.db.commit()
             return user, False
@@ -82,7 +87,12 @@ class AccountLinkingService:
 
             # Check if user needs organization assignment (for existing users after migration)
             if not existing_user.organization_id:
-                self._assign_user_to_organization(existing_user, primary_email)
+                try:
+                    self._assign_user_to_organization(existing_user, primary_email)
+                except Exception as e:
+                    logger.error(f"Error assigning user to organization: {e}")
+                    # Don't fail the OAuth flow if organization assignment fails
+                    pass
 
             return existing_user, False
         else:
@@ -153,7 +163,12 @@ class AccountLinkingService:
         self.db.add(user_email)
 
         # Handle organization assignment
-        self._assign_user_to_organization(user, primary_email)
+        try:
+            self._assign_user_to_organization(user, primary_email)
+        except Exception as e:
+            logger.error(f"Error assigning new user to organization: {e}")
+            # Don't fail user creation if organization assignment fails
+            pass
 
         self.db.commit()
         return user
@@ -295,47 +310,57 @@ class AccountLinkingService:
 
     def _assign_user_to_organization(self, user: User, email: str) -> None:
         """Assign user to organization based on email domain or invitation."""
-        domain = email.split('@')[1] if '@' in email else None
-        if not domain:
-            return
+        try:
+            domain = email.split('@')[1] if '@' in email else None
+            if not domain:
+                logger.info(f"No domain found in email {email}")
+                return
 
-        # Shared domains (Gmail, etc.) - check for invitation
-        shared_domains = {'gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'icloud.com'}
-        if domain in shared_domains:
-            # Look for pending invitation
-            invitation = self.db.query(OrganizationInvitation).filter(
-                OrganizationInvitation.email == email,
-                OrganizationInvitation.status == 'pending'
-            ).first()
+            # Shared domains (Gmail, etc.) - check for invitation
+            shared_domains = {'gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'icloud.com'}
+            if domain in shared_domains:
+                # Look for pending invitation
+                invitation = self.db.query(OrganizationInvitation).filter(
+                    OrganizationInvitation.email == email,
+                    OrganizationInvitation.status == 'pending'
+                ).first()
 
-            if invitation and not invitation.is_expired:
-                # Accept invitation automatically on OAuth
-                user.organization_id = invitation.organization_id
-                user.role = invitation.role
-                user.joined_org_at = datetime.now()
+                if invitation and not invitation.is_expired:
+                    # Accept invitation automatically on OAuth
+                    user.organization_id = invitation.organization_id
+                    user.role = invitation.role
+                    user.joined_org_at = datetime.now()
 
-                # Mark invitation as accepted
-                invitation.status = 'accepted'
-                invitation.used_at = datetime.now()
+                    # Mark invitation as accepted
+                    invitation.status = 'accepted'
+                    invitation.used_at = datetime.now()
 
-                logger.info(f"Auto-accepted invitation for {email} to org {invitation.organization_id}")
-            # else: Leave user unassigned, they need manual invitation
+                    logger.info(f"Auto-accepted invitation for {email} to org {invitation.organization_id}")
+                else:
+                    logger.info(f"No pending invitation found for {email}")
+                # else: Leave user unassigned, they need manual invitation
 
-        else:
-            # Company domain - auto-assign to organization
-            organization = self.db.query(Organization).filter(
-                Organization.domain == domain
-            ).first()
+            else:
+                # Company domain - auto-assign to organization
+                organization = self.db.query(Organization).filter(
+                    Organization.domain == domain
+                ).first()
 
-            if organization:
-                # Check if this is the first user from this domain (make them admin)
-                existing_users = self.db.query(User).filter(
-                    User.organization_id == organization.id
-                ).count()
+                if organization:
+                    # Check if this is the first user from this domain (make them admin)
+                    existing_users = self.db.query(User).filter(
+                        User.organization_id == organization.id
+                    ).count()
 
-                user.organization_id = organization.id
-                user.role = 'org_admin' if existing_users == 0 else 'user'
-                user.joined_org_at = datetime.now()
+                    user.organization_id = organization.id
+                    user.role = 'org_admin' if existing_users == 0 else 'user'
+                    user.joined_org_at = datetime.now()
 
-                logger.info(f"Auto-assigned {email} to org {organization.id} as {user.role}")
-            # else: No organization exists for this domain yet
+                    logger.info(f"Auto-assigned {email} to org {organization.id} as {user.role}")
+                else:
+                    logger.info(f"No organization found for domain {domain}")
+                # else: No organization exists for this domain yet
+
+        except Exception as e:
+            logger.error(f"Error in _assign_user_to_organization: {e}")
+            raise
