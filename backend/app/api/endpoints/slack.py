@@ -1,7 +1,7 @@
 """
 Slack integration API endpoints for OAuth and data collection.
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Form
 from sqlalchemy.orm import Session
 from typing import Dict, Any
 import secrets
@@ -833,7 +833,17 @@ class SlackModalPayload(BaseModel):
 
 @router.post("/commands/burnout-survey")
 async def handle_burnout_survey_command(
-    payload: dict,
+    token: str = Form(...),
+    team_id: str = Form(...),
+    team_domain: str = Form(...),
+    channel_id: str = Form(...),
+    channel_name: str = Form(...),
+    user_id: str = Form(...),
+    user_name: str = Form(...),
+    command: str = Form(...),
+    text: str = Form(""),
+    response_url: str = Form(...),
+    trigger_id: str = Form(...),
     db: Session = Depends(get_db)
 ):
     """
@@ -841,14 +851,8 @@ async def handle_burnout_survey_command(
     Opens a modal with the 3-question burnout survey.
     """
     try:
-        # Handle Slack URL verification challenge
-        if payload.get("type") == "url_verification":
-            return {"challenge": payload.get("challenge")}
-
-        # Extract user info from Slack command payload
-        user_id = payload.get("user_id")
-        trigger_id = payload.get("trigger_id")
-        team_id = payload.get("team_id")
+        # Extract user info from Slack command form data
+        # user_id, trigger_id, team_id are already available as form parameters
 
         if not user_id or not trigger_id:
             return {"text": "⚠️ Sorry, there was an error processing your request. Please try again."}
