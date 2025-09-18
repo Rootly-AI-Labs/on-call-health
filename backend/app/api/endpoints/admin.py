@@ -318,3 +318,42 @@ async def migrate_organizations(db: Session = Depends(get_db)) -> Dict[str, Any]
             "message": f"Organizations migration failed: {str(e)}",
             "error": str(e)
         }
+
+@router.post("/add-missing-user-columns")
+async def add_missing_user_columns(db: Session = Depends(get_db)) -> Dict[str, Any]:
+    """
+    Add missing user columns that were not included in the original migration.
+    Fixes: column users.joined_org_at does not exist
+    """
+    try:
+        from sqlalchemy import text
+
+        add_columns_sql = """
+        -- Add missing user columns
+        ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS joined_org_at TIMESTAMP WITH TIME ZONE,
+        ADD COLUMN IF NOT EXISTS last_active_at TIMESTAMP WITH TIME ZONE,
+        ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'active';
+
+        -- Create indexes
+        CREATE INDEX IF NOT EXISTS idx_users_joined_org_at ON users(joined_org_at);
+        CREATE INDEX IF NOT EXISTS idx_users_last_active_at ON users(last_active_at);
+        CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
+        """
+
+        db.execute(text(add_columns_sql))
+        db.commit()
+
+        return {
+            "status": "success",
+            "message": "Successfully added missing user columns",
+            "columns_added": ["joined_org_at", "last_active_at", "status"]
+        }
+
+    except Exception as e:
+        db.rollback()
+        return {
+            "status": "error",
+            "message": f"Failed to add missing user columns: {str(e)}",
+            "error": str(e)
+        }

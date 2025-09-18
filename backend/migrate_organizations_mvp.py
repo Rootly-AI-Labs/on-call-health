@@ -114,7 +114,10 @@ def add_organization_columns(engine):
     -- Add organization columns
     ALTER TABLE users
     ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id),
-    ADD COLUMN IF NOT EXISTS role VARCHAR(20) DEFAULT 'user';
+    ADD COLUMN IF NOT EXISTS role VARCHAR(20) DEFAULT 'user',
+    ADD COLUMN IF NOT EXISTS joined_org_at TIMESTAMP WITH TIME ZONE,
+    ADD COLUMN IF NOT EXISTS last_active_at TIMESTAMP WITH TIME ZONE,
+    ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'active';
 
     ALTER TABLE analyses
     ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id);
