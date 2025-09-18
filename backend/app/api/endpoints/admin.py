@@ -8,8 +8,12 @@ from sqlalchemy.orm import Session
 
 from ...core.database import get_db
 from ...models import Analysis
+from ...models.slack_workspace_mapping import SlackWorkspaceMapping
+from ...models.slack_integration import SlackIntegration
 from ...core.rootly_client import RootlyAPIClient
 from ...core.pagerduty_client import PagerDutyAPIClient
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 
 router = APIRouter(
     prefix="/admin",
@@ -121,3 +125,129 @@ async def fix_null_organizations(db: Session = Depends(get_db)) -> Dict[str, Any
         "updated_analyses": analysis_details[:10],  # Show first 10 for brevity
         "message": f"Updated {updated_count} analyses with proper organization names"
     }
+
+@router.post("/migrate-slack-workspace-mappings")
+async def migrate_slack_workspace_mappings(db: Session = Depends(get_db)) -> Dict[str, Any]:
+    """
+    Create slack_workspace_mappings table and migrate existing Slack integrations.
+    This is a one-time migration endpoint for multi-org Slack support.
+    """
+
+    create_table_sql = """
+    CREATE TABLE IF NOT EXISTS slack_workspace_mappings (
+        id SERIAL PRIMARY KEY,
+
+        -- Slack workspace identification
+        workspace_id VARCHAR(20) NOT NULL UNIQUE,  -- T01234567 (Slack team ID)
+        workspace_name VARCHAR(255),               -- "Acme Corp"
+        workspace_domain VARCHAR(255),             -- "acme-corp.slack.com"
+
+        -- Organization mapping
+        owner_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        organization_domain VARCHAR(255),          -- "company.com"
+
+        -- Registration tracking
+        registered_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        registered_via VARCHAR(20) DEFAULT 'oauth',  -- 'oauth', 'manual', 'admin'
+
+        -- Status and management
+        status VARCHAR(20) DEFAULT 'active',       -- 'active', 'suspended', 'pending'
+
+        -- Constraints
+        CONSTRAINT unique_workspace_id UNIQUE(workspace_id)
+    );
+    """
+
+    create_indexes_sql = """
+    -- Create indexes for better query performance
+    CREATE INDEX IF NOT EXISTS idx_slack_workspace_mappings_owner_user_id ON slack_workspace_mappings(owner_user_id);
+    CREATE INDEX IF NOT EXISTS idx_slack_workspace_mappings_workspace_id ON slack_workspace_mappings(workspace_id);
+    CREATE INDEX IF NOT EXISTS idx_slack_workspace_mappings_status ON slack_workspace_mappings(status);
+    CREATE INDEX IF NOT EXISTS idx_slack_workspace_mappings_domain ON slack_workspace_mappings(organization_domain);
+    """
+
+    create_trigger_function_sql = """
+    -- Future-proofing: trigger function for updated_at column
+    CREATE OR REPLACE FUNCTION update_slack_workspace_mappings_updated_at()
+    RETURNS TRIGGER AS $$
+    BEGIN
+        NEW.updated_at = CURRENT_TIMESTAMP;
+        RETURN NEW;
+    END;
+    $$ language 'plpgsql';
+    """
+
+    migrate_existing_sql = """
+    -- Migrate existing slack_integrations to workspace mappings
+    INSERT INTO slack_workspace_mappings (
+        workspace_id,
+        workspace_name,
+        owner_user_id,
+        registered_via,
+        status
+    )
+    SELECT DISTINCT
+        si.workspace_id,
+        'Legacy Workspace' as workspace_name,
+        si.user_id as owner_user_id,
+        'legacy' as registered_via,
+        'active' as status
+    FROM slack_integrations si
+    WHERE si.workspace_id IS NOT NULL
+      AND NOT EXISTS (
+          SELECT 1 FROM slack_workspace_mappings swm
+          WHERE swm.workspace_id = si.workspace_id
+      );
+    """
+
+    try:
+        # Start transaction
+        results = {}
+
+        # Create table
+        db.execute(text(create_table_sql))
+        results["table_created"] = True
+
+        # Create indexes
+        db.execute(text(create_indexes_sql))
+        results["indexes_created"] = True
+
+        # Create trigger function
+        db.execute(text(create_trigger_function_sql))
+        results["trigger_function_created"] = True
+
+        # Migrate existing integrations
+        migration_result = db.execute(text(migrate_existing_sql))
+        migrated_count = migration_result.rowcount
+        results["migrated_count"] = migrated_count
+
+        # Commit all changes
+        db.commit()
+
+        # Verify table creation
+        verify_result = db.execute(text("""
+            SELECT column_name, data_type, is_nullable
+            FROM information_schema.columns
+            WHERE table_name = 'slack_workspace_mappings'
+            ORDER BY ordinal_position;
+        """))
+        columns = verify_result.fetchall()
+        results["columns"] = [{"name": col[0], "type": col[1], "nullable": col[2]} for col in columns]
+
+        # Get count of workspace mappings
+        count_result = db.execute(text("SELECT COUNT(*) FROM slack_workspace_mappings"))
+        total_count = count_result.scalar()
+        results["total_workspace_mappings"] = total_count
+
+        return {
+            "status": "success",
+            "message": f"Successfully created slack_workspace_mappings table and migrated {migrated_count} existing workspace(s)",
+            "results": results
+        }
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Database error during migration: {str(e)}")
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Migration failed: {str(e)}")
