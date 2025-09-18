@@ -6,7 +6,7 @@ from typing import Dict, Any, Optional, List, Tuple
 from sqlalchemy.orm import Session
 from datetime import datetime
 
-from ..models import User, OAuthProvider, UserEmail
+from ..models import User, OAuthProvider, UserEmail, Organization, OrganizationInvitation
 from ..auth.oauth import github_oauth, google_oauth
 
 logger = logging.getLogger(__name__)
@@ -59,8 +59,14 @@ class AccountLinkingService:
             existing_oauth.access_token = access_token
             existing_oauth.refresh_token = refresh_token
             existing_oauth.updated_at = datetime.now()
+
+            # Check if user needs organization assignment (for existing users after migration)
+            user = existing_oauth.user
+            if not user.organization_id:
+                self._assign_user_to_organization(user, user.email)
+
             self.db.commit()
-            return existing_oauth.user, False
+            return user, False
         
         # Look for existing user by any of the emails
         existing_user = self._find_user_by_emails(email_list)
@@ -73,6 +79,11 @@ class AccountLinkingService:
                 access_token, refresh_token, user_info
             )
             self._add_emails_to_user(existing_user, all_emails, provider)
+
+            # Check if user needs organization assignment (for existing users after migration)
+            if not existing_user.organization_id:
+                self._assign_user_to_organization(existing_user, primary_email)
+
             return existing_user, False
         else:
             # Create new user
@@ -140,7 +151,10 @@ class AccountLinkingService:
             source=provider
         )
         self.db.add(user_email)
-        
+
+        # Handle organization assignment
+        self._assign_user_to_organization(user, primary_email)
+
         self.db.commit()
         return user
     
@@ -278,3 +292,50 @@ class AccountLinkingService:
         self.db.delete(provider_to_remove)
         self.db.commit()
         return True
+
+    def _assign_user_to_organization(self, user: User, email: str) -> None:
+        """Assign user to organization based on email domain or invitation."""
+        domain = email.split('@')[1] if '@' in email else None
+        if not domain:
+            return
+
+        # Shared domains (Gmail, etc.) - check for invitation
+        shared_domains = {'gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'icloud.com'}
+        if domain in shared_domains:
+            # Look for pending invitation
+            invitation = self.db.query(OrganizationInvitation).filter(
+                OrganizationInvitation.email == email,
+                OrganizationInvitation.status == 'pending'
+            ).first()
+
+            if invitation and not invitation.is_expired:
+                # Accept invitation automatically on OAuth
+                user.organization_id = invitation.organization_id
+                user.role = invitation.role
+                user.joined_org_at = datetime.now()
+
+                # Mark invitation as accepted
+                invitation.status = 'accepted'
+                invitation.used_at = datetime.now()
+
+                logger.info(f"Auto-accepted invitation for {email} to org {invitation.organization_id}")
+            # else: Leave user unassigned, they need manual invitation
+
+        else:
+            # Company domain - auto-assign to organization
+            organization = self.db.query(Organization).filter(
+                Organization.domain == domain
+            ).first()
+
+            if organization:
+                # Check if this is the first user from this domain (make them admin)
+                existing_users = self.db.query(User).filter(
+                    User.organization_id == organization.id
+                ).count()
+
+                user.organization_id = organization.id
+                user.role = 'org_admin' if existing_users == 0 else 'user'
+                user.joined_org_at = datetime.now()
+
+                logger.info(f"Auto-assigned {email} to org {organization.id} as {user.role}")
+            # else: No organization exists for this domain yet

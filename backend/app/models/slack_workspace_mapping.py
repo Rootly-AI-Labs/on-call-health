@@ -22,6 +22,7 @@ class SlackWorkspaceMapping(Base):
 
     # Organization mapping
     owner_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)  # Manager who connected
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True)  # Organization reference
     organization_domain = Column(String(255), nullable=True)  # "company.com"
 
     # Registration tracking
@@ -32,7 +33,8 @@ class SlackWorkspaceMapping(Base):
     status = Column(String(20), default="active")  # "active", "suspended", "pending"
 
     # Relationships
-    owner = relationship("User", backref="owned_slack_workspaces")
+    owner = relationship("User", back_populates="owned_slack_workspaces")
+    organization = relationship("Organization", back_populates="workspace_mappings")
 
     # Constraints
     __table_args__ = (

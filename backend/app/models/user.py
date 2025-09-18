@@ -1,7 +1,7 @@
 """
 User model for authentication and user management.
 """
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, ForeignKey
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from .base import Base
@@ -24,11 +24,19 @@ class User(Base):
     # LLM Integration fields
     llm_token = Column(Text, nullable=True)  # Encrypted LLM API token
     llm_provider = Column(String(50), nullable=True)  # 'openai', 'anthropic', etc.
-    
+
+    # Organization and role management
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True)
+    role = Column(String(20), default="user")  # 'super_admin', 'org_admin', 'manager', 'user'
+    joined_org_at = Column(DateTime(timezone=True), server_default=func.now())
+    last_active_at = Column(DateTime(timezone=True))
+    status = Column(String(20), default="active")  # 'active', 'suspended', 'pending'
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     
     # Relationships
+    organization = relationship("Organization", back_populates="users")
     analyses = relationship("Analysis", back_populates="user")
     rootly_integrations = relationship("RootlyIntegration", back_populates="user")
     oauth_providers = relationship("OAuthProvider", back_populates="user", cascade="all, delete-orphan")
@@ -39,6 +47,7 @@ class User(Base):
     integration_mappings = relationship("IntegrationMapping", back_populates="user", cascade="all, delete-orphan")
     user_mappings_owned = relationship("UserMapping", foreign_keys="UserMapping.user_id", back_populates="user", cascade="all, delete-orphan")
     user_mappings_created = relationship("UserMapping", foreign_keys="UserMapping.created_by", back_populates="creator")
+    owned_slack_workspaces = relationship("SlackWorkspaceMapping", back_populates="owner")
     
     def __repr__(self):
         return f"<User(id={self.id}, email='{self.email}', providers={len(self.oauth_providers)})>"
@@ -101,3 +110,67 @@ class User(Base):
         if self.user_correlations and any(c.pagerduty_user_id for c in self.user_correlations):
             platforms.append("pagerduty")
         return platforms
+
+    # Role-based properties
+    @property
+    def is_super_admin(self) -> bool:
+        """Check if user is a super admin."""
+        return self.role == 'super_admin'
+
+    @property
+    def is_org_admin(self) -> bool:
+        """Check if user is an organization admin."""
+        return self.role in ['super_admin', 'org_admin']
+
+    @property
+    def is_manager(self) -> bool:
+        """Check if user can manage analyses and surveys."""
+        return self.role in ['super_admin', 'org_admin', 'manager']
+
+    @property
+    def is_active(self) -> bool:
+        """Check if user account is active."""
+        return self.status == 'active'
+
+    def can_manage_organization(self, org_id: int = None) -> bool:
+        """Check if user can manage organization settings."""
+        if self.is_super_admin:
+            return True
+        if self.role == 'org_admin' and (org_id is None or self.organization_id == org_id):
+            return True
+        return False
+
+    def can_manage_users(self, org_id: int = None) -> bool:
+        """Check if user can manage other users."""
+        return self.can_manage_organization(org_id)
+
+    def can_create_analyses(self) -> bool:
+        """Check if user can create burnout analyses."""
+        return self.is_manager
+
+    def to_dict(self, include_sensitive=False):
+        """Convert user to dictionary for API responses."""
+        data = {
+            'id': self.id,
+            'email': self.email,
+            'name': self.name,
+            'role': self.role,
+            'status': self.status,
+            'is_verified': self.is_verified,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'last_active_at': self.last_active_at.isoformat() if self.last_active_at else None,
+            'connected_platforms': self.connected_platforms
+        }
+
+        if self.organization:
+            data['organization'] = {
+                'id': self.organization.id,
+                'name': self.organization.name,
+                'domain': self.organization.domain
+            }
+
+        if include_sensitive and self.is_super_admin:
+            data['organization_id'] = self.organization_id
+            data['joined_org_at'] = self.joined_org_at.isoformat() if self.joined_org_at else None
+
+        return data
