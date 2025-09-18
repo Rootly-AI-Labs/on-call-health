@@ -251,3 +251,70 @@ async def migrate_slack_workspace_mappings(db: Session = Depends(get_db)) -> Dic
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Migration failed: {str(e)}")
+
+@router.post("/migrate-organizations")
+async def migrate_organizations(db: Session = Depends(get_db)) -> Dict[str, Any]:
+    """
+    Run the complete organizations migration - creates organizations, invitations, and notifications tables.
+    This is a one-time migration for multi-org support.
+    """
+    try:
+        # Import and run the migration
+        import sys
+        import os
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../..'))
+
+        from migrate_organizations_mvp import (
+            create_organizations_table,
+            add_organization_columns,
+            populate_organizations,
+            verify_migration,
+            get_database_url
+        )
+        from sqlalchemy import create_engine
+
+        # Create engine using the same database URL
+        database_url = get_database_url()
+        engine = create_engine(database_url)
+
+        results = {}
+
+        # Step 1: Create organizations table
+        if create_organizations_table(engine):
+            results["organizations_table"] = "created"
+        else:
+            results["organizations_table"] = "failed"
+            return {"status": "error", "results": results}
+
+        # Step 2: Add organization columns
+        if add_organization_columns(engine):
+            results["organization_columns"] = "added"
+        else:
+            results["organization_columns"] = "failed"
+            return {"status": "error", "results": results}
+
+        # Step 3: Populate organizations from existing data
+        if populate_organizations(engine):
+            results["organizations_populated"] = "success"
+        else:
+            results["organizations_populated"] = "failed"
+            return {"status": "error", "results": results}
+
+        # Step 4: Verify migration
+        if verify_migration(engine):
+            results["migration_verified"] = "success"
+        else:
+            results["migration_verified"] = "failed"
+
+        return {
+            "status": "success",
+            "message": "Organizations migration completed successfully!",
+            "results": results
+        }
+
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Organizations migration failed: {str(e)}",
+            "error": str(e)
+        }
