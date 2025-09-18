@@ -857,26 +857,50 @@ async def handle_burnout_survey_command(
         if not user_id or not trigger_id:
             return {"text": "⚠️ Sorry, there was an error processing your request. Please try again."}
 
-        # Find the current active analysis
+        # Find workspace mapping to get organization
+        workspace_mapping = db.query(SlackWorkspaceMapping).filter(
+            SlackWorkspaceMapping.workspace_id == team_id,
+            SlackWorkspaceMapping.status == 'active'
+        ).first()
+
+        if not workspace_mapping:
+            return {
+                "text": "⚠️ This Slack workspace is not registered with any organization. Please ask your admin to connect this workspace through the dashboard.",
+                "response_type": "ephemeral"
+            }
+
+        # Get organization
+        organization = workspace_mapping.organization
+        if not organization or organization.status != 'active':
+            return {
+                "text": "⚠️ Organization is not active. Please contact support.",
+                "response_type": "ephemeral"
+            }
+
+        # Find the current active analysis FOR THIS ORGANIZATION
         latest_analysis = db.query(Analysis).filter(
-            Analysis.status == "completed"
+            Analysis.status == "completed",
+            Analysis.organization_id == organization.id
         ).order_by(Analysis.created_at.desc()).first()
 
         if not latest_analysis:
             return {
-                "text": "📋 No active burnout analysis found. Your manager will start a new analysis soon!",
+                "text": f"📋 No active burnout analysis found for {organization.name}. Ask your manager to run an analysis first!",
                 "response_type": "ephemeral"
             }
 
         # Check if user already submitted survey for this analysis
-        # First, try to find user by correlating Slack user_id to email
-        user_correlation = db.query(UserCorrelation).filter(
-            UserCorrelation.slack_user_id == user_id
+        # First, try to find user by correlating Slack user_id to email (ORGANIZATION-SCOPED)
+        user_correlation = db.query(UserCorrelation).join(
+            User, UserCorrelation.user_id == User.id
+        ).filter(
+            UserCorrelation.slack_user_id == user_id,
+            User.organization_id == organization.id
         ).first()
 
         if not user_correlation:
             return {
-                "text": "👋 Hi! I couldn't find you in our team roster. Please ask your manager to ensure you're included in the burnout analysis.",
+                "text": f"👋 Hi! I couldn't find you in the {organization.name} team roster. Please ask your manager to ensure you're included in the burnout analysis.",
                 "response_type": "ephemeral"
             }
 
