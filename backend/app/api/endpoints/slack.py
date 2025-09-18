@@ -841,6 +841,10 @@ async def handle_burnout_survey_command(
     Opens a modal with the 3-question burnout survey.
     """
     try:
+        # Handle Slack URL verification challenge
+        if payload.get("type") == "url_verification":
+            return {"challenge": payload.get("challenge")}
+
         # Extract user info from Slack command payload
         user_id = payload.get("user_id")
         trigger_id = payload.get("trigger_id")
