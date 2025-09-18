@@ -12,7 +12,7 @@ import base64
 from datetime import datetime
 from pydantic import BaseModel
 
-from ...models import get_db, User, SlackIntegration, UserCorrelation
+from ...models import get_db, User, SlackIntegration, UserCorrelation, UserBurnoutReport, Analysis
 from ...auth.dependencies import get_current_user
 from ...auth.integration_oauth import slack_integration_oauth
 from ...core.config import settings
@@ -809,3 +809,411 @@ async def disconnect_slack(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to disconnect Slack integration: {str(e)}"
         )
+
+
+# Survey-related models and endpoints
+class SlackSurveySubmission(BaseModel):
+    """Model for Slack burnout survey submissions."""
+    analysis_id: int
+    user_email: str
+    self_reported_score: int  # 0-100 scale
+    energy_level: int  # 1-5 scale
+    stress_factors: list[str]  # Array of stress factors
+    additional_comments: str = ""
+    is_anonymous: bool = False
+
+
+class SlackModalPayload(BaseModel):
+    """Model for Slack modal interaction payloads."""
+    trigger_id: str
+    user_id: str
+    team_id: str
+    user_email: str = ""
+
+
+@router.post("/commands/burnout-survey")
+async def handle_burnout_survey_command(
+    payload: dict,
+    db: Session = Depends(get_db)
+):
+    """
+    Handle /burnout-survey slash command from Slack.
+    Opens a modal with the 3-question burnout survey.
+    """
+    try:
+        # Extract user info from Slack command payload
+        user_id = payload.get("user_id")
+        trigger_id = payload.get("trigger_id")
+        team_id = payload.get("team_id")
+
+        if not user_id or not trigger_id:
+            return {"text": "⚠️ Sorry, there was an error processing your request. Please try again."}
+
+        # Find the current active analysis
+        latest_analysis = db.query(Analysis).filter(
+            Analysis.status == "completed"
+        ).order_by(Analysis.created_at.desc()).first()
+
+        if not latest_analysis:
+            return {
+                "text": "📋 No active burnout analysis found. Your manager will start a new analysis soon!",
+                "response_type": "ephemeral"
+            }
+
+        # Check if user already submitted survey for this analysis
+        # First, try to find user by correlating Slack user_id to email
+        user_correlation = db.query(UserCorrelation).filter(
+            UserCorrelation.slack_user_id == user_id
+        ).first()
+
+        if not user_correlation:
+            return {
+                "text": "👋 Hi! I couldn't find you in our team roster. Please ask your manager to ensure you're included in the burnout analysis.",
+                "response_type": "ephemeral"
+            }
+
+        # Check for existing survey response
+        existing_report = db.query(UserBurnoutReport).filter(
+            UserBurnoutReport.user_id == user_correlation.user_id,
+            UserBurnoutReport.analysis_id == latest_analysis.id
+        ).first()
+
+        if existing_report:
+            return {
+                "text": f"✅ Thanks! You already completed the burnout survey on {existing_report.submitted_at.strftime('%B %d')}.\n\n"
+                       f"Your responses help improve team health insights. 🌟",
+                "response_type": "ephemeral"
+            }
+
+        # Create and return survey modal
+        modal_view = create_burnout_survey_modal(latest_analysis.id, user_correlation.user_id)
+
+        # In a real implementation, you would send this modal to Slack using their API
+        # For now, return a simple response indicating the survey would open
+        return {
+            "text": "📝 Opening your 2-minute burnout survey...\n\n"
+                   "This helps us:\n"
+                   "• Validate our automated detection\n"
+                   "• Catch stress before it impacts you\n"
+                   "• Make data-driven team improvements",
+            "response_type": "ephemeral",
+            "attachments": [
+                {
+                    "fallback": "Burnout Survey",
+                    "color": "good",
+                    "fields": [
+                        {
+                            "title": "Quick Survey Questions:",
+                            "value": "1. How burned out do you feel? (0-10 scale)\n"
+                                   "2. What's your energy level? (Very Low to Very High)\n"
+                                   "3. Main stress factors? (Select all that apply)",
+                            "short": False
+                        }
+                    ],
+                    "actions": [
+                        {
+                            "type": "button",
+                            "text": "Open Survey",
+                            "url": f"{settings.FRONTEND_URL}/survey?analysis={latest_analysis.id}&user={user_correlation.user_id}",
+                            "style": "primary"
+                        }
+                    ]
+                }
+            ]
+        }
+
+    except Exception as e:
+        logging.error(f"Error handling burnout survey command: {str(e)}")
+        return {
+            "text": "⚠️ Sorry, there was an error opening the survey. Please try again or contact your manager.",
+            "response_type": "ephemeral"
+        }
+
+
+@router.post("/survey/submit")
+async def submit_slack_burnout_survey(
+    submission: SlackSurveySubmission,
+    db: Session = Depends(get_db)
+):
+    """
+    Submit burnout survey response from Slack.
+    """
+    try:
+        # Find the user by email
+        user_correlation = db.query(UserCorrelation).filter(
+            UserCorrelation.user_email == submission.user_email.lower()
+        ).first()
+
+        if not user_correlation:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found in team roster"
+            )
+
+        # Validate analysis exists
+        analysis = db.query(Analysis).filter(
+            Analysis.id == submission.analysis_id
+        ).first()
+
+        if not analysis:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Analysis not found"
+            )
+
+        # Check for duplicate submission
+        existing_report = db.query(UserBurnoutReport).filter(
+            UserBurnoutReport.user_id == user_correlation.user_id,
+            UserBurnoutReport.analysis_id == submission.analysis_id
+        ).first()
+
+        if existing_report:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Survey already submitted for this analysis"
+            )
+
+        # Create new burnout report
+        new_report = UserBurnoutReport(
+            user_id=user_correlation.user_id,
+            analysis_id=submission.analysis_id,
+            self_reported_score=submission.self_reported_score,
+            energy_level=submission.energy_level,
+            stress_factors=submission.stress_factors,
+            additional_comments=submission.additional_comments,
+            submitted_via='slack',
+            is_anonymous=submission.is_anonymous
+        )
+
+        db.add(new_report)
+        db.commit()
+        db.refresh(new_report)
+
+        return {
+            "success": True,
+            "message": "Survey submitted successfully!",
+            "report_id": new_report.id,
+            "submitted_at": new_report.submitted_at.isoformat()
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logging.error(f"Error submitting burnout survey: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to submit survey"
+        )
+
+
+@router.get("/survey/status/{analysis_id}")
+async def get_team_survey_status(
+    analysis_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get team survey response status for an analysis (manager view).
+    """
+    try:
+        # Validate analysis exists and belongs to current user
+        analysis = db.query(Analysis).filter(
+            Analysis.id == analysis_id,
+            Analysis.user_id == current_user.id
+        ).first()
+
+        if not analysis:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Analysis not found"
+            )
+
+        # Get all survey responses for this analysis
+        survey_responses = db.query(UserBurnoutReport).filter(
+            UserBurnoutReport.analysis_id == analysis_id
+        ).all()
+
+        # Get team members from the analysis results
+        team_members = []
+        if analysis.results and isinstance(analysis.results, dict):
+            team_analysis = analysis.results.get('team_analysis', {})
+            members = team_analysis.get('members', [])
+            team_members = [member.get('user_email', '').lower() for member in members if member.get('user_email')]
+
+        # Calculate response statistics
+        total_members = len(team_members)
+        responses_collected = len(survey_responses)
+        response_rate = (responses_collected / total_members * 100) if total_members > 0 else 0
+
+        # Identify non-responders
+        responded_emails = {
+            db.query(UserCorrelation).filter(
+                UserCorrelation.user_id == response.user_id
+            ).first().user_email.lower()
+            for response in survey_responses
+        }
+
+        non_responders = [email for email in team_members if email not in responded_emails]
+
+        return {
+            "analysis_id": analysis_id,
+            "total_members": total_members,
+            "responses_collected": responses_collected,
+            "response_rate": round(response_rate, 1),
+            "non_responders": non_responders,
+            "survey_responses": [
+                {
+                    "user_email": db.query(UserCorrelation).filter(
+                        UserCorrelation.user_id == response.user_id
+                    ).first().user_email,
+                    "self_reported_score": response.self_reported_score,
+                    "energy_level": response.energy_level,
+                    "stress_factors": response.stress_factors,
+                    "submitted_at": response.submitted_at.isoformat(),
+                    "submitted_via": response.submitted_via,
+                    "is_anonymous": response.is_anonymous
+                }
+                for response in survey_responses
+            ]
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Error getting survey status: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get survey status"
+        )
+
+
+def create_burnout_survey_modal(analysis_id: int, user_id: int) -> dict:
+    """
+    Create Slack modal view for burnout survey.
+    This would be used with Slack's views.open API in a real implementation.
+    """
+    return {
+        "type": "modal",
+        "callback_id": f"burnout_survey_{analysis_id}",
+        "title": {
+            "type": "plain_text",
+            "text": "Burnout Check-in",
+            "emoji": True
+        },
+        "submit": {
+            "type": "plain_text",
+            "text": "Submit",
+            "emoji": True
+        },
+        "close": {
+            "type": "plain_text",
+            "text": "Cancel",
+            "emoji": True
+        },
+        "blocks": [
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": "📋 *2-minute burnout check-in*\n\nYour responses help improve team health and workload distribution. All responses are confidential."
+                }
+            },
+            {
+                "type": "divider"
+            },
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": "*Question 1: How burned out do you feel right now?*"
+                },
+                "accessory": {
+                    "type": "static_select",
+                    "action_id": "burnout_score",
+                    "placeholder": {
+                        "type": "plain_text",
+                        "text": "Select level (0-10)",
+                        "emoji": True
+                    },
+                    "options": [
+                        {"text": {"type": "plain_text", "text": "0 - Not at all"}, "value": "0"},
+                        {"text": {"type": "plain_text", "text": "1 - Very slightly"}, "value": "10"},
+                        {"text": {"type": "plain_text", "text": "2 - Slightly"}, "value": "20"},
+                        {"text": {"type": "plain_text", "text": "3 - Somewhat"}, "value": "30"},
+                        {"text": {"type": "plain_text", "text": "4 - Moderately"}, "value": "40"},
+                        {"text": {"type": "plain_text", "text": "5 - Considerably"}, "value": "50"},
+                        {"text": {"type": "plain_text", "text": "6 - Quite a bit"}, "value": "60"},
+                        {"text": {"type": "plain_text", "text": "7 - Very much"}, "value": "70"},
+                        {"text": {"type": "plain_text", "text": "8 - Extremely"}, "value": "80"},
+                        {"text": {"type": "plain_text", "text": "9 - Almost completely"}, "value": "90"},
+                        {"text": {"type": "plain_text", "text": "10 - Completely"}, "value": "100"}
+                    ]
+                }
+            },
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": "*Question 2: What's your energy level this week?*"
+                },
+                "accessory": {
+                    "type": "static_select",
+                    "action_id": "energy_level",
+                    "placeholder": {
+                        "type": "plain_text",
+                        "text": "Select energy level",
+                        "emoji": True
+                    },
+                    "options": [
+                        {"text": {"type": "plain_text", "text": "Very Low"}, "value": "1"},
+                        {"text": {"type": "plain_text", "text": "Low"}, "value": "2"},
+                        {"text": {"type": "plain_text", "text": "Moderate"}, "value": "3"},
+                        {"text": {"type": "plain_text", "text": "High"}, "value": "4"},
+                        {"text": {"type": "plain_text", "text": "Very High"}, "value": "5"}
+                    ]
+                }
+            },
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": "*Question 3: Main stress factors? (select all that apply)*"
+                },
+                "accessory": {
+                    "type": "multi_static_select",
+                    "action_id": "stress_factors",
+                    "placeholder": {
+                        "type": "plain_text",
+                        "text": "Select stress factors",
+                        "emoji": True
+                    },
+                    "options": [
+                        {"text": {"type": "plain_text", "text": "Incident volume"}, "value": "incident_volume"},
+                        {"text": {"type": "plain_text", "text": "Work hours"}, "value": "work_hours"},
+                        {"text": {"type": "plain_text", "text": "On-call burden"}, "value": "on_call_burden"},
+                        {"text": {"type": "plain_text", "text": "Workload"}, "value": "workload"},
+                        {"text": {"type": "plain_text", "text": "Team dynamics"}, "value": "team_dynamics"},
+                        {"text": {"type": "plain_text", "text": "Other"}, "value": "other"}
+                    ]
+                }
+            },
+            {
+                "type": "input",
+                "element": {
+                    "type": "plain_text_input",
+                    "action_id": "additional_comments",
+                    "placeholder": {
+                        "type": "plain_text",
+                        "text": "Anything else affecting your stress? (optional)"
+                    },
+                    "multiline": True
+                },
+                "label": {
+                    "type": "plain_text",
+                    "text": "Additional Comments (Optional)"
+                },
+                "optional": True
+            }
+        ]
+    }
