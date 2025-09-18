@@ -88,6 +88,7 @@ import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { MappingDrawer } from "@/components/mapping-drawer"
+import { NotificationBell } from "@/components/notifications"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -2054,7 +2055,10 @@ export default function IntegrationsPage() {
             </div>
           </div>
 
-          <div className="flex items-center">
+          <div className="flex items-center space-x-4">
+            {/* Notifications */}
+            <NotificationBell />
+
             {/* User Account Indicator */}
             {userInfo ? (
               <DropdownMenu>
