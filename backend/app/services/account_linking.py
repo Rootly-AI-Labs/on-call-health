@@ -55,55 +55,86 @@ class AccountLinkingService:
         ).first()
         
         if existing_oauth:
-            # Update existing OAuth provider
-            existing_oauth.access_token = access_token
-            existing_oauth.refresh_token = refresh_token
-            existing_oauth.updated_at = datetime.now()
+            try:
+                # Update existing OAuth provider
+                existing_oauth.access_token = access_token
+                existing_oauth.refresh_token = refresh_token
+                existing_oauth.updated_at = datetime.now()
 
-            # Check if user needs organization assignment (for existing users after migration)
-            user = existing_oauth.user
-            if not user.organization_id:
-                try:
-                    self._assign_user_to_organization(user, user.email)
-                except Exception as e:
-                    logger.error(f"Error assigning user to organization: {e}")
-                    # Don't fail the OAuth flow if organization assignment fails
-                    pass
+                # Check if user needs organization assignment (for existing users after migration)
+                user = existing_oauth.user
+                if not user.organization_id:
+                    try:
+                        self._assign_user_to_organization(user, user.email)
+                    except Exception as e:
+                        logger.error(f"Error assigning user to organization: {e}")
+                        # Rollback the transaction and start fresh
+                        self.db.rollback()
 
-            self.db.commit()
-            return user, False
+                        # Retry just the OAuth update without organization assignment
+                        existing_oauth.access_token = access_token
+                        existing_oauth.refresh_token = refresh_token
+                        existing_oauth.updated_at = datetime.now()
+
+                self.db.commit()
+                return user, False
+
+            except Exception as e:
+                logger.error(f"Error in OAuth update: {e}")
+                self.db.rollback()
+                raise
         
         # Look for existing user by any of the emails
         existing_user = self._find_user_by_emails(email_list)
         
         if existing_user:
-            # Link this provider to existing user
-            logger.info(f"Linking {provider} account to existing user {existing_user.id}")
-            self._link_provider_to_user(
-                existing_user, provider, provider_user_id, 
-                access_token, refresh_token, user_info
-            )
-            self._add_emails_to_user(existing_user, all_emails, provider)
+            try:
+                # Link this provider to existing user
+                logger.info(f"Linking {provider} account to existing user {existing_user.id}")
+                self._link_provider_to_user(
+                    existing_user, provider, provider_user_id,
+                    access_token, refresh_token, user_info
+                )
+                self._add_emails_to_user(existing_user, all_emails, provider)
 
-            # Check if user needs organization assignment (for existing users after migration)
-            if not existing_user.organization_id:
-                try:
-                    self._assign_user_to_organization(existing_user, primary_email)
-                except Exception as e:
-                    logger.error(f"Error assigning user to organization: {e}")
-                    # Don't fail the OAuth flow if organization assignment fails
-                    pass
+                # Check if user needs organization assignment (for existing users after migration)
+                if not existing_user.organization_id:
+                    try:
+                        self._assign_user_to_organization(existing_user, primary_email)
+                    except Exception as e:
+                        logger.error(f"Error assigning user to organization: {e}")
+                        # Rollback and continue without organization assignment
+                        self.db.rollback()
 
-            return existing_user, False
+                        # Retry the provider linking without organization assignment
+                        self._link_provider_to_user(
+                            existing_user, provider, provider_user_id,
+                            access_token, refresh_token, user_info
+                        )
+                        self._add_emails_to_user(existing_user, all_emails, provider)
+
+                self.db.commit()
+                return existing_user, False
+
+            except Exception as e:
+                logger.error(f"Error linking provider to existing user: {e}")
+                self.db.rollback()
+                raise
         else:
-            # Create new user
-            logger.info(f"Creating new user for {provider} account")
-            new_user = self._create_new_user(
-                primary_email, user_info.get("name"), 
-                provider, provider_user_id, access_token, refresh_token
-            )
-            self._add_emails_to_user(new_user, all_emails, provider)
-            return new_user, True
+            try:
+                # Create new user
+                logger.info(f"Creating new user for {provider} account")
+                new_user = self._create_new_user(
+                    primary_email, user_info.get("name"),
+                    provider, provider_user_id, access_token, refresh_token
+                )
+                self._add_emails_to_user(new_user, all_emails, provider)
+                return new_user, True
+
+            except Exception as e:
+                logger.error(f"Error creating new user: {e}")
+                self.db.rollback()
+                raise
     
     def _find_user_by_emails(self, email_list: List[str]) -> Optional[User]:
         """Find existing user by any of the provided emails."""
@@ -165,12 +196,46 @@ class AccountLinkingService:
         # Handle organization assignment
         try:
             self._assign_user_to_organization(user, primary_email)
+            self.db.commit()
         except Exception as e:
             logger.error(f"Error assigning new user to organization: {e}")
-            # Don't fail user creation if organization assignment fails
-            pass
+            # Rollback and commit without organization assignment
+            self.db.rollback()
 
-        self.db.commit()
+            # Recreate user without organization assignment
+            user = User(
+                email=primary_email,
+                name=name,
+                is_verified=True,
+                provider=provider,
+                provider_id=provider_user_id
+            )
+            self.db.add(user)
+            self.db.flush()
+
+            # Add OAuth provider
+            oauth_provider = OAuthProvider(
+                user_id=user.id,
+                provider=provider,
+                provider_user_id=provider_user_id,
+                access_token=access_token,
+                refresh_token=refresh_token,
+                is_primary=True
+            )
+            self.db.add(oauth_provider)
+
+            # Add primary email
+            user_email = UserEmail(
+                user_id=user.id,
+                email=primary_email,
+                is_primary=True,
+                is_verified=True,
+                source=provider
+            )
+            self.db.add(user_email)
+
+            self.db.commit()
+
         return user
     
     def _link_provider_to_user(
