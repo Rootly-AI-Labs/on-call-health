@@ -6,7 +6,7 @@ from typing import Dict, Any
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from ...core.database import get_db
+from ...models import get_db
 from ...models import Analysis
 from ...models.slack_workspace_mapping import SlackWorkspaceMapping
 from ...models.slack_integration import SlackIntegration
