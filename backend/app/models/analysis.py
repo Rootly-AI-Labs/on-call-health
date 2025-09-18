@@ -14,6 +14,7 @@ class Analysis(Base):
     uuid = Column(String(36), unique=True, index=True, nullable=False, default=lambda: str(uuid.uuid4()))
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     rootly_integration_id = Column(Integer, ForeignKey("rootly_integrations.id"), nullable=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True)
     
     # NEW: Store integration details directly to avoid complex matching
     integration_name = Column(String(255), nullable=True)  # "PagerDuty (Beta Access)", "Failwhale Tales", etc.
@@ -29,6 +30,7 @@ class Analysis(Base):
     
     # Relationships
     user = relationship("User", back_populates="analyses")
+    organization = relationship("Organization", back_populates="analyses")
     rootly_integration = relationship("RootlyIntegration", back_populates="analyses")
     integration_mappings = relationship("IntegrationMapping", back_populates="analysis")
     
