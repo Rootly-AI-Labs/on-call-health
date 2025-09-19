@@ -523,15 +523,42 @@ export default function IntegrationsPage() {
     const workspace = urlParams.get('workspace')
     const status = urlParams.get('status')
 
-    // Debug: Log all URL parameters
-    console.log('OAuth redirect debug:', {
+    // Debug: Log all URL parameters (persist across redirects)
+    const debugInfo = {
       fullUrl: window.location.href,
       search: window.location.search,
       slackConnected,
       workspace,
       status,
-      allParams: Object.fromEntries(urlParams.entries())
-    })
+      allParams: Object.fromEntries(urlParams.entries()),
+      timestamp: new Date().toISOString()
+    }
+
+    // Store in sessionStorage for persistence
+    sessionStorage.setItem('slack_oauth_debug', JSON.stringify(debugInfo))
+
+    // Add global debug function for manual checking
+    ;(window as any).getSlackOAuthDebug = () => {
+      const stored = sessionStorage.getItem('slack_oauth_debug')
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        console.log('Stored OAuth debug info:', parsed)
+        return parsed
+      }
+      console.log('No OAuth debug info found in sessionStorage')
+      return null
+    }
+
+    // Also log to console
+    console.log('OAuth redirect debug:', debugInfo)
+
+    // Show debug info as temporary toast for troubleshooting
+    if (window.location.search.includes('slack_connected')) {
+      toast.info(`Debug: OAuth redirect detected`, {
+        description: `URL: ${window.location.search.substring(0, 100)}...`,
+        duration: 8000,
+      })
+    }
 
     if (slackConnected === 'true' && workspace) {
       // Show success toast
