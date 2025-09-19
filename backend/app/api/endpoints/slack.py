@@ -108,7 +108,7 @@ async def slack_oauth_callback(
             else:
                 backend_url = "http://localhost:8000"
 
-            redirect_uri = f"{backend_url}/api/integrations/slack/oauth/callback"
+            redirect_uri = f"{backend_url}/integrations/slack/oauth/callback"
 
             token_response = await client.post(
                 "https://slack.com/api/oauth.v2.access",
