@@ -65,6 +65,11 @@ async def connect_slack(
         "state": state
     }
 
+@router.get("/test-endpoint")
+async def test_slack_endpoint():
+    """Simple test endpoint to verify routing is working."""
+    return {"message": "Slack OAuth endpoint is reachable", "endpoint": "/api/integrations/slack/test-endpoint"}
+
 @router.get("/oauth/callback")
 async def slack_oauth_callback(
     code: str,
