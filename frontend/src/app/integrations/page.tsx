@@ -3290,7 +3290,7 @@ export default function IntegrationsPage() {
                         }
 
                         // Include organization context in callback URL so backend knows which org is installing
-                        const redirectUri = `${backendUrl}/api/integrations/slack/oauth/callback`
+                        const redirectUri = `${backendUrl}/integrations/slack/oauth/callback`
                         const scopes = 'commands,chat:write,team:read'
 
                         // Add state parameter to track which organization is installing
