@@ -707,7 +707,10 @@ export default function IntegrationsPage() {
         return
       }
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/invitations/create`, {
+      const apiUrl = `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/invitations/create`
+      console.log('Making invitation request to:', apiUrl)
+
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${authToken}`,
@@ -719,9 +722,25 @@ export default function IntegrationsPage() {
         })
       })
 
+      console.log('Response status:', response.status)
+      console.log('Response headers:', response.headers)
+
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.detail || 'Failed to send invitation')
+        const responseText = await response.text()
+        console.log('Error response body:', responseText)
+
+        // Try to parse as JSON, fallback to text
+        let errorMessage = 'Failed to send invitation'
+        try {
+          const errorData = JSON.parse(responseText)
+          errorMessage = errorData.detail || errorMessage
+        } catch {
+          errorMessage = responseText.includes('<!DOCTYPE')
+            ? 'API server not available or wrong URL'
+            : responseText
+        }
+
+        throw new Error(errorMessage)
       }
 
       const data = await response.json()
