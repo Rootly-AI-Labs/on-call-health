@@ -524,7 +524,6 @@ export default function IntegrationsPage() {
       })
 
       const data = response.ok ? await response.json() : { integrations: [] }
-      console.log(`🔍 API returned ${data.integrations?.length || 0} Rootly integrations:`, data.integrations)
       const rootlyIntegrations = data.integrations.map((i: Integration) => ({ ...i, platform: 'rootly' }))
 
       setIntegrations(prev => {
@@ -1142,7 +1141,6 @@ export default function IntegrationsPage() {
         setAddingPlatform(null)
 
         // Reload integrations to show the newly added one
-        console.log(`🔄 Reloading ${platform} integrations after successful add...`)
         setReloadingIntegrations(true)
         try {
           if (platform === 'rootly') {
@@ -1150,7 +1148,6 @@ export default function IntegrationsPage() {
           } else {
             await loadPagerDutyIntegrations(true)
           }
-          console.log(`✅ Finished reloading ${platform} integrations`)
 
           // Dismiss loading toast and show success
           toast.dismiss(loadingToastId)
