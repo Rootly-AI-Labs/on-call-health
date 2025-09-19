@@ -609,10 +609,9 @@ export default function Dashboard() {
         setLoadingIntegrations(false)
         setHasDataFromCache(true)
         
-        // Still need to load previous analyses and trends even if integrations are cached
+        // Still need to load previous analyses when using cache
         loadPreviousAnalyses()
-        loadHistoricalTrends()
-        
+
         return // Exit early since we used cache
       }
     }
@@ -637,13 +636,12 @@ export default function Dashboard() {
         // Load data with individual error handling to prevent blocking
         const results = await Promise.allSettled([
           loadPreviousAnalyses(),
-          loadIntegrations(false, false), // Don't force refresh, don't show global loading
-          loadHistoricalTrends()
+          loadIntegrations(false, false) // Don't force refresh, don't show global loading
         ])
         
         // Log any failures but don't block the UI
         results.forEach((result, index) => {
-          const functionNames = ['loadPreviousAnalyses', 'loadIntegrations', 'loadHistoricalTrends']
+          const functionNames = ['loadPreviousAnalyses', 'loadIntegrations']
           if (result.status === 'rejected') {
             }
         })
@@ -804,7 +802,12 @@ export default function Dashboard() {
         const newAnalyses = data.analyses || []
         
         if (append) {
-          setPreviousAnalyses(prev => [...prev, ...newAnalyses])
+          setPreviousAnalyses(prev => {
+            // Deduplicate analyses by ID to prevent duplicate keys
+            const existingIds = new Set(prev.map(a => a.id))
+            const uniqueNewAnalyses = newAnalyses.filter((analysis: any) => !existingIds.has(analysis.id))
+            return [...prev, ...uniqueNewAnalyses]
+          })
         } else {
           setPreviousAnalyses(newAnalyses)
         }
@@ -819,10 +822,17 @@ export default function Dashboard() {
         if (!analysisId && data.analyses && data.analyses.length > 0 && !currentAnalysis) {
           const mostRecentAnalysis = data.analyses[0] // Analyses should be ordered by created_at desc
           setCurrentAnalysis(mostRecentAnalysis)
-          // Fetch platform mappings (same as integrations page)
-          fetchPlatformMappings()
+          // Platform mappings will be fetched by the dedicated useEffect
         }
       } else {
+        // Handle API errors (401, 404, 500, etc.)
+        const errorText = await response.text()
+        console.error('Failed to load analyses:', response.status, errorText)
+        if (response.status === 401) {
+          toast.error("Authentication failed - please log in again")
+        } else {
+          toast.error("Failed to load analyses")
+        }
       }
     } catch (error) {
       
@@ -866,8 +876,7 @@ export default function Dashboard() {
       if (response.ok) {
         const analysis = await response.json()
         setCurrentAnalysis(analysis)
-        // Fetch platform mappings (same as integrations page)
-        fetchPlatformMappings()
+        // Platform mappings will be fetched by the dedicated useEffect
         // Turn off redirect loader since we successfully loaded the analysis
         setRedirectingToSuggested(false)
         // Update URL to use UUID if we loaded by integer ID
@@ -1147,10 +1156,9 @@ export default function Dashboard() {
             setLoadingIntegrations(false)
             setHasDataFromCache(true)
             
-            // Still need to load previous analyses and trends even if integrations are cached
+            // Still need to load previous analyses when using integration cache
             loadPreviousAnalyses()
-            loadHistoricalTrends()
-            
+
             return
           } catch (error) {
               // Continue to fetch fresh data
@@ -2353,10 +2361,10 @@ export default function Dashboard() {
                       variant="outline"
                       size="sm"
                       onClick={() => loadPreviousAnalyses(true)}
-                      disabled={loadingMoreAnalyses || analysisRunning || !initialDataLoaded}
+                      disabled={loadingMoreAnalyses || analysisRunning}
                       className="w-full border-gray-500 bg-gray-800 text-gray-200 hover:bg-gray-700 hover:text-white hover:border-gray-400 text-xs"
                     >
-                      {(loadingMoreAnalyses || analysisRunning || !initialDataLoaded) ? (
+                      {(loadingMoreAnalyses || analysisRunning || (!initialDataLoaded && previousAnalyses.length === 0)) ? (
                         <>
                           <div className="w-3 h-3 border border-gray-300 border-t-transparent rounded-full animate-spin mr-2" />
                           Loading...
