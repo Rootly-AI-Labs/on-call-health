@@ -3269,7 +3269,11 @@ export default function IntegrationsPage() {
                           email: currentUser.email
                         })) : ''
 
-                        const slackAuthUrl = `https://slack.com/oauth/v2/authorize?client_id=${clientId}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}`
+                        // Debug: Test without state parameter first
+                        console.log('Redirect URI being sent:', redirectUri)
+                        console.log('Full OAuth URL:', `https://slack.com/oauth/v2/authorize?client_id=${clientId}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUri)}`)
+
+                        const slackAuthUrl = `https://slack.com/oauth/v2/authorize?client_id=${clientId}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUri)}`
 
                         console.log('Installing official OnCall Burnout Slack app for org:', currentUser?.organization_id)
                         window.open(slackAuthUrl, '_blank')
