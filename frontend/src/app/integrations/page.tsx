@@ -791,6 +791,10 @@ export default function IntegrationsPage() {
       if (membersResponse.ok) {
         const membersData = await membersResponse.json()
         setOrgMembers(membersData.members || [])
+      } else {
+        console.log('Failed to load organization members:', membersResponse.status)
+        const errorText = await membersResponse.text()
+        console.log('Members error response:', errorText)
       }
 
       // Load pending invitations
@@ -803,6 +807,10 @@ export default function IntegrationsPage() {
       if (invitationsResponse.ok) {
         const invitationsData = await invitationsResponse.json()
         setPendingInvitations(invitationsData.invitations || [])
+      } else {
+        console.log('Failed to load pending invitations:', invitationsResponse.status)
+        const errorText = await invitationsResponse.text()
+        console.log('Invitations error response:', errorText)
       }
 
     } catch (error) {
