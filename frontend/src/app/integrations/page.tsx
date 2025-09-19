@@ -312,6 +312,11 @@ export default function IntegrationsPage() {
   const [inviteRole, setInviteRole] = useState("member")
   const [isInviting, setIsInviting] = useState(false)
 
+  // Organization members and invitations state
+  const [orgMembers, setOrgMembers] = useState([])
+  const [pendingInvitations, setPendingInvitations] = useState([])
+  const [loadingOrgData, setLoadingOrgData] = useState(false)
+
   // Sorting state
   const [sortField, setSortField] = useState<'email' | 'status' | 'data' | 'method'>('email')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
@@ -503,6 +508,13 @@ export default function IntegrationsPage() {
       loadSlackPermissions()
     }
   }, [slackIntegration, activeEnhancementTab])
+
+  // Load organization data when invite modal opens
+  useEffect(() => {
+    if (showInviteModal) {
+      loadOrganizationData()
+    }
+  }, [showInviteModal])
 
   // Load each provider independently for better UX
   const loadRootlyIntegrations = async (forceRefresh = false) => {
@@ -746,16 +758,57 @@ export default function IntegrationsPage() {
       const data = await response.json()
       toast.success(`Invitation sent to ${inviteEmail}! They'll receive a notification and can accept within 30 days.`)
 
-      // Reset form
+      // Reset form and refresh organization data
       setInviteEmail("")
       setInviteRole("member")
       setShowInviteModal(false)
+
+      // Refresh the organization data to show the new invitation
+      await loadOrganizationData()
 
     } catch (error) {
       console.error('Failed to send invitation:', error)
       toast.error(error instanceof Error ? error.message : "Failed to send invitation")
     } finally {
       setIsInviting(false)
+    }
+  }
+
+  // Load organization members and pending invitations
+  const loadOrganizationData = async () => {
+    const authToken = localStorage.getItem('auth_token')
+    if (!authToken) return
+
+    setLoadingOrgData(true)
+    try {
+      // Load organization members
+      const membersResponse = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/invitations/organization/members`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+        }
+      })
+
+      if (membersResponse.ok) {
+        const membersData = await membersResponse.json()
+        setOrgMembers(membersData.members || [])
+      }
+
+      // Load pending invitations
+      const invitationsResponse = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/invitations/pending`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+        }
+      })
+
+      if (invitationsResponse.ok) {
+        const invitationsData = await invitationsResponse.json()
+        setPendingInvitations(invitationsData.invitations || [])
+      }
+
+    } catch (error) {
+      console.error('Failed to load organization data:', error)
+    } finally {
+      setLoadingOrgData(false)
     }
   }
 
@@ -5161,12 +5214,116 @@ export default function IntegrationsPage() {
               </div>
             </div>
 
-            {/* Current Members & Pending Invitations would go here */}
-            <div className="text-center py-8 text-gray-500">
-              <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p>Organization members and pending invitations will be shown here</p>
-              <p className="text-sm mt-1">Feature coming soon...</p>
-            </div>
+            {/* Current Members & Pending Invitations */}
+            {loadingOrgData ? (
+              <div className="text-center py-8">
+                <Loader2 className="w-8 h-8 mx-auto mb-4 animate-spin text-gray-400" />
+                <p className="text-gray-500">Loading organization data...</p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* Current Members */}
+                {orgMembers.length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-medium mb-3 flex items-center space-x-2">
+                      <Users className="w-5 h-5" />
+                      <span>Organization Members ({orgMembers.length})</span>
+                    </h3>
+                    <div className="border rounded-lg overflow-hidden">
+                      <div className="bg-gray-50 px-4 py-2 border-b">
+                        <div className="grid grid-cols-4 gap-4 text-sm font-medium text-gray-700">
+                          <div>Name</div>
+                          <div>Email</div>
+                          <div>Role</div>
+                          <div>Joined</div>
+                        </div>
+                      </div>
+                      <div className="max-h-60 overflow-y-auto">
+                        {orgMembers.map((member: any) => (
+                          <div key={member.id} className="px-4 py-3 border-b last:border-b-0 bg-white">
+                            <div className="grid grid-cols-4 gap-4 text-sm">
+                              <div className="font-medium text-gray-900">
+                                {member.name}
+                                {member.is_current_user && (
+                                  <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">You</span>
+                                )}
+                              </div>
+                              <div className="text-gray-600">{member.email}</div>
+                              <div>
+                                <span className="inline-block px-2 py-1 text-xs rounded-full bg-green-100 text-green-800 capitalize">
+                                  {member.role?.replace('_', ' ') || 'member'}
+                                </span>
+                              </div>
+                              <div className="text-gray-500 text-xs">
+                                {member.joined_org_at
+                                  ? new Date(member.joined_org_at).toLocaleDateString()
+                                  : 'N/A'
+                                }
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Pending Invitations */}
+                {pendingInvitations.length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-medium mb-3 flex items-center space-x-2">
+                      <Mail className="w-5 h-5" />
+                      <span>Pending Invitations ({pendingInvitations.length})</span>
+                    </h3>
+                    <div className="border rounded-lg overflow-hidden">
+                      <div className="bg-gray-50 px-4 py-2 border-b">
+                        <div className="grid grid-cols-5 gap-4 text-sm font-medium text-gray-700">
+                          <div>Email</div>
+                          <div>Role</div>
+                          <div>Invited By</div>
+                          <div>Sent</div>
+                          <div>Expires</div>
+                        </div>
+                      </div>
+                      <div className="max-h-60 overflow-y-auto">
+                        {pendingInvitations.map((invitation: any) => (
+                          <div key={invitation.id} className="px-4 py-3 border-b last:border-b-0 bg-yellow-50">
+                            <div className="grid grid-cols-5 gap-4 text-sm">
+                              <div className="font-medium text-gray-900">{invitation.email}</div>
+                              <div>
+                                <span className="inline-block px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800 capitalize">
+                                  {invitation.role?.replace('_', ' ') || 'member'}
+                                </span>
+                              </div>
+                              <div className="text-gray-600">{invitation.invited_by?.name || 'Unknown'}</div>
+                              <div className="text-gray-500 text-xs">
+                                {new Date(invitation.created_at).toLocaleDateString()}
+                              </div>
+                              <div className="text-gray-500 text-xs">
+                                {invitation.is_expired ? (
+                                  <span className="text-red-600">Expired</span>
+                                ) : (
+                                  new Date(invitation.expires_at).toLocaleDateString()
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Empty State */}
+                {!loadingOrgData && orgMembers.length === 0 && pendingInvitations.length === 0 && (
+                  <div className="text-center py-8 text-gray-500">
+                    <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p>No organization members or pending invitations found</p>
+                    <p className="text-sm mt-1">Start by inviting team members above</p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <DialogFooter>
