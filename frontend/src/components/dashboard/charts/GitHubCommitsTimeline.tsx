@@ -8,9 +8,11 @@ interface GitHubCommitsTimelineProps {
   analysisId: number
   totalCommits: number
   weekendPercentage: number
+  cache: Map<string, any>
+  setCache: React.Dispatch<React.SetStateAction<Map<string, any>>>
 }
 
-export function GitHubCommitsTimeline({ analysisId, totalCommits, weekendPercentage }: GitHubCommitsTimelineProps) {
+export function GitHubCommitsTimeline({ analysisId, totalCommits, weekendPercentage, cache, setCache }: GitHubCommitsTimelineProps) {
   const [loading, setLoading] = useState(true)
   const [timelineData, setTimelineData] = useState<any[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -18,9 +20,23 @@ export function GitHubCommitsTimeline({ analysisId, totalCommits, weekendPercent
   useEffect(() => {
     const fetchTimelineData = async () => {
       if (!analysisId) {
+        console.log('❌ GITHUB TIMELINE: No analysis ID provided')
+        setLoading(false)
         return
       }
 
+      const cacheKey = `github-timeline-${analysisId}`
+
+      // Check cache first
+      const cachedData = cache.get(cacheKey)
+      if (cachedData) {
+        console.log('🎯 GITHUB TIMELINE CACHE HIT: Using cached data for analysis', analysisId)
+        setTimelineData(cachedData)
+        setLoading(false)
+        return
+      }
+
+      console.log('📡 GITHUB TIMELINE CACHE MISS: Loading fresh data for analysis', analysisId)
       setLoading(true)
       setError(null)
 
@@ -28,6 +44,7 @@ export function GitHubCommitsTimeline({ analysisId, totalCommits, weekendPercent
         const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
         const url = `${API_BASE}/analyses/${analysisId}/github-commits-timeline`
 
+        console.log('🌐 GITHUB TIMELINE: Fetching from', url)
         const response = await fetch(url, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
@@ -35,27 +52,40 @@ export function GitHubCommitsTimeline({ analysisId, totalCommits, weekendPercent
           }
         })
 
+        console.log('📊 GITHUB TIMELINE: Response status', response.status)
 
         if (!response.ok) {
+          console.error('❌ GITHUB TIMELINE: API error', response.status)
           throw new Error(`Failed to fetch GitHub timeline data: ${response.status}`)
         }
 
+        console.log('🔍 GITHUB TIMELINE: Parsing JSON response...')
         const result = await response.json()
+        console.log('📋 GITHUB TIMELINE: Response data', result)
 
         if (result.status === 'success' && result.data?.daily_commits) {
+          console.log('✅ GITHUB TIMELINE: Data loaded successfully', result.data.daily_commits.length, 'days')
+
+          // Cache the data
+          console.log('💾 GITHUB TIMELINE: Caching data for future use')
+          setCache(prev => new Map(prev.set(cacheKey, result.data.daily_commits)))
+
           setTimelineData(result.data.daily_commits)
         } else if (result.status === 'error') {
+          console.error('❌ GITHUB TIMELINE: Server error', result.message)
           setError(result.message || 'Failed to fetch timeline data')
         }
       } catch (err) {
-          setError('Unable to load timeline data')
+        console.error('❌ GITHUB TIMELINE: Unexpected error', err)
+        setError('Unable to load timeline data')
       } finally {
+        console.log('🏁 GITHUB TIMELINE: Loading finished, setting loading to false')
         setLoading(false)
       }
     }
 
     fetchTimelineData()
-  }, [analysisId])
+  }, [analysisId, cache, setCache])
 
   if (loading) {
     return (
