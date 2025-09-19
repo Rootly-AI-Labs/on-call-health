@@ -523,6 +523,16 @@ export default function IntegrationsPage() {
     const workspace = urlParams.get('workspace')
     const status = urlParams.get('status')
 
+    // Debug: Log all URL parameters
+    console.log('OAuth redirect debug:', {
+      fullUrl: window.location.href,
+      search: window.location.search,
+      slackConnected,
+      workspace,
+      status,
+      allParams: Object.fromEntries(urlParams.entries())
+    })
+
     if (slackConnected === 'true' && workspace) {
       // Show success toast
       if (status === 'pending_user_association') {
