@@ -516,6 +516,38 @@ export default function IntegrationsPage() {
     }
   }, [showInviteModal])
 
+  // Handle Slack OAuth success redirect
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const slackConnected = urlParams.get('slack_connected')
+    const workspace = urlParams.get('workspace')
+    const status = urlParams.get('status')
+
+    if (slackConnected === 'true' && workspace) {
+      // Show success toast
+      if (status === 'pending_user_association') {
+        toast.success(`🎉 Slack app installed successfully!`, {
+          description: `Added to "${decodeURIComponent(workspace)}" workspace. The /burnout-survey command is now available.`,
+          duration: 6000,
+        })
+      } else {
+        toast.success(`🎉 Slack integration connected!`, {
+          description: `Successfully connected to "${decodeURIComponent(workspace)}" workspace.`,
+          duration: 5000,
+        })
+      }
+
+      // Clean up URL parameters
+      const newUrl = window.location.pathname
+      window.history.replaceState({}, '', newUrl)
+
+      // Refresh integrations to show updated status
+      setTimeout(() => {
+        loadAllIntegrationsOptimized()
+      }, 1000)
+    }
+  }, [])
+
   // Load each provider independently for better UX
   const loadRootlyIntegrations = async (forceRefresh = false) => {
     // Check cache first
