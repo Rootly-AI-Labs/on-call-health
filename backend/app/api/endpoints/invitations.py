@@ -81,6 +81,103 @@ async def create_invitation(
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to create invitation: {str(e)}")
 
+@router.get("/pending")
+async def list_pending_invitations(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    """
+    List pending invitations for current user's organization.
+    """
+    if not current_user.organization_id:
+        raise HTTPException(status_code=400, detail="You must be part of an organization")
+
+    # Check if user can view invitations (org_admin, manager, or super_admin)
+    if current_user.role not in ['org_admin', 'manager', 'super_admin']:
+        raise HTTPException(status_code=403, detail="Only organization admins and managers can view invitations")
+
+    try:
+        # Get pending invitations for this organization
+        invitations = db.query(OrganizationInvitation).filter(
+            OrganizationInvitation.organization_id == current_user.organization_id,
+            OrganizationInvitation.status == "pending"
+        ).order_by(OrganizationInvitation.created_at.desc()).all()
+
+        invitation_list = []
+        for invitation in invitations:
+            # Get the user who sent the invitation
+            invited_by_user = db.query(User).filter(User.id == invitation.invited_by).first()
+
+            invitation_data = {
+                "id": invitation.id,
+                "email": invitation.email,
+                "role": invitation.role,
+                "status": invitation.status,
+                "created_at": invitation.created_at.isoformat(),
+                "expires_at": invitation.expires_at.isoformat(),
+                "is_expired": invitation.is_expired,
+                "invited_by": {
+                    "id": invited_by_user.id if invited_by_user else None,
+                    "name": invited_by_user.name if invited_by_user else "Unknown",
+                    "email": invited_by_user.email if invited_by_user else "Unknown"
+                }
+            }
+            invitation_list.append(invitation_data)
+
+        return {
+            "invitations": invitation_list,
+            "total": len(invitation_list),
+            "organization": {
+                "id": current_user.organization_id,
+                "name": current_user.organization.name if current_user.organization else "Unknown"
+            }
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch invitations: {str(e)}")
+
+@router.get("/organization/members")
+async def list_organization_members(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    """
+    List all members of current user's organization with their roles.
+    """
+    if not current_user.organization_id:
+        raise HTTPException(status_code=400, detail="You must be part of an organization")
+
+    try:
+        # Get all users in this organization
+        members = db.query(User).filter(
+            User.organization_id == current_user.organization_id
+        ).order_by(User.name.asc()).all()
+
+        member_list = []
+        for member in members:
+            member_data = {
+                "id": member.id,
+                "name": member.name,
+                "email": member.email,
+                "role": member.role,
+                "joined_org_at": member.joined_org_at.isoformat() if member.joined_org_at else None,
+                "created_at": member.created_at.isoformat() if member.created_at else None,
+                "is_current_user": member.id == current_user.id
+            }
+            member_list.append(member_data)
+
+        return {
+            "members": member_list,
+            "total": len(member_list),
+            "organization": {
+                "id": current_user.organization_id,
+                "name": current_user.organization.name if current_user.organization else "Unknown"
+            }
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch members: {str(e)}")
+
 @router.get("/accept/{invitation_id}")
 async def accept_invitation_page(
     invitation_id: int,
@@ -432,100 +529,3 @@ async def revoke_invitation(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to revoke invitation: {str(e)}")
-
-@router.get("/pending")
-async def list_pending_invitations(
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-) -> Dict[str, Any]:
-    """
-    List pending invitations for current user's organization.
-    """
-    if not current_user.organization_id:
-        raise HTTPException(status_code=400, detail="You must be part of an organization")
-
-    # Check if user can view invitations (org_admin, manager, or super_admin)
-    if current_user.role not in ['org_admin', 'manager', 'super_admin']:
-        raise HTTPException(status_code=403, detail="Only organization admins and managers can view invitations")
-
-    try:
-        # Get pending invitations for this organization
-        invitations = db.query(OrganizationInvitation).filter(
-            OrganizationInvitation.organization_id == current_user.organization_id,
-            OrganizationInvitation.status == "pending"
-        ).order_by(OrganizationInvitation.created_at.desc()).all()
-
-        invitation_list = []
-        for invitation in invitations:
-            # Get the user who sent the invitation
-            invited_by_user = db.query(User).filter(User.id == invitation.invited_by).first()
-
-            invitation_data = {
-                "id": invitation.id,
-                "email": invitation.email,
-                "role": invitation.role,
-                "status": invitation.status,
-                "created_at": invitation.created_at.isoformat(),
-                "expires_at": invitation.expires_at.isoformat(),
-                "is_expired": invitation.is_expired,
-                "invited_by": {
-                    "id": invited_by_user.id if invited_by_user else None,
-                    "name": invited_by_user.name if invited_by_user else "Unknown",
-                    "email": invited_by_user.email if invited_by_user else "Unknown"
-                }
-            }
-            invitation_list.append(invitation_data)
-
-        return {
-            "invitations": invitation_list,
-            "total": len(invitation_list),
-            "organization": {
-                "id": current_user.organization_id,
-                "name": current_user.organization.name if current_user.organization else "Unknown"
-            }
-        }
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch invitations: {str(e)}")
-
-@router.get("/organization/members")
-async def list_organization_members(
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-) -> Dict[str, Any]:
-    """
-    List all members of current user's organization with their roles.
-    """
-    if not current_user.organization_id:
-        raise HTTPException(status_code=400, detail="You must be part of an organization")
-
-    try:
-        # Get all users in this organization
-        members = db.query(User).filter(
-            User.organization_id == current_user.organization_id
-        ).order_by(User.name.asc()).all()
-
-        member_list = []
-        for member in members:
-            member_data = {
-                "id": member.id,
-                "name": member.name,
-                "email": member.email,
-                "role": member.role,
-                "joined_org_at": member.joined_org_at.isoformat() if member.joined_org_at else None,
-                "created_at": member.created_at.isoformat() if member.created_at else None,
-                "is_current_user": member.id == current_user.id
-            }
-            member_list.append(member_data)
-
-        return {
-            "members": member_list,
-            "total": len(member_list),
-            "organization": {
-                "id": current_user.organization_id,
-                "name": current_user.organization.name if current_user.organization else "Unknown"
-            }
-        }
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch members: {str(e)}")
