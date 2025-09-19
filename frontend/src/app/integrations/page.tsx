@@ -2594,7 +2594,7 @@ export default function IntegrationsPage() {
                         <Alert variant="destructive">
                           <AlertCircle className="h-4 w-4" />
                           <AlertDescription>
-                            Failed to connect. Please check your API token and try again.
+                            ❌ Invalid API token. Please verify your Rootly token and try again.
                           </AlertDescription>
                         </Alert>
                       )}
@@ -2797,7 +2797,7 @@ export default function IntegrationsPage() {
                         <Alert variant="destructive">
                           <AlertCircle className="h-4 w-4" />
                           <AlertDescription>
-                            Failed to connect. Please check your API token and try again.
+                            ❌ Invalid API token. Please verify your PagerDuty token and try again.
                           </AlertDescription>
                         </Alert>
                       )}
