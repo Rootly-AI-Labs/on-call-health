@@ -675,6 +675,11 @@ export default function Dashboard() {
         
         // Small delay to ensure state updates have propagated
         setTimeout(() => {
+          console.log('🏁 INITIAL DATA: Setting initialDataLoaded to true', {
+            previousAnalysesCount: previousAnalyses.length,
+            integrationsCount: integrations.length,
+            hasDataFromCache
+          })
           setInitialDataLoaded(true)
         }, 100)
       } catch (error) {
@@ -872,6 +877,12 @@ export default function Dashboard() {
 
         setTotalAnalysesCount(data.total || newAnalyses.length)
         setHasMoreAnalyses(newAnalyses.length === 3 && (!data.total || previousAnalyses.length + newAnalyses.length < data.total))
+
+        // If this is the initial load (not append) and we got an empty array, ensure initial data is marked as loaded
+        if (!append && newAnalyses.length === 0) {
+          console.log('📊 LOAD ANALYSES: Got empty array, ensuring initialDataLoaded is set')
+          setTimeout(() => setInitialDataLoaded(true), 50)
+        }
 
         // If no specific analysis is loaded and we have analyses, load the most recent one (only for initial load)
         if (!append) {
@@ -2495,7 +2506,7 @@ export default function Dashboard() {
                       disabled={loadingMoreAnalyses || analysisRunning}
                       className="w-full border-gray-500 bg-gray-800 text-gray-200 hover:bg-gray-700 hover:text-white hover:border-gray-400 text-xs"
                     >
-                      {(loadingMoreAnalyses || analysisRunning || (!initialDataLoaded && previousAnalyses.length === 0)) ? (
+                      {(loadingMoreAnalyses || (!initialDataLoaded && previousAnalyses.length === 0)) ? (
                         <>
                           <div className="w-3 h-3 border border-gray-300 border-t-transparent rounded-full animate-spin mr-2" />
                           Loading...
