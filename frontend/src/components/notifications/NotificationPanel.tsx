@@ -12,6 +12,8 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useToast } from '@/hooks/use-toast'
 
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'
+
 interface Notification {
   id: number
   type: 'invitation' | 'survey' | 'integration' | 'analysis' | 'reminder'
@@ -169,7 +171,7 @@ export function NotificationPanel() {
   const fetchNotifications = async () => {
     try {
       setIsLoading(true)
-      const response = await fetch('/api/notifications/', {
+      const response = await fetch(`${API_BASE}/api/notifications/`, {
         credentials: 'include',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -201,7 +203,7 @@ export function NotificationPanel() {
   // Mark notification as read
   const handleMarkAsRead = async (notificationId: number) => {
     try {
-      const response = await fetch(`/api/notifications/${notificationId}/read`, {
+      const response = await fetch(`${API_BASE}/api/notifications/${notificationId}/read`, {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -229,7 +231,7 @@ export function NotificationPanel() {
   // Dismiss notification
   const handleDismiss = async (notificationId: number) => {
     try {
-      const response = await fetch(`/api/notifications/${notificationId}`, {
+      const response = await fetch(`${API_BASE}/api/notifications/${notificationId}`, {
         method: 'DELETE',
         credentials: 'include',
         headers: {
@@ -274,7 +276,7 @@ export function NotificationPanel() {
   // Mark all as read
   const handleMarkAllAsRead = async () => {
     try {
-      const response = await fetch('/api/notifications/mark-all-read', {
+      const response = await fetch(`${API_BASE}/api/notifications/mark-all-read`, {
         method: 'POST',
         credentials: 'include',
         headers: {

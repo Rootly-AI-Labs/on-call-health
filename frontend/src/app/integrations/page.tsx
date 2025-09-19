@@ -3243,61 +3243,71 @@ export default function IntegrationsPage() {
                     </div>
                   </div>
 
-                  {/* Add to Slack OAuth Button */}
-                  <Button
-                    onClick={() => {
-                      // Official OnCall Burnout Detector Slack App
-                      // This single app can be installed by any organization
-                      const clientId = process.env.NEXT_PUBLIC_SLACK_CLIENT_ID
+                  {/* Add to Slack OAuth Button - Conditional */}
+                  {process.env.NEXT_PUBLIC_SLACK_CLIENT_ID ? (
+                    <Button
+                      onClick={() => {
+                        // Official OnCall Burnout Detector Slack App
+                        // This single app can be installed by any organization
+                        const clientId = process.env.NEXT_PUBLIC_SLACK_CLIENT_ID
+                        const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL
 
-                      if (!clientId) {
-                        toast.error('Slack app not configured. Please contact support.')
-                        return
-                      }
+                        if (!backendUrl) {
+                          toast.error('Backend URL not configured. Please contact support.')
+                          return
+                        }
 
-                      // Use Railway backend URLs from environment variables
-                      const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL
+                        // Include organization context in callback URL so backend knows which org is installing
+                        const redirectUri = `${backendUrl}/api/integrations/slack/oauth/callback`
+                        const scopes = 'commands,chat:write,team:read'
 
-                      if (!backendUrl) {
-                        toast.error('Backend URL not configured. Please contact support.')
-                        return
-                      }
+                        // Add state parameter to track which organization is installing
+                        const currentUser = userInfo // Assuming userInfo contains org info
+                        const state = currentUser ? btoa(JSON.stringify({
+                          orgId: currentUser.organization_id,
+                          userId: currentUser.id,
+                          email: currentUser.email
+                        })) : ''
 
-                      // Include organization context in callback URL so backend knows which org is installing
-                      const redirectUri = `${backendUrl}/api/slack/oauth/callback`
-                      const scopes = 'commands,chat:write,team:read'
+                        const slackAuthUrl = `https://slack.com/oauth/v2/authorize?client_id=${clientId}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}`
 
-                      // Add state parameter to track which organization is installing
-                      const currentUser = userInfo // Assuming userInfo contains org info
-                      const state = currentUser ? btoa(JSON.stringify({
-                        orgId: currentUser.organization_id,
-                        userId: currentUser.id,
-                        email: currentUser.email
-                      })) : ''
-
-                      const slackAuthUrl = `https://slack.com/oauth/v2/authorize?client_id=${clientId}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}`
-
-                      console.log('Installing official OnCall Burnout Slack app for org:', currentUser?.organization_id)
-                      window.open(slackAuthUrl, '_blank')
-                    }}
-                    className="inline-flex items-center space-x-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-                  >
-                    <svg className="w-4 h-4" viewBox="0 0 124 124" fill="currentColor">
-                      <path d="M26.3996 78.2003C26.3996 84.7003 21.2996 89.8003 14.7996 89.8003C8.29961 89.8003 3.19961 84.7003 3.19961 78.2003C3.19961 71.7003 8.29961 66.6003 14.7996 66.6003H26.3996V78.2003Z"/>
-                      <path d="M32.2996 78.2003C32.2996 71.7003 37.3996 66.6003 43.8996 66.6003C50.3996 66.6003 55.4996 71.7003 55.4996 78.2003V109.2C55.4996 115.7 50.3996 120.8 43.8996 120.8C37.3996 120.8 32.2996 115.7 32.2996 109.2V78.2003Z"/>
-                      <path d="M43.8996 26.4003C37.3996 26.4003 32.2996 21.3003 32.2996 14.8003C32.2996 8.30026 37.3996 3.20026 43.8996 3.20026C50.3996 3.20026 55.4996 8.30026 55.4996 14.8003V26.4003H43.8996Z"/>
-                    </svg>
-                    <span>Add to Slack</span>
-                  </Button>
+                        console.log('Installing official OnCall Burnout Slack app for org:', currentUser?.organization_id)
+                        window.open(slackAuthUrl, '_blank')
+                      }}
+                      className="inline-flex items-center space-x-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                    >
+                      <svg className="w-4 h-4" viewBox="0 0 124 124" fill="currentColor">
+                        <path d="M26.3996 78.2003C26.3996 84.7003 21.2996 89.8003 14.7996 89.8003C8.29961 89.8003 3.19961 84.7003 3.19961 78.2003C3.19961 71.7003 8.29961 66.6003 14.7996 66.6003H26.3996V78.2003Z"/>
+                        <path d="M32.2996 78.2003C32.2996 71.7003 37.3996 66.6003 43.8996 66.6003C50.3996 66.6003 55.4996 71.7003 55.4996 78.2003V109.2C55.4996 115.7 50.3996 120.8 43.8996 120.8C37.3996 120.8 32.2996 115.7 32.2996 109.2V78.2003Z"/>
+                        <path d="M43.8996 26.4003C37.3996 26.4003 32.2996 21.3003 32.2996 14.8003C32.2996 8.30026 37.3996 3.20026 43.8996 3.20026C50.3996 3.20026 55.4996 8.30026 55.4996 14.8003V26.4003H43.8996Z"/>
+                      </svg>
+                      <span>Add to Slack</span>
+                    </Button>
+                  ) : (
+                    <div className="inline-flex items-center space-x-2 bg-gray-100 text-gray-500 px-4 py-2 rounded-lg text-sm font-medium">
+                      <svg className="w-4 h-4" viewBox="0 0 124 124" fill="currentColor">
+                        <path d="M26.3996 78.2003C26.3996 84.7003 21.2996 89.8003 14.7996 89.8003C8.29961 89.8003 3.19961 84.7003 3.19961 78.2003C3.19961 71.7003 8.29961 66.6003 14.7996 66.6003H26.3996V78.2003Z"/>
+                        <path d="M32.2996 78.2003C32.2996 71.7003 37.3996 66.6003 43.8996 66.6003C50.3996 66.6003 55.4996 71.7003 55.4996 78.2003V109.2C55.4996 115.7 50.3996 120.8 43.8996 120.8C37.3996 120.8 32.2996 115.7 32.2996 109.2V78.2003Z"/>
+                        <path d="M43.8996 26.4003C37.3996 26.4003 32.2996 21.3003 32.2996 14.8003C32.2996 8.30026 37.3996 3.20026 43.8996 3.20026C50.3996 3.20026 55.4996 8.30026 55.4996 14.8003V26.4003H43.8996Z"/>
+                      </svg>
+                      <span>Slack App Not Configured</span>
+                    </div>
+                  )}
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="bg-white rounded-lg border p-4 space-y-4">
                   <div className="text-center py-2">
                     <h4 className="font-medium text-gray-900 mb-2">Official OnCall Burnout App</h4>
-                    <p className="text-sm text-gray-600 mb-4">
-                      Click "Add to Slack" above to install the official OnCall Burnout Detector app with the <code className="bg-gray-100 px-1 rounded">/burnout-survey</code> command for your workspace.
-                    </p>
+                    {process.env.NEXT_PUBLIC_SLACK_CLIENT_ID ? (
+                      <p className="text-sm text-gray-600 mb-4">
+                        Click "Add to Slack" above to install the official OnCall Burnout Detector app with the <code className="bg-gray-100 px-1 rounded">/burnout-survey</code> command for your workspace.
+                      </p>
+                    ) : (
+                      <p className="text-sm text-gray-600 mb-4">
+                        The official Slack app is not currently configured. You can still use the manual Slack integration below to connect your workspace with webhook URL and bot token.
+                      </p>
+                    )}
                   </div>
 
                   <div className="border-t pt-4">
@@ -5239,17 +5249,16 @@ export default function IntegrationsPage() {
                     </h3>
                     <div className="border rounded-lg overflow-hidden">
                       <div className="bg-gray-50 px-4 py-2 border-b">
-                        <div className="grid grid-cols-4 gap-4 text-sm font-medium text-gray-700">
+                        <div className="grid grid-cols-3 gap-4 text-sm font-medium text-gray-700">
                           <div>Name</div>
                           <div>Email</div>
                           <div>Role</div>
-                          <div>Joined</div>
                         </div>
                       </div>
                       <div className="max-h-60 overflow-y-auto">
                         {orgMembers.map((member: any) => (
                           <div key={member.id} className="px-4 py-3 border-b last:border-b-0 bg-white">
-                            <div className="grid grid-cols-4 gap-4 text-sm">
+                            <div className="grid grid-cols-3 gap-4 text-sm">
                               <div className="font-medium text-gray-900">
                                 {member.name}
                                 {member.is_current_user && (
@@ -5261,12 +5270,6 @@ export default function IntegrationsPage() {
                                 <span className="inline-block px-2 py-1 text-xs rounded-full bg-green-100 text-green-800 capitalize">
                                   {member.role?.replace('_', ' ') || 'member'}
                                 </span>
-                              </div>
-                              <div className="text-gray-500 text-xs">
-                                {member.joined_org_at
-                                  ? new Date(member.joined_org_at).toLocaleDateString()
-                                  : 'N/A'
-                                }
                               </div>
                             </div>
                           </div>

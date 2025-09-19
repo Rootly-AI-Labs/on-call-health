@@ -6,6 +6,9 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { CheckCircle, AlertCircle, Loader2, Building2, Users, Mail } from 'lucide-react'
+import { toast } from 'sonner'
+
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'
 
 interface Invitation {
   id: number
@@ -46,7 +49,7 @@ export default function AcceptInvitationPage() {
   useEffect(() => {
     const fetchInvitation = async () => {
       try {
-        const response = await fetch(`/api/invitations/${invitationId}`)
+        const response = await fetch(`${API_BASE}/api/invitations/${invitationId}`)
 
         if (!response.ok) {
           throw new Error('Invitation not found')
@@ -86,7 +89,7 @@ export default function AcceptInvitationPage() {
     setError(null)
 
     try {
-      const response = await fetch(`/api/invitations/accept/${invitation.id}`, {
+      const response = await fetch(`${API_BASE}/api/invitations/accept/${invitation.id}`, {
         method: 'GET', // Use GET endpoint that handles auth check
         credentials: 'include'
       })
@@ -106,6 +109,12 @@ export default function AcceptInvitationPage() {
 
       if (data.success) {
         setAccepted(true)
+
+        // Show success toast
+        toast.success(`🎉 Welcome to ${invitation.organization_name}!`, {
+          description: `You've successfully joined as a ${invitation.role}. Redirecting to dashboard...`,
+          duration: 4000,
+        })
 
         // Redirect after successful acceptance
         setTimeout(() => {

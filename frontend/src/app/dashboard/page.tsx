@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useInfiniteScroll } from "@/hooks/useInfiniteScroll"
 import { Button } from "@/components/ui/button"
 import { MappingDrawer } from "@/components/mapping-drawer"
 import { Separator } from "@/components/ui/separator"
@@ -410,7 +411,16 @@ export default function Dashboard() {
   const [initialDataLoaded, setInitialDataLoaded] = useState(false)
   const [analysisMappings, setAnalysisMappings] = useState<any>(null)
   const [hasDataFromCache, setHasDataFromCache] = useState(false)
-  
+
+  // Initialize infinite scroll hook
+  const { triggerRef: infiniteScrollTrigger } = useInfiniteScroll({
+    hasMore: hasMoreAnalyses,
+    isLoading: loadingMoreAnalyses || analysisRunning || !initialDataLoaded,
+    onLoadMore: () => loadPreviousAnalyses(true),
+    threshold: 0.1,
+    rootMargin: '50px'
+  })
+
   // Mapping drawer states
   const [mappingDrawerOpen, setMappingDrawerOpen] = useState(false)
   const [mappingDrawerPlatform, setMappingDrawerPlatform] = useState<'github' | 'slack'>('github')
@@ -2345,25 +2355,15 @@ export default function Dashboard() {
                 })
                 )}
                 
-                {/* Load More Button */}
+                {/* Infinite Scroll Trigger */}
                 {hasMoreAnalyses && !sidebarCollapsed && (
-                  <div className="px-3 py-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => loadPreviousAnalyses(true)}
-                      disabled={loadingMoreAnalyses || analysisRunning || !initialDataLoaded}
-                      className="w-full border-gray-500 bg-gray-800 text-gray-200 hover:bg-gray-700 hover:text-white hover:border-gray-400 text-xs"
-                    >
-                      {(loadingMoreAnalyses || analysisRunning || !initialDataLoaded) ? (
-                        <>
-                          <div className="w-3 h-3 border border-gray-300 border-t-transparent rounded-full animate-spin mr-2" />
-                          Loading...
-                        </>
-                      ) : (
-                        <>+ {Math.min(3, totalAnalysesCount - previousAnalyses.length)} more</>
-                      )}
-                    </Button>
+                  <div ref={infiniteScrollTrigger} className="px-3 py-2 min-h-[40px] flex items-center justify-center">
+                    {loadingMoreAnalyses && (
+                      <div className="flex items-center space-x-2">
+                        <div className="w-3 h-3 border border-gray-300 border-t-transparent rounded-full animate-spin" />
+                        <span className="text-xs text-gray-400">Loading more...</span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

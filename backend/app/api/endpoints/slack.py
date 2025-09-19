@@ -65,100 +65,101 @@ async def connect_slack(
         "state": state
     }
 
-@router.get("/callback")
-async def slack_callback(
+@router.get("/oauth/callback")
+async def slack_oauth_callback(
     code: str,
     state: str = None,
-    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Handle Slack OAuth callback and store integration.
+    Handle Slack OAuth callback for workspace-level app installation.
+    Creates a workspace mapping and redirects to the frontend with success status.
     """
     try:
-        # Exchange code for token
-        token_data = await slack_integration_oauth.exchange_code_for_token(code)
-        access_token = token_data.get("access_token")
-        
-        if not access_token:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Failed to get access token from Slack"
+        # Parse state parameter to get organization info
+        organization_id = None
+        user_email = None
+
+        if state:
+            import base64
+            try:
+                decoded_state = json.loads(base64.b64decode(state + '=='))  # Add padding
+                organization_id = decoded_state.get("orgId")
+                user_email = decoded_state.get("email")
+            except:
+                # If state parsing fails, continue without org mapping
+                pass
+
+        # Exchange code for token using Slack's OAuth API
+        import httpx
+        async with httpx.AsyncClient() as client:
+            token_response = await client.post(
+                "https://slack.com/api/oauth.v2.access",
+                data={
+                    "client_id": settings.SLACK_CLIENT_ID,
+                    "client_secret": settings.SLACK_CLIENT_SECRET,
+                    "code": code
+                }
             )
-        
-        # Get auth info and user ID
-        auth_info = await slack_integration_oauth.test_auth(access_token)
-        slack_user_id = auth_info.get("user_id")
-        workspace_id = auth_info.get("team_id")
-        
-        if not slack_user_id or not workspace_id:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Failed to get Slack user ID or workspace ID"
-            )
-        
-        # Get user info
-        user_info = await slack_integration_oauth.get_user_info(access_token, slack_user_id)
-        user_profile = user_info.get("user", {}).get("profile", {})
-        user_email = user_profile.get("email")
-        
-        # Encrypt the token
-        encrypted_token = encrypt_token(access_token)
-        
-        # Check if integration already exists
-        existing_integration = db.query(SlackIntegration).filter(
-            SlackIntegration.user_id == current_user.id
-        ).first()
-        
-        if existing_integration:
-            # Update existing integration
-            existing_integration.slack_token = encrypted_token
-            existing_integration.slack_user_id = slack_user_id
-            existing_integration.workspace_id = workspace_id
-            existing_integration.token_source = "oauth"
-            existing_integration.updated_at = datetime.utcnow()
-            integration = existing_integration
-        else:
-            # Create new integration
-            integration = SlackIntegration(
-                user_id=current_user.id,
-                slack_token=encrypted_token,
-                slack_user_id=slack_user_id,
-                workspace_id=workspace_id,
-                token_source="oauth"
-            )
-            db.add(integration)
-        
-        # Update user correlations if email is available
-        if user_email:
-            existing_correlation = db.query(UserCorrelation).filter(
-                UserCorrelation.user_id == current_user.id,
-                UserCorrelation.email == user_email
-            ).first()
-            
-            if existing_correlation:
-                existing_correlation.slack_user_id = slack_user_id
-            else:
-                correlation = UserCorrelation(
-                    user_id=current_user.id,
-                    email=user_email,
-                    slack_user_id=slack_user_id
+
+            if token_response.status_code != 200:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Failed to exchange code for token"
                 )
-                db.add(correlation)
-        
+
+            token_data = token_response.json()
+
+            if not token_data.get("ok"):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Slack OAuth error: {token_data.get('error', 'Unknown error')}"
+                )
+
+            # Extract token and team info
+            access_token = token_data.get("access_token")
+            team_info = token_data.get("team", {})
+            workspace_id = team_info.get("id")
+            workspace_name = team_info.get("name")
+
+            if not access_token or not workspace_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Failed to get access token or workspace ID from Slack"
+                )
+
+        # Create or update workspace mapping
+        existing_mapping = db.query(SlackWorkspaceMapping).filter(
+            SlackWorkspaceMapping.workspace_id == workspace_id
+        ).first()
+
+        if existing_mapping:
+            # Update existing mapping
+            existing_mapping.workspace_name = workspace_name
+            existing_mapping.bot_token = encrypt_token(access_token)
+            if organization_id:
+                existing_mapping.organization_id = organization_id
+            existing_mapping.updated_at = datetime.utcnow()
+            mapping = existing_mapping
+        else:
+            # Create new mapping
+            mapping = SlackWorkspaceMapping(
+                workspace_id=workspace_id,
+                workspace_name=workspace_name,
+                organization_id=organization_id,
+                bot_token=encrypt_token(access_token),
+                status='active'
+            )
+            db.add(mapping)
+
         db.commit()
-        
-        return {
-            "success": True,
-            "message": "Slack integration connected successfully",
-            "integration": {
-                "id": integration.id,
-                "slack_user_id": slack_user_id,
-                "workspace_id": workspace_id,
-                "user_email": user_email,
-                "user_name": user_profile.get("real_name") or user_profile.get("display_name")
-            }
-        }
+
+        # Redirect to frontend with success message
+        frontend_url = settings.FRONTEND_URL or "http://localhost:3000"
+        redirect_url = f"{frontend_url}/integrations?slack_connected=true&workspace={workspace_name}"
+
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url=redirect_url, status_code=302)
         
     except HTTPException:
         raise

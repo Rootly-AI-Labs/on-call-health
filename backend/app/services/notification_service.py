@@ -38,29 +38,46 @@ class NotificationService:
         return notification
 
     def create_invitation_accepted_notification(self, invitation: OrganizationInvitation, accepted_by: User) -> List[UserNotification]:
-        """Notify org admins that someone accepted an invitation."""
+        """Notify the inviter and org admins that someone accepted an invitation."""
         notifications = []
 
-        # Notify org admins
+        # First, notify the person who sent the invitation
+        inviter = self.db.query(User).filter(User.id == invitation.invited_by).first()
+        if inviter and inviter.id != accepted_by.id:  # Don't notify if they accepted their own invite
+            invitation_notification = UserNotification(
+                user_id=inviter.id,
+                organization_id=invitation.organization_id,
+                type='invitation',
+                title=f"🎉 {accepted_by.name or accepted_by.email} accepted your invitation!",
+                message=f"{accepted_by.email} accepted your invitation and joined {invitation.organization.name} as a {invitation.role}.",
+                action_url=f"/integrations?tab=members",
+                action_text="View Team Members",
+                priority='high'
+            )
+            notifications.append(invitation_notification)
+            self.db.add(invitation_notification)
+
+        # Also notify org admins (but not the inviter again or the person who accepted)
         org_admins = self.db.query(User).filter(
             User.organization_id == invitation.organization_id,
-            User.role.in_(['org_admin', 'super_admin'])
+            User.role.in_(['org_admin', 'super_admin']),
+            User.id != invitation.invited_by,  # Don't duplicate notification for inviter
+            User.id != accepted_by.id  # Don't notify the person who accepted
         ).all()
 
         for admin in org_admins:
-            if admin.id != accepted_by.id:  # Don't notify if they accepted their own invite
-                notification = UserNotification(
-                    user_id=admin.id,
-                    organization_id=invitation.organization_id,
-                    type='integration',
-                    title=f"{accepted_by.name or accepted_by.email} joined your organization",
-                    message=f"{accepted_by.email} accepted the invitation and joined {invitation.organization.name}.",
-                    action_url=f"/organization/members",
-                    action_text="View Members",
-                    priority='normal'
-                )
-                notifications.append(notification)
-                self.db.add(notification)
+            admin_notification = UserNotification(
+                user_id=admin.id,
+                organization_id=invitation.organization_id,
+                type='integration',
+                title=f"New team member: {accepted_by.name or accepted_by.email}",
+                message=f"{accepted_by.email} accepted an invitation and joined {invitation.organization.name}.",
+                action_url=f"/integrations?tab=members",
+                action_text="View Members",
+                priority='normal'
+            )
+            notifications.append(admin_notification)
+            self.db.add(admin_notification)
 
         self.db.commit()
         return notifications
@@ -161,7 +178,7 @@ class NotificationService:
         notifications = self.db.query(UserNotification).filter(
             ((UserNotification.user_id == user.id) |
              (UserNotification.email == user.email)),
-            UserNotification.status != 'dismissed'
+            UserNotification.status.notin_(['dismissed', 'acted'])
         ).order_by(
             UserNotification.priority.desc(),
             UserNotification.created_at.desc()
