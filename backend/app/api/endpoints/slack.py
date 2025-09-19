@@ -156,15 +156,18 @@ async def slack_oauth_callback(
                 User.organization_id == organization_id
             ).first()
 
-        # If no specific owner found, we'll create a placeholder mapping
-        # In production, you'd want better user association logic
+        # If no specific owner found, find any user to be the owner
+        # This allows the workspace to be registered and functional
         if not owner_user:
-            # Create a temporary mapping without owner - this will need to be improved
-            # For now, let's just log successful installation without storing the mapping
-            from fastapi.responses import RedirectResponse
-            frontend_url = settings.FRONTEND_URL or "http://localhost:3000"
-            redirect_url = f"{frontend_url}/integrations?slack_connected=true&workspace={workspace_name}&status=pending_user_association"
-            return RedirectResponse(url=redirect_url, status_code=302)
+            # Use the first available user as the owner for the workspace mapping
+            owner_user = db.query(User).first()
+
+            if not owner_user:
+                # If absolutely no users exist, we can't create the mapping
+                from fastapi.responses import RedirectResponse
+                frontend_url = settings.FRONTEND_URL or "http://localhost:3000"
+                redirect_url = f"{frontend_url}/integrations?slack_connected=false&error=no_users_found"
+                return RedirectResponse(url=redirect_url, status_code=302)
 
         # Create or update workspace mapping
         existing_mapping = db.query(SlackWorkspaceMapping).filter(

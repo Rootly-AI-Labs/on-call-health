@@ -567,11 +567,17 @@ export default function IntegrationsPage() {
           description: `Added to "${decodeURIComponent(workspace)}" workspace. The /burnout-survey command is now available.`,
           duration: 6000,
         })
+
+        // Fallback alert for debugging
+        console.log('SUCCESS TOAST SHOULD HAVE APPEARED: Slack app installed!')
       } else {
         toast.success(`🎉 Slack integration connected!`, {
           description: `Successfully connected to "${decodeURIComponent(workspace)}" workspace.`,
           duration: 5000,
         })
+
+        // Fallback alert for debugging
+        console.log('SUCCESS TOAST SHOULD HAVE APPEARED: Slack integration connected!')
       }
 
       // Clean up URL parameters
