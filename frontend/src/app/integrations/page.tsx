@@ -3318,8 +3318,14 @@ export default function IntegrationsPage() {
                     </div>
                   </div>
 
-                  {/* Add to Slack OAuth Button - Conditional */}
-                  {process.env.NEXT_PUBLIC_SLACK_CLIENT_ID ? (
+                  {/* Slack Connection Status */}
+                  {slackIntegration ? (
+                    // Connected Status Display
+                    <div className="inline-flex items-center space-x-2 bg-green-100 text-green-800 px-4 py-2 rounded-lg text-sm font-medium">
+                      <CheckCircle className="w-4 h-4" />
+                      <span>Connected to Slack</span>
+                    </div>
+                  ) : process.env.NEXT_PUBLIC_SLACK_CLIENT_ID ? (
                     <Button
                       onClick={() => {
                         // Official OnCall Burnout Detector Slack App

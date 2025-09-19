@@ -387,12 +387,30 @@ async def get_slack_status(
 ):
     """
     Get Slack integration status for current user.
+    Checks both SlackIntegration (manual setup) and SlackWorkspaceMapping (OAuth setup).
     """
+    # Check for manual SlackIntegration first
     integration = db.query(SlackIntegration).filter(
         SlackIntegration.user_id == current_user.id
     ).first()
-    
+
+    # If no manual integration, check for OAuth workspace mapping
+    workspace_mapping = None
     if not integration:
+        # Check if there's a workspace mapping for this user's organization
+        workspace_mapping = db.query(SlackWorkspaceMapping).filter(
+            SlackWorkspaceMapping.organization_id == current_user.organization_id,
+            SlackWorkspaceMapping.status == 'active'
+        ).first()
+
+        # Also check if user is the owner of any workspace mapping
+        if not workspace_mapping:
+            workspace_mapping = db.query(SlackWorkspaceMapping).filter(
+                SlackWorkspaceMapping.owner_user_id == current_user.id,
+                SlackWorkspaceMapping.status == 'active'
+            ).first()
+
+    if not integration and not workspace_mapping:
         return {
             "connected": False,
             "integration": None
@@ -464,25 +482,54 @@ async def get_slack_status(
         # Only log as warning since this is just a preview/test, not critical functionality
         logging.getLogger(__name__).warning(f"Slack API preview failed for channels: {channels_error[:100]}...")
     
-    response_data = {
-        "connected": True,
-        "integration": {
-            "id": integration.id,
-            "slack_user_id": integration.slack_user_id,
-            "workspace_id": integration.workspace_id,
-            "token_source": integration.token_source,
-            "is_oauth": integration.is_oauth,
-            "supports_refresh": integration.supports_refresh,
-            "has_webhook": integration.webhook_url is not None,
-            "webhook_configured": integration.webhook_url is not None,
-            "connected_at": integration.created_at.isoformat(),
-            "last_updated": integration.updated_at.isoformat(),
-            "total_channels": total_channels,
-            "channel_names": channel_names,
-            "token_preview": token_preview,
-            "webhook_preview": webhook_preview
+    # Build response data based on connection type
+    if integration:
+        # Manual SlackIntegration
+        response_data = {
+            "connected": True,
+            "integration": {
+                "id": integration.id,
+                "slack_user_id": integration.slack_user_id,
+                "workspace_id": integration.workspace_id,
+                "token_source": integration.token_source,
+                "is_oauth": integration.is_oauth,
+                "supports_refresh": integration.supports_refresh,
+                "has_webhook": integration.webhook_url is not None,
+                "webhook_configured": integration.webhook_url is not None,
+                "connected_at": integration.created_at.isoformat(),
+                "last_updated": integration.updated_at.isoformat(),
+                "total_channels": total_channels,
+                "channel_names": channel_names,
+                "token_preview": token_preview,
+                "webhook_preview": webhook_preview,
+                "connection_type": "manual"
+            }
         }
-    }
+    else:
+        # OAuth SlackWorkspaceMapping
+        response_data = {
+            "connected": True,
+            "integration": {
+                "id": workspace_mapping.id,
+                "slack_user_id": None,  # Not stored in workspace mapping
+                "workspace_id": workspace_mapping.workspace_id,
+                "workspace_name": workspace_mapping.workspace_name,
+                "token_source": "oauth",
+                "is_oauth": True,
+                "supports_refresh": False,
+                "has_webhook": False,
+                "webhook_configured": False,
+                "connected_at": workspace_mapping.registered_at.isoformat(),
+                "last_updated": workspace_mapping.registered_at.isoformat(),
+                "total_channels": 0,  # Not fetched for workspace mappings
+                "channel_names": [],
+                "token_preview": None,
+                "webhook_preview": None,
+                "connection_type": "oauth",
+                "status": workspace_mapping.status,
+                "owner_user_id": workspace_mapping.owner_user_id
+            }
+        }
     
     # Add error information if there was an issue getting channel count
     if channels_error:
