@@ -675,11 +675,6 @@ export default function Dashboard() {
         
         // Small delay to ensure state updates have propagated
         setTimeout(() => {
-          console.log('🏁 INITIAL DATA: Setting initialDataLoaded to true', {
-            previousAnalysesCount: previousAnalyses.length,
-            integrationsCount: integrations.length,
-            hasDataFromCache
-          })
           setInitialDataLoaded(true)
         }, 100)
       } catch (error) {
@@ -807,18 +802,14 @@ export default function Dashboard() {
   }, [])
 
   const loadPreviousAnalyses = async (append = false) => {
-    console.log(`🔄 LOAD MORE: Starting loadPreviousAnalyses (append: ${append})`)
-
     // CRITICAL: Set loading state FIRST before any async operations
     if (append) {
-      console.log('🔄 LOAD MORE: Setting loading state to true at start')
       setLoadingMoreAnalyses(true)
     }
 
     try {
       const authToken = localStorage.getItem('auth_token')
       if (!authToken) {
-        console.log('❌ LOAD MORE: No auth token available - exiting')
         return
       }
 
@@ -826,7 +817,6 @@ export default function Dashboard() {
       try {
         const limit = 3
         const offset = append ? previousAnalyses.length : 0
-        console.log(`🔄 LOAD MORE: Fetching with limit=${limit}, offset=${offset}`)
 
         // Add timeout to prevent indefinite waiting
         const controller = new AbortController()
@@ -842,10 +832,8 @@ export default function Dashboard() {
         } finally {
           clearTimeout(timeoutId)
         }
-
-        console.log(`🔄 LOAD MORE: Fetch completed with status ${response.status}`)
       } catch (networkError) {
-        console.error('❌ LOAD MORE: Network error during fetch', networkError)
+        console.error('Network error during fetch', networkError)
 
         if (networkError.name === 'AbortError') {
           throw new Error('Request timed out - server may be slow')
@@ -861,14 +849,12 @@ export default function Dashboard() {
       if (response.ok) {
         const data = await response.json()
         const newAnalyses = data.analyses || []
-        console.log(`✅ LOAD MORE: Successfully got ${newAnalyses.length} analyses`)
 
         if (append) {
           setPreviousAnalyses(prev => {
             // Deduplicate analyses by ID to prevent duplicate keys
             const existingIds = new Set(prev.map(a => a.id))
             const uniqueNewAnalyses = newAnalyses.filter((analysis: any) => !existingIds.has(analysis.id))
-            console.log(`✅ LOAD MORE: Adding ${uniqueNewAnalyses.length} unique analyses to existing ${prev.length}`)
             return [...prev, ...uniqueNewAnalyses]
           })
         } else {
@@ -880,7 +866,6 @@ export default function Dashboard() {
 
         // If this is the initial load (not append) and we got an empty array, ensure initial data is marked as loaded
         if (!append && newAnalyses.length === 0) {
-          console.log('📊 LOAD ANALYSES: Got empty array, ensuring initialDataLoaded is set')
           setTimeout(() => setInitialDataLoaded(true), 50)
         }
 
@@ -901,10 +886,10 @@ export default function Dashboard() {
         try {
           errorText = await response.text()
         } catch (parseError) {
-          console.error('❌ LOAD MORE: Could not parse error response:', parseError)
+          console.error('Could not parse error response:', parseError)
         }
 
-        console.error(`❌ LOAD MORE: API error ${response.status}:`, errorText)
+        console.error(`API error ${response.status}:`, errorText)
 
         if (response.status === 401) {
           toast.error("Authentication failed - please log in again")
@@ -915,7 +900,7 @@ export default function Dashboard() {
         }
       }
     } catch (error) {
-      console.error('❌ LOAD MORE: Unexpected error in loadPreviousAnalyses:', error)
+      console.error('Unexpected error in loadPreviousAnalyses:', error)
 
       // Check if this is a network connectivity issue
       const isNetworkError = error instanceof Error && (
@@ -927,16 +912,13 @@ export default function Dashboard() {
       )
 
       if (isNetworkError) {
-        console.error('❌ LOAD MORE: Network connectivity issue')
         toast.error("Cannot connect to backend")
       } else {
-        console.error('❌ LOAD MORE: Non-network error')
         toast.error("Error loading analyses")
       }
     } finally {
       // CRITICAL: ALWAYS reset loading state in finally block
       if (append) {
-        console.log('🏁 LOAD MORE: FINALLY - Resetting loading state to false')
         setLoadingMoreAnalyses(false)
       }
     }
@@ -952,13 +934,10 @@ export default function Dashboard() {
       // Check cache first
       const cachedAnalysis = analysisCache.get(analysisId)
       if (cachedAnalysis && cachedAnalysis.analysis_data && cachedAnalysis.analysis_data.team_analysis) {
-        console.log('🎯 CACHE HIT (loadSpecific): Using cached analysis', analysisId)
         setCurrentAnalysis(cachedAnalysis)
         setRedirectingToSuggested(false)
         return
       }
-
-      console.log('📡 CACHE MISS (loadSpecific): Loading fresh analysis', analysisId)
       // Check if analysisId is a UUID (contains hyphens) or integer ID
       const isUuid = analysisId.includes('-')
 
@@ -975,7 +954,6 @@ export default function Dashboard() {
         const analysis = await response.json()
         // Cache the analysis data
         const cacheKey = analysis.uuid || analysis.id.toString()
-        console.log('💾 CACHE (loadSpecific): Storing analysis', cacheKey)
         setAnalysisCache(prev => new Map(prev.set(cacheKey, analysis)))
         setCurrentAnalysis(analysis)
         // Platform mappings will be fetched by the dedicated useEffect
@@ -1030,16 +1008,13 @@ export default function Dashboard() {
       // Check cache first
       const cachedTrends = trendsCache.get(cacheKey)
       if (cachedTrends) {
-        console.log('🎯 TRENDS CACHE HIT: Using cached trends data')
         setHistoricalTrends(cachedTrends)
         setLoadingTrends(false)
         return
       }
 
-      console.log('📡 TRENDS CACHE MISS: Loading fresh trends data')
       const authToken = localStorage.getItem('auth_token')
       if (!authToken) {
-        console.log('❌ TRENDS: No auth token available')
         setLoadingTrends(false)
         return
       }
@@ -1075,20 +1050,16 @@ export default function Dashboard() {
 
       if (response.ok) {
         const data = await response.json()
-        console.log('✅ TRENDS: Data loaded successfully', data)
 
         // Cache the data
-        console.log('💾 TRENDS: Caching data for future use')
         setTrendsCache(prev => new Map(prev.set(cacheKey, data)))
-
         setHistoricalTrends(data)
       } else {
         const errorText = await response.text()
       }
     } catch (error) {
-      console.error('❌ TRENDS: Unexpected error', error)
+      console.error('Unexpected error loading trends:', error)
     } finally {
-      console.log('🏁 TRENDS: Loading finished, setting loadingTrends to false')
       setLoadingTrends(false)
     }
   }
@@ -2411,7 +2382,6 @@ export default function Dashboard() {
                         const cachedAnalysis = analysisCache.get(analysisKey)
                         if (cachedAnalysis) {
                           // Use cached analysis data (includes both sufficient and insufficient data cases)
-                          console.log('🎯 CACHE HIT: Using cached analysis', analysisKey, cachedAnalysis)
                           setCurrentAnalysis(cachedAnalysis)
                           setRedirectingToSuggested(false) // Turn off redirect loader
                           updateURLWithAnalysis(cachedAnalysis.uuid || cachedAnalysis.id)
@@ -2419,7 +2389,6 @@ export default function Dashboard() {
                         }
 
                         // If analysis doesn't have full data and not in cache, fetch it
-                        console.log('📡 CACHE MISS: Fetching analysis', analysisKey)
                         if (!analysis.analysis_data || !analysis.analysis_data.team_analysis) {
                           try {
                             const authToken = localStorage.getItem('auth_token')
@@ -2434,7 +2403,6 @@ export default function Dashboard() {
                             if (response.ok) {
                               const fullAnalysis = await response.json()
                               // Cache the full analysis data (whether sufficient or insufficient)
-                              console.log('💾 CACHING: Storing analysis', analysisKey, fullAnalysis)
                               setAnalysisCache(prev => new Map(prev.set(analysisKey, fullAnalysis)))
                               setCurrentAnalysis(fullAnalysis)
                               setRedirectingToSuggested(false) // Turn off redirect loader
@@ -2451,7 +2419,6 @@ export default function Dashboard() {
                           }
                         } else {
                           // Analysis already has full data, cache it and use it
-                          console.log('💾 CACHING: Storing existing analysis data', analysisKey, analysis)
                           setAnalysisCache(prev => new Map(prev.set(analysisKey, analysis)))
                           setCurrentAnalysis(analysis)
                           setRedirectingToSuggested(false) // Turn off redirect loader
@@ -3889,8 +3856,8 @@ export default function Dashboard() {
                 </Card>
               ) : (
                 <>
-                  {/* Check if integrations exist */}
-                  {integrations.length === 0 ? (
+                  {/* Show setup required ONLY if we definitely have no integrations (not during loading) */}
+                  {integrations.length === 0 && !loadingIntegrations && !hasDataFromCache ? (
                 <Card className="text-center p-8">
                   <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
                     <Settings className="w-8 h-8 text-blue-600" />
