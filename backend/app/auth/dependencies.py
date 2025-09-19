@@ -63,3 +63,15 @@ async def get_current_active_user(
 ) -> User:
     """Get current active user (can add additional checks here)."""
     return current_user
+
+async def get_current_user_optional(
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    db: Session = Depends(get_db)
+) -> Optional[User]:
+    """Get current user if authenticated, otherwise return None (for optional auth endpoints)."""
+    try:
+        return await get_current_user(request, credentials, db)
+    except HTTPException:
+        # If authentication fails, return None instead of raising exception
+        return None
