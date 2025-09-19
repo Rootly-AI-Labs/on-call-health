@@ -525,10 +525,20 @@ export default function IntegrationsPage() {
       const data = response.ok ? await response.json() : { integrations: [] }
       const rootlyIntegrations = data.integrations.map((i: Integration) => ({ ...i, platform: 'rootly' }))
 
-      setIntegrations(prev => [
-        ...prev.filter(i => i.platform !== 'rootly'),
-        ...rootlyIntegrations
-      ])
+      setIntegrations(prev => {
+        const updatedIntegrations = [
+          ...prev.filter(i => i.platform !== 'rootly'),
+          ...rootlyIntegrations
+        ]
+
+        // Update cache with fresh data when force refreshing
+        if (forceRefresh) {
+          localStorage.setItem('all_integrations', JSON.stringify(updatedIntegrations))
+          localStorage.setItem('all_integrations_timestamp', Date.now().toString())
+        }
+
+        return updatedIntegrations
+      })
     } catch (error) {
       console.error('Error loading Rootly integrations:', error)
     } finally {
@@ -565,10 +575,20 @@ export default function IntegrationsPage() {
       const data = response.ok ? await response.json() : { integrations: [] }
       const pagerdutyIntegrations = data.integrations || []
 
-      setIntegrations(prev => [
-        ...prev.filter(i => i.platform !== 'pagerduty'),
-        ...pagerdutyIntegrations
-      ])
+      setIntegrations(prev => {
+        const updatedIntegrations = [
+          ...prev.filter(i => i.platform !== 'pagerduty'),
+          ...pagerdutyIntegrations
+        ]
+
+        // Update cache with fresh data when force refreshing
+        if (forceRefresh) {
+          localStorage.setItem('all_integrations', JSON.stringify(updatedIntegrations))
+          localStorage.setItem('all_integrations_timestamp', Date.now().toString())
+        }
+
+        return updatedIntegrations
+      })
     } catch (error) {
       console.error('Error loading PagerDuty integrations:', error)
     } finally {
