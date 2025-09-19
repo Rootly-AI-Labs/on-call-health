@@ -146,6 +146,26 @@ async def slack_oauth_callback(
                     detail="Failed to get access token or workspace ID from Slack"
                 )
 
+        # For now, we'll store the bot token in SlackIntegration model instead
+        # and create a basic workspace mapping without token storage
+
+        # Find a user from the organization if we have organization_id
+        owner_user = None
+        if organization_id:
+            owner_user = db.query(User).filter(
+                User.organization_id == organization_id
+            ).first()
+
+        # If no specific owner found, we'll create a placeholder mapping
+        # In production, you'd want better user association logic
+        if not owner_user:
+            # Create a temporary mapping without owner - this will need to be improved
+            # For now, let's just log successful installation without storing the mapping
+            from fastapi.responses import RedirectResponse
+            frontend_url = settings.FRONTEND_URL or "http://localhost:3000"
+            redirect_url = f"{frontend_url}/integrations?slack_connected=true&workspace={workspace_name}&status=pending_user_association"
+            return RedirectResponse(url=redirect_url, status_code=302)
+
         # Create or update workspace mapping
         existing_mapping = db.query(SlackWorkspaceMapping).filter(
             SlackWorkspaceMapping.workspace_id == workspace_id
@@ -154,10 +174,8 @@ async def slack_oauth_callback(
         if existing_mapping:
             # Update existing mapping
             existing_mapping.workspace_name = workspace_name
-            existing_mapping.bot_token = encrypt_token(access_token)
             if organization_id:
                 existing_mapping.organization_id = organization_id
-            existing_mapping.updated_at = datetime.utcnow()
             mapping = existing_mapping
         else:
             # Create new mapping
@@ -165,10 +183,29 @@ async def slack_oauth_callback(
                 workspace_id=workspace_id,
                 workspace_name=workspace_name,
                 organization_id=organization_id,
-                bot_token=encrypt_token(access_token),
+                owner_user_id=owner_user.id,
                 status='active'
             )
             db.add(mapping)
+
+        # Store the bot token separately in a SlackIntegration record for the workspace
+        # This is a simplified approach - in production you might want a dedicated bot token table
+        slack_integration = db.query(SlackIntegration).filter(
+            SlackIntegration.workspace_id == workspace_id
+        ).first()
+
+        if slack_integration:
+            slack_integration.slack_token = encrypt_token(access_token)
+            slack_integration.updated_at = datetime.utcnow()
+        else:
+            # Create a workspace-level integration record
+            slack_integration = SlackIntegration(
+                user_id=owner_user.id,
+                slack_token=encrypt_token(access_token),
+                workspace_id=workspace_id,
+                token_source="oauth"
+            )
+            db.add(slack_integration)
 
         db.commit()
 
