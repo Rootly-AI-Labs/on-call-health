@@ -98,12 +98,25 @@ async def slack_oauth_callback(
         # Exchange code for token using Slack's OAuth API
         import httpx
         async with httpx.AsyncClient() as client:
+            # Construct the same redirect_uri that was used in the OAuth request
+            frontend_url = settings.FRONTEND_URL or "http://localhost:3000"
+            backend_base = settings.DATABASE_URL.replace("postgresql://", "https://").split("@")[1].split("/")[0] if settings.DATABASE_URL else "localhost:8000"
+
+            # For Railway deployment, construct the correct backend URL
+            if "railway" in str(settings.DATABASE_URL):
+                backend_url = f"https://rootly-burnout-detector-web-development.up.railway.app"
+            else:
+                backend_url = "http://localhost:8000"
+
+            redirect_uri = f"{backend_url}/api/integrations/slack/oauth/callback"
+
             token_response = await client.post(
                 "https://slack.com/api/oauth.v2.access",
                 data={
                     "client_id": settings.SLACK_CLIENT_ID,
                     "client_secret": settings.SLACK_CLIENT_SECRET,
-                    "code": code
+                    "code": code,
+                    "redirect_uri": redirect_uri
                 }
             )
 
