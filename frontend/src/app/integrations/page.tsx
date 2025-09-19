@@ -82,6 +82,8 @@ import {
   ArrowUp,
   ArrowDown,
   LogOut,
+  UserPlus,
+  Mail,
 } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
@@ -276,7 +278,7 @@ export default function IntegrationsPage() {
   const [loadingPagerDuty, setLoadingPagerDuty] = useState(true) 
   const [loadingGitHub, setLoadingGitHub] = useState(true)
   const [loadingSlack, setLoadingSlack] = useState(true)
-  const [userInfo, setUserInfo] = useState<{name: string, email: string, avatar?: string} | null>(null)
+  const [userInfo, setUserInfo] = useState<{name: string, email: string, avatar?: string, organization_id?: number, id?: number} | null>(null)
   const [activeTab, setActiveTab] = useState<"rootly" | "pagerduty" | null>(null)
   const [backUrl, setBackUrl] = useState<string>('/dashboard')
   const [selectedOrganization, setSelectedOrganization] = useState<string>("")
@@ -303,7 +305,13 @@ export default function IntegrationsPage() {
   const [savingInlineMapping, setSavingInlineMapping] = useState(false)
   const [validatingGithub, setValidatingGithub] = useState(false)
   const [githubValidation, setGithubValidation] = useState<{valid: boolean, message?: string} | null>(null)
-  
+
+  // Invite modal state
+  const [showInviteModal, setShowInviteModal] = useState(false)
+  const [inviteEmail, setInviteEmail] = useState("")
+  const [inviteRole, setInviteRole] = useState("member")
+  const [isInviting, setIsInviting] = useState(false)
+
   // Sorting state
   const [sortField, setSortField] = useState<'email' | 'status' | 'data' | 'method'>('email')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
@@ -681,6 +689,54 @@ export default function IntegrationsPage() {
       console.error('Background refresh failed:', error)
     } finally {
       setRefreshingInBackground(false)
+    }
+  }
+
+  // Invite function
+  const handleInvite = async () => {
+    if (!inviteEmail.trim()) {
+      toast.error("Please enter an email address")
+      return
+    }
+
+    setIsInviting(true)
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) {
+        toast.error("Authentication required")
+        return
+      }
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/invitations/create`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: inviteEmail.trim(),
+          role: inviteRole
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.detail || 'Failed to send invitation')
+      }
+
+      const data = await response.json()
+      toast.success(`Invitation sent to ${inviteEmail}! They'll receive a notification and can accept within 30 days.`)
+
+      // Reset form
+      setInviteEmail("")
+      setInviteRole("member")
+      setShowInviteModal(false)
+
+    } catch (error) {
+      console.error('Failed to send invitation:', error)
+      toast.error(error instanceof Error ? error.message : "Failed to send invitation")
+    } finally {
+      setIsInviting(false)
     }
   }
 
@@ -2084,7 +2140,15 @@ export default function IntegrationsPage() {
                     </div>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem 
+                  <DropdownMenuItem
+                    className="px-2 py-1.5 cursor-pointer"
+                    onClick={() => setShowInviteModal(true)}
+                  >
+                    <UserPlus className="w-4 h-4 mr-2" />
+                    Invite People
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
                     className="text-red-600 hover:text-red-700 hover:bg-red-50 px-2 py-1.5 cursor-pointer"
                     onClick={() => {
                       // Clear all user data
@@ -3061,6 +3125,196 @@ export default function IntegrationsPage() {
                 <p className="text-sm">Add a Rootly or PagerDuty integration to get started!</p>
               </div>
             )}
+        </div>
+
+        {/* User-Reported Connection Section */}
+        <div className="mt-16 space-y-8">
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-slate-900 mb-3">User-Reported Insights</h2>
+            <p className="text-lg text-slate-600 mb-2">
+              Enable team members to share their own burnout insights
+            </p>
+            <p className="text-slate-500">
+              Collect direct feedback through Slack commands and web surveys
+            </p>
+          </div>
+
+          <div className="max-w-4xl mx-auto space-y-6">
+            {/* Slack Slash Command Setup */}
+            <Card className="border-2 border-purple-200 bg-purple-50/30">
+              <CardHeader className="pb-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                      <svg className="w-6 h-6" viewBox="0 0 124 124" fill="none">
+                        <path d="M26.3996 78.2003C26.3996 84.7003 21.2996 89.8003 14.7996 89.8003C8.29961 89.8003 3.19961 84.7003 3.19961 78.2003C3.19961 71.7003 8.29961 66.6003 14.7996 66.6003H26.3996V78.2003Z" fill="#E01E5A"/>
+                        <path d="M32.2996 78.2003C32.2996 71.7003 37.3996 66.6003 43.8996 66.6003C50.3996 66.6003 55.4996 71.7003 55.4996 78.2003V109.2C55.4996 115.7 50.3996 120.8 43.8996 120.8C37.3996 120.8 32.2996 115.7 32.2996 109.2V78.2003Z" fill="#E01E5A"/>
+                        <path d="M43.8996 26.4003C37.3996 26.4003 32.2996 21.3003 32.2996 14.8003C32.2996 8.30026 37.3996 3.20026 43.8996 3.20026C50.3996 3.20026 55.4996 8.30026 55.4996 14.8003V26.4003H43.8996Z" fill="#36C5F0"/>
+                        <path d="M43.8996 32.3003C50.3996 32.3003 55.4996 37.4003 55.4996 43.9003C55.4996 50.4003 50.3996 55.5003 43.8996 55.5003H12.8996C6.39961 55.5003 1.29961 50.4003 1.29961 43.9003C1.29961 37.4003 6.39961 32.3003 12.8996 32.3003H43.8996Z" fill="#36C5F0"/>
+                        <path d="M95.5996 43.9003C95.5996 37.4003 100.7 32.3003 107.2 32.3003C113.7 32.3003 118.8 37.4003 118.8 43.9003C118.8 50.4003 113.7 55.5003 107.2 55.5003H95.5996V43.9003Z" fill="#2EB67D"/>
+                        <path d="M89.6996 43.9003C89.6996 50.4003 84.5996 55.5003 78.0996 55.5003C71.5996 55.5003 66.4996 50.4003 66.4996 43.9003V12.9003C66.4996 6.40026 71.5996 1.30026 78.0996 1.30026C84.5996 1.30026 89.6996 6.40026 89.6996 12.9003V43.9003Z" fill="#2EB67D"/>
+                        <path d="M78.0996 95.6003C84.5996 95.6003 89.6996 100.7 89.6996 107.2C89.6996 113.7 84.5996 118.8 78.0996 118.8C71.5996 118.8 66.4996 113.7 66.4996 107.2V95.6003H78.0996Z" fill="#ECB22E"/>
+                        <path d="M78.0996 89.7003C71.5996 89.7003 66.4996 84.6003 66.4996 78.1003C66.4996 71.6003 71.5996 66.5003 78.0996 66.5003H109.1C115.6 66.5003 120.7 71.6003 120.7 78.1003C120.7 84.6003 115.6 89.7003 109.1 89.7003H78.0996Z" fill="#ECB22E"/>
+                      </svg>
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg text-gray-900">Slack Slash Command</CardTitle>
+                      <p className="text-sm text-gray-600">Let team members report burnout scores directly in Slack</p>
+                    </div>
+                  </div>
+
+                  {/* Add to Slack OAuth Button */}
+                  <Button
+                    onClick={() => {
+                      // Official OnCall Burnout Detector Slack App
+                      // This single app can be installed by any organization
+                      const clientId = process.env.NEXT_PUBLIC_SLACK_CLIENT_ID
+
+                      if (!clientId) {
+                        toast.error('Slack app not configured. Please contact support.')
+                        return
+                      }
+
+                      // Use Railway backend URLs from environment variables
+                      const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL
+
+                      if (!backendUrl) {
+                        toast.error('Backend URL not configured. Please contact support.')
+                        return
+                      }
+
+                      // Include organization context in callback URL so backend knows which org is installing
+                      const redirectUri = `${backendUrl}/api/slack/oauth/callback`
+                      const scopes = 'commands,chat:write,team:read'
+
+                      // Add state parameter to track which organization is installing
+                      const currentUser = userInfo // Assuming userInfo contains org info
+                      const state = currentUser ? btoa(JSON.stringify({
+                        orgId: currentUser.organization_id,
+                        userId: currentUser.id,
+                        email: currentUser.email
+                      })) : ''
+
+                      const slackAuthUrl = `https://slack.com/oauth/v2/authorize?client_id=${clientId}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}`
+
+                      console.log('Installing official OnCall Burnout Slack app for org:', currentUser?.organization_id)
+                      window.open(slackAuthUrl, '_blank')
+                    }}
+                    className="inline-flex items-center space-x-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                  >
+                    <svg className="w-4 h-4" viewBox="0 0 124 124" fill="currentColor">
+                      <path d="M26.3996 78.2003C26.3996 84.7003 21.2996 89.8003 14.7996 89.8003C8.29961 89.8003 3.19961 84.7003 3.19961 78.2003C3.19961 71.7003 8.29961 66.6003 14.7996 66.6003H26.3996V78.2003Z"/>
+                      <path d="M32.2996 78.2003C32.2996 71.7003 37.3996 66.6003 43.8996 66.6003C50.3996 66.6003 55.4996 71.7003 55.4996 78.2003V109.2C55.4996 115.7 50.3996 120.8 43.8996 120.8C37.3996 120.8 32.2996 115.7 32.2996 109.2V78.2003Z"/>
+                      <path d="M43.8996 26.4003C37.3996 26.4003 32.2996 21.3003 32.2996 14.8003C32.2996 8.30026 37.3996 3.20026 43.8996 3.20026C50.3996 3.20026 55.4996 8.30026 55.4996 14.8003V26.4003H43.8996Z"/>
+                    </svg>
+                    <span>Add to Slack</span>
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="bg-white rounded-lg border p-4 space-y-4">
+                  <div className="text-center py-2">
+                    <h4 className="font-medium text-gray-900 mb-2">Official OnCall Burnout App</h4>
+                    <p className="text-sm text-gray-600 mb-4">
+                      Click "Add to Slack" above to install the official OnCall Burnout Detector app with the <code className="bg-gray-100 px-1 rounded">/burnout-survey</code> command for your workspace.
+                    </p>
+                  </div>
+
+                  <div className="border-t pt-4">
+                    <h4 className="font-medium text-gray-900 mb-3">How it works:</h4>
+                    <div className="space-y-3">
+                      <div className="flex items-start space-x-3">
+                        <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <span className="text-green-600 text-xs font-bold">1</span>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-700"><strong>Authorize the app</strong> to add slash commands to your Slack workspace</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start space-x-3">
+                        <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <span className="text-green-600 text-xs font-bold">2</span>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-700"><strong>Team members type</strong> <code className="bg-gray-100 px-1 rounded text-xs">/burnout-survey</code></p>
+                          <div className="bg-slate-800 rounded p-3 font-mono text-sm text-green-400 mt-2">
+                            <div>/burnout-survey</div>
+                            <div className="text-slate-400 mt-1">→ Opens 2-minute burnout survey with 3 questions</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start space-x-3">
+                        <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <span className="text-green-600 text-xs font-bold">3</span>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-700"><strong>Survey responses appear automatically</strong> in your burnout analysis to validate automated detection</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-2">
+                  <div className="flex items-center space-x-2 text-sm text-gray-500">
+                    <Users className="w-4 h-4" />
+                    <span>Available to all workspace members</span>
+                  </div>
+                  <div className="flex items-center space-x-2 text-xs text-gray-400">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                    <span>Secure OAuth authentication</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Future: Web Survey Section (Placeholder) */}
+            <Card className="border-2 border-gray-200 bg-gray-50/30">
+              <CardHeader className="pb-4">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+                    <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg text-gray-700">Web Survey Sharing</CardTitle>
+                    <p className="text-sm text-gray-500">Share survey links for detailed burnout assessment</p>
+                  </div>
+                  <Badge variant="secondary" className="ml-auto">Coming Soon</Badge>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-6">
+                  <p className="text-gray-600 mb-4">Generate shareable survey links that team members can complete at their own pace.</p>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                    <div className="flex items-center space-x-2 text-gray-500">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                      </svg>
+                      <span>Shareable survey URLs</span>
+                    </div>
+                    <div className="flex items-center space-x-2 text-gray-500">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                      </svg>
+                      <span>Anonymous responses</span>
+                    </div>
+                    <div className="flex items-center space-x-2 text-gray-500">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                      </svg>
+                      <span>Detailed analytics</span>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
 
         {/* GitHub and Slack Integrations Section */}
@@ -4814,6 +5068,98 @@ export default function IntegrationsPage() {
               ) : (
                 "Delete Integration"
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Organization Management Modal */}
+      <Dialog open={showInviteModal} onOpenChange={setShowInviteModal}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <Users className="w-5 h-5" />
+              <span>Organization Management</span>
+            </DialogTitle>
+            <DialogDescription>
+              Invite new members and manage your organization
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6">
+            {/* Invite New Member Section */}
+            <div className="p-4 border rounded-lg bg-gray-50">
+              <h3 className="text-lg font-medium mb-4 flex items-center space-x-2">
+                <Mail className="w-4 h-4" />
+                <span>Invite New Member</span>
+              </h3>
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="invite-email" className="block text-sm font-medium text-gray-700 mb-1">
+                    Email Address
+                  </label>
+                  <Input
+                    id="invite-email"
+                    type="email"
+                    placeholder="Enter email address"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    className="w-full"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="invite-role" className="block text-sm font-medium text-gray-700 mb-1">
+                    Role
+                  </label>
+                  <select
+                    id="invite-role"
+                    value={inviteRole}
+                    onChange={(e) => setInviteRole(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  >
+                    <option value="member">Member</option>
+                    <option value="manager">Manager</option>
+                    <option value="org_admin">Admin</option>
+                  </select>
+                </div>
+                <Button
+                  onClick={handleInvite}
+                  disabled={isInviting || !inviteEmail.trim()}
+                  className="w-full"
+                >
+                  {isInviting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Sending Invitation...
+                    </>
+                  ) : (
+                    <>
+                      <Mail className="w-4 h-4 mr-2" />
+                      Send Invitation
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            {/* Current Members & Pending Invitations would go here */}
+            <div className="text-center py-8 text-gray-500">
+              <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p>Organization members and pending invitations will be shown here</p>
+              <p className="text-sm mt-1">Feature coming soon...</p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowInviteModal(false)
+                setInviteEmail("")
+                setInviteRole("member")
+              }}
+            >
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>
