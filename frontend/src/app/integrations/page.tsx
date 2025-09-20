@@ -3294,7 +3294,7 @@ export default function IntegrationsPage() {
             </p>
           </div>
 
-          <div className="max-w-4xl mx-auto space-y-6">
+          <div className="max-w-2xl mx-auto space-y-6">
             {/* Slack Slash Command Setup */}
             <Card className="border-2 border-purple-200 bg-purple-50/30">
               <CardHeader className="pb-4">
@@ -3323,7 +3323,7 @@ export default function IntegrationsPage() {
                     // Connected Status Display
                     <div className="inline-flex items-center space-x-2 bg-green-100 text-green-800 px-4 py-2 rounded-lg text-sm font-medium">
                       <CheckCircle className="w-4 h-4" />
-                      <span>Connected to Slack</span>
+                      <span>Connected</span>
                     </div>
                   ) : process.env.NEXT_PUBLIC_SLACK_CLIENT_ID ? (
                     <Button
@@ -3382,18 +3382,13 @@ export default function IntegrationsPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="bg-white rounded-lg border p-4 space-y-4">
-                  <div className="text-center py-2">
-                    <h4 className="font-medium text-gray-900 mb-2">Official OnCall Burnout App</h4>
-                    {process.env.NEXT_PUBLIC_SLACK_CLIENT_ID ? (
-                      <p className="text-sm text-gray-600 mb-4">
-                        Click "Add to Slack" above to install the official OnCall Burnout Detector app with the <code className="bg-gray-100 px-1 rounded">/burnout-survey</code> command for your workspace.
-                      </p>
-                    ) : (
+                  {!process.env.NEXT_PUBLIC_SLACK_CLIENT_ID && (
+                    <div className="text-center py-2">
                       <p className="text-sm text-gray-600 mb-4">
                         The official Slack app is not currently configured. You can still use the manual Slack integration below to connect your workspace with webhook URL and bot token.
                       </p>
-                    )}
-                  </div>
+                    </div>
+                  )}
 
                   <div className="border-t pt-4">
                     <h4 className="font-medium text-gray-900 mb-3">How it works:</h4>
