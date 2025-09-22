@@ -1041,19 +1041,29 @@ class UnifiedBurnoutAnalyzer:
                 }
             }
         
-        # Calculate metrics
+        # Calculate base metrics from incidents
         days_analyzed = metadata.get("days_analyzed", 30) or 30
-        metrics = self._calculate_member_metrics(
-            incidents, 
-            days_analyzed, 
+        base_metrics = self._calculate_member_metrics(
+            incidents,
+            days_analyzed,
             include_weekends
         )
+
+        # Enhance metrics with GitHub/Slack data if available
+        metrics = self._enhance_metrics_with_github_data(base_metrics, github_data)
+
+        # Add Slack communication patterns
+        if slack_data:
+            metrics = self._enhance_metrics_with_slack_data(metrics, slack_data)
         
         # Calculate burnout dimensions  
         dimensions = self._calculate_burnout_dimensions(metrics)
         
         # Calculate burnout factors for backward compatibility
         factors = self._calculate_burnout_factors(metrics)
+
+        # Calculate confidence intervals and data quality
+        confidence = self._calculate_confidence_intervals(metrics, incidents, github_data, slack_data)
         
         # CBI DEBUG LOGGING - Track score calculation
         print(f"🐛 CBI RAILWAY DEBUG - User: {user_email}")
@@ -1245,7 +1255,8 @@ class UnifiedBurnoutAnalyzer:
                 "interpretation": composite_cbi['interpretation']
             },
             "cbi_reasoning": cbi_reasoning,  # Add explanations for the score
-            "metrics": metrics
+            "metrics": metrics,
+            "confidence": confidence  # Add confidence intervals and data quality
         }
         
         # Add GitHub activity if available
@@ -1398,7 +1409,8 @@ class UnifiedBurnoutAnalyzer:
         safe_weekend_percentage = weekend_percentage if weekend_percentage is not None else 0
         safe_avg_response_time = avg_response_time if avg_response_time is not None else 0
         
-        return {
+        # Add enhanced GitHub/Slack metrics if available
+        enhanced_metrics = {
             "incidents_per_week": round(safe_incidents_per_week, 2),
             "after_hours_percentage": round(safe_after_hours_percentage, 3),
             "weekend_percentage": round(safe_weekend_percentage, 3),
@@ -1406,7 +1418,392 @@ class UnifiedBurnoutAnalyzer:
             "severity_distribution": dict(severity_counts),
             "status_distribution": dict(status_counts)
         }
-    
+
+        # Add severity-weighted incident calculation for better load assessment
+        if safe_incidents_len > 0:
+            severity_weights = {"critical": 4, "high": 3, "medium": 2, "low": 1, "unknown": 1.5}
+            total_weighted_severity = 0
+            for incident in incidents:
+                severity = incident.get("severity", "unknown").lower()
+                weight = severity_weights.get(severity, 1.5)
+                total_weighted_severity += weight
+
+            severity_weighted_per_week = (total_weighted_severity / safe_days) * 7 if safe_days > 0 else 0
+            enhanced_metrics["severity_weighted_incidents_per_week"] = round(severity_weighted_per_week, 2)
+
+        return enhanced_metrics
+
+    def _enhance_metrics_with_github_data(self, base_metrics: Dict[str, Any], github_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Add sophisticated GitHub analysis patterns to base incident metrics."""
+        if not github_data:
+            return base_metrics
+
+        enhanced = base_metrics.copy()
+
+        # Extract GitHub activity patterns
+        commits = github_data.get("commits", [])
+        pull_requests = github_data.get("pull_requests", [])
+        reviews = github_data.get("code_reviews", [])
+
+        if commits:
+            # 1. Commit Temporal Patterns (beyond simple after-hours)
+            commit_hours = []
+            commit_weekdays = []
+            daily_commit_counts = {}
+
+            from datetime import datetime
+            for commit in commits:
+                try:
+                    commit_time = datetime.fromisoformat(commit.get("timestamp", "").replace("Z", "+00:00"))
+                    commit_hours.append(commit_time.hour)
+                    commit_weekdays.append(commit_time.weekday())
+
+                    date_key = commit_time.date()
+                    daily_commit_counts[date_key] = daily_commit_counts.get(date_key, 0) + 1
+                except:
+                    continue
+
+            # Context switching intensity (high variation = more stress)
+            if daily_commit_counts:
+                daily_counts = list(daily_commit_counts.values())
+                avg_daily_commits = sum(daily_counts) / len(daily_counts)
+                commit_variance = sum((x - avg_daily_commits) ** 2 for x in daily_counts) / len(daily_counts)
+                enhanced["context_switching_intensity"] = min(1.0, commit_variance / (avg_daily_commits + 1))
+
+            # Work-life boundary erosion (commits spread across more hours = worse)
+            if commit_hours:
+                unique_hours = len(set(commit_hours))
+                enhanced["work_hours_spread"] = unique_hours / 24.0  # 0-1 scale
+
+                # Late night coding pattern (11PM - 6AM commits)
+                late_night_commits = sum(1 for h in commit_hours if h >= 23 or h <= 6)
+                enhanced["late_night_coding_ratio"] = late_night_commits / len(commits) if commits else 0
+
+        # 2. Pull Request Patterns (cognitive load and social engagement)
+        if pull_requests:
+            pr_sizes = []
+            pr_review_times = []
+
+            for pr in pull_requests:
+                # PR size indicates cognitive complexity
+                additions = pr.get("additions", 0)
+                deletions = pr.get("deletions", 0)
+                pr_size = additions + deletions
+                if pr_size > 0:
+                    pr_sizes.append(pr_size)
+
+                # Review turnaround time indicates pressure
+                created_at = pr.get("created_at")
+                merged_at = pr.get("merged_at")
+                if created_at and merged_at:
+                    try:
+                        created = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+                        merged = datetime.fromisoformat(merged_at.replace("Z", "+00:00"))
+                        review_hours = (merged - created).total_seconds() / 3600
+                        pr_review_times.append(review_hours)
+                    except:
+                        continue
+
+            if pr_sizes:
+                avg_pr_size = sum(pr_sizes) / len(pr_sizes)
+                enhanced["avg_pr_complexity"] = min(1.0, avg_pr_size / 1000)  # Normalize large PRs
+
+                # Large PR ratio (>500 lines = potentially rushed/overwhelming)
+                large_prs = sum(1 for size in pr_sizes if size > 500)
+                enhanced["large_pr_ratio"] = large_prs / len(pr_sizes) if pr_sizes else 0
+
+            if pr_review_times:
+                avg_review_time = sum(pr_review_times) / len(pr_review_times)
+                enhanced["avg_pr_review_hours"] = avg_review_time
+
+                # Rush PRs (merged within 2 hours = high pressure)
+                rush_prs = sum(1 for t in pr_review_times if t < 2)
+                enhanced["rush_pr_ratio"] = rush_prs / len(pr_review_times) if pr_review_times else 0
+
+        # 3. Code Review Social Health
+        if reviews:
+            # Review participation decline over time
+            review_dates = []
+            for review in reviews:
+                try:
+                    review_time = datetime.fromisoformat(review.get("submitted_at", "").replace("Z", "+00:00"))
+                    review_dates.append(review_time)
+                except:
+                    continue
+
+            if len(review_dates) >= 4:  # Need minimum data for trend
+                # Sort and calculate trend (positive = increasing, negative = declining)
+                review_dates.sort()
+                days = [(d - review_dates[0]).days for d in review_dates]
+                counts = list(range(len(review_dates)))  # Cumulative review count
+
+                # Simple linear regression slope
+                n = len(days)
+                sum_xy = sum(d * c for d, c in zip(days, counts))
+                sum_x = sum(days)
+                sum_y = sum(counts)
+                sum_x2 = sum(d * d for d in days)
+
+                if n * sum_x2 - sum_x * sum_x != 0:
+                    slope = (n * sum_xy - sum_x * sum_y) / (n * sum_x2 - sum_x * sum_x)
+                    enhanced["review_engagement_trend"] = slope  # Positive = improving, negative = declining
+
+        # 4. Overall GitHub Burnout Indicators
+        github_burnout_score = 0
+
+        # High context switching
+        if enhanced.get("context_switching_intensity", 0) > 0.7:
+            github_burnout_score += 15
+
+        # Eroded work boundaries
+        if enhanced.get("work_hours_spread", 0) > 0.6:
+            github_burnout_score += 20
+
+        # Late night coding
+        if enhanced.get("late_night_coding_ratio", 0) > 0.2:
+            github_burnout_score += 25
+
+        # Large, complex PRs
+        if enhanced.get("large_pr_ratio", 0) > 0.3:
+            github_burnout_score += 15
+
+        # Rush PRs (time pressure)
+        if enhanced.get("rush_pr_ratio", 0) > 0.4:
+            github_burnout_score += 15
+
+        # Declining social engagement
+        if enhanced.get("review_engagement_trend", 0) < -0.1:
+            github_burnout_score += 10
+
+        enhanced["github_burnout_indicators"] = min(100, github_burnout_score)
+
+        return enhanced
+
+    def _enhance_metrics_with_slack_data(self, base_metrics: Dict[str, Any], slack_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Add Slack communication health metrics to detect burnout through social patterns."""
+        if not slack_data:
+            return base_metrics
+
+        enhanced = base_metrics.copy()
+
+        # Extract Slack activity patterns
+        messages = slack_data.get("messages", [])
+        channels = slack_data.get("channels_active", 0)
+        response_times = slack_data.get("response_times", [])
+
+        if messages:
+            # 1. Communication Temporal Patterns
+            message_hours = []
+            message_weekdays = []
+            daily_message_counts = {}
+
+            from datetime import datetime
+            for message in messages:
+                try:
+                    msg_time = datetime.fromisoformat(message.get("timestamp", "").replace("Z", "+00:00"))
+                    message_hours.append(msg_time.hour)
+                    message_weekdays.append(msg_time.weekday())
+
+                    date_key = msg_time.date()
+                    daily_message_counts[date_key] = daily_message_counts.get(date_key, 0) + 1
+                except:
+                    continue
+
+            # After-hours communication burden
+            if message_hours:
+                after_hours_msgs = sum(1 for h in message_hours if h >= 18 or h <= 8)
+                enhanced["slack_after_hours_ratio"] = after_hours_msgs / len(messages)
+
+                # Late night communication stress (10PM - 6AM)
+                late_night_msgs = sum(1 for h in message_hours if h >= 22 or h <= 6)
+                enhanced["slack_late_night_ratio"] = late_night_msgs / len(messages)
+
+            # Weekend communication encroachment
+            if message_weekdays:
+                weekend_msgs = sum(1 for day in message_weekdays if day >= 5)  # Sat=5, Sun=6
+                enhanced["slack_weekend_ratio"] = weekend_msgs / len(messages)
+
+        # 2. Social Engagement and Isolation Indicators
+        total_messages = len(messages)
+        enhanced["slack_daily_msg_volume"] = total_messages / 30 if total_messages > 0 else 0  # Avg per day
+
+        # Communication channel diversity (social health indicator)
+        enhanced["slack_channel_diversity"] = min(1.0, channels / 10.0) if channels > 0 else 0
+
+        # 3. Response Pressure Indicators
+        if response_times:
+            avg_response_mins = sum(response_times) / len(response_times) / 60  # Convert to minutes
+            enhanced["slack_avg_response_minutes"] = avg_response_mins
+
+            # Immediate response pressure (responses within 5 minutes)
+            immediate_responses = sum(1 for t in response_times if t <= 300)  # 5 minutes in seconds
+            enhanced["slack_immediate_response_ratio"] = immediate_responses / len(response_times)
+
+            # High pressure responses (within 1 minute)
+            urgent_responses = sum(1 for t in response_times if t <= 60)
+            enhanced["slack_urgent_response_ratio"] = urgent_responses / len(response_times)
+
+        # 4. Communication Burnout Indicators
+        slack_burnout_score = 0
+
+        # After-hours communication burden
+        after_hours_ratio = enhanced.get("slack_after_hours_ratio", 0)
+        if after_hours_ratio > 0.3:  # >30% after hours
+            slack_burnout_score += 20
+
+        # Late night communication stress
+        late_night_ratio = enhanced.get("slack_late_night_ratio", 0)
+        if late_night_ratio > 0.1:  # >10% late night
+            slack_burnout_score += 25
+
+        # Weekend work encroachment
+        weekend_ratio = enhanced.get("slack_weekend_ratio", 0)
+        if weekend_ratio > 0.15:  # >15% weekend
+            slack_burnout_score += 20
+
+        # High response pressure
+        immediate_ratio = enhanced.get("slack_immediate_response_ratio", 0)
+        if immediate_ratio > 0.4:  # >40% immediate responses
+            slack_burnout_score += 15
+
+        # Communication overload
+        daily_volume = enhanced.get("slack_daily_msg_volume", 0)
+        if daily_volume > 50:  # >50 messages per day
+            slack_burnout_score += 10
+
+        # Low social engagement (isolation indicator)
+        channel_diversity = enhanced.get("slack_channel_diversity", 0)
+        if channel_diversity < 0.2:  # <20% diversity
+            slack_burnout_score += 15
+
+        enhanced["slack_burnout_indicators"] = min(100, slack_burnout_score)
+
+        # 5. Sentiment Analysis (if available)
+        sentiment_scores = slack_data.get("sentiment_scores", [])
+        if sentiment_scores:
+            avg_sentiment = sum(sentiment_scores) / len(sentiment_scores)
+            enhanced["slack_avg_sentiment"] = avg_sentiment
+
+            # Negative sentiment trend (burnout indicator)
+            if avg_sentiment < -0.2:  # Negative sentiment
+                enhanced["slack_burnout_indicators"] = min(100, enhanced.get("slack_burnout_indicators", 0) + 15)
+
+        return enhanced
+
+    def _calculate_confidence_intervals(self, metrics: Dict[str, Any], incidents: List[Dict], github_data: Dict = None, slack_data: Dict = None) -> Dict[str, Any]:
+        """Calculate confidence intervals and data quality indicators for burnout metrics."""
+        confidence = {}
+
+        # 1. Data Sample Size Assessment
+        incident_count = len(incidents) if incidents else 0
+        github_commits = len(github_data.get("commits", [])) if github_data else 0
+        slack_messages = len(slack_data.get("messages", [])) if slack_data else 0
+
+        # 2. Temporal Coverage Assessment
+        days_with_activity = 0
+        if incidents:
+            from datetime import datetime
+            incident_dates = set()
+            for incident in incidents:
+                try:
+                    created_at = incident.get("created_at", "")
+                    if created_at:
+                        incident_date = datetime.fromisoformat(created_at.replace("Z", "+00:00")).date()
+                        incident_dates.add(incident_date)
+                except:
+                    continue
+            days_with_activity = len(incident_dates)
+
+        # 3. Data Quality Scores (0-100 scale)
+
+        # Incident data quality
+        incident_quality = 0
+        if incident_count >= 10:  # High confidence threshold
+            incident_quality = min(100, incident_count * 5)  # Scale up to 100
+        elif incident_count >= 3:  # Moderate confidence
+            incident_quality = min(70, incident_count * 15)
+        else:  # Low confidence
+            incident_quality = incident_count * 20
+
+        # GitHub data quality
+        github_quality = 0
+        if github_commits >= 20:  # High confidence
+            github_quality = min(100, github_commits * 3)
+        elif github_commits >= 5:  # Moderate confidence
+            github_quality = min(70, github_commits * 10)
+        else:  # Low confidence
+            github_quality = github_commits * 15
+
+        # Slack data quality
+        slack_quality = 0
+        if slack_messages >= 50:  # High confidence
+            slack_quality = min(100, slack_messages * 1.5)
+        elif slack_messages >= 10:  # Moderate confidence
+            slack_quality = min(70, slack_messages * 5)
+        else:  # Low confidence
+            slack_quality = slack_messages * 8
+
+        # 4. Temporal Consistency (days with activity vs analysis period)
+        expected_days = 30  # Default analysis period
+        temporal_coverage = min(100, (days_with_activity / expected_days) * 100) if expected_days > 0 else 0
+
+        # 5. Overall Confidence Score
+        data_sources_available = sum([1 for q in [incident_quality, github_quality, slack_quality] if q > 0])
+
+        if data_sources_available == 0:
+            overall_confidence = 0
+        elif data_sources_available == 1:
+            overall_confidence = max(incident_quality, github_quality, slack_quality) * 0.6  # Single source penalty
+        elif data_sources_available == 2:
+            overall_confidence = (max(incident_quality, github_quality, slack_quality) * 0.7 +
+                                min(incident_quality, github_quality, slack_quality) * 0.3)
+        else:  # All 3 sources
+            weights = [0.5, 0.3, 0.2] if incident_quality >= github_quality >= slack_quality else [0.4, 0.35, 0.25]
+            qualities = sorted([incident_quality, github_quality, slack_quality], reverse=True)
+            overall_confidence = sum(q * w for q, w in zip(qualities, weights))
+
+        # Apply temporal coverage adjustment
+        overall_confidence *= (temporal_coverage / 100) * 0.8 + 0.2  # Min 20% confidence
+
+        # 6. Confidence Categories
+        if overall_confidence >= 80:
+            confidence_level = "HIGH"
+            reliability_note = "High confidence - sufficient data across multiple sources"
+        elif overall_confidence >= 60:
+            confidence_level = "MODERATE"
+            reliability_note = "Moderate confidence - good data coverage"
+        elif overall_confidence >= 40:
+            confidence_level = "LOW"
+            reliability_note = "Low confidence - limited data available"
+        else:
+            confidence_level = "VERY_LOW"
+            reliability_note = "Very low confidence - insufficient data for reliable assessment"
+
+        confidence = {
+            "overall_confidence": round(overall_confidence, 1),
+            "confidence_level": confidence_level,
+            "reliability_note": reliability_note,
+            "data_quality": {
+                "incident_quality": round(incident_quality, 1),
+                "github_quality": round(github_quality, 1),
+                "slack_quality": round(slack_quality, 1),
+                "temporal_coverage": round(temporal_coverage, 1)
+            },
+            "sample_sizes": {
+                "incidents": incident_count,
+                "github_commits": github_commits,
+                "slack_messages": slack_messages,
+                "days_with_activity": days_with_activity
+            },
+            "confidence_intervals": {
+                # Burnout score confidence intervals based on data quality
+                "burnout_score_lower": lambda score: max(0, score - (50 - overall_confidence/2)),
+                "burnout_score_upper": lambda score: min(100, score + (50 - overall_confidence/2))
+            }
+        }
+
+        return confidence
+
     def _calculate_burnout_dimensions(self, metrics: Dict[str, Any]) -> Dict[str, float]:
         """Calculate burnout dimensions (0-10 scale each)."""
         # Currently only implementing incident-based calculations (70% weight)
@@ -1642,16 +2039,27 @@ class UnifiedBurnoutAnalyzer:
         # REMOVED incident_load factor - was duplicate of workload factor
         # Both were calculated from incidents_per_week, causing double-counting
         
+        # Response pressure factor - based on incident frequency and urgency
+        # This should correlate with workload but captures urgency/pressure aspect
+        response_pressure = min(10, incidents_per_week * 1.2) if incidents_per_week > 0 else 0.0
+
         # Response time factor - ensure numeric value with division safety
         response_time_mins = metrics.get("avg_response_time_minutes", 0)
         response_time_mins = float(response_time_mins) if response_time_mins is not None else 0.0
         response_time = min(10, response_time_mins / 6) if response_time_mins and response_time_mins >= 0 else 0.0
-        
+
+        # Incident load factor - restore this as it measures total burden not just frequency
+        # Combines frequency + severity + response complexity
+        severity_weighted_per_week = metrics.get("severity_weighted_incidents_per_week", incidents_per_week * 1.5)
+        incident_load = min(10, severity_weighted_per_week * 0.8)
+
         factors = {
             "workload": workload,
-            "after_hours": after_hours, 
+            "after_hours": after_hours,
             "weekend_work": weekend_work,
-            "response_time": response_time
+            "response_pressure": response_pressure,
+            "response_time": response_time,
+            "incident_load": incident_load
         }
         
         return {k: round(v, 2) for k, v in factors.items()}
@@ -1661,18 +2069,21 @@ class UnifiedBurnoutAnalyzer:
         # First get the metrics to calculate proper dimensions
         # For now, we'll use the factors to approximate dimensions
         
-        # Approximate Emotional Exhaustion from factors
-        emotional_exhaustion = (factors.get("workload", 0) * 0.5 + 
-                              factors.get("after_hours", 0) * 0.5)
-        
-        # Approximate Depersonalization from factors
-        depersonalization = (factors.get("response_time", 0) * 0.5 + 
-                           factors.get("workload", 0) * 0.3 + 
-                           factors.get("weekend_work", 0) * 0.2)
-        
-        # Approximate Personal Accomplishment (inverted)
-        personal_accomplishment = 10 - (factors.get("response_time", 0) * 0.4 + 
-                                       factors.get("workload", 0) * 0.6)
+        # Emotional Exhaustion - workload and time pressure
+        emotional_exhaustion = (factors.get("workload", 0) * 0.4 +
+                              factors.get("after_hours", 0) * 0.3 +
+                              factors.get("response_pressure", 0) * 0.2 +
+                              factors.get("incident_load", 0) * 0.1)
+
+        # Depersonalization/Cynicism - stress response and withdrawal
+        depersonalization = (factors.get("response_time", 0) * 0.4 +
+                           factors.get("response_pressure", 0) * 0.3 +
+                           factors.get("weekend_work", 0) * 0.3)
+
+        # Personal Accomplishment (inverted) - effectiveness under pressure
+        personal_accomplishment = 10 - (factors.get("response_time", 0) * 0.3 +
+                                       factors.get("incident_load", 0) * 0.4 +
+                                       factors.get("response_pressure", 0) * 0.3)
         personal_accomplishment = max(0, personal_accomplishment)
         
         # Calculate final score using equal weights
