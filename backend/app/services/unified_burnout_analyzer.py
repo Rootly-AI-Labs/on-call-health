@@ -1797,8 +1797,8 @@ class UnifiedBurnoutAnalyzer:
             },
             "confidence_intervals": {
                 # Burnout score confidence intervals based on data quality
-                "burnout_score_lower": lambda score: max(0, score - (50 - overall_confidence/2)),
-                "burnout_score_upper": lambda score: min(100, score + (50 - overall_confidence/2))
+                "burnout_score_margin": (50 - overall_confidence/2),
+                "calculation_note": "Lower bound: max(0, score - margin), Upper bound: min(100, score + margin)"
             }
         }
 

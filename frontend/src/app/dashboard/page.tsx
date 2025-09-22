@@ -126,6 +126,7 @@ interface OrganizationMember {
     weekend_work?: number
     incident_load?: number
     response_time?: number
+    response_pressure?: number
   }
   metrics?: {
     avg_response_time_minutes: number
@@ -2214,9 +2215,9 @@ export default function Dashboard() {
       value: (() => {
         if (allActiveMembers.length === 0) return null;
         
-        // Use backend-calculated response_time factors
+        // Use backend-calculated response_pressure factors
         const responseScores = allActiveMembers
-          .map((m: any) => m?.factors?.response_time ?? 0)
+          .map((m: any) => m?.factors?.response_pressure ?? 0)
           .filter(score => score > 0);
         
         if (responseScores.length === 0) return 0;
