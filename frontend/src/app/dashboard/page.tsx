@@ -3135,11 +3135,12 @@ export default function Dashboard() {
                             className="text-sm"
                             tickFormatter={formatRadarLabel}
                           />
-                          <PolarRadiusAxis 
-                            domain={[0, 100]} 
+                          <PolarRadiusAxis
+                            domain={[0, 100]}
                             tick={{ fontSize: 11, fill: '#6B7280' }}
                             tickCount={6}
                             angle={270}
+                            reversed={true}
                           />
                           <Radar 
                             dataKey="value" 
