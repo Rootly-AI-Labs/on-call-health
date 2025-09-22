@@ -2039,19 +2039,35 @@ class UnifiedBurnoutAnalyzer:
         # REMOVED incident_load factor - was duplicate of workload factor
         # Both were calculated from incidents_per_week, causing double-counting
         
-        # Response pressure factor - based on incident frequency and urgency
-        # This should correlate with workload but captures urgency/pressure aspect
-        response_pressure = min(10, incidents_per_week * 1.2) if incidents_per_week > 0 else 0.0
-
-        # Response time factor - ensure numeric value with division safety
+        # Response pressure factor - based on URGENCY of response (actual response times)
+        # Fast response requirements create pressure regardless of incident volume
         response_time_mins = metrics.get("avg_response_time_minutes", 0)
         response_time_mins = float(response_time_mins) if response_time_mins is not None else 0.0
+        if response_time_mins > 0:
+            # Pressure increases as response time gets faster (more urgency)
+            # <5 min = high pressure, 5-15 min = medium, >15 min = low pressure
+            if response_time_mins <= 5:
+                response_pressure = 8 + min(2, (5 - response_time_mins) / 2.5)  # 8-10 range
+            elif response_time_mins <= 15:
+                response_pressure = 4 + (15 - response_time_mins) / 2.5  # 4-8 range
+            else:
+                response_pressure = min(4, 60 / response_time_mins)  # 0-4 range
+        else:
+            # No response time data - use incident frequency as proxy for pressure
+            response_pressure = min(6, incidents_per_week * 1.0) if incidents_per_week > 0 else 0.0
+
+        # Response time factor - for backward compatibility (different from pressure)
         response_time = min(10, response_time_mins / 6) if response_time_mins and response_time_mins >= 0 else 0.0
 
-        # Incident load factor - restore this as it measures total burden not just frequency
-        # Combines frequency + severity + response complexity
-        severity_weighted_per_week = metrics.get("severity_weighted_incidents_per_week", incidents_per_week * 1.5)
-        incident_load = min(10, severity_weighted_per_week * 0.8)
+        # Incident load factor - severity-weighted total burden
+        # Uses actual severity weights: Critical=4, High=3, Medium=2, Low=1
+        severity_weighted_per_week = metrics.get("severity_weighted_incidents_per_week", 0)
+        if severity_weighted_per_week > 0:
+            # Scale based on severity-weighted load
+            incident_load = min(10, severity_weighted_per_week * 0.6)
+        else:
+            # Fallback: use frequency with higher scaling for missing severity data
+            incident_load = min(10, incidents_per_week * 1.8) if incidents_per_week > 0 else 0.0
 
         factors = {
             "workload": workload,
