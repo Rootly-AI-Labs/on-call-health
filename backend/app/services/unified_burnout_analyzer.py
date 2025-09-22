@@ -2039,24 +2039,9 @@ class UnifiedBurnoutAnalyzer:
         # REMOVED incident_load factor - was duplicate of workload factor
         # Both were calculated from incidents_per_week, causing double-counting
         
-        # Response pressure factor - based on URGENCY of response (actual response times)
-        # Fast response requirements create pressure regardless of incident volume
+        # Response time factor - based on actual response times (backward compatibility)
         response_time_mins = metrics.get("avg_response_time_minutes", 0)
         response_time_mins = float(response_time_mins) if response_time_mins is not None else 0.0
-        if response_time_mins > 0:
-            # Pressure increases as response time gets faster (more urgency)
-            # <5 min = high pressure, 5-15 min = medium, >15 min = low pressure
-            if response_time_mins <= 5:
-                response_pressure = 8 + min(2, (5 - response_time_mins) / 2.5)  # 8-10 range
-            elif response_time_mins <= 15:
-                response_pressure = 4 + (15 - response_time_mins) / 2.5  # 4-8 range
-            else:
-                response_pressure = min(4, 60 / response_time_mins)  # 0-4 range
-        else:
-            # No response time data - use incident frequency as proxy for pressure
-            response_pressure = min(6, incidents_per_week * 1.0) if incidents_per_week > 0 else 0.0
-
-        # Response time factor - for backward compatibility (different from pressure)
         response_time = min(10, response_time_mins / 6) if response_time_mins and response_time_mins >= 0 else 0.0
 
         # Incident load factor - severity-weighted total burden
@@ -2073,7 +2058,6 @@ class UnifiedBurnoutAnalyzer:
             "workload": workload,
             "after_hours": after_hours,
             "weekend_work": weekend_work,
-            "response_pressure": response_pressure,
             "response_time": response_time,
             "incident_load": incident_load
         }
@@ -2086,20 +2070,17 @@ class UnifiedBurnoutAnalyzer:
         # For now, we'll use the factors to approximate dimensions
         
         # Emotional Exhaustion - workload and time pressure
-        emotional_exhaustion = (factors.get("workload", 0) * 0.4 +
+        emotional_exhaustion = (factors.get("workload", 0) * 0.5 +
                               factors.get("after_hours", 0) * 0.3 +
-                              factors.get("response_pressure", 0) * 0.2 +
-                              factors.get("incident_load", 0) * 0.1)
+                              factors.get("incident_load", 0) * 0.2)
 
         # Depersonalization/Cynicism - stress response and withdrawal
-        depersonalization = (factors.get("response_time", 0) * 0.4 +
-                           factors.get("response_pressure", 0) * 0.3 +
-                           factors.get("weekend_work", 0) * 0.3)
+        depersonalization = (factors.get("response_time", 0) * 0.5 +
+                           factors.get("weekend_work", 0) * 0.5)
 
         # Personal Accomplishment (inverted) - effectiveness under pressure
-        personal_accomplishment = 10 - (factors.get("response_time", 0) * 0.3 +
-                                       factors.get("incident_load", 0) * 0.4 +
-                                       factors.get("response_pressure", 0) * 0.3)
+        personal_accomplishment = 10 - (factors.get("response_time", 0) * 0.4 +
+                                       factors.get("incident_load", 0) * 0.6)
         personal_accomplishment = max(0, personal_accomplishment)
         
         # Calculate final score using equal weights
