@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { MappingDrawer } from "@/components/mapping-drawer"
 import { Separator } from "@/components/ui/separator"
@@ -2257,6 +2257,15 @@ export default function Dashboard() {
   // Get high-risk factors for emphasis (CBI scale 0-100)
   const highRiskFactors = burnoutFactors.filter(f => f.value >= 50).sort((a, b) => b.value - a.value);
 
+  // sort descending for RiskFactors 
+  const sortedBurnoutFactors = useMemo(
+    () =>
+      [...burnoutFactors].sort(
+        (a, b) => (b.value ?? -1) - (a.value ?? -1) 
+      ),
+    [burnoutFactors]
+  );
+
 
   // Show full-screen loading when loading integrations
   if (loadingIntegrations) {
@@ -3320,7 +3329,7 @@ export default function Dashboard() {
                     
                     <CardContent>
                       <div className="space-y-4">
-                        {burnoutFactors.map((factor, index) => (
+                        {sortedBurnoutFactors.map((factor, index) => (
                           <div key={factor.factor} className="relative">
                             <div className="flex items-center justify-between mb-2">
                               <div className="flex items-center space-x-2">
