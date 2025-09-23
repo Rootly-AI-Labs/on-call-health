@@ -2562,26 +2562,7 @@ export default function Dashboard() {
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center justify-between w-full">
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">Organization Burnout Analysis</h1>
-                <p className="text-gray-600">
-                  {(() => {
-                    // If viewing a specific analysis, show the integration used for that analysis
-                    if (currentAnalysis) {
-                      const analysisIntegration = integrations.find(i => i.id === currentAnalysis.integration_id);
-                      if (analysisIntegration) {
-                        const platform = analysisIntegration.platform === 'pagerduty' ? 'PagerDuty' : 'Rootly';
-                        return `${platform} - ${analysisIntegration.organization_name || analysisIntegration.name}`;
-                      }
-                      return 'Analysis Dashboard';
-                    }
-                    // Otherwise show the currently selected integration
-                    if (selectedIntegrationData) {
-                      const platform = selectedIntegrationData.platform === 'pagerduty' ? 'PagerDuty' : 'Rootly';
-                      return `${platform} - ${selectedIntegrationData.organization_name || selectedIntegrationData.name}`;
-                    }
-                    return 'Organization Burnout Analysis Dashboard';
-                  })()}
-                </p>
+                <h1 className="text-2xl font-bold text-gray-900">Analysis Dashboard</h1>
               </div>
               <div className="flex items-center space-x-4">
                 <div className="flex flex-col items-center">
