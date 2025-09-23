@@ -10,9 +10,9 @@ export const metadata: Metadata = {
   title: 'Rootly Burnout Detector',
   description: 'Prevent engineering burnout before it impacts your team',
   icons: {
-    icon: '/images/rootly-ai-logo.png',
-    shortcut: '/images/rootly-ai-logo.png',
-    apple: '/images/rootly-ai-logo.png',
+    icon: '/images/favicon.png',
+    shortcut: '/images/favicon.png',
+    apple: '/images/favicon.png',
   },
 }
 
