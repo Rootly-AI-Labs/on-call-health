@@ -9,6 +9,11 @@ const inter = Inter({ subsets: ['latin'] })
 export const metadata: Metadata = {
   title: 'Rootly Burnout Detector',
   description: 'Prevent engineering burnout before it impacts your team',
+  icons: {
+    icon: '/images/rootly-ai-logo.png',
+    shortcut: '/images/rootly-ai-logo.png',
+    apple: '/images/rootly-ai-logo.png',
+  },
 }
 
 export default function RootLayout({
