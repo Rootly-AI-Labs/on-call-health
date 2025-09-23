@@ -1619,22 +1619,22 @@ export default function Dashboard() {
 
     // Load cached GitHub/Slack data immediately if we don't have it in state
     if (!githubIntegration || !slackIntegration) {
-      const cachedGitHub = localStorage.getItem('github_integration')
-      const cachedSlack = localStorage.getItem('slack_integration')
-      
-      if (cachedGitHub && !githubIntegration) {
+    const cachedGitHub = localStorage.getItem('github_integration');
+    const cachedSlack  = localStorage.getItem('slack_integration');
+
+    if (cachedGitHub && !githubIntegration) {
         try {
-          setGithubIntegration(JSON.parse(cachedGitHub))
-        } catch (e) {
-          }
-      }
-      
-      if (cachedSlack && !slackIntegration) {
+        const gh = JSON.parse(cachedGitHub);
+        setGithubIntegration(gh?.connected && gh?.integration ? gh.integration : null);
+        } catch {}
+    }
+
+    if (cachedSlack && !slackIntegration) {
         try {
-          setSlackIntegration(JSON.parse(cachedSlack))
-        } catch (e) {
-          }
-      }
+        const sl = JSON.parse(cachedSlack);
+        setSlackIntegration(sl?.connected && sl?.integration ? sl.integration : null);
+        } catch {}
+    }
     }
 
     // Check cache validity for GitHub/Slack data
