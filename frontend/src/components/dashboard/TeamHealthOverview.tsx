@@ -9,7 +9,6 @@ import {
   Minus,
   ChevronDown,
   ChevronRight,
-  AlertTriangle,
   Info
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -453,23 +452,18 @@ export function TeamHealthOverview({
                           {riskCounts.critical > 0 && (
                             <div className="flex items-center space-x-2">
                               <div className="text-2xl font-bold text-red-800">{riskCounts.critical}</div>
-                              <AlertTriangle className="w-6 h-6 text-red-700" />
                               <span className="text-sm text-gray-600">Critical (CBI 75-100)</span>
                             </div>
                           )}
                           {riskCounts.high > 0 && (
                             <div className="flex items-center space-x-2">
                               <div className="text-2xl font-bold text-red-600">{riskCounts.high}</div>
-                              <AlertTriangle className="w-6 h-6 text-red-500" />
                               <span className="text-sm text-gray-600">High (CBI 50-74)</span>
                             </div>
                           )}
                           {riskCounts.medium > 0 && (
                             <div className="flex items-center space-x-2">
                               <div className="text-2xl font-bold text-orange-600">{riskCounts.medium}</div>
-                              <div className="w-6 h-6 rounded-full bg-orange-500/20 flex items-center justify-center">
-                                <div className="w-3 h-3 rounded-full bg-orange-500"></div>
-                              </div>
                               <span className="text-sm text-gray-600">Medium (CBI 25-49)</span>
                             </div>
                           )}
@@ -477,9 +471,6 @@ export function TeamHealthOverview({
                           {(riskCounts.low > 0 && (riskCounts.critical + riskCounts.high + riskCounts.medium === 0)) && (
                             <div className="flex items-center space-x-2">
                               <div className="text-2xl font-bold text-green-600">{riskCounts.low}</div>
-                              <div className="w-6 h-6 rounded-full bg-green-500/20 flex items-center justify-center">
-                                <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                              </div>
                               <span className="text-sm text-gray-600">Low (CBI 0-24)</span>
                             </div>
                           )}
@@ -500,20 +491,15 @@ export function TeamHealthOverview({
                         {(currentAnalysis.analysis_data.team_health?.risk_distribution?.critical > 0 || currentAnalysis.analysis_data.team_summary?.risk_distribution?.critical > 0) && (
                           <div className="flex items-center space-x-2">
                             <div className="text-2xl font-bold text-red-800">{currentAnalysis.analysis_data.team_health?.risk_distribution?.critical || currentAnalysis.analysis_data.team_summary?.risk_distribution?.critical || 0}</div>
-                            <AlertTriangle className="w-6 h-6 text-red-700" />
                             <span className="text-sm text-gray-600">Critical risk</span>
                           </div>
                         )}
                         <div className="flex items-center space-x-2">
                           <div className="text-2xl font-bold text-red-600">{currentAnalysis.analysis_data.team_health?.risk_distribution?.high || currentAnalysis.analysis_data.team_summary?.risk_distribution?.high || 0}</div>
-                          <AlertTriangle className="w-6 h-6 text-red-500" />
                           <span className="text-sm text-gray-600">High risk</span>
                         </div>
                         <div className="flex items-center space-x-2">
                           <div className="text-2xl font-bold text-orange-600">{currentAnalysis.analysis_data.team_health?.risk_distribution?.medium || currentAnalysis.analysis_data.team_summary?.risk_distribution?.medium || 0}</div>
-                          <div className="w-6 h-6 rounded-full bg-orange-500/20 flex items-center justify-center">
-                            <div className="w-3 h-3 rounded-full bg-orange-500"></div>
-                          </div>
                           <span className="text-sm text-gray-600">Medium risk</span>
                         </div>
                       </>

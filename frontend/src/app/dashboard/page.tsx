@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { MappingDrawer } from "@/components/mapping-drawer"
 import { Separator } from "@/components/ui/separator"
@@ -1619,22 +1619,22 @@ export default function Dashboard() {
 
     // Load cached GitHub/Slack data immediately if we don't have it in state
     if (!githubIntegration || !slackIntegration) {
-      const cachedGitHub = localStorage.getItem('github_integration')
-      const cachedSlack = localStorage.getItem('slack_integration')
-      
-      if (cachedGitHub && !githubIntegration) {
+    const cachedGitHub = localStorage.getItem('github_integration');
+    const cachedSlack  = localStorage.getItem('slack_integration');
+
+    if (cachedGitHub && !githubIntegration) {
         try {
-          setGithubIntegration(JSON.parse(cachedGitHub))
-        } catch (e) {
-          }
-      }
-      
-      if (cachedSlack && !slackIntegration) {
+        const gh = JSON.parse(cachedGitHub);
+        setGithubIntegration(gh?.connected && gh?.integration ? gh.integration : null);
+        } catch {}
+    }
+
+    if (cachedSlack && !slackIntegration) {
         try {
-          setSlackIntegration(JSON.parse(cachedSlack))
-        } catch (e) {
-          }
-      }
+        const sl = JSON.parse(cachedSlack);
+        setSlackIntegration(sl?.connected && sl?.integration ? sl.integration : null);
+        } catch {}
+    }
     }
 
     // Check cache validity for GitHub/Slack data
@@ -2256,6 +2256,15 @@ export default function Dashboard() {
   
   // Get high-risk factors for emphasis (CBI scale 0-100)
   const highRiskFactors = burnoutFactors.filter(f => f.value >= 50).sort((a, b) => b.value - a.value);
+
+  // sort descending for RiskFactors 
+  const sortedBurnoutFactors = useMemo(
+    () =>
+      [...burnoutFactors].sort(
+        (a, b) => (b.value ?? -1) - (a.value ?? -1) 
+      ),
+    [burnoutFactors]
+  );
 
 
   // Show full-screen loading when loading integrations
@@ -3257,8 +3266,8 @@ export default function Dashboard() {
                             domain={[0, 100]}
                             tick={{ fontSize: 11, fill: '#6B7280' }}
                             tickCount={6}
-                            angle={270}
-                            reversed={true}
+                            angle={90}
+                            
                           />
                           <Radar 
                             dataKey="value" 
@@ -3320,7 +3329,7 @@ export default function Dashboard() {
                     
                     <CardContent>
                       <div className="space-y-4">
-                        {burnoutFactors.map((factor, index) => (
+                        {sortedBurnoutFactors.map((factor, index) => (
                           <div key={factor.factor} className="relative">
                             <div className="flex items-center justify-between mb-2">
                               <div className="flex items-center space-x-2">
@@ -3438,6 +3447,19 @@ export default function Dashboard() {
                           
                           return (
                             <>
+
+
+
+                            
+                              {/* Commit Activity Timeline */}
+                              <GitHubCommitsTimeline
+                                analysisId={currentAnalysis?.id ? parseInt(currentAnalysis.id) : 0}
+                                totalCommits={github.total_commits || 0}
+                                weekendPercentage={(github.weekend_activity_percentage || github.weekend_commit_percentage || 0)}
+                                cache={githubTimelineCache}
+                                setCache={setGithubTimelineCache}
+                              />
+
                               {/* GitHub Metrics Grid */}
                               <div className="grid grid-cols-2 gap-4">
                                 <div className="bg-gray-50 rounded-lg p-3">
@@ -3487,15 +3509,6 @@ export default function Dashboard() {
                                   )}
                                 </div>
                               </div>
-
-                              {/* Commit Activity Timeline */}
-                              <GitHubCommitsTimeline
-                                analysisId={currentAnalysis?.id ? parseInt(currentAnalysis.id) : 0}
-                                totalCommits={github.total_commits || 0}
-                                weekendPercentage={(github.weekend_activity_percentage || github.weekend_commit_percentage || 0)}
-                                cache={githubTimelineCache}
-                                setCache={setGithubTimelineCache}
-                              />
 
                               {/* Burnout Indicators */}
                               {github.burnout_indicators && (
@@ -3685,7 +3698,7 @@ export default function Dashboard() {
                                       {slack?.total_messages ? (
                                         <p className="text-lg font-bold text-purple-900">{slack.total_messages.toLocaleString()}</p>
                                       ) : (
-                                        <p className="text-lg font-bold text-gray-400 italic">No data</p>
+                                        <p className="text-lg font-bold text-gray-400">No data</p>
                                       )}
                                     </div>
                                     <div className="bg-purple-50 rounded-lg p-3">
@@ -3693,7 +3706,7 @@ export default function Dashboard() {
                                       {slack?.active_channels ? (
                                         <p className="text-lg font-bold text-purple-900">{slack.active_channels}</p>
                                       ) : (
-                                        <p className="text-lg font-bold text-gray-400 italic">No data</p>
+                                        <p className="text-lg font-bold text-gray-400">No data</p>
                                       )}
                                     </div>
                                     <div className="bg-purple-50 rounded-lg p-3">
@@ -3701,7 +3714,7 @@ export default function Dashboard() {
                                       {slack?.after_hours_activity_percentage !== undefined && slack.after_hours_activity_percentage !== null ? (
                                         <p className="text-lg font-bold text-purple-900">{slack.after_hours_activity_percentage.toFixed(1)}%</p>
                                       ) : (
-                                        <p className="text-lg font-bold text-gray-400 italic">No data</p>
+                                        <p className="text-lg font-bold text-gray-400">No data</p>
                                       )}
                                     </div>
                                     <div className="bg-purple-50 rounded-lg p-3">
@@ -3710,7 +3723,7 @@ export default function Dashboard() {
                                        (slack?.weekend_percentage !== undefined && slack.weekend_percentage !== null) ? (
                                         <p className="text-lg font-bold text-purple-900">{(slack.weekend_activity_percentage || slack.weekend_percentage || 0).toFixed(1)}%</p>
                                       ) : (
-                                        <p className="text-lg font-bold text-gray-400 italic">No data</p>
+                                        <p className="text-lg font-bold text-gray-400">No data</p>
                                       )}
                                     </div>
                                     <div className="bg-purple-50 rounded-lg p-3">
@@ -3718,7 +3731,7 @@ export default function Dashboard() {
                                       {slack?.avg_response_time_minutes ? (
                                         <p className="text-lg font-bold text-purple-900">{slack.avg_response_time_minutes.toFixed(0)}m</p>
                                       ) : (
-                                        <p className="text-lg font-bold text-gray-400 italic">No data</p>
+                                        <p className="text-lg font-bold text-gray-400">No data</p>
                                       )}
                                     </div>
                                     <div className="bg-purple-50 rounded-lg p-3">
@@ -3726,7 +3739,7 @@ export default function Dashboard() {
                                       {slack?.sentiment_analysis?.avg_sentiment !== undefined && slack.sentiment_analysis.avg_sentiment !== null ? (
                                         <p className="text-lg font-bold text-purple-900">{slack.sentiment_analysis.avg_sentiment.toFixed(2)}</p>
                                       ) : (
-                                        <p className="text-lg font-bold text-gray-400 italic">No data</p>
+                                        <p className="text-lg font-bold text-gray-400">No data</p>
                                       )}
                                     </div>
                                   </div>
