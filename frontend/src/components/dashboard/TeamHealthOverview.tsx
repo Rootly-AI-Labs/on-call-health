@@ -536,42 +536,89 @@ export function TeamHealthOverview({
             <p className="text-xs text-gray-600 mt-1">
               In the last {currentAnalysis.time_range || 30} days
             </p>
-            {(currentAnalysis.analysis_data as any)?.metadata?.severity_breakdown && (
-              <div className={`mt-4 grid ${(currentAnalysis.analysis_data as any).metadata.severity_breakdown.sev0_count > 0 ? 'grid-cols-5' : 'grid-cols-4'} gap-2`}>
-                {(currentAnalysis.analysis_data as any).metadata.severity_breakdown.sev0_count > 0 && (
-                  <div className="bg-purple-50 rounded-lg p-2 text-center">
-                    <div className="text-xs font-semibold text-purple-700">SEV0</div>
-                    <div className="text-lg font-bold text-purple-600">
-                      {(currentAnalysis.analysis_data as any).metadata.severity_breakdown.sev0_count}
+            {(() => {
+              // Only show severity breakdown if we have real data - no fake/generated data
+              const metadataBreakdown = (currentAnalysis.analysis_data as any)?.metadata?.severity_breakdown;
+
+              let severityBreakdown = null;
+              if (metadataBreakdown) {
+                // Use existing metadata breakdown (from actual API data)
+                severityBreakdown = {
+                  sev0_count: metadataBreakdown.sev0_count || 0,
+                  sev1_count: metadataBreakdown.sev1_count || 0,
+                  sev2_count: metadataBreakdown.sev2_count || 0,
+                  sev3_count: metadataBreakdown.sev3_count || 0,
+                  sev4_count: metadataBreakdown.sev4_count || 0
+                };
+              } else {
+                // Only aggregate from daily trends if they contain real incident data
+                const dailyTrends = (currentAnalysis.analysis_data as any)?.daily_trends;
+                if (dailyTrends && Array.isArray(dailyTrends)) {
+                  const aggregated = {
+                    sev0_count: 0,
+                    sev1_count: 0,
+                    sev2_count: 0,
+                    sev3_count: 0,
+                    sev4_count: 0
+                  };
+
+                  dailyTrends.forEach((day: any) => {
+                    const dayBreakdown = day.severity_breakdown;
+                    // Only count if this day has real incident data (not generated)
+                    if (dayBreakdown && day.incident_count > 0) {
+                      aggregated.sev0_count += dayBreakdown.sev0 || 0;
+                      aggregated.sev1_count += dayBreakdown.sev1 || 0;
+                      aggregated.sev2_count += dayBreakdown.sev2 || 0;
+                      aggregated.sev3_count += dayBreakdown.sev3 || 0;
+                      aggregated.sev4_count += dayBreakdown.low || 0;
+                    }
+                  });
+
+                  // Only show if we have actual incident data
+                  const total = Object.values(aggregated).reduce((sum, count) => sum + count, 0);
+                  if (total > 0) {
+                    severityBreakdown = aggregated;
+                  }
+                }
+              }
+
+              return severityBreakdown && (
+                <div className={`mt-4 grid ${severityBreakdown.sev0_count > 0 ? 'grid-cols-5' : 'grid-cols-4'} gap-2`}>
+                  {severityBreakdown.sev0_count > 0 && (
+                    <div className="bg-purple-50 rounded-lg p-2 text-center">
+                      <div className="text-xs font-semibold text-purple-700">SEV0</div>
+                      <div className="text-lg font-bold text-purple-600">
+                        {severityBreakdown.sev0_count}
+                      </div>
+                    </div>
+                  )}
+                  <div className="bg-red-50 rounded-lg p-2 text-center">
+                    <div className="text-xs font-semibold text-red-700">SEV1</div>
+                    <div className="text-lg font-bold text-red-600">
+                      {severityBreakdown.sev1_count}
                     </div>
                   </div>
-                )}
-                <div className="bg-red-50 rounded-lg p-2 text-center">
-                  <div className="text-xs font-semibold text-red-700">SEV1</div>
-                  <div className="text-lg font-bold text-red-600">
-                    {(currentAnalysis.analysis_data as any).metadata.severity_breakdown.sev1_count || 0}
+                  <div className="bg-orange-50 rounded-lg p-2 text-center">
+                    <div className="text-xs font-semibold text-orange-700">SEV2</div>
+                    <div className="text-lg font-bold text-orange-600">
+                      {severityBreakdown.sev2_count}
+                    </div>
+                  </div>
+                  <div className="bg-yellow-50 rounded-lg p-2 text-center">
+                    <div className="text-xs font-semibold text-yellow-700">SEV3</div>
+                    <div className="text-lg font-bold text-yellow-600">
+                      {severityBreakdown.sev3_count}
+                    </div>
+                  </div>
+                  <div className="bg-green-50 rounded-lg p-2 text-center">
+                    <div className="text-xs font-semibold text-green-700">SEV4</div>
+                    <div className="text-lg font-bold text-green-600">
+                      {severityBreakdown.sev4_count}
+                    </div>
                   </div>
                 </div>
-                <div className="bg-orange-50 rounded-lg p-2 text-center">
-                  <div className="text-xs font-semibold text-orange-700">SEV2</div>
-                  <div className="text-lg font-bold text-orange-600">
-                    {(currentAnalysis.analysis_data as any).metadata.severity_breakdown.sev2_count || 0}
-                  </div>
-                </div>
-                <div className="bg-yellow-50 rounded-lg p-2 text-center">
-                  <div className="text-xs font-semibold text-yellow-700">SEV3</div>
-                  <div className="text-lg font-bold text-yellow-600">
-                    {(currentAnalysis.analysis_data as any).metadata.severity_breakdown.sev3_count || 0}
-                  </div>
-                </div>
-                <div className="bg-green-50 rounded-lg p-2 text-center">
-                  <div className="text-xs font-semibold text-green-700">SEV4</div>
-                  <div className="text-lg font-bold text-green-600">
-                    {(currentAnalysis.analysis_data as any).metadata.severity_breakdown.sev4_count || 0}
-                  </div>
-                </div>
-              </div>
-            )}
+              );
+            })()}
             {currentAnalysis.analysis_data?.session_hours !== undefined && (
               <p className="text-xs text-gray-600 mt-1">
                 {currentAnalysis.analysis_data.session_hours?.toFixed(1) || '0.0'} total hours
