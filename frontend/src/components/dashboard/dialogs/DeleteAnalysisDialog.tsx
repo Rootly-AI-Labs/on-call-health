@@ -7,6 +7,7 @@ import { AlertTriangle, Loader2 } from "lucide-react"
 interface Integration {
   id: number
   name: string
+  organization_name?: string
 }
 
 interface AnalysisResult {
@@ -55,9 +56,12 @@ export function DeleteAnalysisDialog({
             <div className="flex items-center justify-between text-sm">
               <div className="flex flex-col">
                 <span className="font-medium text-gray-900">
-                  {integrations.find(i => i.id === Number(analysisToDelete.integration_id))?.name ||
-                   integrations.find(i => String(i.id) === String(analysisToDelete.integration_id))?.name ||
-                   `Organization ${analysisToDelete.integration_id}`}
+                  {(() => {
+                    const integration = integrations.find(i => i.id === Number(analysisToDelete.integration_id)) ||
+                                      integrations.find(i => String(i.id) === String(analysisToDelete.integration_id));
+
+                    return integration?.name || integration?.organization_name || 'Organization';
+                  })()}
                 </span>
                 <span className="text-gray-500">
                   {new Date(analysisToDelete.created_at).toLocaleString([], {
