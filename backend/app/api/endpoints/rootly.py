@@ -29,6 +29,7 @@ class RootlyIntegrationAdd(BaseModel):
 class RootlyIntegrationUpdate(BaseModel):
     name: str = None
     is_default: bool = None
+    api_token: str = None
 
 class RootlyTestResponse(BaseModel):
     status: str

@@ -3,9 +3,8 @@
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
 import { Progress } from "@/components/ui/progress"
-import { ArrowLeft, TrendingUp, Clock, Calendar, Activity, AlertTriangle } from "lucide-react"
+import { ArrowLeft, TrendingUp, Clock, AlertTriangle, Activity, Timer } from "lucide-react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 
@@ -17,30 +16,30 @@ export default function MethodologyPage() {
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <Button 
-            variant="ghost" 
+          <Button
+            variant="ghost"
             onClick={() => router.push('/dashboard')}
             className="mb-4"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Dashboard
           </Button>
-          
+
           <div className="flex items-center justify-between mb-4">
             <div className="flex-1">
               <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                Burnout Score Methodology
+                Burnout Methodology
               </h1>
               <p className="text-gray-600">
-                Understanding how we calculate team burnout risk using the Copenhagen Burnout Inventory
+                How we calculate burnout risk using the Copenhagen Burnout Inventory
               </p>
             </div>
             <div className="flex flex-col items-center ml-8">
               <span className="text-xs text-gray-400">powered by</span>
-              <Image 
-                src="/images/rootly-ai-logo.png" 
-                alt="Rootly AI" 
-                width={120} 
+              <Image
+                src="/images/rootly-ai-logo.png"
+                alt="Rootly AI"
+                width={120}
                 height={48}
                 className="h-6 w-auto"
               />
@@ -48,7 +47,7 @@ export default function MethodologyPage() {
           </div>
         </div>
 
-        {/* Overview Card */}
+        {/* Overview */}
         <Card className="mb-8">
           <CardHeader>
             <CardTitle>The Science Behind Our Scoring</CardTitle>
@@ -58,377 +57,278 @@ export default function MethodologyPage() {
           </CardHeader>
           <CardContent>
             <p className="text-gray-700 mb-4">
-              Our burnout detection system analyzes multiple data sources to calculate three key dimensions 
-              of burnout, providing an evidence-based assessment of team mental health and well-being.
+              Our burnout detection system analyzes incident response data from PagerDuty and Rootly to calculate
+              burnout risk across three key dimensions. The Copenhagen Burnout Inventory is a well-established
+              psychological assessment tool that measures burnout in three core areas: emotional exhaustion,
+              depersonalization/cynicism, and reduced personal accomplishment.
             </p>
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <p className="text-sm text-blue-800">
-                <strong>Multi-Source Analysis:</strong> We analyze incident data from PagerDuty/Rootly (primary source), 
-                with optional GitHub activity data for code patterns and Slack communication data for sentiment analysis. 
-                The analysis adapts based on available integrations to provide the most comprehensive assessment possible.
-              </p>
-            </div>
-            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-              <p className="text-sm text-purple-800">
-                <strong>GitHub-Only Analysis:</strong> When only GitHub data is available, our system can provide 
-                a complete burnout assessment (100% scoring) using advanced flow state detection to distinguish 
-                healthy high-productivity from burnout patterns. Confidence intervals and baseline comparisons 
-                ensure scientifically rigorous results even with a single data source.
+                <strong>Multi-Source Analysis:</strong> We analyze incident data from PagerDuty/Rootly as the primary source,
+                with additional insights from GitHub activity patterns and Slack communication when available.
+                The system adapts based on available integrations to provide the most comprehensive assessment possible.
               </p>
             </div>
           </CardContent>
         </Card>
 
-        {/* Three Dimensions */}
+        {/* Burnout Factors */}
         <div className="space-y-6 mb-8">
-          <h2 className="text-2xl font-semibold text-gray-900">The Two Dimensions of Copenhagen Burnout Inventory</h2>
-          
-          {/* Personal Burnout */}
+          <h2 className="text-2xl font-semibold text-gray-900">The Five Key Burnout Factors</h2>
+
+          <p className="text-gray-700 mb-6">
+            We analyze five specific factors that contribute to burnout in incident response teams. Each factor is measured
+            on a scale of 0-10, with higher scores indicating greater burnout risk. These factors are then combined using
+            the three-dimensional Copenhagen Burnout Inventory framework to produce an overall burnout score.
+          </p>
+
+          {/* Workload */}
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center">
-                  <TrendingUp className="w-5 h-5 mr-2 text-red-500" />
-                  Personal Burnout (50% weight)
-                </CardTitle>
-                <Badge variant="destructive">High Impact</Badge>
-              </div>
-              <CardDescription>
-                Physical and psychological exhaustion from workload overwhelm and boundary violations
-              </CardDescription>
+              <CardTitle className="flex items-center">
+                <Activity className="w-5 h-5 mr-2 text-red-500" />
+                Workload Factor
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <p className="text-gray-700">
-                  We measure personal burnout by analyzing:
+              <p className="text-sm text-gray-700 mb-3">
+                Measures the frequency and volume of incidents handled by each team member over time.
+                This is one of the strongest predictors of burnout, as high incident volumes can lead to
+                chronic stress and exhaustion.
+              </p>
+              <div className="bg-gray-50 rounded-lg p-3">
+                <p className="text-xs text-gray-600">
+                  <strong>Scoring:</strong> 0-2 incidents/week = Low (0-3 points) • 2-5 incidents/week = Moderate (3-7 points) •
+                  5-8 incidents/week = High (7-10 points) • 8+ incidents/week = Critical (10 points)
                 </p>
-                <div className="grid gap-3">
-                  <div className="flex items-start space-x-3">
-                    <div className="w-2 h-2 bg-red-500 rounded-full mt-1.5"></div>
-                    <div>
-                      <strong className="text-sm">Workload Pressure</strong>
-                      <p className="text-sm text-gray-600">Incident frequency and volume over time, weighted by severity:</p>
-                      <ul className="text-xs text-gray-500 mt-1 ml-4">
-                        <li>• SEV0 incidents: 5x weight (catastrophic - complete outage)</li>
-                        <li>• SEV1 incidents: 4x weight (critical business impact)</li>
-                        <li>• SEV2 incidents: 2x weight (major functionality affected)</li>
-                        <li>• SEV3 incidents: 1.5x weight (moderate impact)</li>
-                        <li>• SEV4 incidents: 1x weight (minor issues)</li>
-                      </ul>
-                    </div>
-                  </div>
-                  <div className="flex items-start space-x-3">
-                    <div className="w-2 h-2 bg-red-500 rounded-full mt-1.5"></div>
-                    <div>
-                      <strong className="text-sm">After-Hours Activity</strong>
-                      <p className="text-sm text-gray-600">Work performed outside normal business hours (incidents, commits, messages)</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start space-x-3">
-                    <div className="w-2 h-2 bg-red-500 rounded-full mt-1.5"></div>
-                    <div>
-                      <strong className="text-sm">GitHub Activity Patterns</strong>
-                      <p className="text-sm text-gray-600">High commit frequency (&gt;25/week), late-night commits (&gt;30% after hours), and weekend coding activity (&gt;25%)</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start space-x-3">
-                    <div className="w-2 h-2 bg-red-500 rounded-full mt-1.5"></div>
-                    <div>
-                      <strong className="text-sm">Communication Stress</strong>
-                      <p className="text-sm text-gray-600">Negative sentiment patterns in Slack messages (when available)</p>
-                    </div>
-                  </div>
-                </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Work-Related Burnout */}
+          {/* After Hours */}
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center">
-                  <AlertTriangle className="w-5 h-5 mr-2 text-yellow-500" />
-                  Work-Related Burnout (50% weight)
-                </CardTitle>
-                <Badge variant="outline" className="border-yellow-500 text-yellow-700">Medium Impact</Badge>
-              </div>
-              <CardDescription>
-                Fatigue and dysfunction specifically attributed to work processes and collaboration
-              </CardDescription>
+              <CardTitle className="flex items-center">
+                <Clock className="w-5 h-5 mr-2 text-orange-500" />
+                After Hours Factor
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <p className="text-gray-700">
-                  We identify work-related burnout through:
+              <p className="text-sm text-gray-700 mb-3">
+                Tracks work performed outside normal business hours, including incident responses, code commits,
+                and team communications. Excessive after-hours work disrupts work-life balance and contributes
+                to emotional exhaustion.
+              </p>
+              <div className="bg-gray-50 rounded-lg p-3">
+                <p className="text-xs text-gray-600">
+                  <strong>Data Sources:</strong> Incident timestamps from PagerDuty/Rootly, GitHub commit times,
+                  and Slack message activity (when connected)
                 </p>
-                <div className="grid gap-3">
-                  <div className="flex items-start space-x-3">
-                    <div className="w-2 h-2 bg-yellow-500 rounded-full mt-1.5"></div>
-                    <div>
-                      <strong className="text-sm">Response Time Pressure</strong>
-                      <p className="text-sm text-gray-600">Time pressure to respond quickly to incidents</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start space-x-3">
-                    <div className="w-2 h-2 bg-yellow-500 rounded-full mt-1.5"></div>
-                    <div>
-                      <strong className="text-sm">Weekend Work Disruption</strong>
-                      <p className="text-sm text-gray-600">Work performed during weekends (incidents, commits, messages)</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start space-x-3">
-                    <div className="w-2 h-2 bg-yellow-500 rounded-full mt-1.5"></div>
-                    <div>
-                      <strong className="text-sm">Code Collaboration Decline</strong>
-                      <p className="text-sm text-gray-600">Large, infrequent PRs (&gt;1000 lines), declining code review participation (&lt;50%), and shorter commit messages (&lt;20 chars)</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start space-x-3">
-                    <div className="w-2 h-2 bg-yellow-500 rounded-full mt-1.5"></div>
-                    <div>
-                      <strong className="text-sm">Communication Cynicism</strong>
-                      <p className="text-sm text-gray-600">Declining communication quality and engagement in Slack (when available)</p>
-                    </div>
-                  </div>
-                </div>
               </div>
             </CardContent>
           </Card>
 
+          {/* Weekend Work */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <AlertTriangle className="w-5 h-5 mr-2 text-yellow-500" />
+                Weekend Work Factor
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-gray-700 mb-3">
+                Measures weekend activity that disrupts personal time and recovery periods. Regular weekend work
+                prevents proper rest and contributes to chronic stress accumulation, leading to depersonalization
+                and cynicism toward work.
+              </p>
+              <div className="bg-gray-50 rounded-lg p-3">
+                <p className="text-xs text-gray-600">
+                  <strong>Boundary Health:</strong> Healthy teams typically have &lt;10% weekend activity.
+                  Scores above 25% indicate significant work-life boundary violations.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Response Time */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Timer className="w-5 h-5 mr-2 text-blue-500" />
+                Response Time Pressure
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-gray-700 mb-3">
+                Measures the time pressure to respond quickly to incidents. While fast response times are important
+                for business continuity, excessive pressure to respond immediately can create chronic stress and
+                contribute to feelings of being overwhelmed and losing control.
+              </p>
+              <div className="bg-gray-50 rounded-lg p-3">
+                <p className="text-xs text-gray-600">
+                  <strong>Pressure Points:</strong> Average response time under 5 minutes indicates high pressure.
+                  Sustained pressure can lead to anxiety and reduced job satisfaction.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Incident Load */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <TrendingUp className="w-5 h-5 mr-2 text-purple-500" />
+                Severity-Weighted Incident Load
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-gray-700 mb-3">
+                Goes beyond simple incident count to measure the actual psychological burden of different incident
+                severities. Critical incidents (SEV0/SEV1) cause significantly more stress than minor issues,
+                so this factor weights incidents by their business impact and stress level.
+              </p>
+              <div className="bg-gray-50 rounded-lg p-3">
+                <p className="text-xs text-gray-600">
+                  <strong>Severity Weighting:</strong> Critical incidents = 4x weight • High = 3x weight •
+                  Medium = 2x weight • Low = 1x weight. This reflects the exponentially higher stress
+                  of handling business-critical outages.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
-        {/* GitHub-Only Analysis Section */}
+        {/* Three Dimensions */}
         <Card className="mb-8">
           <CardHeader>
-            <CardTitle className="flex items-center">
-              <Badge className="mr-3 bg-purple-500">GitHub-Only</Badge>
-              Comprehensive Single-Source Analysis
-            </CardTitle>
+            <CardTitle>Copenhagen Burnout Inventory Dimensions</CardTitle>
             <CardDescription>
-              How we achieve 100% burnout scoring using only GitHub data with scientific rigor
+              How the five factors map to the three scientifically validated burnout dimensions
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
               <div>
-                <h4 className="font-semibold mb-3">Flow State vs. Frantic Activity Detection</h4>
+                <h4 className="font-semibold text-gray-900 mb-2 flex items-center">
+                  <div className="w-4 h-4 bg-red-500 rounded mr-2"></div>
+                  Emotional Exhaustion (40% weight)
+                </h4>
                 <p className="text-sm text-gray-700 mb-3">
-                  Our advanced algorithm distinguishes between healthy high-productivity (flow state) and 
-                  burnout-driven frantic activity by analyzing multiple patterns:
+                  Physical and psychological fatigue from work demands. This dimension measures the core stress
+                  experience and depletion of emotional resources that characterizes burnout.
                 </p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                    <h5 className="font-medium text-green-800 mb-2">Healthy Flow State</h5>
-                    <ul className="text-xs text-green-700 space-y-1">
-                      <li>• Consistent, sustainable work pace</li>
-                      <li>• High-quality output (fewer revisions)</li>
-                      <li>• Balanced activities (coding + reviews + docs)</li>
-                      <li>• Reasonable work hour boundaries</li>
-                    </ul>
-                  </div>
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                    <h5 className="font-medium text-red-800 mb-2">Frantic Burnout Activity</h5>
-                    <ul className="text-xs text-red-700 space-y-1">
-                      <li>• Erratic commit patterns with extreme peaks</li>
-                      <li>• Poor quality output (many revisions, rushed commits)</li>
-                      <li>• Imbalanced work (all coding, no collaboration)</li>
-                      <li>• Constant boundary violations (24/7 activity)</li>
-                    </ul>
-                  </div>
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                  <p className="text-xs text-red-800">
+                    <strong>Calculation:</strong> Workload Factor (50%) + After Hours Factor (30%) + Incident Load (20%)
+                  </p>
                 </div>
               </div>
-              
-              <Separator />
-              
+
               <div>
-                <h4 className="font-semibold mb-3">Baseline Comparison System</h4>
+                <h4 className="font-semibold text-gray-900 mb-2 flex items-center">
+                  <div className="w-4 h-4 bg-yellow-500 rounded mr-2"></div>
+                  Depersonalization/Cynicism (30% weight)
+                </h4>
                 <p className="text-sm text-gray-700 mb-3">
-                  Individual metrics are compared against three baseline types for accurate risk assessment:
+                  Detached, callous attitudes toward work and colleagues. This reflects the psychological
+                  distancing and defensive coping mechanisms that develop under chronic stress.
                 </p>
-                <div className="space-y-2">
-                  <div className="flex items-center space-x-3">
-                    <Badge variant="outline" className="w-20 text-xs">Personal</Badge>
-                    <span className="text-sm text-gray-600">Individual's historical patterns and trends</span>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <Badge variant="outline" className="w-20 text-xs">Team</Badge>
-                    <span className="text-sm text-gray-600">Team median values (70% weight)</span>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <Badge variant="outline" className="w-20 text-xs">Industry</Badge>
-                    <span className="text-sm text-gray-600">Software industry standards (30% weight)</span>
-                  </div>
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                  <p className="text-xs text-yellow-800">
+                    <strong>Calculation:</strong> Response Time Pressure (50%) + Weekend Work Factor (50%)
+                  </p>
                 </div>
               </div>
-              
-              <Separator />
-              
+
               <div>
-                <h4 className="font-semibold mb-3">Confidence Intervals & Validation</h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="text-center">
-                    <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-2">
-                      <span className="text-green-600 font-bold">High</span>
-                    </div>
-                    <p className="text-xs text-gray-600">
-                      Comprehensive GitHub data, active team, 30+ day period
-                    </p>
-                  </div>
-                  <div className="text-center">
-                    <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-2">
-                      <span className="text-yellow-600 font-bold">Med</span>
-                    </div>
-                    <p className="text-xs text-gray-600">
-                      Good data coverage, some limitations in scope or time
-                    </p>
-                  </div>
-                  <div className="text-center">
-                    <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-2">
-                      <span className="text-red-600 font-bold">Low</span>
-                    </div>
-                    <p className="text-xs text-gray-600">
-                      Limited data - results should be validated with team
-                    </p>
-                  </div>
+                <h4 className="font-semibold text-gray-900 mb-2 flex items-center">
+                  <div className="w-4 h-4 bg-blue-500 rounded mr-2"></div>
+                  Reduced Personal Accomplishment (30% weight)
+                </h4>
+                <p className="text-sm text-gray-700 mb-3">
+                  Feelings of ineffectiveness and lack of achievement at work. This dimension captures
+                  the erosion of professional self-efficacy and satisfaction with one's contributions.
+                </p>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <p className="text-xs text-blue-800">
+                    <strong>Calculation:</strong> Inverted measure of effectiveness under pressure, derived from
+                    response time pressure and incident load factors.
+                  </p>
                 </div>
+              </div>
+
+              <div className="mt-6 bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <p className="text-sm text-gray-700">
+                  <strong>Final Score:</strong> The three dimensions are weighted and combined to produce a final
+                  burnout score from 0-100, with higher scores indicating greater burnout risk. The weighting
+                  reflects the relative importance of each dimension based on burnout research.
+                </p>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Scoring System */}
+        {/* Risk Levels */}
         <Card className="mb-8">
           <CardHeader>
             <CardTitle>Risk Level Classification</CardTitle>
             <CardDescription>
-              How we categorize burnout risk based on the combined score
+              How we categorize burnout risk and what each level means for team intervention
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center space-x-4">
-                <div className="w-24">
-                  <Badge className="bg-green-500">Low Risk</Badge>
+            <div className="space-y-6">
+              <div>
+                <div className="flex items-center space-x-4 mb-2">
+                  <Badge className="bg-green-500 w-24">Low Risk</Badge>
+                  <Progress value={20} className="h-3 flex-1" />
+                  <span className="text-sm font-medium">0-24 points</span>
                 </div>
-                <div className="flex-1">
-                  <Progress value={30} className="h-3" />
-                </div>
-                <span className="text-sm font-medium">0-24</span>
+                <p className="text-sm text-gray-600 ml-28">
+                  Sustainable workload and healthy work-life balance. Team members are functioning well
+                  with minimal stress indicators. Continue current practices and monitor for changes.
+                </p>
               </div>
-              <p className="text-sm text-gray-600 ml-24">
-                Low risk - sustainable workload and healthy work-life balance
-              </p>
-              
-              <div className="flex items-center space-x-4">
-                <div className="w-24">
-                  <Badge className="bg-yellow-500">Moderate Risk</Badge>
-                </div>
-                <div className="flex-1">
-                  <Progress value={49} className="h-3" />
-                </div>
-                <span className="text-sm font-medium">25-49</span>
-              </div>
-              <p className="text-sm text-gray-600 ml-24">
-                Monitor closely - some stress indicators present
-              </p>
 
-              <div className="flex items-center space-x-4">
-                <div className="w-24">
-                  <Badge className="bg-orange-500">High Risk</Badge>
+              <div>
+                <div className="flex items-center space-x-4 mb-2">
+                  <Badge className="bg-yellow-500 w-24">Moderate</Badge>
+                  <Progress value={37} className="h-3 flex-1" />
+                  <span className="text-sm font-medium">25-49 points</span>
                 </div>
-                <div className="flex-1">
-                  <Progress value={74} className="h-3" />
-                </div>
-                <span className="text-sm font-medium">50-74</span>
+                <p className="text-sm text-gray-600 ml-28">
+                  Some stress indicators present but manageable. Consider workload distribution,
+                  schedule adjustments, or additional support. Monitor closely for escalation.
+                </p>
               </div>
-              <p className="text-sm text-gray-600 ml-24">
-                Intervention recommended - significant burnout indicators
-              </p>
-              
-              <div className="flex items-center space-x-4">
-                <div className="w-24">
-                  <Badge className="bg-red-500">Critical Risk</Badge>
+
+              <div>
+                <div className="flex items-center space-x-4 mb-2">
+                  <Badge className="bg-orange-500 w-24">High Risk</Badge>
+                  <Progress value={62} className="h-3 flex-1" />
+                  <span className="text-sm font-medium">50-74 points</span>
                 </div>
-                <div className="flex-1">
-                  <Progress value={85} className="h-3" />
-                </div>
-                <span className="text-sm font-medium">75-100</span>
+                <p className="text-sm text-gray-600 ml-28">
+                  Significant burnout indicators requiring intervention. Recommend workload reduction,
+                  schedule changes, additional team support, or temporary assignment adjustments.
+                </p>
               </div>
-              <p className="text-sm text-gray-600 ml-24">
-                Immediate action required - severe burnout risk
-              </p>
+
+              <div>
+                <div className="flex items-center space-x-4 mb-2">
+                  <Badge className="bg-red-500 w-24">Critical</Badge>
+                  <Progress value={87} className="h-3 flex-1" />
+                  <span className="text-sm font-medium">75-100 points</span>
+                </div>
+                <p className="text-sm text-gray-600 ml-28">
+                  Severe burnout risk requiring immediate action. Consider temporary on-call rotation
+                  removal, significant workload reduction, or professional support resources.
+                </p>
+              </div>
             </div>
           </CardContent>
         </Card>
-
-        {/* Data Sources */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Data Privacy & Accuracy</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <h4 className="font-medium mb-2">What We Analyze</h4>
-              <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
-                <li>Incident frequency, timing, and resolution patterns (PagerDuty/Rootly)</li>
-                <li>GitHub commit patterns, PR activity, and code review participation</li>
-                <li>Slack message sentiment, timing, and communication patterns (when connected)</li>
-                <li>Work hour distribution and boundary violations across all platforms</li>
-                <li>Flow state analysis: sustainable productivity vs. frantic burnout patterns</li>
-                <li>Code quality indicators: PR merge rates, review depth, commit message quality</li>
-                <li>Collaboration patterns: knowledge sharing, mentoring, cross-team contributions</li>
-              </ul>
-            </div>
-            
-            <Separator />
-            
-            <div>
-              <h4 className="font-medium mb-2">What We Don't Track</h4>
-              <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
-                <li>Specific content of Slack messages (only sentiment analysis)</li>
-                <li>Private repository code or proprietary information</li>
-                <li>Individual performance reviews or HR data</li>
-                <li>Personal calendar or non-work related activities</li>
-                <li>Detailed code content (only commit patterns and timing)</li>
-              </ul>
-            </div>
-            
-            <Separator />
-            
-            <div className="bg-gray-50 rounded-lg p-4 space-y-3">
-              <p className="text-sm text-gray-700">
-                <strong>GitHub-Only Analysis Validation:</strong> When using only GitHub data, our system 
-                achieves high accuracy through flow state detection and baseline comparisons. However, 
-                the most comprehensive assessment comes from combining multiple data sources (incidents + GitHub + Slack).
-              </p>
-              <p className="text-sm text-gray-700">
-                <strong>Important:</strong> This tool provides data-driven insights but should not replace 
-                professional mental health assessment. Always consult with HR and mental health professionals 
-                when addressing burnout concerns.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Powered by Rootly AI Footer */}
-        <div className="mt-12 pt-8 border-t border-gray-200 text-center">
-          <a 
-            href="https://rootly.com" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="inline-flex flex-col items-center space-y-1 hover:opacity-80 transition-opacity"
-          >
-            <span className="text-sm text-gray-500">powered by</span>
-            <Image 
-              src="/images/rootly-ai-logo.png" 
-              alt="Rootly AI" 
-              width={160} 
-              height={64} 
-              className="h-8 w-auto"
-            />
-          </a>
-        </div>
       </div>
     </div>
   )

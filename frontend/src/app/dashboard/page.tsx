@@ -2571,24 +2571,33 @@ export default function Dashboard() {
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center justify-between w-full">
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">Organization Burnout Analysis</h1>
+                <h1 className="text-2xl font-bold text-gray-900">Analysis Dashboard</h1>
                 <p className="text-gray-600">
                   {(() => {
-                    // If viewing a specific analysis, show the integration used for that analysis
                     if (currentAnalysis) {
+                      // Find the integration for this specific analysis
                       const analysisIntegration = integrations.find(i => i.id === currentAnalysis.integration_id);
-                      if (analysisIntegration) {
-                        const platform = analysisIntegration.platform === 'pagerduty' ? 'PagerDuty' : 'Rootly';
-                        return `${platform} - ${analysisIntegration.organization_name || analysisIntegration.name}`;
-                      }
-                      return 'Analysis Dashboard';
+
+                      // Use multiple sources to get the organization name (to handle different integrations)
+                      const orgName = analysisIntegration?.name ||
+                                    analysisIntegration?.organization_name ||
+                                    (currentAnalysis.analysis_data as any)?.metadata?.organization_name ||
+                                    'Organization';
+
+                      const analysisDateTime = new Date(currentAnalysis.created_at);
+                      const date = analysisDateTime.toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      });
+                      const time = analysisDateTime.toLocaleTimeString('en-US', {
+                        hour: 'numeric',
+                        minute: '2-digit',
+                        hour12: true
+                      });
+                      return `${orgName} • ${date} at ${time}`;
                     }
-                    // Otherwise show the currently selected integration
-                    if (selectedIntegrationData) {
-                      const platform = selectedIntegrationData.platform === 'pagerduty' ? 'PagerDuty' : 'Rootly';
-                      return `${platform} - ${selectedIntegrationData.organization_name || selectedIntegrationData.name}`;
-                    }
-                    return 'Organization Burnout Analysis Dashboard';
+                    return '';
                   })()}
                 </p>
               </div>

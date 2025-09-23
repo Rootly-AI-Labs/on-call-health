@@ -143,8 +143,9 @@ class RootlyAPIClient:
                             elif "company" in attrs:
                                 organization_name = attrs["company"]
                     
-                    # Always include organization name, with fallback
-                    account_info["organization_name"] = organization_name or "Rootly Organization"
+                    # Only include organization name if available
+                    if organization_name:
+                        account_info["organization_name"] = organization_name
                     
                     # Check permissions for required endpoints
                     permissions = await self.check_permissions()
