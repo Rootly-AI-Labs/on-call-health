@@ -206,8 +206,7 @@ export function TeamMembersList({
             
             // Filter members with valid scores
             const validMembers = allMembers.filter((member) => {
-              // Only include members with CBI scores
-              return member.cbi_score !== undefined && member.cbi_score !== null && member.cbi_score > 0
+              return member.cbi_score !== undefined && member.cbi_score !== null
             })
             
             // Separate members with and without incidents
