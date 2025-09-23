@@ -3826,8 +3826,12 @@ class UnifiedBurnoutAnalyzer:
     def _get_severity_level(self, incident: Dict[str, Any]) -> str:
         """Extract severity level from platform-specific incident data."""
         try:
+            # First, check if severity was already mapped by the platform client
+            if "severity" in incident:
+                return incident["severity"]
+
             if self.platform == "pagerduty":
-                # PagerDuty format
+                # PagerDuty format - fallback if severity not pre-mapped
                 urgency = incident.get("urgency", "low")
                 priority = incident.get("priority", {})
                 if isinstance(priority, dict):
@@ -3838,6 +3842,10 @@ class UnifiedBurnoutAnalyzer:
                         return "sev2"
                     elif "p3" in priority_name:
                         return "sev3"
+                    elif "p4" in priority_name:
+                        return "sev4"
+                    elif "p5" in priority_name:
+                        return "low"  # Matches the daily trends structure
                     else:
                         return "sev4"
                 return "sev3"  # default
