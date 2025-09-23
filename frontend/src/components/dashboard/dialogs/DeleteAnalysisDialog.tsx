@@ -15,6 +15,7 @@ interface AnalysisResult {
   integration_id: number
   created_at: string
   time_range?: number
+  analysis_data?: any
 }
 
 interface DeleteAnalysisDialogProps {
@@ -57,10 +58,15 @@ export function DeleteAnalysisDialog({
               <div className="flex flex-col">
                 <span className="font-medium text-gray-900">
                   {(() => {
+                    // Find the integration for this analysis
                     const integration = integrations.find(i => i.id === Number(analysisToDelete.integration_id)) ||
                                       integrations.find(i => String(i.id) === String(analysisToDelete.integration_id));
 
-                    return integration?.name || integration?.organization_name || 'Organization';
+                    // Use multiple sources to get the organization name (same as dashboard header)
+                    return integration?.name ||
+                           integration?.organization_name ||
+                           analysisToDelete.analysis_data?.metadata?.organization_name ||
+                           'Organization';
                   })()}
                 </span>
                 <span className="text-gray-500">
