@@ -3447,6 +3447,19 @@ export default function Dashboard() {
                           
                           return (
                             <>
+
+
+
+                            
+                              {/* Commit Activity Timeline */}
+                              <GitHubCommitsTimeline
+                                analysisId={currentAnalysis?.id ? parseInt(currentAnalysis.id) : 0}
+                                totalCommits={github.total_commits || 0}
+                                weekendPercentage={(github.weekend_activity_percentage || github.weekend_commit_percentage || 0)}
+                                cache={githubTimelineCache}
+                                setCache={setGithubTimelineCache}
+                              />
+
                               {/* GitHub Metrics Grid */}
                               <div className="grid grid-cols-2 gap-4">
                                 <div className="bg-gray-50 rounded-lg p-3">
@@ -3496,15 +3509,6 @@ export default function Dashboard() {
                                   )}
                                 </div>
                               </div>
-
-                              {/* Commit Activity Timeline */}
-                              <GitHubCommitsTimeline
-                                analysisId={currentAnalysis?.id ? parseInt(currentAnalysis.id) : 0}
-                                totalCommits={github.total_commits || 0}
-                                weekendPercentage={(github.weekend_activity_percentage || github.weekend_commit_percentage || 0)}
-                                cache={githubTimelineCache}
-                                setCache={setGithubTimelineCache}
-                              />
 
                               {/* Burnout Indicators */}
                               {github.burnout_indicators && (
