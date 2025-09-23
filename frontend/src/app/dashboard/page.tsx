@@ -2563,6 +2563,34 @@ export default function Dashboard() {
             <div className="flex items-center justify-between w-full">
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">Analysis Dashboard</h1>
+                <p className="text-gray-600">
+                  {(() => {
+                    if (currentAnalysis) {
+                      // Find the integration for this specific analysis
+                      const analysisIntegration = integrations.find(i => i.id === currentAnalysis.integration_id);
+
+                      // Use multiple sources to get the organization name (to handle different integrations)
+                      const orgName = analysisIntegration?.name ||
+                                    analysisIntegration?.organization_name ||
+                                    (currentAnalysis.analysis_data as any)?.metadata?.organization_name ||
+                                    'Organization';
+
+                      const analysisDateTime = new Date(currentAnalysis.created_at);
+                      const date = analysisDateTime.toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      });
+                      const time = analysisDateTime.toLocaleTimeString('en-US', {
+                        hour: 'numeric',
+                        minute: '2-digit',
+                        hour12: true
+                      });
+                      return `${orgName} • ${date} at ${time}`;
+                    }
+                    return '';
+                  })()}
+                </p>
               </div>
               <div className="flex items-center space-x-4">
                 <div className="flex flex-col items-center">
