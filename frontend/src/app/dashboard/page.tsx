@@ -3257,8 +3257,8 @@ export default function Dashboard() {
                             domain={[0, 100]}
                             tick={{ fontSize: 11, fill: '#6B7280' }}
                             tickCount={6}
-                            angle={270}
-                            reversed={true}
+                            angle={90}
+                            
                           />
                           <Radar 
                             dataKey="value" 
@@ -3685,7 +3685,7 @@ export default function Dashboard() {
                                       {slack?.total_messages ? (
                                         <p className="text-lg font-bold text-purple-900">{slack.total_messages.toLocaleString()}</p>
                                       ) : (
-                                        <p className="text-lg font-bold text-gray-400 italic">No data</p>
+                                        <p className="text-lg font-bold text-gray-400">No data</p>
                                       )}
                                     </div>
                                     <div className="bg-purple-50 rounded-lg p-3">
@@ -3693,7 +3693,7 @@ export default function Dashboard() {
                                       {slack?.active_channels ? (
                                         <p className="text-lg font-bold text-purple-900">{slack.active_channels}</p>
                                       ) : (
-                                        <p className="text-lg font-bold text-gray-400 italic">No data</p>
+                                        <p className="text-lg font-bold text-gray-400">No data</p>
                                       )}
                                     </div>
                                     <div className="bg-purple-50 rounded-lg p-3">
@@ -3701,7 +3701,7 @@ export default function Dashboard() {
                                       {slack?.after_hours_activity_percentage !== undefined && slack.after_hours_activity_percentage !== null ? (
                                         <p className="text-lg font-bold text-purple-900">{slack.after_hours_activity_percentage.toFixed(1)}%</p>
                                       ) : (
-                                        <p className="text-lg font-bold text-gray-400 italic">No data</p>
+                                        <p className="text-lg font-bold text-gray-400">No data</p>
                                       )}
                                     </div>
                                     <div className="bg-purple-50 rounded-lg p-3">
@@ -3710,7 +3710,7 @@ export default function Dashboard() {
                                        (slack?.weekend_percentage !== undefined && slack.weekend_percentage !== null) ? (
                                         <p className="text-lg font-bold text-purple-900">{(slack.weekend_activity_percentage || slack.weekend_percentage || 0).toFixed(1)}%</p>
                                       ) : (
-                                        <p className="text-lg font-bold text-gray-400 italic">No data</p>
+                                        <p className="text-lg font-bold text-gray-400">No data</p>
                                       )}
                                     </div>
                                     <div className="bg-purple-50 rounded-lg p-3">
@@ -3718,7 +3718,7 @@ export default function Dashboard() {
                                       {slack?.avg_response_time_minutes ? (
                                         <p className="text-lg font-bold text-purple-900">{slack.avg_response_time_minutes.toFixed(0)}m</p>
                                       ) : (
-                                        <p className="text-lg font-bold text-gray-400 italic">No data</p>
+                                        <p className="text-lg font-bold text-gray-400">No data</p>
                                       )}
                                     </div>
                                     <div className="bg-purple-50 rounded-lg p-3">
@@ -3726,7 +3726,7 @@ export default function Dashboard() {
                                       {slack?.sentiment_analysis?.avg_sentiment !== undefined && slack.sentiment_analysis.avg_sentiment !== null ? (
                                         <p className="text-lg font-bold text-purple-900">{slack.sentiment_analysis.avg_sentiment.toFixed(2)}</p>
                                       ) : (
-                                        <p className="text-lg font-bold text-gray-400 italic">No data</p>
+                                        <p className="text-lg font-bold text-gray-400">No data</p>
                                       )}
                                     </div>
                                   </div>
