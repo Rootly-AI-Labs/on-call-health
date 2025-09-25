@@ -450,7 +450,7 @@ def generate_cbi_score_reasoning(
         if recovery_violations > 0:
             personal_factors.append(f"Insufficient recovery periods: {recovery_violations} violations (<48 hours between incidents)")
         if avg_recovery > 0 and avg_recovery < 168:  # Less than 1 week
-            personal_factors.append(f"Average recovery time: {avg_recovery:.1f} hours (optimal: 168+ hours)")
+            personal_factors.append(f"Average recovery time: {avg_recovery:.1f} hours")
 
     # Work-related burnout contributors
     if work_score > 50:
