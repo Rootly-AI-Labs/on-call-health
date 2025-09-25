@@ -1,63 +1,6 @@
 "use client"
 
 import { useState, useEffect, useMemo } from "react"
-import { Button } from "@/components/ui/button"
-import { MappingDrawer } from "@/components/mapping-drawer"
-import { Separator } from "@/components/ui/separator"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Switch } from "@/components/ui/switch"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import {
-  Bar,
-  BarChart,
-  Radar,
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
-  ResponsiveContainer,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Cell,
-} from "recharts"
-import {
-  Activity,
-  ChevronLeft,
-  ChevronRight,
-  Play,
-  Clock,
-  FileText,
-  Settings,
-  TrendingUp,
-  TrendingDown,
-  Minus,
-  AlertTriangle,
-  Download,
-  AlertCircle,
-  Trash2,
-  LogOut,
-  BookOpen,
-  Users,
-  Star,
-  Info,
-  BarChart3,
-} from "lucide-react"
-import { TeamHealthOverview } from "@/components/dashboard/TeamHealthOverview"
-import { AnalysisProgressSection } from "@/components/dashboard/AnalysisProgressSection"
-import { TeamMembersList } from "@/components/dashboard/TeamMembersList"
-import { HealthTrendsChart } from "@/components/dashboard/HealthTrendsChart"
-import { MemberDetailModal } from "@/components/dashboard/MemberDetailModal"
-import { GitHubCommitsTimeline } from "@/components/dashboard/charts/GitHubCommitsTimeline"
-import { AIInsightsCard } from "@/components/dashboard/insights/AIInsightsCard"
-import { DeleteAnalysisDialog } from "@/components/dashboard/dialogs/DeleteAnalysisDialog"
-import Image from "next/image"
 import { useRouter, useSearchParams } from "next/navigation"
 import { toast } from "sonner"
 
@@ -74,7 +17,7 @@ import type {
 } from "@/lib/types";
 
 
-export default function Dashboard() {
+export default function useDashboard() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [integrations, setIntegrations] = useState<Integration[]>([])
   const [selectedIntegration, setSelectedIntegration] = useState<string>("")
@@ -1682,16 +1625,18 @@ export default function Dashboard() {
     }
   }
 
-  const getTrendIcon = (trend: string) => {
+  
+  const getTrendIcon = (trend?: string) => {
     switch (trend) {
       case "up":
-        return <TrendingUp className="w-4 h-4 text-red-500" />
+        return { icon: "up" as const, className: "w-4 h-4 text-red-500" };
       case "down":
-        return <TrendingDown className="w-4 h-4 text-green-500" />
+        return { icon: "down" as const, className: "w-4 h-4 text-green-500" };
       default:
-        return <Minus className="w-4 h-4 text-gray-500" />
+        return { icon: "flat" as const, className: "w-4 h-4 text-gray-500" };
     }
-  }
+  };
+
 
   const exportAsJSON = () => {
     if (!currentAnalysis) return
@@ -1961,33 +1906,131 @@ export default function Dashboard() {
     [burnoutFactors]
   );
 
+  return {
+    API_BASE,
+    router,
+    searchParams,
+    allActiveMembers,
+    githubTimelineCache,
+    setGithubTimelineCache,
+    membersWithIncidents,
+    membersWithGitHubData,
+    loadingIntegrations,
+    initialDataLoaded,
+    hasDataFromCache,
+    loadingTrends,
+    analysisRunning,
+    analysisStage,
+    analysisProgress,
+    targetProgress,
+    redirectingToSuggested,
+    hasMoreAnalyses,
+    loadingMoreAnalyses,
+    deletingAnalysis,
+    deleteDialogOpen,
+    setDeleteDialogOpen,
+    dropdownLoading,
+    debugSectionOpen,
+    setDebugSectionOpen,
 
-  // Show full-screen loading when loading integrations
-  if (loadingIntegrations) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <Activity className="w-8 h-8 text-purple-600 animate-pulse mx-auto mb-4" />
-          <p className="text-gray-600">Loading dashboard...</p>
-        </div>
-      </div>
-    );
-  }
+    sidebarCollapsed,
+    setSidebarCollapsed,
 
-  // Show main page loader ONLY while initial data loads (and no cached data)
-  // Once data is loaded, show proper empty state or analysis content
-  const showLoader = !initialDataLoaded && !hasDataFromCache;
-  
-  if (showLoader) {
-    return (
-      <div className="flex h-screen bg-gray-50">
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <div className="w-8 h-8 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading dashboard...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-  
+    // selections / ids
+    selectedIntegration,
+    setSelectedIntegration,
+    selectedIntegrationData,
+    currentRunningAnalysisId,
+    selectedMember,
+    setSelectedMember,
+    timeRange,
+    setTimeRange,
+
+    // data
+    integrations,
+    currentAnalysis,
+    previousAnalyses,
+    totalAnalysesCount,
+    historicalTrends,
+    analysisMappings,
+
+    // github/slack + options
+    githubIntegration,
+    slackIntegration,
+    includeGithub,
+    setIncludeGithub,
+    includeSlack,
+    setIncludeSlack,
+    enableAI,
+    setEnableAI,
+    llmConfig,
+    isLoadingGitHubSlack,
+
+    // mapping drawer
+    mappingDrawerOpen,
+    setMappingDrawerOpen,
+    mappingDrawerPlatform,
+    openMappingDrawer,
+
+    // derived data
+    chartData,
+    memberBarData,
+    members,
+    burnoutFactors,
+    highRiskFactors,
+    sortedBurnoutFactors,
+
+    // trend icon meta for the page to render with Lucide icons
+    getTrendIcon,
+
+    // helpers for styles/text
+    getRiskColor,
+    getProgressColor,
+    formatRadarLabel,
+    getAnalysisStages,
+    getAnalysisDescription,
+
+    // actions
+    startAnalysis,
+    runAnalysisWithTimeRange,
+    cancelRunningAnalysis,
+    openDeleteDialog,
+    confirmDeleteAnalysis,
+    loadPreviousAnalyses,
+    loadSpecificAnalysis,
+    loadHistoricalTrends,
+    fetchPlatformMappings,
+    hasGitHubMapping,
+    hasSlackMapping,
+    ensureIntegrationsLoaded,
+    handleManageIntegrations,
+    handleSignOut,
+    exportAsJSON,
+    shouldShowInsufficientDataCard,
+
+    // start analysis modal state
+    showTimeRangeDialog,
+    setShowTimeRangeDialog,
+    selectedTimeRange,
+    setSelectedTimeRange,
+    dialogSelectedIntegration,
+    setDialogSelectedIntegration,
+
+
+
+    analysisCache,
+    setAnalysisCache,
+
+
+    setCurrentAnalysis,
+    setRedirectingToSuggested,
+    updateURLWithAnalysis,
+
+    expandedDataSources,
+    setExpandedDataSources,
+
+    analysisToDelete,
+    setAnalysisToDelete,
+
+  };
+}
