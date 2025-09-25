@@ -419,13 +419,17 @@ def generate_cbi_score_reasoning(
                 elif factor_name == 'weekend_work':
                     personal_factors.append(f"Weekend incident activity ({weighted_score:.1f} points)")
 
-    # Add research insights as separate, clean factors
+    # Collect time pattern and recovery data for separate display
+    time_patterns = []
+    recovery_patterns = []
+    trauma_patterns = []
+
     if raw_metrics:
         # Critical incidents insights
         critical_count = trauma_data.get('critical_incidents', 0)
         compound_factor = trauma_data.get('compound_factor', 1.0)
         if critical_count > 0:
-            personal_factors.append(f"Multiple critical incidents: {critical_count} incidents (compound factor: {compound_factor:.2f}x)")
+            trauma_patterns.append(f"Multiple critical incidents: {critical_count} incidents (compound factor: {compound_factor:.2f}x)")
 
         # Time impact insights
         after_hours_count = time_data.get('after_hours_incidents', 0)
@@ -433,24 +437,19 @@ def generate_cbi_score_reasoning(
         overnight_count = time_data.get('overnight_incidents', 0)
 
         if after_hours_count > 0:
-            multiplier = time_data.get('after_hours_multiplier', 1.4)
-            personal_factors.append(f"After-hours incidents: {after_hours_count} incidents ({multiplier:.1f}x weighting)")
-
+            time_patterns.append(f"After-hours incidents: {after_hours_count} incidents")
         if weekend_count > 0:
-            weekend_multiplier = time_data.get('weekend_multiplier', 1.6)
-            personal_factors.append(f"Weekend incidents: {weekend_count} incidents ({weekend_multiplier:.1f}x weighting)")
-
+            time_patterns.append(f"Weekend incidents: {weekend_count} incidents")
         if overnight_count > 0:
-            overnight_multiplier = time_data.get('overnight_multiplier', 1.8)
-            personal_factors.append(f"Overnight incidents: {overnight_count} incidents ({overnight_multiplier:.1f}x weighting)")
+            time_patterns.append(f"Overnight incidents: {overnight_count} incidents")
 
         # Recovery insights
         recovery_violations = recovery_data.get('recovery_violations', 0)
         avg_recovery = recovery_data.get('avg_recovery_hours', 0)
         if recovery_violations > 0:
-            personal_factors.append(f"Recovery periods <48 hours: {recovery_violations} occurrences")
+            recovery_patterns.append(f"Recovery periods <48 hours: {recovery_violations} occurrences")
         if avg_recovery > 0 and avg_recovery < 168:  # Less than 1 week
-            personal_factors.append(f"Average recovery time: {avg_recovery:.1f} hours")
+            recovery_patterns.append(f"Average recovery time: {avg_recovery:.1f} hours")
 
     # Work-related burnout contributors
     if work_score > 50:
@@ -495,6 +494,22 @@ def generate_cbi_score_reasoning(
         reasons.append("WORK-RELATED:")
         for factor in work_factors:
             reasons.append(f"• {factor}")
+
+    # Add separate analysis sections
+    if time_patterns:
+        reasons.append("Time Pattern Analysis:")
+        for pattern in time_patterns:
+            reasons.append(f"• {pattern}")
+
+    if recovery_patterns:
+        reasons.append("Recovery Pattern Analysis:")
+        for pattern in recovery_patterns:
+            reasons.append(f"• {pattern}")
+
+    if trauma_patterns:
+        reasons.append("Critical Incident Analysis:")
+        for pattern in trauma_patterns:
+            reasons.append(f"• {pattern}")
 
     # Add educational research note only once at the end
     if trauma_data.get('compound_trauma_detected', False):
