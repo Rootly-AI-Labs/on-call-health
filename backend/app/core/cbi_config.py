@@ -405,19 +405,19 @@ def generate_cbi_score_reasoning(
             weighted_score = factor_data.get('weighted_score', 0)
             if weighted_score > 5:  # Only show significant contributors
                 if factor_name == 'sleep_quality_proxy':
-                    personal_factors.append(f"Critical incident stress impact ({weighted_score:.1f} points)")
+                    personal_factors.append(f"Sleep quality impact from critical incidents ({weighted_score:.1f} points)")
 
                 elif factor_name == 'vacation_usage':
-                    personal_factors.append(f"Inadequate recovery time ({weighted_score:.1f} points)")
+                    personal_factors.append(f"Recovery time between incidents ({weighted_score:.1f} points)")
 
                 elif factor_name == 'work_hours_trend':
-                    personal_factors.append(f"Exhaustion from excessive work hours ({weighted_score:.1f} points)")
+                    personal_factors.append(f"Extended work hours ({weighted_score:.1f} points)")
 
                 elif factor_name == 'after_hours_activity':
-                    personal_factors.append(f"Non-business hours incident stress ({weighted_score:.1f} points)")
+                    personal_factors.append(f"Non-business hours incident activity ({weighted_score:.1f} points)")
 
                 elif factor_name == 'weekend_work':
-                    personal_factors.append(f"Weekend work disruptions ({weighted_score:.1f} points)")
+                    personal_factors.append(f"Weekend incident activity ({weighted_score:.1f} points)")
 
     # Add research insights as separate, clean factors
     if raw_metrics:
@@ -434,21 +434,21 @@ def generate_cbi_score_reasoning(
 
         if after_hours_count > 0:
             multiplier = time_data.get('after_hours_multiplier', 1.4)
-            personal_factors.append(f"After-hours incidents: {after_hours_count} incidents ({multiplier:.1f}x psychological impact)")
+            personal_factors.append(f"After-hours incidents: {after_hours_count} incidents ({multiplier:.1f}x weighting)")
 
         if weekend_count > 0:
             weekend_multiplier = time_data.get('weekend_multiplier', 1.6)
-            personal_factors.append(f"Weekend incidents: {weekend_count} incidents ({weekend_multiplier:.1f}x impact)")
+            personal_factors.append(f"Weekend incidents: {weekend_count} incidents ({weekend_multiplier:.1f}x weighting)")
 
         if overnight_count > 0:
             overnight_multiplier = time_data.get('overnight_multiplier', 1.8)
-            personal_factors.append(f"Overnight incidents disrupting sleep: {overnight_count} incidents ({overnight_multiplier:.1f}x impact)")
+            personal_factors.append(f"Overnight incidents: {overnight_count} incidents ({overnight_multiplier:.1f}x weighting)")
 
         # Recovery insights
         recovery_violations = recovery_data.get('recovery_violations', 0)
         avg_recovery = recovery_data.get('avg_recovery_hours', 0)
         if recovery_violations > 0:
-            personal_factors.append(f"Insufficient recovery periods: {recovery_violations} violations (<48 hours between incidents)")
+            personal_factors.append(f"Recovery periods <48 hours: {recovery_violations} occurrences")
         if avg_recovery > 0 and avg_recovery < 168:  # Less than 1 week
             personal_factors.append(f"Average recovery time: {avg_recovery:.1f} hours")
 
@@ -463,27 +463,27 @@ def generate_cbi_score_reasoning(
                 if factor_name == 'oncall_burden':
                     total_incidents = sum(severity_dist.values()) if severity_dist else 0
                     if total_incidents > 0:
-                        work_factors.append(f"On-call responsibility burden: {total_incidents} total incidents ({weighted_score:.1f} points)")
+                        work_factors.append(f"On-call responsibility load: {total_incidents} total incidents ({weighted_score:.1f} points)")
                     else:
-                        work_factors.append(f"On-call responsibility burden ({weighted_score:.1f} points)")
+                        work_factors.append(f"On-call responsibility load ({weighted_score:.1f} points)")
 
                 elif factor_name == 'deployment_frequency':
-                    work_factors.append(f"Critical production incident pressure ({weighted_score:.1f} points)")
+                    work_factors.append(f"Critical production incident frequency ({weighted_score:.1f} points)")
 
                 elif factor_name == 'pr_frequency':
-                    work_factors.append(f"Incident severity burden ({weighted_score:.1f} points)")
+                    work_factors.append(f"Incident severity-weighted workload ({weighted_score:.1f} points)")
 
                 elif factor_name == 'sprint_completion':
-                    work_factors.append(f"High-pressure response demands ({weighted_score:.1f} points)")
+                    work_factors.append(f"Response time requirements ({weighted_score:.1f} points)")
 
                 elif factor_name == 'meeting_load':
-                    work_factors.append(f"Incident response process overhead ({weighted_score:.1f} points)")
+                    work_factors.append(f"Incident response meeting load ({weighted_score:.1f} points)")
 
     # Add work-related baseline information
     if raw_metrics:
         total_incidents = sum(severity_dist.values()) if severity_dist else 0
         if total_incidents > 0:
-            work_factors.append(f"On-call baseline stress from handling {total_incidents} total incidents")
+            work_factors.append(f"Total incident volume: {total_incidents} incidents handled")
 
     # Output organized factors with clear headers
     if personal_factors:
