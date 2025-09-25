@@ -1906,131 +1906,133 @@ export default function useDashboard() {
     [burnoutFactors]
   );
 
-  return {
-    API_BASE,
-    router,
-    searchParams,
-    allActiveMembers,
-    githubTimelineCache,
-    setGithubTimelineCache,
-    membersWithIncidents,
-    membersWithGitHubData,
-    loadingIntegrations,
-    initialDataLoaded,
-    hasDataFromCache,
-    loadingTrends,
-    analysisRunning,
-    analysisStage,
-    analysisProgress,
-    targetProgress,
-    redirectingToSuggested,
-    hasMoreAnalyses,
-    loadingMoreAnalyses,
-    deletingAnalysis,
-    deleteDialogOpen,
-    setDeleteDialogOpen,
-    dropdownLoading,
-    debugSectionOpen,
-    setDebugSectionOpen,
+return {
+  // config, routing
+  API_BASE,
+  router,
+  searchParams,
 
-    sidebarCollapsed,
-    setSidebarCollapsed,
+  // loading, lifecycle
+  loadingIntegrations,
+  initialDataLoaded,
+  hasDataFromCache,
+  loadingTrends,
+  analysisRunning,
+  analysisStage,
+  analysisProgress,
+  targetProgress,
+  redirectingToSuggested,
+  hasMoreAnalyses,
+  loadingMoreAnalyses,
+  dropdownLoading,
 
-    // selections / ids
-    selectedIntegration,
-    setSelectedIntegration,
-    selectedIntegrationData,
-    currentRunningAnalysisId,
-    selectedMember,
-    setSelectedMember,
-    timeRange,
-    setTimeRange,
+  // ui states
+  sidebarCollapsed,
+  setSidebarCollapsed,
+  debugSectionOpen,
+  setDebugSectionOpen,
+  expandedDataSources,
+  setExpandedDataSources,
 
-    // data
-    integrations,
-    currentAnalysis,
-    previousAnalyses,
-    totalAnalysesCount,
-    historicalTrends,
-    analysisMappings,
+  // selections & ids
+  selectedIntegration,
+  setSelectedIntegration,
+  selectedIntegrationData,
+  currentRunningAnalysisId,
+  selectedMember,
+  setSelectedMember,
+  timeRange,
+  setTimeRange,
 
-    // github/slack + options
-    githubIntegration,
-    slackIntegration,
-    includeGithub,
-    setIncludeGithub,
-    includeSlack,
-    setIncludeSlack,
-    enableAI,
-    setEnableAI,
-    llmConfig,
-    isLoadingGitHubSlack,
+  // core data
+  integrations,
+  currentAnalysis,
+  previousAnalyses,
+  totalAnalysesCount,
+  historicalTrends,
+  analysisMappings,
 
-    // mapping drawer
-    mappingDrawerOpen,
-    setMappingDrawerOpen,
-    mappingDrawerPlatform,
-    openMappingDrawer,
+  // caches
+  analysisCache,
+  setAnalysisCache,
+  githubTimelineCache,
+  setGithubTimelineCache,
 
-    // derived data
-    chartData,
-    memberBarData,
-    members,
-    burnoutFactors,
-    highRiskFactors,
-    sortedBurnoutFactors,
+  // members
+  members,
+  allActiveMembers,
+  membersWithIncidents,
+  membersWithGitHubData,
 
-    // trend icon meta for the page to render with Lucide icons
-    getTrendIcon,
+  // derived data
+  chartData,
+  memberBarData,
+  burnoutFactors,
+  highRiskFactors,
+  sortedBurnoutFactors,
 
-    // helpers for styles/text
-    getRiskColor,
-    getProgressColor,
-    formatRadarLabel,
-    getAnalysisStages,
-    getAnalysisDescription,
+  // integrations & options
+  githubIntegration,
+  slackIntegration,
+  includeGithub,
+  setIncludeGithub,
+  includeSlack,
+  setIncludeSlack,
+  enableAI,
+  setEnableAI,
+  llmConfig,
+  isLoadingGitHubSlack,
 
-    // actions
-    startAnalysis,
-    runAnalysisWithTimeRange,
-    cancelRunningAnalysis,
-    openDeleteDialog,
-    confirmDeleteAnalysis,
-    loadPreviousAnalyses,
-    loadSpecificAnalysis,
-    loadHistoricalTrends,
-    fetchPlatformMappings,
-    hasGitHubMapping,
-    hasSlackMapping,
-    ensureIntegrationsLoaded,
-    handleManageIntegrations,
-    handleSignOut,
-    exportAsJSON,
-    shouldShowInsufficientDataCard,
+  // mapping drawer
+  mappingDrawerOpen,
+  setMappingDrawerOpen,
+  mappingDrawerPlatform,
+  openMappingDrawer,
 
-    // start analysis modal state
-    showTimeRangeDialog,
-    setShowTimeRangeDialog,
-    selectedTimeRange,
-    setSelectedTimeRange,
-    dialogSelectedIntegration,
-    setDialogSelectedIntegration,
+  // helpers
+  getTrendIcon,
+  getRiskColor,
+  getProgressColor,
+  formatRadarLabel,
+  getAnalysisStages,
+  getAnalysisDescription,
 
+  // actions
+  startAnalysis,
+  runAnalysisWithTimeRange,
+  cancelRunningAnalysis,
+  openDeleteDialog,
+  confirmDeleteAnalysis,
+  loadPreviousAnalyses,
+  loadSpecificAnalysis,
+  loadHistoricalTrends,
+  fetchPlatformMappings,
+  hasGitHubMapping,
+  hasSlackMapping,
+  ensureIntegrationsLoaded,
+  handleManageIntegrations,
+  handleSignOut,
+  exportAsJSON,
+  shouldShowInsufficientDataCard,
+  updateURLWithAnalysis,
 
+  // start-analysis modal
+  showTimeRangeDialog,
+  setShowTimeRangeDialog,
+  selectedTimeRange,
+  setSelectedTimeRange,
+  dialogSelectedIntegration,
+  setDialogSelectedIntegration,
 
-    analysisCache,
-    setAnalysisCache,
+  // delete modal
+  deleteDialogOpen,
+  setDeleteDialogOpen,
+  deletingAnalysis,
+  analysisToDelete,
+  setAnalysisToDelete,
 
-
-    setCurrentAnalysis,
-    setRedirectingToSuggested,
-    updateURLWithAnalysis,
-
-    expandedDataSources,
-    setExpandedDataSources,
-
-    analysisToDelete,
-    setAnalysisToDelete,
-
-  };
+  // direct setters
+  setCurrentAnalysis,
+  setRedirectingToSuggested
+};
 }
