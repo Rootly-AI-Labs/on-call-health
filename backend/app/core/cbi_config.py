@@ -405,52 +405,52 @@ def generate_cbi_score_reasoning(
             weighted_score = factor_data.get('weighted_score', 0)
             if weighted_score > 5:  # Only show significant contributors
                 if factor_name == 'sleep_quality_proxy':
-                    # Combine critical incident data with sleep impact
-                    critical_count = trauma_data.get('critical_incidents', 0)
-                    compound_factor = trauma_data.get('compound_factor', 1.0)
-                    overnight_count = time_data.get('overnight_incidents', 0)
-                    overnight_multiplier = time_data.get('overnight_multiplier', 1.8)
-
-                    parts = []
-                    if critical_count > 0:
-                        parts.append(f"{critical_count} critical incidents (compound factor: {compound_factor:.2f}x)")
-                    if overnight_count > 0:
-                        parts.append(f"{overnight_count} overnight ({overnight_multiplier:.1f}x impact)")
-
-                    if parts:
-                        personal_factors.append(f"Critical incident stress impact: {', '.join(parts)} ({weighted_score:.1f} points)")
-                    else:
-                        personal_factors.append(f"Critical incident stress impact ({weighted_score:.1f} points)")
+                    personal_factors.append(f"Critical incident stress impact ({weighted_score:.1f} points)")
 
                 elif factor_name == 'vacation_usage':
-                    # Combine recovery data
-                    recovery_violations = recovery_data.get('recovery_violations', 0)
-                    avg_recovery = recovery_data.get('avg_recovery_hours', 0)
-                    recovery_score = recovery_data.get('recovery_score', 100)
-                    if recovery_violations > 0:
-                        personal_factors.append(f"Inadequate recovery time: {recovery_violations} violations (<48h), {avg_recovery:.1f}h avg, {recovery_score:.0f}/100 adequacy ({weighted_score:.1f} points)")
-                    else:
-                        personal_factors.append(f"Inadequate recovery time ({weighted_score:.1f} points)")
+                    personal_factors.append(f"Inadequate recovery time ({weighted_score:.1f} points)")
 
                 elif factor_name == 'work_hours_trend':
                     personal_factors.append(f"Exhaustion from excessive work hours ({weighted_score:.1f} points)")
 
                 elif factor_name == 'after_hours_activity':
-                    # Combine time impact data but keep as separate factor
-                    after_hours_count = time_data.get('after_hours_incidents', 0)
-                    multiplier = time_data.get('after_hours_multiplier', 1.4)
-                    if after_hours_count > 0:
-                        personal_factors.append(f"Non-business hours incident stress: {after_hours_count} incidents ({multiplier:.1f}x impact) ({weighted_score:.1f} points)")
-                    else:
-                        personal_factors.append(f"Non-business hours incident stress ({weighted_score:.1f} points)")
+                    personal_factors.append(f"Non-business hours incident stress ({weighted_score:.1f} points)")
 
                 elif factor_name == 'weekend_work':
-                    weekend_count = time_data.get('weekend_incidents', 0)
-                    weekend_multiplier = time_data.get('weekend_multiplier', 1.6)
-                    if weekend_count > 0:
-                        personal_factors.append(f"Weekend incident disruptions: {weekend_count} incidents ({weekend_multiplier:.1f}x impact) ({weighted_score:.1f} points)")
-                    else:
-                        personal_factors.append(f"Weekend work disruptions ({weighted_score:.1f} points)")
+                    personal_factors.append(f"Weekend work disruptions ({weighted_score:.1f} points)")
+
+    # Add research insights as separate, clean factors
+    if raw_metrics:
+        # Critical incidents insights
+        critical_count = trauma_data.get('critical_incidents', 0)
+        compound_factor = trauma_data.get('compound_factor', 1.0)
+        if critical_count > 0:
+            personal_factors.append(f"Multiple critical incidents: {critical_count} incidents (compound factor: {compound_factor:.2f}x)")
+
+        # Time impact insights
+        after_hours_count = time_data.get('after_hours_incidents', 0)
+        weekend_count = time_data.get('weekend_incidents', 0)
+        overnight_count = time_data.get('overnight_incidents', 0)
+
+        if after_hours_count > 0:
+            multiplier = time_data.get('after_hours_multiplier', 1.4)
+            personal_factors.append(f"After-hours incidents: {after_hours_count} incidents ({multiplier:.1f}x psychological impact)")
+
+        if weekend_count > 0:
+            weekend_multiplier = time_data.get('weekend_multiplier', 1.6)
+            personal_factors.append(f"Weekend incidents: {weekend_count} incidents ({weekend_multiplier:.1f}x impact)")
+
+        if overnight_count > 0:
+            overnight_multiplier = time_data.get('overnight_multiplier', 1.8)
+            personal_factors.append(f"Overnight incidents disrupting sleep: {overnight_count} incidents ({overnight_multiplier:.1f}x impact)")
+
+        # Recovery insights
+        recovery_violations = recovery_data.get('recovery_violations', 0)
+        avg_recovery = recovery_data.get('avg_recovery_hours', 0)
+        if recovery_violations > 0:
+            personal_factors.append(f"Insufficient recovery periods: {recovery_violations} violations (<48 hours between incidents)")
+        if avg_recovery > 0 and avg_recovery < 168:  # Less than 1 week
+            personal_factors.append(f"Average recovery time: {avg_recovery:.1f} hours (optimal: 168+ hours)")
 
     # Work-related burnout contributors
     if work_score > 50:
@@ -478,6 +478,12 @@ def generate_cbi_score_reasoning(
 
                 elif factor_name == 'meeting_load':
                     work_factors.append(f"Incident response process overhead ({weighted_score:.1f} points)")
+
+    # Add work-related baseline information
+    if raw_metrics:
+        total_incidents = sum(severity_dist.values()) if severity_dist else 0
+        if total_incidents > 0:
+            work_factors.append(f"On-call baseline stress from handling {total_incidents} total incidents")
 
     # Output organized factors with clear headers
     if personal_factors:
