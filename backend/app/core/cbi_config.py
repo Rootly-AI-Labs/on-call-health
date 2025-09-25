@@ -386,96 +386,157 @@ def generate_cbi_score_reasoning(
     else:
         reasons.append(f"Low burnout risk (CBI: {composite_score:.0f}/100) - healthy stress levels")
     
+    # Organize all factors by dimension and combine related insights
+    personal_factors = []
+    work_factors = []
+
+    # Collect research-based insights first for consolidation
+    time_data = raw_metrics.get('time_impact_analysis', {}) if raw_metrics else {}
+    recovery_data = raw_metrics.get('recovery_analysis', {}) if raw_metrics else {}
+    trauma_data = raw_metrics.get('trauma_analysis', {}) if raw_metrics else {}
+    severity_dist = raw_metrics.get('severity_distribution', {}) if raw_metrics else {}
+
+    # Consolidate personal factors by grouping similar stress sources
+    personal_factor_groups = {
+        'time_disruption': {'score': 0, 'details': []},
+        'recovery_deficit': {'score': 0, 'details': []},
+        'critical_stress': {'score': 0, 'details': []},
+        'work_intensity': {'score': 0, 'details': []}
+    }
+
     # Personal burnout contributors
     if personal_score > 50:
         personal_components = personal_result.get('components', {})
         top_personal = sorted(personal_components.items(), key=lambda x: x[1].get('weighted_score', 0), reverse=True)
-        
-        reasons.append("Personal burnout factors:")
+
         for factor_name, factor_data in top_personal[:3]:  # Top 3 contributors
             weighted_score = factor_data.get('weighted_score', 0)
             if weighted_score > 5:  # Only show significant contributors
                 if factor_name == 'work_hours_trend':
-                    reasons.append(f"   • Personal exhaustion from excessive work hours ({weighted_score:.1f} points)")
+                    personal_factor_groups['work_intensity']['score'] += weighted_score
+                    personal_factor_groups['work_intensity']['details'].append("excessive work hours")
                 elif factor_name == 'weekend_work':
-                    reasons.append(f"   • Personal stress from weekend incident disruptions ({weighted_score:.1f} points)")
+                    personal_factor_groups['time_disruption']['score'] += weighted_score
+                    weekend_count = time_data.get('weekend_incidents', 0)
+                    weekend_multiplier = time_data.get('weekend_multiplier', 1.6)
+                    if weekend_count > 0:
+                        personal_factor_groups['time_disruption']['details'].append(f"{weekend_count} weekend incidents ({weekend_multiplier:.1f}x impact)")
+                    else:
+                        personal_factor_groups['time_disruption']['details'].append("weekend disruptions")
                 elif factor_name == 'after_hours_activity':
-                    reasons.append(f"   • Personal fatigue from non-business hours incident stress ({weighted_score:.1f} points)")
+                    personal_factor_groups['time_disruption']['score'] += weighted_score
+                    after_hours_count = time_data.get('after_hours_incidents', 0)
+                    multiplier = time_data.get('after_hours_multiplier', 1.4)
+                    overnight_count = time_data.get('overnight_incidents', 0)
+                    overnight_multiplier = time_data.get('overnight_multiplier', 1.8)
+
+                    time_details = []
+                    if after_hours_count > 0:
+                        time_details.append(f"{after_hours_count} non-business hours ({multiplier:.1f}x impact)")
+                    if overnight_count > 0:
+                        time_details.append(f"{overnight_count} overnight ({overnight_multiplier:.1f}x impact)")
+
+                    if time_details:
+                        personal_factor_groups['time_disruption']['details'].extend(time_details)
+                    else:
+                        personal_factor_groups['time_disruption']['details'].append("non-business hours stress")
                 elif factor_name == 'vacation_usage':
-                    reasons.append(f"   • Personal burnout from inadequate recovery time ({weighted_score:.1f} points)")
+                    personal_factor_groups['recovery_deficit']['score'] += weighted_score
+                    recovery_violations = recovery_data.get('recovery_violations', 0)
+                    avg_recovery = recovery_data.get('avg_recovery_hours', 0)
+                    recovery_score = recovery_data.get('recovery_score', 100)
+                    if recovery_violations > 0:
+                        personal_factor_groups['recovery_deficit']['details'].append(f"{recovery_violations} violations (<48h), {avg_recovery:.1f}h avg recovery, {recovery_score:.0f}/100 adequacy")
+                    else:
+                        personal_factor_groups['recovery_deficit']['details'].append("inadequate recovery time")
                 elif factor_name == 'sleep_quality_proxy':
-                    reasons.append(f"   • Personal exhaustion from critical incident stress impact ({weighted_score:.1f} points)")
-    
-    # Work-related burnout contributors  
+                    personal_factor_groups['critical_stress']['score'] += weighted_score
+                    critical_count = trauma_data.get('critical_incidents', 0)
+                    compound_factor = trauma_data.get('compound_factor', 1.0)
+
+                    if critical_count > 0:
+                        personal_factor_groups['critical_stress']['details'].append(f"{critical_count} critical incidents (compound factor: {compound_factor:.2f}x)")
+                    else:
+                        personal_factor_groups['critical_stress']['details'].append("critical incident stress")
+
+    # Generate consolidated personal factors
+    for group_name, group_data in personal_factor_groups.items():
+        if group_data['score'] > 0 and group_data['details']:
+            if group_name == 'time_disruption':
+                details_str = ', '.join(group_data['details'])
+                personal_factors.append(f"Time boundary disruptions: {details_str} ({group_data['score']:.1f} points)")
+            elif group_name == 'recovery_deficit':
+                details_str = ', '.join(group_data['details'])
+                personal_factors.append(f"Recovery inadequacy: {details_str} ({group_data['score']:.1f} points)")
+            elif group_name == 'critical_stress':
+                details_str = ', '.join(group_data['details'])
+                personal_factors.append(f"Critical incident psychological impact: {details_str} ({group_data['score']:.1f} points)")
+            elif group_name == 'work_intensity':
+                details_str = ', '.join(group_data['details'])
+                personal_factors.append(f"Work intensity exhaustion: {details_str} ({group_data['score']:.1f} points)")
+
+    # Consolidate work factors by grouping similar stress sources
+    work_factor_groups = {
+        'incident_load': {'score': 0, 'details': []},
+        'response_pressure': {'score': 0, 'details': []},
+        'process_burden': {'score': 0, 'details': []}
+    }
+
+    # Work-related burnout contributors
     if work_score > 50:
         work_components = work_result.get('components', {})
         top_work = sorted(work_components.items(), key=lambda x: x[1].get('weighted_score', 0), reverse=True)
-        
-        reasons.append("Work-related burnout factors:")
+
         for factor_name, factor_data in top_work[:3]:  # Top 3 contributors
             weighted_score = factor_data.get('weighted_score', 0)
             if weighted_score > 5:  # Only show significant contributors
                 if factor_name == 'sprint_completion':
-                    reasons.append(f"   • Work-related stress from high-pressure response demands ({weighted_score:.1f} points)")
+                    work_factor_groups['response_pressure']['score'] += weighted_score
+                    work_factor_groups['response_pressure']['details'].append("high-pressure response demands")
                 elif factor_name == 'pr_frequency':
-                    reasons.append(f"   • Work-related stress from incident severity burden ({weighted_score:.1f} points)")
+                    work_factor_groups['incident_load']['score'] += weighted_score
+                    work_factor_groups['incident_load']['details'].append("incident severity burden")
                 elif factor_name == 'deployment_frequency':
-                    reasons.append(f"   • Work-related pressure from critical production incidents ({weighted_score:.1f} points)")
+                    work_factor_groups['incident_load']['score'] += weighted_score
+                    work_factor_groups['incident_load']['details'].append("critical production incident pressure")
                 elif factor_name == 'meeting_load':
-                    reasons.append(f"   • Work-related stress from incident response process overhead ({weighted_score:.1f} points)")
+                    work_factor_groups['process_burden']['score'] += weighted_score
+                    work_factor_groups['process_burden']['details'].append("incident response process overhead")
                 elif factor_name == 'oncall_burden':
-                    reasons.append(f"   • Work-related burnout from on-call responsibility burden ({weighted_score:.1f} points)")
-    
-    # Specific severity insights
-    if raw_metrics:
-        severity_dist = raw_metrics.get('severity_distribution', {})
-        sev0_count = severity_dist.get('sev0', 0)
-        sev1_count = severity_dist.get('sev1', 0)
-        
-        if sev0_count > 0:
-            reasons.append(f"Handled {sev0_count} critical SEV0 incident{'s' if sev0_count != 1 else ''} (severe psychological impact)")
-        if sev1_count > 0:
-            reasons.append(f"Managed {sev1_count} high-impact SEV1 incident{'s' if sev1_count != 1 else ''} (high stress impact)")
+                    work_factor_groups['incident_load']['score'] += weighted_score
+                    total_incidents = sum(severity_dist.values()) if severity_dist else 0
+                    if total_incidents > 0:
+                        work_factor_groups['incident_load']['details'].append(f"on-call responsibility for {total_incidents} total incidents")
+                    else:
+                        work_factor_groups['incident_load']['details'].append("on-call responsibility burden")
 
-        total_incidents = sum(severity_dist.values()) if severity_dist else 0
-        if total_incidents > 0:
-            reasons.append(f"On-call baseline stress from handling {total_incidents} total incidents (cumulative impact)")
+    # Generate consolidated work factors
+    for group_name, group_data in work_factor_groups.items():
+        if group_data['score'] > 0 and group_data['details']:
+            if group_name == 'incident_load':
+                details_str = ', '.join(group_data['details'])
+                work_factors.append(f"Incident workload burden: {details_str} ({group_data['score']:.1f} points)")
+            elif group_name == 'response_pressure':
+                details_str = ', '.join(group_data['details'])
+                work_factors.append(f"Response pressure: {details_str} ({group_data['score']:.1f} points)")
+            elif group_name == 'process_burden':
+                details_str = ', '.join(group_data['details'])
+                work_factors.append(f"Process overhead: {details_str} ({group_data['score']:.1f} points)")
 
-    # Add research-based insights if available in raw_metrics
-    if raw_metrics and 'time_impact_analysis' in raw_metrics:
-        time_data = raw_metrics['time_impact_analysis']
-        recovery_data = raw_metrics.get('recovery_analysis', {})
-        trauma_data = raw_metrics.get('trauma_analysis', {})
+    # Output organized factors
+    if personal_factors:
+        reasons.append("Personal burnout factors:")
+        for factor in personal_factors:
+            reasons.append(f"   • {factor}")
 
-        # Time impact insights
-        if time_data.get('after_hours_incidents', 0) > 0:
-            reasons.append(f"Time impact factors:")
-            reasons.append(f"   • Non-business hours incidents: {time_data['after_hours_incidents']} ({time_data.get('after_hours_multiplier', 1.4):.1f}x psychological impact)")
+    if work_factors:
+        reasons.append("Work-related burnout factors:")
+        for factor in work_factors:
+            reasons.append(f"   • {factor}")
 
-        if time_data.get('weekend_incidents', 0) > 0:
-            reasons.append(f"   • Weekend incidents disrupting family time: {time_data['weekend_incidents']} ({time_data.get('weekend_multiplier', 1.6):.1f}x impact)")
-
-        if time_data.get('overnight_incidents', 0) > 0:
-            reasons.append(f"   • Overnight incidents disrupting sleep: {time_data['overnight_incidents']} ({time_data.get('overnight_multiplier', 1.8):.1f}x impact)")
-
-        # Recovery analysis insights
-        if recovery_data.get('recovery_violations', 0) > 0:
-            reasons.append(f"Recovery deficit factors:")
-            reasons.append(f"   • Insufficient recovery periods: {recovery_data['recovery_violations']} violations (<48 hours between incidents)")
-            avg_recovery = recovery_data.get('avg_recovery_hours', 0)
-            if avg_recovery > 0:
-                reasons.append(f"   • Average recovery time: {avg_recovery:.1f} hours (optimal: 168+ hours)")
-            recovery_score = recovery_data.get('recovery_score', 100)
-            if recovery_score < 50:
-                reasons.append(f"   • Recovery adequacy: {recovery_score:.0f}/100 (psychological restoration impaired)")
-
-        # Compound trauma insights
-        if trauma_data.get('compound_trauma_detected', False):
-            critical_count = trauma_data.get('critical_incidents', 0)
-            compound_factor = trauma_data.get('compound_factor', 1.0)
-            reasons.append(f"Compound trauma factors:")
-            reasons.append(f"   • Multiple critical incidents: {critical_count} (compound factor: {compound_factor:.2f}x)")
-            reasons.append(f"   • Research shows: 5+ critical incidents create exponential psychological impact")
+    # Add educational research note only once at the end
+    if trauma_data.get('compound_trauma_detected', False):
+        reasons.append("Research insight: 5+ critical incidents create exponential psychological impact")
     
     # Dimensional comparison
     if abs(personal_score - work_score) > 15:
