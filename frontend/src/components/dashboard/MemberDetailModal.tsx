@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, Cell } from "recharts"
 import { Info, RefreshCw, BarChart3 } from "lucide-react"
 import { useState, useEffect } from "react"
+import { BurnoutFactorsV0 } from "@/components/BurnoutFactorsV0"
 
 // Individual Daily Health Chart component
 function IndividualDailyHealthChart({ memberData, analysisId, currentAnalysis }: {
@@ -356,8 +357,8 @@ export function MemberDetailModal({
             {/* Overall Burnout Assessment */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Card>
-                <CardContent className="p-4 text-center">
-                  <p className="text-sm text-gray-600 mb-2">Overall Risk Level</p>
+                <CardContent className="p-6 text-center">
+                  <p className="text-sm text-gray-600 mb-3">Overall Risk Level</p>
                   {(() => {
                     // Calculate CBI-based risk level when available
                     const getCBIRiskLevel = () => {
@@ -371,32 +372,32 @@ export function MemberDetailModal({
                       // No CBI score available - default to unknown risk
                       return { level: 'unknown', label: 'Unknown Risk' };
                     };
-                    
+
                     const riskInfo = getCBIRiskLevel();
                     const getCBIColor = (level: string) => {
                       switch(level) {
                         case 'critical': return 'bg-red-100 text-red-800 border-red-300';
-                        case 'poor': return 'bg-red-50 text-red-600 border-red-200'; 
+                        case 'poor': return 'bg-red-50 text-red-600 border-red-200';
                         case 'fair': return 'bg-yellow-50 text-yellow-600 border-yellow-200';
                         case 'healthy': return 'bg-green-50 text-green-600 border-green-200';
                         default: return 'bg-gray-50 text-gray-600 border-gray-200';
                       }
                     };
-                    
+
                     return (
-                      <Badge className={`px-3 py-1 ${getCBIColor(riskInfo.level)}`}>
+                      <Badge className={`px-3 py-1 ${getCBIColor(riskInfo.level)} mb-4`}>
                         {riskInfo.label}
                       </Badge>
                     );
                   })()}
-                  <div className="mt-3">
-                    <div className={`text-2xl font-bold ${(() => {
+                  <div className="mt-2">
+                    <div className={`text-3xl font-bold mb-2 ${(() => {
                       if (memberData?.cbi_score !== undefined) {
                         // Color the CBI score based on risk level
                         const score = memberData.cbi_score;
                         if (score < 25) return 'text-green-600';      // Healthy
                         if (score < 50) return 'text-yellow-600';     // Fair
-                        if (score < 75) return 'text-orange-600';     // Poor  
+                        if (score < 75) return 'text-orange-600';     // Poor
                         return 'text-red-600';                       // Critical
                       }
                       return 'text-gray-900'; // Legacy fallback
@@ -406,240 +407,61 @@ export function MemberDetailModal({
                         'No Score Available'
                       }
                     </div>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-sm text-gray-500">
                       {memberData?.cbi_score !== undefined ? 'CBI Score' : 'No Score Available'}
                     </p>
                   </div>
                 </CardContent>
               </Card>
-              
+
               <Card>
-                <CardContent className="p-4 text-center">
-                  <p className="text-sm text-gray-600 mb-2">Incidents Handled</p>
-                  <div className="text-2xl font-bold text-blue-600">
-                    {memberData?.incident_count || 0}
+                <CardContent className="p-6 text-center">
+                  <p className="text-sm text-gray-600 mb-3">Incidents Handled</p>
+                  {(() => {
+                    const incidentCount = memberData?.incident_count || 0;
+                    const getIncidentLevel = () => {
+                      if (incidentCount === 0) return { level: 'none', label: 'No Activity' };
+                      if (incidentCount < 5) return { level: 'low', label: 'Low Volume' };
+                      if (incidentCount < 15) return { level: 'moderate', label: 'Moderate' };
+                      if (incidentCount < 30) return { level: 'high', label: 'High Volume' };
+                      return { level: 'critical', label: 'Very High' };
+                    };
+
+                    const incidentInfo = getIncidentLevel();
+                    const getIncidentColor = (level: string) => {
+                      switch(level) {
+                        case 'none': return 'bg-gray-100 text-gray-600 border-gray-300';
+                        case 'low': return 'bg-green-100 text-green-600 border-green-300';
+                        case 'moderate': return 'bg-blue-100 text-blue-600 border-blue-300';
+                        case 'high': return 'bg-yellow-100 text-yellow-600 border-yellow-300';
+                        case 'critical': return 'bg-red-100 text-red-600 border-red-300';
+                        default: return 'bg-gray-100 text-gray-600 border-gray-300';
+                      }
+                    };
+
+                    return (
+                      <Badge className={`px-3 py-1 ${getIncidentColor(incidentInfo.level)} mb-4`}>
+                        {incidentInfo.label}
+                      </Badge>
+                    );
+                  })()}
+                  <div className="mt-2">
+                    <div className="text-3xl font-bold text-blue-600 mb-2">
+                      {memberData?.incident_count || 0}
+                    </div>
+                    <p className="text-sm text-gray-500">Past 30 days</p>
                   </div>
-                  <p className="text-xs text-gray-500">Past 30 days</p>
                 </CardContent>
               </Card>
-              
+
             </div>
             
-            {/* CBI Burnout Analysis */}
+            {/* CBI Burnout Factors */}
             <Card>
               <CardContent className="p-4">
-                <h4 className="font-semibold text-gray-900 mb-2">Burnout Analysis</h4>
+                <h4 className="text-xl font-semibold text-gray-900 mb-4">Burnout Factors</h4>
                 {memberData?.cbi_reasoning ? (
-                  <div className="space-y-6">
-                    {/* Contributing Factors */}
-                    <div className="space-y-3">
-                      <h5 className="text-sm font-semibold text-gray-900 mb-3 pb-1 border-b border-gray-200">
-                        Factors
-                      </h5>
-                      <div className="space-y-3">
-                        {(() => {
-                          let currentSection = 'personal'; // Default section
-                          let personalPoints = 0;
-                          let workRelatedPoints = 0;
-
-                          // First pass: calculate total points for each section
-                          memberData.cbi_reasoning.slice(1).forEach((reason: string) => {
-                            const cleanReason = reason.replace(/^[\s]*[•·\-*]\s*/, '').trim();
-                            if (cleanReason === 'PERSONAL:') {
-                              currentSection = 'personal';
-                            } else if (cleanReason === 'WORK-RELATED:') {
-                              currentSection = 'work';
-                            } else if (!cleanReason.endsWith(':') && cleanReason.length > 0) {
-                              const pointsMatch = cleanReason.match(/\(([0-9.]+) points?\)/);
-                              if (pointsMatch) {
-                                const points = parseFloat(pointsMatch[1]);
-                                if (currentSection === 'personal') {
-                                  personalPoints += points;
-                                } else if (currentSection === 'work') {
-                                  workRelatedPoints += points;
-                                }
-                              }
-                            }
-                          });
-
-                          // Reset section for rendering
-                          currentSection = 'personal';
-                          return memberData.cbi_reasoning.slice(1).map((reason: string, index: number) => {
-                            const cleanReason = reason.replace(/^[\s]*[•·\-*]\s*/, '').trim();
-
-                            // Update current section context when we encounter section headers
-                            if (cleanReason === 'PERSONAL:') {
-                              currentSection = 'personal';
-                              // Render PERSONAL header in card style
-                              return (
-                                <div key={index} className="mt-6 first:mt-0">
-                                  <div className="bg-green-50 rounded-lg p-3">
-                                    <div className="flex items-center space-x-1 mb-1">
-                                      <div className="text-xs font-medium text-green-600 uppercase">Personal</div>
-                                      <div className="relative group">
-                                        <Info className="w-3 h-3 text-green-500 cursor-help" />
-                                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg w-72 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                                          <div className="font-semibold mb-1">Personal Burnout Factors</div>
-                                          <div>Individual-level stress indicators including incident frequency, after-hours work patterns, sleep disruption, and personal workload intensity</div>
-                                          <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-900"></div>
-                                        </div>
-                                      </div>
-                                    </div>
-                                    <div className="text-lg font-bold text-green-700">
-                                      {(personalPoints / 2).toFixed(1)} points
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            }
-                            if (cleanReason === 'WORK-RELATED:') {
-                              currentSection = 'work';
-                              // Render WORK-RELATED header in card style
-                              return (
-                                <div key={index} className="mt-6 first:mt-0">
-                                  <div className="bg-blue-50 rounded-lg p-3">
-                                    <div className="flex items-center space-x-1 mb-1">
-                                      <div className="text-xs font-medium text-blue-600 uppercase">Work-Related</div>
-                                      <div className="relative group">
-                                        <Info className="w-3 h-3 text-blue-500 cursor-help" />
-                                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg w-72 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                                          <div className="font-semibold mb-1">Work-Related Burnout Factors</div>
-                                          <div>Job-specific stress indicators including incident response patterns, severity-weighted workload, code activity timing, and work-life boundary violations</div>
-                                          <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-900"></div>
-                                        </div>
-                                      </div>
-                                    </div>
-                                    <div className="text-lg font-bold text-blue-700">
-                                      {(workRelatedPoints / 2).toFixed(1)} points
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            }
-
-                            // Check if this is a section header (other analysis sections like Time Pattern Analysis:)
-                            const isSectionHeader = cleanReason.endsWith(':');
-
-                            // For individual factors (not ending with :), render as styled cards
-                            if (!isSectionHeader && cleanReason.length > 0) {
-                              // Check if this is a sub-bullet (starts with spaces + bullet)
-                              const isSubBullet = reason.match(/^\s{2,}[•·\-*]\s*/);
-
-                              if (isSubBullet) {
-                                // Render sub-bullets with reduced visual hierarchy and tighter spacing
-                                return (
-                                  <div key={index} className="ml-6 mt-1 first:mt-2">
-                                    <div className="flex items-start space-x-3">
-                                      <div className="flex-shrink-0 mt-1">
-                                        <div className="w-1.5 h-1.5 bg-gray-300 rounded-full"></div>
-                                      </div>
-                                      <div className="flex-1 text-sm text-gray-600 leading-5 font-normal">
-                                        {cleanReason}
-                                      </div>
-                                    </div>
-                                  </div>
-                                );
-                              }
-
-                              // Extract points from the factor text
-                              const pointsMatch = cleanReason.match(/\(([0-9.]+) points?\)/);
-                              const points = pointsMatch ? parseFloat(pointsMatch[1]) : null;
-                              const factorText = points ? cleanReason.replace(/\s*\([0-9.]+ points?\)/, '') : cleanReason;
-
-                              // Use current section context for styling
-                              const isPersonalFactor = currentSection === 'personal';
-                              const bgColor = isPersonalFactor ? 'bg-green-50' : 'bg-blue-50';
-                              const textColor = 'text-gray-900'; // Black/dark grey for all factor text
-                              const pointsColor = 'text-gray-700'; // Dark grey for points
-
-                              return (
-                                <div key={index} className="py-4 border-b border-gray-100 last:border-b-0">
-                                  <div className="flex justify-between items-start">
-                                    <div className="flex-1 pr-2">
-                                      <div className={`text-base font-semibold ${textColor} leading-tight mb-1`}>
-                                        {factorText}
-                                      </div>
-                                    </div>
-                                    {points !== null && (
-                                      <div className="flex-shrink-0">
-                                        <div className={`text-xl font-bold ${pointsColor}`}>
-                                          {(points / 2).toFixed(1)}
-                                        </div>
-                                        <div className="text-xs text-gray-500 text-right">points</div>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            }
-
-                            if (isSectionHeader) {
-                              // Render section headers with elegant compact styling
-                              return (
-                                <div key={index} className="mt-5 first:mt-0">
-                                  <div className="flex items-center space-x-2 mb-3">
-                                    {cleanReason === 'Time Pattern Analysis:' && (
-                                      <>
-                                        <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                                        <span className="text-sm font-medium text-gray-800">{cleanReason.replace(':', '')}</span>
-                                        <div className="relative group">
-                                          <Info className="w-3 h-3 text-orange-500 cursor-help opacity-60 hover:opacity-100" />
-                                          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg w-72 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                                            <div className="font-semibold mb-1">Time Pattern Analysis</div>
-                                            <div>Temporal analysis of work activities, including after-hours patterns, weekend work, and time-based stress multipliers</div>
-                                            <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-900"></div>
-                                          </div>
-                                        </div>
-                                      </>
-                                    )}
-                                    {cleanReason === 'Recovery Pattern Analysis:' && (
-                                      <>
-                                        <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                                        <span className="text-sm font-medium text-gray-800">{cleanReason.replace(':', '')}</span>
-                                        <div className="relative group">
-                                          <Info className="w-3 h-3 text-purple-500 cursor-help opacity-60 hover:opacity-100" />
-                                          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg w-72 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                                            <div className="font-semibold mb-1">Recovery Pattern Analysis</div>
-                                            <div>Assessment of recovery time between incidents, sleep quality impact, and overall recovery deficit patterns</div>
-                                            <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-900"></div>
-                                          </div>
-                                        </div>
-                                      </>
-                                    )}
-                                    {cleanReason === 'Critical Incident Analysis:' && (
-                                      <>
-                                        <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                                        <span className="text-sm font-medium text-gray-800">{cleanReason.replace(':', '')}</span>
-                                        <div className="relative group">
-                                          <Info className="w-3 h-3 text-red-500 cursor-help opacity-60 hover:opacity-100" />
-                                          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg w-72 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                                            <div className="font-semibold mb-1">Critical Incident Analysis</div>
-                                            <div>Analysis of high-severity incidents and their psychological impact, including compound trauma effects and stress accumulation</div>
-                                            <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-900"></div>
-                                          </div>
-                                        </div>
-                                      </>
-                                    )}
-                                    {/* Fallback for other section headers */}
-                                    {!cleanReason.match(/^(Time Pattern Analysis|Recovery Pattern Analysis|Critical Incident Analysis):$/) && (
-                                      <>
-                                        <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-                                        <span className="text-sm font-medium text-gray-800">{cleanReason.replace(':', '')}</span>
-                                      </>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            }
-
-                            // Return null for unhandled cases
-                            return null;
-                          });
-                        })()}
-                      </div>
-                    </div>
-
-                  </div>
+                  <BurnoutFactorsV0 cbiReasoning={memberData.cbi_reasoning} />
                 ) : (
                   <p className="text-sm text-gray-500 italic">
                     CBI burnout analysis not available. Run a new analysis to see detailed burnout factors.
