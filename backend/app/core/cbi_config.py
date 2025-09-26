@@ -109,12 +109,12 @@ class CBIConfig:
         }
     }
     
-    # CBI Score Interpretation Ranges (0-100 scale)
+    # CBI Score Interpretation Ranges (0-100 scale, sum of Personal + Work-Related points capped at 100)
     CBI_SCORE_RANGES = {
-        'low': (0, 25),           # Minimal burnout
-        'mild': (25, 50),         # Some burnout symptoms
-        'moderate': (50, 75),     # Significant burnout
-        'high': (75, 100)         # Severe burnout
+        'low': (0, 25),           # Minimal burnout (0-25 total points)
+        'mild': (25, 50),         # Some burnout symptoms (25-50 total points)
+        'moderate': (50, 75),     # Significant burnout (50-75 total points)
+        'high': (75, 100)         # Severe burnout (75-100 total points)
     }
     
     # Risk Level Mapping (for compatibility with existing system)
@@ -252,7 +252,7 @@ def calculate_composite_cbi_score(personal_score: float, work_related_score: flo
     
     weights = config.DIMENSION_WEIGHTS
     
-    # Calculate weighted average
+    # Calculate weighted average as per CBI methodology
     composite_score = (
         personal_score * weights[CBIDimension.PERSONAL] +
         work_related_score * weights[CBIDimension.WORK_RELATED]
@@ -278,7 +278,7 @@ def calculate_composite_cbi_score(personal_score: float, work_related_score: flo
 def get_cbi_interpretation(score: float, config: CBIConfig = None) -> str:
     """
     Get CBI score interpretation based on standard ranges.
-    
+
     Args:
         score: CBI score (0-100)
         config: Optional config override

@@ -486,7 +486,7 @@ export function MemberDetailModal({
                                       </div>
                                     </div>
                                     <div className="text-lg font-bold text-green-700">
-                                      {personalPoints.toFixed(1)} points
+                                      {(personalPoints / 2).toFixed(1)} points
                                     </div>
                                   </div>
                                 </div>
@@ -510,7 +510,7 @@ export function MemberDetailModal({
                                       </div>
                                     </div>
                                     <div className="text-lg font-bold text-blue-700">
-                                      {workRelatedPoints.toFixed(1)} points
+                                      {(workRelatedPoints / 2).toFixed(1)} points
                                     </div>
                                   </div>
                                 </div>
@@ -526,11 +526,16 @@ export function MemberDetailModal({
                               const isSubBullet = reason.match(/^\s{2,}[•·\-*]\s*/);
 
                               if (isSubBullet) {
-                                // Render sub-bullets as indented items
+                                // Render sub-bullets with reduced visual hierarchy and tighter spacing
                                 return (
-                                  <div key={index} className="ml-4 py-1">
-                                    <div className="text-sm text-gray-600 leading-relaxed">
-                                      {cleanReason}
+                                  <div key={index} className="ml-6 mt-1 first:mt-2">
+                                    <div className="flex items-start space-x-3">
+                                      <div className="flex-shrink-0 mt-1">
+                                        <div className="w-1.5 h-1.5 bg-gray-300 rounded-full"></div>
+                                      </div>
+                                      <div className="flex-1 text-sm text-gray-600 leading-5 font-normal">
+                                        {cleanReason}
+                                      </div>
                                     </div>
                                   </div>
                                 );
@@ -548,17 +553,17 @@ export function MemberDetailModal({
                               const pointsColor = 'text-gray-700'; // Dark grey for points
 
                               return (
-                                <div key={index} className="py-2">
+                                <div key={index} className="py-4 border-b border-gray-100 last:border-b-0">
                                   <div className="flex justify-between items-start">
                                     <div className="flex-1 pr-2">
-                                      <div className={`text-sm font-medium ${textColor} leading-tight`}>
+                                      <div className={`text-base font-semibold ${textColor} leading-tight mb-1`}>
                                         {factorText}
                                       </div>
                                     </div>
                                     {points !== null && (
                                       <div className="flex-shrink-0">
-                                        <div className={`text-lg font-bold ${pointsColor}`}>
-                                          {points.toFixed(1)}
+                                        <div className={`text-xl font-bold ${pointsColor}`}>
+                                          {(points / 2).toFixed(1)}
                                         </div>
                                         <div className="text-xs text-gray-500 text-right">points</div>
                                       </div>
