@@ -406,18 +406,47 @@ def generate_cbi_score_reasoning(
             if weighted_score > 5:  # Only show significant contributors
                 if factor_name == 'sleep_quality_proxy':
                     personal_factors.append(f"Sleep quality impact from critical incidents ({weighted_score:.1f} points)")
+                    # Add critical incident details
+                    critical_count = trauma_data.get('critical_incidents', 0) if raw_metrics else 0
+                    compound_factor = trauma_data.get('compound_factor', 1.0) if raw_metrics else 1.0
+                    if critical_count > 0:
+                        personal_factors.append(f"  • {critical_count} critical incidents (compound factor: {compound_factor:.2f}x)")
+                    if critical_count >= 5:
+                        personal_factors.append(f"  • Research insight: 5+ critical incidents create exponential psychological impact")
 
                 elif factor_name == 'vacation_usage':
                     personal_factors.append(f"Recovery time between incidents ({weighted_score:.1f} points)")
+                    # Add recovery pattern details
+                    recovery_violations = recovery_data.get('recovery_violations', 0) if raw_metrics else 0
+                    avg_recovery = recovery_data.get('avg_recovery_hours', 0) if raw_metrics else 0
+                    if recovery_violations > 0:
+                        personal_factors.append(f"  • Recovery periods <48 hours: {recovery_violations} occurrences")
+                    if avg_recovery > 0 and avg_recovery < 168:
+                        personal_factors.append(f"  • Average recovery time: {avg_recovery:.1f} hours")
 
                 elif factor_name == 'work_hours_trend':
                     personal_factors.append(f"Extended work hours ({weighted_score:.1f} points)")
+                    # Add time pattern details for extended work hours
+                    after_hours_count = time_data.get('after_hours_incidents', 0) if raw_metrics else 0
+                    if after_hours_count > 0:
+                        personal_factors.append(f"  • After-hours incidents: {after_hours_count} incidents")
 
                 elif factor_name == 'after_hours_activity':
                     personal_factors.append(f"Non-business hours incident activity ({weighted_score:.1f} points)")
+                    # Add time pattern details
+                    after_hours_count = time_data.get('after_hours_incidents', 0) if raw_metrics else 0
+                    overnight_count = time_data.get('overnight_incidents', 0) if raw_metrics else 0
+                    if after_hours_count > 0:
+                        personal_factors.append(f"  • After-hours incidents: {after_hours_count} incidents")
+                    if overnight_count > 0:
+                        personal_factors.append(f"  • Overnight incidents: {overnight_count} incidents")
 
                 elif factor_name == 'weekend_work':
                     personal_factors.append(f"Weekend incident activity ({weighted_score:.1f} points)")
+                    # Add weekend pattern details
+                    weekend_count = time_data.get('weekend_incidents', 0) if raw_metrics else 0
+                    if weekend_count > 0:
+                        personal_factors.append(f"  • Weekend incidents: {weekend_count} incidents")
 
     # Collect time pattern and recovery data for separate display
     time_patterns = []
@@ -467,10 +496,32 @@ def generate_cbi_score_reasoning(
                         work_factors.append(f"On-call responsibility load ({weighted_score:.1f} points)")
 
                 elif factor_name == 'deployment_frequency':
-                    work_factors.append(f"Critical production incident frequency ({weighted_score:.1f} points)")
+                    # Include severity breakdown in critical production incident frequency
+                    if severity_dist:
+                        severity_breakdown = []
+                        for severity, count in severity_dist.items():
+                            if count > 0:
+                                severity_breakdown.append(f"{count} {severity}")
+                        if severity_breakdown:
+                            severity_text = ", ".join(severity_breakdown)
+                            work_factors.append(f"Critical production incident frequency: {severity_text} ({weighted_score:.1f} points)")
+                        else:
+                            work_factors.append(f"Critical production incident frequency ({weighted_score:.1f} points)")
+                    else:
+                        work_factors.append(f"Critical production incident frequency ({weighted_score:.1f} points)")
+                    # Add critical incident compound factor details
+                    critical_count = trauma_data.get('critical_incidents', 0) if raw_metrics else 0
+                    compound_factor = trauma_data.get('compound_factor', 1.0) if raw_metrics else 1.0
+                    if critical_count > 0 and compound_factor > 1.0:
+                        work_factors.append(f"  • Compound trauma factor: {compound_factor:.2f}x psychological impact")
 
                 elif factor_name == 'pr_frequency':
                     work_factors.append(f"Incident severity-weighted workload ({weighted_score:.1f} points)")
+                    # Add severity distribution details
+                    if severity_dist:
+                        high_severity = severity_dist.get('SEV0', 0) + severity_dist.get('SEV1', 0)
+                        if high_severity > 0:
+                            work_factors.append(f"  • High-severity incidents (SEV0/SEV1): {high_severity} incidents")
 
                 elif factor_name == 'sprint_completion':
                     work_factors.append(f"Response time requirements ({weighted_score:.1f} points)")
@@ -495,25 +546,6 @@ def generate_cbi_score_reasoning(
         for factor in work_factors:
             reasons.append(f"• {factor}")
 
-    # Add separate analysis sections
-    if time_patterns:
-        reasons.append("Time Pattern Analysis:")
-        for pattern in time_patterns:
-            reasons.append(f"• {pattern}")
-
-    if recovery_patterns:
-        reasons.append("Recovery Pattern Analysis:")
-        for pattern in recovery_patterns:
-            reasons.append(f"• {pattern}")
-
-    if trauma_patterns:
-        reasons.append("Critical Incident Analysis:")
-        for pattern in trauma_patterns:
-            reasons.append(f"• {pattern}")
-
-    # Add educational research note only once at the end
-    if trauma_data.get('compound_trauma_detected', False):
-        reasons.append("Research insight: 5+ critical incidents create exponential psychological impact")
     
     # Dimensional comparison
     if abs(personal_score - work_score) > 15:

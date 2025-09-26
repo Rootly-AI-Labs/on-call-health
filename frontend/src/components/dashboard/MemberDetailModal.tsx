@@ -437,22 +437,46 @@ export function MemberDetailModal({
                         Factors
                       </h5>
                       <div className="space-y-3">
-                        {memberData.cbi_reasoning.slice(1).map((reason: string, index: number) => {
-                          const cleanReason = reason.replace(/^[\s]*[•·\-*]\s*/, '').trim();
+                        {(() => {
+                          let currentSection = 'personal'; // Default section
+                          let personalPoints = 0;
+                          let workRelatedPoints = 0;
 
-                          // Check if this is a section header
-                          const isSectionHeader = cleanReason.endsWith(':');
+                          // First pass: calculate total points for each section
+                          memberData.cbi_reasoning.slice(1).forEach((reason: string) => {
+                            const cleanReason = reason.replace(/^[\s]*[•·\-*]\s*/, '').trim();
+                            if (cleanReason === 'PERSONAL:') {
+                              currentSection = 'personal';
+                            } else if (cleanReason === 'WORK-RELATED:') {
+                              currentSection = 'work';
+                            } else if (!cleanReason.endsWith(':') && cleanReason.length > 0) {
+                              const pointsMatch = cleanReason.match(/\(([0-9.]+) points?\)/);
+                              if (pointsMatch) {
+                                const points = parseFloat(pointsMatch[1]);
+                                if (currentSection === 'personal') {
+                                  personalPoints += points;
+                                } else if (currentSection === 'work') {
+                                  workRelatedPoints += points;
+                                }
+                              }
+                            }
+                          });
 
-                          if (isSectionHeader) {
-                            // Render section headers with distinctive styling and tooltips
-                            return (
-                              <div key={index} className="mt-6 first:mt-0">
-                                <h6 className="text-sm font-semibold text-gray-900 mb-2 pb-1 border-b border-gray-200 flex items-center">
-                                  {cleanReason === 'PERSONAL:' && (
-                                    <>
-                                      <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
-                                      {cleanReason.replace(':', '')}
-                                      <div className="relative group ml-1">
+                          // Reset section for rendering
+                          currentSection = 'personal';
+                          return memberData.cbi_reasoning.slice(1).map((reason: string, index: number) => {
+                            const cleanReason = reason.replace(/^[\s]*[•·\-*]\s*/, '').trim();
+
+                            // Update current section context when we encounter section headers
+                            if (cleanReason === 'PERSONAL:') {
+                              currentSection = 'personal';
+                              // Render PERSONAL header in card style
+                              return (
+                                <div key={index} className="mt-6 first:mt-0">
+                                  <div className="bg-green-50 rounded-lg p-3">
+                                    <div className="flex items-center space-x-1 mb-1">
+                                      <div className="text-xs font-medium text-green-600 uppercase">Personal</div>
+                                      <div className="relative group">
                                         <Info className="w-3 h-3 text-green-500 cursor-help" />
                                         <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg w-72 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
                                           <div className="font-semibold mb-1">Personal Burnout Factors</div>
@@ -460,13 +484,23 @@ export function MemberDetailModal({
                                           <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-900"></div>
                                         </div>
                                       </div>
-                                    </>
-                                  )}
-                                  {cleanReason === 'WORK-RELATED:' && (
-                                    <>
-                                      <div className="w-3 h-3 bg-blue-500 rounded-full mr-2"></div>
-                                      {cleanReason.replace(':', '')}
-                                      <div className="relative group ml-1">
+                                    </div>
+                                    <div className="text-lg font-bold text-green-700">
+                                      {personalPoints.toFixed(1)} points
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            }
+                            if (cleanReason === 'WORK-RELATED:') {
+                              currentSection = 'work';
+                              // Render WORK-RELATED header in card style
+                              return (
+                                <div key={index} className="mt-6 first:mt-0">
+                                  <div className="bg-blue-50 rounded-lg p-3">
+                                    <div className="flex items-center space-x-1 mb-1">
+                                      <div className="text-xs font-medium text-blue-600 uppercase">Work-Related</div>
+                                      <div className="relative group">
                                         <Info className="w-3 h-3 text-blue-500 cursor-help" />
                                         <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg w-72 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
                                           <div className="font-semibold mb-1">Work-Related Burnout Factors</div>
@@ -474,106 +508,132 @@ export function MemberDetailModal({
                                           <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-900"></div>
                                         </div>
                                       </div>
-                                    </>
-                                  )}
-                                  {cleanReason === 'Time Pattern Analysis:' && (
-                                    <>
-                                      <div className="w-3 h-3 bg-orange-500 rounded-full mr-2"></div>
-                                      {cleanReason.replace(':', '')}
-                                      <div className="relative group ml-1">
-                                        <Info className="w-3 h-3 text-orange-500 cursor-help" />
-                                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg w-72 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                                          <div className="font-semibold mb-1">Time Pattern Analysis</div>
-                                          <div>Temporal analysis of work activities, including after-hours patterns, weekend work, and time-based stress multipliers</div>
-                                          <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-900"></div>
-                                        </div>
+                                    </div>
+                                    <div className="text-lg font-bold text-blue-700">
+                                      {workRelatedPoints.toFixed(1)} points
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            }
+
+                            // Check if this is a section header (other analysis sections like Time Pattern Analysis:)
+                            const isSectionHeader = cleanReason.endsWith(':');
+
+                            // For individual factors (not ending with :), render as styled cards
+                            if (!isSectionHeader && cleanReason.length > 0) {
+                              // Check if this is a sub-bullet (starts with spaces + bullet)
+                              const isSubBullet = reason.match(/^\s{2,}[•·\-*]\s*/);
+
+                              if (isSubBullet) {
+                                // Render sub-bullets as indented items
+                                return (
+                                  <div key={index} className="ml-4 py-1">
+                                    <div className="text-sm text-gray-600 leading-relaxed">
+                                      {cleanReason}
+                                    </div>
+                                  </div>
+                                );
+                              }
+
+                              // Extract points from the factor text
+                              const pointsMatch = cleanReason.match(/\(([0-9.]+) points?\)/);
+                              const points = pointsMatch ? parseFloat(pointsMatch[1]) : null;
+                              const factorText = points ? cleanReason.replace(/\s*\([0-9.]+ points?\)/, '') : cleanReason;
+
+                              // Use current section context for styling
+                              const isPersonalFactor = currentSection === 'personal';
+                              const bgColor = isPersonalFactor ? 'bg-green-50' : 'bg-blue-50';
+                              const textColor = 'text-gray-900'; // Black/dark grey for all factor text
+                              const pointsColor = 'text-gray-700'; // Dark grey for points
+
+                              return (
+                                <div key={index} className="py-2">
+                                  <div className="flex justify-between items-start">
+                                    <div className="flex-1 pr-2">
+                                      <div className={`text-sm font-medium ${textColor} leading-tight`}>
+                                        {factorText}
                                       </div>
-                                    </>
-                                  )}
-                                  {cleanReason === 'Recovery Pattern Analysis:' && (
-                                    <>
-                                      <div className="w-3 h-3 bg-purple-500 rounded-full mr-2"></div>
-                                      {cleanReason.replace(':', '')}
-                                      <div className="relative group ml-1">
-                                        <Info className="w-3 h-3 text-purple-500 cursor-help" />
-                                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg w-72 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                                          <div className="font-semibold mb-1">Recovery Pattern Analysis</div>
-                                          <div>Assessment of recovery time between incidents, sleep quality impact, and overall recovery deficit patterns</div>
-                                          <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-900"></div>
+                                    </div>
+                                    {points !== null && (
+                                      <div className="flex-shrink-0">
+                                        <div className={`text-lg font-bold ${pointsColor}`}>
+                                          {points.toFixed(1)}
                                         </div>
+                                        <div className="text-xs text-gray-500 text-right">points</div>
                                       </div>
-                                    </>
-                                  )}
-                                  {cleanReason === 'Critical Incident Analysis:' && (
-                                    <>
-                                      <div className="w-3 h-3 bg-red-500 rounded-full mr-2"></div>
-                                      {cleanReason.replace(':', '')}
-                                      <div className="relative group ml-1">
-                                        <Info className="w-3 h-3 text-red-500 cursor-help" />
-                                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg w-72 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                                          <div className="font-semibold mb-1">Critical Incident Analysis</div>
-                                          <div>Analysis of high-severity incidents and their psychological impact, including compound trauma effects and stress accumulation</div>
-                                          <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-900"></div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            }
+
+                            if (isSectionHeader) {
+                              // Render section headers with elegant compact styling
+                              return (
+                                <div key={index} className="mt-5 first:mt-0">
+                                  <div className="flex items-center space-x-2 mb-3">
+                                    {cleanReason === 'Time Pattern Analysis:' && (
+                                      <>
+                                        <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                                        <span className="text-sm font-medium text-gray-800">{cleanReason.replace(':', '')}</span>
+                                        <div className="relative group">
+                                          <Info className="w-3 h-3 text-orange-500 cursor-help opacity-60 hover:opacity-100" />
+                                          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg w-72 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                                            <div className="font-semibold mb-1">Time Pattern Analysis</div>
+                                            <div>Temporal analysis of work activities, including after-hours patterns, weekend work, and time-based stress multipliers</div>
+                                            <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-900"></div>
+                                          </div>
                                         </div>
-                                      </div>
-                                    </>
-                                  )}
-                                  {/* Fallback for other section headers */}
-                                  {!cleanReason.match(/^(PERSONAL|WORK-RELATED|Time Pattern Analysis|Recovery Pattern Analysis|Critical Incident Analysis):$/) && (
-                                    cleanReason.replace(':', '')
-                                  )}
-                                </h6>
-                              </div>
-                            );
-                          } else {
-                            // Render regular factors
-                            return (
-                              <div key={index} className="px-3 py-2 bg-gray-50 rounded-md border text-sm text-gray-700 ml-1">
-                                {cleanReason}
-                              </div>
-                            );
-                          }
-                        })}
+                                      </>
+                                    )}
+                                    {cleanReason === 'Recovery Pattern Analysis:' && (
+                                      <>
+                                        <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                                        <span className="text-sm font-medium text-gray-800">{cleanReason.replace(':', '')}</span>
+                                        <div className="relative group">
+                                          <Info className="w-3 h-3 text-purple-500 cursor-help opacity-60 hover:opacity-100" />
+                                          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg w-72 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                                            <div className="font-semibold mb-1">Recovery Pattern Analysis</div>
+                                            <div>Assessment of recovery time between incidents, sleep quality impact, and overall recovery deficit patterns</div>
+                                            <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-900"></div>
+                                          </div>
+                                        </div>
+                                      </>
+                                    )}
+                                    {cleanReason === 'Critical Incident Analysis:' && (
+                                      <>
+                                        <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                                        <span className="text-sm font-medium text-gray-800">{cleanReason.replace(':', '')}</span>
+                                        <div className="relative group">
+                                          <Info className="w-3 h-3 text-red-500 cursor-help opacity-60 hover:opacity-100" />
+                                          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg w-72 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                                            <div className="font-semibold mb-1">Critical Incident Analysis</div>
+                                            <div>Analysis of high-severity incidents and their psychological impact, including compound trauma effects and stress accumulation</div>
+                                            <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-900"></div>
+                                          </div>
+                                        </div>
+                                      </>
+                                    )}
+                                    {/* Fallback for other section headers */}
+                                    {!cleanReason.match(/^(Time Pattern Analysis|Recovery Pattern Analysis|Critical Incident Analysis):$/) && (
+                                      <>
+                                        <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                                        <span className="text-sm font-medium text-gray-800">{cleanReason.replace(':', '')}</span>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            }
+
+                            // Return null for unhandled cases
+                            return null;
+                          });
+                        })()}
                       </div>
                     </div>
 
-                    {/* Dimensional Breakdown */}
-                    {memberData.cbi_breakdown && (
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-green-50 rounded-lg p-3">
-                          <div className="flex items-center space-x-1 mb-1">
-                            <div className="text-xs font-medium text-green-600 uppercase">Personal</div>
-                            <div className="relative group">
-                              <Info className="w-3 h-3 text-green-500 cursor-help" />
-                              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg w-72 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                                <div className="font-semibold mb-1">Personal Burnout - What We Measure</div>
-                                <div>• Incident frequency (incidents per week)<br/>• After-hours work patterns<br/>• Weekend activity levels<br/>• Sleep disruption indicators<br/>• Overall workload intensity relative to team baseline</div>
-                                <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-900"></div>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="text-lg font-bold text-green-700">
-                            {memberData.cbi_breakdown.personal?.toFixed(0)}/100
-                          </div>
-                        </div>
-                        <div className="bg-blue-50 rounded-lg p-3">
-                          <div className="flex items-center space-x-1 mb-1">
-                            <div className="text-xs font-medium text-blue-600 uppercase">Work-Related</div>
-                            <div className="relative group">
-                              <Info className="w-3 h-3 text-blue-500 cursor-help" />
-                              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg w-72 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                                <div className="font-semibold mb-1">Work-Related Burnout - What We Measure</div>
-                                <div>• Incident response time patterns<br/>• Severity-weighted incident load<br/>• GitHub commit activity and timing<br/>• Slack communication patterns<br/>• Work-life boundary violations (late night/weekend work)</div>
-                                <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-900"></div>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="text-lg font-bold text-blue-700">
-                            {memberData.cbi_breakdown.work_related?.toFixed(0)}/100
-                          </div>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 ) : (
                   <p className="text-sm text-gray-500 italic">
