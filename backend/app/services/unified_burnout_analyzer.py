@@ -16,6 +16,12 @@ from ..core.cbi_config import calculate_composite_cbi_score, calculate_personal_
 from .ai_burnout_analyzer import get_ai_burnout_analyzer
 from .github_correlation_service import GitHubCorrelationService
 
+import pytz
+from collections import defaultdict
+
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
 logger = logging.getLogger(__name__)
 
 
@@ -61,6 +67,9 @@ class UnifiedBurnoutAnalyzer:
             'slack': slack_token is not None
         }
         
+        # Keeping track of user timezones
+        self.user_tz_by_id = {} 
+
         logger.info(f"UnifiedBurnoutAnalyzer initialized - Platform: {platform}, Features: {self.features}")
         
         # Burnout scoring thresholds
@@ -92,7 +101,9 @@ class UnifiedBurnoutAnalyzer:
                 "low": 1.0
             }
         }
-    
+
+
+
     async def analyze_burnout(
         self, 
         time_range_days: int = 30,
@@ -134,6 +145,17 @@ class UnifiedBurnoutAnalyzer:
             extraction_start = datetime.now()
             logger.info(f"🔍 BURNOUT ANALYSIS: Step 2 - Extracting users and incidents from {time_range_days}-day data")
             users = data.get("users", []) if data else []
+
+            # create map with user time zones
+            self.user_tz_by_id = self._build_user_tz_map(users)
+            # print(self.user_tz_by_id)
+
+            # optional: calculate 
+            if self.user_tz_by_id:
+                sample = list(self.user_tz_by_id.items())[:3]
+                print(f"🕒 TZ MAP sample: {sample}")
+
+
             incidents = data.get("incidents", []) if data else []
             metadata = data.get("collection_metadata", {}) if data else {}
             
@@ -816,7 +838,28 @@ class UnifiedBurnoutAnalyzer:
                     }
                 }
             }
-    
+        
+    # helper for building  timezone map
+    def _build_user_tz_map(self, users):
+        tz_by_id = {}
+        if not users:
+            return tz_by_id
+        for user in users:
+            uid = user.get("id")        
+            if not uid:
+                continue
+            if self.platform == "pagerduty":
+                tz = user.get("timezone") 
+                # print(f"User: {user.get('name')} ({user.get('email')}) → TZ: {user.get('timezone')}")
+            else:  # TODO: implement rootly timezone
+                attrs = user.get("attributes", {}) or {}
+                # print(f"User: {user.get('name')} ({user.get('email')}) → TZ: {user.get('timezone')}")
+
+                tz = attrs.get("time_zone") or attrs.get("timezone")
+            tz_by_id[str(uid)] = tz
+        return tz_by_id
+
+
     def _analyze_team_data(
         self, 
         users: List[Dict[str, Any]], 
@@ -1043,18 +1086,20 @@ class UnifiedBurnoutAnalyzer:
         
         # Calculate base metrics from incidents
         days_analyzed = metadata.get("days_analyzed", 30) or 30
+        user_tz = self.user_tz_by_id.get(str(user_id), "UTC")
         base_metrics = self._calculate_member_metrics(
             incidents,
             days_analyzed,
-            include_weekends
+            include_weekends, 
+            user_tz
         )
 
         # Enhance metrics with GitHub/Slack data if available
-        metrics = self._enhance_metrics_with_github_data(base_metrics, github_data)
+        metrics = self._enhance_metrics_with_github_data(base_metrics, github_data, user_tz)
 
         # Add Slack communication patterns
         if slack_data:
-            metrics = self._enhance_metrics_with_slack_data(metrics, slack_data)
+            metrics = self._enhance_metrics_with_slack_data(metrics, slack_data, user_tz)
         
         # Calculate burnout dimensions  
         dimensions = self._calculate_burnout_dimensions(metrics)
@@ -1063,7 +1108,7 @@ class UnifiedBurnoutAnalyzer:
         factors = self._calculate_burnout_factors(metrics)
 
         # Calculate confidence intervals and data quality
-        confidence = self._calculate_confidence_intervals(metrics, incidents, github_data, slack_data)
+        confidence = self._calculate_confidence_intervals(metrics, incidents, github_data, slack_data, user_tz)
         
         # CBI DEBUG LOGGING - Track score calculation
         print(f"🐛 CBI RAILWAY DEBUG - User: {user_email}")
@@ -1093,8 +1138,8 @@ class UnifiedBurnoutAnalyzer:
         severity_dist = metrics.get('severity_distribution', {})
 
         # Calculate research-based impact factors
-        time_impacts = self._calculate_time_impact_multipliers(incidents, metrics)
-        recovery_data = self._calculate_recovery_deficit(incidents)
+        time_impacts = self._calculate_time_impact_multipliers(incidents, metrics, user_tz)
+        recovery_data = self._calculate_recovery_deficit(incidents, user_tz)
 
         # Log research-based insights
         logger.info(f"🕐 TIME IMPACT: {user_name} - After-hours: {time_impacts['after_hours_incidents']}, "
@@ -1362,12 +1407,45 @@ class UnifiedBurnoutAnalyzer:
             }
         
         return result
-    
+
+
+
+    def _get_user_tz(self, user_id: Any, default: str = "UTC") -> str:
+        """Return a user's timezone string from the cached id->tz map."""
+        if user_id is None:
+            return default
+        return self.user_tz_by_id.get(str(user_id), default) or default
+
+    def _parse_iso_utc(self, ts: Optional[str]) -> Optional[datetime]:
+        """Parse ISO8601 (possibly ending with 'Z') into an aware UTC datetime."""
+        if not ts:
+            return None
+        try:
+            return datetime.fromisoformat(ts.replace("Z", "+00:00"))
+        except Exception:
+            return None
+
+
+
+    def _to_local(self, dt, user_tz: str):
+        """convert dt to the user's timezone"""
+        try:
+            tz = pytz.timezone(user_tz or "UTC")
+        except Exception:
+            tz = pytz.UTC
+        if dt is None:
+            return None
+        if dt.tzinfo is None:
+            dt = pytz.UTC.localize(dt)
+        return dt.astimezone(tz)
+
+
     def _calculate_member_metrics(
         self,
         incidents: List[Dict[str, Any]],
         days_analyzed: int,
-        include_weekends: bool
+        include_weekends: bool,
+        user_tz: str = "UTC",
     ) -> Dict[str, Any]:
         """Calculate detailed metrics for a team member."""
         # Initialize counters
@@ -1380,6 +1458,8 @@ class UnifiedBurnoutAnalyzer:
         for incident in incidents:
             # Handle both Rootly (with attributes) and PagerDuty (normalized) formats
             if self.platform == "pagerduty":
+                # print("USING PAGERDUTY")
+
                 # PagerDuty normalized format
                 created_at = incident.get("created_at")
                 acknowledged_at = incident.get("acknowledged_at")
@@ -1387,6 +1467,7 @@ class UnifiedBurnoutAnalyzer:
                 status = incident.get("status", "unknown")
             else:
                 # Rootly format
+                # print("USING ROOTLY")
                 attrs = incident.get("attributes", {})
                 created_at = attrs.get("created_at")
                 # Try multiple timestamp fields for response time calculation
@@ -1413,18 +1494,25 @@ class UnifiedBurnoutAnalyzer:
             # Check timing
             if created_at:
                 dt = self._parse_timestamp(created_at)
-                if dt:
+                dt_local = self._to_local(dt, user_tz)
+
+                # # Uncomment to test and validate:
+                # print("PAGE DUTY or ROOTLY Regular: ", dt)
+                # print("PAGER DUTY or ROOTLY Local Timezone: ", user_tz, " now is: ", dt_local)
+
+                if dt_local:
                     # After hours: before 9 AM or after 6 PM
-                    if dt.hour < 9 or dt.hour >= 18:
+                    if dt_local.hour < 9 or dt_local.hour >= 18:
                         after_hours_count += 1
                     
                     # Weekend: Saturday (5) or Sunday (6)
-                    if dt.weekday() >= 5:
+                    if dt_local.weekday() >= 5:
                         weekend_count += 1
-            
+
+
             # Response time (time to acknowledge)
             if created_at and acknowledged_at:
-                response_time = self._calculate_response_time(created_at, acknowledged_at)
+                response_time = self._calculate_response_time(created_at, acknowledged_at, user_tz)
                 if response_time is not None:
                     response_times.append(response_time)
             
@@ -1473,7 +1561,7 @@ class UnifiedBurnoutAnalyzer:
 
         return enhanced_metrics
 
-    def _enhance_metrics_with_github_data(self, base_metrics: Dict[str, Any], github_data: Dict[str, Any]) -> Dict[str, Any]:
+    def _enhance_metrics_with_github_data(self, base_metrics: Dict[str, Any], github_data: Dict[str, Any], user_tz: str = "UTC") -> Dict[str, Any]:
         """Add sophisticated GitHub analysis patterns to base incident metrics."""
         if not github_data:
             return base_metrics
@@ -1491,15 +1579,34 @@ class UnifiedBurnoutAnalyzer:
             commit_weekdays = []
             daily_commit_counts = {}
 
+            commit_hours_local = []
+            commit_weekdays_local = []
+            daily_commit_counts_local = {}
             from datetime import datetime
             for commit in commits:
                 try:
+                    # TODO:double-check, possibly adjust timezone
                     commit_time = datetime.fromisoformat(commit.get("timestamp", "").replace("Z", "+00:00"))
                     commit_hours.append(commit_time.hour)
                     commit_weekdays.append(commit_time.weekday())
 
                     date_key = commit_time.date()
                     daily_commit_counts[date_key] = daily_commit_counts.get(date_key, 0) + 1
+
+
+                    # dt_utc = self._parse_iso_utc(commit.get("timestamp"))
+                    # print("GITHUB TIMEZONE BEFORE: ", commit_time)
+                    # print("GITHUB TIMEZONE AFTER: ", dt_utc)
+                    # if not dt_utc:
+                    #     continue
+                    # dt_local = self._to_local(dt_utc, user_tz)
+                    # commit_hours_local.append(dt_local.hour)
+                    # commit_weekdays_local.append(dt_local.weekday())
+
+                    # date_key = dt_local.date()
+                    # daily_commit_counts_local[date_key] = daily_commit_counts_local.get(date_key, 0) + 1
+
+
                 except:
                     continue
 
@@ -1566,6 +1673,7 @@ class UnifiedBurnoutAnalyzer:
             review_dates = []
             for review in reviews:
                 try:
+                    # TODO:double-check, possibly adjust timezone
                     review_time = datetime.fromisoformat(review.get("submitted_at", "").replace("Z", "+00:00"))
                     review_dates.append(review_time)
                 except:
@@ -1619,7 +1727,7 @@ class UnifiedBurnoutAnalyzer:
 
         return enhanced
 
-    def _enhance_metrics_with_slack_data(self, base_metrics: Dict[str, Any], slack_data: Dict[str, Any]) -> Dict[str, Any]:
+    def _enhance_metrics_with_slack_data(self, base_metrics: Dict[str, Any], slack_data: Dict[str, Any], user_tz: str = "UTC") -> Dict[str, Any]:
         """Add Slack communication health metrics to detect burnout through social patterns."""
         if not slack_data:
             return base_metrics
@@ -1640,6 +1748,7 @@ class UnifiedBurnoutAnalyzer:
             from datetime import datetime
             for message in messages:
                 try:
+                    # TODO:double-check, possibly adjust timezone
                     msg_time = datetime.fromisoformat(message.get("timestamp", "").replace("Z", "+00:00"))
                     message_hours.append(msg_time.hour)
                     message_weekdays.append(msg_time.weekday())
@@ -1730,7 +1839,7 @@ class UnifiedBurnoutAnalyzer:
 
         return enhanced
 
-    def _calculate_confidence_intervals(self, metrics: Dict[str, Any], incidents: List[Dict], github_data: Dict = None, slack_data: Dict = None) -> Dict[str, Any]:
+    def _calculate_confidence_intervals(self, metrics: Dict[str, Any], incidents: List[Dict], github_data: Dict = None, slack_data: Dict = None, user_tz: str = "UTC") -> Dict[str, Any]:
         """Calculate confidence intervals and data quality indicators for burnout metrics."""
         confidence = {}
 
@@ -1748,6 +1857,7 @@ class UnifiedBurnoutAnalyzer:
                 try:
                     created_at = incident.get("created_at", "")
                     if created_at:
+                        # TODO:double-check, possibly adjust timezone
                         incident_date = datetime.fromisoformat(created_at.replace("Z", "+00:00")).date()
                         incident_dates.add(incident_date)
                 except:
@@ -2142,7 +2252,7 @@ class UnifiedBurnoutAnalyzer:
             additional_compound = (critical_incident_count - 10) * 0.15
             return min(2.0, base_compound + additional_compound)
 
-    def _calculate_time_impact_multipliers(self, incidents: List[Dict], metrics: Dict) -> Dict[str, float]:
+    def _calculate_time_impact_multipliers(self, incidents: List[Dict], metrics: Dict, user_tz: str) -> Dict[str, float]:
         """
         Calculate time-based impact multipliers based on research.
 
@@ -2164,7 +2274,7 @@ class UnifiedBurnoutAnalyzer:
         }
 
         for incident in incidents:
-            incident_time = self._parse_incident_time(incident)
+            incident_time = self._parse_incident_time(incident, user_tz)
             if not incident_time:
                 continue
 
@@ -2185,7 +2295,7 @@ class UnifiedBurnoutAnalyzer:
 
         return time_impacts
 
-    def _calculate_recovery_deficit(self, incidents: List[Dict]) -> Dict[str, Any]:
+    def _calculate_recovery_deficit(self, incidents: List[Dict], user_tz: str) -> Dict[str, Any]:
         """
         Calculate recovery time deficit based on research.
 
@@ -2203,7 +2313,7 @@ class UnifiedBurnoutAnalyzer:
 
         incident_times = []
         for incident in incidents:
-            incident_time = self._parse_incident_time(incident)
+            incident_time = self._parse_incident_time(incident, user_tz)
             if incident_time:
                 incident_times.append(incident_time)
 
@@ -2237,19 +2347,21 @@ class UnifiedBurnoutAnalyzer:
 
         return recovery_data
 
-    def _parse_incident_time(self, incident: Dict) -> datetime:
+    def _parse_incident_time(self, incident: Dict, uzer_tz: str) -> datetime:
         """Parse incident timestamp from platform-specific format."""
         try:
             if self.platform == "pagerduty":
                 # PagerDuty format: "2024-09-25T14:30:00Z"
                 time_str = incident.get("created_at")
                 if time_str:
+                    # TODO:double-check, possibly adjust timezone
                     return datetime.fromisoformat(time_str.replace('Z', '+00:00'))
             else:
                 # Rootly format
                 attrs = incident.get("attributes", {})
                 time_str = attrs.get("created_at")
                 if time_str:
+                    # TODO:double-check, possibly adjust timezone
                     return datetime.fromisoformat(time_str.replace('Z', '+00:00'))
         except Exception as e:
             logger.warning(f"Failed to parse incident time: {e}")
@@ -2590,15 +2702,16 @@ class UnifiedBurnoutAnalyzer:
     def _parse_timestamp(self, timestamp: str) -> Optional[datetime]:
         """Parse ISO format timestamp."""
         try:
+            # TODO:double-check, possibly adjust timezone
             return datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
         except:
             return None
     
-    def _calculate_response_time(self, created_at: str, started_at: str) -> Optional[float]:
+    def _calculate_response_time(self, created_at: str, started_at: str, user_tz: str) -> Optional[float]:
         """Calculate response time in minutes."""
         created = self._parse_timestamp(created_at)
         started = self._parse_timestamp(started_at)
-        
+
         if created and started:
             return (started - created).total_seconds() / 60
         return None
@@ -3018,6 +3131,7 @@ class UnifiedBurnoutAnalyzer:
                             
                         # Parse date
                         try:
+                            # TODO:double-check, possibly adjust timezone
                             incident_date = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
                             date_str = incident_date.strftime("%Y-%m-%d")
                             
