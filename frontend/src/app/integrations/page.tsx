@@ -237,8 +237,9 @@ interface GitHubIntegration {
 
 interface SlackIntegration {
   id: number
-  slack_user_id: string
+  slack_user_id: string | null
   workspace_id: string
+  workspace_name?: string
   token_source: "oauth" | "manual"
   is_oauth: boolean
   supports_refresh: boolean
@@ -250,6 +251,9 @@ interface SlackIntegration {
   channel_names?: string[]
   token_preview?: string
   webhook_preview?: string
+  connection_type?: "oauth" | "manual"
+  status?: string
+  owner_user_id?: number
 }
 
 interface PreviewData {
@@ -354,7 +358,12 @@ export default function IntegrationsPage() {
   const [isDisconnectingSlack, setIsDisconnectingSlack] = useState(false)
   const [slackPermissions, setSlackPermissions] = useState<any>(null)
   const [isLoadingPermissions, setIsLoadingPermissions] = useState(false)
-  
+
+  // Team members state
+  const [teamMembers, setTeamMembers] = useState<any[]>([])
+  const [loadingTeamMembers, setLoadingTeamMembers] = useState(false)
+  const [teamMembersError, setTeamMembersError] = useState<string | null>(null)
+
   // AI Integration state
   const [llmToken, setLlmToken] = useState('')
   const [llmModel, setLlmModel] = useState('gpt-4o-mini')
@@ -1748,6 +1757,48 @@ export default function IntegrationsPage() {
       toast.error(`Failed to load mapping data: ${error.message}`)
     } finally {
       setLoadingMappingData(false)
+    }
+  }
+
+  // Fetch team members from selected organization
+  const fetchTeamMembers = async () => {
+    if (!selectedOrganization) {
+      toast.error('Please select an organization first')
+      return
+    }
+
+    setLoadingTeamMembers(true)
+    setTeamMembersError(null)
+
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) {
+        toast.error('Please log in to view team members')
+        return
+      }
+
+      const response = await fetch(`${API_BASE}/integrations/${selectedOrganization}/users`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setTeamMembers(data.users || [])
+        toast.success(`Loaded ${data.total_users} team members from ${data.integration_name}`)
+      } else {
+        const errorData = await response.json()
+        throw new Error(errorData.detail || 'Failed to fetch team members')
+      }
+    } catch (error) {
+      console.error('Error fetching team members:', error)
+      const errorMsg = error instanceof Error ? error.message : 'Failed to fetch team members'
+      setTeamMembersError(errorMsg)
+      toast.error(errorMsg)
+    } finally {
+      setLoadingTeamMembers(false)
     }
   }
 
@@ -3324,6 +3375,9 @@ export default function IntegrationsPage() {
                     <div className="inline-flex items-center space-x-2 bg-green-100 text-green-800 px-4 py-2 rounded-lg text-sm font-medium">
                       <CheckCircle className="w-4 h-4" />
                       <span>Connected</span>
+                      {slackIntegration.connection_type === 'oauth' && slackIntegration.workspace_name && (
+                        <span className="ml-2 text-xs text-green-700">({slackIntegration.workspace_name})</span>
+                      )}
                     </div>
                   ) : process.env.NEXT_PUBLIC_SLACK_CLIENT_ID ? (
                     <Button
@@ -3427,6 +3481,39 @@ export default function IntegrationsPage() {
                   </div>
                 </div>
 
+                {/* Workspace Details for OAuth Connections */}
+                {slackIntegration?.connection_type === 'oauth' && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <h4 className="font-medium text-blue-900 mb-2 flex items-center">
+                      <Building className="w-4 h-4 mr-2" />
+                      Registered Workspace
+                    </h4>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <span className="text-blue-700 font-medium">Workspace:</span>
+                        <p className="text-blue-900">{slackIntegration.workspace_name || 'Unknown'}</p>
+                      </div>
+                      <div>
+                        <span className="text-blue-700 font-medium">Status:</span>
+                        <p className="text-blue-900 capitalize">{slackIntegration.status || 'Active'}</p>
+                      </div>
+                      <div>
+                        <span className="text-blue-700 font-medium">Registered:</span>
+                        <p className="text-blue-900">{new Date(slackIntegration.connected_at).toLocaleDateString()}</p>
+                      </div>
+                      <div>
+                        <span className="text-blue-700 font-medium">Workspace ID:</span>
+                        <p className="text-blue-900 font-mono text-xs">{slackIntegration.workspace_id}</p>
+                      </div>
+                    </div>
+                    <div className="mt-3 pt-3 border-t border-blue-200">
+                      <p className="text-xs text-blue-800">
+                        💡 The <code className="bg-blue-100 px-1 rounded">/burnout-survey</code> command will only show analyses for your organization
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex items-center justify-between pt-2">
                   <div className="flex items-center space-x-2 text-sm text-gray-500">
                     <Users className="w-4 h-4" />
@@ -3441,6 +3528,132 @@ export default function IntegrationsPage() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Team Members for Survey Correlation */}
+            {slackIntegration && selectedOrganization && (
+              <Card className="border-2 border-purple-200 bg-purple-50/30">
+                <CardHeader className="pb-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                        <Users className="w-6 h-6 text-purple-600" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-lg text-gray-900">Team Members</CardTitle>
+                        <p className="text-sm text-gray-600">Users from your organization who can submit surveys</p>
+                      </div>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="bg-white rounded-lg border p-4">
+                    <div className="mb-4">
+                      <h4 className="font-medium text-gray-900 mb-2">Survey Correlation</h4>
+                      <p className="text-sm text-gray-600 mb-3">
+                        When team members submit a <code className="bg-gray-100 px-1 rounded text-xs">/burnout-survey</code>,
+                        we match them to their profile using:
+                      </p>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex items-start space-x-2">
+                          <div className="w-5 h-5 bg-purple-100 rounded flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <span className="text-purple-600 text-xs">1</span>
+                          </div>
+                          <div>
+                            <span className="font-medium text-gray-900">Slack email</span> matches
+                            <span className="font-medium text-gray-900"> Rootly/PagerDuty email</span>
+                          </div>
+                        </div>
+                        <div className="flex items-start space-x-2">
+                          <div className="w-5 h-5 bg-purple-100 rounded flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <span className="text-purple-600 text-xs">2</span>
+                          </div>
+                          <div>
+                            Survey response is linked to their burnout analysis profile
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="border-t pt-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="font-medium text-gray-900">
+                          Team Members from {integrations.find(i => i.id.toString() === selectedOrganization)?.name}
+                        </h4>
+                        <Button
+                          onClick={fetchTeamMembers}
+                          disabled={loadingTeamMembers || !selectedOrganization}
+                          size="sm"
+                          variant="outline"
+                          className="flex items-center space-x-2"
+                        >
+                          {loadingTeamMembers ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              <span>Loading...</span>
+                            </>
+                          ) : (
+                            <>
+                              <RefreshCw className="w-4 h-4" />
+                              <span>Load Members</span>
+                            </>
+                          )}
+                        </Button>
+                      </div>
+
+                      {teamMembersError && (
+                        <Alert className="border-red-200 bg-red-50 mb-3">
+                          <AlertCircle className="w-4 h-4 text-red-600" />
+                          <AlertDescription className="text-red-800">
+                            {teamMembersError}
+                          </AlertDescription>
+                        </Alert>
+                      )}
+
+                      {teamMembers.length === 0 && !loadingTeamMembers && (
+                        <div className="text-sm text-gray-600 mb-3">
+                          Click "Load Members" to fetch users from your organization who can submit burnout surveys
+                        </div>
+                      )}
+
+                      {teamMembers.length > 0 && (
+                        <div className="bg-gray-50 border rounded-lg p-4 max-h-96 overflow-y-auto">
+                          <div className="text-sm text-gray-700 mb-3 font-medium">
+                            {teamMembers.length} team member{teamMembers.length !== 1 ? 's' : ''} found
+                          </div>
+                          <div className="space-y-2">
+                            {teamMembers.map((member: any) => (
+                              <div
+                                key={member.id}
+                                className="bg-white border border-gray-200 rounded p-3 flex items-center justify-between"
+                              >
+                                <div className="flex items-center space-x-3">
+                                  <Avatar className="h-8 w-8">
+                                    <AvatarFallback className="bg-purple-100 text-purple-700 text-xs">
+                                      {member.name?.substring(0, 2).toUpperCase() || member.email?.substring(0, 2).toUpperCase() || '??'}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div>
+                                    <div className="text-sm font-medium text-gray-900">
+                                      {member.name || 'Unknown'}
+                                    </div>
+                                    <div className="text-xs text-gray-600">
+                                      {member.email}
+                                    </div>
+                                  </div>
+                                </div>
+                                <Badge variant="secondary" className="text-xs">
+                                  {member.platform}
+                                </Badge>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Future: Web Survey Section (Placeholder) */}
             <Card className="border-2 border-gray-200 bg-gray-50/30">
@@ -4112,56 +4325,56 @@ export default function IntegrationsPage() {
                 </CardHeader>
                 <CardContent className="p-8 pt-0">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                    <div className="flex items-center space-x-2">
-                      <Key className="w-4 h-4 text-gray-400" />
-                      <div>
-                        <div className="font-medium">Webhook URL</div>
-                        <div className="text-gray-600 font-mono text-xs">
-                          {slackIntegration.webhook_preview || 'Not configured'}
+                      <div className="flex items-center space-x-2">
+                        <Key className="w-4 h-4 text-gray-400" />
+                        <div>
+                          <div className="font-medium">Webhook URL</div>
+                          <div className="text-gray-600 font-mono text-xs">
+                            {slackIntegration.webhook_preview || 'Not configured'}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Key className="w-4 h-4 text-gray-400" />
+                        <div>
+                          <div className="font-medium">Bot Token</div>
+                          <div className="text-gray-600 font-mono text-xs">
+                            {slackIntegration.token_preview || 'Not available'}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Building className="w-4 h-4 text-gray-400" />
+                        <div>
+                          <div className="font-medium">Workspace ID</div>
+                          <div className="text-gray-600 font-mono text-xs">{slackIntegration.workspace_id}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Calendar className="w-4 h-4 text-gray-400" />
+                        <div>
+                          <div className="font-medium">Connected</div>
+                          <div className="text-gray-600">{new Date(slackIntegration.connected_at).toLocaleDateString()}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Clock className="w-4 h-4 text-gray-400" />
+                        <div>
+                          <div className="font-medium">Last Updated</div>
+                          <div className="text-gray-600">{new Date(slackIntegration.last_updated).toLocaleDateString()}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Users className="w-4 h-4 text-gray-400" />
+                        <div>
+                          <div className="font-medium">User ID</div>
+                          <div className="text-gray-600 font-mono text-xs">{slackIntegration.slack_user_id}</div>
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <Key className="w-4 h-4 text-gray-400" />
-                      <div>
-                        <div className="font-medium">Bot Token</div>
-                        <div className="text-gray-600 font-mono text-xs">
-                          {slackIntegration.token_preview || 'Not available'}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Building className="w-4 h-4 text-gray-400" />
-                      <div>
-                        <div className="font-medium">Workspace ID</div>
-                        <div className="text-gray-600 font-mono text-xs">{slackIntegration.workspace_id}</div>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Calendar className="w-4 h-4 text-gray-400" />
-                      <div>
-                        <div className="font-medium">Connected</div>
-                        <div className="text-gray-600">{new Date(slackIntegration.connected_at).toLocaleDateString()}</div>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Clock className="w-4 h-4 text-gray-400" />
-                      <div>
-                        <div className="font-medium">Last Updated</div>
-                        <div className="text-gray-600">{new Date(slackIntegration.last_updated).toLocaleDateString()}</div>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Users className="w-4 h-4 text-gray-400" />
-                      <div>
-                        <div className="font-medium">User ID</div>
-                        <div className="text-gray-600 font-mono text-xs">{slackIntegration.slack_user_id}</div>
-                      </div>
-                    </div>
-                  </div>
 
                   {/* Permissions Section */}
-                  <div className="border-t pt-4">
+                  <div className="border-t pt-4 mt-6">
                     <div className="flex items-center justify-between mb-3">
                       <h4 className="font-medium text-sm">Bot Permissions</h4>
                       {isLoadingPermissions ? (
@@ -4219,7 +4432,7 @@ export default function IntegrationsPage() {
                       </div>
                     )}
                   </div>
-                  
+
                   {/* Bot Channels Section */}
                   <div className="mt-6">
                     <div className="flex items-center justify-between mb-3">
@@ -4237,7 +4450,7 @@ export default function IntegrationsPage() {
                       </div>
                     ) : (
                       <div className="text-xs text-gray-500">
-                        {slackPermissions?.errors?.includes('not_in_channel') 
+                        {slackPermissions?.errors?.includes('not_in_channel')
                           ? 'Bot is not in any channels. Add it to channels in Slack.'
                           : 'No channels found'}
                       </div>

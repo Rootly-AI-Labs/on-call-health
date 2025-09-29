@@ -779,9 +779,97 @@ async def debug_rootly_incidents(
             debug_info["processed_data"]["user_fetch_error"] = str(e)
         
         return debug_info
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Debug failed: {str(e)}"
+        )
+
+
+@router.get("/integrations/{integration_id}/users")
+async def get_integration_users(
+    integration_id: int,
+    limit: int = 100,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Fetch all users from a specific Rootly/PagerDuty integration.
+    Used to show team members who can submit burnout surveys.
+    """
+    try:
+        # Get the integration
+        integration = db.query(Integration).filter(
+            Integration.id == integration_id,
+            Integration.organization_id == current_user.organization_id
+        ).first()
+
+        if not integration:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Integration not found"
+            )
+
+        # Fetch users based on platform
+        if integration.platform == "rootly":
+            from app.services.rootly_client import RootlyClient
+            client = RootlyClient(integration.token)
+            users = await client.get_users(limit=limit)
+
+            # Format user data
+            formatted_users = []
+            for user in users:
+                formatted_users.append({
+                    "id": user.get("id"),
+                    "email": user.get("email"),
+                    "name": user.get("name") or user.get("full_name"),
+                    "platform": "rootly",
+                    "platform_user_id": user.get("id")
+                })
+
+            return {
+                "integration_id": integration_id,
+                "integration_name": integration.name,
+                "platform": "rootly",
+                "total_users": len(formatted_users),
+                "users": formatted_users
+            }
+
+        elif integration.platform == "pagerduty":
+            from app.services.pagerduty_client import PagerDutyClient
+            client = PagerDutyClient(integration.token)
+            users = await client.get_users(limit=limit)
+
+            # Format user data
+            formatted_users = []
+            for user in users:
+                formatted_users.append({
+                    "id": user.get("id"),
+                    "email": user.get("email"),
+                    "name": user.get("name"),
+                    "platform": "pagerduty",
+                    "platform_user_id": user.get("id")
+                })
+
+            return {
+                "integration_id": integration_id,
+                "integration_name": integration.name,
+                "platform": "pagerduty",
+                "total_users": len(formatted_users),
+                "users": formatted_users
+            }
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Platform {integration.platform} not supported for user fetching"
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to fetch users from integration {integration_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch users: {str(e)}"
         )
