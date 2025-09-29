@@ -6,6 +6,8 @@ We also offer a free hosted version at [www.oncallburnout.com](https://www.oncal
 
 The interface helps engineering managers spot team members who may be overworked or burned out. Our methodology is leveraging the [Copenhagen Burnout Inventory](https://nfa.dk/media/hl5nbers/cbi-first-edition.pdf) (CBI), which was developed by a team of Danish researchers. 
 
+![Rootly AI Labs burnout detector screenshot](assets/rootly-burnout-detector.png)
+
 ## ✨ Features
 
 - **🔐 Social Authentication**: Login with Google or GitHub
