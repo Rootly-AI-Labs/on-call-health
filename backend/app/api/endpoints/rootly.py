@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from ...models import get_db, User, RootlyIntegration, Integration
+from ...models import get_db, User, RootlyIntegration
 from ...auth.dependencies import get_current_active_user
 from ...core.rootly_client import RootlyAPIClient
 from ...core.rate_limiting import integration_rate_limit
@@ -799,10 +799,10 @@ async def get_integration_users(
     Used to show team members who can submit burnout surveys.
     """
     try:
-        # Get the integration
-        integration = db.query(Integration).filter(
-            Integration.id == integration_id,
-            Integration.organization_id == current_user.organization_id
+        # Get the integration and verify it belongs to the user
+        integration = db.query(RootlyIntegration).filter(
+            RootlyIntegration.id == integration_id,
+            RootlyIntegration.user_id == current_user.id
         ).first()
 
         if not integration:
@@ -814,7 +814,7 @@ async def get_integration_users(
         # Fetch users based on platform
         if integration.platform == "rootly":
             from app.services.rootly_client import RootlyClient
-            client = RootlyClient(integration.token)
+            client = RootlyClient(integration.api_token)
             users = await client.get_users(limit=limit)
 
             # Format user data
@@ -838,7 +838,7 @@ async def get_integration_users(
 
         elif integration.platform == "pagerduty":
             from app.services.pagerduty_client import PagerDutyClient
-            client = PagerDutyClient(integration.token)
+            client = PagerDutyClient(integration.api_token)
             users = await client.get_users(limit=limit)
 
             # Format user data
