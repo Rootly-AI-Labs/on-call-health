@@ -8,10 +8,11 @@ from .base import Base
 
 class UserCorrelation(Base):
     __tablename__ = "user_correlations"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     email = Column(String(255), nullable=False, index=True)  # The email that links platforms
+    name = Column(String(255), nullable=True)  # User's display name from platform
     github_username = Column(String(100), nullable=True, index=True)
     slack_user_id = Column(String(20), nullable=True, index=True)
     rootly_email = Column(String(255), nullable=True)

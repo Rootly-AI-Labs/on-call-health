@@ -951,3 +951,58 @@ async def get_integration_users(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to fetch users: {str(e)}"
         )
+
+@router.post("/integrations/{integration_id}/sync-users")
+async def sync_integration_users(
+    integration_id: str,  # Support both numeric and beta IDs
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Sync all users from a Rootly/PagerDuty integration to UserCorrelation table.
+    
+    This ensures ALL team members can submit burnout surveys via Slack,
+    not just those who appear in incident data.
+    
+    Returns sync statistics showing how many users were created/updated.
+    """
+    try:
+        from app.services.user_sync_service import UserSyncService
+        
+        # Handle beta integrations differently
+        if integration_id in ["beta-rootly", "beta-pagerduty"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot sync beta integration users. Please use your own integration."
+            )
+        
+        # Convert to integer for regular integrations
+        try:
+            numeric_id = int(integration_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid integration ID: {integration_id}"
+            )
+        
+        # Sync users
+        sync_service = UserSyncService(db)
+        stats = await sync_service.sync_integration_users(
+            integration_id=numeric_id,
+            current_user=current_user
+        )
+        
+        return {
+            "success": True,
+            "message": f"Successfully synced {stats['total']} users from integration",
+            "stats": stats
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error syncing integration users: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to sync users: {str(e)}"
+        )

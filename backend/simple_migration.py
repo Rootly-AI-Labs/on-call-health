@@ -31,16 +31,14 @@ def get_database_url():
     logger.info(f"🔗 Using database URL: {database_url[:50]}...")
     return database_url
 
-def run_migration():
-    """Run the integration fields migration"""
+def run_migrations():
+    """Run all pending migrations"""
 
     try:
         database_url = get_database_url()
         engine = create_engine(database_url)
 
         with engine.connect() as conn:
-            logger.info("🔧 Adding integration_name and platform columns to analyses table...")
-
             # Create migrations tracking table
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS migrations (
@@ -50,64 +48,127 @@ def run_migration():
                     status VARCHAR(50) DEFAULT 'completed'
                 )
             """))
+            conn.commit()
 
-            # Check if migration already applied
+            # Migration 1: Add integration fields to analyses
+            logger.info("🔧 Migration 1: Adding integration_name and platform to analyses...")
             result = conn.execute(text("""
                 SELECT COUNT(*) as count FROM migrations
                 WHERE name = '001_add_integration_fields_to_analyses'
                 AND status = 'completed'
             """))
 
-            if result.fetchone()[0] > 0:
-                logger.info("⏭️  Migration already applied, skipping...")
-                return True
+            if result.fetchone()[0] == 0:
+                conn.execute(text("""
+                    ALTER TABLE analyses
+                    ADD COLUMN IF NOT EXISTS integration_name VARCHAR(255),
+                    ADD COLUMN IF NOT EXISTS platform VARCHAR(50)
+                """))
 
-            # Add the columns
-            conn.execute(text("""
-                ALTER TABLE analyses
-                ADD COLUMN IF NOT EXISTS integration_name VARCHAR(255),
-                ADD COLUMN IF NOT EXISTS platform VARCHAR(50)
-            """))
+                conn.execute(text("""
+                    INSERT INTO migrations (name, status)
+                    VALUES ('001_add_integration_fields_to_analyses', 'completed')
+                    ON CONFLICT (name) DO UPDATE SET
+                        applied_at = CURRENT_TIMESTAMP,
+                        status = 'completed'
+                """))
+                conn.commit()
+                logger.info("✅ Migration 1 completed: Added integration fields to analyses")
+            else:
+                logger.info("⏭️  Migration 1 already applied")
 
-            # Mark migration as applied
-            conn.execute(text("""
-                INSERT INTO migrations (name, status)
-                VALUES ('001_add_integration_fields_to_analyses', 'completed')
-                ON CONFLICT (name) DO UPDATE SET
-                    applied_at = CURRENT_TIMESTAMP,
-                    status = 'completed'
-            """))
-
-            conn.commit()
-
-            logger.info("✅ Successfully added integration_name and platform columns")
-
-            # Verify the columns were added
+            # Migration 2: Add name to user_correlations
+            logger.info("🔧 Migration 2: Adding name column to user_correlations...")
             result = conn.execute(text("""
-                SELECT column_name, data_type
-                FROM information_schema.columns
-                WHERE table_name = 'analyses'
-                AND column_name IN ('integration_name', 'platform')
-                ORDER BY column_name
+                SELECT COUNT(*) as count FROM migrations
+                WHERE name = '002_add_name_to_user_correlations'
+                AND status = 'completed'
             """))
 
-            columns = result.fetchall()
-            logger.info(f"📊 Verified new columns: {[dict(row._mapping) for row in columns]}")
+            if result.fetchone()[0] == 0:
+                conn.execute(text("""
+                    ALTER TABLE user_correlations
+                    ADD COLUMN IF NOT EXISTS name VARCHAR(255)
+                """))
+
+                conn.execute(text("""
+                    INSERT INTO migrations (name, status)
+                    VALUES ('002_add_name_to_user_correlations', 'completed')
+                    ON CONFLICT (name) DO UPDATE SET
+                        applied_at = CURRENT_TIMESTAMP,
+                        status = 'completed'
+                """))
+                conn.commit()
+                logger.info("✅ Migration 2 completed: Added name to user_correlations")
+            else:
+                logger.info("⏭️  Migration 2 already applied")
+
+            # Migration 3: Add unique constraint on user_correlations
+            logger.info("🔧 Migration 3: Adding unique constraint to user_correlations...")
+            result = conn.execute(text("""
+                SELECT COUNT(*) as count FROM migrations
+                WHERE name = '003_unique_constraint_user_correlations'
+                AND status = 'completed'
+            """))
+
+            if result.fetchone()[0] == 0:
+                # Check if constraint already exists
+                constraint_check = conn.execute(text("""
+                    SELECT constraint_name
+                    FROM information_schema.table_constraints
+                    WHERE table_name='user_correlations'
+                    AND constraint_type='UNIQUE'
+                    AND constraint_name='uq_user_correlation_user_email'
+                """))
+
+                if not constraint_check.fetchone():
+                    # Remove duplicates first (keep most recent)
+                    conn.execute(text("""
+                        DELETE FROM user_correlations a
+                        USING user_correlations b
+                        WHERE a.id < b.id
+                        AND a.user_id = b.user_id
+                        AND a.email = b.email
+                    """))
+
+                    # Add constraint
+                    conn.execute(text("""
+                        ALTER TABLE user_correlations
+                        ADD CONSTRAINT uq_user_correlation_user_email
+                        UNIQUE (user_id, email)
+                    """))
+                    logger.info("✅ Added unique constraint on (user_id, email)")
+                else:
+                    logger.info("⏭️  Unique constraint already exists")
+
+                conn.execute(text("""
+                    INSERT INTO migrations (name, status)
+                    VALUES ('003_unique_constraint_user_correlations', 'completed')
+                    ON CONFLICT (name) DO UPDATE SET
+                        applied_at = CURRENT_TIMESTAMP,
+                        status = 'completed'
+                """))
+                conn.commit()
+                logger.info("✅ Migration 3 completed: Added unique constraint")
+            else:
+                logger.info("⏭️  Migration 3 already applied")
 
             return True
 
     except Exception as e:
-        logger.error(f"❌ Migration failed: {str(e)}")
+        logger.error(f"❌ Migrations failed: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
         return False
 
 if __name__ == "__main__":
     logger.info("🚀 Simple migration runner starting...")
-    success = run_migration()
+    success = run_migrations()
 
     if success:
-        logger.info("🎉 Migration completed successfully!")
+        logger.info("🎉 All migrations completed successfully!")
     else:
-        logger.error("❌ Migration failed")
+        logger.error("❌ Migrations failed")
         sys.exit(1)
 
     sys.exit(0)

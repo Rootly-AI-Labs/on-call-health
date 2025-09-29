@@ -1806,6 +1806,55 @@ export default function IntegrationsPage() {
     }
   }
 
+  // Sync users to UserCorrelation table
+  const syncUsersToCorrelation = async () => {
+    if (!selectedOrganization) {
+      toast.error('Please select an organization first')
+      return
+    }
+
+    console.log('Syncing users to UserCorrelation for integration:', selectedOrganization)
+    setLoadingTeamMembers(true)
+    setTeamMembersError(null)
+
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) {
+        toast.error('Please log in to sync users')
+        return
+      }
+
+      const response = await fetch(`${API_BASE}/rootly/integrations/${selectedOrganization}/sync-users`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        const stats = data.stats || data
+        toast.success(
+          `Synced ${stats.created} new users, updated ${stats.updated} existing users. ` +
+          `All team members can now submit burnout surveys via Slack!`
+        )
+        // Optionally reload the members list to show updated data
+        await fetchTeamMembers()
+      } else {
+        const errorData = await response.json()
+        throw new Error(errorData.detail || 'Failed to sync users')
+      }
+    } catch (error) {
+      console.error('Error syncing users:', error)
+      const errorMsg = error instanceof Error ? error.message : 'Failed to sync users'
+      setTeamMembersError(errorMsg)
+      toast.error(errorMsg)
+    } finally {
+      setLoadingTeamMembers(false)
+    }
+  }
+
   // Inline mapping edit handlers
   const startInlineEdit = (mappingId: number | string, currentValue: string = '') => {
     // Don't allow editing of manual mappings inline since they already exist
@@ -3589,25 +3638,46 @@ export default function IntegrationsPage() {
                         <h4 className="font-medium text-gray-900">
                           Team Members from {integrations.find(i => i.id.toString() === selectedOrganization)?.name}
                         </h4>
-                        <Button
-                          onClick={fetchTeamMembers}
-                          disabled={loadingTeamMembers || !selectedOrganization}
-                          size="sm"
-                          variant="outline"
-                          className="flex items-center space-x-2"
-                        >
-                          {loadingTeamMembers ? (
-                            <>
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                              <span>Loading...</span>
-                            </>
-                          ) : (
-                            <>
-                              <RefreshCw className="w-4 h-4" />
-                              <span>Load Members</span>
-                            </>
-                          )}
-                        </Button>
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            onClick={fetchTeamMembers}
+                            disabled={loadingTeamMembers || !selectedOrganization}
+                            size="sm"
+                            variant="outline"
+                            className="flex items-center space-x-2"
+                          >
+                            {loadingTeamMembers ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <span>Loading...</span>
+                              </>
+                            ) : (
+                              <>
+                                <RefreshCw className="w-4 h-4" />
+                                <span>Load Members</span>
+                              </>
+                            )}
+                          </Button>
+                          <Button
+                            onClick={syncUsersToCorrelation}
+                            disabled={loadingTeamMembers || !selectedOrganization || teamMembers.length === 0}
+                            size="sm"
+                            variant="default"
+                            className="flex items-center space-x-2 bg-purple-600 hover:bg-purple-700"
+                          >
+                            {loadingTeamMembers ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <span>Syncing...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Database className="w-4 h-4" />
+                                <span>Sync to Survey System</span>
+                              </>
+                            )}
+                          </Button>
+                        </div>
                       </div>
 
                       {teamMembersError && (
@@ -3621,7 +3691,11 @@ export default function IntegrationsPage() {
 
                       {teamMembers.length === 0 && !loadingTeamMembers && (
                         <div className="text-sm text-gray-600 mb-3">
-                          Click "Load Members" to fetch users from your organization who can submit burnout surveys
+                          <p className="mb-2">Click "Load Members" to fetch users from your organization who can submit burnout surveys.</p>
+                          <p className="text-xs text-gray-500">
+                            After loading, use "Sync to Survey System" to ensure all team members can submit surveys via Slack,
+                            even if they haven't been involved in incidents yet.
+                          </p>
                         </div>
                       )}
 
