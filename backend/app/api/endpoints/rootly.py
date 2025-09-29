@@ -820,8 +820,8 @@ async def get_integration_users(
 
             # Fetch users using beta token
             if platform == "rootly":
-                from app.services.rootly_client import RootlyClient
-                client = RootlyClient(beta_token)
+                from app.core.rootly_client import RootlyAPIClient
+                client = RootlyAPIClient(beta_token)
                 users = await client.get_users(limit=limit)
 
                 formatted_users = []
@@ -842,8 +842,8 @@ async def get_integration_users(
                     "users": formatted_users
                 }
             else:  # pagerduty
-                from app.services.pagerduty_client import PagerDutyClient
-                client = PagerDutyClient(beta_token)
+                from app.core.pagerduty_client import PagerDutyAPIClient
+                client = PagerDutyAPIClient(beta_token)
                 users = await client.get_users(limit=limit)
 
                 formatted_users = []
@@ -887,8 +887,8 @@ async def get_integration_users(
 
         # Fetch users based on platform
         if integration.platform == "rootly":
-            from app.services.rootly_client import RootlyClient
-            client = RootlyClient(integration.api_token)
+            from app.core.rootly_client import RootlyAPIClient
+            client = RootlyAPIClient(integration.api_token)
             users = await client.get_users(limit=limit)
 
             # Format user data
@@ -911,8 +911,8 @@ async def get_integration_users(
             }
 
         elif integration.platform == "pagerduty":
-            from app.services.pagerduty_client import PagerDutyClient
-            client = PagerDutyClient(integration.api_token)
+            from app.core.pagerduty_client import PagerDutyAPIClient
+            client = PagerDutyAPIClient(integration.api_token)
             users = await client.get_users(limit=limit)
 
             # Format user data
