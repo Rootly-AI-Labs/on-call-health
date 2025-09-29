@@ -367,6 +367,7 @@ export default function IntegrationsPage() {
   const [syncedUsers, setSyncedUsers] = useState<any[]>([])
   const [loadingSyncedUsers, setLoadingSyncedUsers] = useState(false)
   const [showSyncedUsers, setShowSyncedUsers] = useState(false)
+  const [teamMembersDrawerOpen, setTeamMembersDrawerOpen] = useState(false)
 
   // AI Integration state
   const [llmToken, setLlmToken] = useState('')
@@ -1833,6 +1834,7 @@ export default function IntegrationsPage() {
       if (response.ok) {
         const data = await response.json()
         setTeamMembers(data.users || [])
+        setTeamMembersDrawerOpen(true)
         toast.success(`Loaded ${data.total_users} team members from ${data.integration_name}`)
       } else {
         const errorData = await response.json()
@@ -3822,112 +3824,14 @@ export default function IntegrationsPage() {
                         </div>
                       </div>
 
-                      {teamMembersError && (
-                        <Alert className="border-red-200 bg-red-50 mb-3">
-                          <AlertCircle className="w-4 h-4 text-red-600" />
-                          <AlertDescription className="text-red-800">
-                            {teamMembersError}
-                          </AlertDescription>
-                        </Alert>
-                      )}
-
-                      {teamMembers.length === 0 && !loadingTeamMembers && (
-                        <div className="text-sm text-gray-600 mb-3">
-                          <p className="mb-2">Click "Load Members" to fetch users from your organization who can submit burnout surveys.</p>
-                          <p className="text-xs text-gray-500">
-                            After loading, use "Sync to Survey System" to ensure all team members can submit surveys via Slack,
-                            even if they haven't been involved in incidents yet.
-                          </p>
-                        </div>
-                      )}
-
-                      {teamMembers.length > 0 && (
-                        <div className="bg-gray-50 border rounded-lg p-4 max-h-96 overflow-y-auto">
-                          <div className="text-sm text-gray-700 mb-3 font-medium">
-                            {teamMembers.length} team member{teamMembers.length !== 1 ? 's' : ''} found
-                          </div>
-                          <div className="space-y-2">
-                            {teamMembers.map((member: any) => (
-                              <div
-                                key={member.id}
-                                className="bg-white border border-gray-200 rounded p-3 flex items-center justify-between"
-                              >
-                                <div className="flex items-center space-x-3">
-                                  <Avatar className="h-8 w-8">
-                                    <AvatarFallback className="bg-purple-100 text-purple-700 text-xs">
-                                      {member.name?.substring(0, 2).toUpperCase() || member.email?.substring(0, 2).toUpperCase() || '??'}
-                                    </AvatarFallback>
-                                  </Avatar>
-                                  <div>
-                                    <div className="text-sm font-medium text-gray-900">
-                                      {member.name || 'Unknown'}
-                                    </div>
-                                    <div className="text-xs text-gray-600">
-                                      {member.email}
-                                    </div>
-                                  </div>
-                                </div>
-                                <Badge variant="secondary" className="text-xs">
-                                  {member.platform}
-                                </Badge>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Synced Users Section */}
-                    {showSyncedUsers && syncedUsers.length > 0 && (
-                      <div className="border-t pt-4 mt-4">
-                        <h4 className="font-medium text-gray-900 mb-3">
-                          Synced Users ({syncedUsers.length})
-                        </h4>
-                        <p className="text-sm text-gray-600 mb-3">
-                          These users are stored in the database and can submit burnout surveys via Slack.
+                      <div className="text-sm text-gray-600">
+                        <p className="mb-2">Click "Load Members" to view users from your organization who can submit burnout surveys.</p>
+                        <p className="text-xs text-gray-500">
+                          After loading, use "Sync to Survey System" to ensure all team members can submit surveys via Slack,
+                          even if they haven't been involved in incidents yet.
                         </p>
-                        <div className="bg-gray-50 border rounded-lg p-4 max-h-96 overflow-y-auto">
-                          <div className="space-y-2">
-                            {syncedUsers.map((user: any) => (
-                              <div
-                                key={user.id}
-                                className="bg-white border border-gray-200 rounded p-3"
-                              >
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center space-x-3">
-                                    <Avatar className="h-8 w-8">
-                                      <AvatarFallback className="bg-green-100 text-green-700 text-xs">
-                                        {user.name?.substring(0, 2).toUpperCase() || user.email?.substring(0, 2).toUpperCase() || '??'}
-                                      </AvatarFallback>
-                                    </Avatar>
-                                    <div>
-                                      <div className="text-sm font-medium text-gray-900">
-                                        {user.name || 'Unknown'}
-                                      </div>
-                                      <div className="text-xs text-gray-600">
-                                        {user.email}
-                                      </div>
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center space-x-2">
-                                    {user.platforms.map((platform: string) => (
-                                      <Badge key={platform} variant="secondary" className="text-xs">
-                                        {platform}
-                                      </Badge>
-                                    ))}
-                                  </div>
-                                </div>
-                                {user.github_username && (
-                                  <div className="mt-2 text-xs text-gray-500">
-                                    GitHub: <span className="font-mono">{user.github_username}</span>
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
                       </div>
-                    )}
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -5925,22 +5829,179 @@ export default function IntegrationsPage() {
 
       {/* Powered by Rootly AI Footer */}
       <div className="mt-12 pt-8 border-t border-gray-200 text-center">
-        <a 
-          href="https://rootly.com" 
-          target="_blank" 
+        <a
+          href="https://rootly.com"
+          target="_blank"
           rel="noopener noreferrer"
           className="inline-flex flex-col items-center space-y-1 hover:opacity-80 transition-opacity"
         >
           <span className="text-lg text-gray-600">powered by</span>
-          <Image 
-            src="/images/rootly-ai-logo.png" 
-            alt="Rootly AI" 
-            width={200} 
+          <Image
+            src="/images/rootly-ai-logo.png"
+            alt="Rootly AI"
+            width={200}
             height={80}
             className="h-12 w-auto"
           />
         </a>
       </div>
+
+      {/* Team Members Drawer */}
+      <Sheet open={teamMembersDrawerOpen} onOpenChange={setTeamMembersDrawerOpen}>
+        <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Team Members</SheetTitle>
+            <SheetDescription>
+              Users from {integrations.find(i => i.id.toString() === selectedOrganization)?.name || 'your organization'} who can submit burnout surveys
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="mt-6 space-y-4">
+            {/* Action Buttons */}
+            <div className="flex items-center space-x-2">
+              <Button
+                onClick={syncUsersToCorrelation}
+                disabled={loadingTeamMembers || teamMembers.length === 0}
+                size="sm"
+                className="flex items-center space-x-2 bg-purple-600 hover:bg-purple-700"
+              >
+                {loadingTeamMembers ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Syncing...</span>
+                  </>
+                ) : (
+                  <>
+                    <Database className="w-4 h-4" />
+                    <span>Sync to Survey System</span>
+                  </>
+                )}
+              </Button>
+              <Button
+                onClick={fetchSyncedUsers}
+                disabled={loadingSyncedUsers}
+                size="sm"
+                variant="outline"
+                className="flex items-center space-x-2"
+              >
+                {loadingSyncedUsers ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Loading...</span>
+                  </>
+                ) : (
+                  <>
+                    <Users2 className="w-4 h-4" />
+                    <span>View Synced Users</span>
+                  </>
+                )}
+              </Button>
+            </div>
+
+            {/* Team Members from API */}
+            {teamMembers.length > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-gray-900">
+                    From API ({teamMembers.length})
+                  </h3>
+                  <Badge variant="secondary" className="text-xs">Live Data</Badge>
+                </div>
+                <div className="space-y-2">
+                  {teamMembers.map((member: any) => (
+                    <div
+                      key={member.id}
+                      className="bg-white border border-gray-200 rounded-lg p-3 hover:border-purple-300 transition-colors"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <Avatar className="h-10 w-10">
+                            <AvatarFallback className="bg-purple-100 text-purple-700 text-sm font-medium">
+                              {member.name?.substring(0, 2).toUpperCase() || member.email?.substring(0, 2).toUpperCase() || '??'}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">
+                              {member.name || 'Unknown'}
+                            </div>
+                            <div className="text-xs text-gray-600">
+                              {member.email}
+                            </div>
+                          </div>
+                        </div>
+                        <Badge variant="secondary" className="text-xs">
+                          {member.platform}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Synced Users from Database */}
+            {showSyncedUsers && syncedUsers.length > 0 && (
+              <div className="border-t pt-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-gray-900">
+                    Synced to Database ({syncedUsers.length})
+                  </h3>
+                  <Badge className="text-xs bg-green-100 text-green-700 border-green-300">Persisted</Badge>
+                </div>
+                <p className="text-xs text-gray-600 mb-3">
+                  These users can submit burnout surveys via Slack
+                </p>
+                <div className="space-y-2">
+                  {syncedUsers.map((user: any) => (
+                    <div
+                      key={user.id}
+                      className="bg-white border border-gray-200 rounded-lg p-3 hover:border-green-300 transition-colors"
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center space-x-3">
+                          <Avatar className="h-10 w-10">
+                            <AvatarFallback className="bg-green-100 text-green-700 text-sm font-medium">
+                              {user.name?.substring(0, 2).toUpperCase() || user.email?.substring(0, 2).toUpperCase() || '??'}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">
+                              {user.name || 'Unknown'}
+                            </div>
+                            <div className="text-xs text-gray-600">
+                              {user.email}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-1">
+                          {user.platforms.map((platform: string) => (
+                            <Badge key={platform} variant="secondary" className="text-xs">
+                              {platform}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                      {user.github_username && (
+                        <div className="pl-13 text-xs text-gray-500">
+                          GitHub: <span className="font-mono">{user.github_username}</span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {teamMembers.length === 0 && (!showSyncedUsers || syncedUsers.length === 0) && (
+              <div className="text-center py-12 text-gray-500">
+                <Users className="w-12 h-12 mx-auto mb-4 opacity-40" />
+                <p className="text-sm">No team members loaded yet</p>
+                <p className="text-xs mt-2">Close this drawer and click "Load Members" to fetch team members</p>
+              </div>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }
