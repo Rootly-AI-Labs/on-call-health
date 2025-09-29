@@ -436,15 +436,10 @@ export default function IntegrationsPage() {
     // Load saved organization preference
     const savedOrg = localStorage.getItem('selected_organization')
     console.log('Loading saved organization from localStorage:', savedOrg)
-    // Validate that savedOrg is a numeric ID (not a name)
-    if (savedOrg && /^\d+$/.test(savedOrg)) {
-      console.log('Valid numeric ID, setting selectedOrganization:', savedOrg)
+    // Accept both numeric IDs and beta string IDs (like "beta-rootly")
+    if (savedOrg) {
+      console.log('Setting selectedOrganization from localStorage:', savedOrg)
       setSelectedOrganization(savedOrg)
-    } else if (savedOrg) {
-      // Clear invalid old value
-      console.log('Invalid organization ID (not numeric), clearing:', savedOrg)
-      localStorage.removeItem('selected_organization')
-      setSelectedOrganization('')
     }
     
     // Load user info from localStorage
@@ -1775,16 +1770,7 @@ export default function IntegrationsPage() {
       return
     }
 
-    // Validate that selectedOrganization is a numeric ID
-    if (!/^\d+$/.test(selectedOrganization)) {
-      console.error('Invalid selectedOrganization (must be numeric ID):', selectedOrganization)
-      toast.error('Invalid organization selected. Please select an organization from the dropdown.')
-      // Clear the invalid value
-      localStorage.removeItem('selected_organization')
-      setSelectedOrganization('')
-      return
-    }
-
+    console.log('Fetching team members for integration:', selectedOrganization)
     setLoadingTeamMembers(true)
     setTeamMembersError(null)
 

@@ -789,7 +789,7 @@ async def debug_rootly_incidents(
 
 @router.get("/integrations/{integration_id}/users")
 async def get_integration_users(
-    integration_id: int,
+    integration_id: str,  # Changed to str to support beta IDs like "beta-rootly"
     limit: int = 100,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
@@ -797,11 +797,85 @@ async def get_integration_users(
     """
     Fetch all users from a specific Rootly/PagerDuty integration.
     Used to show team members who can submit burnout surveys.
+    Supports both numeric IDs and beta integration string IDs.
     """
     try:
+        # Check if this is a beta integration (string ID like "beta-rootly")
+        if integration_id in ["beta-rootly", "beta-pagerduty"]:
+            # Use environment variable token for beta integrations
+            if integration_id == "beta-rootly":
+                beta_token = os.getenv('ROOTLY_API_TOKEN')
+                platform = "rootly"
+                integration_name = "Rootly (Beta Access)"
+            else:  # beta-pagerduty
+                beta_token = os.getenv('PAGERDUTY_API_TOKEN')
+                platform = "pagerduty"
+                integration_name = "PagerDuty (Beta Access)"
+
+            if not beta_token:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Beta {platform} token not configured"
+                )
+
+            # Fetch users using beta token
+            if platform == "rootly":
+                from app.services.rootly_client import RootlyClient
+                client = RootlyClient(beta_token)
+                users = await client.get_users(limit=limit)
+
+                formatted_users = []
+                for user in users:
+                    formatted_users.append({
+                        "id": user.get("id"),
+                        "email": user.get("email"),
+                        "name": user.get("name") or user.get("full_name"),
+                        "platform": "rootly",
+                        "platform_user_id": user.get("id")
+                    })
+
+                return {
+                    "integration_id": integration_id,
+                    "integration_name": integration_name,
+                    "platform": "rootly",
+                    "total_users": len(formatted_users),
+                    "users": formatted_users
+                }
+            else:  # pagerduty
+                from app.services.pagerduty_client import PagerDutyClient
+                client = PagerDutyClient(beta_token)
+                users = await client.get_users(limit=limit)
+
+                formatted_users = []
+                for user in users:
+                    formatted_users.append({
+                        "id": user.get("id"),
+                        "email": user.get("email"),
+                        "name": user.get("name"),
+                        "platform": "pagerduty",
+                        "platform_user_id": user.get("id")
+                    })
+
+                return {
+                    "integration_id": integration_id,
+                    "integration_name": integration_name,
+                    "platform": "pagerduty",
+                    "total_users": len(formatted_users),
+                    "users": formatted_users
+                }
+
+        # Handle regular (non-beta) numeric integration IDs
+        try:
+            numeric_id = int(integration_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid integration ID: {integration_id}"
+            )
+
         # Get the integration and verify it belongs to the user
         integration = db.query(RootlyIntegration).filter(
-            RootlyIntegration.id == integration_id,
+            RootlyIntegration.id == numeric_id,
             RootlyIntegration.user_id == current_user.id
         ).first()
 
