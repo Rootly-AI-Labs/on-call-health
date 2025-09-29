@@ -435,12 +435,16 @@ export default function IntegrationsPage() {
     
     // Load saved organization preference
     const savedOrg = localStorage.getItem('selected_organization')
+    console.log('Loading saved organization from localStorage:', savedOrg)
     // Validate that savedOrg is a numeric ID (not a name)
     if (savedOrg && /^\d+$/.test(savedOrg)) {
+      console.log('Valid numeric ID, setting selectedOrganization:', savedOrg)
       setSelectedOrganization(savedOrg)
     } else if (savedOrg) {
       // Clear invalid old value
+      console.log('Invalid organization ID (not numeric), clearing:', savedOrg)
       localStorage.removeItem('selected_organization')
+      setSelectedOrganization('')
     }
     
     // Load user info from localStorage
@@ -2548,20 +2552,26 @@ export default function IntegrationsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="pb-6">
-              <Select 
-                value={selectedOrganization} 
+              <Select
+                value={selectedOrganization}
                 onValueChange={(value) => {
+                  console.log('onValueChange called with value:', value, 'type:', typeof value)
+                  console.log('Available integrations:', integrations.map(i => ({ id: i.id, name: i.name })))
+
                   // Only show toast if selecting a different organization
                   if (value !== selectedOrganization) {
                     const selected = integrations.find(i => i.id.toString() === value)
+                    console.log('Found selected integration:', selected)
                     if (selected) {
                       toast.success(`${selected.name} has been set as your default organization.`)
                     }
                   }
-                  
+
+                  console.log('Setting selectedOrganization to:', value)
                   setSelectedOrganization(value)
                   // Save to localStorage for persistence
                   localStorage.setItem('selected_organization', value)
+                  console.log('Saved to localStorage:', value)
                 }}
               >
                 <SelectTrigger className="w-full h-12 text-base bg-white">
