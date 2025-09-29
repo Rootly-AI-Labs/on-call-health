@@ -263,7 +263,13 @@ class PagerDutyAPIClient:
                             
                         data = await response.json()
                         incidents = data.get("incidents", [])
-                        
+
+                        #test
+                        # users = await self.get_users(limit=10)
+
+                        # for u in users:
+                        #     print(f"User: {u.get('name')} ({u.get('email')}) → TZ: {u.get('time_zone')}")
+
                         # COMPREHENSIVE LOGGING FOR FIRST BATCH
                         if len(all_incidents) == 0 and len(incidents) > 0:
                             logger.info(f"🔍 PD GET_INCIDENTS: First batch analysis:")
