@@ -1007,3 +1007,56 @@ async def sync_integration_users(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to sync users: {str(e)}"
         )
+
+@router.get("/synced-users")
+async def get_synced_users(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all synced users from UserCorrelation table for the current user.
+    These are team members who can submit burnout surveys via Slack.
+    """
+    try:
+        from app.models import UserCorrelation
+
+        # Fetch all user correlations for this user
+        correlations = db.query(UserCorrelation).filter(
+            UserCorrelation.user_id == current_user.id
+        ).order_by(UserCorrelation.name).all()
+
+        # Format the response
+        synced_users = []
+        for corr in correlations:
+            # Determine platform based on which fields are populated
+            platforms = []
+            if corr.rootly_email:
+                platforms.append("rootly")
+            if corr.pagerduty_user_id:
+                platforms.append("pagerduty")
+            if corr.github_username:
+                platforms.append("github")
+            if corr.slack_user_id:
+                platforms.append("slack")
+
+            synced_users.append({
+                "id": corr.id,
+                "name": corr.name,
+                "email": corr.email,
+                "platforms": platforms,
+                "github_username": corr.github_username,
+                "slack_user_id": corr.slack_user_id,
+                "created_at": corr.created_at.isoformat() if corr.created_at else None
+            })
+
+        return {
+            "total": len(synced_users),
+            "users": synced_users
+        }
+
+    except Exception as e:
+        logger.error(f"Error fetching synced users: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch synced users: {str(e)}"
+        )

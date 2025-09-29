@@ -364,6 +364,9 @@ export default function IntegrationsPage() {
   const [teamMembers, setTeamMembers] = useState<any[]>([])
   const [loadingTeamMembers, setLoadingTeamMembers] = useState(false)
   const [teamMembersError, setTeamMembersError] = useState<string | null>(null)
+  const [syncedUsers, setSyncedUsers] = useState<any[]>([])
+  const [loadingSyncedUsers, setLoadingSyncedUsers] = useState(false)
+  const [showSyncedUsers, setShowSyncedUsers] = useState(false)
 
   // AI Integration state
   const [llmToken, setLlmToken] = useState('')
@@ -1878,8 +1881,9 @@ export default function IntegrationsPage() {
           `Synced ${stats.created} new users, updated ${stats.updated} existing users. ` +
           `All team members can now submit burnout surveys via Slack!`
         )
-        // Optionally reload the members list to show updated data
+        // Reload the members list and fetch synced users
         await fetchTeamMembers()
+        await fetchSyncedUsers()
       } else {
         const errorData = await response.json()
         throw new Error(errorData.detail || 'Failed to sync users')
@@ -1891,6 +1895,43 @@ export default function IntegrationsPage() {
       toast.error(errorMsg)
     } finally {
       setLoadingTeamMembers(false)
+    }
+  }
+
+  // Fetch synced users from database
+  const fetchSyncedUsers = async () => {
+    console.log('Fetching synced users from database')
+    setLoadingSyncedUsers(true)
+
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) {
+        toast.error('Please log in to view synced users')
+        return
+      }
+
+      const response = await fetch(`${API_BASE}/rootly/synced-users`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setSyncedUsers(data.users || [])
+        setShowSyncedUsers(true)
+        toast.success(`Found ${data.total} synced users`)
+      } else {
+        const errorData = await response.json()
+        throw new Error(errorData.detail || 'Failed to fetch synced users')
+      }
+    } catch (error) {
+      console.error('Error fetching synced users:', error)
+      const errorMsg = error instanceof Error ? error.message : 'Failed to fetch synced users'
+      toast.error(errorMsg)
+    } finally {
+      setLoadingSyncedUsers(false)
     }
   }
 
@@ -3759,6 +3800,25 @@ export default function IntegrationsPage() {
                               </>
                             )}
                           </Button>
+                          <Button
+                            onClick={fetchSyncedUsers}
+                            disabled={loadingSyncedUsers}
+                            size="sm"
+                            variant="outline"
+                            className="flex items-center space-x-2"
+                          >
+                            {loadingSyncedUsers ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <span>Loading...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Users2 className="w-4 h-4" />
+                                <span>View Synced Users</span>
+                              </>
+                            )}
+                          </Button>
                         </div>
                       </div>
 
@@ -3816,6 +3876,58 @@ export default function IntegrationsPage() {
                         </div>
                       )}
                     </div>
+
+                    {/* Synced Users Section */}
+                    {showSyncedUsers && syncedUsers.length > 0 && (
+                      <div className="border-t pt-4 mt-4">
+                        <h4 className="font-medium text-gray-900 mb-3">
+                          Synced Users ({syncedUsers.length})
+                        </h4>
+                        <p className="text-sm text-gray-600 mb-3">
+                          These users are stored in the database and can submit burnout surveys via Slack.
+                        </p>
+                        <div className="bg-gray-50 border rounded-lg p-4 max-h-96 overflow-y-auto">
+                          <div className="space-y-2">
+                            {syncedUsers.map((user: any) => (
+                              <div
+                                key={user.id}
+                                className="bg-white border border-gray-200 rounded p-3"
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center space-x-3">
+                                    <Avatar className="h-8 w-8">
+                                      <AvatarFallback className="bg-green-100 text-green-700 text-xs">
+                                        {user.name?.substring(0, 2).toUpperCase() || user.email?.substring(0, 2).toUpperCase() || '??'}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <div>
+                                      <div className="text-sm font-medium text-gray-900">
+                                        {user.name || 'Unknown'}
+                                      </div>
+                                      <div className="text-xs text-gray-600">
+                                        {user.email}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center space-x-2">
+                                    {user.platforms.map((platform: string) => (
+                                      <Badge key={platform} variant="secondary" className="text-xs">
+                                        {platform}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                </div>
+                                {user.github_username && (
+                                  <div className="mt-2 text-xs text-gray-500">
+                                    GitHub: <span className="font-mono">{user.github_username}</span>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
