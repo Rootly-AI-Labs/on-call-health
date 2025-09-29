@@ -20,7 +20,6 @@ import pytz
 from collections import defaultdict
 
 from datetime import datetime
-from zoneinfo import ZoneInfo
 
 logger = logging.getLogger(__name__)
 
@@ -851,7 +850,7 @@ class UnifiedBurnoutAnalyzer:
             if self.platform == "pagerduty":
                 tz = user.get("timezone") 
                 # print(f"User: {user.get('name')} ({user.get('email')}) → TZ: {user.get('timezone')}")
-            else:  # TODO: implement rootly timezone
+            else:  
                 attrs = user.get("attributes", {}) or {}
                 # print(f"User: {user.get('name')} ({user.get('email')}) → TZ: {user.get('timezone')}")
 
@@ -1493,7 +1492,7 @@ class UnifiedBurnoutAnalyzer:
             
             # Check timing
             if created_at:
-                dt = self._parse_timestamp(created_at)
+                dt = self._parse_iso_utc(created_at)
                 dt_local = self._to_local(dt, user_tz)
 
                 # # Uncomment to test and validate:
@@ -1579,36 +1578,19 @@ class UnifiedBurnoutAnalyzer:
             commit_weekdays = []
             daily_commit_counts = {}
 
-            commit_hours_local = []
-            commit_weekdays_local = []
-            daily_commit_counts_local = {}
             from datetime import datetime
+
             for commit in commits:
-                try:
-                    # TODO:double-check, possibly adjust timezone
-                    commit_time = datetime.fromisoformat(commit.get("timestamp", "").replace("Z", "+00:00"))
-                    commit_hours.append(commit_time.hour)
-                    commit_weekdays.append(commit_time.weekday())
-
-                    date_key = commit_time.date()
-                    daily_commit_counts[date_key] = daily_commit_counts.get(date_key, 0) + 1
-
-
-                    # dt_utc = self._parse_iso_utc(commit.get("timestamp"))
-                    # print("GITHUB TIMEZONE BEFORE: ", commit_time)
-                    # print("GITHUB TIMEZONE AFTER: ", dt_utc)
-                    # if not dt_utc:
-                    #     continue
-                    # dt_local = self._to_local(dt_utc, user_tz)
-                    # commit_hours_local.append(dt_local.hour)
-                    # commit_weekdays_local.append(dt_local.weekday())
-
-                    # date_key = dt_local.date()
-                    # daily_commit_counts_local[date_key] = daily_commit_counts_local.get(date_key, 0) + 1
-
-
-                except:
+                dt_utc = self._parse_iso_utc(commit.get("timestamp"))
+                if not dt_utc:
                     continue
+                dt_local = self._to_local(dt_utc, user_tz)
+                commit_hours.append(dt_local.hour)
+                commit_weekdays.append(dt_local.weekday())
+
+                date_key = dt_local.date()
+                daily_commit_counts[date_key] = daily_commit_counts.get(date_key, 0) + 1
+
 
             # Context switching intensity (high variation = more stress)
             if daily_commit_counts:
@@ -1639,17 +1621,10 @@ class UnifiedBurnoutAnalyzer:
                 if pr_size > 0:
                     pr_sizes.append(pr_size)
 
-                # Review turnaround time indicates pressure
-                created_at = pr.get("created_at")
-                merged_at = pr.get("merged_at")
-                if created_at and merged_at:
-                    try:
-                        created = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
-                        merged = datetime.fromisoformat(merged_at.replace("Z", "+00:00"))
-                        review_hours = (merged - created).total_seconds() / 3600
-                        pr_review_times.append(review_hours)
-                    except:
-                        continue
+                created = self._parse_iso_utc(pr.get("created_at"))
+                merged  = self._parse_iso_utc(pr.get("merged_at"))
+                if created and merged:
+                    pr_review_times.append((merged - created).total_seconds() / 3600.0)
 
             if pr_sizes:
                 avg_pr_size = sum(pr_sizes) / len(pr_sizes)
@@ -1671,13 +1646,12 @@ class UnifiedBurnoutAnalyzer:
         if reviews:
             # Review participation decline over time
             review_dates = []
+
             for review in reviews:
-                try:
-                    # TODO:double-check, possibly adjust timezone
-                    review_time = datetime.fromisoformat(review.get("submitted_at", "").replace("Z", "+00:00"))
-                    review_dates.append(review_time)
-                except:
+                dt_utc = self._parse_iso_utc(review.get("submitted_at"))
+                if not dt_utc:
                     continue
+                review_dates.append(self._to_local(dt_utc, user_tz))
 
             if len(review_dates) >= 4:  # Need minimum data for trend
                 # Sort and calculate trend (positive = increasing, negative = declining)
@@ -1740,24 +1714,24 @@ class UnifiedBurnoutAnalyzer:
         response_times = slack_data.get("response_times", [])
 
         if messages:
-            # 1. Communication Temporal Patterns
             message_hours = []
             message_weekdays = []
             daily_message_counts = {}
 
-            from datetime import datetime
             for message in messages:
-                try:
-                    # TODO:double-check, possibly adjust timezone
-                    msg_time = datetime.fromisoformat(message.get("timestamp", "").replace("Z", "+00:00"))
-                    message_hours.append(msg_time.hour)
-                    message_weekdays.append(msg_time.weekday())
-
-                    date_key = msg_time.date()
-                    daily_message_counts[date_key] = daily_message_counts.get(date_key, 0) + 1
-                except:
+                dt_utc = self._parse_iso_utc(message.get("timestamp"))
+                if not dt_utc:
                     continue
+                dt_local = self._to_local(dt_utc, user_tz)
+                # Uncomment below to verify slack
+                # print("SLACK TIME UTC: ", dt_utc)
+                # print("AFTER TIME AFTER TZ ADJUSTMENT: ", dt_local)
+                message_hours.append(dt_local.hour)
+                message_weekdays.append(dt_local.weekday())
 
+                date_key = dt_local.date()
+                daily_message_counts[date_key] = daily_message_counts.get(date_key, 0) + 1
+            
             # After-hours communication burden
             if message_hours:
                 after_hours_msgs = sum(1 for h in message_hours if h >= 18 or h <= 8)
@@ -1855,11 +1829,16 @@ class UnifiedBurnoutAnalyzer:
             incident_dates = set()
             for incident in incidents:
                 try:
-                    created_at = incident.get("created_at", "")
+                    # rootly and pagerduty functionality
+                    created_at = (incident.get("created_at") or (incident.get("attributes", {}) or {}).get("created_at"))
                     if created_at:
-                        # TODO:double-check, possibly adjust timezone
-                        incident_date = datetime.fromisoformat(created_at.replace("Z", "+00:00")).date()
-                        incident_dates.add(incident_date)
+                        dt_utc = self._parse_iso_utc(created_at)
+                        dt_local = self._to_local(dt_utc, user_tz)
+
+                        # #uncomment for testing
+                        # print("CONFIDENCE INTERVAL IN UTC: ", dt_utc)
+                        # print("CONFIDENCE INTERVAL IN LOCAL TIME: ", dt_local)
+                        incident_dates.add(dt_local.date())
                 except:
                     continue
             days_with_activity = len(incident_dates)
@@ -2347,22 +2326,25 @@ class UnifiedBurnoutAnalyzer:
 
         return recovery_data
 
-    def _parse_incident_time(self, incident: Dict, uzer_tz: str) -> datetime:
+    def _parse_incident_time(self, incident: Dict, user_tz: str) -> datetime:
         """Parse incident timestamp from platform-specific format."""
         try:
             if self.platform == "pagerduty":
                 # PagerDuty format: "2024-09-25T14:30:00Z"
                 time_str = incident.get("created_at")
-                if time_str:
-                    # TODO:double-check, possibly adjust timezone
-                    return datetime.fromisoformat(time_str.replace('Z', '+00:00'))
             else:
                 # Rootly format
                 attrs = incident.get("attributes", {})
                 time_str = attrs.get("created_at")
-                if time_str:
-                    # TODO:double-check, possibly adjust timezone
-                    return datetime.fromisoformat(time_str.replace('Z', '+00:00'))
+            tz_utc =  self._parse_iso_utc(time_str)
+            if not tz_utc:
+                return None
+            tz_local =  self._to_local(tz_utc, user_tz)
+
+            # # For testing purposes, uncomment to view
+            # print("UTC TIMEZONE:", tz_utc)
+            # print("LOCAL TIMEZONE:", tz_local, " for the time zone: ", user_tz)
+            return tz_local
         except Exception as e:
             logger.warning(f"Failed to parse incident time: {e}")
         return None
@@ -2699,18 +2681,11 @@ class UnifiedBurnoutAnalyzer:
         
         return recommendations
     
-    def _parse_timestamp(self, timestamp: str) -> Optional[datetime]:
-        """Parse ISO format timestamp."""
-        try:
-            # TODO:double-check, possibly adjust timezone
-            return datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
-        except:
-            return None
     
     def _calculate_response_time(self, created_at: str, started_at: str, user_tz: str) -> Optional[float]:
         """Calculate response time in minutes."""
-        created = self._parse_timestamp(created_at)
-        started = self._parse_timestamp(started_at)
+        created = self._parse_iso_utc(created_at)
+        started = self._parse_iso_utc(started_at)
 
         if created and started:
             return (started - created).total_seconds() / 60
@@ -3078,9 +3053,12 @@ class UnifiedBurnoutAnalyzer:
             for user in team_analysis:
                 if user.get('user_email'):
                     user_key = user['user_email'].lower()
+                    # TODO: verify if correct - possibly add testcases
+                    tzname = self._get_user_tz(user.get('user_id'), "UTC")
+                    today_local = self._to_local(datetime.now(), tzname)
                     for day_offset in range(days_analyzed):
-                        date_obj = datetime.now() - timedelta(days=days_analyzed - day_offset - 1)
-                        date_str = date_obj.strftime('%Y-%m-%d')
+                        d = today_local - timedelta(days=days_analyzed - day_offset - 1)
+                        date_str = d.date().isoformat()
                         individual_daily_data[user_key][date_str] = {
                             "date": date_str,
                             "incident_count": 0,
@@ -3132,9 +3110,12 @@ class UnifiedBurnoutAnalyzer:
                         # Parse date
                         try:
                             # TODO:double-check, possibly adjust timezone
-                            incident_date = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
-                            date_str = incident_date.strftime("%Y-%m-%d")
-                            
+                            incident_date_utc = self._parse_iso_utc(created_at)
+                            if not incident_date_utc:
+                                continue
+
+                            date_str = incident_date_utc.strftime("%Y-%m-%d")
+
                             # Initialize day data if this is the first incident for this day
                             if date_str not in daily_data:
                                 daily_data[date_str] = {
