@@ -527,17 +527,17 @@ export function MemberDetailModal({
                         value: selectedMember.factors?.weekendWork || 0
                       },
                       { 
-                        factor: 'Incident Load', 
-                        value: selectedMember.factors?.incidentLoad || 0
-                      },
-                      { 
                         factor: 'Response Time', 
                         value: selectedMember.factors?.responseTime || 0
+                      },
+                      { 
+                        factor: 'Incident Load', 
+                        value: selectedMember.factors?.incidentLoad || 0
                       }
                     ]}>
                       <PolarGrid />
                       <PolarAngleAxis dataKey="factor" tick={{ fontSize: 11 }} />
-                      <PolarRadiusAxis domain={[0, 10]} tick={{ fontSize: 9 }} reversed={true} />
+                      <PolarRadiusAxis domain={[0, 10]} tick={{ fontSize: 9 }} reversed={true} angle={90}/>
                       <Radar
                         name="Risk Level"
                         dataKey="value"

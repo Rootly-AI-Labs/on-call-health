@@ -3159,7 +3159,7 @@ class UnifiedBurnoutAnalyzer:
                             daily_data[date_str]["severity_weighted_count"] += severity_weight
                             
                             # Check if after hours (rough approximation)
-                            incident_hour = incident_date.hour
+                            incident_hour = incident_date_utc.hour
                             if incident_hour < 8 or incident_hour > 18:
                                 daily_data[date_str]["after_hours_count"] += 1
                             
