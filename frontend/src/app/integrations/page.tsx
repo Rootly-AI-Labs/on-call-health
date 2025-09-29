@@ -435,8 +435,12 @@ export default function IntegrationsPage() {
     
     // Load saved organization preference
     const savedOrg = localStorage.getItem('selected_organization')
-    if (savedOrg) {
+    // Validate that savedOrg is a numeric ID (not a name)
+    if (savedOrg && /^\d+$/.test(savedOrg)) {
       setSelectedOrganization(savedOrg)
+    } else if (savedOrg) {
+      // Clear invalid old value
+      localStorage.removeItem('selected_organization')
     }
     
     // Load user info from localStorage
