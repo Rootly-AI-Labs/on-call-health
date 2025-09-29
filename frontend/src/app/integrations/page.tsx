@@ -1771,6 +1771,16 @@ export default function IntegrationsPage() {
       return
     }
 
+    // Validate that selectedOrganization is a numeric ID
+    if (!/^\d+$/.test(selectedOrganization)) {
+      console.error('Invalid selectedOrganization (must be numeric ID):', selectedOrganization)
+      toast.error('Invalid organization selected. Please select an organization from the dropdown.')
+      // Clear the invalid value
+      localStorage.removeItem('selected_organization')
+      setSelectedOrganization('')
+      return
+    }
+
     setLoadingTeamMembers(true)
     setTeamMembersError(null)
 
