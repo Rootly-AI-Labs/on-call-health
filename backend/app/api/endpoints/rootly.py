@@ -826,10 +826,12 @@ async def get_integration_users(
 
                 formatted_users = []
                 for user in users:
+                    # Rootly API uses JSONAPI format with attributes nested
+                    attrs = user.get("attributes", {})
                     formatted_users.append({
                         "id": user.get("id"),
-                        "email": user.get("email"),
-                        "name": user.get("name") or user.get("full_name"),
+                        "email": attrs.get("email"),
+                        "name": attrs.get("name") or attrs.get("full_name"),
                         "platform": "rootly",
                         "platform_user_id": user.get("id")
                     })
@@ -894,10 +896,12 @@ async def get_integration_users(
             # Format user data
             formatted_users = []
             for user in users:
+                # Rootly API uses JSONAPI format with attributes nested
+                attrs = user.get("attributes", {})
                 formatted_users.append({
                     "id": user.get("id"),
-                    "email": user.get("email"),
-                    "name": user.get("name") or user.get("full_name"),
+                    "email": attrs.get("email"),
+                    "name": attrs.get("name") or attrs.get("full_name"),
                     "platform": "rootly",
                     "platform_user_id": user.get("id")
                 })
