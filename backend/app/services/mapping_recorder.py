@@ -31,6 +31,13 @@ class MappingRecorder:
     ) -> Optional[IntegrationMapping]:
         """Record a mapping attempt."""
         
+        # Verify user exists to prevent foreign key violations
+        from ..models import User
+        user_exists = self.db.query(User).filter(User.id == user_id).first()
+        if not user_exists:
+            logger.warning(f"Skipping mapping record - user {user_id} does not exist")
+            return None
+
         # If analysis_id is provided, verify it exists
         if analysis_id is not None:
             from ..models import Analysis

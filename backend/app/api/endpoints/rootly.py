@@ -29,6 +29,7 @@ class RootlyIntegrationAdd(BaseModel):
 class RootlyIntegrationUpdate(BaseModel):
     name: str = None
     is_default: bool = None
+    api_token: str = None
 
 class RootlyTestResponse(BaseModel):
     status: str
@@ -77,7 +78,7 @@ async def test_rootly_token_preview(
     # Check if user already has this exact token (only active integrations)
     existing_token = db.query(RootlyIntegration).filter(
         RootlyIntegration.user_id == current_user.id,
-        RootlyIntegration.api_token == token_update.token,
+        RootlyIntegration.api_token == token_request.token,
         RootlyIntegration.is_active == True
     ).first()
     

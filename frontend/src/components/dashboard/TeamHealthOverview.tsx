@@ -9,7 +9,6 @@ import {
   Minus,
   ChevronDown,
   ChevronRight,
-  AlertTriangle,
   Info
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -453,23 +452,18 @@ export function TeamHealthOverview({
                           {riskCounts.critical > 0 && (
                             <div className="flex items-center space-x-2">
                               <div className="text-2xl font-bold text-red-800">{riskCounts.critical}</div>
-                              <AlertTriangle className="w-6 h-6 text-red-700" />
                               <span className="text-sm text-gray-600">Critical (CBI 75-100)</span>
                             </div>
                           )}
                           {riskCounts.high > 0 && (
                             <div className="flex items-center space-x-2">
                               <div className="text-2xl font-bold text-red-600">{riskCounts.high}</div>
-                              <AlertTriangle className="w-6 h-6 text-red-500" />
                               <span className="text-sm text-gray-600">High (CBI 50-74)</span>
                             </div>
                           )}
                           {riskCounts.medium > 0 && (
                             <div className="flex items-center space-x-2">
                               <div className="text-2xl font-bold text-orange-600">{riskCounts.medium}</div>
-                              <div className="w-6 h-6 rounded-full bg-orange-500/20 flex items-center justify-center">
-                                <div className="w-3 h-3 rounded-full bg-orange-500"></div>
-                              </div>
                               <span className="text-sm text-gray-600">Medium (CBI 25-49)</span>
                             </div>
                           )}
@@ -477,9 +471,6 @@ export function TeamHealthOverview({
                           {(riskCounts.low > 0 && (riskCounts.critical + riskCounts.high + riskCounts.medium === 0)) && (
                             <div className="flex items-center space-x-2">
                               <div className="text-2xl font-bold text-green-600">{riskCounts.low}</div>
-                              <div className="w-6 h-6 rounded-full bg-green-500/20 flex items-center justify-center">
-                                <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                              </div>
                               <span className="text-sm text-gray-600">Low (CBI 0-24)</span>
                             </div>
                           )}
@@ -500,20 +491,15 @@ export function TeamHealthOverview({
                         {(currentAnalysis.analysis_data.team_health?.risk_distribution?.critical > 0 || currentAnalysis.analysis_data.team_summary?.risk_distribution?.critical > 0) && (
                           <div className="flex items-center space-x-2">
                             <div className="text-2xl font-bold text-red-800">{currentAnalysis.analysis_data.team_health?.risk_distribution?.critical || currentAnalysis.analysis_data.team_summary?.risk_distribution?.critical || 0}</div>
-                            <AlertTriangle className="w-6 h-6 text-red-700" />
                             <span className="text-sm text-gray-600">Critical risk</span>
                           </div>
                         )}
                         <div className="flex items-center space-x-2">
                           <div className="text-2xl font-bold text-red-600">{currentAnalysis.analysis_data.team_health?.risk_distribution?.high || currentAnalysis.analysis_data.team_summary?.risk_distribution?.high || 0}</div>
-                          <AlertTriangle className="w-6 h-6 text-red-500" />
                           <span className="text-sm text-gray-600">High risk</span>
                         </div>
                         <div className="flex items-center space-x-2">
                           <div className="text-2xl font-bold text-orange-600">{currentAnalysis.analysis_data.team_health?.risk_distribution?.medium || currentAnalysis.analysis_data.team_summary?.risk_distribution?.medium || 0}</div>
-                          <div className="w-6 h-6 rounded-full bg-orange-500/20 flex items-center justify-center">
-                            <div className="w-3 h-3 rounded-full bg-orange-500"></div>
-                          </div>
                           <span className="text-sm text-gray-600">Medium risk</span>
                         </div>
                       </>
@@ -550,42 +536,89 @@ export function TeamHealthOverview({
             <p className="text-xs text-gray-600 mt-1">
               In the last {currentAnalysis.time_range || 30} days
             </p>
-            {(currentAnalysis.analysis_data as any)?.metadata?.severity_breakdown && (
-              <div className={`mt-4 grid ${(currentAnalysis.analysis_data as any).metadata.severity_breakdown.sev0_count > 0 ? 'grid-cols-5' : 'grid-cols-4'} gap-2`}>
-                {(currentAnalysis.analysis_data as any).metadata.severity_breakdown.sev0_count > 0 && (
-                  <div className="bg-purple-50 rounded-lg p-2 text-center">
-                    <div className="text-xs font-semibold text-purple-700">SEV0</div>
-                    <div className="text-lg font-bold text-purple-600">
-                      {(currentAnalysis.analysis_data as any).metadata.severity_breakdown.sev0_count}
+            {(() => {
+              // Only show severity breakdown if we have real data - no fake/generated data
+              const metadataBreakdown = (currentAnalysis.analysis_data as any)?.metadata?.severity_breakdown;
+
+              let severityBreakdown = null;
+              if (metadataBreakdown) {
+                // Use existing metadata breakdown (from actual API data)
+                severityBreakdown = {
+                  sev0_count: metadataBreakdown.sev0_count || 0,
+                  sev1_count: metadataBreakdown.sev1_count || 0,
+                  sev2_count: metadataBreakdown.sev2_count || 0,
+                  sev3_count: metadataBreakdown.sev3_count || 0,
+                  sev4_count: metadataBreakdown.sev4_count || 0
+                };
+              } else {
+                // Only aggregate from daily trends if they contain real incident data
+                const dailyTrends = (currentAnalysis.analysis_data as any)?.daily_trends;
+                if (dailyTrends && Array.isArray(dailyTrends)) {
+                  const aggregated = {
+                    sev0_count: 0,
+                    sev1_count: 0,
+                    sev2_count: 0,
+                    sev3_count: 0,
+                    sev4_count: 0
+                  };
+
+                  dailyTrends.forEach((day: any) => {
+                    const dayBreakdown = day.severity_breakdown;
+                    // Only count if this day has real incident data (not generated)
+                    if (dayBreakdown && day.incident_count > 0) {
+                      aggregated.sev0_count += dayBreakdown.sev0 || 0;
+                      aggregated.sev1_count += dayBreakdown.sev1 || 0;
+                      aggregated.sev2_count += dayBreakdown.sev2 || 0;
+                      aggregated.sev3_count += dayBreakdown.sev3 || 0;
+                      aggregated.sev4_count += dayBreakdown.low || 0;
+                    }
+                  });
+
+                  // Only show if we have actual incident data
+                  const total = Object.values(aggregated).reduce((sum, count) => sum + count, 0);
+                  if (total > 0) {
+                    severityBreakdown = aggregated;
+                  }
+                }
+              }
+
+              return severityBreakdown && (
+                <div className={`mt-4 grid ${severityBreakdown.sev0_count > 0 ? 'grid-cols-5' : 'grid-cols-4'} gap-2`}>
+                  {severityBreakdown.sev0_count > 0 && (
+                    <div className="bg-purple-50 rounded-lg p-2 text-center">
+                      <div className="text-xs font-semibold text-purple-700">SEV0</div>
+                      <div className="text-lg font-bold text-purple-600">
+                        {severityBreakdown.sev0_count}
+                      </div>
+                    </div>
+                  )}
+                  <div className="bg-red-50 rounded-lg p-2 text-center">
+                    <div className="text-xs font-semibold text-red-700">SEV1</div>
+                    <div className="text-lg font-bold text-red-600">
+                      {severityBreakdown.sev1_count}
                     </div>
                   </div>
-                )}
-                <div className="bg-red-50 rounded-lg p-2 text-center">
-                  <div className="text-xs font-semibold text-red-700">SEV1</div>
-                  <div className="text-lg font-bold text-red-600">
-                    {(currentAnalysis.analysis_data as any).metadata.severity_breakdown.sev1_count || 0}
+                  <div className="bg-orange-50 rounded-lg p-2 text-center">
+                    <div className="text-xs font-semibold text-orange-700">SEV2</div>
+                    <div className="text-lg font-bold text-orange-600">
+                      {severityBreakdown.sev2_count}
+                    </div>
+                  </div>
+                  <div className="bg-yellow-50 rounded-lg p-2 text-center">
+                    <div className="text-xs font-semibold text-yellow-700">SEV3</div>
+                    <div className="text-lg font-bold text-yellow-600">
+                      {severityBreakdown.sev3_count}
+                    </div>
+                  </div>
+                  <div className="bg-green-50 rounded-lg p-2 text-center">
+                    <div className="text-xs font-semibold text-green-700">SEV4</div>
+                    <div className="text-lg font-bold text-green-600">
+                      {severityBreakdown.sev4_count}
+                    </div>
                   </div>
                 </div>
-                <div className="bg-orange-50 rounded-lg p-2 text-center">
-                  <div className="text-xs font-semibold text-orange-700">SEV2</div>
-                  <div className="text-lg font-bold text-orange-600">
-                    {(currentAnalysis.analysis_data as any).metadata.severity_breakdown.sev2_count || 0}
-                  </div>
-                </div>
-                <div className="bg-yellow-50 rounded-lg p-2 text-center">
-                  <div className="text-xs font-semibold text-yellow-700">SEV3</div>
-                  <div className="text-lg font-bold text-yellow-600">
-                    {(currentAnalysis.analysis_data as any).metadata.severity_breakdown.sev3_count || 0}
-                  </div>
-                </div>
-                <div className="bg-green-50 rounded-lg p-2 text-center">
-                  <div className="text-xs font-semibold text-green-700">SEV4</div>
-                  <div className="text-lg font-bold text-green-600">
-                    {(currentAnalysis.analysis_data as any).metadata.severity_breakdown.sev4_count || 0}
-                  </div>
-                </div>
-              </div>
-            )}
+              );
+            })()}
             {currentAnalysis.analysis_data?.session_hours !== undefined && (
               <p className="text-xs text-gray-600 mt-1">
                 {currentAnalysis.analysis_data.session_hours?.toFixed(1) || '0.0'} total hours

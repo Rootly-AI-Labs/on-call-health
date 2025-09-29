@@ -244,7 +244,7 @@ class PagerDutyAPIClient:
                             "until": until_str,
                             "limit": min(100, limit - len(all_incidents)),
                             "offset": offset,
-                            "include[]": ["users", "services", "teams", "escalation_policies"],
+                            "include[]": ["users", "services", "teams", "escalation_policies", "priorities"],
                             "statuses[]": ["triggered", "acknowledged", "resolved"]
                         }
                     ) as response:
@@ -263,7 +263,13 @@ class PagerDutyAPIClient:
                             
                         data = await response.json()
                         incidents = data.get("incidents", [])
-                        
+
+                        #test
+                        # users = await self.get_users(limit=10)
+
+                        # for u in users:
+                        #     print(f"User: {u.get('name')} ({u.get('email')}) → TZ: {u.get('time_zone')}")
+
                         # COMPREHENSIVE LOGGING FOR FIRST BATCH
                         if len(all_incidents) == 0 and len(incidents) > 0:
                             logger.info(f"🔍 PD GET_INCIDENTS: First batch analysis:")
@@ -928,27 +934,36 @@ class PagerDutyDataCollector:
     def _map_priority_to_severity(self, incident: Dict[str, Any]) -> str:
         """Map PagerDuty priority/urgency to severity level."""
         urgency = incident.get("urgency", "low").lower()
-        
+
         # Check priority first for more specific classification
         priority = incident.get("priority")
+        mapped_severity = None
+
         if priority and isinstance(priority, dict):
             priority_name = priority.get("summary", "").lower()
             if not priority_name:
                 priority_name = priority.get("name", "").lower()
-                
+
             if "p1" in priority_name or "critical" in priority_name:
-                return "sev1"
+                mapped_severity = "sev1"
             elif "p2" in priority_name or "high" in priority_name:
-                return "sev2" 
+                mapped_severity = "sev2"
             elif "p3" in priority_name or "medium" in priority_name:
-                return "sev3"
+                mapped_severity = "sev3"
             elif "p4" in priority_name or "low" in priority_name:
-                return "sev4"
+                mapped_severity = "sev4"
             elif "p5" in priority_name or "info" in priority_name:
-                return "sev5"
-        
+                mapped_severity = "sev5"
+
+            if mapped_severity:
+                logger.debug(f"🎯 SEVERITY MAPPING: Priority '{priority_name}' + Urgency '{urgency}' → {mapped_severity}")
+                return mapped_severity
+
         # Fallback to urgency mapping
         if urgency == "high":
-            return "sev1"
+            mapped_severity = "sev1"
         else:
-            return "sev4"  # Default for low/unknown urgency
+            mapped_severity = "sev4"  # Default for low/unknown urgency
+
+        logger.debug(f"🎯 SEVERITY MAPPING (fallback): Urgency '{urgency}' → {mapped_severity}")
+        return mapped_severity

@@ -279,9 +279,10 @@ export default function IntegrationsPage() {
   // State management
   const [integrations, setIntegrations] = useState<Integration[]>([])
   const [loadingRootly, setLoadingRootly] = useState(true)
-  const [loadingPagerDuty, setLoadingPagerDuty] = useState(true) 
+  const [loadingPagerDuty, setLoadingPagerDuty] = useState(true)
   const [loadingGitHub, setLoadingGitHub] = useState(true)
   const [loadingSlack, setLoadingSlack] = useState(true)
+  const [reloadingIntegrations, setReloadingIntegrations] = useState(false)
   const [userInfo, setUserInfo] = useState<{name: string, email: string, avatar?: string, organization_id?: number, id?: number} | null>(null)
   const [activeTab, setActiveTab] = useState<"rootly" | "pagerduty" | null>(null)
   const [backUrl, setBackUrl] = useState<string>('/dashboard')
@@ -633,10 +634,20 @@ export default function IntegrationsPage() {
       const data = response.ok ? await response.json() : { integrations: [] }
       const rootlyIntegrations = data.integrations.map((i: Integration) => ({ ...i, platform: 'rootly' }))
 
-      setIntegrations(prev => [
-        ...prev.filter(i => i.platform !== 'rootly'),
-        ...rootlyIntegrations
-      ])
+      setIntegrations(prev => {
+        const updatedIntegrations = [
+          ...prev.filter(i => i.platform !== 'rootly'),
+          ...rootlyIntegrations
+        ]
+
+        // Update cache with fresh data when force refreshing
+        if (forceRefresh) {
+          localStorage.setItem('all_integrations', JSON.stringify(updatedIntegrations))
+          localStorage.setItem('all_integrations_timestamp', Date.now().toString())
+        }
+
+        return updatedIntegrations
+      })
     } catch (error) {
       console.error('Error loading Rootly integrations:', error)
     } finally {
@@ -673,10 +684,20 @@ export default function IntegrationsPage() {
       const data = response.ok ? await response.json() : { integrations: [] }
       const pagerdutyIntegrations = data.integrations || []
 
-      setIntegrations(prev => [
-        ...prev.filter(i => i.platform !== 'pagerduty'),
-        ...pagerdutyIntegrations
-      ])
+      setIntegrations(prev => {
+        const updatedIntegrations = [
+          ...prev.filter(i => i.platform !== 'pagerduty'),
+          ...pagerdutyIntegrations
+        ]
+
+        // Update cache with fresh data when force refreshing
+        if (forceRefresh) {
+          localStorage.setItem('all_integrations', JSON.stringify(updatedIntegrations))
+          localStorage.setItem('all_integrations_timestamp', Date.now().toString())
+        }
+
+        return updatedIntegrations
+      })
     } catch (error) {
       console.error('Error loading PagerDuty integrations:', error)
     } finally {
@@ -1314,13 +1335,18 @@ export default function IntegrationsPage() {
 
       if (response.ok) {
         toast.success(`Your ${platform === 'rootly' ? 'Rootly' : 'PagerDuty'} account has been connected successfully.`)
-        
+
+        // Show loading toast for the reload process
+        const loadingToastId = toast.loading(`Adding ${platform === 'rootly' ? 'Rootly' : 'PagerDuty'} integration to your dashboard...`, {
+          duration: 0 // Persistent until dismissed
+        })
+
         // Clear local storage cache
         localStorage.removeItem(`${platform}_integrations`)
         localStorage.removeItem(`${platform}_integrations_timestamp`)
         localStorage.removeItem('all_integrations')
         localStorage.removeItem('all_integrations_timestamp')
-        
+
         // If this is the first integration, set it as selected for dashboard
         try {
           const newIntegrationId = responseData.integration?.id || responseData.id
@@ -1331,18 +1357,31 @@ export default function IntegrationsPage() {
           console.error('Error setting default integration:', error)
           // Continue without setting default - not critical
         }
-        
+
         // Reset form and state
         form.reset()
         setConnectionStatus('idle')
         setPreviewData(null)
         setAddingPlatform(null)
-        
+
         // Reload integrations to show the newly added one
-        if (platform === 'rootly') {
-          await loadRootlyIntegrations(true)
-        } else {
-          await loadPagerDutyIntegrations(true)
+        setReloadingIntegrations(true)
+        try {
+          if (platform === 'rootly') {
+            await loadRootlyIntegrations(true)
+          } else {
+            await loadPagerDutyIntegrations(true)
+          }
+
+          // Dismiss loading toast and show success
+          toast.dismiss(loadingToastId)
+          toast.success(`${platform === 'rootly' ? 'Rootly' : 'PagerDuty'} integration added to dashboard!`)
+        } catch (reloadError) {
+          console.error('Error reloading integrations:', reloadError)
+          toast.dismiss(loadingToastId)
+          toast.error('Integration added but failed to refresh list. Please refresh the page.')
+        } finally {
+          setReloadingIntegrations(false)
         }
       } else {
         throw new Error(responseData.detail?.message || responseData.message || 'Failed to add integration')
@@ -2503,6 +2542,11 @@ export default function IntegrationsPage() {
                 onClick={() => {
                   setActiveTab('rootly')
                   setAddingPlatform('rootly')
+                  // Reset connection state when switching platforms
+                  setConnectionStatus('idle')
+                  setPreviewData(null)
+                  setDuplicateInfo(null)
+                  setTokenError(null)
                 }}
               >
                 {activeTab === 'rootly' && (
@@ -2549,6 +2593,11 @@ export default function IntegrationsPage() {
               onClick={() => {
                 setActiveTab('pagerduty')
                 setAddingPlatform('pagerduty')
+                // Reset connection state when switching platforms
+                setConnectionStatus('idle')
+                setPreviewData(null)
+                setDuplicateInfo(null)
+                setTokenError(null)
               }}
             >
               {activeTab === 'pagerduty' && (
@@ -2809,7 +2858,8 @@ export default function IntegrationsPage() {
                             <CheckCircle className="h-4 w-4 text-purple-600" />
                             <AlertDescription className="text-purple-800">
                               <div className="space-y-2">
-                                <p className="font-semibold">Connection successful!</p>
+                                <p className="font-semibold">✅ Token validated! Permissions verified.</p>
+                                <p className="text-sm text-purple-700">Ready to add this Rootly integration to your dashboard.</p>
                                 <div className="space-y-1 text-sm">
                                   <p><span className="font-medium">Organization:</span> {previewData.organization_name}</p>
                                   <p><span className="font-medium">Users:</span> {previewData.total_users}</p>
@@ -2877,7 +2927,7 @@ export default function IntegrationsPage() {
                         <Alert variant="destructive">
                           <AlertCircle className="h-4 w-4" />
                           <AlertDescription>
-                            Failed to connect. Please check your API token and try again.
+                            ❌ Invalid API token. Please verify your Rootly token and try again.
                           </AlertDescription>
                         </Alert>
                       )}
@@ -3044,7 +3094,8 @@ export default function IntegrationsPage() {
                             <CheckCircle className="h-4 w-4 text-green-600" />
                             <AlertDescription className="text-green-800">
                               <div className="space-y-2">
-                                <p className="font-semibold">Connection successful!</p>
+                                <p className="font-semibold">✅ Token validated! API access confirmed.</p>
+                                <p className="text-sm text-green-700">Ready to add this PagerDuty integration to your dashboard.</p>
                                 <div className="space-y-1 text-sm">
                                   <p><span className="font-medium">Organization:</span> {previewData.organization_name}</p>
                                   <p><span className="font-medium">Users:</span> {previewData.total_users}</p>
@@ -3079,7 +3130,7 @@ export default function IntegrationsPage() {
                         <Alert variant="destructive">
                           <AlertCircle className="h-4 w-4" />
                           <AlertDescription>
-                            Failed to connect. Please check your API token and try again.
+                            ❌ Invalid API token. Please verify your PagerDuty token and try again.
                           </AlertDescription>
                         </Alert>
                       )}
@@ -3369,18 +3420,49 @@ export default function IntegrationsPage() {
                       </div>
                     </div>
                   ))}
-                  
-                  {/* General Run Analysis Button */}
-                  <div className="pt-6 mt-4 border-t border-gray-200">
-                    <Button
-                      onClick={() => router.push('/dashboard')}
-                      className="w-full bg-purple-600 hover:bg-purple-700 text-white"
-                      size="lg"
-                    >
-                      <Activity className="w-5 h-5 mr-2" />
-                      Run Analysis
-                    </Button>
-                  </div>
+
+                  {/* Skeleton card while reloading integrations */}
+                  {reloadingIntegrations && (
+                    <div className="p-6 rounded-lg border border-gray-200 bg-gray-50 animate-pulse">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-6 h-6 bg-gray-300 rounded"></div>
+                          <div className="h-5 w-32 bg-gray-300 rounded"></div>
+                        </div>
+                        <div className="w-16 h-6 bg-gray-300 rounded"></div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
+                        <div className="flex items-start space-x-2">
+                          <div className="w-4 h-4 mt-0.5 bg-gray-300 rounded"></div>
+                          <div>
+                            <div className="h-4 w-20 bg-gray-300 rounded mb-2"></div>
+                            <div className="h-4 w-24 bg-gray-300 rounded"></div>
+                          </div>
+                        </div>
+                        <div className="flex items-start space-x-2">
+                          <div className="w-4 h-4 mt-0.5 bg-gray-300 rounded"></div>
+                          <div>
+                            <div className="h-4 w-16 bg-gray-300 rounded mb-2"></div>
+                            <div className="h-4 w-8 bg-gray-300 rounded"></div>
+                          </div>
+                        </div>
+                        <div className="flex items-start space-x-2">
+                          <div className="w-4 h-4 mt-0.5 bg-gray-300 rounded"></div>
+                          <div>
+                            <div className="h-4 w-12 bg-gray-300 rounded mb-2"></div>
+                            <div className="h-4 w-16 bg-gray-300 rounded"></div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Loading indicator */}
+                      <div className="flex items-center justify-center mt-4 pt-4 border-t border-gray-300">
+                        <Loader2 className="w-4 h-4 animate-spin mr-2 text-gray-400" />
+                        <span className="text-sm text-gray-500">Adding integration...</span>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             ) : (

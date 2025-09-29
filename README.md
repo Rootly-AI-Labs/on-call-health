@@ -1,10 +1,12 @@
-# Rootly Burnout Detector - Web Application
+# Rootly Burnout Detector
 
-A modern web application for detecting burnout risk in engineering teams using Rootly incident data, GitHub activity, and Slack communication patterns.
+A web application for detecting burnout risk in incident responder teams, using Rootly or PagerDuty incident data, GitHub activity, and Slack communication patterns.
 
-## 🎯 Overview
+We also offer a free hosted version at [www.oncallburnout.com](https://www.oncallburnout.com/)
 
-This web application provides an intuitive interface for analyzing team burnout risk using scientific methods based on the Maslach Burnout Inventory. It integrates with Rootly's incident management platform to provide actionable insights for engineering managers.
+The interface helps engineering managers spot team members who may be overworked or burned out. Our methodology is leveraging the [Copenhagen Burnout Inventory](https://nfa.dk/media/hl5nbers/cbi-first-edition.pdf) (CBI), which was developed by a team of Danish researchers. 
+
+![Rootly AI Labs burnout detector screenshot](assets/rootly-burnout-detector.png)
 
 ## ✨ Features
 

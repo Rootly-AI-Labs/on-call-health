@@ -8,9 +8,11 @@ interface GitHubCommitsTimelineProps {
   analysisId: number
   totalCommits: number
   weekendPercentage: number
+  cache: Map<string, any>
+  setCache: React.Dispatch<React.SetStateAction<Map<string, any>>>
 }
 
-export function GitHubCommitsTimeline({ analysisId, totalCommits, weekendPercentage }: GitHubCommitsTimelineProps) {
+export function GitHubCommitsTimeline({ analysisId, totalCommits, weekendPercentage, cache, setCache }: GitHubCommitsTimelineProps) {
   const [loading, setLoading] = useState(true)
   const [timelineData, setTimelineData] = useState<any[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -18,9 +20,19 @@ export function GitHubCommitsTimeline({ analysisId, totalCommits, weekendPercent
   useEffect(() => {
     const fetchTimelineData = async () => {
       if (!analysisId) {
+        setLoading(false)
         return
       }
 
+      const cacheKey = `github-timeline-${analysisId}`
+
+      // Check cache first
+      const cachedData = cache.get(cacheKey)
+      if (cachedData) {
+        setTimelineData(cachedData)
+        setLoading(false)
+        return
+      }
       setLoading(true)
       setError(null)
 
@@ -35,27 +47,31 @@ export function GitHubCommitsTimeline({ analysisId, totalCommits, weekendPercent
           }
         })
 
-
         if (!response.ok) {
+          console.error('GitHub timeline API error', response.status)
           throw new Error(`Failed to fetch GitHub timeline data: ${response.status}`)
         }
 
         const result = await response.json()
 
         if (result.status === 'success' && result.data?.daily_commits) {
+          // Cache the data
+          setCache(prev => new Map(prev.set(cacheKey, result.data.daily_commits)))
           setTimelineData(result.data.daily_commits)
         } else if (result.status === 'error') {
+          console.error('GitHub timeline server error', result.message)
           setError(result.message || 'Failed to fetch timeline data')
         }
       } catch (err) {
-          setError('Unable to load timeline data')
+        console.error('Unexpected error loading GitHub timeline:', err)
+        setError('Unable to load timeline data')
       } finally {
         setLoading(false)
       }
     }
 
     fetchTimelineData()
-  }, [analysisId])
+  }, [analysisId, cache, setCache])
 
   if (loading) {
     return (

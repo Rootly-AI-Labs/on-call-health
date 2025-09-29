@@ -16,6 +16,11 @@ from ..core.cbi_config import calculate_composite_cbi_score, calculate_personal_
 from .ai_burnout_analyzer import get_ai_burnout_analyzer
 from .github_correlation_service import GitHubCorrelationService
 
+import pytz
+from collections import defaultdict
+
+from datetime import datetime
+
 logger = logging.getLogger(__name__)
 
 
@@ -61,6 +66,9 @@ class UnifiedBurnoutAnalyzer:
             'slack': slack_token is not None
         }
         
+        # Keeping track of user timezones
+        self.user_tz_by_id = {} 
+
         logger.info(f"UnifiedBurnoutAnalyzer initialized - Platform: {platform}, Features: {self.features}")
         
         # Burnout scoring thresholds
@@ -92,7 +100,9 @@ class UnifiedBurnoutAnalyzer:
                 "low": 1.0
             }
         }
-    
+
+
+
     async def analyze_burnout(
         self, 
         time_range_days: int = 30,
@@ -134,6 +144,17 @@ class UnifiedBurnoutAnalyzer:
             extraction_start = datetime.now()
             logger.info(f"🔍 BURNOUT ANALYSIS: Step 2 - Extracting users and incidents from {time_range_days}-day data")
             users = data.get("users", []) if data else []
+
+            # create map with user time zones
+            self.user_tz_by_id = self._build_user_tz_map(users)
+            # print(self.user_tz_by_id)
+
+            # optional: calculate 
+            if self.user_tz_by_id:
+                sample = list(self.user_tz_by_id.items())[:3]
+                print(f"🕒 TZ MAP sample: {sample}")
+
+
             incidents = data.get("incidents", []) if data else []
             metadata = data.get("collection_metadata", {}) if data else {}
             
@@ -816,7 +837,28 @@ class UnifiedBurnoutAnalyzer:
                     }
                 }
             }
-    
+        
+    # helper for building  timezone map
+    def _build_user_tz_map(self, users):
+        tz_by_id = {}
+        if not users:
+            return tz_by_id
+        for user in users:
+            uid = user.get("id")        
+            if not uid:
+                continue
+            if self.platform == "pagerduty":
+                tz = user.get("timezone") 
+                # print(f"User: {user.get('name')} ({user.get('email')}) → TZ: {user.get('timezone')}")
+            else:  
+                attrs = user.get("attributes", {}) or {}
+                # print(f"User: {user.get('name')} ({user.get('email')}) → TZ: {user.get('timezone')}")
+
+                tz = attrs.get("time_zone") or attrs.get("timezone")
+            tz_by_id[str(uid)] = tz
+        return tz_by_id
+
+
     def _analyze_team_data(
         self, 
         users: List[Dict[str, Any]], 
@@ -1041,19 +1083,31 @@ class UnifiedBurnoutAnalyzer:
                 }
             }
         
-        # Calculate metrics
+        # Calculate base metrics from incidents
         days_analyzed = metadata.get("days_analyzed", 30) or 30
-        metrics = self._calculate_member_metrics(
-            incidents, 
-            days_analyzed, 
-            include_weekends
+        user_tz = self.user_tz_by_id.get(str(user_id), "UTC")
+        base_metrics = self._calculate_member_metrics(
+            incidents,
+            days_analyzed,
+            include_weekends, 
+            user_tz
         )
+
+        # Enhance metrics with GitHub/Slack data if available
+        metrics = self._enhance_metrics_with_github_data(base_metrics, github_data, user_tz)
+
+        # Add Slack communication patterns
+        if slack_data:
+            metrics = self._enhance_metrics_with_slack_data(metrics, slack_data, user_tz)
         
         # Calculate burnout dimensions  
         dimensions = self._calculate_burnout_dimensions(metrics)
         
         # Calculate burnout factors for backward compatibility
         factors = self._calculate_burnout_factors(metrics)
+
+        # Calculate confidence intervals and data quality
+        confidence = self._calculate_confidence_intervals(metrics, incidents, github_data, slack_data, user_tz)
         
         # CBI DEBUG LOGGING - Track score calculation
         print(f"🐛 CBI RAILWAY DEBUG - User: {user_email}")
@@ -1081,6 +1135,16 @@ class UnifiedBurnoutAnalyzer:
         # Calculate CBI (Copenhagen Burnout Inventory) score
         # Map existing metrics to CBI format with severity weighting
         severity_dist = metrics.get('severity_distribution', {})
+
+        # Calculate research-based impact factors
+        time_impacts = self._calculate_time_impact_multipliers(incidents, metrics, user_tz)
+        recovery_data = self._calculate_recovery_deficit(incidents, user_tz)
+
+        # Log research-based insights
+        logger.info(f"🕐 TIME IMPACT: {user_name} - After-hours: {time_impacts['after_hours_incidents']}, "
+                   f"Weekend: {time_impacts['weekend_incidents']}, Overnight: {time_impacts['overnight_incidents']}")
+        logger.info(f"🔄 RECOVERY: {user_name} - Violations: {recovery_data['recovery_violations']}, "
+                   f"Avg recovery: {recovery_data['avg_recovery_hours']:.1f}h, Score: {recovery_data['recovery_score']:.0f}/100")
         
         # Calculate severity-weighted incident burden 
         # Handle both Rootly (sev0-sev4) and PagerDuty (sev1-sev5) severity mappings
@@ -1221,12 +1285,22 @@ class UnifiedBurnoutAnalyzer:
         print(f"🐛 CBI RAILWAY DEBUG - CBI composite score: {round(composite_cbi['composite_score'], 2)}")
         logger.info(f"🐛 CBI METRICS DEBUG - CBI composite score: {round(composite_cbi['composite_score'], 2)}")
         
+        # Prepare enhanced metrics with research insights for CBI reasoning
+        enhanced_metrics = metrics.copy()
+        enhanced_metrics['time_impact_analysis'] = time_impacts
+        enhanced_metrics['recovery_analysis'] = recovery_data
+        enhanced_metrics['trauma_analysis'] = {
+            "critical_incidents": severity_dist.get('sev0', 0) + severity_dist.get('sev1', 0),
+            "compound_trauma_detected": (severity_dist.get('sev0', 0) + severity_dist.get('sev1', 0)) >= 5,
+            "compound_factor": self._calculate_compound_trauma_factor(severity_dist.get('sev0', 0) + severity_dist.get('sev1', 0))
+        }
+
         # Generate reasoning for the CBI scores
         cbi_reasoning = generate_cbi_score_reasoning(
-            personal_cbi, 
-            work_cbi, 
+            personal_cbi,
+            work_cbi,
             composite_cbi,
-            metrics  # Pass original metrics for context
+            enhanced_metrics  # Pass enhanced metrics with research insights
         )
         
         result = {
@@ -1245,7 +1319,28 @@ class UnifiedBurnoutAnalyzer:
                 "interpretation": composite_cbi['interpretation']
             },
             "cbi_reasoning": cbi_reasoning,  # Add explanations for the score
-            "metrics": metrics
+            "metrics": metrics,
+            "confidence": confidence,  # Add confidence intervals and data quality
+            # Research-based insights
+            "time_impact_analysis": {
+                "after_hours_incidents": time_impacts['after_hours_incidents'],
+                "weekend_incidents": time_impacts['weekend_incidents'],
+                "overnight_incidents": time_impacts['overnight_incidents'],
+                "after_hours_multiplier": time_impacts['after_hours_multiplier'],
+                "weekend_multiplier": time_impacts['weekend_multiplier'],
+                "overnight_multiplier": time_impacts['overnight_multiplier']
+            },
+            "recovery_analysis": {
+                "recovery_violations": recovery_data['recovery_violations'],
+                "avg_recovery_hours": round(recovery_data['avg_recovery_hours'], 1),
+                "min_recovery_hours": round(recovery_data['min_recovery_hours'], 1) if recovery_data['min_recovery_hours'] != float('inf') else 0,
+                "recovery_score": round(recovery_data['recovery_score'], 0)
+            },
+            "trauma_analysis": {
+                "critical_incidents": severity_dist.get('sev0', 0) + severity_dist.get('sev1', 0),
+                "compound_trauma_detected": (severity_dist.get('sev0', 0) + severity_dist.get('sev1', 0)) >= 5,
+                "compound_factor": self._calculate_compound_trauma_factor(severity_dist.get('sev0', 0) + severity_dist.get('sev1', 0))
+            }
         }
         
         # Add GitHub activity if available
@@ -1311,12 +1406,45 @@ class UnifiedBurnoutAnalyzer:
             }
         
         return result
-    
+
+
+
+    def _get_user_tz(self, user_id: Any, default: str = "UTC") -> str:
+        """Return a user's timezone string from the cached id->tz map."""
+        if user_id is None:
+            return default
+        return self.user_tz_by_id.get(str(user_id), default) or default
+
+    def _parse_iso_utc(self, ts: Optional[str]) -> Optional[datetime]:
+        """Parse ISO8601 (possibly ending with 'Z') into an aware UTC datetime."""
+        if not ts:
+            return None
+        try:
+            return datetime.fromisoformat(ts.replace("Z", "+00:00"))
+        except Exception:
+            return None
+
+
+
+    def _to_local(self, dt, user_tz: str):
+        """convert dt to the user's timezone"""
+        try:
+            tz = pytz.timezone(user_tz or "UTC")
+        except Exception:
+            tz = pytz.UTC
+        if dt is None:
+            return None
+        if dt.tzinfo is None:
+            dt = pytz.UTC.localize(dt)
+        return dt.astimezone(tz)
+
+
     def _calculate_member_metrics(
         self,
         incidents: List[Dict[str, Any]],
         days_analyzed: int,
-        include_weekends: bool
+        include_weekends: bool,
+        user_tz: str = "UTC",
     ) -> Dict[str, Any]:
         """Calculate detailed metrics for a team member."""
         # Initialize counters
@@ -1329,6 +1457,8 @@ class UnifiedBurnoutAnalyzer:
         for incident in incidents:
             # Handle both Rootly (with attributes) and PagerDuty (normalized) formats
             if self.platform == "pagerduty":
+                # print("USING PAGERDUTY")
+
                 # PagerDuty normalized format
                 created_at = incident.get("created_at")
                 acknowledged_at = incident.get("acknowledged_at")
@@ -1336,6 +1466,7 @@ class UnifiedBurnoutAnalyzer:
                 status = incident.get("status", "unknown")
             else:
                 # Rootly format
+                # print("USING ROOTLY")
                 attrs = incident.get("attributes", {})
                 created_at = attrs.get("created_at")
                 # Try multiple timestamp fields for response time calculation
@@ -1361,19 +1492,26 @@ class UnifiedBurnoutAnalyzer:
             
             # Check timing
             if created_at:
-                dt = self._parse_timestamp(created_at)
-                if dt:
+                dt = self._parse_iso_utc(created_at)
+                dt_local = self._to_local(dt, user_tz)
+
+                # # Uncomment to test and validate:
+                # print("PAGE DUTY or ROOTLY Regular: ", dt)
+                # print("PAGER DUTY or ROOTLY Local Timezone: ", user_tz, " now is: ", dt_local)
+
+                if dt_local:
                     # After hours: before 9 AM or after 6 PM
-                    if dt.hour < 9 or dt.hour >= 18:
+                    if dt_local.hour < 9 or dt_local.hour >= 18:
                         after_hours_count += 1
                     
                     # Weekend: Saturday (5) or Sunday (6)
-                    if dt.weekday() >= 5:
+                    if dt_local.weekday() >= 5:
                         weekend_count += 1
-            
+
+
             # Response time (time to acknowledge)
             if created_at and acknowledged_at:
-                response_time = self._calculate_response_time(created_at, acknowledged_at)
+                response_time = self._calculate_response_time(created_at, acknowledged_at, user_tz)
                 if response_time is not None:
                     response_times.append(response_time)
             
@@ -1398,7 +1536,8 @@ class UnifiedBurnoutAnalyzer:
         safe_weekend_percentage = weekend_percentage if weekend_percentage is not None else 0
         safe_avg_response_time = avg_response_time if avg_response_time is not None else 0
         
-        return {
+        # Add enhanced GitHub/Slack metrics if available
+        enhanced_metrics = {
             "incidents_per_week": round(safe_incidents_per_week, 2),
             "after_hours_percentage": round(safe_after_hours_percentage, 3),
             "weekend_percentage": round(safe_weekend_percentage, 3),
@@ -1406,7 +1545,394 @@ class UnifiedBurnoutAnalyzer:
             "severity_distribution": dict(severity_counts),
             "status_distribution": dict(status_counts)
         }
-    
+
+        # Add severity-weighted incident calculation for better load assessment
+        if safe_incidents_len > 0:
+            severity_weights = {"critical": 4, "high": 3, "medium": 2, "low": 1, "unknown": 1.5}
+            total_weighted_severity = 0
+            for incident in incidents:
+                severity = incident.get("severity", "unknown").lower()
+                weight = severity_weights.get(severity, 1.5)
+                total_weighted_severity += weight
+
+            severity_weighted_per_week = (total_weighted_severity / safe_days) * 7 if safe_days > 0 else 0
+            enhanced_metrics["severity_weighted_incidents_per_week"] = round(severity_weighted_per_week, 2)
+
+        return enhanced_metrics
+
+    def _enhance_metrics_with_github_data(self, base_metrics: Dict[str, Any], github_data: Dict[str, Any], user_tz: str = "UTC") -> Dict[str, Any]:
+        """Add sophisticated GitHub analysis patterns to base incident metrics."""
+        if not github_data:
+            return base_metrics
+
+        enhanced = base_metrics.copy()
+
+        # Extract GitHub activity patterns
+        commits = github_data.get("commits", [])
+        pull_requests = github_data.get("pull_requests", [])
+        reviews = github_data.get("code_reviews", [])
+
+        if commits:
+            # 1. Commit Temporal Patterns (beyond simple after-hours)
+            commit_hours = []
+            commit_weekdays = []
+            daily_commit_counts = {}
+
+            from datetime import datetime
+
+            for commit in commits:
+                dt_utc = self._parse_iso_utc(commit.get("timestamp"))
+                if not dt_utc:
+                    continue
+                dt_local = self._to_local(dt_utc, user_tz)
+                commit_hours.append(dt_local.hour)
+                commit_weekdays.append(dt_local.weekday())
+
+                date_key = dt_local.date()
+                daily_commit_counts[date_key] = daily_commit_counts.get(date_key, 0) + 1
+
+
+            # Context switching intensity (high variation = more stress)
+            if daily_commit_counts:
+                daily_counts = list(daily_commit_counts.values())
+                avg_daily_commits = sum(daily_counts) / len(daily_counts)
+                commit_variance = sum((x - avg_daily_commits) ** 2 for x in daily_counts) / len(daily_counts)
+                enhanced["context_switching_intensity"] = min(1.0, commit_variance / (avg_daily_commits + 1))
+
+            # Work-life boundary erosion (commits spread across more hours = worse)
+            if commit_hours:
+                unique_hours = len(set(commit_hours))
+                enhanced["work_hours_spread"] = unique_hours / 24.0  # 0-1 scale
+
+                # Late night coding pattern (11PM - 6AM commits)
+                late_night_commits = sum(1 for h in commit_hours if h >= 23 or h <= 6)
+                enhanced["late_night_coding_ratio"] = late_night_commits / len(commits) if commits else 0
+
+        # 2. Pull Request Patterns (cognitive load and social engagement)
+        if pull_requests:
+            pr_sizes = []
+            pr_review_times = []
+
+            for pr in pull_requests:
+                # PR size indicates cognitive complexity
+                additions = pr.get("additions", 0)
+                deletions = pr.get("deletions", 0)
+                pr_size = additions + deletions
+                if pr_size > 0:
+                    pr_sizes.append(pr_size)
+
+                created = self._parse_iso_utc(pr.get("created_at"))
+                merged  = self._parse_iso_utc(pr.get("merged_at"))
+                if created and merged:
+                    pr_review_times.append((merged - created).total_seconds() / 3600.0)
+
+            if pr_sizes:
+                avg_pr_size = sum(pr_sizes) / len(pr_sizes)
+                enhanced["avg_pr_complexity"] = min(1.0, avg_pr_size / 1000)  # Normalize large PRs
+
+                # Large PR ratio (>500 lines = potentially rushed/overwhelming)
+                large_prs = sum(1 for size in pr_sizes if size > 500)
+                enhanced["large_pr_ratio"] = large_prs / len(pr_sizes) if pr_sizes else 0
+
+            if pr_review_times:
+                avg_review_time = sum(pr_review_times) / len(pr_review_times)
+                enhanced["avg_pr_review_hours"] = avg_review_time
+
+                # Rush PRs (merged within 2 hours = high pressure)
+                rush_prs = sum(1 for t in pr_review_times if t < 2)
+                enhanced["rush_pr_ratio"] = rush_prs / len(pr_review_times) if pr_review_times else 0
+
+        # 3. Code Review Social Health
+        if reviews:
+            # Review participation decline over time
+            review_dates = []
+
+            for review in reviews:
+                dt_utc = self._parse_iso_utc(review.get("submitted_at"))
+                if not dt_utc:
+                    continue
+                review_dates.append(self._to_local(dt_utc, user_tz))
+
+            if len(review_dates) >= 4:  # Need minimum data for trend
+                # Sort and calculate trend (positive = increasing, negative = declining)
+                review_dates.sort()
+                days = [(d - review_dates[0]).days for d in review_dates]
+                counts = list(range(len(review_dates)))  # Cumulative review count
+
+                # Simple linear regression slope
+                n = len(days)
+                sum_xy = sum(d * c for d, c in zip(days, counts))
+                sum_x = sum(days)
+                sum_y = sum(counts)
+                sum_x2 = sum(d * d for d in days)
+
+                if n * sum_x2 - sum_x * sum_x != 0:
+                    slope = (n * sum_xy - sum_x * sum_y) / (n * sum_x2 - sum_x * sum_x)
+                    enhanced["review_engagement_trend"] = slope  # Positive = improving, negative = declining
+
+        # 4. Overall GitHub Burnout Indicators
+        github_burnout_score = 0
+
+        # High context switching
+        if enhanced.get("context_switching_intensity", 0) > 0.7:
+            github_burnout_score += 15
+
+        # Eroded work boundaries
+        if enhanced.get("work_hours_spread", 0) > 0.6:
+            github_burnout_score += 20
+
+        # Late night coding
+        if enhanced.get("late_night_coding_ratio", 0) > 0.2:
+            github_burnout_score += 25
+
+        # Large, complex PRs
+        if enhanced.get("large_pr_ratio", 0) > 0.3:
+            github_burnout_score += 15
+
+        # Rush PRs (time pressure)
+        if enhanced.get("rush_pr_ratio", 0) > 0.4:
+            github_burnout_score += 15
+
+        # Declining social engagement
+        if enhanced.get("review_engagement_trend", 0) < -0.1:
+            github_burnout_score += 10
+
+        enhanced["github_burnout_indicators"] = min(100, github_burnout_score)
+
+        return enhanced
+
+    def _enhance_metrics_with_slack_data(self, base_metrics: Dict[str, Any], slack_data: Dict[str, Any], user_tz: str = "UTC") -> Dict[str, Any]:
+        """Add Slack communication health metrics to detect burnout through social patterns."""
+        if not slack_data:
+            return base_metrics
+
+        enhanced = base_metrics.copy()
+
+        # Extract Slack activity patterns
+        messages = slack_data.get("messages", [])
+        channels = slack_data.get("channels_active", 0)
+        response_times = slack_data.get("response_times", [])
+
+        if messages:
+            message_hours = []
+            message_weekdays = []
+            daily_message_counts = {}
+
+            for message in messages:
+                dt_utc = self._parse_iso_utc(message.get("timestamp"))
+                if not dt_utc:
+                    continue
+                dt_local = self._to_local(dt_utc, user_tz)
+                # Uncomment below to verify slack
+                # print("SLACK TIME UTC: ", dt_utc)
+                # print("AFTER TIME AFTER TZ ADJUSTMENT: ", dt_local)
+                message_hours.append(dt_local.hour)
+                message_weekdays.append(dt_local.weekday())
+
+                date_key = dt_local.date()
+                daily_message_counts[date_key] = daily_message_counts.get(date_key, 0) + 1
+            
+            # After-hours communication burden
+            if message_hours:
+                after_hours_msgs = sum(1 for h in message_hours if h >= 18 or h <= 8)
+                enhanced["slack_after_hours_ratio"] = after_hours_msgs / len(messages)
+
+                # Late night communication stress (10PM - 6AM)
+                late_night_msgs = sum(1 for h in message_hours if h >= 22 or h <= 6)
+                enhanced["slack_late_night_ratio"] = late_night_msgs / len(messages)
+
+            # Weekend communication encroachment
+            if message_weekdays:
+                weekend_msgs = sum(1 for day in message_weekdays if day >= 5)  # Sat=5, Sun=6
+                enhanced["slack_weekend_ratio"] = weekend_msgs / len(messages)
+
+        # 2. Social Engagement and Isolation Indicators
+        total_messages = len(messages)
+        enhanced["slack_daily_msg_volume"] = total_messages / 30 if total_messages > 0 else 0  # Avg per day
+
+        # Communication channel diversity (social health indicator)
+        enhanced["slack_channel_diversity"] = min(1.0, channels / 10.0) if channels > 0 else 0
+
+        # 3. Response Pressure Indicators
+        if response_times:
+            avg_response_mins = sum(response_times) / len(response_times) / 60  # Convert to minutes
+            enhanced["slack_avg_response_minutes"] = avg_response_mins
+
+            # Immediate response pressure (responses within 5 minutes)
+            immediate_responses = sum(1 for t in response_times if t <= 300)  # 5 minutes in seconds
+            enhanced["slack_immediate_response_ratio"] = immediate_responses / len(response_times)
+
+            # High pressure responses (within 1 minute)
+            urgent_responses = sum(1 for t in response_times if t <= 60)
+            enhanced["slack_urgent_response_ratio"] = urgent_responses / len(response_times)
+
+        # 4. Communication Burnout Indicators
+        slack_burnout_score = 0
+
+        # After-hours communication burden
+        after_hours_ratio = enhanced.get("slack_after_hours_ratio", 0)
+        if after_hours_ratio > 0.3:  # >30% after hours
+            slack_burnout_score += 20
+
+        # Late night communication stress
+        late_night_ratio = enhanced.get("slack_late_night_ratio", 0)
+        if late_night_ratio > 0.1:  # >10% late night
+            slack_burnout_score += 25
+
+        # Weekend work encroachment
+        weekend_ratio = enhanced.get("slack_weekend_ratio", 0)
+        if weekend_ratio > 0.15:  # >15% weekend
+            slack_burnout_score += 20
+
+        # High response pressure
+        immediate_ratio = enhanced.get("slack_immediate_response_ratio", 0)
+        if immediate_ratio > 0.4:  # >40% immediate responses
+            slack_burnout_score += 15
+
+        # Communication overload
+        daily_volume = enhanced.get("slack_daily_msg_volume", 0)
+        if daily_volume > 50:  # >50 messages per day
+            slack_burnout_score += 10
+
+        # Low social engagement (isolation indicator)
+        channel_diversity = enhanced.get("slack_channel_diversity", 0)
+        if channel_diversity < 0.2:  # <20% diversity
+            slack_burnout_score += 15
+
+        enhanced["slack_burnout_indicators"] = min(100, slack_burnout_score)
+
+        # 5. Sentiment Analysis (if available)
+        sentiment_scores = slack_data.get("sentiment_scores", [])
+        if sentiment_scores:
+            avg_sentiment = sum(sentiment_scores) / len(sentiment_scores)
+            enhanced["slack_avg_sentiment"] = avg_sentiment
+
+            # Negative sentiment trend (burnout indicator)
+            if avg_sentiment < -0.2:  # Negative sentiment
+                enhanced["slack_burnout_indicators"] = min(100, enhanced.get("slack_burnout_indicators", 0) + 15)
+
+        return enhanced
+
+    def _calculate_confidence_intervals(self, metrics: Dict[str, Any], incidents: List[Dict], github_data: Dict = None, slack_data: Dict = None, user_tz: str = "UTC") -> Dict[str, Any]:
+        """Calculate confidence intervals and data quality indicators for burnout metrics."""
+        confidence = {}
+
+        # 1. Data Sample Size Assessment
+        incident_count = len(incidents) if incidents else 0
+        github_commits = len(github_data.get("commits", [])) if github_data else 0
+        slack_messages = len(slack_data.get("messages", [])) if slack_data else 0
+
+        # 2. Temporal Coverage Assessment
+        days_with_activity = 0
+        if incidents:
+            from datetime import datetime
+            incident_dates = set()
+            for incident in incidents:
+                try:
+                    # rootly and pagerduty functionality
+                    created_at = (incident.get("created_at") or (incident.get("attributes", {}) or {}).get("created_at"))
+                    if created_at:
+                        dt_utc = self._parse_iso_utc(created_at)
+                        dt_local = self._to_local(dt_utc, user_tz)
+
+                        # #uncomment for testing
+                        # print("CONFIDENCE INTERVAL IN UTC: ", dt_utc)
+                        # print("CONFIDENCE INTERVAL IN LOCAL TIME: ", dt_local)
+                        incident_dates.add(dt_local.date())
+                except:
+                    continue
+            days_with_activity = len(incident_dates)
+
+        # 3. Data Quality Scores (0-100 scale)
+
+        # Incident data quality
+        incident_quality = 0
+        if incident_count >= 10:  # High confidence threshold
+            incident_quality = min(100, incident_count * 5)  # Scale up to 100
+        elif incident_count >= 3:  # Moderate confidence
+            incident_quality = min(70, incident_count * 15)
+        else:  # Low confidence
+            incident_quality = incident_count * 20
+
+        # GitHub data quality
+        github_quality = 0
+        if github_commits >= 20:  # High confidence
+            github_quality = min(100, github_commits * 3)
+        elif github_commits >= 5:  # Moderate confidence
+            github_quality = min(70, github_commits * 10)
+        else:  # Low confidence
+            github_quality = github_commits * 15
+
+        # Slack data quality
+        slack_quality = 0
+        if slack_messages >= 50:  # High confidence
+            slack_quality = min(100, slack_messages * 1.5)
+        elif slack_messages >= 10:  # Moderate confidence
+            slack_quality = min(70, slack_messages * 5)
+        else:  # Low confidence
+            slack_quality = slack_messages * 8
+
+        # 4. Temporal Consistency (days with activity vs analysis period)
+        expected_days = 30  # Default analysis period
+        temporal_coverage = min(100, (days_with_activity / expected_days) * 100) if expected_days > 0 else 0
+
+        # 5. Overall Confidence Score
+        data_sources_available = sum([1 for q in [incident_quality, github_quality, slack_quality] if q > 0])
+
+        if data_sources_available == 0:
+            overall_confidence = 0
+        elif data_sources_available == 1:
+            overall_confidence = max(incident_quality, github_quality, slack_quality) * 0.6  # Single source penalty
+        elif data_sources_available == 2:
+            overall_confidence = (max(incident_quality, github_quality, slack_quality) * 0.7 +
+                                min(incident_quality, github_quality, slack_quality) * 0.3)
+        else:  # All 3 sources
+            weights = [0.5, 0.3, 0.2] if incident_quality >= github_quality >= slack_quality else [0.4, 0.35, 0.25]
+            qualities = sorted([incident_quality, github_quality, slack_quality], reverse=True)
+            overall_confidence = sum(q * w for q, w in zip(qualities, weights))
+
+        # Apply temporal coverage adjustment
+        overall_confidence *= (temporal_coverage / 100) * 0.8 + 0.2  # Min 20% confidence
+
+        # 6. Confidence Categories
+        if overall_confidence >= 80:
+            confidence_level = "HIGH"
+            reliability_note = "High confidence - sufficient data across multiple sources"
+        elif overall_confidence >= 60:
+            confidence_level = "MODERATE"
+            reliability_note = "Moderate confidence - good data coverage"
+        elif overall_confidence >= 40:
+            confidence_level = "LOW"
+            reliability_note = "Low confidence - limited data available"
+        else:
+            confidence_level = "VERY_LOW"
+            reliability_note = "Very low confidence - insufficient data for reliable assessment"
+
+        confidence = {
+            "overall_confidence": round(overall_confidence, 1),
+            "confidence_level": confidence_level,
+            "reliability_note": reliability_note,
+            "data_quality": {
+                "incident_quality": round(incident_quality, 1),
+                "github_quality": round(github_quality, 1),
+                "slack_quality": round(slack_quality, 1),
+                "temporal_coverage": round(temporal_coverage, 1)
+            },
+            "sample_sizes": {
+                "incidents": incident_count,
+                "github_commits": github_commits,
+                "slack_messages": slack_messages,
+                "days_with_activity": days_with_activity
+            },
+            "confidence_intervals": {
+                # Burnout score confidence intervals based on data quality
+                "burnout_score_margin": (50 - overall_confidence/2),
+                "calculation_note": "Lower bound: max(0, score - margin), Upper bound: min(100, score + margin)"
+            }
+        }
+
+        return confidence
+
     def _calculate_burnout_dimensions(self, metrics: Dict[str, Any]) -> Dict[str, float]:
         """Calculate burnout dimensions (0-10 scale each)."""
         # Currently only implementing incident-based calculations (70% weight)
@@ -1478,12 +2004,25 @@ class UnifiedBurnoutAnalyzer:
         else:
             severity_weights = {'sev0': 15.0, 'sev1': 12.0, 'sev2': 6.0, 'sev3': 3.0, 'sev4': 1.5, 'unknown': 1.5}
         
-        # Calculate weighted severity impact using NEW weights
+        # Calculate weighted severity impact using NEW weights with compound trauma
         total_severity_impact = 0.0
         total_incidents = 0
+        critical_incidents_count = 0
+
         for severity, count in severity_dist.items():
             if count > 0:
                 weight = severity_weights.get(severity.lower(), 1.5)
+
+                # Track critical incidents for compound trauma calculation
+                if severity.lower() in ['sev0', 'sev1'] and weight >= 12.0:
+                    critical_incidents_count += count
+
+                # Apply compound trauma factor for critical incidents
+                if severity.lower() in ['sev0', 'sev1'] and count >= 5:
+                    compound_factor = self._calculate_compound_trauma_factor(count)
+                    weight *= compound_factor
+                    logger.info(f"🔥 COMPOUND TRAUMA: {severity} incidents: {count}, compound factor: {compound_factor:.2f}")
+
                 total_severity_impact += count * weight
                 total_incidents += count
         
@@ -1642,37 +2181,191 @@ class UnifiedBurnoutAnalyzer:
         # REMOVED incident_load factor - was duplicate of workload factor
         # Both were calculated from incidents_per_week, causing double-counting
         
-        # Response time factor - ensure numeric value with division safety
+        # Response time factor - based on actual response times (backward compatibility)
         response_time_mins = metrics.get("avg_response_time_minutes", 0)
         response_time_mins = float(response_time_mins) if response_time_mins is not None else 0.0
         response_time = min(10, response_time_mins / 6) if response_time_mins and response_time_mins >= 0 else 0.0
-        
+
+        # Incident load factor - severity-weighted total burden
+        # Uses actual severity weights: Critical=4, High=3, Medium=2, Low=1
+        severity_weighted_per_week = metrics.get("severity_weighted_incidents_per_week", 0)
+        if severity_weighted_per_week > 0:
+            # Scale based on severity-weighted load
+            incident_load = min(10, severity_weighted_per_week * 0.6)
+        else:
+            # Fallback: use frequency with higher scaling for missing severity data
+            incident_load = min(10, incidents_per_week * 1.8) if incidents_per_week > 0 else 0.0
+
         factors = {
             "workload": workload,
-            "after_hours": after_hours, 
+            "after_hours": after_hours,
             "weekend_work": weekend_work,
-            "response_time": response_time
+            "response_time": response_time,
+            "incident_load": incident_load
         }
         
         return {k: round(v, 2) for k, v in factors.items()}
-    
+
+    def _calculate_compound_trauma_factor(self, critical_incident_count: int) -> float:
+        """
+        Calculate compound trauma factor based on research showing exponential psychological impact.
+
+        Research basis: Multiple critical incidents create compound trauma, not just additive impact.
+        - 5-10 critical incidents: 10% compound effect
+        - 10+ critical incidents: 15% compound effect per additional incident (capped at 2.0x)
+
+        Args:
+            critical_incident_count: Number of SEV0/SEV1 incidents
+
+        Returns:
+            Compound factor (1.0-2.0)
+        """
+        if critical_incident_count < 5:
+            return 1.0  # No compound effect for low counts
+        elif critical_incident_count <= 10:
+            # Moderate compound effect: 10% increase
+            return 1.0 + (critical_incident_count - 5) * 0.02  # 10% over 5 incidents
+        else:
+            # High compound effect: 15% per additional incident, capped at 2.0x
+            base_compound = 1.1  # 10% for first 10 incidents
+            additional_compound = (critical_incident_count - 10) * 0.15
+            return min(2.0, base_compound + additional_compound)
+
+    def _calculate_time_impact_multipliers(self, incidents: List[Dict], metrics: Dict, user_tz: str) -> Dict[str, float]:
+        """
+        Calculate time-based impact multipliers based on research.
+
+        Research shows timing dramatically affects psychological impact:
+        - After-hours: 40% higher impact
+        - Weekend: 60% higher impact
+        - Overnight: 80% higher impact
+
+        Returns:
+            Dict with multiplier factors and counts
+        """
+        time_impacts = {
+            'after_hours_multiplier': 1.4,
+            'weekend_multiplier': 1.6,
+            'overnight_multiplier': 1.8,
+            'after_hours_incidents': 0,
+            'weekend_incidents': 0,
+            'overnight_incidents': 0
+        }
+
+        for incident in incidents:
+            incident_time = self._parse_incident_time(incident, user_tz)
+            if not incident_time:
+                continue
+
+            hour = incident_time.hour
+            weekday = incident_time.weekday()
+
+            # After hours: before 8am or after 6pm
+            if hour < 8 or hour > 18:
+                time_impacts['after_hours_incidents'] += 1
+
+            # Weekend: Saturday (5) or Sunday (6)
+            if weekday >= 5:
+                time_impacts['weekend_incidents'] += 1
+
+            # Overnight: 11pm to 6am
+            if hour >= 23 or hour <= 6:
+                time_impacts['overnight_incidents'] += 1
+
+        return time_impacts
+
+    def _calculate_recovery_deficit(self, incidents: List[Dict], user_tz: str) -> Dict[str, Any]:
+        """
+        Calculate recovery time deficit based on research.
+
+        Research: Recovery periods <48 hours prevent psychological restoration.
+
+        Returns:
+            Dict with recovery analysis
+        """
+        recovery_data = {
+            'recovery_violations': 0,
+            'avg_recovery_hours': 0,
+            'min_recovery_hours': float('inf'),
+            'recovery_score': 0  # 0-100, higher = better recovery
+        }
+
+        incident_times = []
+        for incident in incidents:
+            incident_time = self._parse_incident_time(incident, user_tz)
+            if incident_time:
+                incident_times.append(incident_time)
+
+        if len(incident_times) < 2:
+            recovery_data['recovery_score'] = 100  # Perfect recovery with few incidents
+            return recovery_data
+
+        # Sort by time
+        incident_times.sort()
+
+        recovery_periods = []
+        for i in range(1, len(incident_times)):
+            time_diff = incident_times[i] - incident_times[i-1]
+            hours_between = time_diff.total_seconds() / 3600
+            recovery_periods.append(hours_between)
+
+            if hours_between < 48:  # Less than 48 hours recovery
+                recovery_data['recovery_violations'] += 1
+
+            if hours_between < recovery_data['min_recovery_hours']:
+                recovery_data['min_recovery_hours'] = hours_between
+
+        if recovery_periods:
+            recovery_data['avg_recovery_hours'] = sum(recovery_periods) / len(recovery_periods)
+
+            # Recovery score: higher is better
+            # Perfect score (100) for avg 168+ hours (1 week)
+            # Zero score for avg <24 hours
+            avg_hours = recovery_data['avg_recovery_hours']
+            recovery_data['recovery_score'] = min(100, max(0, (avg_hours - 24) / (168 - 24) * 100))
+
+        return recovery_data
+
+    def _parse_incident_time(self, incident: Dict, user_tz: str) -> datetime:
+        """Parse incident timestamp from platform-specific format."""
+        try:
+            if self.platform == "pagerduty":
+                # PagerDuty format: "2024-09-25T14:30:00Z"
+                time_str = incident.get("created_at")
+            else:
+                # Rootly format
+                attrs = incident.get("attributes", {})
+                time_str = attrs.get("created_at")
+            tz_utc =  self._parse_iso_utc(time_str)
+            if not tz_utc:
+                return None
+            tz_local =  self._to_local(tz_utc, user_tz)
+
+            # # For testing purposes, uncomment to view
+            # print("UTC TIMEZONE:", tz_utc)
+            # print("LOCAL TIMEZONE:", tz_local, " for the time zone: ", user_tz)
+            return tz_local
+        except Exception as e:
+            logger.warning(f"Failed to parse incident time: {e}")
+        return None
+
     def _calculate_burnout_score(self, factors: Dict[str, float]) -> float:
         """Calculate overall burnout score using three-factor methodology."""
         # First get the metrics to calculate proper dimensions
         # For now, we'll use the factors to approximate dimensions
         
-        # Approximate Emotional Exhaustion from factors
-        emotional_exhaustion = (factors.get("workload", 0) * 0.5 + 
-                              factors.get("after_hours", 0) * 0.5)
-        
-        # Approximate Depersonalization from factors
-        depersonalization = (factors.get("response_time", 0) * 0.5 + 
-                           factors.get("workload", 0) * 0.3 + 
-                           factors.get("weekend_work", 0) * 0.2)
-        
-        # Approximate Personal Accomplishment (inverted)
-        personal_accomplishment = 10 - (factors.get("response_time", 0) * 0.4 + 
-                                       factors.get("workload", 0) * 0.6)
+        # Emotional Exhaustion - workload and time pressure
+        emotional_exhaustion = (factors.get("workload", 0) * 0.5 +
+                              factors.get("after_hours", 0) * 0.3 +
+                              factors.get("incident_load", 0) * 0.2)
+
+        # Depersonalization/Cynicism - stress response and withdrawal
+        depersonalization = (factors.get("response_time", 0) * 0.5 +
+                           factors.get("weekend_work", 0) * 0.5)
+
+        # Personal Accomplishment (inverted) - effectiveness under pressure
+        personal_accomplishment = 10 - (factors.get("response_time", 0) * 0.4 +
+                                       factors.get("incident_load", 0) * 0.6)
         personal_accomplishment = max(0, personal_accomplishment)
         
         # Calculate final score using equal weights
@@ -1988,18 +2681,12 @@ class UnifiedBurnoutAnalyzer:
         
         return recommendations
     
-    def _parse_timestamp(self, timestamp: str) -> Optional[datetime]:
-        """Parse ISO format timestamp."""
-        try:
-            return datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
-        except:
-            return None
     
-    def _calculate_response_time(self, created_at: str, started_at: str) -> Optional[float]:
+    def _calculate_response_time(self, created_at: str, started_at: str, user_tz: str) -> Optional[float]:
         """Calculate response time in minutes."""
-        created = self._parse_timestamp(created_at)
-        started = self._parse_timestamp(started_at)
-        
+        created = self._parse_iso_utc(created_at)
+        started = self._parse_iso_utc(started_at)
+
         if created and started:
             return (started - created).total_seconds() / 60
         return None
@@ -2366,9 +3053,12 @@ class UnifiedBurnoutAnalyzer:
             for user in team_analysis:
                 if user.get('user_email'):
                     user_key = user['user_email'].lower()
+                    # TODO: verify if correct - possibly add testcases
+                    tzname = self._get_user_tz(user.get('user_id'), "UTC")
+                    today_local = self._to_local(datetime.now(), tzname)
                     for day_offset in range(days_analyzed):
-                        date_obj = datetime.now() - timedelta(days=days_analyzed - day_offset - 1)
-                        date_str = date_obj.strftime('%Y-%m-%d')
+                        d = today_local - timedelta(days=days_analyzed - day_offset - 1)
+                        date_str = d.date().isoformat()
                         individual_daily_data[user_key][date_str] = {
                             "date": date_str,
                             "incident_count": 0,
@@ -2419,9 +3109,13 @@ class UnifiedBurnoutAnalyzer:
                             
                         # Parse date
                         try:
-                            incident_date = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
-                            date_str = incident_date.strftime("%Y-%m-%d")
-                            
+                            # TODO:double-check, possibly adjust timezone
+                            incident_date_utc = self._parse_iso_utc(created_at)
+                            if not incident_date_utc:
+                                continue
+
+                            date_str = incident_date_utc.strftime("%Y-%m-%d")
+
                             # Initialize day data if this is the first incident for this day
                             if date_str not in daily_data:
                                 daily_data[date_str] = {
@@ -2465,7 +3159,7 @@ class UnifiedBurnoutAnalyzer:
                             daily_data[date_str]["severity_weighted_count"] += severity_weight
                             
                             # Check if after hours (rough approximation)
-                            incident_hour = incident_date.hour
+                            incident_hour = incident_date_utc.hour
                             if incident_hour < 8 or incident_hour > 18:
                                 daily_data[date_str]["after_hours_count"] += 1
                             
@@ -3418,8 +4112,12 @@ class UnifiedBurnoutAnalyzer:
     def _get_severity_level(self, incident: Dict[str, Any]) -> str:
         """Extract severity level from platform-specific incident data."""
         try:
+            # First, check if severity was already mapped by the platform client
+            if "severity" in incident:
+                return incident["severity"]
+
             if self.platform == "pagerduty":
-                # PagerDuty format
+                # PagerDuty format - fallback if severity not pre-mapped
                 urgency = incident.get("urgency", "low")
                 priority = incident.get("priority", {})
                 if isinstance(priority, dict):
@@ -3430,6 +4128,10 @@ class UnifiedBurnoutAnalyzer:
                         return "sev2"
                     elif "p3" in priority_name:
                         return "sev3"
+                    elif "p4" in priority_name:
+                        return "sev4"
+                    elif "p5" in priority_name:
+                        return "low"  # Matches the daily trends structure
                     else:
                         return "sev4"
                 return "sev3"  # default

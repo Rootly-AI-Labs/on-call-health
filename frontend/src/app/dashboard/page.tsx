@@ -411,6 +411,7 @@ export default function Dashboard() {
   const [initialDataLoaded, setInitialDataLoaded] = useState(false)
   const [analysisMappings, setAnalysisMappings] = useState<any>(null)
   const [hasDataFromCache, setHasDataFromCache] = useState(false)
+  const [chartDataCache, setChartDataCache] = useState<Map<string, any>>(new Map())
 
   // Initialize infinite scroll hook
   const { triggerRef: infiniteScrollTrigger } = useInfiniteScroll({
@@ -3371,10 +3372,12 @@ export default function Dashboard() {
                               </div>
 
                               {/* Commit Activity Timeline */}
-                              <GitHubCommitsTimeline 
+                              <GitHubCommitsTimeline
                                 analysisId={currentAnalysis?.id ? parseInt(currentAnalysis.id) : 0}
                                 totalCommits={github.total_commits || 0}
                                 weekendPercentage={(github.weekend_activity_percentage || github.weekend_commit_percentage || 0)}
+                                cache={chartDataCache}
+                                setCache={setChartDataCache}
                               />
 
                               {/* Burnout Indicators */}
