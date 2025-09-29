@@ -1781,7 +1781,7 @@ export default function IntegrationsPage() {
         return
       }
 
-      const response = await fetch(`${API_BASE}/integrations/${selectedOrganization}/users`, {
+      const response = await fetch(`${API_BASE}/rootly/integrations/${selectedOrganization}/users`, {
         headers: {
           'Authorization': `Bearer ${authToken}`,
           'Content-Type': 'application/json'
