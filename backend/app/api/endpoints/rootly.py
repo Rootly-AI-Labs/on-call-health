@@ -829,12 +829,27 @@ async def get_integration_users(
                 for user in users:
                     # Rootly API uses JSONAPI format with attributes nested
                     attrs = user.get("attributes", {})
+                    user_email = attrs.get("email")
+
+                    # Check for existing user correlations
+                    user_correlations = db.query(UserCorrelation).filter(
+                        UserCorrelation.email == user_email
+                    ).all()
+
+                    # Collect unique GitHub usernames
+                    github_usernames = list(set([
+                        uc.github_username for uc in user_correlations
+                        if uc.github_username
+                    ]))
+
                     formatted_users.append({
                         "id": user.get("id"),
-                        "email": attrs.get("email"),
+                        "email": user_email,
                         "name": attrs.get("name") or attrs.get("full_name"),
                         "platform": "rootly",
-                        "platform_user_id": user.get("id")
+                        "platform_user_id": user.get("id"),
+                        "github_usernames": github_usernames,
+                        "has_github_mapping": len(github_usernames) > 0
                     })
 
                 return {
@@ -899,12 +914,27 @@ async def get_integration_users(
             for user in users:
                 # Rootly API uses JSONAPI format with attributes nested
                 attrs = user.get("attributes", {})
+                user_email = attrs.get("email")
+
+                # Check for existing user correlations
+                user_correlations = db.query(UserCorrelation).filter(
+                    UserCorrelation.email == user_email
+                ).all()
+
+                # Collect unique GitHub usernames
+                github_usernames = list(set([
+                    uc.github_username for uc in user_correlations
+                    if uc.github_username
+                ]))
+
                 formatted_users.append({
                     "id": user.get("id"),
-                    "email": attrs.get("email"),
+                    "email": user_email,
                     "name": attrs.get("name") or attrs.get("full_name"),
                     "platform": "rootly",
-                    "platform_user_id": user.get("id")
+                    "platform_user_id": user.get("id"),
+                    "github_usernames": github_usernames,
+                    "has_github_mapping": len(github_usernames) > 0
                 })
 
             return {
