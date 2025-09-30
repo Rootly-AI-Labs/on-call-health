@@ -1926,6 +1926,7 @@ export default function IntegrationsPage() {
         const data = await response.json()
         setSyncedUsers(data.users || [])
         setShowSyncedUsers(true)
+        setTeamMembersDrawerOpen(true)
         toast.success(`Found ${data.total} synced users`)
       } else {
         const errorData = await response.json()
