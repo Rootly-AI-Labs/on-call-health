@@ -3699,6 +3699,81 @@ export default function IntegrationsPage() {
                         💡 The <code className="bg-blue-100 px-1 rounded">/burnout-survey</code> command will only show analyses for your organization
                       </p>
                     </div>
+
+                    {/* Workspace Registration Fix Button */}
+                    <div className="mt-3 pt-3 border-t border-blue-200">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={async () => {
+                          try {
+                            const authToken = localStorage.getItem('auth_token')
+                            if (!authToken) {
+                              toast.error('Please log in to check workspace status')
+                              return
+                            }
+
+                            // Check workspace status
+                            const statusResponse = await fetch(`${API_BASE}/slack/workspace/status`, {
+                              headers: {
+                                'Authorization': `Bearer ${authToken}`,
+                                'Content-Type': 'application/json'
+                              }
+                            })
+
+                            if (!statusResponse.ok) {
+                              toast.error('Failed to check workspace status')
+                              return
+                            }
+
+                            const statusData = await statusResponse.json()
+                            console.log('Workspace status:', statusData)
+
+                            if (statusData.diagnosis.has_workspace_mapping) {
+                              toast.success('✅ Workspace is properly registered! /burnout-survey command should work.')
+                            } else {
+                              // Need to register workspace
+                              if (!slackIntegration?.workspace_id) {
+                                toast.error('No workspace ID found. Please reconnect Slack.')
+                                return
+                              }
+
+                              const formData = new FormData()
+                              formData.append('workspace_id', slackIntegration.workspace_id)
+                              formData.append('workspace_name', slackIntegration.workspace_name || 'My Workspace')
+
+                              const registerResponse = await fetch(`${API_BASE}/slack/workspace/register`, {
+                                method: 'POST',
+                                headers: {
+                                  'Authorization': `Bearer ${authToken}`
+                                },
+                                body: formData
+                              })
+
+                              if (registerResponse.ok) {
+                                const registerData = await registerResponse.json()
+                                toast.success('✅ Workspace registered! /burnout-survey command should now work.')
+                                console.log('Workspace registered:', registerData)
+                              } else {
+                                toast.error('Failed to register workspace')
+                              }
+                            }
+                          } catch (error) {
+                            console.error('Error checking/fixing workspace:', error)
+                            toast.error('Error checking workspace status')
+                          }
+                        }}
+                        className="w-full text-xs"
+                      >
+                        <svg className="w-3 h-3 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Check & Fix Workspace Registration
+                      </Button>
+                      <p className="text-xs text-gray-500 mt-2">
+                        Click if /burnout-survey command shows "workspace not registered" error
+                      </p>
+                    </div>
                   </div>
                 )}
 

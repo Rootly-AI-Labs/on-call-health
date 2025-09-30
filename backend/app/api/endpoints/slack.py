@@ -1355,3 +1355,148 @@ def create_burnout_survey_modal(analysis_id: int, user_id: int) -> dict:
             }
         ]
     }
+
+
+@router.get("/workspace/status")
+async def get_workspace_status(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Diagnostic endpoint to check Slack workspace registration status.
+    Returns detailed information about workspace mappings and integrations.
+    """
+    try:
+        # Check for workspace mappings
+        workspace_mappings = db.query(SlackWorkspaceMapping).filter(
+            SlackWorkspaceMapping.owner_user_id == current_user.id
+        ).all()
+
+        # Check for user's Slack integrations
+        slack_integrations = db.query(SlackIntegration).filter(
+            SlackIntegration.user_id == current_user.id
+        ).all()
+
+        # Check for organization-level mappings
+        org_mappings = []
+        if current_user.organization_id:
+            org_mappings = db.query(SlackWorkspaceMapping).filter(
+                SlackWorkspaceMapping.organization_id == current_user.organization_id
+            ).all()
+
+        return {
+            "user_workspace_mappings": [
+                {
+                    "workspace_id": m.workspace_id,
+                    "workspace_name": m.workspace_name,
+                    "organization_id": m.organization_id,
+                    "status": m.status,
+                    "created_at": m.created_at.isoformat() if m.created_at else None
+                }
+                for m in workspace_mappings
+            ],
+            "organization_workspace_mappings": [
+                {
+                    "workspace_id": m.workspace_id,
+                    "workspace_name": m.workspace_name,
+                    "owner_user_id": m.owner_user_id,
+                    "status": m.status
+                }
+                for m in org_mappings
+            ],
+            "slack_integrations": [
+                {
+                    "workspace_id": si.workspace_id,
+                    "token_source": si.token_source,
+                    "connected_at": si.connected_at.isoformat() if si.connected_at else None
+                }
+                for si in slack_integrations
+            ],
+            "current_user": {
+                "id": current_user.id,
+                "email": current_user.email,
+                "organization_id": current_user.organization_id
+            },
+            "diagnosis": {
+                "has_workspace_mapping": len(workspace_mappings) > 0 or len(org_mappings) > 0,
+                "has_slack_integration": len(slack_integrations) > 0,
+                "issue": None if (len(workspace_mappings) > 0 or len(org_mappings) > 0) else
+                        "No workspace mapping found. Slack /burnout-survey command will not work."
+            }
+        }
+
+    except Exception as e:
+        logging.error(f"Error checking workspace status: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error checking workspace status: {str(e)}"
+        )
+
+
+@router.post("/workspace/register")
+async def register_workspace_manual(
+    workspace_id: str = Form(...),
+    workspace_name: str = Form(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Manually register a Slack workspace that wasn't properly registered during OAuth.
+    This fixes the "workspace not registered" error for /burnout-survey command.
+    """
+    try:
+        # Check if workspace mapping already exists
+        existing_mapping = db.query(SlackWorkspaceMapping).filter(
+            SlackWorkspaceMapping.workspace_id == workspace_id
+        ).first()
+
+        if existing_mapping:
+            # Update existing mapping
+            existing_mapping.workspace_name = workspace_name
+            existing_mapping.organization_id = current_user.organization_id
+            existing_mapping.status = 'active'
+            existing_mapping.updated_at = datetime.utcnow()
+            db.commit()
+
+            return {
+                "success": True,
+                "message": "Workspace mapping updated successfully",
+                "mapping": {
+                    "workspace_id": existing_mapping.workspace_id,
+                    "workspace_name": existing_mapping.workspace_name,
+                    "organization_id": existing_mapping.organization_id,
+                    "status": existing_mapping.status
+                }
+            }
+        else:
+            # Create new mapping
+            new_mapping = SlackWorkspaceMapping(
+                workspace_id=workspace_id,
+                workspace_name=workspace_name,
+                organization_id=current_user.organization_id,
+                owner_user_id=current_user.id,
+                status='active',
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow()
+            )
+            db.add(new_mapping)
+            db.commit()
+
+            return {
+                "success": True,
+                "message": "Workspace registered successfully! /burnout-survey command should now work.",
+                "mapping": {
+                    "workspace_id": new_mapping.workspace_id,
+                    "workspace_name": new_mapping.workspace_name,
+                    "organization_id": new_mapping.organization_id,
+                    "status": new_mapping.status
+                }
+            }
+
+    except Exception as e:
+        db.rollback()
+        logging.error(f"Error registering workspace: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error registering workspace: {str(e)}"
+        )
