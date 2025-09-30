@@ -1299,6 +1299,66 @@ async def handle_slack_interactions(
 
         interaction_type = data.get("type")
 
+        # Handle button clicks (e.g., "Take Survey" button from DM)
+        if interaction_type == "block_actions":
+            actions = data.get("actions", [])
+            for action in actions:
+                if action.get("action_id") == "open_burnout_survey":
+                    # Extract user and org IDs from button value
+                    value = action.get("value", "")
+                    try:
+                        user_id, organization_id = map(int, value.split("|"))
+                    except:
+                        return {"text": "Invalid survey data"}
+
+                    # Get user's Slack ID
+                    slack_user = data.get("user", {})
+                    slack_user_id = slack_user.get("id")
+                    trigger_id = data.get("trigger_id")
+
+                    # Get organization and check for existing report
+                    from datetime import datetime
+                    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+
+                    existing_report = db.query(UserBurnoutReport).filter(
+                        UserBurnoutReport.user_id == user_id,
+                        UserBurnoutReport.organization_id == organization_id,
+                        UserBurnoutReport.submitted_at >= today_start
+                    ).first()
+
+                    # Open modal
+                    modal_view = create_burnout_survey_modal(
+                        organization_id=organization_id,
+                        user_id=user_id,
+                        analysis_id=None,  # No specific analysis for daily check-ins
+                        is_update=bool(existing_report)
+                    )
+
+                    # Get Slack token to open modal
+                    team_id = data.get("team", {}).get("id")
+                    slack_integration = db.query(SlackIntegration).filter(
+                        SlackIntegration.workspace_id == team_id
+                    ).first()
+
+                    if slack_integration and slack_integration.slack_token:
+                        import httpx
+                        slack_token = decrypt_token(slack_integration.slack_token)
+
+                        async with httpx.AsyncClient() as client:
+                            response = await client.post(
+                                "https://slack.com/api/views.open",
+                                headers={"Authorization": f"Bearer {slack_token}"},
+                                json={"trigger_id": trigger_id, "view": modal_view}
+                            )
+
+                            result = response.json()
+                            if not result.get("ok"):
+                                logging.error(f"Failed to open modal: {result.get('error')}")
+                                return {"text": "Sorry, couldn't open the survey. Please try again."}
+
+                    # Acknowledge the button click
+                    return {"response_action": "clear"}
+
         # Handle modal submission
         if interaction_type == "view_submission":
             view = data.get("view", {})
