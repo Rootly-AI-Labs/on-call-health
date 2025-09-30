@@ -937,6 +937,76 @@ class SlackModalPayload(BaseModel):
     user_email: str = ""
 
 
+@router.get("/user/me")
+async def get_slack_user_info(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get current user's Slack information including email.
+    Useful for debugging user correlation issues.
+    """
+    try:
+        # Get user's Slack integration
+        slack_integration = db.query(SlackIntegration).filter(
+            SlackIntegration.user_id == current_user.id
+        ).first()
+
+        if not slack_integration:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No Slack integration found. Please connect Slack first."
+            )
+
+        # Decrypt token
+        slack_token = decrypt_token(slack_integration.slack_token)
+
+        # Call Slack API to get user info
+        import httpx
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                "https://slack.com/api/users.info",
+                params={"user": slack_integration.slack_user_id},
+                headers={"Authorization": f"Bearer {slack_token}"}
+            )
+
+            if response.status_code != 200:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to fetch Slack user info"
+                )
+
+            data = response.json()
+
+            if not data.get("ok"):
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Slack API error: {data.get('error', 'Unknown error')}"
+                )
+
+            user_info = data.get("user", {})
+            profile = user_info.get("profile", {})
+
+            return {
+                "slack_user_id": slack_integration.slack_user_id,
+                "workspace_id": slack_integration.workspace_id,
+                "real_name": user_info.get("real_name"),
+                "display_name": profile.get("display_name"),
+                "email": profile.get("email"),  # This is what you need!
+                "is_admin": user_info.get("is_admin"),
+                "is_owner": user_info.get("is_owner")
+            }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Error fetching Slack user info: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching Slack user info: {str(e)}"
+        )
+
+
 @router.post("/commands/burnout-survey")
 async def handle_burnout_survey_command(
     token: str = Form(...),
