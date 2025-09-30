@@ -1304,11 +1304,20 @@ async def handle_slack_interactions(
                 # Extract form values from modal
                 values = view.get("state", {}).get("values", {})
 
-                # Get burnout score (0-10 slider)
-                burnout_score = int(values.get("burnout_score_block", {}).get("burnout_score_input", {}).get("value", 5))
+                # Get burnout score (0-10 slider) - convert to 0-100 scale
+                burnout_score_raw = int(values.get("burnout_score_block", {}).get("burnout_score_input", {}).get("value", 5))
+                self_reported_score = burnout_score_raw * 10  # Convert 0-10 to 0-100 scale
 
-                # Get energy level (radio buttons)
-                energy_level = values.get("energy_level_block", {}).get("energy_level_input", {}).get("selected_option", {}).get("value", "medium")
+                # Get energy level (radio buttons) - convert to 1-5 integer
+                energy_level_str = values.get("energy_level_block", {}).get("energy_level_input", {}).get("selected_option", {}).get("value", "moderate")
+                energy_level_map = {
+                    "very_low": 1,
+                    "low": 2,
+                    "moderate": 3,
+                    "high": 4,
+                    "very_high": 5
+                }
+                energy_level = energy_level_map.get(energy_level_str, 3)
 
                 # Get stress factors (checkboxes)
                 stress_factors_options = values.get("stress_factors_block", {}).get("stress_factors_input", {}).get("selected_options", [])
@@ -1348,10 +1357,11 @@ async def handle_slack_interactions(
                 new_report = UserBurnoutReport(
                     user_id=user_id,
                     analysis_id=analysis_id,
-                    burnout_score=burnout_score,
-                    energy_level=energy_level,
+                    self_reported_score=self_reported_score,  # Use correct field name
+                    energy_level=energy_level,  # Now an integer 1-5
                     stress_factors=stress_factors,
                     additional_comments=comments,
+                    submitted_via='slack',  # Mark as submitted from Slack
                     submitted_at=datetime.utcnow()
                 )
                 db.add(new_report)
