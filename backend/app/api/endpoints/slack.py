@@ -1269,12 +1269,9 @@ async def handle_burnout_survey_command(
                     }]
                 }
 
-        # Modal opened successfully - return empty response
-        # (Slack will show the modal, so no text response needed)
-        return {
-            "response_type": "ephemeral",
-            "text": ""
-        }
+        # Modal opened successfully - return empty response with 200 status
+        # Slack will show the modal, so no text response needed
+        return ""
 
     except Exception as e:
         logging.error(f"Error handling burnout survey command: {str(e)}")
