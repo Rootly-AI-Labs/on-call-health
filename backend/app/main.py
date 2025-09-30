@@ -9,7 +9,7 @@ from .models import create_tables
 from .core.config import settings
 from .core.rate_limiting import limiter, custom_rate_limit_exceeded_handler
 from .middleware.security import security_middleware
-from .api.endpoints import auth, rootly, analysis, analyses, pagerduty, github, slack, llm, mappings, manual_mappings, debug_mappings, migrate
+from .api.endpoints import auth, rootly, analyses, pagerduty, github, slack, llm, mappings, manual_mappings, debug_mappings, migrate
 
 # Create FastAPI application
 app = FastAPI(
@@ -104,8 +104,7 @@ async def startup_event():
 app.include_router(auth.router, prefix="/auth", tags=["authentication"])
 app.include_router(rootly.router, prefix="/rootly", tags=["rootly"])
 app.include_router(pagerduty.router, prefix="/pagerduty", tags=["pagerduty"])
-app.include_router(analysis.router, prefix="/analysis", tags=["analysis"])
-app.include_router(analyses.router, prefix="/analyses", tags=["burnout-analyses"])
+app.include_router(analyses.router, prefix="/analyses", tags=["analyses"])
 app.include_router(github.router, prefix="/integrations", tags=["github-integration"])
 app.include_router(slack.router, prefix="/integrations", tags=["slack-integration"])
 app.include_router(llm.router, tags=["llm-tokens"])
