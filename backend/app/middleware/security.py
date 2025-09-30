@@ -150,20 +150,40 @@ async def security_middleware(request: Request, call_next: Callable) -> Response
         response = await call_next(request)
         
         # 5. Add security headers to response
+        request_path = str(request.url.path)
+
+        # Check if this is a Swagger/OpenAPI endpoint
+        is_swagger_route = (request_path == "/docs" or
+                          request_path == "/openapi.json" or
+                          request_path.startswith("/docs/") or
+                          request_path == "/redoc")
+
         for header, value in SECURITY_HEADERS.items():
+            # Skip restrictive CSP for Swagger UI - set relaxed one instead
+            if header == "Content-Security-Policy" and is_swagger_route:
+                # Swagger UI needs inline scripts and styles
+                response.headers[header] = (
+                    "default-src 'self'; "
+                    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+                    "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+                    "img-src 'self' data: https:; "
+                    "font-src 'self' https:; "
+                    "connect-src 'self' https:; "
+                )
+                continue
+
             # Don't override caching for cacheable routes
             if header in ["Cache-Control", "Pragma", "Expires"]:
-                if any(route in str(request.url.path) for route in CACHEABLE_ROUTES):
+                if any(route in request_path for route in CACHEABLE_ROUTES):
                     continue
-                    
+
                 # Force no-cache for sensitive routes
-                if any(route in str(request.url.path) for route in SENSITIVE_ROUTES):
+                if any(route in request_path for route in SENSITIVE_ROUTES):
                     response.headers[header] = value
             else:
                 response.headers[header] = value
-        
+
         # 6. Add custom security headers based on route
-        request_path = str(request.url.path)
         
         # API endpoints get additional security
         if request_path.startswith("/auth/") or request_path.startswith("/api/"):
