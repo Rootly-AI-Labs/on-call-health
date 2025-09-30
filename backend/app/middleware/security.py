@@ -161,14 +161,15 @@ async def security_middleware(request: Request, call_next: Callable) -> Response
         for header, value in SECURITY_HEADERS.items():
             # Skip restrictive CSP for Swagger UI - set relaxed one instead
             if header == "Content-Security-Policy" and is_swagger_route:
-                # Swagger UI needs inline scripts and styles
+                # Swagger UI needs inline scripts, eval, and CDN resources
                 response.headers[header] = (
                     "default-src 'self'; "
-                    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+                    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; "
                     "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
                     "img-src 'self' data: https:; "
                     "font-src 'self' https:; "
                     "connect-src 'self' https:; "
+                    "worker-src 'self' blob:; "
                 )
                 continue
 
