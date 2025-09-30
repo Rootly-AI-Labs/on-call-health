@@ -1408,7 +1408,7 @@ async def get_workspace_status(
                 {
                     "workspace_id": si.workspace_id,
                     "token_source": si.token_source,
-                    "connected_at": si.connected_at.isoformat() if si.connected_at else None
+                    "connected_at": si.created_at.isoformat() if si.created_at else None
                 }
                 for si in slack_integrations
             ],
