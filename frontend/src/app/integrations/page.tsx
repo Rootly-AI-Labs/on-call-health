@@ -1833,8 +1833,11 @@ export default function IntegrationsPage() {
 
       if (response.ok) {
         const data = await response.json()
+        console.log('Setting team members:', data.users?.length, 'members')
+        console.log('Opening drawer...')
         setTeamMembers(data.users || [])
         setTeamMembersDrawerOpen(true)
+        console.log('Drawer state set to true')
         toast.success(`Loaded ${data.total_users} team members from ${data.integration_name}`)
       } else {
         const errorData = await response.json()
