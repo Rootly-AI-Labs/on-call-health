@@ -15,7 +15,14 @@ from .api.endpoints import auth, rootly, analyses, pagerduty, github, slack, llm
 app = FastAPI(
     title="Rootly Burnout Detector API",
     description="API for detecting burnout risk in engineering teams using Rootly incident data",
-    version="1.0.0"
+    version="1.0.0",
+    swagger_ui_parameters={
+        "defaultModelsExpandDepth": 1,  # Don't expand schemas deeply
+        "syntaxHighlight.theme": "monokai",
+        "displayRequestDuration": True,
+        "filter": True,
+        "tryItOutEnabled": True,
+    }
 )
 
 # Add rate limiting to the app
