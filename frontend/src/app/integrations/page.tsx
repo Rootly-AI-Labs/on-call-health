@@ -3726,7 +3726,7 @@ export default function IntegrationsPage() {
                           }
 
                           // Check workspace status
-                          const statusResponse = await fetch(`${API_BASE}/slack/workspace/status`, {
+                          const statusResponse = await fetch(`${API_BASE}/integrations/slack/workspace/status`, {
                             headers: {
                               'Authorization': `Bearer ${authToken}`,
                               'Content-Type': 'application/json'
@@ -3754,7 +3754,7 @@ export default function IntegrationsPage() {
                             formData.append('workspace_id', slackIntegration.workspace_id)
                             formData.append('workspace_name', slackIntegration.workspace_name || 'My Workspace')
 
-                            const registerResponse = await fetch(`${API_BASE}/slack/workspace/register`, {
+                            const registerResponse = await fetch(`${API_BASE}/integrations/slack/workspace/register`, {
                               method: 'POST',
                               headers: {
                                 'Authorization': `Bearer ${authToken}`
