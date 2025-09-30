@@ -1379,15 +1379,16 @@ async def handle_slack_interactions(
 
                 # Return success response with different message for updates
                 if is_update:
-                    success_message = f"✅ *Survey updated successfully!*\n\n_You already submitted a survey today. Your burnout score has been updated to {self_reported_score}/100._\n\nYour updated feedback helps us:\n• Validate automated burnout detection\n• Catch stress before it impacts you\n• Make data-driven team improvements\n\n🌟 Thank you for contributing to a healthier team!"
+                    success_message = f"✅ *Survey updated successfully*\n\n_You already submitted a survey today. Your burnout score has been updated to {self_reported_score}/100._\n\nYour updated feedback helps us:\n• Validate automated burnout detection\n• Catch stress before it impacts you\n• Make data-driven team improvements\n\nThank you for contributing to a healthier team."
                 else:
-                    success_message = "✅ *Survey submitted successfully!*\n\nYour feedback helps us:\n• Validate automated burnout detection\n• Catch stress before it impacts you\n• Make data-driven team improvements\n\n🌟 Thank you for contributing to a healthier team!"
+                    success_message = "✅ *Survey submitted successfully*\n\nYour feedback helps us:\n• Validate automated burnout detection\n• Catch stress before it impacts you\n• Make data-driven team improvements\n\nThank you for contributing to a healthier team."
 
                 return {
                     "response_action": "update",
                     "view": {
                         "type": "modal",
-                        "title": {"type": "plain_text", "text": "Thank You!"},
+                        "title": {"type": "plain_text", "text": "Thank You"},
+                        "close": {"type": "plain_text", "text": "Close"},
                         "blocks": [
                             {
                                 "type": "section",
