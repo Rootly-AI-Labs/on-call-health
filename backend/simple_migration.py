@@ -187,6 +187,58 @@ def run_migrations():
             else:
                 logger.info("⏭️  Migration 4 already applied")
 
+            # Migration 5: Restructure user_burnout_reports to be independent of analyses
+            migration_5_exists = conn.execute(text(
+                "SELECT COUNT(*) FROM migrations WHERE name = 'user_burnout_reports_add_org_make_analysis_optional'"
+            )).scalar()
+
+            if migration_5_exists == 0:
+                logger.info("🔧 Running Migration 5: Restructure user_burnout_reports...")
+
+                # Add organization_id column
+                conn.execute(text("""
+                    ALTER TABLE user_burnout_reports
+                    ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id)
+                """))
+
+                # Make analysis_id nullable
+                conn.execute(text("""
+                    ALTER TABLE user_burnout_reports
+                    ALTER COLUMN analysis_id DROP NOT NULL
+                """))
+
+                # Drop the old unique constraint on (user_id, analysis_id)
+                conn.execute(text("""
+                    ALTER TABLE user_burnout_reports
+                    DROP CONSTRAINT IF EXISTS unique_user_analysis_report
+                """))
+
+                # Populate organization_id from existing user records
+                conn.execute(text("""
+                    UPDATE user_burnout_reports ubr
+                    SET organization_id = u.organization_id
+                    FROM users u
+                    WHERE ubr.user_id = u.id
+                    AND ubr.organization_id IS NULL
+                """))
+
+                # Make organization_id non-nullable after populating
+                conn.execute(text("""
+                    ALTER TABLE user_burnout_reports
+                    ALTER COLUMN organization_id SET NOT NULL
+                """))
+
+                conn.commit()
+
+                # Mark migration as complete
+                conn.execute(text(
+                    "INSERT INTO migrations (name, status) VALUES ('user_burnout_reports_add_org_make_analysis_optional', 'completed')"
+                ))
+                conn.commit()
+                logger.info("✅ Migration 5 completed: Restructured user_burnout_reports")
+            else:
+                logger.info("⏭️  Migration 5 already applied")
+
             return True
 
     except Exception as e:

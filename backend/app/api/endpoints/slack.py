@@ -1121,20 +1121,13 @@ async def handle_burnout_survey_command(
                 "response_type": "ephemeral"
             }
 
-        # Find the current active analysis FOR THIS ORGANIZATION
+        # Find the current active analysis FOR THIS ORGANIZATION (optional - surveys can be submitted without analysis)
         latest_analysis = db.query(Analysis).filter(
             Analysis.status == "completed",
             Analysis.organization_id == organization.id
         ).order_by(Analysis.created_at.desc()).first()
 
-        if not latest_analysis:
-            return {
-                "text": f"📋 No active burnout analysis found for {organization.name}. Ask your manager to run an analysis first!",
-                "response_type": "ephemeral"
-            }
-
-        # Check if user already submitted survey for this analysis
-        # First, try to find user by correlating Slack user_id to email (ORGANIZATION-SCOPED)
+        # Check if user is in the organization roster (ORGANIZATION-SCOPED)
         user_correlation = db.query(UserCorrelation).join(
             User, UserCorrelation.user_id == User.id
         ).filter(
@@ -1191,21 +1184,24 @@ async def handle_burnout_survey_command(
                 "response_type": "ephemeral"
             }
 
-        # Check for existing survey response
+        # Check for existing survey response today
+        from datetime import datetime
+        today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+
         existing_report = db.query(UserBurnoutReport).filter(
             UserBurnoutReport.user_id == user_correlation.user_id,
-            UserBurnoutReport.analysis_id == latest_analysis.id
+            UserBurnoutReport.organization_id == organization.id,
+            UserBurnoutReport.submitted_at >= today_start
         ).first()
 
-        if existing_report:
-            return {
-                "text": f"✅ Thanks! You already completed the burnout survey on {existing_report.submitted_at.strftime('%B %d')}.\n\n"
-                       f"Your responses help improve team health insights. 🌟",
-                "response_type": "ephemeral"
-            }
-
         # Create and open interactive Slack modal
-        modal_view = create_burnout_survey_modal(latest_analysis.id, user_correlation.user_id)
+        # Pass organization_id and optional analysis_id
+        modal_view = create_burnout_survey_modal(
+            organization_id=organization.id,
+            user_id=user_correlation.user_id,
+            analysis_id=latest_analysis.id if latest_analysis else None,
+            is_update=bool(existing_report)
+        )
 
         # Get workspace bot token to open modal
         slack_integration = db.query(SlackIntegration).filter(
@@ -1214,6 +1210,10 @@ async def handle_burnout_survey_command(
 
         if not slack_integration or not slack_integration.slack_token:
             # Fallback to old button-based approach if no token
+            survey_url = f"{settings.FRONTEND_URL}/survey?user={user_correlation.user_id}"
+            if latest_analysis:
+                survey_url += f"&analysis={latest_analysis.id}"
+
             return {
                 "text": "📝 Opening your 2-minute burnout survey...",
                 "response_type": "ephemeral",
@@ -1223,7 +1223,7 @@ async def handle_burnout_survey_command(
                     "actions": [{
                         "type": "button",
                         "text": "Open Survey",
-                        "url": f"{settings.FRONTEND_URL}/survey?analysis={latest_analysis.id}&user={user_correlation.user_id}",
+                        "url": survey_url,
                         "style": "primary"
                     }]
                 }]
@@ -1251,6 +1251,10 @@ async def handle_burnout_survey_command(
             if not result.get("ok"):
                 logging.error(f"Failed to open modal: {result.get('error')}")
                 # Fallback to button approach
+                survey_url = f"{settings.FRONTEND_URL}/survey?user={user_correlation.user_id}"
+                if latest_analysis:
+                    survey_url += f"&analysis={latest_analysis.id}"
+
                 return {
                     "text": "📝 Click below to open your burnout survey:",
                     "response_type": "ephemeral",
@@ -1259,7 +1263,7 @@ async def handle_burnout_survey_command(
                         "actions": [{
                             "type": "button",
                             "text": "Open Survey",
-                            "url": f"{settings.FRONTEND_URL}/survey?analysis={latest_analysis.id}&user={user_correlation.user_id}",
+                            "url": survey_url,
                             "style": "primary"
                         }]
                     }]
@@ -1306,9 +1310,8 @@ async def handle_slack_interactions(
                 # Extract form values from modal
                 values = view.get("state", {}).get("values", {})
 
-                # Get burnout score (0-10 slider) - convert to 0-100 scale
-                burnout_score_raw = int(values.get("burnout_score_block", {}).get("burnout_score_input", {}).get("value", 5))
-                self_reported_score = burnout_score_raw * 10  # Convert 0-10 to 0-100 scale
+                # Get burnout score (0-100 scale) - already in correct format
+                self_reported_score = int(values.get("burnout_score_block", {}).get("burnout_score_input", {}).get("selected_option", {}).get("value", "50"))
 
                 # Get energy level (radio buttons) - convert to 1-5 integer
                 energy_level_str = values.get("energy_level_block", {}).get("energy_level_input", {}).get("selected_option", {}).get("value", "moderate")
@@ -1328,48 +1331,61 @@ async def handle_slack_interactions(
                 # Get optional comments
                 comments = values.get("comments_block", {}).get("comments_input", {}).get("value", "")
 
-                # Extract user and analysis IDs from private_metadata
+                # Extract user and organization IDs from private_metadata
                 metadata = json.loads(view.get("private_metadata", "{}"))
-                analysis_id = metadata.get("analysis_id")
                 user_id = metadata.get("user_id")
+                organization_id = metadata.get("organization_id")
+                analysis_id = metadata.get("analysis_id")  # Optional - may be None
 
-                if not analysis_id or not user_id:
+                if not user_id or not organization_id:
                     return {"response_action": "errors", "errors": {"comments_block": "Invalid survey data"}}
 
-                # Check if already submitted
+                # Check if user already submitted today (within last 24 hours)
+                from datetime import datetime, timedelta
+                today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+
                 existing_report = db.query(UserBurnoutReport).filter(
                     UserBurnoutReport.user_id == user_id,
-                    UserBurnoutReport.analysis_id == analysis_id
-                ).first()
+                    UserBurnoutReport.organization_id == organization_id,
+                    UserBurnoutReport.submitted_at >= today_start
+                ).order_by(UserBurnoutReport.submitted_at.desc()).first()
 
+                is_update = False
                 if existing_report:
-                    return {
-                        "response_action": "update",
-                        "view": {
-                            "type": "modal",
-                            "title": {"type": "plain_text", "text": "Already Submitted"},
-                            "blocks": [{
-                                "type": "section",
-                                "text": {"type": "mrkdwn", "text": "✅ You've already submitted this survey. Thank you!"}
-                            }]
-                        }
-                    }
+                    # Update existing report
+                    existing_report.self_reported_score = self_reported_score
+                    existing_report.energy_level = energy_level
+                    existing_report.stress_factors = stress_factors
+                    existing_report.additional_comments = comments
+                    existing_report.submitted_via = 'slack'
+                    existing_report.analysis_id = analysis_id  # Update linked analysis if provided
+                    existing_report.updated_at = datetime.utcnow()
+                    logging.info(f"Updated existing report ID {existing_report.id} for user {user_id}")
+                    is_update = True
+                else:
+                    # Create new burnout report
+                    new_report = UserBurnoutReport(
+                        user_id=user_id,
+                        organization_id=organization_id,
+                        analysis_id=analysis_id,  # Optional - may be None
+                        self_reported_score=self_reported_score,
+                        energy_level=energy_level,
+                        stress_factors=stress_factors,
+                        additional_comments=comments,
+                        submitted_via='slack',
+                        submitted_at=datetime.utcnow()
+                    )
+                    db.add(new_report)
+                    logging.info(f"Created new report for user {user_id}")
 
-                # Create new burnout report
-                new_report = UserBurnoutReport(
-                    user_id=user_id,
-                    analysis_id=analysis_id,
-                    self_reported_score=self_reported_score,  # Use correct field name
-                    energy_level=energy_level,  # Now an integer 1-5
-                    stress_factors=stress_factors,
-                    additional_comments=comments,
-                    submitted_via='slack',  # Mark as submitted from Slack
-                    submitted_at=datetime.utcnow()
-                )
-                db.add(new_report)
                 db.commit()
 
-                # Return success response
+                # Return success response with different message for updates
+                if is_update:
+                    success_message = f"✅ *Survey updated successfully!*\n\n_You already submitted a survey today. Your burnout score has been updated to {self_reported_score}/100._\n\nYour updated feedback helps us:\n• Validate automated burnout detection\n• Catch stress before it impacts you\n• Make data-driven team improvements\n\n🌟 Thank you for contributing to a healthier team!"
+                else:
+                    success_message = "✅ *Survey submitted successfully!*\n\nYour feedback helps us:\n• Validate automated burnout detection\n• Catch stress before it impacts you\n• Make data-driven team improvements\n\n🌟 Thank you for contributing to a healthier team!"
+
                 return {
                     "response_action": "update",
                     "view": {
@@ -1380,7 +1396,7 @@ async def handle_slack_interactions(
                                 "type": "section",
                                 "text": {
                                     "type": "mrkdwn",
-                                    "text": "✅ *Survey submitted successfully!*\n\nYour feedback helps us:\n• Validate automated burnout detection\n• Catch stress before it impacts you\n• Make data-driven team improvements\n\n🌟 Thank you for contributing to a healthier team!"
+                                    "text": success_message
                                 }
                             }
                         ]
@@ -1560,17 +1576,35 @@ async def get_team_survey_status(
         )
 
 
-def create_burnout_survey_modal(analysis_id: int, user_id: int) -> dict:
+def create_burnout_survey_modal(organization_id: int, user_id: int, analysis_id: int = None, is_update: bool = False) -> dict:
     """
     Create Slack modal view for burnout survey.
-    This would be used with Slack's views.open API in a real implementation.
+
+    Args:
+        organization_id: Organization ID (required)
+        user_id: User ID (required)
+        analysis_id: Analysis ID (optional - for linking survey to specific analysis)
+        is_update: Whether this is updating an existing survey today
     """
+    import json
+
+    # Store metadata to be retrieved on submission
+    metadata = {
+        "user_id": user_id,
+        "organization_id": organization_id,
+        "analysis_id": analysis_id
+    }
+
+    modal_title = "Update Check-in" if is_update else "Burnout Check-in"
+    intro_text = "📋 *Update your burnout check-in*\n\nYou already submitted today. Your previous response will be updated." if is_update else "📋 *2-minute burnout check-in*\n\nYour responses help improve team health and workload distribution. All responses are confidential."
+
     return {
         "type": "modal",
-        "callback_id": f"burnout_survey_{analysis_id}",
+        "callback_id": "burnout_survey_modal",
+        "private_metadata": json.dumps(metadata),
         "title": {
             "type": "plain_text",
-            "text": "Burnout Check-in",
+            "text": modal_title,
             "emoji": True
         },
         "submit": {
@@ -1588,25 +1622,21 @@ def create_burnout_survey_modal(analysis_id: int, user_id: int) -> dict:
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": "📋 *2-minute burnout check-in*\n\nYour responses help improve team health and workload distribution. All responses are confidential."
+                    "text": intro_text
                 }
             },
             {
                 "type": "divider"
             },
             {
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": "*Question 1: How burned out do you feel right now?*"
-                },
-                "accessory": {
+                "type": "input",
+                "block_id": "burnout_score_block",
+                "element": {
                     "type": "static_select",
-                    "action_id": "burnout_score",
+                    "action_id": "burnout_score_input",
                     "placeholder": {
                         "type": "plain_text",
-                        "text": "Select level (0-10)",
-                        "emoji": True
+                        "text": "Select level (0-10)"
                     },
                     "options": [
                         {"text": {"type": "plain_text", "text": "0 - Not at all"}, "value": "0"},
@@ -1621,44 +1651,44 @@ def create_burnout_survey_modal(analysis_id: int, user_id: int) -> dict:
                         {"text": {"type": "plain_text", "text": "9 - Almost completely"}, "value": "90"},
                         {"text": {"type": "plain_text", "text": "10 - Completely"}, "value": "100"}
                     ]
+                },
+                "label": {
+                    "type": "plain_text",
+                    "text": "Question 1: How burned out do you feel right now?"
                 }
             },
             {
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": "*Question 2: What's your energy level this week?*"
-                },
-                "accessory": {
+                "type": "input",
+                "block_id": "energy_level_block",
+                "element": {
                     "type": "static_select",
-                    "action_id": "energy_level",
+                    "action_id": "energy_level_input",
                     "placeholder": {
                         "type": "plain_text",
-                        "text": "Select energy level",
-                        "emoji": True
+                        "text": "Select energy level"
                     },
                     "options": [
-                        {"text": {"type": "plain_text", "text": "Very Low"}, "value": "1"},
-                        {"text": {"type": "plain_text", "text": "Low"}, "value": "2"},
-                        {"text": {"type": "plain_text", "text": "Moderate"}, "value": "3"},
-                        {"text": {"type": "plain_text", "text": "High"}, "value": "4"},
-                        {"text": {"type": "plain_text", "text": "Very High"}, "value": "5"}
+                        {"text": {"type": "plain_text", "text": "Very Low"}, "value": "very_low"},
+                        {"text": {"type": "plain_text", "text": "Low"}, "value": "low"},
+                        {"text": {"type": "plain_text", "text": "Moderate"}, "value": "moderate"},
+                        {"text": {"type": "plain_text", "text": "High"}, "value": "high"},
+                        {"text": {"type": "plain_text", "text": "Very High"}, "value": "very_high"}
                     ]
+                },
+                "label": {
+                    "type": "plain_text",
+                    "text": "Question 2: What's your energy level this week?"
                 }
             },
             {
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": "*Question 3: Main stress factors? (select all that apply)*"
-                },
-                "accessory": {
+                "type": "input",
+                "block_id": "stress_factors_block",
+                "element": {
                     "type": "multi_static_select",
-                    "action_id": "stress_factors",
+                    "action_id": "stress_factors_input",
                     "placeholder": {
                         "type": "plain_text",
-                        "text": "Select stress factors",
-                        "emoji": True
+                        "text": "Select stress factors"
                     },
                     "options": [
                         {"text": {"type": "plain_text", "text": "Incident volume"}, "value": "incident_volume"},
@@ -1668,13 +1698,19 @@ def create_burnout_survey_modal(analysis_id: int, user_id: int) -> dict:
                         {"text": {"type": "plain_text", "text": "Team dynamics"}, "value": "team_dynamics"},
                         {"text": {"type": "plain_text", "text": "Other"}, "value": "other"}
                     ]
-                }
+                },
+                "label": {
+                    "type": "plain_text",
+                    "text": "Question 3: Main stress factors? (select all that apply)"
+                },
+                "optional": True
             },
             {
                 "type": "input",
+                "block_id": "comments_block",
                 "element": {
                     "type": "plain_text_input",
-                    "action_id": "additional_comments",
+                    "action_id": "comments_input",
                     "placeholder": {
                         "type": "plain_text",
                         "text": "Anything else affecting your stress? (optional)"

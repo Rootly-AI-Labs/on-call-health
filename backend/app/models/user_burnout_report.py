@@ -8,14 +8,15 @@ from .base import Base
 
 class UserBurnoutReport(Base):
     """
-    Stores user self-reported burnout assessments linked to specific analyses.
-    Enables comparison between automated CBI scores and user perceptions.
+    Stores user self-reported burnout assessments independent of analyses.
+    Enables daily/periodic tracking of self-reported burnout over time.
     """
     __tablename__ = "user_burnout_reports"
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    analysis_id = Column(Integer, ForeignKey("analyses.id"), nullable=False)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
+    analysis_id = Column(Integer, ForeignKey("analyses.id"), nullable=True)  # Optional - for linking to specific analysis
 
     # Core self-reported scores (0-100 scale to match CBI)
     self_reported_score = Column(Integer, nullable=False)  # 0-100 burnout score
@@ -35,12 +36,8 @@ class UserBurnoutReport(Base):
 
     # Relationships
     user = relationship("User", backref="burnout_reports")
+    organization = relationship("Organization")
     analysis = relationship("Analysis", backref="user_burnout_reports")
-
-    # Constraints
-    __table_args__ = (
-        UniqueConstraint('user_id', 'analysis_id', name='unique_user_analysis_report'),
-    )
 
     def to_dict(self):
         """Convert model to dictionary for API responses."""
