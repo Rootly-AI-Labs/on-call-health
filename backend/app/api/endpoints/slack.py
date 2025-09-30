@@ -1269,9 +1269,10 @@ async def handle_burnout_survey_command(
                     }]
                 }
 
-        # Modal opened successfully - return empty response with 200 status
-        # Slack will show the modal, so no text response needed
-        return ""
+        # Modal opened successfully - return 200 with no body
+        # Slack will show the modal, so no command response needed
+        from fastapi.responses import Response
+        return Response(status_code=200)
 
     except Exception as e:
         logging.error(f"Error handling burnout survey command: {str(e)}")
