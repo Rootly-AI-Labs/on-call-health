@@ -1204,41 +1204,72 @@ async def handle_burnout_survey_command(
                 "response_type": "ephemeral"
             }
 
-        # Create and return survey modal
+        # Create and open interactive Slack modal
         modal_view = create_burnout_survey_modal(latest_analysis.id, user_correlation.user_id)
 
-        # In a real implementation, you would send this modal to Slack using their API
-        # For now, return a simple response indicating the survey would open
-        return {
-            "text": "📝 Opening your 2-minute burnout survey...\n\n"
-                   "This helps us:\n"
-                   "• Validate our automated detection\n"
-                   "• Catch stress before it impacts you\n"
-                   "• Make data-driven team improvements",
-            "response_type": "ephemeral",
-            "attachments": [
-                {
+        # Get workspace bot token to open modal
+        slack_integration = db.query(SlackIntegration).filter(
+            SlackIntegration.workspace_id == team_id
+        ).first()
+
+        if not slack_integration or not slack_integration.slack_token:
+            # Fallback to old button-based approach if no token
+            return {
+                "text": "📝 Opening your 2-minute burnout survey...",
+                "response_type": "ephemeral",
+                "attachments": [{
                     "fallback": "Burnout Survey",
                     "color": "good",
-                    "fields": [
-                        {
-                            "title": "Quick Survey Questions:",
-                            "value": "1. How burned out do you feel? (0-10 scale)\n"
-                                   "2. What's your energy level? (Very Low to Very High)\n"
-                                   "3. Main stress factors? (Select all that apply)",
-                            "short": False
-                        }
-                    ],
-                    "actions": [
-                        {
+                    "actions": [{
+                        "type": "button",
+                        "text": "Open Survey",
+                        "url": f"{settings.FRONTEND_URL}/survey?analysis={latest_analysis.id}&user={user_correlation.user_id}",
+                        "style": "primary"
+                    }]
+                }]
+            }
+
+        # Open modal using Slack API
+        import httpx
+        slack_token = decrypt_token(slack_integration.slack_token)
+
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://slack.com/api/views.open",
+                headers={
+                    "Authorization": f"Bearer {slack_token}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "trigger_id": trigger_id,
+                    "view": modal_view
+                }
+            )
+
+            result = response.json()
+
+            if not result.get("ok"):
+                logging.error(f"Failed to open modal: {result.get('error')}")
+                # Fallback to button approach
+                return {
+                    "text": "📝 Click below to open your burnout survey:",
+                    "response_type": "ephemeral",
+                    "attachments": [{
+                        "fallback": "Burnout Survey",
+                        "actions": [{
                             "type": "button",
                             "text": "Open Survey",
                             "url": f"{settings.FRONTEND_URL}/survey?analysis={latest_analysis.id}&user={user_correlation.user_id}",
                             "style": "primary"
-                        }
-                    ]
+                        }]
+                    }]
                 }
-            ]
+
+        # Modal opened successfully - return empty response
+        # (Slack will show the modal, so no text response needed)
+        return {
+            "response_type": "ephemeral",
+            "text": ""
         }
 
     except Exception as e:
@@ -1247,6 +1278,109 @@ async def handle_burnout_survey_command(
             "text": "⚠️ Sorry, there was an error opening the survey. Please try again or contact your manager.",
             "response_type": "ephemeral"
         }
+
+
+@router.post("/interactions")
+async def handle_slack_interactions(
+    payload: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Handle Slack interactive component submissions (modals, buttons, etc).
+    This is called when user submits the burnout survey modal.
+    """
+    try:
+        import json
+        data = json.loads(payload)
+
+        interaction_type = data.get("type")
+
+        # Handle modal submission
+        if interaction_type == "view_submission":
+            view = data.get("view", {})
+            callback_id = view.get("callback_id")
+
+            if callback_id == "burnout_survey_modal":
+                # Extract form values from modal
+                values = view.get("state", {}).get("values", {})
+
+                # Get burnout score (0-10 slider)
+                burnout_score = int(values.get("burnout_score_block", {}).get("burnout_score_input", {}).get("value", 5))
+
+                # Get energy level (radio buttons)
+                energy_level = values.get("energy_level_block", {}).get("energy_level_input", {}).get("selected_option", {}).get("value", "medium")
+
+                # Get stress factors (checkboxes)
+                stress_factors_options = values.get("stress_factors_block", {}).get("stress_factors_input", {}).get("selected_options", [])
+                stress_factors = [opt.get("value") for opt in stress_factors_options]
+
+                # Get optional comments
+                comments = values.get("comments_block", {}).get("comments_input", {}).get("value", "")
+
+                # Extract user and analysis IDs from private_metadata
+                metadata = json.loads(view.get("private_metadata", "{}"))
+                analysis_id = metadata.get("analysis_id")
+                user_id = metadata.get("user_id")
+
+                if not analysis_id or not user_id:
+                    return {"response_action": "errors", "errors": {"comments_block": "Invalid survey data"}}
+
+                # Check if already submitted
+                existing_report = db.query(UserBurnoutReport).filter(
+                    UserBurnoutReport.user_id == user_id,
+                    UserBurnoutReport.analysis_id == analysis_id
+                ).first()
+
+                if existing_report:
+                    return {
+                        "response_action": "update",
+                        "view": {
+                            "type": "modal",
+                            "title": {"type": "plain_text", "text": "Already Submitted"},
+                            "blocks": [{
+                                "type": "section",
+                                "text": {"type": "mrkdwn", "text": "✅ You've already submitted this survey. Thank you!"}
+                            }]
+                        }
+                    }
+
+                # Create new burnout report
+                new_report = UserBurnoutReport(
+                    user_id=user_id,
+                    analysis_id=analysis_id,
+                    burnout_score=burnout_score,
+                    energy_level=energy_level,
+                    stress_factors=stress_factors,
+                    additional_comments=comments,
+                    submitted_at=datetime.utcnow()
+                )
+                db.add(new_report)
+                db.commit()
+
+                # Return success response
+                return {
+                    "response_action": "update",
+                    "view": {
+                        "type": "modal",
+                        "title": {"type": "plain_text", "text": "Thank You!"},
+                        "blocks": [
+                            {
+                                "type": "section",
+                                "text": {
+                                    "type": "mrkdwn",
+                                    "text": "✅ *Survey submitted successfully!*\n\nYour feedback helps us:\n• Validate automated burnout detection\n• Catch stress before it impacts you\n• Make data-driven team improvements\n\n🌟 Thank you for contributing to a healthier team!"
+                                }
+                            }
+                        ]
+                    }
+                }
+
+        # For other interaction types, just acknowledge
+        return {}
+
+    except Exception as e:
+        logging.error(f"Error handling Slack interaction: {str(e)}")
+        return {"response_action": "errors", "errors": {"comments_block": str(e)}}
 
 
 @router.post("/survey/submit")
