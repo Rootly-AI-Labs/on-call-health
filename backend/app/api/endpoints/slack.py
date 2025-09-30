@@ -1291,7 +1291,9 @@ async def handle_slack_interactions(
     """
     try:
         import json
+        logging.info(f"Received Slack interaction payload: {payload[:500]}...")  # Log first 500 chars
         data = json.loads(payload)
+        logging.info(f"Parsed interaction type: {data.get('type')}")
 
         interaction_type = data.get("type")
 
@@ -1390,7 +1392,14 @@ async def handle_slack_interactions(
 
     except Exception as e:
         logging.error(f"Error handling Slack interaction: {str(e)}")
-        return {"response_action": "errors", "errors": {"comments_block": str(e)}}
+        import traceback
+        logging.error(f"Traceback: {traceback.format_exc()}")
+        return {
+            "response_action": "errors",
+            "errors": {
+                "comments_block": f"Error: {str(e)}"
+            }
+        }
 
 
 @router.post("/survey/submit")
