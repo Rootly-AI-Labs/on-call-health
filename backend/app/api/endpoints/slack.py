@@ -937,6 +937,68 @@ class SlackModalPayload(BaseModel):
     user_email: str = ""
 
 
+@router.get("/debug/correlation")
+async def debug_user_correlation(
+    email: str = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Debug endpoint to check if a user exists in user_correlations table.
+    If email not provided, checks current user's organization for all correlations.
+    """
+    try:
+        if email:
+            # Check specific email
+            correlation = db.query(UserCorrelation).filter(
+                UserCorrelation.email == email.lower()
+            ).first()
+
+            if correlation:
+                return {
+                    "found": True,
+                    "email": correlation.email,
+                    "name": correlation.name,
+                    "slack_user_id": correlation.slack_user_id,
+                    "github_username": correlation.github_username,
+                    "rootly_email": correlation.rootly_email,
+                    "pagerduty_user_id": correlation.pagerduty_user_id,
+                    "user_id": correlation.user_id,
+                    "created_at": correlation.created_at.isoformat() if correlation.created_at else None
+                }
+            else:
+                return {
+                    "found": False,
+                    "email": email,
+                    "message": f"No user_correlation found for {email}"
+                }
+        else:
+            # Show all correlations for current user's organization
+            correlations = db.query(UserCorrelation).filter(
+                UserCorrelation.user_id == current_user.id
+            ).all()
+
+            return {
+                "total_correlations": len(correlations),
+                "correlations": [
+                    {
+                        "email": c.email,
+                        "name": c.name,
+                        "slack_user_id": c.slack_user_id,
+                        "github_username": c.github_username
+                    }
+                    for c in correlations
+                ]
+            }
+
+    except Exception as e:
+        logging.error(f"Error debugging correlation: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error: {str(e)}"
+        )
+
+
 @router.get("/user/me")
 async def get_slack_user_info(
     current_user: User = Depends(get_current_user),
@@ -1079,6 +1141,49 @@ async def handle_burnout_survey_command(
             UserCorrelation.slack_user_id == user_id,
             User.organization_id == organization.id
         ).first()
+
+        # If not found by slack_user_id, try to get Slack email and match by email
+        if not user_correlation:
+            # Try to fetch user's email from Slack API
+            try:
+                # Get workspace bot token from SlackIntegration
+                slack_integration = db.query(SlackIntegration).filter(
+                    SlackIntegration.workspace_id == team_id
+                ).first()
+
+                if slack_integration and slack_integration.slack_token:
+                    import httpx
+                    slack_token = decrypt_token(slack_integration.slack_token)
+
+                    async with httpx.AsyncClient() as client:
+                        response = await client.get(
+                            "https://slack.com/api/users.info",
+                            params={"user": user_id},
+                            headers={"Authorization": f"Bearer {slack_token}"}
+                        )
+
+                        if response.status_code == 200:
+                            data = response.json()
+                            if data.get("ok"):
+                                user_email = data.get("user", {}).get("profile", {}).get("email")
+
+                                if user_email:
+                                    # Try to find by email
+                                    user_correlation = db.query(UserCorrelation).join(
+                                        User, UserCorrelation.user_id == User.id
+                                    ).filter(
+                                        UserCorrelation.email == user_email.lower(),
+                                        User.organization_id == organization.id
+                                    ).first()
+
+                                    # If found, update with Slack user ID for future lookups
+                                    if user_correlation:
+                                        user_correlation.slack_user_id = user_id
+                                        db.commit()
+                                        logging.info(f"Auto-populated Slack user ID for {user_email}")
+            except Exception as e:
+                logging.error(f"Error fetching Slack user email: {str(e)}")
+                # Continue without Slack email lookup
 
         if not user_correlation:
             return {
