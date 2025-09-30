@@ -153,6 +153,40 @@ def run_migrations():
             else:
                 logger.info("⏭️  Migration 3 already applied")
 
+            # Migration 4: Fix organizations with NULL status
+            migration_4_exists = conn.execute(text(
+                "SELECT COUNT(*) FROM migrations WHERE name = 'fix_organization_status_null'"
+            )).scalar()
+
+            if migration_4_exists == 0:
+                logger.info("🔧 Running Migration 4: Fix organizations with NULL status...")
+
+                # Check if any organizations have NULL status
+                null_status_count = conn.execute(text(
+                    "SELECT COUNT(*) FROM organizations WHERE status IS NULL"
+                )).scalar()
+
+                if null_status_count > 0:
+                    logger.info(f"   Found {null_status_count} organizations with NULL status")
+
+                    # Update NULL status to 'active'
+                    conn.execute(text(
+                        "UPDATE organizations SET status = 'active' WHERE status IS NULL"
+                    ))
+                    conn.commit()
+                    logger.info(f"   ✅ Updated {null_status_count} organizations to 'active' status")
+                else:
+                    logger.info("   ℹ️  No organizations with NULL status found")
+
+                # Mark migration as complete
+                conn.execute(text(
+                    "INSERT INTO migrations (name, status) VALUES ('fix_organization_status_null', 'completed')"
+                ))
+                conn.commit()
+                logger.info("✅ Migration 4 completed: Fixed organization status")
+            else:
+                logger.info("⏭️  Migration 4 already applied")
+
             return True
 
     except Exception as e:
