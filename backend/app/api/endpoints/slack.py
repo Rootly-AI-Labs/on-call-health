@@ -977,9 +977,15 @@ async def handle_burnout_survey_command(
 
         # Get organization
         organization = workspace_mapping.organization
-        if not organization or organization.status != 'active':
+        if not organization:
             return {
-                "text": "⚠️ Organization is not active. Please contact support.",
+                "text": f"⚠️ Workspace is registered but not linked to an organization (mapping org_id: {workspace_mapping.organization_id}). Please contact support.",
+                "response_type": "ephemeral"
+            }
+
+        if organization.status != 'active':
+            return {
+                "text": f"⚠️ Organization '{organization.name}' has status '{organization.status}' (needs 'active'). Please contact support.",
                 "response_type": "ephemeral"
             }
 
@@ -1367,6 +1373,8 @@ async def get_workspace_status(
     Returns detailed information about workspace mappings and integrations.
     """
     try:
+        from ...models import Organization
+
         # Check for workspace mappings
         workspace_mappings = db.query(SlackWorkspaceMapping).filter(
             SlackWorkspaceMapping.owner_user_id == current_user.id
@@ -1384,6 +1392,19 @@ async def get_workspace_status(
                 SlackWorkspaceMapping.organization_id == current_user.organization_id
             ).all()
 
+        # Check organization status
+        organization_info = None
+        if current_user.organization_id:
+            org = db.query(Organization).filter(
+                Organization.id == current_user.organization_id
+            ).first()
+            if org:
+                organization_info = {
+                    "id": org.id,
+                    "name": org.name,
+                    "status": org.status if hasattr(org, 'status') else "unknown"
+                }
+
         return {
             "user_workspace_mappings": [
                 {
@@ -1391,7 +1412,7 @@ async def get_workspace_status(
                     "workspace_name": m.workspace_name,
                     "organization_id": m.organization_id,
                     "status": m.status,
-                    "created_at": m.created_at.isoformat() if m.created_at else None
+                    "created_at": m.registered_at.isoformat() if m.registered_at else None
                 }
                 for m in workspace_mappings
             ],
@@ -1400,6 +1421,7 @@ async def get_workspace_status(
                     "workspace_id": m.workspace_id,
                     "workspace_name": m.workspace_name,
                     "owner_user_id": m.owner_user_id,
+                    "organization_id": m.organization_id,
                     "status": m.status
                 }
                 for m in org_mappings
@@ -1417,9 +1439,12 @@ async def get_workspace_status(
                 "email": current_user.email,
                 "organization_id": current_user.organization_id
             },
+            "organization": organization_info,
             "diagnosis": {
                 "has_workspace_mapping": len(workspace_mappings) > 0 or len(org_mappings) > 0,
                 "has_slack_integration": len(slack_integrations) > 0,
+                "organization_exists": organization_info is not None,
+                "organization_active": organization_info.get("status") == "active" if organization_info else False,
                 "issue": None if (len(workspace_mappings) > 0 or len(org_mappings) > 0) else
                         "No workspace mapping found. Slack /burnout-survey command will not work."
             }
