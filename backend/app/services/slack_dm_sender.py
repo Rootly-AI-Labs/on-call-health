@@ -4,7 +4,7 @@ Service for sending Slack DMs with interactive survey buttons.
 import logging
 import httpx
 from typing import Optional
-from app.core.encryption import decrypt_token
+from ..api.endpoints.slack import decrypt_token
 
 logger = logging.getLogger(__name__)
 

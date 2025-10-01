@@ -10,13 +10,13 @@ from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy.orm import Session
 import pytz
 
-from app.models.survey_schedule import SurveySchedule, UserSurveyPreference
-from app.models.user_correlation import UserCorrelation
-from app.models.slack_integration import SlackIntegration
-from app.models.slack_workspace_mapping import SlackWorkspaceMapping
-from app.models.user_burnout_report import UserBurnoutReport
-from app.services.slack_dm_sender import SlackDMSender
-from app.services.notification_service import NotificationService
+from ..models.survey_schedule import SurveySchedule, UserSurveyPreference
+from ..models.user_correlation import UserCorrelation
+from ..models.slack_integration import SlackIntegration
+from ..models.slack_workspace_mapping import SlackWorkspaceMapping
+from ..models.user_burnout_report import UserBurnoutReport
+from .slack_dm_sender import SlackDMSender
+from .notification_service import NotificationService
 
 logger = logging.getLogger(__name__)
 
