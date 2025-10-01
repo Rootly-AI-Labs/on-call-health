@@ -122,6 +122,10 @@ class User(Base):
         """Check if user is an organization admin."""
         return self.role in ['super_admin', 'org_admin']
 
+    def is_admin(self) -> bool:
+        """Check if user is an admin (super_admin or org_admin)."""
+        return self.is_org_admin
+
     @property
     def is_manager(self) -> bool:
         """Check if user can manage analyses and surveys."""
