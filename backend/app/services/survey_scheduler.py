@@ -12,7 +12,8 @@ import pytz
 
 from app.models.survey_schedule import SurveySchedule, UserSurveyPreference
 from app.models.user_correlation import UserCorrelation
-from app.models.slack_integration import SlackIntegration, SlackWorkspaceMapping
+from app.models.slack_integration import SlackIntegration
+from app.models.slack_workspace_mapping import SlackWorkspaceMapping
 from app.models.user_burnout_report import UserBurnoutReport
 from app.services.slack_dm_sender import SlackDMSender
 from app.services.notification_service import NotificationService
