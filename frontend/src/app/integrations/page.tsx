@@ -84,6 +84,7 @@ import {
   LogOut,
   UserPlus,
   Mail,
+  Send,
 } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
@@ -91,6 +92,7 @@ import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { MappingDrawer } from "@/components/mapping-drawer"
 import { NotificationBell } from "@/components/notifications"
+import ManualSurveyDeliveryModal from "@/components/ManualSurveyDeliveryModal"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -283,7 +285,7 @@ export default function IntegrationsPage() {
   const [loadingGitHub, setLoadingGitHub] = useState(true)
   const [loadingSlack, setLoadingSlack] = useState(true)
   const [reloadingIntegrations, setReloadingIntegrations] = useState(false)
-  const [userInfo, setUserInfo] = useState<{name: string, email: string, avatar?: string, organization_id?: number, id?: number} | null>(null)
+  const [userInfo, setUserInfo] = useState<{name: string, email: string, avatar?: string, organization_id?: number, id?: number, role?: string} | null>(null)
   const [activeTab, setActiveTab] = useState<"rootly" | "pagerduty" | null>(null)
   const [backUrl, setBackUrl] = useState<string>('/dashboard')
   const [selectedOrganization, setSelectedOrganization] = useState<string>("")
@@ -368,6 +370,9 @@ export default function IntegrationsPage() {
   const [loadingSyncedUsers, setLoadingSyncedUsers] = useState(false)
   const [showSyncedUsers, setShowSyncedUsers] = useState(false)
   const [teamMembersDrawerOpen, setTeamMembersDrawerOpen] = useState(false)
+
+  // Manual survey delivery modal state
+  const [showManualSurveyModal, setShowManualSurveyModal] = useState(false)
 
   // AI Integration state
   const [llmToken, setLlmToken] = useState('')
@@ -482,13 +487,17 @@ export default function IntegrationsPage() {
             setUserInfo({
               name: userData.name,
               email: userData.email,
-              avatar: userData.avatar || undefined
+              avatar: userData.avatar || undefined,
+              role: userData.role || 'member'
             })
             // Store in localStorage for future use
             localStorage.setItem('user_name', userData.name)
             localStorage.setItem('user_email', userData.email)
             if (userData.avatar) {
               localStorage.setItem('user_avatar', userData.avatar)
+            }
+            if (userData.role) {
+              localStorage.setItem('user_role', userData.role)
             }
           }
         })
@@ -3912,6 +3921,16 @@ export default function IntegrationsPage() {
                               </>
                             )}
                           </Button>
+                          {userInfo?.role === 'admin' && (
+                            <Button
+                              onClick={() => setShowManualSurveyModal(true)}
+                              size="sm"
+                              className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700"
+                            >
+                              <Send className="w-4 h-4" />
+                              <span>Send Survey Now</span>
+                            </Button>
+                          )}
                         </div>
                       </div>
 
@@ -6093,6 +6112,16 @@ export default function IntegrationsPage() {
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* Manual Survey Delivery Modal */}
+      <ManualSurveyDeliveryModal
+        isOpen={showManualSurveyModal}
+        onClose={() => setShowManualSurveyModal(false)}
+        onSuccess={() => {
+          // Refresh notifications or show success message
+          toast.success("Survey delivery initiated successfully")
+        }}
+      />
     </div>
   )
 }
