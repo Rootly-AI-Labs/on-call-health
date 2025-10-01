@@ -3923,7 +3923,7 @@ export default function IntegrationsPage() {
                               </>
                             )}
                           </Button>
-                          {userInfo?.role === 'admin' && (
+                          {(userInfo?.role === 'super_admin' || userInfo?.role === 'org_admin') && (
                             <Button
                               onClick={() => setShowManualSurveyModal(true)}
                               size="sm"

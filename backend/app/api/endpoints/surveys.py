@@ -66,8 +66,8 @@ async def create_or_update_survey_schedule(
     Create or update survey schedule for an organization.
     Only org admins can configure schedules.
     """
-    # Check if user is admin
-    if current_user.role != "admin":
+    # Check if user is admin (super_admin or org_admin)
+    if not current_user.is_admin():
         raise HTTPException(status_code=403, detail="Only admins can configure survey schedules")
 
     organization_id = current_user.organization_id
@@ -273,7 +273,8 @@ async def manual_survey_delivery(
     Only admins can trigger manual deliveries.
     Requires confirmation to prevent accidental sends.
     """
-    if current_user.role != "admin":
+    # Check if user is an admin (super_admin or org_admin)
+    if not current_user.is_admin():
         raise HTTPException(status_code=403, detail="Only admins can manually trigger survey delivery")
 
     organization_id = current_user.organization_id
