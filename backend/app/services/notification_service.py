@@ -238,6 +238,54 @@ class NotificationService:
 
         return False
 
+    def create_survey_delivery_notification(
+        self,
+        organization_id: int,
+        triggered_by: Optional[User],
+        recipient_count: int,
+        is_manual: bool = False
+    ) -> List[UserNotification]:
+        """
+        Create notification when surveys are delivered.
+
+        Args:
+            organization_id: Organization ID
+            triggered_by: User who triggered (None for scheduled)
+            recipient_count: Number of recipients
+            is_manual: True if manually triggered, False if scheduled
+        """
+        notifications = []
+
+        # Get org admins
+        org_admins = self.db.query(User).filter(
+            User.organization_id == organization_id,
+            User.role == "admin"
+        ).all()
+
+        if is_manual:
+            title = "📤 Manual survey delivery sent"
+            message = f"{triggered_by.name or triggered_by.email} manually sent burnout surveys to {recipient_count} team members."
+        else:
+            title = "📅 Scheduled surveys sent"
+            message = f"Daily burnout surveys were automatically sent to {recipient_count} team members."
+
+        for admin in org_admins:
+            notification = UserNotification(
+                user_id=admin.id,
+                organization_id=organization_id,
+                type='survey',
+                title=title,
+                message=message,
+                action_url="/integrations?tab=surveys",
+                action_text="View Survey Settings",
+                priority='low' if not is_manual else 'normal'
+            )
+            notifications.append(notification)
+            self.db.add(notification)
+
+        self.db.commit()
+        return notifications
+
     def cleanup_expired_notifications(self):
         """Clean up expired notifications."""
         expired = self.db.query(UserNotification).filter(

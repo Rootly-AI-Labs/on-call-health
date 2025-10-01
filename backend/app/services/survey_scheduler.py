@@ -15,6 +15,7 @@ from app.models.user_correlation import UserCorrelation
 from app.models.slack_integration import SlackIntegration, SlackWorkspaceMapping
 from app.models.user_burnout_report import UserBurnoutReport
 from app.services.slack_dm_sender import SlackDMSender
+from app.services.notification_service import NotificationService
 
 logger = logging.getLogger(__name__)
 
@@ -231,6 +232,19 @@ class SurveyScheduler:
                     f"Initial survey delivery complete for org {organization_id}: "
                     f"{sent_count} sent, {failed_count} failed"
                 )
+
+                # Create notification for admins (only for initial delivery, not reminders)
+                if sent_count > 0:
+                    try:
+                        notification_service = NotificationService(db)
+                        notification_service.create_survey_delivery_notification(
+                            organization_id=organization_id,
+                            triggered_by=None,  # Scheduled delivery
+                            recipient_count=sent_count,
+                            is_manual=False
+                        )
+                    except Exception as e:
+                        logger.error(f"Failed to create delivery notification: {str(e)}")
 
         except Exception as e:
             logger.error(f"Error in daily survey delivery for org {organization_id}: {str(e)}")

@@ -13,6 +13,8 @@ from app.models.survey_schedule import SurveySchedule, UserSurveyPreference
 from app.models.user import User
 from app.core.auth import get_current_user
 from app.services.survey_scheduler import survey_scheduler
+from app.services.notification_service import NotificationService
+from app.models.user_notification import UserNotification
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -256,24 +258,88 @@ async def get_survey_preferences(
     }
 
 
-@router.post("/survey-schedule/test-delivery")
-async def test_survey_delivery(
+class ManualDeliveryRequest(BaseModel):
+    """Schema for manual survey delivery with confirmation."""
+    confirmed: bool = False
+
+
+@router.post("/survey-schedule/manual-delivery")
+async def manual_survey_delivery(
+    request: ManualDeliveryRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Manually trigger survey delivery for testing.
-    Only admins can trigger test deliveries.
+    Manually trigger survey delivery.
+    Only admins can trigger manual deliveries.
+    Requires confirmation to prevent accidental sends.
     """
     if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Only admins can test survey delivery")
+        raise HTTPException(status_code=403, detail="Only admins can manually trigger survey delivery")
 
     organization_id = current_user.organization_id
 
-    # Trigger survey delivery
+    # First call without confirmation - return preview
+    if not request.confirmed:
+        # Get recipients count
+        recipients = survey_scheduler._get_survey_recipients(organization_id, db, is_reminder=False)
+
+        return {
+            "requires_confirmation": True,
+            "message": f"This will send surveys to {len(recipients)} team members via Slack DM.",
+            "recipient_count": len(recipients),
+            "recipients": [
+                {
+                    "name": r.get('name', 'Unknown'),
+                    "email": r['email']
+                } for r in recipients
+            ],
+            "note": "To proceed, send this request again with 'confirmed': true"
+        }
+
+    # Confirmed - trigger survey delivery
     try:
+        logger.info(f"Manual survey delivery triggered by {current_user.email} for org {organization_id}")
+
+        # Get recipients before sending
+        recipients = survey_scheduler._get_survey_recipients(organization_id, db, is_reminder=False)
+        recipient_count = len(recipients)
+
+        # Trigger delivery
         await survey_scheduler._send_organization_surveys(organization_id, db, is_reminder=False)
-        return {"message": "Test survey delivery triggered successfully"}
+
+        # Create notification for admins
+        notification_service = NotificationService(db)
+        notification_service.create_survey_delivery_notification(
+            organization_id=organization_id,
+            triggered_by=current_user,
+            recipient_count=recipient_count,
+            is_manual=True
+        )
+
+        return {
+            "success": True,
+            "message": f"Survey delivery triggered successfully to {recipient_count} recipients",
+            "recipient_count": recipient_count,
+            "triggered_by": current_user.email
+        }
+
     except Exception as e:
-        logger.error(f"Test delivery failed: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Test delivery failed: {str(e)}")
+        logger.error(f"Manual survey delivery failed: {str(e)}")
+
+        # Create error notification for admin who triggered it
+        notification_service = NotificationService(db)
+        error_notification = UserNotification(
+            user_id=current_user.id,
+            organization_id=organization_id,
+            type='survey',
+            title="❌ Survey delivery failed",
+            message=f"Manual survey delivery failed: {str(e)}",
+            action_url="/integrations?tab=surveys",
+            action_text="Check Settings",
+            priority='high'
+        )
+        db.add(error_notification)
+        db.commit()
+
+        raise HTTPException(status_code=500, detail=f"Survey delivery failed: {str(e)}")
