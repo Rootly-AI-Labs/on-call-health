@@ -3,8 +3,7 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Activity, Link2, Brain, Target, Github, Chrome, Shield, Users, TrendingUp, Loader2, Flame } from "lucide-react"
-import Link from "next/link"
+import { Link2, Brain, Target, Github, Chrome, Loader2, Flame } from "lucide-react";
 import Image from "next/image"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
@@ -85,7 +84,7 @@ export default function LandingPage() {
                   />
                 </a>
               </div>
-              <div className="text-2xl font-semibold text-slate-900">On-call Burnout Detector</div>
+              <div className="text-2xl font-semibold text-slate-900">On-call burnout detector</div>
             </div>
           </div>
         </div>
@@ -94,16 +93,16 @@ export default function LandingPage() {
             <h1 className="text-3xl lg:text-5xl tracking-tight mb-6 leading-tight lg:pt-20 lg:pb-1">
               Stop on-call burnout
               <br />
-               before it starts
+               before it starts.
             </h1>
 
             <p className="text-md lg:text-lg lg:pr-10">
-              An open source, research-based tool that looks for early-warning signs of burnout in your on-call engineers
+              An open source, research-based tool that looks for early-warning signs of burnout in your on-call engineers.
             </p>
 
             {/* OAuth Login Buttons */}
             <p className="lg:text-lg font-semibold mt-10 lg:mt-20 mb-3">
-              Get started with the burnout detector, it's free
+              Get started with the burnout detector, it's free.
             </p>
             <div id="login" className="flex flex-col sm:flex-row gap-4 items-center mb-6">
               <Button
@@ -164,9 +163,9 @@ export default function LandingPage() {
       <section className="pt-8 pb-12 bg-white lg:pt-8">
         <div className="container mx-auto px-4">
           <div className="text-center mb-4">
-            <h2 className="text-2xl md:text-3xl text-slate-900 mb-4">How It Works</h2>
+            <h2 className="text-2xl md:text-3xl text-slate-900 mb-4">How it works</h2>
             <p className="text-lg text-slate-600 max-w-3xl mx-auto">
-              Based on scientifically validated burnout research methodology
+              Based on scientifically validated burnout research methodology.
             </p>
           </div>
 
@@ -176,7 +175,7 @@ export default function LandingPage() {
                 <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-purple-100">
                   <Link2 className="w-8 h-8 text-purple-600" />
                 </div>
-                <h3 className="text-xl font-semibold text-slate-900 mb-4">Connect your incident tools</h3>
+                <h3 className="text-xl font-semibold text-slate-900 mb-4">Connect your incident tools.</h3>
                 <p className="text-slate-600 leading-relaxed mb-4">
                   Research shows a majority of on-call burnout risk can be predicted from incident history. Refine accuracy by connecting more tools.
                 </p>
@@ -202,7 +201,7 @@ export default function LandingPage() {
                 <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-purple-100">
                   <Brain className="w-8 h-8 text-purple-600" />
                 </div>
-                <h3 className="text-xl font-semibold text-slate-900 mb-4">See who’s at risk, backed by research</h3>
+                <h3 className="text-xl font-semibold text-slate-900 mb-4">See who’s at risk, backed by research.</h3>
                 <p className="text-slate-600 leading-relaxed mb-4">
                   The burnout detector calculates individual risk scores using the Copenhagen Burnout Inventory (CBI) the most widely used research framework for assessing burnout.
                 </p>
@@ -232,7 +231,7 @@ export default function LandingPage() {
                 <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-purple-100">
                   <Target className="w-8 h-8 text-purple-600" />
                 </div>
-                <h3 className="text-xl font-semibold text-slate-900 mb-4">Access the results where you need them</h3>
+                <h3 className="text-xl font-semibold text-slate-900 mb-4">Access the results where you need them.</h3>
                 <p className="text-slate-600 leading-relaxed mb-4">
                   Make the burnout detector part of your powered workflow by getting the results via a UI, CLI, or MCP.
                 </p>
@@ -260,7 +259,7 @@ export default function LandingPage() {
         <div className="container mt-10">
           <div className="lg:columns-2 gap-12">
             <div className="py-10">
-              <h2 className="text-2xl md:text-3xl text-slate-900 mb-4">Burnout Signals, Backed by Data</h2>
+              <h2 className="text-2xl md:text-3xl text-slate-900 mb-4">Burnout signals, backed by data.</h2>
               <p className="mb-2">
                 Our analysis combines workload pressure, after-hours activity, response time patterns, and communication sentiment to give a holistic view of burnout risk. 
               </p>
@@ -278,7 +277,7 @@ export default function LandingPage() {
           </div>
           <div className="lg:grid grid-cols-2 gap-12 mt-20">
             <div className="py-10 lg:order-last">
-              <h2 className="text-2xl md:text-3xl text-slate-900 mb-4">For Engineers, By Engineers</h2>
+              <h2 className="text-2xl md:text-3xl text-slate-900 mb-4">For engineers, by engineers.</h2>
               <p className="mb-2">
                 On-call engineers and SREs face a disproportionate risk of burnout. At Rootly, we want to help change that.
               </p>
@@ -297,7 +296,7 @@ export default function LandingPage() {
           </div>
           <div className="lg:columns-2 gap-12 mt-20">
             <div className="py-10">
-              <h2 className="text-2xl md:text-3xl text-slate-900 mb-4">Hosted or Self-Hosted</h2>
+              <h2 className="text-2xl md:text-3xl text-slate-900 mb-4">Hosted or self-hosted.</h2>
               <p className="mb-2">
                 The Rootly Burnout Detector is open source, giving you full flexibility. Use the hosted web version for instant setup, or customize it to fit your workflow.</p>
               <p className="mb-2">That’s why we built this as open source, in the open, for the community.</p>
@@ -317,12 +316,12 @@ Skip the UI and pull results directly into your CLI via MCP, or fork the code to
               <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-purple-100">
                 <Flame className="w-8 h-8 text-purple-600" />
               </div>
-              <h2 className="text-2xl md:text-3xl text-slate-900 mb-6">Detect who’s at risk of burnout in your team</h2>
+              <h2 className="text-2xl md:text-3xl text-slate-900 mb-6">Detect who’s at risk of burnout in your team.</h2>
               <div className="flex flex-col justify-center sm:flex-row gap-4 items-center mb-6">
                 <a href="#get-started"
                   className="w-full rounded-full sm:w-auto bg-slate-900 hover:bg-slate-800 text-white px-8 py-4 text-lg"
                 >
-                  Get Started
+                  Get started
                 </a>
                 <a
                   href="https://github.com/Rootly-AI-Labs/rootly-burnout-detector-web/tree/main"
@@ -351,7 +350,7 @@ Skip the UI and pull results directly into your CLI via MCP, or fork the code to
                       className="h-14 w-auto brightness-0 invert"
                     />
                   </a>
-                <span className="text-2xl font-semibold text-white">On-Call Burnout Detector</span>
+                <span className="text-2xl font-semibold text-white">On-call burnout detector</span>
               </div>
             </div>
 
