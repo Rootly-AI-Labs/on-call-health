@@ -3861,11 +3861,11 @@ export default function IntegrationsPage() {
                     </div>
 
                     <div className="border-t pt-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <h4 className="font-medium text-gray-900">
+                      <div className="mb-4">
+                        <h4 className="font-medium text-gray-900 mb-3">
                           Team Members from {integrations.find(i => i.id.toString() === selectedOrganization)?.name}
                         </h4>
-                        <div className="flex items-center space-x-2">
+                        <div className="flex flex-wrap gap-2">
                           <Button
                             onClick={fetchTeamMembers}
                             disabled={loadingTeamMembers || !selectedOrganization}
