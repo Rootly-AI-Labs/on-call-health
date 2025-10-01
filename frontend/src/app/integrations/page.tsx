@@ -2446,14 +2446,6 @@ export default function IntegrationsPage() {
       <header className="bg-white/80 backdrop-blur-sm border-b border-slate-200 sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            {backUrl && (
-              <Link href={backUrl}>
-                <Button variant="ghost" size="sm" className="flex items-center space-x-2">
-                  <ArrowLeft className="w-4 h-4" />
-                  <span>Back</span>
-                </Button>
-              </Link>
-            )}
             <div className="flex items-center space-x-3">
               <h1 className="text-2xl font-bold text-slate-900">Manage Integrations</h1>
               

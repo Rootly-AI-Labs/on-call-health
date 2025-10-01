@@ -291,8 +291,8 @@ class NotificationService:
                 type='survey',
                 title=title,
                 message=message,
-                action_url="/integrations?tab=surveys",
-                action_text="View Survey Settings",
+                action_url="/integrations",
+                action_text="View Integrations",
                 priority='low' if not is_manual else 'normal'
             )
             notifications.append(notification)
