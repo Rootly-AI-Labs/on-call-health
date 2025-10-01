@@ -16,6 +16,7 @@ from ...models import get_db, User, SlackIntegration, UserCorrelation, UserBurno
 from ...auth.dependencies import get_current_user
 from ...auth.integration_oauth import slack_integration_oauth
 from ...core.config import settings
+from ...services.notification_service import NotificationService
 
 router = APIRouter(prefix="/slack", tags=["slack-integration"])
 
@@ -1437,6 +1438,26 @@ async def handle_slack_interactions(
                     logging.info(f"Created new report for user {user_id}")
 
                 db.commit()
+
+                # Notify org admins about survey submission (only for new submissions, not updates)
+                if not is_update:
+                    try:
+                        notification_service = NotificationService(db)
+                        # Get user info for notification
+                        user = db.query(User).filter(User.id == user_id).first()
+                        if user and analysis_id:
+                            # Get analysis for notification context
+                            analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
+                            if analysis:
+                                notification_service.create_survey_submission_notification(
+                                    user=user,
+                                    organization_id=organization_id,
+                                    analysis=analysis
+                                )
+                                logging.info(f"Created survey submission notifications for org {organization_id}")
+                    except Exception as e:
+                        logging.error(f"Failed to create survey submission notifications: {str(e)}")
+                        # Don't fail the survey submission if notification fails
 
                 # Return success response with different message for updates
                 if is_update:

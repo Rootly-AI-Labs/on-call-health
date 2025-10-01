@@ -82,26 +82,40 @@ class NotificationService:
         self.db.commit()
         return notifications
 
-    def create_survey_submitted_notification(self, survey_response, analysis: Analysis) -> List[UserNotification]:
+    def create_survey_submitted_notification(self, user: User, organization_id: int, analysis: Optional[Analysis] = None) -> List[UserNotification]:
         """Notify org admins when someone submits a survey."""
         notifications = []
 
-        # Get org admins for the analysis organization
+        # Get org admins for the organization
         org_admins = self.db.query(User).filter(
-            User.organization_id == analysis.organization_id,
-            User.role.in_(['org_admin', 'super_admin'])
+            User.organization_id == organization_id,
+            User.role.in_(['org_admin', 'super_admin']),
+            User.id != user.id  # Don't notify the user who submitted
         ).all()
+
+        # Build notification message
+        user_name = user.name or user.email
+        title = "📝 New survey response received"
+        message = f"{user_name} submitted a burnout survey response."
+
+        # Set action URL based on whether there's an analysis
+        if analysis:
+            action_url = f"/dashboard?analysis={analysis.id}"
+            action_text = "View Analysis"
+        else:
+            action_url = "/dashboard"
+            action_text = "View Dashboard"
 
         for admin in org_admins:
             notification = UserNotification(
                 user_id=admin.id,
-                organization_id=analysis.organization_id,
+                organization_id=organization_id,
                 type='survey',
-                title="New survey response received",
-                message=f"A team member submitted their burnout survey response.",
-                action_url=f"/analyses/{analysis.id}/responses",
-                action_text="View Responses",
-                analysis_id=analysis.id,
+                title=title,
+                message=message,
+                action_url=action_url,
+                action_text=action_text,
+                analysis_id=analysis.id if analysis else None,
                 priority='normal'
             )
             notifications.append(notification)
