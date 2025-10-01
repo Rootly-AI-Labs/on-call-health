@@ -9,7 +9,7 @@ from .models import create_tables
 from .core.config import settings
 from .core.rate_limiting import limiter, custom_rate_limit_exceeded_handler
 from .middleware.security import security_middleware
-from .api.endpoints import auth, rootly, analysis, analyses, pagerduty, github, slack, llm, mappings, manual_mappings, debug_mappings, migrate, admin, notifications, invitations
+from .api.endpoints import auth, rootly, analysis, analyses, pagerduty, github, slack, llm, mappings, manual_mappings, debug_mappings, migrate, admin, notifications, invitations, surveys
 
 # Create FastAPI application
 app = FastAPI(
@@ -103,6 +103,23 @@ async def startup_event():
     # Temporarily commented out to fix import issues
     # Will add back after fixing imports
     print("ℹ️ Organizations migration temporarily disabled during deployment fix")
+
+    # Start survey scheduler
+    from app.services.survey_scheduler import survey_scheduler
+    from app.database import SessionLocal
+
+    survey_scheduler.start()
+    print("✅ Survey scheduler started")
+
+    # Load existing schedules from database
+    db = SessionLocal()
+    try:
+        survey_scheduler.schedule_organization_surveys(db)
+        print("✅ Loaded survey schedules from database")
+    except Exception as e:
+        print(f"⚠️ Error loading survey schedules: {str(e)}")
+    finally:
+        db.close()
     
 
 # Include API routers
@@ -121,3 +138,4 @@ app.include_router(migrate.router, prefix="/api/migrate", tags=["migration"])
 app.include_router(admin.router, prefix="/api", tags=["admin"])
 app.include_router(notifications.router, prefix="/api", tags=["notifications"])
 app.include_router(invitations.router, prefix="/api", tags=["invitations"])
+app.include_router(surveys.router, prefix="/api", tags=["surveys"])

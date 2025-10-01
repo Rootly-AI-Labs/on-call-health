@@ -13,6 +13,7 @@ import pytz
 from app.models.survey_schedule import SurveySchedule, UserSurveyPreference
 from app.models.user_correlation import UserCorrelation
 from app.models.slack_integration import SlackIntegration, SlackWorkspaceMapping
+from app.models.user_burnout_report import UserBurnoutReport
 from app.services.slack_dm_sender import SlackDMSender
 
 logger = logging.getLogger(__name__)
