@@ -29,6 +29,8 @@ interface ManualSurveyDeliveryModalProps {
   onSuccess?: () => void;
 }
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
 export default function ManualSurveyDeliveryModal({
   isOpen,
   onClose,
@@ -44,11 +46,11 @@ export default function ManualSurveyDeliveryModal({
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/survey-schedule/manual-delivery', {
+      const response = await fetch(`${API_BASE}/api/survey-schedule/manual-delivery`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
         },
         body: JSON.stringify({ confirmed: false })
       });
@@ -73,11 +75,11 @@ export default function ManualSurveyDeliveryModal({
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/survey-schedule/manual-delivery', {
+      const response = await fetch(`${API_BASE}/api/survey-schedule/manual-delivery`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
         },
         body: JSON.stringify({ confirmed: true })
       });
