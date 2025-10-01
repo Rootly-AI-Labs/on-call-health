@@ -8,13 +8,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
-from app.database import get_db
-from app.models.survey_schedule import SurveySchedule, UserSurveyPreference
-from app.models.user import User
-from app.core.auth import get_current_user
-from app.services.survey_scheduler import survey_scheduler
-from app.services.notification_service import NotificationService
-from app.models.user_notification import UserNotification
+from ...models import get_db, User
+from ...models.survey_schedule import SurveySchedule, UserSurveyPreference
+from ...models.user_notification import UserNotification
+from ...core.auth import get_current_user
+from ...services.survey_scheduler import survey_scheduler
+from ...services.notification_service import NotificationService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
