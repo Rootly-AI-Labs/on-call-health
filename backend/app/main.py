@@ -106,7 +106,7 @@ async def startup_event():
 
     # Start survey scheduler
     from app.services.survey_scheduler import survey_scheduler
-    from app.database import SessionLocal
+    from app.models import SessionLocal
 
     survey_scheduler.start()
     print("✅ Survey scheduler started")
