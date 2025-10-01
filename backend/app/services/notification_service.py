@@ -270,18 +270,19 @@ class NotificationService:
         """
         notifications = []
 
-        # Get org admins
+        # Get org admins (include the person who triggered - they want confirmation)
         org_admins = self.db.query(User).filter(
             User.organization_id == organization_id,
-            User.role == "admin"
+            User.role.in_(['org_admin', 'super_admin'])
         ).all()
 
-        if is_manual:
-            title = "📤 Manual survey delivery sent"
-            message = f"{triggered_by.name or triggered_by.email} manually sent burnout surveys to {recipient_count} team members."
+        if is_manual and triggered_by:
+            title = "📤 Survey delivery sent"
+            triggerer_name = triggered_by.name or triggered_by.email
+            message = f"{triggerer_name} sent burnout surveys to {recipient_count} team members via Slack."
         else:
             title = "📅 Scheduled surveys sent"
-            message = f"Daily burnout surveys were automatically sent to {recipient_count} team members."
+            message = f"Daily burnout surveys were automatically sent to {recipient_count} team members via Slack."
 
         for admin in org_admins:
             notification = UserNotification(
