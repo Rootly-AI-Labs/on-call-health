@@ -239,6 +239,67 @@ def run_migrations():
             else:
                 logger.info("⏭️  Migration 5 already applied")
 
+            # Migration 6: Add survey schedule and preferences tables
+            migration_6_exists = conn.execute(text(
+                "SELECT COUNT(*) FROM migrations WHERE name = 'add_survey_schedule_tables'"
+            )).scalar()
+
+            if migration_6_exists == 0:
+                logger.info("🔧 Running Migration 6: Add survey schedule and preferences tables...")
+
+                # Create survey_schedules table
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS survey_schedules (
+                        id SERIAL PRIMARY KEY,
+                        organization_id INTEGER NOT NULL REFERENCES organizations(id),
+                        enabled BOOLEAN DEFAULT TRUE,
+                        send_time TIME NOT NULL,
+                        timezone VARCHAR(50) DEFAULT 'America/New_York',
+                        send_weekdays_only BOOLEAN DEFAULT TRUE,
+                        send_reminder BOOLEAN DEFAULT TRUE,
+                        reminder_time TIME,
+                        reminder_hours_after INTEGER DEFAULT 5,
+                        message_template VARCHAR(500) DEFAULT 'Good morning! 🌅
+
+Quick 2-minute check-in: How are you feeling today?
+
+Your feedback helps us support team health and prevent burnout.',
+                        reminder_message_template VARCHAR(500) DEFAULT 'Quick reminder 🔔
+
+Haven''t heard from you yet today. Take 2 minutes to check in?
+
+Your wellbeing matters to us.',
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """))
+
+                # Create user_survey_preferences table
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS user_survey_preferences (
+                        id SERIAL PRIMARY KEY,
+                        user_id INTEGER NOT NULL UNIQUE REFERENCES users(id),
+                        receive_daily_surveys BOOLEAN DEFAULT TRUE,
+                        receive_slack_dms BOOLEAN DEFAULT TRUE,
+                        receive_reminders BOOLEAN DEFAULT TRUE,
+                        custom_send_time TIME,
+                        custom_timezone VARCHAR(50),
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """))
+
+                conn.commit()
+
+                # Mark migration as complete
+                conn.execute(text(
+                    "INSERT INTO migrations (name, status) VALUES ('add_survey_schedule_tables', 'completed')"
+                ))
+                conn.commit()
+                logger.info("✅ Migration 6 completed: Added survey schedule and preferences tables")
+            else:
+                logger.info("⏭️  Migration 6 already applied")
+
             return True
 
     except Exception as e:
