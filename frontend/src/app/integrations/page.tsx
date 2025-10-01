@@ -456,17 +456,19 @@ export default function IntegrationsPage() {
     const userName = localStorage.getItem('user_name')
     const userEmail = localStorage.getItem('user_email')
     const userAvatar = localStorage.getItem('user_avatar')
-    
-    
+    const userRole = localStorage.getItem('user_role')
+
+
     // Check for valid, non-empty strings (not "null", "undefined", or empty)
     const validUserName = userName && userName !== 'null' && userName !== 'undefined' && userName.trim() !== ''
     const validUserEmail = userEmail && userEmail !== 'null' && userEmail !== 'undefined' && userEmail.trim() !== ''
-    
+
     if (validUserName && validUserEmail) {
       setUserInfo({
         name: userName,
         email: userEmail,
-        avatar: (userAvatar && userAvatar !== 'null' && userAvatar !== 'undefined') ? userAvatar : undefined
+        avatar: (userAvatar && userAvatar !== 'null' && userAvatar !== 'undefined') ? userAvatar : undefined,
+        role: (userRole && userRole !== 'null' && userRole !== 'undefined') ? userRole : 'member'
       })
     } else {
       
