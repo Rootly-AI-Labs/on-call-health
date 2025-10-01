@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from ...models import get_db, User
 from ...models.survey_schedule import SurveySchedule, UserSurveyPreference
 from ...models.user_notification import UserNotification
-from ...core.auth import get_current_user
+from ...auth.dependencies import get_current_user
 from ...services.survey_scheduler import survey_scheduler
 from ...services.notification_service import NotificationService
 
