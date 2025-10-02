@@ -259,9 +259,9 @@ def run_migrations():
                         send_reminder BOOLEAN DEFAULT TRUE,
                         reminder_time TIME,
                         reminder_hours_after INTEGER DEFAULT 5,
-                        message_template VARCHAR(500) DEFAULT 'Good morning! 🌅
+                        message_template VARCHAR(500) DEFAULT 'Hi there! 👋
 
-Quick 2-minute check-in: How are you feeling today?
+Quick check-in: How are you doing today?
 
 Your feedback helps us support team health and prevent burnout.',
                         reminder_message_template VARCHAR(500) DEFAULT 'Quick reminder 🔔

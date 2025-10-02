@@ -39,8 +39,8 @@ class SlackDMSender:
             # Default message if none provided
             if not message:
                 message = (
-                    "Good morning! 🌅\n\n"
-                    "Quick 2-minute check-in: How are you feeling today?\n\n"
+                    "Hi there! 👋\n\n"
+                    "Quick check-in: How are you doing today?\n\n"
                     "Your feedback helps us support team health and prevent burnout."
                 )
 
