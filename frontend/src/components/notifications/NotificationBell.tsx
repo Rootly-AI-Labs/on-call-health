@@ -46,8 +46,8 @@ export function NotificationBell() {
     return () => scrollElement.removeEventListener('scroll', handleScroll)
   }, [isLoading, hasMore])
 
-  if (!isOpen) {
-    return (
+  return (
+    <>
       <Button
         variant="ghost"
         size="sm"
@@ -64,11 +64,9 @@ export function NotificationBell() {
           </Badge>
         )}
       </Button>
-    )
-  }
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/20 p-4 backdrop-blur-sm">
+      {isOpen && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/20 p-4 backdrop-blur-sm">
       <div className="w-full max-w-2xl animate-in fade-in slide-in-from-top-4 duration-300">
         <div className="rounded-xl border border-border bg-card shadow-2xl">
           {/* Header */}
@@ -150,7 +148,9 @@ export function NotificationBell() {
           </div>
         </div>
       </div>
-    </div>
+        </div>
+      )}
+    </>
   )
 }
 
