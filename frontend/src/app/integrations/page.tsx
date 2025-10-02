@@ -3292,7 +3292,7 @@ export default function IntegrationsPage() {
                   </div>
                 </CardContent>
               </Card>
-            ) : filteredIntegrations.length > 0 ? (
+            ) : integrations.length > 0 && filteredIntegrations.length > 0 ? (
               <Card className="max-w-2xl mx-auto">
                 <CardContent className="p-6 space-y-4">
                   {filteredIntegrations.map((integration) => (
