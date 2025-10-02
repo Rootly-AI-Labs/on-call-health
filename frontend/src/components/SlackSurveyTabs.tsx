@@ -308,24 +308,27 @@ export function SlackSurveyTabs({
                 Team Members from {integrations.find(i => i.id.toString() === selectedOrganization)?.name}
               </h4>
               <div className="flex flex-wrap gap-2 justify-center">
-                <Button
-                  onClick={fetchTeamMembers}
-                  disabled={loadingTeamMembers || !selectedOrganization}
-                  size="sm"
-                  className="flex items-center space-x-2 bg-purple-600 hover:bg-purple-700 text-white"
-                >
-                  {loadingTeamMembers ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Syncing...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Database className="w-4 h-4" />
-                      <span>Sync Members</span>
-                    </>
-                  )}
-                </Button>
+                {/* Hide Sync Members button for beta integrations (can't be synced) */}
+                {!selectedOrganization.startsWith('beta-') && (
+                  <Button
+                    onClick={syncUsersToCorrelation}
+                    disabled={loadingTeamMembers || !selectedOrganization}
+                    size="sm"
+                    className="flex items-center space-x-2 bg-purple-600 hover:bg-purple-700 text-white"
+                  >
+                    {loadingTeamMembers ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Syncing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Database className="w-4 h-4" />
+                        <span>Sync Members</span>
+                      </>
+                    )}
+                  </Button>
+                )}
                 <Button
                   onClick={fetchSyncedUsers}
                   disabled={loadingSyncedUsers}
@@ -347,7 +350,11 @@ export function SlackSurveyTabs({
               </div>
 
               <div className="text-sm text-gray-600 mt-4">
-                <p className="mb-2">Click "Sync Members" to load users from your organization who can submit burnout surveys.</p>
+                {selectedOrganization.startsWith('beta-') ? (
+                  <p className="mb-2">Click "View Synced Users" to see team members who can submit burnout surveys.</p>
+                ) : (
+                  <p className="mb-2">Click "Sync Members" to load users from your organization who can submit burnout surveys.</p>
+                )}
               </div>
             </div>
           )}
