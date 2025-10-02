@@ -20,6 +20,7 @@ export interface NotificationResponse {
   notifications: Notification[]
   unread_count: number
   total_count: number
+  has_more: boolean
 }
 
 export interface NotificationActions {

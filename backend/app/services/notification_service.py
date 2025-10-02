@@ -187,8 +187,8 @@ class NotificationService:
         self.db.commit()
         return notification
 
-    def get_user_notifications(self, user: User, limit: int = 20) -> List[UserNotification]:
-        """Get notifications for a user."""
+    def get_user_notifications(self, user: User, limit: int = 20, offset: int = 0) -> List[UserNotification]:
+        """Get notifications for a user with pagination support."""
         notifications = self.db.query(UserNotification).filter(
             ((UserNotification.user_id == user.id) |
              (UserNotification.email == user.email)),
@@ -196,7 +196,7 @@ class NotificationService:
         ).order_by(
             UserNotification.priority.desc(),
             UserNotification.created_at.desc()
-        ).limit(limit).all()
+        ).offset(offset).limit(limit).all()
 
         return notifications
 
@@ -206,6 +206,14 @@ class NotificationService:
             ((UserNotification.user_id == user.id) |
              (UserNotification.email == user.email)),
             UserNotification.status == 'unread'
+        ).count()
+
+    def get_total_count(self, user: User) -> int:
+        """Get total count of non-dismissed notifications for a user."""
+        return self.db.query(UserNotification).filter(
+            ((UserNotification.user_id == user.id) |
+             (UserNotification.email == user.email)),
+            UserNotification.status.notin_(['dismissed', 'acted'])
         ).count()
 
     def mark_as_read(self, notification_id: int, user: User) -> bool:

@@ -51,6 +51,7 @@ export default function ManualSurveyDeliveryModal({
   const [previewData, setPreviewData] = useState<PreviewResponse | null>(null);
   const [successData, setSuccessData] = useState<SuccessResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [selectedRecipients, setSelectedRecipients] = useState<Set<string>>(new Set());
 
   const fetchPreview = async () => {
     setLoading(true);
@@ -72,6 +73,9 @@ export default function ManualSurveyDeliveryModal({
 
       const data = await response.json();
       setPreviewData(data);
+      // Select all recipients by default
+      const allEmails = new Set<string>(data.recipients.map((r: Recipient) => r.email));
+      setSelectedRecipients(allEmails);
       setStep('confirm');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -81,17 +85,44 @@ export default function ManualSurveyDeliveryModal({
     }
   };
 
+  const toggleRecipient = (email: string) => {
+    setSelectedRecipients(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(email)) {
+        newSet.delete(email);
+      } else {
+        newSet.add(email);
+      }
+      return newSet;
+    });
+  };
+
+  const selectAll = () => {
+    if (previewData) {
+      const allEmails = new Set(previewData.recipients.map(r => r.email));
+      setSelectedRecipients(allEmails);
+    }
+  };
+
+  const deselectAll = () => {
+    setSelectedRecipients(new Set());
+  };
+
   const confirmDelivery = async () => {
     setLoading(true);
     setError(null);
     try {
+      const selectedEmails = Array.from(selectedRecipients);
       const response = await fetch(`${API_BASE}/api/survey-schedule/manual-delivery`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
         },
-        body: JSON.stringify({ confirmed: true })
+        body: JSON.stringify({
+          confirmed: true,
+          recipient_emails: selectedEmails
+        })
       });
 
       if (!response.ok) {
@@ -172,7 +203,7 @@ export default function ManualSurveyDeliveryModal({
                 <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5" />
                 <div>
                   <p className="font-medium text-gray-900">
-                    {previewData.message}
+                    This will send surveys to {selectedRecipients.size} team member{selectedRecipients.size !== 1 ? 's' : ''} via Slack DM.
                   </p>
                   <p className="text-sm text-gray-600 mt-1">
                     This action cannot be undone.
@@ -181,13 +212,36 @@ export default function ManualSurveyDeliveryModal({
               </div>
 
               <div>
-                <h3 className="font-medium text-gray-900 mb-3">
-                  Recipients ({previewData.recipient_count})
-                </h3>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-medium text-gray-900">
+                    Recipients ({selectedRecipients.size})
+                  </h3>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={selectAll}
+                      className="text-sm text-purple-600 hover:text-purple-700 font-medium"
+                    >
+                      Select All
+                    </button>
+                    <span className="text-gray-400">|</span>
+                    <button
+                      onClick={deselectAll}
+                      className="text-sm text-purple-600 hover:text-purple-700 font-medium"
+                    >
+                      Deselect All
+                    </button>
+                  </div>
+                </div>
                 <div className="bg-gray-50 rounded-lg p-4 max-h-64 overflow-y-auto">
                   <ul className="space-y-2">
                     {previewData.recipients.map((recipient, index) => (
                       <li key={index} className="flex items-center space-x-3 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={selectedRecipients.has(recipient.email)}
+                          onChange={() => toggleRecipient(recipient.email)}
+                          className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                        />
                         <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-medium">
                           {recipient.name.charAt(0).toUpperCase()}
                         </div>
@@ -266,7 +320,7 @@ export default function ManualSurveyDeliveryModal({
               </button>
               <button
                 onClick={confirmDelivery}
-                disabled={loading}
+                disabled={loading || selectedRecipients.size === 0}
                 className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
               >
                 <Send className="w-4 h-4" />

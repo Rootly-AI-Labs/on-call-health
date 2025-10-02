@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Dialog,
   DialogContent,
@@ -93,6 +94,7 @@ import { toast } from "sonner"
 import { MappingDrawer } from "@/components/mapping-drawer"
 import { NotificationBell } from "@/components/notifications"
 import ManualSurveyDeliveryModal from "@/components/ManualSurveyDeliveryModal"
+import { SlackSurveyTabs } from "@/components/SlackSurveyTabs"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -1917,6 +1919,12 @@ export default function IntegrationsPage() {
   // Fetch synced users from database
   const fetchSyncedUsers = async () => {
     console.log('Fetching synced users from database')
+
+    if (!selectedOrganization) {
+      toast.error('Please select an organization first')
+      return
+    }
+
     setLoadingSyncedUsers(true)
 
     try {
@@ -1926,7 +1934,7 @@ export default function IntegrationsPage() {
         return
       }
 
-      const response = await fetch(`${API_BASE}/rootly/synced-users`, {
+      const response = await fetch(`${API_BASE}/rootly/synced-users?integration_id=${selectedOrganization}`, {
         headers: {
           'Authorization': `Bearer ${authToken}`,
           'Content-Type': 'application/json'
@@ -3537,7 +3545,7 @@ export default function IntegrationsPage() {
           </div>
 
           <div className="max-w-2xl mx-auto space-y-6">
-            {/* Slack Slash Command Setup */}
+            {/* Slack Survey with Tabs */}
             <Card className="border-2 border-purple-200 bg-purple-50/30">
               <CardHeader className="pb-4">
                 <div className="flex items-center justify-between">
@@ -3555,14 +3563,13 @@ export default function IntegrationsPage() {
                       </svg>
                     </div>
                     <div>
-                      <CardTitle className="text-lg text-gray-900">Slack Slash Command</CardTitle>
+                      <CardTitle className="text-lg text-gray-900">Slack Survey</CardTitle>
                       <p className="text-sm text-gray-600">Let team members report burnout scores directly in Slack</p>
                     </div>
                   </div>
 
                   {/* Slack Connection Status */}
                   {slackIntegration ? (
-                    // Connected Status Display
                     <div className="inline-flex items-center space-x-2 bg-green-100 text-green-800 px-4 py-2 rounded-lg text-sm font-medium">
                       <CheckCircle className="w-4 h-4" />
                       <span>Connected</span>
@@ -3624,6 +3631,30 @@ export default function IntegrationsPage() {
                     </div>
                   )}
                 </div>
+              </CardHeader>
+              <CardContent>
+                <SlackSurveyTabs
+                  slackIntegration={slackIntegration}
+                  selectedOrganization={selectedOrganization}
+                  integrations={integrations}
+                  teamMembers={teamMembers}
+                  loadingTeamMembers={loadingTeamMembers}
+                  loadingSyncedUsers={loadingSyncedUsers}
+                  userInfo={userInfo}
+                  fetchTeamMembers={fetchTeamMembers}
+                  syncUsersToCorrelation={syncUsersToCorrelation}
+                  fetchSyncedUsers={fetchSyncedUsers}
+                  setShowManualSurveyModal={setShowManualSurveyModal}
+                  loadSlackPermissions={loadSlackPermissions}
+                  toast={toast}
+                />
+              </CardContent>
+            </Card>
+
+            {/* OLD SLACK SURVEY CONTENT - TO BE REMOVED AFTER TESTING */}
+            <Card className="border-2 border-purple-200 bg-purple-50/30" style={{display: 'none'}}>
+              <CardHeader className="pb-4">
+                <div className="text-sm text-gray-500">Old content hidden - remove after testing</div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="bg-white rounded-lg border p-4 space-y-4">
@@ -3807,9 +3838,9 @@ export default function IntegrationsPage() {
               </CardContent>
             </Card>
 
-            {/* Team Members for Survey Correlation */}
-            {slackIntegration && selectedOrganization && (
-              <Card className="border-2 border-purple-200 bg-purple-50/30">
+            {/* Team Members for Survey Correlation - NOW IN TABS ABOVE */}
+            {false && slackIntegration && selectedOrganization && (
+              <Card className="border-2 border-purple-200 bg-purple-50/30" style={{display: 'none'}}>
                 <CardHeader className="pb-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
@@ -3940,49 +3971,6 @@ export default function IntegrationsPage() {
                 </CardContent>
               </Card>
             )}
-
-            {/* Future: Web Survey Section (Placeholder) */}
-            <Card className="border-2 border-gray-200 bg-gray-50/30">
-              <CardHeader className="pb-4">
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
-                    <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <CardTitle className="text-lg text-gray-700">Web Survey Sharing</CardTitle>
-                    <p className="text-sm text-gray-500">Share survey links for detailed burnout assessment</p>
-                  </div>
-                  <Badge variant="secondary" className="ml-auto">Coming Soon</Badge>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-6">
-                  <p className="text-gray-600 mb-4">Generate shareable survey links that team members can complete at their own pace.</p>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                    <div className="flex items-center space-x-2 text-gray-500">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                      </svg>
-                      <span>Shareable survey URLs</span>
-                    </div>
-                    <div className="flex items-center space-x-2 text-gray-500">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                      </svg>
-                      <span>Anonymous responses</span>
-                    </div>
-                    <div className="flex items-center space-x-2 text-gray-500">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                      </svg>
-                      <span>Detailed analytics</span>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
           </div>
         </div>
 
@@ -5978,25 +5966,6 @@ export default function IntegrationsPage() {
                   <>
                     <Database className="w-4 h-4" />
                     <span>Sync to Survey System</span>
-                  </>
-                )}
-              </Button>
-              <Button
-                onClick={fetchSyncedUsers}
-                disabled={loadingSyncedUsers}
-                size="sm"
-                variant="outline"
-                className="flex items-center space-x-2"
-              >
-                {loadingSyncedUsers ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Loading...</span>
-                  </>
-                ) : (
-                  <>
-                    <Users2 className="w-4 h-4" />
-                    <span>View Synced Users</span>
                   </>
                 )}
               </Button>

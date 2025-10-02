@@ -8,14 +8,19 @@ export function useNotifications() {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
+  const [offset, setOffset] = useState(0)
   const { toast } = useToast()
 
+  const LIMIT = 20
+
   // Fetch notifications from API
-  const fetchNotifications = async () => {
+  const fetchNotifications = async (loadMore = false) => {
     try {
       setIsLoading(true)
+      const currentOffset = loadMore ? offset : 0
       const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-      const response = await fetch(`${API_BASE}/api/notifications/`, {
+      const response = await fetch(`${API_BASE}/api/notifications/?limit=${LIMIT}&offset=${currentOffset}`, {
         credentials: 'include',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
@@ -24,8 +29,15 @@ export function useNotifications() {
 
       if (response.ok) {
         const data: NotificationResponse = await response.json()
-        setNotifications(data.notifications)
+        if (loadMore) {
+          setNotifications(prev => [...prev, ...data.notifications])
+        } else {
+          setNotifications(data.notifications)
+          setOffset(0)
+        }
         setUnreadCount(data.unread_count)
+        setHasMore(data.has_more || false)
+        setOffset(currentOffset + data.notifications.length)
       } else {
         console.error('Failed to fetch notifications:', response.status)
       }
@@ -33,6 +45,13 @@ export function useNotifications() {
       console.error('Error fetching notifications:', error)
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  // Load more notifications for infinite scroll
+  const loadMoreNotifications = async () => {
+    if (!isLoading && hasMore) {
+      await fetchNotifications(true)
     }
   }
 
@@ -151,7 +170,9 @@ export function useNotifications() {
     notifications,
     unreadCount,
     isLoading,
+    hasMore,
     fetchNotifications,
+    loadMoreNotifications,
     markAsRead,
     dismiss,
     markAllAsRead,

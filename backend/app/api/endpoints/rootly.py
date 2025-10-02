@@ -1040,20 +1040,28 @@ async def sync_integration_users(
 
 @router.get("/synced-users")
 async def get_synced_users(
+    integration_id: str = None,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """
     Get all synced users from UserCorrelation table for the current user.
     These are team members who can submit burnout surveys via Slack.
+    Optionally filter by integration_id to show only users from a specific organization.
     """
     try:
         from app.models import UserCorrelation
 
         # Fetch all user correlations for this user
-        correlations = db.query(UserCorrelation).filter(
+        query = db.query(UserCorrelation).filter(
             UserCorrelation.user_id == current_user.id
-        ).order_by(UserCorrelation.name).all()
+        )
+
+        # Filter by integration_id if provided
+        if integration_id:
+            query = query.filter(UserCorrelation.integration_id == integration_id)
+
+        correlations = query.order_by(UserCorrelation.name).all()
 
         # Format the response
         synced_users = []

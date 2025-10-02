@@ -1,5 +1,5 @@
-import React, { useState } from 'react'
-import { Bell } from 'lucide-react'
+import React, { useState, useRef, useEffect } from 'react'
+import { Bell, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -19,17 +19,40 @@ export function NotificationBell() {
     notifications,
     unreadCount,
     isLoading,
+    hasMore,
+    loadMoreNotifications,
     markAsRead,
     dismiss,
     markAllAsRead,
     handleAction
   } = useNotifications()
+  const scrollRef = useRef<HTMLDivElement>(null)
 
   // Handle notification action and close panel
   const onAction = async (notification: any) => {
     await handleAction(notification)
     setIsOpen(false)
   }
+
+  // Handle scroll for infinite loading
+  const handleScroll = () => {
+    if (!scrollRef.current || isLoading || !hasMore) return
+
+    const { scrollTop, scrollHeight, clientHeight } = scrollRef.current
+
+    // Load more when scrolled to within 100px of bottom
+    if (scrollTop + clientHeight >= scrollHeight - 100) {
+      loadMoreNotifications()
+    }
+  }
+
+  useEffect(() => {
+    const scrollElement = scrollRef.current
+    if (!scrollElement) return
+
+    scrollElement.addEventListener('scroll', handleScroll)
+    return () => scrollElement.removeEventListener('scroll', handleScroll)
+  }, [isLoading, hasMore])
 
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
@@ -76,8 +99,8 @@ export function NotificationBell() {
         </SheetHeader>
 
         {/* Notifications List */}
-        <div className="flex-1 overflow-y-auto p-6">
-          {isLoading ? (
+        <div ref={scrollRef} className="flex-1 overflow-y-auto p-6">
+          {isLoading && notifications.length === 0 ? (
             <div className="text-center text-gray-500 py-12">
               <Bell className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <p className="text-sm">Loading notifications...</p>
@@ -89,36 +112,34 @@ export function NotificationBell() {
               <p className="text-xs mt-2">You're all caught up! 🎉</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {notifications.map((notification) => (
-                <NotificationItem
-                  key={notification.id}
-                  notification={notification}
-                  onRead={markAsRead}
-                  onDismiss={dismiss}
-                  onAction={onAction}
-                />
-              ))}
-            </div>
+            <>
+              <div className="space-y-3">
+                {notifications.map((notification) => (
+                  <NotificationItem
+                    key={notification.id}
+                    notification={notification}
+                    onRead={markAsRead}
+                    onDismiss={dismiss}
+                    onAction={onAction}
+                  />
+                ))}
+              </div>
+              {/* Loading indicator for infinite scroll */}
+              {isLoading && (
+                <div className="flex justify-center items-center py-4">
+                  <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+                  <span className="ml-2 text-sm text-gray-500">Loading more...</span>
+                </div>
+              )}
+              {/* End of list indicator */}
+              {!hasMore && notifications.length > 0 && (
+                <div className="text-center py-4 text-sm text-gray-400">
+                  No more notifications
+                </div>
+              )}
+            </>
           )}
         </div>
-
-        {/* Footer */}
-        {notifications.length > 0 && (
-          <div className="border-t border-gray-200 p-4 text-center">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-sm text-gray-500"
-              onClick={() => {
-                // Could navigate to full notifications page
-                setIsOpen(false)
-              }}
-            >
-              View all notifications
-            </Button>
-          </div>
-        )}
       </SheetContent>
     </Sheet>
   )
