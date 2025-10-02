@@ -5750,7 +5750,7 @@ export default function IntegrationsPage() {
                 <Mail className="w-4 h-4" />
                 <span>Invite New Member</span>
               </h3>
-              <div className="space-y-4">
+              <div className="space-y-4 max-w-md">
                 <div>
                   <label htmlFor="invite-email" className="block text-sm font-medium text-gray-700 mb-1">
                     Email Address
@@ -5761,7 +5761,6 @@ export default function IntegrationsPage() {
                     placeholder="Enter email address"
                     value={inviteEmail}
                     onChange={(e) => setInviteEmail(e.target.value)}
-                    className="w-full"
                   />
                 </div>
                 <div>
@@ -5782,7 +5781,6 @@ export default function IntegrationsPage() {
                 <Button
                   onClick={handleInvite}
                   disabled={isInviting || !inviteEmail.trim()}
-                  className="w-full"
                 >
                   {isInviting ? (
                     <>
