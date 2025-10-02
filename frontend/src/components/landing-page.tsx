@@ -78,9 +78,9 @@ export default function LandingPage() {
                   <Image 
                     src="/images/rootly-ai-logo.png" 
                     alt="Rootly AI" 
-                    width={160} 
-                    height={64}
-                    className="h-14 w-auto"
+                    width={321} 
+                    height={129}
+                    className="w-full"
                   />
                 </a>
               </div>
@@ -347,7 +347,7 @@ Skip the UI and pull results directly into your CLI via MCP, or fork the code to
                       alt="Rootly AI" 
                       width={160} 
                       height={64}
-                      className="h-14 w-auto brightness-0 invert"
+                      className="w-full brightness-0 invert"
                     />
                   </a>
                 <span className="text-2xl font-semibold text-white">On-call burnout detector</span>
