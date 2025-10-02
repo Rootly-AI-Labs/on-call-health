@@ -1948,8 +1948,8 @@ export default function IntegrationsPage() {
         setShowSyncedUsers(true)
         setTeamMembersDrawerOpen(true)
 
-        // If no users found, automatically sync them
-        if (users.length === 0) {
+        // If no users found, automatically sync them (but not for beta integrations)
+        if (users.length === 0 && !selectedOrganization.startsWith('beta-')) {
           toast.info('No synced users found. Syncing now...')
           setLoadingSyncedUsers(false) // Reset loading state before syncing
           await syncUsersToCorrelation()
@@ -1957,7 +1957,11 @@ export default function IntegrationsPage() {
           return
         }
 
-        toast.success(`Found ${data.total} synced users`)
+        if (users.length === 0) {
+          toast.info('Beta integrations show users from shared access. Use "Sync Members" with your own integration to enable survey submissions.')
+        } else {
+          toast.success(`Found ${data.total} synced users`)
+        }
       } else {
         const errorData = await response.json()
         throw new Error(errorData.detail || 'Failed to fetch synced users')
