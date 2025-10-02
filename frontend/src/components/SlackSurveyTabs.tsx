@@ -1,8 +1,11 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { CheckCircle, Users, Send, RefreshCw, Database, Users2, Loader2, Building } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
+import { CheckCircle, Users, Send, RefreshCw, Database, Users2, Loader2, Building, Clock } from "lucide-react"
 
 interface SlackSurveyTabsProps {
   slackIntegration: any
@@ -49,6 +52,77 @@ export function SlackSurveyTabs({
   toast
 }: SlackSurveyTabsProps) {
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+
+  // Schedule state
+  const [scheduleEnabled, setScheduleEnabled] = useState(false)
+  const [scheduleTime, setScheduleTime] = useState('09:00')
+  const [loadingSchedule, setLoadingSchedule] = useState(false)
+  const [savingSchedule, setSavingSchedule] = useState(false)
+
+  // Load schedule on mount
+  useEffect(() => {
+    if (userInfo?.organization_id) {
+      loadSchedule()
+    }
+  }, [userInfo?.organization_id])
+
+  const loadSchedule = async () => {
+    setLoadingSchedule(true)
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      const response = await fetch(`${API_BASE}/surveys/survey-schedule`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`
+        }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        if (data.enabled !== undefined) {
+          setScheduleEnabled(data.enabled)
+          setScheduleTime(data.send_time || '09:00')
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load schedule:', error)
+    } finally {
+      setLoadingSchedule(false)
+    }
+  }
+
+  const saveSchedule = async () => {
+    setSavingSchedule(true)
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      const response = await fetch(`${API_BASE}/surveys/survey-schedule`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({
+          enabled: scheduleEnabled,
+          send_time: scheduleTime,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          send_weekdays_only: true,
+          send_reminder: false,
+          reminder_hours_after: 5
+        })
+      })
+
+      if (response.ok) {
+        toast.success('Schedule saved successfully')
+      } else {
+        const error = await response.json()
+        toast.error(error.detail || 'Failed to save schedule')
+      }
+    } catch (error) {
+      console.error('Failed to save schedule:', error)
+      toast.error('Failed to save schedule')
+    } finally {
+      setSavingSchedule(false)
+    }
+  }
 
   const handleSlackConnect = () => {
     const clientId = process.env.NEXT_PUBLIC_SLACK_CLIENT_ID
@@ -401,10 +475,64 @@ export function SlackSurveyTabs({
           )}
 
           <div className="mt-6 border-t pt-4">
-            <h5 className="text-sm font-medium text-gray-700 mb-2">Scheduling (Coming Soon)</h5>
-            <p className="text-xs text-gray-500">
-              Automated survey delivery on a schedule will be available in a future update.
-            </p>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h5 className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                  <Clock className="w-4 h-4" />
+                  Automated Schedule
+                </h5>
+                <p className="text-xs text-gray-500 mt-1">
+                  Send surveys every weekday at a specific time
+                </p>
+              </div>
+              <Switch
+                checked={scheduleEnabled}
+                onCheckedChange={setScheduleEnabled}
+                disabled={!userInfo || (userInfo.role !== 'org_admin' && userInfo.role !== 'super_admin') || savingSchedule}
+              />
+            </div>
+
+            {scheduleEnabled && (
+              <div className="space-y-3 mt-4 p-3 bg-gray-50 rounded-md">
+                <div>
+                  <Label htmlFor="schedule-time" className="text-sm text-gray-700">
+                    Delivery Time (Your Local Time)
+                  </Label>
+                  <input
+                    id="schedule-time"
+                    type="time"
+                    value={scheduleTime}
+                    onChange={(e) => setScheduleTime(e.target.value)}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
+                    disabled={savingSchedule}
+                  />
+                </div>
+
+                <div className="text-xs text-gray-600 bg-blue-50 border border-blue-100 rounded-md p-2">
+                  <p className="font-medium text-blue-900 mb-1">Schedule Details:</p>
+                  <ul className="space-y-1 ml-2">
+                    <li>• Sends Monday through Friday</li>
+                    <li>• Skips weekends automatically</li>
+                    <li>• Time: {scheduleTime || '09:00'} in your local timezone</li>
+                  </ul>
+                </div>
+
+                <Button
+                  onClick={saveSchedule}
+                  disabled={savingSchedule}
+                  className="w-full"
+                  size="sm"
+                >
+                  {savingSchedule ? 'Saving...' : 'Save Schedule'}
+                </Button>
+              </div>
+            )}
+
+            {!userInfo || (userInfo.role !== 'org_admin' && userInfo.role !== 'super_admin') ? (
+              <p className="text-xs text-gray-500 mt-2">
+                Only organization admins can configure automated schedules.
+              </p>
+            ) : null}
           </div>
         </div>
       </TabsContent>
