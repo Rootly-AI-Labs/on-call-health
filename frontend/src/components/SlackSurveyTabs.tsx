@@ -495,17 +495,96 @@ export function SlackSurveyTabs({
             {scheduleEnabled && (
               <div className="space-y-3 mt-4 p-3 bg-gray-50 rounded-md">
                 <div>
-                  <Label htmlFor="schedule-time" className="text-sm text-gray-700">
+                  <Label className="text-sm text-gray-700">
                     Delivery Time (Your Local Time)
                   </Label>
-                  <input
-                    id="schedule-time"
-                    type="time"
-                    value={scheduleTime}
-                    onChange={(e) => setScheduleTime(e.target.value)}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
-                    disabled={savingSchedule}
-                  />
+                  <div className="mt-2 flex items-center justify-center gap-3 p-4 bg-white rounded-lg border border-gray-200">
+                    {/* Hour Scroller */}
+                    <div className="flex flex-col items-center">
+                      <button
+                        onClick={() => {
+                          const [hour, minute] = scheduleTime.split(':').map(Number)
+                          const newHour = hour === 23 ? 0 : hour + 1
+                          setScheduleTime(`${String(newHour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`)
+                        }}
+                        disabled={savingSchedule}
+                        className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                        </svg>
+                      </button>
+                      <div className="text-4xl font-semibold text-gray-900 my-2 w-20 text-center">
+                        {scheduleTime.split(':')[0]}
+                      </div>
+                      <button
+                        onClick={() => {
+                          const [hour, minute] = scheduleTime.split(':').map(Number)
+                          const newHour = hour === 0 ? 23 : hour - 1
+                          setScheduleTime(`${String(newHour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`)
+                        }}
+                        disabled={savingSchedule}
+                        className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                      <span className="text-xs text-gray-500 mt-1">Hour</span>
+                    </div>
+
+                    <div className="text-3xl font-bold text-gray-400">:</div>
+
+                    {/* Minute Scroller */}
+                    <div className="flex flex-col items-center">
+                      <button
+                        onClick={() => {
+                          const [hour, minute] = scheduleTime.split(':').map(Number)
+                          const newMinute = minute === 45 ? 0 : minute + 15
+                          setScheduleTime(`${String(hour).padStart(2, '0')}:${String(newMinute).padStart(2, '0')}`)
+                        }}
+                        disabled={savingSchedule}
+                        className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                        </svg>
+                      </button>
+                      <div className="text-4xl font-semibold text-gray-900 my-2 w-20 text-center">
+                        {scheduleTime.split(':')[1]}
+                      </div>
+                      <button
+                        onClick={() => {
+                          const [hour, minute] = scheduleTime.split(':').map(Number)
+                          const newMinute = minute === 0 ? 45 : minute - 15
+                          setScheduleTime(`${String(hour).padStart(2, '0')}:${String(newMinute).padStart(2, '0')}`)
+                        }}
+                        disabled={savingSchedule}
+                        className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                      <span className="text-xs text-gray-500 mt-1">Minute</span>
+                    </div>
+
+                    {/* AM/PM Toggle */}
+                    <div className="flex flex-col items-center ml-2">
+                      <button
+                        onClick={() => {
+                          const [hour, minute] = scheduleTime.split(':').map(Number)
+                          const newHour = hour >= 12 ? hour - 12 : hour + 12
+                          setScheduleTime(`${String(newHour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`)
+                        }}
+                        disabled={savingSchedule}
+                        className="px-3 py-1 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md disabled:opacity-50"
+                      >
+                        {parseInt(scheduleTime.split(':')[0]) >= 12 ? 'PM' : 'AM'}
+                      </button>
+                      <span className="text-xs text-gray-500 mt-1">Period</span>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="text-xs text-gray-600 bg-blue-50 border border-blue-100 rounded-md p-2">
