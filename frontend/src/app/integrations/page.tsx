@@ -454,60 +454,42 @@ export default function IntegrationsPage() {
       setSelectedOrganization(savedOrg)
     }
     
-    // Load user info from localStorage
-    const userName = localStorage.getItem('user_name')
-    const userEmail = localStorage.getItem('user_email')
-    const userAvatar = localStorage.getItem('user_avatar')
-    const userRole = localStorage.getItem('user_role')
-
-
-    // Check for valid, non-empty strings (not "null", "undefined", or empty)
-    const validUserName = userName && userName !== 'null' && userName !== 'undefined' && userName.trim() !== ''
-    const validUserEmail = userEmail && userEmail !== 'null' && userEmail !== 'undefined' && userEmail.trim() !== ''
-
-    if (validUserName && validUserEmail) {
-      setUserInfo({
-        name: userName,
-        email: userEmail,
-        avatar: (userAvatar && userAvatar !== 'null' && userAvatar !== 'undefined') ? userAvatar : undefined,
-        role: (userRole && userRole !== 'null' && userRole !== 'undefined') ? userRole : 'member'
+    // Always fetch fresh user info from API to ensure role is up-to-date
+    const authToken = localStorage.getItem('auth_token')
+    if (authToken) {
+      const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      fetch(`${API_BASE}/auth/user/me`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        }
       })
-    } else {
-      
-      // Try to fetch user info from API as fallback
-      const authToken = localStorage.getItem('auth_token')
-      if (authToken) {
-        const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-        fetch(`${API_BASE}/auth/user/me`, {
-          headers: { 
-            'Authorization': `Bearer ${authToken}`,
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache'
+      .then(response => response.json())
+      .then(userData => {
+        if (userData.name && userData.email) {
+          setUserInfo({
+            name: userData.name,
+            email: userData.email,
+            avatar: userData.avatar || undefined,
+            role: userData.role || 'member',
+            id: userData.id,
+            organization_id: userData.organization_id
+          })
+          // Store in localStorage for future use
+          localStorage.setItem('user_name', userData.name)
+          localStorage.setItem('user_email', userData.email)
+          if (userData.avatar) {
+            localStorage.setItem('user_avatar', userData.avatar)
           }
-        })
-        .then(response => response.json())
-        .then(userData => {
-          if (userData.name && userData.email) {
-            setUserInfo({
-              name: userData.name,
-              email: userData.email,
-              avatar: userData.avatar || undefined,
-              role: userData.role || 'member'
-            })
-            // Store in localStorage for future use
-            localStorage.setItem('user_name', userData.name)
-            localStorage.setItem('user_email', userData.email)
-            if (userData.avatar) {
-              localStorage.setItem('user_avatar', userData.avatar)
-            }
-            if (userData.role) {
-              localStorage.setItem('user_role', userData.role)
-            }
+          if (userData.role) {
+            localStorage.setItem('user_role', userData.role)
           }
-        })
-        .catch(error => {
-        })
-      }
+        }
+      })
+      .catch(error => {
+        console.error('Failed to fetch user info:', error)
+      })
     }
     
     // Determine back navigation based on referrer
