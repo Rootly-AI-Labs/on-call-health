@@ -40,6 +40,15 @@ else
     echo "   Check logs above for details"
 fi
 
+# Run integration_ids column migration
+echo "🔄 Running integration_ids migration..."
+if python add_integration_id_to_user_correlations.py; then
+    echo "✅ Integration IDs migration completed successfully!"
+else
+    echo "⚠️  Integration IDs migration failed, but continuing startup..."
+    echo "   Check logs above for details"
+fi
+
 # Create tables (safe - won't recreate existing tables)
 echo "🏗️  Ensuring all database tables exist..."
 python -c "

@@ -17,7 +17,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from sqlalchemy import text, inspect
-from app.database import engine, SessionLocal
+from app.models.base import engine, SessionLocal
 from app.models.user_correlation import UserCorrelation
 
 def check_column_exists(table_name: str, column_name: str) -> bool:
