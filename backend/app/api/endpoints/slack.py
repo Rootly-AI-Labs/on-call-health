@@ -1726,22 +1726,22 @@ def create_burnout_survey_modal(organization_id: int, user_id: int, analysis_id:
                         "text": "Select level (0-10)"
                     },
                     "options": [
-                        {"text": {"type": "plain_text", "text": "0 - Not at all"}, "value": "0"},
-                        {"text": {"type": "plain_text", "text": "1 - Very slightly"}, "value": "10"},
-                        {"text": {"type": "plain_text", "text": "2 - Slightly"}, "value": "20"},
-                        {"text": {"type": "plain_text", "text": "3 - Somewhat"}, "value": "30"},
-                        {"text": {"type": "plain_text", "text": "4 - Moderately"}, "value": "40"},
-                        {"text": {"type": "plain_text", "text": "5 - Considerably"}, "value": "50"},
-                        {"text": {"type": "plain_text", "text": "6 - Quite a bit"}, "value": "60"},
-                        {"text": {"type": "plain_text", "text": "7 - Very much"}, "value": "70"},
-                        {"text": {"type": "plain_text", "text": "8 - Extremely"}, "value": "80"},
-                        {"text": {"type": "plain_text", "text": "9 - Almost completely"}, "value": "90"},
-                        {"text": {"type": "plain_text", "text": "10 - Completely"}, "value": "100"}
+                        {"text": {"type": "plain_text", "text": "0 - Never"}, "value": "0"},
+                        {"text": {"type": "plain_text", "text": "1 - Very rarely"}, "value": "10"},
+                        {"text": {"type": "plain_text", "text": "2 - Rarely"}, "value": "20"},
+                        {"text": {"type": "plain_text", "text": "3 - Sometimes"}, "value": "30"},
+                        {"text": {"type": "plain_text", "text": "4 - Often"}, "value": "40"},
+                        {"text": {"type": "plain_text", "text": "5 - Very often"}, "value": "50"},
+                        {"text": {"type": "plain_text", "text": "6 - Usually"}, "value": "60"},
+                        {"text": {"type": "plain_text", "text": "7 - Frequently"}, "value": "70"},
+                        {"text": {"type": "plain_text", "text": "8 - Almost always"}, "value": "80"},
+                        {"text": {"type": "plain_text", "text": "9 - Always"}, "value": "90"},
+                        {"text": {"type": "plain_text", "text": "10 - Constantly"}, "value": "100"}
                     ]
                 },
                 "label": {
                     "type": "plain_text",
-                    "text": "Question 1: How burned out do you feel right now?"
+                    "text": "Question 1: How often have you felt exhausted this week?"
                 }
             },
             {
