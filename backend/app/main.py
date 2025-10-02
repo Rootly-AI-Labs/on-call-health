@@ -2,6 +2,7 @@
 FastAPI main application for Rootly Burnout Detector.
 """
 import os
+import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi.errors import RateLimitExceeded
@@ -10,6 +11,8 @@ from .core.config import settings
 from .core.rate_limiting import limiter, custom_rate_limit_exceeded_handler
 from .middleware.security import security_middleware
 from .api.endpoints import auth, rootly, analysis, analyses, pagerduty, github, slack, llm, mappings, manual_mappings, debug_mappings, migrate, admin, notifications, invitations, surveys
+
+logger = logging.getLogger(__name__)
 
 # Create FastAPI application
 app = FastAPI(
