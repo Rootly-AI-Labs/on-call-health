@@ -5745,55 +5745,66 @@ export default function IntegrationsPage() {
 
           <div className="space-y-6">
             {/* Invite New Member Section */}
-            <div className="p-4 border rounded-lg bg-gray-50">
-              <h3 className="text-lg font-medium mb-4 flex items-center space-x-2">
-                <Mail className="w-4 h-4" />
-                <span>Invite New Member</span>
-              </h3>
-              <div className="space-y-4 max-w-md">
-                <div>
-                  <label htmlFor="invite-email" className="block text-sm font-medium text-gray-700 mb-1">
-                    Email Address
-                  </label>
-                  <Input
-                    id="invite-email"
-                    type="email"
-                    placeholder="Enter email address"
-                    value={inviteEmail}
-                    onChange={(e) => setInviteEmail(e.target.value)}
-                  />
+            <div className="p-6 border rounded-lg bg-gradient-to-br from-purple-50 to-white">
+              <div className="flex items-start space-x-4">
+                <div className="flex-shrink-0 w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                  <Mail className="w-5 h-5 text-purple-600" />
                 </div>
-                <div>
-                  <label htmlFor="invite-role" className="block text-sm font-medium text-gray-700 mb-1">
-                    Role
-                  </label>
-                  <select
-                    id="invite-role"
-                    value={inviteRole}
-                    onChange={(e) => setInviteRole(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                <div className="flex-1 space-y-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">Invite Team Member</h3>
+                    <p className="text-sm text-gray-500 mt-1">Send an invitation to join your organization</p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label htmlFor="invite-email" className="block text-sm font-medium text-gray-700 mb-1.5">
+                        Email Address
+                      </label>
+                      <Input
+                        id="invite-email"
+                        type="email"
+                        placeholder="colleague@company.com"
+                        value={inviteEmail}
+                        onChange={(e) => setInviteEmail(e.target.value)}
+                        className="w-full"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="invite-role" className="block text-sm font-medium text-gray-700 mb-1.5">
+                        Role
+                      </label>
+                      <select
+                        id="invite-role"
+                        value={inviteRole}
+                        onChange={(e) => setInviteRole(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
+                      >
+                        <option value="member">Member</option>
+                        <option value="manager">Manager</option>
+                        <option value="org_admin">Admin</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <Button
+                    onClick={handleInvite}
+                    disabled={isInviting || !inviteEmail.trim()}
+                    className="w-full md:w-auto bg-purple-600 hover:bg-purple-700"
                   >
-                    <option value="member">Member</option>
-                    <option value="manager">Manager</option>
-                    <option value="org_admin">Admin</option>
-                  </select>
+                    {isInviting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Sending Invitation...
+                      </>
+                    ) : (
+                      <>
+                        <Mail className="w-4 h-4 mr-2" />
+                        Send Invitation
+                      </>
+                    )}
+                  </Button>
                 </div>
-                <Button
-                  onClick={handleInvite}
-                  disabled={isInviting || !inviteEmail.trim()}
-                >
-                  {isInviting ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Sending Invitation...
-                    </>
-                  ) : (
-                    <>
-                      <Mail className="w-4 h-4 mr-2" />
-                      Send Invitation
-                    </>
-                  )}
-                </Button>
               </div>
             </div>
 
