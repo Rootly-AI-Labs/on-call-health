@@ -453,8 +453,28 @@ export default function IntegrationsPage() {
       console.log('Setting selectedOrganization from localStorage:', savedOrg)
       setSelectedOrganization(savedOrg)
     }
-    
-    // Always fetch fresh user info from API to ensure role is up-to-date
+
+    // Load user info from localStorage first for immediate display
+    const userName = localStorage.getItem('user_name')
+    const userEmail = localStorage.getItem('user_email')
+    const userAvatar = localStorage.getItem('user_avatar')
+    const userRole = localStorage.getItem('user_role')
+    const userId = localStorage.getItem('user_id')
+    const userOrgId = localStorage.getItem('user_organization_id')
+
+    // Set initial state from localStorage
+    if (userName && userEmail) {
+      setUserInfo({
+        name: userName,
+        email: userEmail,
+        avatar: userAvatar || undefined,
+        role: userRole || 'member',
+        id: userId ? parseInt(userId) : undefined,
+        organization_id: userOrgId ? parseInt(userOrgId) : undefined
+      })
+    }
+
+    // Then fetch fresh data in background to update if needed
     const authToken = localStorage.getItem('auth_token')
     if (authToken) {
       const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'
@@ -465,7 +485,10 @@ export default function IntegrationsPage() {
           'Pragma': 'no-cache'
         }
       })
-      .then(response => response.json())
+      .then(response => {
+        if (!response.ok) throw new Error('Failed to fetch')
+        return response.json()
+      })
       .then(userData => {
         if (userData.name && userData.email) {
           setUserInfo({
@@ -476,19 +499,18 @@ export default function IntegrationsPage() {
             id: userData.id,
             organization_id: userData.organization_id
           })
-          // Store in localStorage for future use
+          // Update localStorage with fresh data
           localStorage.setItem('user_name', userData.name)
           localStorage.setItem('user_email', userData.email)
-          if (userData.avatar) {
-            localStorage.setItem('user_avatar', userData.avatar)
-          }
-          if (userData.role) {
-            localStorage.setItem('user_role', userData.role)
-          }
+          localStorage.setItem('user_role', userData.role || 'member')
+          if (userData.avatar) localStorage.setItem('user_avatar', userData.avatar)
+          if (userData.id) localStorage.setItem('user_id', userData.id.toString())
+          if (userData.organization_id) localStorage.setItem('user_organization_id', userData.organization_id.toString())
         }
       })
       .catch(error => {
-        console.error('Failed to fetch user info:', error)
+        // Silently fail - we already loaded from localStorage
+        console.warn('Could not refresh user info from API:', error.message)
       })
     }
     
