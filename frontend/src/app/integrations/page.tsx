@@ -5949,91 +5949,30 @@ export default function IntegrationsPage() {
           </SheetHeader>
 
           <div className="mt-6 space-y-4">
-            {/* Action Buttons */}
-            <div className="flex items-center space-x-2">
-              <Button
-                onClick={syncUsersToCorrelation}
-                disabled={loadingTeamMembers || teamMembers.length === 0}
-                size="sm"
-                className="flex items-center space-x-2 bg-purple-600 hover:bg-purple-700"
-              >
-                {loadingTeamMembers ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Syncing...</span>
-                  </>
-                ) : (
-                  <>
-                    <Database className="w-4 h-4" />
-                    <span>Sync to Survey System</span>
-                  </>
-                )}
-              </Button>
-            </div>
-
-            {/* Team Members from API */}
-            {teamMembers.length > 0 && (
+            {/* Show synced users only */}
+            {syncedUsers.length > 0 ? (
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-semibold text-gray-900">
-                    From API ({teamMembers.length})
+                    Team Members ({syncedUsers.length})
                   </h3>
-                  <Badge variant="secondary" className="text-xs">Live Data</Badge>
-                </div>
-                <div className="space-y-2">
-                  {teamMembers.map((member: any) => (
-                    <div
-                      key={member.id}
-                      className="bg-white border border-gray-200 rounded-lg p-3 hover:border-purple-300 transition-colors"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                          <Avatar className="h-10 w-10">
-                            <AvatarFallback className="bg-purple-100 text-purple-700 text-sm font-medium">
-                              {member.name?.substring(0, 2).toUpperCase() || member.email?.substring(0, 2).toUpperCase() || '??'}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <div className="text-sm font-medium text-gray-900">
-                              {member.name || 'Unknown'}
-                            </div>
-                            <div className="text-xs text-gray-600">
-                              {member.email}
-                            </div>
-                          </div>
-                        </div>
-                        <Badge variant="secondary" className="text-xs">
-                          {member.platform}
-                        </Badge>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Synced Users from Database */}
-            {showSyncedUsers && syncedUsers.length > 0 && (
-              <div className="border-t pt-4">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-gray-900">
-                    Synced to Database ({syncedUsers.length})
-                  </h3>
-                  <Badge className="text-xs bg-green-100 text-green-700 border-green-300">Persisted</Badge>
+                  <Badge className="text-xs bg-green-100 text-green-700 border-green-300">
+                    Can Submit Surveys
+                  </Badge>
                 </div>
                 <p className="text-xs text-gray-600 mb-3">
-                  These users can submit burnout surveys via Slack
+                  These users can submit burnout surveys via Slack /burnout-survey command
                 </p>
-                <div className="space-y-2">
+                <div className="space-y-2 max-h-[600px] overflow-y-auto">
                   {syncedUsers.map((user: any) => (
                     <div
                       key={user.id}
-                      className="bg-white border border-gray-200 rounded-lg p-3 hover:border-green-300 transition-colors"
+                      className="bg-white border border-gray-200 rounded-lg p-3 hover:border-purple-300 transition-colors"
                     >
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center space-x-3">
                           <Avatar className="h-10 w-10">
-                            <AvatarFallback className="bg-green-100 text-green-700 text-sm font-medium">
+                            <AvatarFallback className="bg-purple-100 text-purple-700 text-sm font-medium">
                               {user.name?.substring(0, 2).toUpperCase() || user.email?.substring(0, 2).toUpperCase() || '??'}
                             </AvatarFallback>
                           </Avatar>
@@ -6047,7 +5986,7 @@ export default function IntegrationsPage() {
                           </div>
                         </div>
                         <div className="flex items-center space-x-1">
-                          {user.platforms.map((platform: string) => (
+                          {user.platforms?.map((platform: string) => (
                             <Badge key={platform} variant="secondary" className="text-xs">
                               {platform}
                             </Badge>
@@ -6063,13 +6002,11 @@ export default function IntegrationsPage() {
                   ))}
                 </div>
               </div>
-            )}
-
-            {teamMembers.length === 0 && (!showSyncedUsers || syncedUsers.length === 0) && (
+            ) : (
               <div className="text-center py-12 text-gray-500">
                 <Users className="w-12 h-12 mx-auto mb-4 opacity-40" />
-                <p className="text-sm">No team members loaded yet</p>
-                <p className="text-xs mt-2">Close this drawer and click "Load Members" to fetch team members</p>
+                <p className="text-sm font-medium mb-2">No team members synced yet</p>
+                <p className="text-xs">Close this drawer and click "Sync Members" to add team members who can submit surveys</p>
               </div>
             )}
           </div>
