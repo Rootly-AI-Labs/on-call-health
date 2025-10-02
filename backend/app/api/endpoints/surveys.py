@@ -174,7 +174,17 @@ async def get_survey_schedule(
     ).first()
 
     if not schedule:
-        return {"message": "No survey schedule configured"}
+        # Return consistent structure even when no schedule exists
+        return {
+            "enabled": False,
+            "send_time": None,
+            "timezone": "America/New_York",
+            "send_weekdays_only": True,
+            "send_reminder": False,
+            "reminder_time": None,
+            "reminder_hours_after": 5,
+            "message": "No survey schedule configured"
+        }
 
     return {
         "id": schedule.id,

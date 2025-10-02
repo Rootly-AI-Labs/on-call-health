@@ -78,13 +78,31 @@ export function SlackSurveyTabs({
 
       if (response.ok) {
         const data = await response.json()
+
+        // Handle case where schedule exists
         if (data.enabled !== undefined) {
           setScheduleEnabled(data.enabled)
-          setScheduleTime(data.send_time || '09:00')
+
+          // Backend returns "HH:MM:SS", extract only "HH:MM"
+          if (data.send_time) {
+            const timeOnly = data.send_time.substring(0, 5) // Extract "HH:MM" from "HH:MM:SS"
+            setScheduleTime(timeOnly)
+          }
+        } else {
+          // Handle case where no schedule is configured
+          setScheduleEnabled(false)
+          setScheduleTime('09:00')
         }
+      } else {
+        // API error - set defaults
+        setScheduleEnabled(false)
+        setScheduleTime('09:00')
       }
     } catch (error) {
       console.error('Failed to load schedule:', error)
+      // Set defaults on error
+      setScheduleEnabled(false)
+      setScheduleTime('09:00')
     } finally {
       setLoadingSchedule(false)
     }
