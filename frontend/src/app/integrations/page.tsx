@@ -2441,7 +2441,7 @@ export default function IntegrationsPage() {
   }
 
   const filteredIntegrations = integrations.filter(integration => {
-    if (activeTab === null) return false
+    if (activeTab === null) return true // Show all integrations when no tab selected
     return integration.platform === activeTab
   })
 
