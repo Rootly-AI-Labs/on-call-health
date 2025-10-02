@@ -3249,7 +3249,7 @@ export default function IntegrationsPage() {
             )}
 
             {/* Existing Integrations */}
-            {activeTab === null ? (
+            {(activeTab === null && !selectedOrganization) ? (
               <div className="text-center py-12">
                 <Shield className="w-12 h-12 mx-auto text-slate-300 mb-4" />
                 <p className="text-lg font-medium mb-2 text-slate-700">Choose a platform to get started</p>
