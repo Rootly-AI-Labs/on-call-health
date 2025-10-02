@@ -55,7 +55,8 @@ class UserSyncService:
             stats = self._sync_users_to_correlation(
                 users=users,
                 platform=integration.platform,
-                current_user=current_user
+                current_user=current_user,
+                integration_id=str(integration_id)  # Store which integration synced this user
             )
 
             logger.info(
@@ -108,7 +109,8 @@ class UserSyncService:
         self,
         users: List[Dict[str, Any]],
         platform: str,
-        current_user: User
+        current_user: User,
+        integration_id: str = None
     ) -> Dict[str, int]:
         """
         Sync users to UserCorrelation table.
@@ -136,15 +138,16 @@ class UserSyncService:
 
             if correlation:
                 # Update existing correlation
-                updated += self._update_correlation(correlation, user, platform)
+                updated += self._update_correlation(correlation, user, platform, integration_id)
             else:
                 # Create new correlation
                 correlation = UserCorrelation(
                     user_id=current_user.id,
                     email=email,
-                    name=user.get("name")  # Store user's display name
+                    name=user.get("name"),  # Store user's display name
+                    integration_id=integration_id  # Store which integration synced this user
                 )
-                self._update_correlation(correlation, user, platform)
+                self._update_correlation(correlation, user, platform, integration_id)
                 self.db.add(correlation)
                 created += 1
 
@@ -167,13 +170,19 @@ class UserSyncService:
         self,
         correlation: UserCorrelation,
         user: Dict[str, Any],
-        platform: str
+        platform: str,
+        integration_id: str = None
     ) -> int:
         """
         Update a UserCorrelation record with platform-specific data.
         Returns 1 if updated, 0 if no changes.
         """
         updated = False
+
+        # Update integration_id if provided and different
+        if integration_id and correlation.integration_id != integration_id:
+            correlation.integration_id = integration_id
+            updated = True
 
         # Update name if available and different
         if user.get("name") and correlation.name != user["name"]:

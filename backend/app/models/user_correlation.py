@@ -17,6 +17,7 @@ class UserCorrelation(Base):
     slack_user_id = Column(String(20), nullable=True, index=True)
     rootly_email = Column(String(255), nullable=True)
     pagerduty_user_id = Column(String(50), nullable=True)
+    integration_id = Column(String(100), nullable=True, index=True)  # Track which integration synced this user
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     # Relationships
