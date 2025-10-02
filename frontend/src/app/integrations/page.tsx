@@ -2543,17 +2543,24 @@ export default function IntegrationsPage() {
                     <div>
                       <div className="font-medium text-gray-900">{userInfo.name}</div>
                       <div className="text-xs text-gray-500">{userInfo.email}</div>
+                      <div className="text-xs text-gray-400 mt-1 capitalize">
+                        {userInfo.role?.replace('_', ' ') || 'Member'}
+                      </div>
                     </div>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    className="px-2 py-1.5 cursor-pointer"
-                    onClick={() => setShowInviteModal(true)}
-                  >
-                    <UserPlus className="w-4 h-4 mr-2" />
-                    Org Management
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
+                  {(userInfo.role === 'org_admin' || userInfo.role === 'super_admin') && (
+                    <>
+                      <DropdownMenuItem
+                        className="px-2 py-1.5 cursor-pointer"
+                        onClick={() => setShowInviteModal(true)}
+                      >
+                        <UserPlus className="w-4 h-4 mr-2" />
+                        Org Management
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                    </>
+                  )}
                   <DropdownMenuItem
                     className="text-red-600 hover:text-red-700 hover:bg-red-50 px-2 py-1.5 cursor-pointer"
                     onClick={() => {
