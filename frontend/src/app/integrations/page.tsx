@@ -2501,7 +2501,7 @@ export default function IntegrationsPage() {
                     onClick={() => setShowInviteModal(true)}
                   >
                     <UserPlus className="w-4 h-4 mr-2" />
-                    Invite People
+                    Org Management
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
