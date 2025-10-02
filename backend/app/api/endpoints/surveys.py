@@ -12,8 +12,16 @@ from ...models import get_db, User
 from ...models.survey_schedule import SurveySchedule, UserSurveyPreference
 from ...models.user_notification import UserNotification
 from ...auth.dependencies import get_current_user
-from ...services.survey_scheduler import survey_scheduler
 from ...services.notification_service import NotificationService
+
+# Import survey_scheduler conditionally to prevent crashes
+try:
+    from ...services.survey_scheduler import survey_scheduler
+    SCHEDULER_AVAILABLE = True
+except Exception as e:
+    logger.warning(f"Survey scheduler not available: {e}")
+    survey_scheduler = None
+    SCHEDULER_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -132,7 +140,12 @@ async def create_or_update_survey_schedule(
         logger.info(f"Created survey schedule for org {organization_id}")
 
     # Reload scheduler with new schedule
-    survey_scheduler.schedule_organization_surveys(db)
+    if SCHEDULER_AVAILABLE and survey_scheduler:
+        try:
+            survey_scheduler.schedule_organization_surveys(db)
+        except Exception as e:
+            logger.error(f"Failed to reload scheduler: {e}")
+            # Continue anyway - schedule is saved in DB
 
     return {
         "id": schedule.id,
