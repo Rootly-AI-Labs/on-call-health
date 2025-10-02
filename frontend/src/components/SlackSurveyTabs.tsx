@@ -498,7 +498,7 @@ export function SlackSurveyTabs({
                   <Label className="text-sm text-gray-700">
                     Delivery Time (Your Local Time)
                   </Label>
-                  <div className="mt-2 flex items-center justify-center gap-3 p-4 bg-white rounded-lg border border-gray-200">
+                  <div className="mt-2 flex items-center justify-center gap-2 p-3 bg-white rounded-lg border border-gray-200">
                     {/* Hour Scroller */}
                     <div className="flex flex-col items-center">
                       <button
@@ -510,11 +510,11 @@ export function SlackSurveyTabs({
                         disabled={savingSchedule}
                         className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
                       >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
                         </svg>
                       </button>
-                      <div className="text-4xl font-semibold text-gray-900 my-2 w-20 text-center">
+                      <div className="text-2xl font-semibold text-gray-900 my-1 w-12 text-center">
                         {scheduleTime.split(':')[0]}
                       </div>
                       <button
@@ -526,14 +526,13 @@ export function SlackSurveyTabs({
                         disabled={savingSchedule}
                         className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
                       >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                         </svg>
                       </button>
-                      <span className="text-xs text-gray-500 mt-1">Hour</span>
                     </div>
 
-                    <div className="text-3xl font-bold text-gray-400">:</div>
+                    <div className="text-2xl font-bold text-gray-400">:</div>
 
                     {/* Minute Scroller */}
                     <div className="flex flex-col items-center">
@@ -546,11 +545,11 @@ export function SlackSurveyTabs({
                         disabled={savingSchedule}
                         className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
                       >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
                         </svg>
                       </button>
-                      <div className="text-4xl font-semibold text-gray-900 my-2 w-20 text-center">
+                      <div className="text-2xl font-semibold text-gray-900 my-1 w-12 text-center">
                         {scheduleTime.split(':')[1]}
                       </div>
                       <button
@@ -562,28 +561,24 @@ export function SlackSurveyTabs({
                         disabled={savingSchedule}
                         className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
                       >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                         </svg>
                       </button>
-                      <span className="text-xs text-gray-500 mt-1">Minute</span>
                     </div>
 
                     {/* AM/PM Toggle */}
-                    <div className="flex flex-col items-center ml-2">
-                      <button
-                        onClick={() => {
-                          const [hour, minute] = scheduleTime.split(':').map(Number)
-                          const newHour = hour >= 12 ? hour - 12 : hour + 12
-                          setScheduleTime(`${String(newHour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`)
-                        }}
-                        disabled={savingSchedule}
-                        className="px-3 py-1 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md disabled:opacity-50"
-                      >
-                        {parseInt(scheduleTime.split(':')[0]) >= 12 ? 'PM' : 'AM'}
-                      </button>
-                      <span className="text-xs text-gray-500 mt-1">Period</span>
-                    </div>
+                    <button
+                      onClick={() => {
+                        const [hour, minute] = scheduleTime.split(':').map(Number)
+                        const newHour = hour >= 12 ? hour - 12 : hour + 12
+                        setScheduleTime(`${String(newHour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`)
+                      }}
+                      disabled={savingSchedule}
+                      className="ml-1 px-2 py-1 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded disabled:opacity-50"
+                    >
+                      {parseInt(scheduleTime.split(':')[0]) >= 12 ? 'PM' : 'AM'}
+                    </button>
                   </div>
                 </div>
 
