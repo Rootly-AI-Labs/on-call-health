@@ -1066,8 +1066,9 @@ async def get_synced_users(
         if integration_id:
             filtered_correlations = []
             for corr in correlations:
-                # Include if integration_ids is None (not yet synced) or contains the integration_id
-                if corr.integration_ids is None or integration_id in (corr.integration_ids or []):
+                # Only include if integration_id is in the integration_ids array
+                # Skip users with NULL integration_ids (not yet synced from any org)
+                if corr.integration_ids and integration_id in corr.integration_ids:
                     filtered_correlations.append(corr)
             correlations = filtered_correlations
 
