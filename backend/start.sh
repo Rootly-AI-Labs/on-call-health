@@ -58,6 +58,15 @@ else
     echo "   Check logs above for details"
 fi
 
+# Run personal circumstances column migration
+echo "🔄 Adding personal circumstances column..."
+if python add_personal_circumstances_column.py; then
+    echo "✅ Personal circumstances column migration completed!"
+else
+    echo "⚠️  Personal circumstances migration failed, but continuing startup..."
+    echo "   Check logs above for details"
+fi
+
 # Create tables (safe - won't recreate existing tables)
 echo "🏗️  Ensuring all database tables exist..."
 python -c "

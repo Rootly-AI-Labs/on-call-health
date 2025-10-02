@@ -25,6 +25,9 @@ class UserBurnoutReport(Base):
     # Stress factors as JSON array
     stress_factors = Column(JSON, nullable=True)  # ["incident_volume", "work_hours", "on_call_burden", ...]
 
+    # Personal circumstances flag (non-work factors)
+    personal_circumstances = Column(String(20), nullable=True)  # 'significantly', 'somewhat', 'no', 'prefer_not_say'
+
     # Optional context
     additional_comments = Column(Text, nullable=True)  # Free text feedback
 
@@ -48,6 +51,7 @@ class UserBurnoutReport(Base):
             'self_reported_score': self.self_reported_score,
             'energy_level': self.energy_level,
             'stress_factors': self.stress_factors,
+            'personal_circumstances': self.personal_circumstances,
             'additional_comments': self.additional_comments,
             'submitted_via': self.submitted_via,
             'is_anonymous': self.is_anonymous,

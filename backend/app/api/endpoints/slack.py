@@ -926,6 +926,7 @@ class SlackSurveySubmission(BaseModel):
     self_reported_score: int  # 0-100 scale
     energy_level: int  # 1-5 scale
     stress_factors: list[str]  # Array of stress factors
+    personal_circumstances: str = None  # 'significantly', 'somewhat', 'no', 'prefer_not_say'
     additional_comments: str = ""
     is_anonymous: bool = False
 
@@ -1387,6 +1388,9 @@ async def handle_slack_interactions(
                 stress_factors_options = values.get("stress_factors_block", {}).get("stress_factors_input", {}).get("selected_options", [])
                 stress_factors = [opt.get("value") for opt in stress_factors_options]
 
+                # Get personal circumstances (optional)
+                personal_circumstances = values.get("personal_circumstances_block", {}).get("personal_circumstances_input", {}).get("selected_option", {}).get("value")
+
                 # Get optional comments
                 comments = values.get("comments_block", {}).get("comments_input", {}).get("value", "")
 
@@ -1415,6 +1419,7 @@ async def handle_slack_interactions(
                     existing_report.self_reported_score = self_reported_score
                     existing_report.energy_level = energy_level
                     existing_report.stress_factors = stress_factors
+                    existing_report.personal_circumstances = personal_circumstances
                     existing_report.additional_comments = comments
                     existing_report.submitted_via = 'slack'
                     existing_report.analysis_id = analysis_id  # Update linked analysis if provided
@@ -1430,6 +1435,7 @@ async def handle_slack_interactions(
                         self_reported_score=self_reported_score,
                         energy_level=energy_level,
                         stress_factors=stress_factors,
+                        personal_circumstances=personal_circumstances,
                         additional_comments=comments,
                         submitted_via='slack',
                         submitted_at=datetime.utcnow()
@@ -1548,6 +1554,7 @@ async def submit_slack_burnout_survey(
             self_reported_score=submission.self_reported_score,
             energy_level=submission.energy_level,
             stress_factors=submission.stress_factors,
+            personal_circumstances=submission.personal_circumstances,
             additional_comments=submission.additional_comments,
             submitted_via='slack',
             is_anonymous=submission.is_anonymous
@@ -1782,6 +1789,29 @@ def create_burnout_survey_modal(organization_id: int, user_id: int, analysis_id:
                 "label": {
                     "type": "plain_text",
                     "text": "Question 3: Main stress factors? (select all that apply)"
+                },
+                "optional": True
+            },
+            {
+                "type": "input",
+                "block_id": "personal_circumstances_block",
+                "element": {
+                    "type": "static_select",
+                    "action_id": "personal_circumstances_input",
+                    "placeholder": {
+                        "type": "plain_text",
+                        "text": "Select option"
+                    },
+                    "options": [
+                        {"text": {"type": "plain_text", "text": "Yes, significantly"}, "value": "significantly"},
+                        {"text": {"type": "plain_text", "text": "Yes, somewhat"}, "value": "somewhat"},
+                        {"text": {"type": "plain_text", "text": "No, this is work-related"}, "value": "no"},
+                        {"text": {"type": "plain_text", "text": "Prefer not to say"}, "value": "prefer_not_say"}
+                    ]
+                },
+                "label": {
+                    "type": "plain_text",
+                    "text": "Question 4: Are personal circumstances (e.g., sleep, family matters) affecting how you feel today?"
                 },
                 "optional": True
             },
