@@ -388,8 +388,15 @@ export function SlackSurveyTabs({
               </Button>
             </div>
           ) : (
-            <div className="text-center py-4 text-sm text-gray-500">
-              Only organization admins can manually send surveys.
+            <div className="text-center py-4">
+              <p className="text-sm text-gray-500 mb-2">
+                Only organization admins can manually send surveys.
+              </p>
+              {userInfo && (
+                <p className="text-xs text-gray-400">
+                  Current role: {userInfo.role || 'unknown'}
+                </p>
+              )}
             </div>
           )}
 
