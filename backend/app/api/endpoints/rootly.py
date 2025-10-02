@@ -1057,9 +1057,9 @@ async def get_synced_users(
             UserCorrelation.user_id == current_user.id
         )
 
-        # Filter by integration_id if provided
-        if integration_id:
-            query = query.filter(UserCorrelation.integration_id == integration_id)
+        # Note: UserCorrelation doesn't have integration_id field yet
+        # For now, we'll return all synced users regardless of integration_id
+        # TODO: Add integration_id field to UserCorrelation model and filter properly
 
         correlations = query.order_by(UserCorrelation.name).all()
 
