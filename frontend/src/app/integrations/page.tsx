@@ -1943,9 +1943,20 @@ export default function IntegrationsPage() {
 
       if (response.ok) {
         const data = await response.json()
-        setSyncedUsers(data.users || [])
+        const users = data.users || []
+        setSyncedUsers(users)
         setShowSyncedUsers(true)
         setTeamMembersDrawerOpen(true)
+
+        // If no users found, automatically sync them
+        if (users.length === 0) {
+          toast.info('No synced users found. Syncing now...')
+          setLoadingSyncedUsers(false) // Reset loading state before syncing
+          await syncUsersToCorrelation()
+          // syncUsersToCorrelation will call fetchSyncedUsers again after syncing
+          return
+        }
+
         toast.success(`Found ${data.total} synced users`)
       } else {
         const errorData = await response.json()
