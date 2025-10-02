@@ -84,13 +84,13 @@ export default function LandingPage() {
                   />
                 </a>
               </div>
-              <div className="text-2xl font-semibold text-slate-900">On-call burnout detector</div>
+              <div className="text-lg leading-[1rem] lg:text-2xl font-semibold text-slate-900">On-call burnout detector</div>
             </div>
           </div>
         </div>
         <div className="container flex flex-col lg:flex-row flex-grow mx-auto px-4">
-          <main className="flex-grow lg:pr-10 text-white">
-            <h1 className="text-3xl lg:text-5xl tracking-tight mb-6 leading-tight lg:pt-20 lg:pb-1">
+          <main className="flex-grow px-5 lg:pr-10 text-white">
+            <h1 className="text-3xl lg:text-5xl tracking-tight mb-6 leading-tight pt-10 lg:pt-20 lg:pb-1">
               Stop on-call burnout
               <br />
                before it starts.
@@ -350,7 +350,7 @@ Skip the UI and pull results directly into your CLI via MCP, or fork the code to
                       className="w-full brightness-0 invert"
                     />
                   </a>
-                <span className="text-2xl font-semibold text-white">On-call burnout detector</span>
+                <span className="text-lg leading-[1rem] lg:text-2xl font-semibold text-white">On-call burnout detector</span>
               </div>
             </div>
 
