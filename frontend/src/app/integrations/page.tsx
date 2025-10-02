@@ -899,6 +899,37 @@ export default function IntegrationsPage() {
     }
   }
 
+  // Handle role change for organization members
+  const handleRoleChange = async (userId: number, newRole: string) => {
+    const authToken = localStorage.getItem('auth_token')
+    if (!authToken) {
+      toast.error("Authentication required")
+      return
+    }
+
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/auth/users/${userId}/role?new_role=${newRole}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+        }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        toast.success(data.message || `Role updated successfully`)
+        // Reload organization data to reflect the change
+        await loadOrganizationData()
+      } else {
+        const errorData = await response.json()
+        throw new Error(errorData.detail || 'Failed to update role')
+      }
+    } catch (error) {
+      console.error('Failed to update role:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to update role')
+    }
+  }
+
   // Load organization members and pending invitations
   const loadOrganizationData = async () => {
     const authToken = localStorage.getItem('auth_token')
@@ -5848,8 +5879,8 @@ export default function IntegrationsPage() {
                       </div>
                       <div className="max-h-60 overflow-y-auto">
                         {orgMembers.map((member: any) => (
-                          <div key={member.id} className="px-4 py-3 border-b last:border-b-0 bg-white">
-                            <div className="grid grid-cols-3 gap-4 text-sm">
+                          <div key={member.id} className="px-4 py-3 border-b last:border-b-0 bg-white hover:bg-gray-50">
+                            <div className="grid grid-cols-3 gap-4 text-sm items-center">
                               <div className="font-medium text-gray-900">
                                 {member.name}
                                 {member.is_current_user && (
@@ -5858,9 +5889,22 @@ export default function IntegrationsPage() {
                               </div>
                               <div className="text-gray-600">{member.email}</div>
                               <div>
-                                <span className="inline-block px-2 py-1 text-xs rounded-full bg-green-100 text-green-800 capitalize">
-                                  {member.role?.replace('_', ' ') || 'member'}
-                                </span>
+                                {member.is_current_user ? (
+                                  <span className="inline-block px-2 py-1 text-xs rounded-full bg-green-100 text-green-800 capitalize">
+                                    {member.role?.replace('_', ' ') || 'member'}
+                                  </span>
+                                ) : (
+                                  <select
+                                    value={member.role || 'member'}
+                                    onChange={(e) => handleRoleChange(member.id, e.target.value)}
+                                    className="text-xs px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
+                                    disabled={userInfo?.role !== 'org_admin'}
+                                  >
+                                    <option value="member">Member</option>
+                                    <option value="manager">Manager</option>
+                                    <option value="org_admin">Org Admin</option>
+                                  </select>
+                                )}
                               </div>
                             </div>
                           </div>

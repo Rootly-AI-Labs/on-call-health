@@ -424,3 +424,59 @@ async def exchange_auth_code_for_token(
         "expires_in": 604800,  # 7 days
         "user_id": auth_data['user_id']
     }
+
+@router.patch("/users/{user_id}/role")
+async def update_user_role(
+    user_id: int,
+    new_role: str = Query(..., regex="^(member|manager|org_admin)$"),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    """
+    Update a user's role within the organization.
+    Only org_admin can change roles.
+    """
+    # Check if current user is org_admin
+    if current_user.role != "org_admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only organization admins can change user roles"
+        )
+
+    # Get the target user
+    target_user = db.query(User).filter(User.id == user_id).first()
+    if not target_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+
+    # Check if target user is in the same organization
+    if target_user.organization_id != current_user.organization_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot change role of users in other organizations"
+        )
+
+    # Prevent changing your own role
+    if target_user.id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot change your own role"
+        )
+
+    # Update the role
+    old_role = target_user.role
+    target_user.role = new_role
+    db.commit()
+    db.refresh(target_user)
+
+    return {
+        "success": True,
+        "user_id": target_user.id,
+        "user_email": target_user.email,
+        "user_name": target_user.name,
+        "old_role": old_role,
+        "new_role": new_role,
+        "message": f"Successfully updated {target_user.name}'s role from {old_role} to {new_role}"
+    }
