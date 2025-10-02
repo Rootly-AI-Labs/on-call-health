@@ -503,6 +503,16 @@ export function SlackSurveyTabs({
                 <p className="text-xs text-gray-500 mt-1">
                   Send surveys every weekday at a specific time
                 </p>
+                {scheduleEnabled && scheduleTime && (
+                  <p className="text-xs font-medium text-purple-600 mt-1.5">
+                    Set time: {(() => {
+                      const [hour, minute] = scheduleTime.split(':').map(Number)
+                      const period = hour >= 12 ? 'PM' : 'AM'
+                      const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour
+                      return `${displayHour}:${String(minute).padStart(2, '0')} ${period}`
+                    })()}
+                  </p>
+                )}
               </div>
               <Switch
                 checked={scheduleEnabled}
