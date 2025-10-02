@@ -24,6 +24,14 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 
+# === BUSINESS HOURS CONSTANTS ===
+# Standardized definitions for after-hours and late-night detection
+BUSINESS_HOURS_START = 9   # 9 AM - standard knowledge worker start time
+BUSINESS_HOURS_END = 17    # 5 PM - standard knowledge worker end time
+LATE_NIGHT_START = 22      # 10 PM - when sleep preparation should begin
+LATE_NIGHT_END = 6         # 6 AM - early morning threshold
+
+
 class UnifiedBurnoutAnalyzer:
     """
     Unified burnout analyzer with all features:
@@ -1458,7 +1466,6 @@ class UnifiedBurnoutAnalyzer:
             # Handle both Rootly (with attributes) and PagerDuty (normalized) formats
             if self.platform == "pagerduty":
                 # print("USING PAGERDUTY")
-
                 # PagerDuty normalized format
                 created_at = incident.get("created_at")
                 acknowledged_at = incident.get("acknowledged_at")
@@ -1494,6 +1501,7 @@ class UnifiedBurnoutAnalyzer:
             if created_at:
                 dt = self._parse_iso_utc(created_at)
                 dt_local = self._to_local(dt, user_tz)
+                # print("LOCAL pagerduty/rootly Weekday at: ", dt_local.weekday())
 
                 # # Uncomment to test and validate:
                 # print("PAGE DUTY or ROOTLY Regular: ", dt)
@@ -1586,6 +1594,7 @@ class UnifiedBurnoutAnalyzer:
                     continue
                 dt_local = self._to_local(dt_utc, user_tz)
                 commit_hours.append(dt_local.hour)
+                print("LOCAL Github weekday at: ", dt_local.weekday())
                 commit_weekdays.append(dt_local.weekday())
 
                 date_key = dt_local.date()
@@ -1604,8 +1613,8 @@ class UnifiedBurnoutAnalyzer:
                 unique_hours = len(set(commit_hours))
                 enhanced["work_hours_spread"] = unique_hours / 24.0  # 0-1 scale
 
-                # Late night coding pattern (11PM - 6AM commits)
-                late_night_commits = sum(1 for h in commit_hours if h >= 23 or h <= 6)
+                # Late night coding pattern (using standard constants: 10PM - 6AM)
+                late_night_commits = sum(1 for h in commit_hours if h >= LATE_NIGHT_START or h <= LATE_NIGHT_END)
                 enhanced["late_night_coding_ratio"] = late_night_commits / len(commits) if commits else 0
 
         # 2. Pull Request Patterns (cognitive load and social engagement)
@@ -1713,7 +1722,10 @@ class UnifiedBurnoutAnalyzer:
         channels = slack_data.get("channels_active", 0)
         response_times = slack_data.get("response_times", [])
 
+        print("seeing slack mesages")
+
         if messages:
+
             message_hours = []
             message_weekdays = []
             daily_message_counts = {}
@@ -1727,18 +1739,19 @@ class UnifiedBurnoutAnalyzer:
                 # print("SLACK TIME UTC: ", dt_utc)
                 # print("AFTER TIME AFTER TZ ADJUSTMENT: ", dt_local)
                 message_hours.append(dt_local.hour)
+
                 message_weekdays.append(dt_local.weekday())
 
                 date_key = dt_local.date()
                 daily_message_counts[date_key] = daily_message_counts.get(date_key, 0) + 1
             
-            # After-hours communication burden
+            # After-hours communication burden (using standard constants)
             if message_hours:
-                after_hours_msgs = sum(1 for h in message_hours if h >= 18 or h <= 8)
+                after_hours_msgs = sum(1 for h in message_hours if h < BUSINESS_HOURS_START or h >= BUSINESS_HOURS_END)
                 enhanced["slack_after_hours_ratio"] = after_hours_msgs / len(messages)
 
-                # Late night communication stress (10PM - 6AM)
-                late_night_msgs = sum(1 for h in message_hours if h >= 22 or h <= 6)
+                # Late night communication stress (using standard constants)
+                late_night_msgs = sum(1 for h in message_hours if h >= LATE_NIGHT_START or h <= LATE_NIGHT_END)
                 enhanced["slack_late_night_ratio"] = late_night_msgs / len(messages)
 
             # Weekend communication encroachment
@@ -2260,16 +2273,16 @@ class UnifiedBurnoutAnalyzer:
             hour = incident_time.hour
             weekday = incident_time.weekday()
 
-            # After hours: before 8am or after 6pm
-            if hour < 8 or hour > 18:
+            # After hours: before 9 AM or 6 PM and later (using standard constants)
+            if hour < BUSINESS_HOURS_START or hour >= BUSINESS_HOURS_END:
                 time_impacts['after_hours_incidents'] += 1
 
             # Weekend: Saturday (5) or Sunday (6)
             if weekday >= 5:
                 time_impacts['weekend_incidents'] += 1
 
-            # Overnight: 11pm to 6am
-            if hour >= 23 or hour <= 6:
+            # Overnight: 10 PM to 6 AM (using standard constants for late night)
+            if hour >= LATE_NIGHT_START or hour <= LATE_NIGHT_END:
                 time_impacts['overnight_incidents'] += 1
 
         return time_impacts
@@ -2684,8 +2697,8 @@ class UnifiedBurnoutAnalyzer:
     
     def _calculate_response_time(self, created_at: str, started_at: str, user_tz: str) -> Optional[float]:
         """Calculate response time in minutes."""
-        created = self._parse_iso_utc(created_at)
-        started = self._parse_iso_utc(started_at)
+        created = self._to_local(self._parse_iso_utc(created_at), user_tz)
+        started = self._to_local(self._parse_iso_utc(started_at), user_tz)
 
         if created and started:
             return (started - created).total_seconds() / 60
@@ -3111,10 +3124,12 @@ class UnifiedBurnoutAnalyzer:
                         try:
                             # TODO:double-check, possibly adjust timezone
                             incident_date_utc = self._parse_iso_utc(created_at)
-                            if not incident_date_utc:
+                            tzname = self._get_user_tz(user.get('user_id'), "UTC")
+                            incident_date = self._to_local(incident_date_utc, tzname)
+                            if not incident_date:
                                 continue
 
-                            date_str = incident_date_utc.strftime("%Y-%m-%d")
+                            date_str = incident_date.strftime("%Y-%m-%d")
 
                             # Initialize day data if this is the first incident for this day
                             if date_str not in daily_data:
@@ -3157,10 +3172,10 @@ class UnifiedBurnoutAnalyzer:
                                             severity_weight = 3.0   # Moderate impact, standard response
                             
                             daily_data[date_str]["severity_weighted_count"] += severity_weight
-                            
-                            # Check if after hours (rough approximation)
-                            incident_hour = incident_date_utc.hour
-                            if incident_hour < 8 or incident_hour > 18:
+
+                            # Check if after hours (using standard constants)
+                            incident_hour = incident_date.hour
+                            if incident_hour < BUSINESS_HOURS_START or incident_hour >= BUSINESS_HOURS_END:
                                 daily_data[date_str]["after_hours_count"] += 1
                             
                             # Track users involved - handle both platforms
@@ -3221,9 +3236,9 @@ class UnifiedBurnoutAnalyzer:
                                     # Enhanced daily summary data collection
                                     daily_summary = user_day_data["daily_summary"]
                                     daily_summary["total_incidents"] = user_day_data["incident_count"]
-                                    
-                                    # Track after-hours and weekend work
-                                    if incident_hour < 8 or incident_hour > 18:
+
+                                    # Track after-hours and weekend work (using standard constants)
+                                    if incident_hour < BUSINESS_HOURS_START or incident_hour >= BUSINESS_HOURS_END:
                                         user_day_data["after_hours_count"] += 1
                                         daily_summary["after_hours_incidents"] = user_day_data["after_hours_count"]
                                     
@@ -3310,9 +3325,9 @@ class UnifiedBurnoutAnalyzer:
                                 if user_key in individual_daily_data and date_str in individual_daily_data[user_key]:
                                     daily_summary = user_day_data["daily_summary"]
                                     daily_summary["total_incidents"] = user_day_data["incident_count"]
-                                    
-                                    # Track after-hours and weekend work
-                                    if incident_hour < 8 or incident_hour > 18:
+
+                                    # Track after-hours and weekend work (using standard constants)
+                                    if incident_hour < BUSINESS_HOURS_START or incident_hour >= BUSINESS_HOURS_END:
                                         daily_summary["after_hours_incidents"] = user_day_data["after_hours_count"]
                                     
                                     # Store weekend incidents
@@ -3346,7 +3361,6 @@ class UnifiedBurnoutAnalyzer:
                                         if "response_times" not in daily_summary:
                                             daily_summary["response_times"] = []
                                         daily_summary["response_times"].append(response_time)
-                                        
                                         # Calculate average response time
                                         avg_response = sum(daily_summary["response_times"]) / len(daily_summary["response_times"])
                                         daily_summary["avg_response_time_minutes"] = avg_response
@@ -3358,7 +3372,7 @@ class UnifiedBurnoutAnalyzer:
                                     "title": incident_title,
                                     "severity": severity_weight,
                                     "severity_level": severity_level,
-                                    "after_hours": incident_hour < 8 or incident_hour > 18,
+                                    "after_hours": incident_hour < BUSINESS_HOURS_START or incident_hour >= BUSINESS_HOURS_END,
                                     "hour": incident_hour,
                                     "created_at": created_at
                                 })
@@ -4172,7 +4186,9 @@ class UnifiedBurnoutAnalyzer:
                 return 0  # equal severity
         except Exception:
             return 0
+
     
+    #TODO
     def _extract_response_time(self, incident: Dict[str, Any]) -> float:
         """Extract response time in minutes from platform-specific incident data."""
         try:
