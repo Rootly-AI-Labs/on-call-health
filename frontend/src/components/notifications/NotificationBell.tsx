@@ -61,7 +61,7 @@ export function NotificationBell() {
           size="sm"
           className="relative p-2 h-9 w-9"
         >
-          <Bell className="h-4 w-4" />
+          <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
             <Badge
               variant="destructive"
@@ -77,12 +77,12 @@ export function NotificationBell() {
         <SheetHeader className="border-b border-gray-200 px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-gray-200">
-                <Bell className="h-8 w-8 text-gray-700" />
+              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-gray-100">
+                <Bell className="h-5 w-5 text-gray-700" />
               </div>
               <div>
-                <SheetTitle className="text-2xl font-bold">Notifications</SheetTitle>
-                <p className="text-sm text-gray-600 mt-1">
+                <SheetTitle className="text-xl font-bold">Notifications</SheetTitle>
+                <p className="text-sm text-gray-500">
                   {unreadCount} {unreadCount === 1 ? "unread notification" : "unread notifications"}
                 </p>
               </div>
@@ -92,7 +92,7 @@ export function NotificationBell() {
                 variant="ghost"
                 size="sm"
                 onClick={markAllAsRead}
-                className="text-sm font-medium text-gray-600 hover:text-gray-900"
+                className="text-sm text-gray-500 hover:text-gray-700"
               >
                 Mark all read
               </Button>

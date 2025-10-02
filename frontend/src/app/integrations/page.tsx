@@ -318,7 +318,7 @@ export default function IntegrationsPage() {
   // Invite modal state
   const [showInviteModal, setShowInviteModal] = useState(false)
   const [inviteEmail, setInviteEmail] = useState("")
-  const [inviteRole, setInviteRole] = useState("member")
+  const [inviteRole, setInviteRole] = useState("manager")
   const [isInviting, setIsInviting] = useState(false)
 
   // Organization members and invitations state
@@ -359,8 +359,10 @@ export default function IntegrationsPage() {
   // Disconnect confirmation state
   const [githubDisconnectDialogOpen, setGithubDisconnectDialogOpen] = useState(false)
   const [slackDisconnectDialogOpen, setSlackDisconnectDialogOpen] = useState(false)
+  const [slackSurveyDisconnectDialogOpen, setSlackSurveyDisconnectDialogOpen] = useState(false)
   const [isDisconnectingGithub, setIsDisconnectingGithub] = useState(false)
   const [isDisconnectingSlack, setIsDisconnectingSlack] = useState(false)
+  const [isDisconnectingSlackSurvey, setIsDisconnectingSlackSurvey] = useState(false)
   const [slackPermissions, setSlackPermissions] = useState<any>(null)
   const [isLoadingPermissions, setIsLoadingPermissions] = useState(false)
 
@@ -912,7 +914,7 @@ export default function IntegrationsPage() {
     }
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/auth/users/${userId}/role?new_role=${newRole}`, {
+      const response = await fetch(`${API_BASE}/api/auth/users/${userId}/role?new_role=${newRole}`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${authToken}`,
@@ -3627,13 +3629,26 @@ export default function IntegrationsPage() {
 
                   {/* Slack Connection Status */}
                   {slackIntegration ? (
-                    <div className="inline-flex items-center space-x-2 bg-green-100 text-green-800 px-4 py-2 rounded-lg text-sm font-medium">
-                      <CheckCircle className="w-4 h-4" />
-                      <span>Connected</span>
-                      {slackIntegration.connection_type === 'oauth' && slackIntegration.workspace_name && (
-                        <span className="ml-2 text-xs text-green-700">({slackIntegration.workspace_name})</span>
-                      )}
-                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button className="inline-flex items-center space-x-2 bg-green-100 text-green-800 px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-200 transition-colors">
+                          <CheckCircle className="w-4 h-4" />
+                          <span>Connected</span>
+                          {slackIntegration.connection_type === 'oauth' && slackIntegration.workspace_name && (
+                            <span className="ml-2 text-xs text-green-700">({slackIntegration.workspace_name})</span>
+                          )}
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50 cursor-pointer"
+                          onClick={() => setSlackSurveyDisconnectDialogOpen(true)}
+                        >
+                          <X className="w-4 h-4 mr-2" />
+                          Disconnect
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   ) : process.env.NEXT_PUBLIC_SLACK_CLIENT_ID ? (
                     <Button
                       onClick={() => {
@@ -5719,7 +5734,7 @@ export default function IntegrationsPage() {
           <DialogHeader>
             <DialogTitle>Disconnect Slack Integration</DialogTitle>
             <DialogDescription>
-              Are you sure you want to disconnect your Slack integration? 
+              Are you sure you want to disconnect your Slack integration?
               This will remove access to your Slack workspace data and you'll need to reconnect to use Slack features again.
             </DialogDescription>
           </DialogHeader>
@@ -5743,6 +5758,67 @@ export default function IntegrationsPage() {
                 </>
               ) : (
                 "Disconnect Slack"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Slack Survey Disconnect Confirmation Dialog */}
+      <Dialog open={slackSurveyDisconnectDialogOpen} onOpenChange={setSlackSurveyDisconnectDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Disconnect Slack Survey Integration</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to disconnect the Slack Survey integration?
+              This will disable survey delivery and the /burnout-survey command in your Slack workspace.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setSlackSurveyDisconnectDialogOpen(false)}
+              disabled={isDisconnectingSlackSurvey}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={async () => {
+                setIsDisconnectingSlackSurvey(true)
+                try {
+                  const authToken = localStorage.getItem('auth_token')
+                  const response = await fetch(`${API_BASE}/api/integrations/slack/${slackIntegration.id}`, {
+                    method: 'DELETE',
+                    headers: {
+                      'Authorization': `Bearer ${authToken}`
+                    }
+                  })
+
+                  if (response.ok) {
+                    toast.success('Slack Survey integration disconnected')
+                    setSlackSurveyDisconnectDialogOpen(false)
+                    window.location.reload()
+                  } else {
+                    const error = await response.json()
+                    toast.error(error.detail || 'Failed to disconnect Slack')
+                  }
+                } catch (error) {
+                  console.error('Failed to disconnect Slack Survey:', error)
+                  toast.error('Failed to disconnect Slack Survey integration')
+                } finally {
+                  setIsDisconnectingSlackSurvey(false)
+                }
+              }}
+              disabled={isDisconnectingSlackSurvey}
+            >
+              {isDisconnectingSlackSurvey ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Disconnecting...
+                </>
+              ) : (
+                "Disconnect"
               )}
             </Button>
           </DialogFooter>
@@ -5800,6 +5876,20 @@ export default function IntegrationsPage() {
             </DialogDescription>
           </DialogHeader>
 
+          {/* Role descriptions - at the top of modal */}
+          <div className="mt-4 px-4 py-3 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg">
+            <div className="space-y-1.5 text-xs">
+              <div className="flex items-baseline space-x-2">
+                <span className="font-semibold text-gray-900 min-w-[80px]">Org Admin</span>
+                <span className="text-gray-700">Everything a Manager can do, plus manage integrations, invite members, and configure settings</span>
+              </div>
+              <div className="flex items-baseline space-x-2">
+                <span className="font-semibold text-gray-900 min-w-[80px]">Manager</span>
+                <span className="text-gray-700">Full access to view team burnout data, run analyses, and send surveys</span>
+              </div>
+            </div>
+          </div>
+
           <div className="space-y-6">
             {/* Invite New Member Section */}
             <div className="p-6 border rounded-lg bg-gradient-to-br from-purple-50 to-white">
@@ -5837,9 +5927,8 @@ export default function IntegrationsPage() {
                         onChange={(e) => setInviteRole(e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
                       >
-                        <option value="member">Member</option>
                         <option value="manager">Manager</option>
-                        <option value="org_admin">Admin</option>
+                        <option value="org_admin">Org Admin</option>
                       </select>
                     </div>
                   </div>
@@ -5906,12 +5995,11 @@ export default function IntegrationsPage() {
                                   </span>
                                 ) : (
                                   <select
-                                    value={member.role || 'member'}
+                                    value={member.role || 'manager'}
                                     onChange={(e) => handleRoleChange(member.id, e.target.value)}
                                     className="text-xs px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
                                     disabled={userInfo?.role !== 'org_admin'}
                                   >
-                                    <option value="member">Member</option>
                                     <option value="manager">Manager</option>
                                     <option value="org_admin">Org Admin</option>
                                   </select>

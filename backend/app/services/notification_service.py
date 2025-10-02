@@ -48,7 +48,7 @@ class NotificationService:
                 user_id=inviter.id,
                 organization_id=invitation.organization_id,
                 type='invitation',
-                title=f"🎉 {accepted_by.name or accepted_by.email} accepted your invitation!",
+                title=f"{accepted_by.name or accepted_by.email} accepted your invitation",
                 message=f"{accepted_by.email} accepted your invitation and joined {invitation.organization.name} as a {invitation.role}.",
                 action_url=f"/integrations?tab=members",
                 action_text="View Team Members",
@@ -95,7 +95,7 @@ class NotificationService:
 
         # Build notification message
         user_name = user.name or user.email
-        title = "📝 New survey response received"
+        title = "New survey response received"
         message = f"{user_name} submitted a burnout survey response."
 
         # Set action URL based on whether there's an analysis
@@ -285,11 +285,11 @@ class NotificationService:
         ).all()
 
         if is_manual and triggered_by:
-            title = "📤 Survey delivery sent"
+            title = "Survey delivery sent"
             triggerer_name = triggered_by.name or triggered_by.email
             message = f"{triggerer_name} sent burnout surveys to {recipient_count} team members via Slack."
         else:
-            title = "📅 Scheduled surveys sent"
+            title = "Scheduled surveys sent"
             message = f"Daily burnout surveys were automatically sent to {recipient_count} team members via Slack."
 
         for admin in org_admins:

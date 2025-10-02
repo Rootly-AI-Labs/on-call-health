@@ -70,7 +70,7 @@ export function SlackSurveyTabs({
     setLoadingSchedule(true)
     try {
       const authToken = localStorage.getItem('auth_token')
-      const response = await fetch(`${API_BASE}/surveys/survey-schedule`, {
+      const response = await fetch(`${API_BASE}/api/surveys/survey-schedule`, {
         headers: {
           'Authorization': `Bearer ${authToken}`
         }
@@ -94,7 +94,7 @@ export function SlackSurveyTabs({
     setSavingSchedule(true)
     try {
       const authToken = localStorage.getItem('auth_token')
-      const response = await fetch(`${API_BASE}/surveys/survey-schedule`, {
+      const response = await fetch(`${API_BASE}/api/surveys/survey-schedule`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -242,7 +242,7 @@ export function SlackSurveyTabs({
                   <span className="text-green-600 text-xs font-bold">1</span>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-700"><strong>Authorize the app</strong> to add slash commands to your Slack workspace</p>
+                  <p className="text-sm text-gray-700"><strong>Authorize the app</strong> to deliver 3-question burnout surveys via Slack</p>
                 </div>
               </div>
 
@@ -251,10 +251,10 @@ export function SlackSurveyTabs({
                   <span className="text-green-600 text-xs font-bold">2</span>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-700"><strong>Team members type</strong> <code className="bg-gray-100 px-1 rounded text-xs">/burnout-survey</code></p>
+                  <p className="text-sm text-gray-700"><strong>Team members receive surveys</strong> via automated DMs or by typing <code className="bg-gray-100 px-1 rounded text-xs">/burnout-survey</code></p>
                   <div className="bg-slate-800 rounded p-3 font-mono text-sm text-green-400 mt-2">
                     <div>/burnout-survey</div>
-                    <div className="text-slate-400 mt-1">→ Opens 2-minute burnout survey with 3 questions</div>
+                    <div className="text-slate-400 mt-1">→ Opens interactive modal with 3 scored questions + optional text</div>
                   </div>
                 </div>
               </div>
@@ -264,7 +264,7 @@ export function SlackSurveyTabs({
                   <span className="text-green-600 text-xs font-bold">3</span>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-700"><strong>Survey responses appear automatically</strong> in your burnout analysis to validate automated detection</p>
+                  <p className="text-sm text-gray-700"><strong>Survey data automatically integrates</strong> with your burnout analysis to validate automated detection patterns</p>
                 </div>
               </div>
             </div>
@@ -388,7 +388,8 @@ export function SlackSurveyTabs({
                     onClick={syncUsersToCorrelation}
                     disabled={loadingTeamMembers || !selectedOrganization}
                     size="sm"
-                    className="flex items-center space-x-2 bg-purple-600 hover:bg-purple-700 text-white"
+                    variant="outline"
+                    className="flex items-center space-x-2 border-purple-300 text-purple-700 hover:bg-purple-50"
                   >
                     {loadingTeamMembers ? (
                       <>
