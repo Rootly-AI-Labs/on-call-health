@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from ...models import get_db, User, RootlyIntegration
+from ...models import get_db, User, RootlyIntegration, UserCorrelation
 from ...auth.dependencies import get_current_active_user
 from ...core.rootly_client import RootlyAPIClient
 from ...core.rate_limiting import integration_rate_limit
@@ -1050,7 +1050,6 @@ async def get_synced_users(
     Optionally filter by integration_id to show only users from a specific organization.
     """
     try:
-        from app.models import UserCorrelation
         from sqlalchemy import func, cast, String
 
         # Fetch all user correlations for this user
