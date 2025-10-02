@@ -457,7 +457,7 @@ export default function IntegrationsPage() {
     // Always fetch fresh user info from API to ensure role is up-to-date
     const authToken = localStorage.getItem('auth_token')
     if (authToken) {
-      const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'
       fetch(`${API_BASE}/auth/user/me`, {
         headers: {
           'Authorization': `Bearer ${authToken}`,
