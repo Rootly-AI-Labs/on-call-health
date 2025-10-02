@@ -145,7 +145,7 @@ class UserSyncService:
                     user_id=current_user.id,
                     email=email,
                     name=user.get("name"),  # Store user's display name
-                    integration_id=integration_id  # Store which integration synced this user
+                    integration_ids=[integration_id] if integration_id else []  # Initialize array
                 )
                 self._update_correlation(correlation, user, platform, integration_id)
                 self.db.add(correlation)
@@ -179,10 +179,14 @@ class UserSyncService:
         """
         updated = False
 
-        # Update integration_id if provided and different
-        if integration_id and correlation.integration_id != integration_id:
-            correlation.integration_id = integration_id
-            updated = True
+        # Update integration_ids array - add if not already present
+        if integration_id:
+            if not correlation.integration_ids:
+                correlation.integration_ids = [integration_id]
+                updated = True
+            elif integration_id not in correlation.integration_ids:
+                correlation.integration_ids = correlation.integration_ids + [integration_id]
+                updated = True
 
         # Update name if available and different
         if user.get("name") and correlation.name != user["name"]:

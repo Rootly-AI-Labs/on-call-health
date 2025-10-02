@@ -1,7 +1,7 @@
 """
 User correlation model for mapping users across different platforms.
 """
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, JSON
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from .base import Base
@@ -17,7 +17,7 @@ class UserCorrelation(Base):
     slack_user_id = Column(String(20), nullable=True, index=True)
     rootly_email = Column(String(255), nullable=True)
     pagerduty_user_id = Column(String(50), nullable=True)
-    integration_id = Column(String(100), nullable=True, index=True)  # Track which integration synced this user
+    integration_ids = Column(JSON, nullable=True)  # Array of integration IDs this user belongs to
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     # Relationships

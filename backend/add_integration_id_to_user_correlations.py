@@ -1,9 +1,9 @@
 """
-Migration script to add integration_id column to user_correlations table.
+Migration script to add integration_ids column to user_correlations table.
 
 This script:
-1. Adds integration_id column to user_correlations table
-2. Creates an index on integration_id for query performance
+1. Adds integration_ids JSON column to user_correlations table
+2. Allows users to belong to multiple organizations
 3. Handles both PostgreSQL and SQLite databases
 
 Run this script directly:
@@ -27,48 +27,52 @@ def check_column_exists(table_name: str, column_name: str) -> bool:
     return column_name in columns
 
 def add_integration_id_column():
-    """Add integration_id column to user_correlations table."""
+    """Add integration_ids JSON column to user_correlations table."""
 
     print("=" * 60)
-    print("Migration: Add integration_id to user_correlations")
+    print("Migration: Add integration_ids to user_correlations")
     print("=" * 60)
 
     # Check if column already exists
-    if check_column_exists('user_correlations', 'integration_id'):
-        print("✓ Column 'integration_id' already exists in user_correlations table")
+    if check_column_exists('user_correlations', 'integration_ids'):
+        print("✓ Column 'integration_ids' already exists in user_correlations table")
         print("  No migration needed.")
         return
 
-    print("Adding 'integration_id' column to user_correlations table...")
+    print("Adding 'integration_ids' JSON column to user_correlations table...")
 
     with engine.connect() as conn:
         try:
-            # Add the column
+            # Add the column (JSON type for PostgreSQL, TEXT for SQLite)
             print("  - Adding column...")
-            conn.execute(text(
-                "ALTER TABLE user_correlations "
-                "ADD COLUMN integration_id VARCHAR(100)"
-            ))
-            conn.commit()
+            # Try PostgreSQL JSON type first
+            try:
+                conn.execute(text(
+                    "ALTER TABLE user_correlations "
+                    "ADD COLUMN integration_ids JSON"
+                ))
+                conn.commit()
+            except Exception as e:
+                # Fallback to JSONB for PostgreSQL or TEXT for SQLite
+                print(f"    Note: {str(e)}")
+                print("    Trying JSONB type...")
+                conn.rollback()
+                conn.execute(text(
+                    "ALTER TABLE user_correlations "
+                    "ADD COLUMN integration_ids JSONB"
+                ))
+                conn.commit()
             print("  ✓ Column added successfully")
-
-            # Create index
-            print("  - Creating index on integration_id...")
-            conn.execute(text(
-                "CREATE INDEX IF NOT EXISTS idx_user_correlations_integration_id "
-                "ON user_correlations(integration_id)"
-            ))
-            conn.commit()
-            print("  ✓ Index created successfully")
 
             print("\n" + "=" * 60)
             print("Migration completed successfully!")
             print("=" * 60)
             print("\nNext steps:")
-            print("1. The integration_id column is now available")
-            print("2. Existing records have NULL integration_id (backward compatible)")
-            print("3. New syncs will populate integration_id automatically")
-            print("4. Re-sync users from each organization to populate integration_id")
+            print("1. The integration_ids column is now available (JSON array)")
+            print("2. Existing records have NULL integration_ids (backward compatible)")
+            print("3. New syncs will populate integration_ids automatically")
+            print("4. Users can now belong to multiple organizations")
+            print("5. Re-sync users from each organization to populate integration_ids")
 
         except Exception as e:
             conn.rollback()

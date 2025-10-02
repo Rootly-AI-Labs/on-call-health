@@ -1051,17 +1051,25 @@ async def get_synced_users(
     """
     try:
         from app.models import UserCorrelation
+        from sqlalchemy import func, cast, String
 
         # Fetch all user correlations for this user
         query = db.query(UserCorrelation).filter(
             UserCorrelation.user_id == current_user.id
         )
 
-        # Filter by integration_id if provided
-        if integration_id:
-            query = query.filter(UserCorrelation.integration_id == integration_id)
-
+        # Get all correlations, then filter in Python
+        # This is simpler and works across all database types
         correlations = query.order_by(UserCorrelation.name).all()
+
+        # Filter by integration_id if provided (check if value is in JSON array)
+        if integration_id:
+            filtered_correlations = []
+            for corr in correlations:
+                # Include if integration_ids is None (not yet synced) or contains the integration_id
+                if corr.integration_ids is None or integration_id in (corr.integration_ids or []):
+                    filtered_correlations.append(corr)
+            correlations = filtered_correlations
 
         # Format the response
         synced_users = []
