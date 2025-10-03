@@ -999,15 +999,70 @@ async def sync_integration_users(
     """
     try:
         from app.services.user_sync_service import UserSyncService
-        
-        # Handle beta integrations differently
+        import os
+        from app.core.rootly_client import RootlyAPIClient
+        from app.core.pagerduty_client import PagerDutyAPIClient
+
+        # Handle beta integrations - use shared tokens from env
         if integration_id in ["beta-rootly", "beta-pagerduty"]:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Cannot sync beta integration users. Please use your own integration."
+            sync_service = UserSyncService(db)
+
+            # Get beta token from environment
+            if integration_id == "beta-rootly":
+                beta_token = os.getenv('ROOTLY_API_TOKEN')
+                if not beta_token:
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail="Beta Rootly token not configured"
+                    )
+                # Fetch users directly from API
+                client = RootlyAPIClient(beta_token)
+                raw_users = await client.get_users(limit=1000)
+                users = []
+                for user in raw_users:
+                    attrs = user.get("attributes", {})
+                    users.append({
+                        "id": user.get("id"),
+                        "email": attrs.get("email"),
+                        "name": attrs.get("name") or attrs.get("full_name"),
+                        "platform": "rootly"
+                    })
+                platform = "rootly"
+            else:  # beta-pagerduty
+                beta_token = os.getenv('PAGERDUTY_API_TOKEN')
+                if not beta_token:
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail="Beta PagerDuty token not configured"
+                    )
+                # Fetch users directly from API
+                client = PagerDutyAPIClient(beta_token)
+                raw_users = await client.get_users(limit=1000)
+                users = []
+                for user in raw_users:
+                    users.append({
+                        "id": user.get("id"),
+                        "email": user.get("email"),
+                        "name": user.get("name"),
+                        "platform": "pagerduty"
+                    })
+                platform = "pagerduty"
+
+            # Sync to user_correlations with organization_id
+            stats = sync_service._sync_users_to_correlation(
+                users=users,
+                platform=platform,
+                current_user=current_user,
+                integration_id=integration_id
             )
-        
-        # Convert to integer for regular integrations
+
+            return {
+                "success": True,
+                "message": f"Successfully synced {stats['total']} users from beta integration",
+                "stats": stats
+            }
+
+        # Regular integration - convert to integer
         try:
             numeric_id = int(integration_id)
         except ValueError:
@@ -1015,14 +1070,14 @@ async def sync_integration_users(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Invalid integration ID: {integration_id}"
             )
-        
-        # Sync users
+
+        # Sync users from database integration
         sync_service = UserSyncService(db)
         stats = await sync_service.sync_integration_users(
             integration_id=numeric_id,
             current_user=current_user
         )
-        
+
         return {
             "success": True,
             "message": f"Successfully synced {stats['total']} users from integration",
