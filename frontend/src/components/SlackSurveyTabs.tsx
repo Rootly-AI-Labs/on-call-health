@@ -79,6 +79,7 @@ export function SlackSurveyTabs({
 
       if (response.ok) {
         const data = await response.json()
+        console.log('📅 Loaded schedule from DB:', data) // Debug logging
 
         // Handle case where schedule exists
         if (data.enabled !== undefined) {
@@ -90,10 +91,12 @@ export function SlackSurveyTabs({
             setScheduleTime(timeOnly)
             setSavedScheduleTime(timeOnly) // Store the saved time from DB
           } else {
+            // No send_time means no schedule saved yet
             setSavedScheduleTime(null)
+            setScheduleTime('09:00') // Reset to default
           }
         } else {
-          // Handle case where no schedule is configured
+          // Handle case where no schedule is configured (shouldn't happen with new backend)
           setScheduleEnabled(false)
           setScheduleTime('09:00')
           setSavedScheduleTime(null)
@@ -119,23 +122,28 @@ export function SlackSurveyTabs({
     setSavingSchedule(true)
     try {
       const authToken = localStorage.getItem('auth_token')
+      const payload = {
+        enabled: scheduleEnabled,
+        send_time: scheduleTime,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        send_weekdays_only: true,
+        send_reminder: false,
+        reminder_hours_after: 5
+      }
+      console.log('💾 Saving schedule:', payload) // Debug logging
+
       const response = await fetch(`${API_BASE}/api/surveys/survey-schedule`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${authToken}`
         },
-        body: JSON.stringify({
-          enabled: scheduleEnabled,
-          send_time: scheduleTime,
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-          send_weekdays_only: true,
-          send_reminder: false,
-          reminder_hours_after: 5
-        })
+        body: JSON.stringify(payload)
       })
 
       if (response.ok) {
+        const responseData = await response.json()
+        console.log('✅ Save response:', responseData) // Debug logging
         toast.success('Schedule saved successfully')
         // Reload schedule from DB to ensure we display exactly what's saved
         await loadSchedule()
