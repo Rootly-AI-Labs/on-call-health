@@ -1,6 +1,10 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@theme {
+  --font-display: "PP Mori", "sans-serif";
+}
  
 @layer base {
   :root {

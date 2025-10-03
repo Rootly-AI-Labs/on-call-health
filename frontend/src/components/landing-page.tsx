@@ -3,11 +3,12 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Activity, Link2, Brain, Target, Github, Chrome, Shield, Users, TrendingUp, Loader2 } from "lucide-react"
-import Link from "next/link"
+import { Link2, Brain, Target, Github, Chrome, Loader2, Flame } from "lucide-react";
 import Image from "next/image"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+
+// TODO: set the meta title and description - what's the right way of doing it?
 
 export default function LandingPage() {
   const [isLoading, setIsLoading] = useState<'google' | 'github' | null>(null)
@@ -65,48 +66,48 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Header */}
-      <header className="border-b border-slate-200 bg-white">
-        <div className="container mx-auto px-4 py-2">
+
+      {/* Hero Section */}
+      <section className="bg-[url(/images/landing/rootly-bg.avif)] relative lg:pb-[120px]" id="get-started">
+        {/* Header */}
+        <div className="px-4 py-2">
           <div className="flex items-center">
             <div className="flex items-center">
-              <span className="text-2xl font-bold text-slate-900">OnCall Burnout</span>
-              <div className="ml-2 flex flex-col items-start -space-y-1">
-                <span className="text-xs text-slate-400">powered by</span>
-                <Image 
-                  src="/images/rootly-ai-logo.png" 
-                  alt="Rootly AI" 
-                  width={160} 
-                  height={64}
-                  className="h-8 w-auto"
-                />
+              <div className="ml-2 mr-6 flex flex-col items-start -space-y-1">
+                <a href="https://rootly.com" target="_blank">
+                  <Image 
+                    src="/images/rootly-ai-logo.png" 
+                    alt="Rootly AI" 
+                    width={321} 
+                    height={129}
+                    className="w-full"
+                  />
+                </a>
               </div>
+              <div className="text-lg leading-[1rem] lg:text-2xl font-semibold text-slate-900">On-call burnout detector</div>
             </div>
           </div>
         </div>
-      </header>
-
-      {/* Hero Section */}
-      <section className="py-20 lg:py-32 bg-gradient-to-b from-slate-50 to-white">
-        <div className="container mx-auto px-4 text-center">
-          <div className="max-w-4xl mx-auto">
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-slate-900 mb-6 leading-tight">
-              Prevent Engineering Burnout Before It
-              <span className="bg-gradient-to-r from-purple-600 to-purple-400 bg-clip-text text-transparent">
-                {" "}
-                Impacts Your Team
-              </span>
+        <div className="container flex flex-col lg:flex-row flex-grow mx-auto px-4">
+          <main className="flex-grow px-5 lg:pr-10 text-white">
+            <h1 className="text-3xl lg:text-5xl tracking-tight mb-6 leading-tight pt-10 lg:pt-20 lg:pb-1">
+              Stop on-call burnout
+              <br />
+               before it starts.
             </h1>
 
-            <p className="text-xl md:text-2xl text-slate-600 mb-12 max-w-3xl mx-auto leading-relaxed">
-              Analyze incident response patterns to identify burnout risk and take action early
+            <p className="text-md lg:text-lg lg:pr-10">
+              An open source, research-based tool that looks for early-warning signs of burnout in your on-call engineers.
             </p>
 
             {/* OAuth Login Buttons */}
-            <div id="login" className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-6">
+            <p className="lg:text-lg font-semibold mt-10 lg:mt-20 mb-3">
+              Get started with the burnout detector, it's free.
+            </p>
+            <div id="login" className="flex flex-col sm:flex-row gap-4 items-center mb-6">
               <Button
                 size="lg"
-                className="w-full sm:w-auto bg-slate-900 hover:bg-slate-800 text-white px-8 py-4 text-lg"
+                className="w-full rounded-full sm:w-auto bg-slate-900 hover:bg-slate-800 text-white px-8 py-4 text-lg"
                 onClick={handleGitHubLogin}
                 disabled={isLoading === 'github'}
               >
@@ -118,14 +119,14 @@ export default function LandingPage() {
                 ) : (
                   <>
                     <Github className="w-5 h-5 mr-3" />
-                    Continue with GitHub
+                    Start with GitHub
                   </>
                 )}
               </Button>
               <Button
                 size="lg"
                 variant="outline"
-                className="w-full sm:w-auto border-slate-300 px-8 py-4 text-lg hover:bg-slate-50 bg-transparent"
+                className="w-full rounded-full sm:w-auto border-slate-300 px-8 py-4 text-lg hover:bg-slate-50 bg-transparent"
                 onClick={handleGoogleLogin}
                 disabled={isLoading === 'google'}
               >
@@ -137,83 +138,72 @@ export default function LandingPage() {
                 ) : (
                   <>
                     <Chrome className="w-5 h-5 mr-3" />
-                    Continue with Google
+                    Start with Google
                   </>
                 )}
               </Button>
             </div>
+          </main>
+          <aside className="w-full">
+            <Image 
+              src="/images/landing/burnout-hero.png" 
+              alt="Burnout detector screenshots" 
+              width={1350} 
+              height={1502}
+              className="w-auto rounded-[28px]"
+            />
+          </aside>
+        </div>
+        <div className="w-full mb-[-1px] absolute h-[120px] bottom-0 left-0 z-0 lg:h-[250px] bg-[url(/images/landing/rootly-bg-gradient.avif)] bg-contain bg-repeat-x">
 
-          </div>
         </div>
       </section>
 
       {/* How It Works Section */}
-      <section className="pt-8 pb-12 bg-white">
+      <section className="pt-8 pb-12 bg-white lg:pt-8">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">How It Works</h2>
+          <div className="text-center mb-4">
+            <h2 className="text-2xl md:text-3xl text-slate-900 mb-4">How it works</h2>
             <p className="text-lg text-slate-600 max-w-3xl mx-auto">
-              Based on scientifically validated burnout research methodology
+              Based on scientifically validated burnout research methodology.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-            <Card className="border-2 border-purple-200 bg-purple-25 hover:border-purple-300 transition-all duration-300 rounded-2xl">
+            <Card className="bg-purple-25 border-none rounded-2xl">
               <CardContent className="p-8">
                 <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-purple-100">
                   <Link2 className="w-8 h-8 text-purple-600" />
                 </div>
-                <h3 className="text-xl font-semibold text-slate-900 mb-4 text-center">Multi-Source Data Collection</h3>
-                <p className="text-slate-600 leading-relaxed text-center mb-4">
-                  Connect your incident management, development, and communication tools
+                <h3 className="text-xl font-semibold text-slate-900 mb-4">Connect your incident tools.</h3>
+                <p className="text-slate-600 leading-relaxed mb-4">
+                  Research shows a majority of on-call burnout risk can be predicted from incident history. Refine accuracy by connecting more tools.
                 </p>
                 <div className="space-y-2 text-sm">
                   <div className="flex items-center space-x-2">
                     <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                    <span className="text-slate-600">Incident data (Rootly/PagerDuty)</span>
+                    <span className="text-slate-600">Start with Rootly or PagerDuty to feed incident data.</span>
                   </div>
                   <div className="flex items-center space-x-2">
                     <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                    <span className="text-slate-600">Code activity (GitHub)</span>
+                    <span className="text-slate-600">Add GitHub for code activity insights (optional).</span>
                   </div>
                   <div className="flex items-center space-x-2">
                     <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                    <span className="text-slate-600">Communication patterns (Slack)</span>
+                    <span className="text-slate-600">Add Slack to explore communication patterns (optional).</span>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="border-2 border-purple-200 bg-purple-25 hover:border-purple-300 transition-all duration-300 rounded-2xl">
+            <Card className="bg-purple-25 border-none rounded-2xl">
               <CardContent className="p-8">
                 <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-purple-100">
                   <Brain className="w-8 h-8 text-purple-600" />
                 </div>
-                <h3 className="text-xl font-semibold text-slate-900 mb-4 text-center">Copenhagen Burnout Inventory</h3>
-                <p className="text-slate-600 leading-relaxed text-center mb-4">
-                  Evidence-based burnout assessment using the scientifically validated CBI framework
-                </p>
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                    <span className="text-slate-600"><strong>Personal Burnout</strong> (50%)</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                    <span className="text-slate-600"><strong>Work-Related Burnout</strong> (50%)</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-2 border-purple-200 bg-purple-25 hover:border-purple-300 transition-all duration-300 rounded-2xl">
-              <CardContent className="p-8">
-                <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-purple-100">
-                  <Target className="w-8 h-8 text-purple-600" />
-                </div>
-                <h3 className="text-xl font-semibold text-slate-900 mb-4 text-center">Risk-Based Recommendations</h3>
-                <p className="text-slate-600 leading-relaxed text-center mb-4">
-                  Get targeted interventions based on your team's specific risk profile
+                <h3 className="text-xl font-semibold text-slate-900 mb-4">See who’s at risk, backed by research.</h3>
+                <p className="text-slate-600 leading-relaxed mb-4">
+                  The burnout detector calculates individual risk scores using the Copenhagen Burnout Inventory (CBI) the most widely used research framework for assessing burnout.
                 </p>
                 <div className="space-y-2 text-sm">
                   <div className="flex items-center space-x-2">
@@ -235,80 +225,132 @@ export default function LandingPage() {
                 </div>
               </CardContent>
             </Card>
+
+            <Card className="bg-purple-25 border-none rounded-2xl">
+              <CardContent className="p-8">
+                <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-purple-100">
+                  <Target className="w-8 h-8 text-purple-600" />
+                </div>
+                <h3 className="text-xl font-semibold text-slate-900 mb-4">Access the results where you need them.</h3>
+                <p className="text-slate-600 leading-relaxed mb-4">
+                  Make the burnout detector part of your powered workflow by getting the results via a UI, CLI, or MCP.
+                </p>
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                    <span className="text-slate-600">Web UI for a simplified navigatoin</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                    <span className="text-slate-600">CLI to incorporate it in your toolchain</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                    <span className="text-slate-600">MCP (Model Context Protocol) to make it part of your AI-powered workflow</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
-          {/* Methodology highlight */}
-          <div className="mt-12 text-center">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 max-w-4xl mx-auto">
-              <p className="text-blue-800 text-sm leading-relaxed">
-                <strong>Evidence-Based Approach:</strong> Our analysis combines workload pressure, after-hours activity, 
-                response time patterns, and communication sentiment to provide a comprehensive burnout risk assessment. 
-                The system adapts based on your available integrations to deliver the most accurate insights possible.
+        </div>
+      </section>
+      <section>
+        <div className="container mt-10">
+          <div className="lg:columns-2 gap-12">
+            <div className="py-10">
+              <h2 className="text-2xl md:text-3xl text-slate-900 mb-4">Burnout signals, backed by data.</h2>
+              <p className="mb-2">
+                Our analysis combines workload pressure, after-hours activity, response time patterns, and communication sentiment to give a holistic view of burnout risk. 
+              </p>
+              <p>
+                The system adapts to the tools you connect, delivering the most accurate insights possible.
               </p>
             </div>
+            <Image 
+              src="/images/landing/calculations.png" 
+              alt="Screenshots of calculation schemes" 
+              width={900} 
+              height={500}
+              className="w-full"
+            />
           </div>
-        </div>
-      </section>
-
-      {/* Value Proposition Section */}
-      <section id="about" className="py-20 bg-gradient-to-r from-purple-50 to-purple-100">
-        <div className="container mx-auto px-4">
-          <div className="max-w-4xl mx-auto text-center">
-            <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-8">
-              Built for engineering leaders who care about their team's well-being
-            </h2>
-
-            <p className="text-xl text-slate-600 mb-12 leading-relaxed">
-              Make data-driven decisions about workload distribution and on-call rotations
-            </p>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
-              <div className="flex flex-col items-center">
-                <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4">
-                  <Shield className="w-6 h-6 text-purple-600" />
-                </div>
-                <h3 className="font-semibold text-slate-900 mb-2">Privacy First</h3>
-                <p className="text-slate-600 text-sm">Your data stays secure with enterprise-grade encryption</p>
-              </div>
-
-              <div className="flex flex-col items-center">
-                <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4">
-                  <Users className="w-6 h-6 text-purple-600" />
-                </div>
-                <h3 className="font-semibold text-slate-900 mb-2">Team Focused</h3>
-                <p className="text-slate-600 text-sm">Designed specifically for engineering team dynamics</p>
-              </div>
-
-              <div className="flex flex-col items-center">
-                <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4">
-                  <TrendingUp className="w-6 h-6 text-purple-600" />
-                </div>
-                <h3 className="font-semibold text-slate-900 mb-2">Actionable Data</h3>
-                <p className="text-slate-600 text-sm">Clear insights you can act on immediately</p>
-              </div>
+          <div className="lg:grid grid-cols-2 gap-12 mt-20">
+            <div className="py-10 lg:order-last">
+              <h2 className="text-2xl md:text-3xl text-slate-900 mb-4">For engineers, by engineers.</h2>
+              <p className="mb-2">
+                On-call engineers and SREs face a disproportionate risk of burnout. At Rootly, we want to help change that.
+              </p>
+              <p className="mb-2">That’s why we built this as <strong>open source</strong>, in the open, for the community.</p>
+              <p>
+                Spearheaded by Rootly AI Labs fellows Spencer Cheng and Sylvain Kalache, the project continues to evolve with contributions from engineers like you. Share feedback, file issues, or contribute code on GitHub—and help shape the future of burnout detection.
+              </p>
             </div>
-
+            <Image 
+              src="/images/landing/open-source.png" 
+              alt="Screenshots of the calculations" 
+              width={900} 
+              height={500}
+              className="w-full"
+            />
           </div>
+          <div className="lg:columns-2 gap-12 mt-20">
+            <div className="py-10">
+              <h2 className="text-2xl md:text-3xl text-slate-900 mb-4">Hosted or self-hosted.</h2>
+              <p className="mb-2">
+                The Rootly Burnout Detector is open source, giving you full flexibility. Use the hosted web version for instant setup, or customize it to fit your workflow.</p>
+              <p className="mb-2">That’s why we built this as open source, in the open, for the community.</p>
+              <p>
+Skip the UI and pull results directly into your CLI via MCP, or fork the code to support niche use cases. That’s the power of open source, adapt it to your team, your way.              </p>
+            </div>
+            <Image 
+              src="/images/landing/views.png" 
+              alt="Screenshots of web UI" 
+              width={900} 
+              height={500}
+              className="w-full"
+            />
+          </div>
+          <Card className="bg-purple-25 border-none rounded-2xl my-10 lg:my-20">
+            <CardContent className="p-8 text-center">
+              <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-purple-100">
+                <Flame className="w-8 h-8 text-purple-600" />
+              </div>
+              <h2 className="text-2xl md:text-3xl text-slate-900 mb-6">Detect who’s at risk of burnout in your team.</h2>
+              <div className="flex flex-col justify-center sm:flex-row gap-4 items-center mb-6">
+                <a href="#get-started"
+                  className="w-full rounded-full sm:w-auto bg-slate-900 hover:bg-slate-800 text-white px-8 py-4 text-lg"
+                >
+                  Get started
+                </a>
+                <a
+                  href="https://github.com/Rootly-AI-Labs/rootly-burnout-detector-web/tree/main"
+                  target="_blank"
+                  className="w-full rounded-full sm:w-auto border-slate-300 px-8 py-4 text-lg hover:bg-slate-50 bg-transparent border border-input bg-background hover:bg-accent hover:text-accent-foreground"
+                >
+                  <Github className="w-5 h-5 mr-3 inline-block" /> See project on GitHub 
+                </a>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </section>
 
-      {/* Footer */}
       <footer className="bg-slate-900 text-slate-300 py-12">
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="flex items-center mb-4 md:mb-0">
               <div className="flex items-center">
-                <span className="text-2xl font-semibold text-white">OnCall Burnout</span>
-                <div className="ml-2 flex flex-col items-start -space-y-1">
-                  <span className="text-xs text-slate-500">powered by</span>
-                  <Image 
-                    src="/images/rootly-ai-logo.png" 
-                    alt="Rootly AI" 
-                    width={160} 
-                    height={64}
-                    className="h-8 w-auto opacity-80 brightness-0 invert"
-                  />
-                </div>
+                  <a href="https://rootly.com" target="_blank" className="mr-6">
+                    <Image 
+                      src="/images/rootly-ai-logo.png" 
+                      alt="Rootly AI" 
+                      width={160} 
+                      height={64}
+                      className="w-full brightness-0 invert"
+                    />
+                  </a>
+                <span className="text-lg leading-[1rem] lg:text-2xl font-semibold text-white">On-call burnout detector</span>
               </div>
             </div>
 
@@ -321,7 +363,7 @@ export default function LandingPage() {
 
           <div className="border-t border-slate-800 mt-8 pt-8 text-center">
             <p className="text-slate-400">
-              © {new Date().getFullYear()} OnCall Burnout by Rootly AI.
+              © {new Date().getFullYear()} Rootly, Inc.
             </p>
           </div>
         </div>

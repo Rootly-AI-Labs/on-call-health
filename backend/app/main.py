@@ -18,7 +18,14 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title="Rootly Burnout Detector API",
     description="API for detecting burnout risk in engineering teams using Rootly incident data",
-    version="1.0.0"
+    version="1.0.0",
+    swagger_ui_parameters={
+        "defaultModelsExpandDepth": 1,  # Don't expand schemas deeply
+        "syntaxHighlight.theme": "monokai",
+        "displayRequestDuration": True,
+        "filter": True,
+        "tryItOutEnabled": True,
+    }
 )
 
 # Add rate limiting to the app
@@ -129,8 +136,7 @@ async def startup_event():
 app.include_router(auth.router, prefix="/auth", tags=["authentication"])
 app.include_router(rootly.router, prefix="/rootly", tags=["rootly"])
 app.include_router(pagerduty.router, prefix="/pagerduty", tags=["pagerduty"])
-app.include_router(analysis.router, prefix="/analysis", tags=["analysis"])
-app.include_router(analyses.router, prefix="/analyses", tags=["burnout-analyses"])
+app.include_router(analyses.router, prefix="/analyses", tags=["analyses"])
 app.include_router(github.router, prefix="/integrations", tags=["github-integration"])
 app.include_router(slack.router, prefix="/integrations", tags=["slack-integration"])
 app.include_router(llm.router, tags=["llm-tokens"])
