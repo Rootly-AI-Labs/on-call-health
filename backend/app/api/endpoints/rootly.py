@@ -1049,7 +1049,7 @@ async def sync_integration_users(
                 platform = "pagerduty"
 
             # Sync to user_correlations with organization_id
-            stats = sync_service._sync_users_to_correlation(
+            stats = sync_service.sync_users_from_list(
                 users=users,
                 platform=platform,
                 current_user=current_user,

@@ -212,6 +212,34 @@ class UserSyncService:
 
         return 1 if updated else 0
 
+    def sync_users_from_list(
+        self,
+        users: List[Dict[str, Any]],
+        platform: str,
+        current_user: User,
+        integration_id: str = None
+    ) -> Dict[str, int]:
+        """
+        Public method to sync a list of users to UserCorrelation.
+
+        Used for beta integrations or when users are already fetched externally.
+
+        Args:
+            users: List of user dictionaries with id, email, name
+            platform: "rootly" or "pagerduty"
+            current_user: The user syncing these members
+            integration_id: Optional integration identifier
+
+        Returns:
+            Dictionary with sync statistics
+        """
+        return self._sync_users_to_correlation(
+            users=users,
+            platform=platform,
+            current_user=current_user,
+            integration_id=integration_id
+        )
+
     async def sync_all_integrations(self, current_user: User) -> Dict[str, Any]:
         """
         Sync users from ALL of the user's integrations.
