@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { CheckCircle, Users, Send, RefreshCw, Database, Users2, Loader2, Building, Clock } from "lucide-react"
 
 interface SlackSurveyTabsProps {
@@ -59,6 +60,7 @@ export function SlackSurveyTabs({
   const [savedScheduleTime, setSavedScheduleTime] = useState<string | null>(null) // Track saved time from DB
   const [loadingSchedule, setLoadingSchedule] = useState(false)
   const [savingSchedule, setSavingSchedule] = useState(false)
+  const [showSaveConfirmation, setShowSaveConfirmation] = useState(false)
 
   // Load schedule on mount - backend uses auth token to determine org
   useEffect(() => {
@@ -232,6 +234,7 @@ export function SlackSurveyTabs({
   }
 
   return (
+    <>
     <Tabs defaultValue="setup" className="w-full">
       <TabsList className="grid w-full grid-cols-3 bg-purple-100/50">
         <TabsTrigger value="setup" className="data-[state=active]:bg-white">Setup</TabsTrigger>
@@ -638,7 +641,7 @@ export function SlackSurveyTabs({
                 </div>
 
                 <Button
-                  onClick={saveSchedule}
+                  onClick={() => setShowSaveConfirmation(true)}
                   disabled={savingSchedule}
                   className="w-full"
                   size="sm"
@@ -657,5 +660,70 @@ export function SlackSurveyTabs({
         </div>
       </TabsContent>
     </Tabs>
+
+    {/* Save Schedule Confirmation Dialog */}
+    <Dialog open={showSaveConfirmation} onOpenChange={setShowSaveConfirmation}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Confirm Schedule</DialogTitle>
+          <DialogDescription>
+            {scheduleEnabled ? (
+              <>
+                Are you sure you want to save this automated schedule?
+                <div className="mt-3 p-3 bg-purple-50 rounded-md border border-purple-100">
+                  <div className="text-sm text-gray-700 space-y-1">
+                    <div className="font-medium text-purple-900">Schedule Details:</div>
+                    <div>• <strong>Time:</strong> {(() => {
+                      const [hour, minute] = scheduleTime.split(':').map(Number)
+                      const period = hour >= 12 ? 'PM' : 'AM'
+                      const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour
+                      return `${displayHour}:${String(minute).padStart(2, '0')} ${period}`
+                    })()} ({Intl.DateTimeFormat().resolvedOptions().timeZone})</div>
+                    <div>• <strong>Days:</strong> Monday through Friday</div>
+                    <div>• <strong>Recipients:</strong> All team members with Slack</div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                Are you sure you want to disable the automated schedule?
+                <div className="mt-3 p-3 bg-amber-50 rounded-md border border-amber-100">
+                  <div className="text-sm text-amber-900">
+                    Surveys will no longer be sent automatically. Team members can still use the <code className="bg-amber-100 px-1 rounded">/burnout-survey</code> command.
+                  </div>
+                </div>
+              </>
+            )}
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => setShowSaveConfirmation(false)}
+            disabled={savingSchedule}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={async () => {
+              await saveSchedule()
+              setShowSaveConfirmation(false)
+            }}
+            disabled={savingSchedule}
+            className="bg-purple-600 hover:bg-purple-700"
+          >
+            {savingSchedule ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              'Confirm & Save'
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   )
 }
