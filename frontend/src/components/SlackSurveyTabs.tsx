@@ -60,16 +60,12 @@ export function SlackSurveyTabs({
   const [loadingSchedule, setLoadingSchedule] = useState(false)
   const [savingSchedule, setSavingSchedule] = useState(false)
 
-  // Load schedule on mount
+  // Load schedule on mount - backend uses auth token to determine org
   useEffect(() => {
-    console.log('🔄 SlackSurveyTabs mounted, userInfo:', userInfo?.email, 'org:', userInfo?.organization_id)
-    if (userInfo?.organization_id) {
-      console.log('🔄 Calling loadSchedule() for org:', userInfo.organization_id)
-      loadSchedule()
-    } else {
-      console.log('⚠️ Not loading schedule - no organization_id yet')
-    }
-  }, [userInfo?.organization_id, userInfo?.email])
+    console.log('🔄 SlackSurveyTabs mounted, loading schedule from DB...')
+    loadSchedule()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Empty array - run once on mount
 
   const loadSchedule = async () => {
     setLoadingSchedule(true)
