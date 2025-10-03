@@ -124,6 +124,115 @@ class MigrationRunner:
                 ]
             },
             {
+                "name": "001b_create_organizations_tables",
+                "description": "Create organizations, invitations, and notifications tables for multi-org support",
+                "sql": [
+                    """
+                    CREATE TABLE IF NOT EXISTS organizations (
+                        id SERIAL PRIMARY KEY,
+                        name VARCHAR(255) NOT NULL,
+                        domain VARCHAR(255) UNIQUE NOT NULL,
+                        slug VARCHAR(100) UNIQUE NOT NULL,
+                        status VARCHAR(20) DEFAULT 'active',
+                        plan_type VARCHAR(50) DEFAULT 'free',
+                        max_users INTEGER DEFAULT 50,
+                        max_analyses_per_month INTEGER DEFAULT 5,
+                        primary_contact_email VARCHAR(255),
+                        billing_email VARCHAR(255),
+                        website VARCHAR(255),
+                        settings JSON DEFAULT '{}',
+                        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_organizations_domain ON organizations(domain)
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_organizations_slug ON organizations(slug)
+                    """,
+                    """
+                    CREATE TABLE IF NOT EXISTS organization_invitations (
+                        id SERIAL PRIMARY KEY,
+                        organization_id INTEGER REFERENCES organizations(id),
+                        email VARCHAR(255) NOT NULL,
+                        role VARCHAR(20) DEFAULT 'user',
+                        invited_by INTEGER REFERENCES users(id),
+                        token VARCHAR(255) UNIQUE,
+                        expires_at TIMESTAMP WITH TIME ZONE,
+                        status VARCHAR(20) DEFAULT 'pending',
+                        used_at TIMESTAMP WITH TIME ZONE,
+                        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_invitations_email ON organization_invitations(email)
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_invitations_token ON organization_invitations(token)
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_invitations_status ON organization_invitations(status)
+                    """,
+                    """
+                    CREATE TABLE IF NOT EXISTS user_notifications (
+                        id SERIAL PRIMARY KEY,
+                        user_id INTEGER REFERENCES users(id),
+                        email VARCHAR(255),
+                        organization_id INTEGER REFERENCES organizations(id),
+                        type VARCHAR(50) NOT NULL,
+                        title VARCHAR(255) NOT NULL,
+                        message TEXT,
+                        action_url VARCHAR(500),
+                        action_text VARCHAR(100),
+                        organization_invitation_id INTEGER REFERENCES organization_invitations(id),
+                        analysis_id INTEGER REFERENCES analyses(id),
+                        status VARCHAR(20) DEFAULT 'unread',
+                        priority VARCHAR(20) DEFAULT 'normal',
+                        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                        read_at TIMESTAMP WITH TIME ZONE,
+                        expires_at TIMESTAMP WITH TIME ZONE
+                    )
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON user_notifications(user_id)
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_notifications_email ON user_notifications(email)
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_notifications_status ON user_notifications(status)
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON user_notifications(created_at)
+                    """,
+                    """
+                    ALTER TABLE users
+                    ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id),
+                    ADD COLUMN IF NOT EXISTS role VARCHAR(20) DEFAULT 'user',
+                    ADD COLUMN IF NOT EXISTS joined_org_at TIMESTAMP WITH TIME ZONE,
+                    ADD COLUMN IF NOT EXISTS last_active_at TIMESTAMP WITH TIME ZONE,
+                    ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'active'
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_users_organization_id ON users(organization_id)
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_users_role ON users(role)
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_users_status ON users(status)
+                    """,
+                    """
+                    ALTER TABLE analyses
+                    ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id)
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_analyses_organization_id ON analyses(organization_id)
+                    """
+                ]
+            },
+            {
                 "name": "002_add_organization_id_to_user_correlations",
                 "description": "Add organization_id to user_correlations for multi-tenancy support",
                 "sql": [
