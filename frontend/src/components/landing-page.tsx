@@ -84,7 +84,12 @@ export default function LandingPage() {
                   />
                 </a>
               </div>
-              <div className="text-lg leading-[1rem] lg:text-2xl font-semibold text-slate-900">On-call burnout detector</div>
+              <div className="flex items-center gap-3">
+                <div className="text-lg leading-[1rem] lg:text-2xl font-semibold text-slate-900">On-call burnout detector</div>
+                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-700 border border-purple-300">
+                  BETA
+                </span>
+              </div>
             </div>
           </div>
         </div>
