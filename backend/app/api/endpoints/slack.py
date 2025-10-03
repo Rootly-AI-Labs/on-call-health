@@ -20,14 +20,17 @@ from ...services.notification_service import NotificationService
 
 router = APIRouter(prefix="/slack", tags=["slack-integration"])
 
-# Helper function to validate user has organization
-def require_organization(user: User) -> None:
-    """Raise HTTPException if user doesn't belong to an organization."""
-    if not user.organization_id:
-        raise HTTPException(
-            status_code=400,
-            detail="You must belong to an organization to use this feature. Please contact support."
-        )
+# Helper function to get the user isolation key (organization_id or user_id for beta)
+def get_user_isolation_key(user: User) -> tuple:
+    """
+    Get the isolation key for queries - organization_id if available, otherwise user_id.
+    Returns: (key_name, key_value) tuple
+    """
+    if user.organization_id:
+        return ("organization_id", user.organization_id)
+    else:
+        # Beta mode: isolate by user_id
+        return ("user_id", user.id)
 
 # Simple encryption for tokens (in production, use proper key management)
 def get_encryption_key():
@@ -561,8 +564,6 @@ async def connect_slack_with_token(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    # Validate user has organization
-    require_organization(current_user)
     """
     Connect Slack integration using a personal access token.
     """

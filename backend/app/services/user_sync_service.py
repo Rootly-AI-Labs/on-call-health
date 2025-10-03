@@ -122,11 +122,13 @@ class UserSyncService:
         updated = 0
         skipped = 0
 
-        # Use organization_id for multi-tenancy
+        # Use organization_id for multi-tenancy (fallback to user_id for beta mode)
         organization_id = current_user.organization_id
+        user_id = current_user.id
+
+        # Beta mode: If no organization, isolate by user_id instead
         if not organization_id:
-            logger.error(f"User {current_user.id} has no organization_id - cannot sync users")
-            raise ValueError("User must belong to an organization to sync team members")
+            logger.info(f"User {user_id} has no organization_id - using user_id for isolation (beta mode)")
 
         for user in users:
             email = user.get("email")
@@ -137,11 +139,18 @@ class UserSyncService:
 
             email = email.lower().strip()
 
-            # Check if correlation already exists for this organization
-            correlation = self.db.query(UserCorrelation).filter(
-                UserCorrelation.organization_id == organization_id,
-                UserCorrelation.email == email
-            ).first()
+            # Check if correlation already exists
+            # In beta mode (no org_id), check by user_id; otherwise use organization_id
+            if organization_id:
+                correlation = self.db.query(UserCorrelation).filter(
+                    UserCorrelation.organization_id == organization_id,
+                    UserCorrelation.email == email
+                ).first()
+            else:
+                correlation = self.db.query(UserCorrelation).filter(
+                    UserCorrelation.user_id == user_id,
+                    UserCorrelation.email == email
+                ).first()
 
             if correlation:
                 # Update existing correlation

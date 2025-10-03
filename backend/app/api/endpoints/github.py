@@ -426,9 +426,6 @@ async def connect_github_with_token(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    # Validate user has organization
-    require_organization(current_user)
-
     """
     Connect GitHub integration using a personal access token.
     """
