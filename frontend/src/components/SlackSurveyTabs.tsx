@@ -64,7 +64,6 @@ export function SlackSurveyTabs({
 
   // Load schedule on mount - backend uses auth token to determine org
   useEffect(() => {
-    console.log('🔄 SlackSurveyTabs mounted, loading schedule from DB...')
     loadSchedule()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) // Empty array - run once on mount
@@ -81,7 +80,6 @@ export function SlackSurveyTabs({
 
       if (response.ok) {
         const data = await response.json()
-        console.log('📅 Loaded schedule from DB:', data) // Debug logging
 
         // Handle case where schedule exists
         if (data.enabled !== undefined) {

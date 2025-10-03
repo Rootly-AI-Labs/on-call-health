@@ -449,10 +449,8 @@ export default function IntegrationsPage() {
     
     // Load saved organization preference
     const savedOrg = localStorage.getItem('selected_organization')
-    console.log('Loading saved organization from localStorage:', savedOrg)
     // Accept both numeric IDs and beta string IDs (like "beta-rootly")
     if (savedOrg) {
-      console.log('Setting selectedOrganization from localStorage:', savedOrg)
       setSelectedOrganization(savedOrg)
     }
 
@@ -584,9 +582,6 @@ export default function IntegrationsPage() {
       console.log('No OAuth debug info found in sessionStorage')
       return null
     }
-
-    // Also log to console
-    console.log('OAuth redirect debug:', debugInfo)
 
     // Show debug info as temporary toast for troubleshooting
     if (window.location.search.includes('slack_connected')) {
@@ -2769,11 +2764,9 @@ export default function IntegrationsPage() {
                     }
                   }
 
-                  console.log('Setting selectedOrganization to:', value)
                   setSelectedOrganization(value)
                   // Save to localStorage for persistence
                   localStorage.setItem('selected_organization', value)
-                  console.log('Saved to localStorage:', value)
                 }}
               >
                 <SelectTrigger className="w-full h-12 text-base bg-white">
