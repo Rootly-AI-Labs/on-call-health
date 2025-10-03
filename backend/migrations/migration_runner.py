@@ -163,9 +163,39 @@ class MigrationRunner:
                     """
                 ]
             },
+            {
+                "name": "003_add_name_to_user_correlations",
+                "description": "Add name field to user_correlations for display names",
+                "sql": [
+                    """
+                    ALTER TABLE user_correlations
+                    ADD COLUMN IF NOT EXISTS name VARCHAR(255)
+                    """
+                ]
+            },
+            {
+                "name": "004_add_integration_ids_to_user_correlations",
+                "description": "Add integration_ids array to user_correlations for multi-integration support",
+                "sql": [
+                    """
+                    ALTER TABLE user_correlations
+                    ADD COLUMN IF NOT EXISTS integration_ids JSON
+                    """
+                ]
+            },
+            {
+                "name": "005_add_personal_circumstances_to_reports",
+                "description": "Add personal circumstances field to user_burnout_reports",
+                "sql": [
+                    """
+                    ALTER TABLE user_burnout_reports
+                    ADD COLUMN IF NOT EXISTS personal_circumstances TEXT
+                    """
+                ]
+            },
             # Add future migrations here with incrementing numbers
             # {
-            #     "name": "003_add_user_preferences",
+            #     "name": "006_add_user_preferences",
             #     "description": "Add user preferences table",
             #     "sql": ["CREATE TABLE IF NOT EXISTS user_preferences (...)"]
             # }
