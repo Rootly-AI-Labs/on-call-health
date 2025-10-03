@@ -56,6 +56,7 @@ export function SlackSurveyTabs({
   // Schedule state
   const [scheduleEnabled, setScheduleEnabled] = useState(false)
   const [scheduleTime, setScheduleTime] = useState('09:00')
+  const [savedScheduleTime, setSavedScheduleTime] = useState<string | null>(null) // Track saved time from DB
   const [loadingSchedule, setLoadingSchedule] = useState(false)
   const [savingSchedule, setSavingSchedule] = useState(false)
 
@@ -87,22 +88,28 @@ export function SlackSurveyTabs({
           if (data.send_time) {
             const timeOnly = data.send_time.substring(0, 5) // Extract "HH:MM" from "HH:MM:SS"
             setScheduleTime(timeOnly)
+            setSavedScheduleTime(timeOnly) // Store the saved time from DB
+          } else {
+            setSavedScheduleTime(null)
           }
         } else {
           // Handle case where no schedule is configured
           setScheduleEnabled(false)
           setScheduleTime('09:00')
+          setSavedScheduleTime(null)
         }
       } else {
         // API error - set defaults
         setScheduleEnabled(false)
         setScheduleTime('09:00')
+        setSavedScheduleTime(null)
       }
     } catch (error) {
       console.error('Failed to load schedule:', error)
       // Set defaults on error
       setScheduleEnabled(false)
       setScheduleTime('09:00')
+      setSavedScheduleTime(null)
     } finally {
       setLoadingSchedule(false)
     }
@@ -130,6 +137,8 @@ export function SlackSurveyTabs({
 
       if (response.ok) {
         toast.success('Schedule saved successfully')
+        // Update saved time only after successful save
+        setSavedScheduleTime(scheduleTime)
       } else {
         const error = await response.json()
         toast.error(error.detail || 'Failed to save schedule')
@@ -503,10 +512,10 @@ export function SlackSurveyTabs({
                 <p className="text-xs text-gray-500 mt-1">
                   Send surveys every weekday at a specific time
                 </p>
-                {scheduleEnabled && scheduleTime && (
+                {scheduleEnabled && savedScheduleTime && (
                   <p className="text-xs font-medium text-purple-600 mt-1.5">
                     Set time: {(() => {
-                      const [hour, minute] = scheduleTime.split(':').map(Number)
+                      const [hour, minute] = savedScheduleTime.split(':').map(Number)
                       const period = hour >= 12 ? 'PM' : 'AM'
                       const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour
                       return `${displayHour}:${String(minute).padStart(2, '0')} ${period}`
