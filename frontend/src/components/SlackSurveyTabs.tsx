@@ -62,10 +62,14 @@ export function SlackSurveyTabs({
 
   // Load schedule on mount
   useEffect(() => {
+    console.log('🔄 SlackSurveyTabs mounted, userInfo:', userInfo?.email, 'org:', userInfo?.organization_id)
     if (userInfo?.organization_id) {
+      console.log('🔄 Calling loadSchedule() for org:', userInfo.organization_id)
       loadSchedule()
+    } else {
+      console.log('⚠️ Not loading schedule - no organization_id yet')
     }
-  }, [userInfo?.organization_id])
+  }, [userInfo?.organization_id, userInfo?.email])
 
   const loadSchedule = async () => {
     setLoadingSchedule(true)
