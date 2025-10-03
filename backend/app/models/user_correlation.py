@@ -10,7 +10,8 @@ class UserCorrelation(Base):
     __tablename__ = "user_correlations"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)  # Keep for backwards compatibility
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)  # Multi-tenancy support
     email = Column(String(255), nullable=False, index=True)  # The email that links platforms
     name = Column(String(255), nullable=True)  # User's display name from platform
     github_username = Column(String(100), nullable=True, index=True)
@@ -19,9 +20,10 @@ class UserCorrelation(Base):
     pagerduty_user_id = Column(String(50), nullable=True)
     integration_ids = Column(JSON, nullable=True)  # Array of integration IDs this user belongs to
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    
+
     # Relationships
     user = relationship("User", back_populates="user_correlations")
+    organization = relationship("Organization")
     
     def __repr__(self):
         return f"<UserCorrelation(id={self.id}, user_id={self.user_id}, email='{self.email}')>"

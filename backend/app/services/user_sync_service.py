@@ -116,10 +116,17 @@ class UserSyncService:
         Sync users to UserCorrelation table.
 
         Creates new records or updates existing ones.
+        Uses organization_id for multi-tenancy support.
         """
         created = 0
         updated = 0
         skipped = 0
+
+        # Use organization_id for multi-tenancy
+        organization_id = current_user.organization_id
+        if not organization_id:
+            logger.error(f"User {current_user.id} has no organization_id - cannot sync users")
+            raise ValueError("User must belong to an organization to sync team members")
 
         for user in users:
             email = user.get("email")
@@ -130,9 +137,9 @@ class UserSyncService:
 
             email = email.lower().strip()
 
-            # Check if correlation already exists
+            # Check if correlation already exists for this organization
             correlation = self.db.query(UserCorrelation).filter(
-                UserCorrelation.user_id == current_user.id,
+                UserCorrelation.organization_id == organization_id,
                 UserCorrelation.email == email
             ).first()
 
@@ -142,7 +149,8 @@ class UserSyncService:
             else:
                 # Create new correlation
                 correlation = UserCorrelation(
-                    user_id=current_user.id,
+                    user_id=current_user.id,  # Keep for backwards compatibility
+                    organization_id=organization_id,  # Multi-tenancy key
                     email=email,
                     name=user.get("name"),  # Store user's display name
                     integration_ids=[integration_id] if integration_id else []  # Initialize array

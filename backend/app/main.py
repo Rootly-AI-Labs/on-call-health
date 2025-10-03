@@ -109,10 +109,19 @@ async def health():
 async def startup_event():
     create_tables()
 
-    # TODO: Run organizations migration if needed
-    # Temporarily commented out to fix import issues
-    # Will add back after fixing imports
-    print("ℹ️ Organizations migration temporarily disabled during deployment fix")
+    # Run database migrations
+    try:
+        from migrations.migration_runner import run_migrations
+        print("🔧 Running database migrations...")
+        success = run_migrations()
+        if success:
+            print("✅ All migrations applied successfully")
+        else:
+            print("⚠️  Some migrations failed - check logs")
+    except Exception as e:
+        print(f"⚠️  Migration runner failed: {e}")
+        # Don't fail startup if migrations fail
+        pass
 
     # Start survey scheduler
     from app.services.survey_scheduler import survey_scheduler

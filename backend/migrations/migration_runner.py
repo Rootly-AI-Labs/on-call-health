@@ -123,9 +123,49 @@ class MigrationRunner:
                     """
                 ]
             },
+            {
+                "name": "002_add_organization_id_to_user_correlations",
+                "description": "Add organization_id to user_correlations for multi-tenancy support",
+                "sql": [
+                    """
+                    ALTER TABLE user_correlations
+                    ADD COLUMN IF NOT EXISTS organization_id INTEGER
+                    """,
+                    """
+                    ALTER TABLE user_correlations
+                    DROP CONSTRAINT IF EXISTS fk_user_correlations_organization
+                    """,
+                    """
+                    ALTER TABLE user_correlations
+                    ADD CONSTRAINT fk_user_correlations_organization
+                    FOREIGN KEY (organization_id) REFERENCES organizations(id)
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_user_correlations_organization_id
+                    ON user_correlations(organization_id)
+                    """,
+                    """
+                    UPDATE user_correlations uc
+                    SET organization_id = u.organization_id
+                    FROM users u
+                    WHERE uc.user_id = u.id
+                    AND uc.organization_id IS NULL
+                    AND u.organization_id IS NOT NULL
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_user_correlations_org_email
+                    ON user_correlations(organization_id, email)
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_user_correlations_org_slack
+                    ON user_correlations(organization_id, slack_user_id)
+                    WHERE slack_user_id IS NOT NULL
+                    """
+                ]
+            },
             # Add future migrations here with incrementing numbers
             # {
-            #     "name": "002_add_user_preferences",
+            #     "name": "003_add_user_preferences",
             #     "description": "Add user preferences table",
             #     "sql": ["CREATE TABLE IF NOT EXISTS user_preferences (...)"]
             # }

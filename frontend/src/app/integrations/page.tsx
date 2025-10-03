@@ -2551,7 +2551,8 @@ export default function IntegrationsPage() {
                     </div>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  {(userInfo.role === 'org_admin' || userInfo.role === 'super_admin') && (
+                  {/* Temporarily hidden for beta - everyone is an org admin */}
+                  {/* {(userInfo.role === 'org_admin' || userInfo.role === 'super_admin') && (
                     <>
                       <DropdownMenuItem
                         className="px-2 py-1.5 cursor-pointer"
@@ -2562,7 +2563,7 @@ export default function IntegrationsPage() {
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                     </>
-                  )}
+                  )} */}
                   <DropdownMenuItem
                     className="text-red-600 hover:text-red-700 hover:bg-red-50 px-2 py-1.5 cursor-pointer"
                     onClick={() => {

@@ -20,6 +20,15 @@ from ...services.notification_service import NotificationService
 
 router = APIRouter(prefix="/slack", tags=["slack-integration"])
 
+# Helper function to validate user has organization
+def require_organization(user: User) -> None:
+    """Raise HTTPException if user doesn't belong to an organization."""
+    if not user.organization_id:
+        raise HTTPException(
+            status_code=400,
+            detail="You must belong to an organization to use this feature. Please contact support."
+        )
+
 # Simple encryption for tokens (in production, use proper key management)
 def get_encryption_key():
     """Get or create encryption key for tokens."""
@@ -552,6 +561,8 @@ async def connect_slack_with_token(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    # Validate user has organization
+    require_organization(current_user)
     """
     Connect Slack integration using a personal access token.
     """
@@ -655,16 +666,18 @@ async def connect_slack_with_token(
         
         # Update user correlations if email is available
         if user_email:
+            # Use organization_id for multi-tenancy
             existing_correlation = db.query(UserCorrelation).filter(
-                UserCorrelation.user_id == current_user.id,
+                UserCorrelation.organization_id == current_user.organization_id,
                 UserCorrelation.email == user_email
             ).first()
-            
+
             if existing_correlation:
                 existing_correlation.slack_user_id = slack_user_id
             else:
                 correlation = UserCorrelation(
                     user_id=current_user.id,
+                    organization_id=current_user.organization_id,
                     email=user_email,
                     slack_user_id=slack_user_id
                 )
@@ -832,16 +845,18 @@ async def setup_slack_with_token_and_webhook(
         
         # Update user correlations if email is available
         if user_email:
+            # Use organization_id for multi-tenancy
             existing_correlation = db.query(UserCorrelation).filter(
-                UserCorrelation.user_id == current_user.id,
+                UserCorrelation.organization_id == current_user.organization_id,
                 UserCorrelation.email == user_email
             ).first()
-            
+
             if existing_correlation:
                 existing_correlation.slack_user_id = slack_user_id
             else:
                 correlation = UserCorrelation(
                     user_id=current_user.id,
+                    organization_id=current_user.organization_id,
                     email=user_email,
                     slack_user_id=slack_user_id
                 )
@@ -893,11 +908,11 @@ async def disconnect_slack(
         )
     
     try:
-        # Remove Slack data from user correlations
+        # Remove Slack data from user correlations (organization-scoped)
         correlations = db.query(UserCorrelation).filter(
-            UserCorrelation.user_id == current_user.id
+            UserCorrelation.organization_id == current_user.organization_id
         ).all()
-        
+
         for correlation in correlations:
             correlation.slack_user_id = None
         
@@ -977,7 +992,7 @@ async def debug_user_correlation(
         else:
             # Show all correlations for current user's organization
             correlations = db.query(UserCorrelation).filter(
-                UserCorrelation.user_id == current_user.id
+                UserCorrelation.organization_id == current_user.organization_id
             ).all()
 
             return {
@@ -1130,11 +1145,10 @@ async def handle_burnout_survey_command(
         ).order_by(Analysis.created_at.desc()).first()
 
         # Check if user is in the organization roster (ORGANIZATION-SCOPED)
-        user_correlation = db.query(UserCorrelation).join(
-            User, UserCorrelation.user_id == User.id
-        ).filter(
+        # Use organization_id directly for multi-tenancy support
+        user_correlation = db.query(UserCorrelation).filter(
             UserCorrelation.slack_user_id == user_id,
-            User.organization_id == organization.id
+            UserCorrelation.organization_id == organization.id
         ).first()
 
         # If not found by slack_user_id, try to get Slack email and match by email
@@ -1163,12 +1177,10 @@ async def handle_burnout_survey_command(
                                 user_email = data.get("user", {}).get("profile", {}).get("email")
 
                                 if user_email:
-                                    # Try to find by email
-                                    user_correlation = db.query(UserCorrelation).join(
-                                        User, UserCorrelation.user_id == User.id
-                                    ).filter(
+                                    # Try to find by email using organization_id for multi-tenancy
+                                    user_correlation = db.query(UserCorrelation).filter(
                                         UserCorrelation.email == user_email.lower(),
-                                        User.organization_id == organization.id
+                                        UserCorrelation.organization_id == organization.id
                                     ).first()
 
                                     # If found, update with Slack user ID for future lookups

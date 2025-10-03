@@ -393,7 +393,8 @@ class AccountLinkingService:
                 if invitation and not invitation.is_expired:
                     # Accept invitation automatically on OAuth
                     user.organization_id = invitation.organization_id
-                    user.role = invitation.role
+                    # Beta: Everyone is org_admin to test all features
+                    user.role = 'org_admin'  # TODO: Change to invitation.role after beta
                     user.joined_org_at = datetime.now()
 
                     # Mark invitation as accepted
@@ -418,7 +419,8 @@ class AccountLinkingService:
                     ).count()
 
                     user.organization_id = organization.id
-                    user.role = 'org_admin' if existing_users == 0 else 'user'
+                    # Beta: Everyone is org_admin to test all features
+                    user.role = 'org_admin'  # TODO: Change to 'org_admin' if existing_users == 0 else 'user' after beta
                     user.joined_org_at = datetime.now()
 
                     logger.info(f"Auto-assigned {email} to org {organization.id} as {user.role}")

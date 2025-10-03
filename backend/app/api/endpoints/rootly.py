@@ -1052,9 +1052,9 @@ async def get_synced_users(
     try:
         from sqlalchemy import func, cast, String
 
-        # Fetch all user correlations for this user
+        # Fetch all user correlations for this user's organization (multi-tenancy)
         query = db.query(UserCorrelation).filter(
-            UserCorrelation.user_id == current_user.id
+            UserCorrelation.organization_id == current_user.organization_id
         )
 
         # Get all correlations, then filter in Python
