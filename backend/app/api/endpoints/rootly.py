@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from ...models import get_db, User, RootlyIntegration, UserCorrelation
+from ...models import get_db, User, RootlyIntegration, UserCorrelation, Organization
 from ...auth.dependencies import get_current_active_user
 from ...core.rootly_client import RootlyAPIClient
 from ...core.rate_limiting import integration_rate_limit
@@ -18,6 +18,66 @@ from ...core.input_validation import RootlyTokenRequest, RootlyIntegrationReques
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+def get_or_create_organization(
+    db: Session,
+    organization_name: str,
+    user: User
+) -> Organization:
+    """
+    Get or create an Organization record based on the integration's organization name.
+
+    This is called when users add Rootly/PagerDuty integrations.
+    Organizations are created from the integration's organization_name, not email domains.
+    """
+    if not organization_name:
+        # Fallback to email domain if no organization name provided
+        domain = user.email.split('@')[1] if '@' in user.email else None
+        if not domain:
+            raise ValueError("Cannot determine organization - no organization name or valid email")
+        organization_name = domain.split('.')[0].title() + " Organization"
+    else:
+        # Clean the organization name
+        organization_name = organization_name.strip()
+        domain = user.email.split('@')[1] if '@' in user.email else "example.com"
+
+    # Create a unique domain identifier from the organization name
+    # Use a slug-like format: "acme-corp-rootly"
+    slug = organization_name.lower().replace(' ', '-').replace('.', '-')[:50]
+    domain = f"{slug}.rootly.com"
+
+    # Check if organization already exists by name or domain
+    organization = db.query(Organization).filter(
+        (Organization.name == organization_name) | (Organization.domain == domain)
+    ).first()
+
+    if not organization:
+        # Create new organization
+        counter = 1
+        unique_domain = domain
+        unique_slug = slug
+
+        # Ensure domain and slug are unique
+        while db.query(Organization).filter(Organization.domain == unique_domain).first():
+            unique_domain = f"{slug}-{counter}.rootly.com"
+            unique_slug = f"{slug}-{counter}"
+            counter += 1
+
+        organization = Organization(
+            name=organization_name,
+            domain=unique_domain,
+            slug=unique_slug,
+            status='active',
+            plan_type='free',
+            max_users=50,
+            max_analyses_per_month=5
+        )
+        db.add(organization)
+        db.flush()  # Get the organization.id without committing yet
+
+        logger.info(f"Created new organization: {organization_name} (id={organization.id})")
+
+    return organization
 
 class RootlyTokenUpdate(BaseModel):
     token: str
@@ -171,28 +231,39 @@ async def add_rootly_integration(
     account_info = test_result.get("account_info", {})
     organization_name = account_info.get("organization_name")
     total_users = account_info.get("total_users", 0)
-    
+
     # Check if this will be the user's first Rootly integration (make it default)
     existing_integrations = db.query(RootlyIntegration).filter(
         RootlyIntegration.user_id == current_user.id,
         RootlyIntegration.platform == "rootly"
     ).count()
     is_first_integration = existing_integrations == 0
-    
-    # Create the new integration
-    new_integration = RootlyIntegration(
-        user_id=current_user.id,
-        name=integration_data.name,
-        organization_name=organization_name,
-        api_token=integration_data.token,
-        total_users=total_users,
-        is_default=is_first_integration,  # First integration becomes default
-        is_active=True,
-        created_at=datetime.utcnow(),
-        last_used_at=datetime.utcnow()
-    )
-    
+
     try:
+        # Get or create organization based on Rootly's organization name
+        if organization_name:
+            organization = get_or_create_organization(db, organization_name, current_user)
+
+            # Link user to organization if they don't have one
+            if not current_user.organization_id:
+                current_user.organization_id = organization.id
+                current_user.role = 'org_admin'  # First user becomes admin
+                current_user.joined_org_at = datetime.utcnow()
+                logger.info(f"Linked user {current_user.id} to organization {organization.id}")
+
+        # Create the new integration
+        new_integration = RootlyIntegration(
+            user_id=current_user.id,
+            name=integration_data.name,
+            organization_name=organization_name,
+            api_token=integration_data.token,
+            total_users=total_users,
+            is_default=is_first_integration,  # First integration becomes default
+            is_active=True,
+            created_at=datetime.utcnow(),
+            last_used_at=datetime.utcnow()
+        )
+
         db.add(new_integration)
         db.commit()
         db.refresh(new_integration)

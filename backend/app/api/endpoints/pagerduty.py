@@ -11,13 +11,73 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 
-from ...models import get_db, User
+from ...models import get_db, User, Organization
 from ...models.rootly_integration import RootlyIntegration
 from ...auth.dependencies import get_current_active_user
 from ...core.pagerduty_client import PagerDutyAPIClient
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+def get_or_create_organization(
+    db: Session,
+    organization_name: str,
+    user: User,
+    platform: str = "pagerduty"
+) -> Organization:
+    """
+    Get or create an Organization record based on the integration's organization name.
+
+    This is called when users add PagerDuty integrations.
+    Organizations are created from the integration's organization_name, not email domains.
+    """
+    if not organization_name:
+        # Fallback to email domain if no organization name provided
+        domain = user.email.split('@')[1] if '@' in user.email else None
+        if not domain:
+            raise ValueError("Cannot determine organization - no organization name or valid email")
+        organization_name = domain.split('.')[0].title() + " Organization"
+
+    # Clean the organization name
+    organization_name = organization_name.strip()
+
+    # Create a unique domain identifier from the organization name
+    # Use a slug-like format: "acme-corp-pagerduty"
+    slug = organization_name.lower().replace(' ', '-').replace('.', '-')[:50]
+    domain = f"{slug}.{platform}.com"
+
+    # Check if organization already exists by name or domain
+    organization = db.query(Organization).filter(
+        (Organization.name == organization_name) | (Organization.domain == domain)
+    ).first()
+
+    if not organization:
+        # Create new organization
+        counter = 1
+        unique_domain = domain
+        unique_slug = slug
+
+        # Ensure domain and slug are unique
+        while db.query(Organization).filter(Organization.domain == unique_domain).first():
+            unique_domain = f"{slug}-{counter}.{platform}.com"
+            unique_slug = f"{slug}-{counter}"
+            counter += 1
+
+        organization = Organization(
+            name=organization_name,
+            domain=unique_domain,
+            slug=unique_slug,
+            status='active',
+            plan_type='free',
+            max_users=50,
+            max_analyses_per_month=5
+        )
+        db.add(organization)
+        db.flush()  # Get the organization.id without committing yet
+
+        logger.info(f"Created new organization: {organization_name} (id={organization.id})")
+
+    return organization
 
 class TokenTestRequest(BaseModel):
     token: str
@@ -253,7 +313,17 @@ async def add_pagerduty_integration(
     existing_count = db.query(RootlyIntegration).filter(
         RootlyIntegration.user_id == current_user.id
     ).count()
-    
+
+    # Get or create organization based on PagerDuty's organization name
+    organization = get_or_create_organization(db, org_name, current_user, platform="pagerduty")
+
+    # Link user to organization if they don't have one
+    if not current_user.organization_id:
+        current_user.organization_id = organization.id
+        current_user.role = 'org_admin'  # First user becomes admin
+        current_user.joined_org_at = datetime.utcnow()
+        logger.info(f"Linked user {current_user.id} to organization {organization.id}")
+
     # Create new integration
     integration = RootlyIntegration(
         user_id=current_user.id,
@@ -264,7 +334,7 @@ async def add_pagerduty_integration(
         is_default=(existing_count == 0),
         platform="pagerduty"
     )
-    
+
     db.add(integration)
     db.commit()
     db.refresh(integration)
