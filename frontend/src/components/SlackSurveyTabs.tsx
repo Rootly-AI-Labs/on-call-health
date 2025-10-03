@@ -200,7 +200,11 @@ export function SlackSurveyTabs({
       const statusData = await statusResponse.json()
 
       if (statusData.diagnosis.has_workspace_mapping) {
-        toast.success('✅ Workspace is properly registered! /burnout-survey command should work.')
+        // Get workspace name from mappings
+        const workspaceName = statusData.organization_workspace_mappings?.[0]?.workspace_name ||
+                             statusData.user_workspace_mappings?.[0]?.workspace_name ||
+                             'Unknown workspace'
+        toast.success(`✅ Workspace is properly registered! /burnout-survey command should work.\n\nRegistered workspace: ${workspaceName}`)
       } else {
         if (!slackIntegration?.workspace_id) {
           toast.error('No workspace ID found. Please reconnect Slack.')
@@ -309,8 +313,8 @@ export function SlackSurveyTabs({
           </div>
         </div>
 
-        {/* Workspace Details for OAuth Connections */}
-        {slackIntegration?.connection_type === 'oauth' && (
+        {/* Workspace Details - Show for all connected Slack integrations */}
+        {slackIntegration && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <h4 className="font-medium text-blue-900 mb-2 flex items-center">
               <Building className="w-4 h-4 mr-2" />
@@ -322,16 +326,16 @@ export function SlackSurveyTabs({
                 <p className="text-blue-900">{slackIntegration.workspace_name || 'Unknown'}</p>
               </div>
               <div>
-                <span className="text-blue-700 font-medium">Status:</span>
-                <p className="text-blue-900 capitalize">{slackIntegration.status || 'Active'}</p>
+                <span className="text-blue-700 font-medium">Connection:</span>
+                <p className="text-blue-900 capitalize">{slackIntegration.connection_type === 'oauth' ? 'OAuth' : 'Token'}</p>
               </div>
               <div>
-                <span className="text-blue-700 font-medium">Registered:</span>
+                <span className="text-blue-700 font-medium">Connected:</span>
                 <p className="text-blue-900">{new Date(slackIntegration.connected_at).toLocaleDateString()}</p>
               </div>
               <div>
                 <span className="text-blue-700 font-medium">Workspace ID:</span>
-                <p className="text-blue-900 font-mono text-xs">{slackIntegration.workspace_id}</p>
+                <p className="text-blue-900 font-mono text-xs">{slackIntegration.workspace_id || 'N/A'}</p>
               </div>
             </div>
             <div className="mt-3 pt-3 border-t border-blue-200">
