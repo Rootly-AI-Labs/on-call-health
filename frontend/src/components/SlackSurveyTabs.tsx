@@ -137,8 +137,8 @@ export function SlackSurveyTabs({
 
       if (response.ok) {
         toast.success('Schedule saved successfully')
-        // Update saved time only after successful save
-        setSavedScheduleTime(scheduleTime)
+        // Reload schedule from DB to ensure we display exactly what's saved
+        await loadSchedule()
       } else {
         const error = await response.json()
         toast.error(error.detail || 'Failed to save schedule')
