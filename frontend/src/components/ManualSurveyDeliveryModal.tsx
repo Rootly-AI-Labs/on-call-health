@@ -57,7 +57,7 @@ export default function ManualSurveyDeliveryModal({
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${API_BASE}/api/survey-schedule/manual-delivery`, {
+      const response = await fetch(`${API_BASE}/api/surveys/survey-schedule/manual-delivery`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -113,7 +113,7 @@ export default function ManualSurveyDeliveryModal({
     setError(null);
     try {
       const selectedEmails = Array.from(selectedRecipients);
-      const response = await fetch(`${API_BASE}/api/survey-schedule/manual-delivery`, {
+      const response = await fetch(`${API_BASE}/api/surveys/survey-schedule/manual-delivery`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
