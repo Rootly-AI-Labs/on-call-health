@@ -133,14 +133,18 @@ export function SlackSurveyTabs({
       }
       console.log('💾 Saving schedule:', payload) // Debug logging
 
-      const response = await fetch(`${API_BASE}/api/surveys/survey-schedule`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`
-        },
-        body: JSON.stringify(payload)
-      })
+      // Add 2 second delay for better UX feedback
+      const [response] = await Promise.all([
+        fetch(`${API_BASE}/api/surveys/survey-schedule`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify(payload)
+        }),
+        new Promise(resolve => setTimeout(resolve, 2000))
+      ])
 
       if (response.ok) {
         const responseData = await response.json()
