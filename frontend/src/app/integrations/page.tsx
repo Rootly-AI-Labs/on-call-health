@@ -3687,21 +3687,69 @@ export default function IntegrationsPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <SlackSurveyTabs
-                  slackIntegration={slackIntegration}
-                  selectedOrganization={selectedOrganization}
-                  integrations={integrations}
-                  teamMembers={teamMembers}
-                  loadingTeamMembers={loadingTeamMembers}
-                  loadingSyncedUsers={loadingSyncedUsers}
-                  userInfo={userInfo}
-                  fetchTeamMembers={fetchTeamMembers}
-                  syncUsersToCorrelation={syncUsersToCorrelation}
-                  fetchSyncedUsers={fetchSyncedUsers}
-                  setShowManualSurveyModal={setShowManualSurveyModal}
-                  loadSlackPermissions={loadSlackPermissions}
-                  toast={toast}
-                />
+                {loadingSlack ? (
+                  <div className="space-y-6 animate-pulse">
+                    {/* Skeleton for "Connect Slack Workspace" button */}
+                    <div className="flex flex-col items-center justify-center py-8 space-y-3">
+                      <div className="w-64 h-12 bg-gray-200 rounded-lg"></div>
+                      <div className="w-96 h-4 bg-gray-200 rounded"></div>
+                    </div>
+
+                    {/* Skeleton for "How it works" section */}
+                    <div className="space-y-4">
+                      <div className="w-32 h-6 bg-gray-200 rounded"></div>
+                      <div className="space-y-4">
+                        <div className="flex items-start space-x-3">
+                          <div className="w-8 h-8 bg-gray-200 rounded-full flex-shrink-0"></div>
+                          <div className="flex-1 space-y-2">
+                            <div className="w-3/4 h-4 bg-gray-200 rounded"></div>
+                          </div>
+                        </div>
+                        <div className="flex items-start space-x-3">
+                          <div className="w-8 h-8 bg-gray-200 rounded-full flex-shrink-0"></div>
+                          <div className="flex-1 space-y-2">
+                            <div className="w-2/3 h-4 bg-gray-200 rounded"></div>
+                            <div className="w-full h-20 bg-gray-200 rounded-lg mt-2"></div>
+                          </div>
+                        </div>
+                        <div className="flex items-start space-x-3">
+                          <div className="w-8 h-8 bg-gray-200 rounded-full flex-shrink-0"></div>
+                          <div className="flex-1 space-y-2">
+                            <div className="w-3/4 h-4 bg-gray-200 rounded"></div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Skeleton for footer */}
+                    <div className="flex items-center justify-between pt-4 border-t">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-4 h-4 bg-gray-200 rounded"></div>
+                        <div className="w-48 h-4 bg-gray-200 rounded"></div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <div className="w-4 h-4 bg-gray-200 rounded"></div>
+                        <div className="w-40 h-4 bg-gray-200 rounded"></div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <SlackSurveyTabs
+                    slackIntegration={slackIntegration}
+                    selectedOrganization={selectedOrganization}
+                    integrations={integrations}
+                    teamMembers={teamMembers}
+                    loadingTeamMembers={loadingTeamMembers}
+                    loadingSyncedUsers={loadingSyncedUsers}
+                    userInfo={userInfo}
+                    fetchTeamMembers={fetchTeamMembers}
+                    syncUsersToCorrelation={syncUsersToCorrelation}
+                    fetchSyncedUsers={fetchSyncedUsers}
+                    setShowManualSurveyModal={setShowManualSurveyModal}
+                    loadSlackPermissions={loadSlackPermissions}
+                    toast={toast}
+                  />
+                )}
               </CardContent>
             </Card>
 
