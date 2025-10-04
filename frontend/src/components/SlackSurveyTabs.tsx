@@ -62,6 +62,7 @@ export function SlackSurveyTabs({
   const [savingSchedule, setSavingSchedule] = useState(false)
   const [showSaveConfirmation, setShowSaveConfirmation] = useState(false)
 
+
   // Load schedule on mount - backend uses auth token to determine org
   useEffect(() => {
     loadSchedule()
@@ -311,38 +312,6 @@ export function SlackSurveyTabs({
           </div>
         </div>
 
-        {/* Workspace Details - Show for all connected Slack integrations */}
-        {slackIntegration && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <h4 className="font-medium text-blue-900 mb-2 flex items-center">
-              <Building className="w-4 h-4 mr-2" />
-              Registered Workspace
-            </h4>
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div>
-                <span className="text-blue-700 font-medium">Workspace:</span>
-                <p className="text-blue-900">{slackIntegration.workspace_name || 'Unknown'}</p>
-              </div>
-              <div>
-                <span className="text-blue-700 font-medium">Connection:</span>
-                <p className="text-blue-900 capitalize">{slackIntegration.connection_type === 'oauth' ? 'OAuth' : 'Token'}</p>
-              </div>
-              <div>
-                <span className="text-blue-700 font-medium">Connected:</span>
-                <p className="text-blue-900">{new Date(slackIntegration.connected_at).toLocaleDateString()}</p>
-              </div>
-              <div>
-                <span className="text-blue-700 font-medium">Workspace ID:</span>
-                <p className="text-blue-900 font-mono text-xs">{slackIntegration.workspace_id || 'N/A'}</p>
-              </div>
-            </div>
-            <div className="mt-3 pt-3 border-t border-blue-200">
-              <p className="text-xs text-blue-800">
-                💡 The <code className="bg-blue-100 px-1 rounded">/burnout-survey</code> command will only show analyses for your organization
-              </p>
-            </div>
-          </div>
-        )}
 
         {/* Troubleshooting - Collapsible */}
         {slackIntegration && (

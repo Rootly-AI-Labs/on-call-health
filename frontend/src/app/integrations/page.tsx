@@ -3623,26 +3623,16 @@ export default function IntegrationsPage() {
 
                   {/* Slack Connection Status */}
                   {slackIntegration ? (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <button className="inline-flex items-center space-x-2 bg-green-100 text-green-800 px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-200 transition-colors">
-                          <CheckCircle className="w-4 h-4" />
-                          <span>Connected</span>
-                          {slackIntegration.connection_type === 'oauth' && slackIntegration.workspace_name && (
-                            <span className="ml-2 text-xs text-green-700">({slackIntegration.workspace_name})</span>
-                          )}
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50 cursor-pointer"
-                          onClick={() => setSlackSurveyDisconnectDialogOpen(true)}
-                        >
-                          <X className="w-4 h-4 mr-2" />
-                          Disconnect
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <button
+                      onClick={() => setSlackSurveyDisconnectDialogOpen(true)}
+                      className="inline-flex items-center space-x-2 bg-green-100 text-green-800 px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-200 transition-colors"
+                    >
+                      <CheckCircle className="w-4 h-4" />
+                      <span>Connected</span>
+                      {slackIntegration.connection_type === 'oauth' && slackIntegration.workspace_name && (
+                        <span className="ml-2 text-xs text-green-700">({slackIntegration.workspace_name})</span>
+                      )}
+                    </button>
                   ) : process.env.NEXT_PUBLIC_SLACK_CLIENT_ID ? (
                     <Button
                       onClick={() => {
@@ -5758,23 +5748,56 @@ export default function IntegrationsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Slack Survey Disconnect Confirmation Dialog */}
+      {/* Slack Survey Workspace Info & Disconnect Dialog */}
       <Dialog open={slackSurveyDisconnectDialogOpen} onOpenChange={setSlackSurveyDisconnectDialogOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Disconnect Slack Survey Integration</DialogTitle>
+            <DialogTitle className="flex items-center">
+              <Building className="w-5 h-5 mr-2 text-blue-600" />
+              Registered Workspace
+            </DialogTitle>
             <DialogDescription>
-              Are you sure you want to disconnect the Slack Survey integration?
-              This will disable survey delivery and the /burnout-survey command in your Slack workspace.
+              Your Slack workspace connection details
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter>
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm font-medium text-gray-700">Workspace</p>
+                <p className="text-sm text-gray-900 mt-1">{slackIntegration?.workspace_name || 'Unknown'}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-700">Connection</p>
+                <p className="text-sm text-gray-900 mt-1 capitalize">
+                  {slackIntegration?.connection_type === 'oauth' ? 'OAuth' : 'Token'}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-700">Connected</p>
+                <p className="text-sm text-gray-900 mt-1">
+                  {slackIntegration?.connected_at ? new Date(slackIntegration.connected_at).toLocaleDateString() : 'N/A'}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-700">Workspace ID</p>
+                <p className="text-sm text-gray-900 mt-1 font-mono text-xs">
+                  {slackIntegration?.workspace_id || 'N/A'}
+                </p>
+              </div>
+            </div>
+            <div className="pt-3 border-t border-gray-200">
+              <p className="text-xs text-gray-600">
+                💡 The <code className="bg-gray-100 px-1 rounded">/burnout-survey</code> command will only show analyses for your organization
+              </p>
+            </div>
+          </div>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
             <Button
               variant="outline"
               onClick={() => setSlackSurveyDisconnectDialogOpen(false)}
-              disabled={isDisconnectingSlackSurvey}
+              className="w-full sm:w-auto"
             >
-              Cancel
+              Close
             </Button>
             <Button
               variant="destructive"
@@ -5782,7 +5805,9 @@ export default function IntegrationsPage() {
                 setIsDisconnectingSlackSurvey(true)
                 try {
                   const authToken = localStorage.getItem('auth_token')
-                  const response = await fetch(`${API_BASE}/api/integrations/slack/${slackIntegration.id}`, {
+                  if (!authToken) return
+
+                  const response = await fetch(`${API_BASE}/integrations/slack/disconnect`, {
                     method: 'DELETE',
                     headers: {
                       'Authorization': `Bearer ${authToken}`
@@ -5805,6 +5830,7 @@ export default function IntegrationsPage() {
                 }
               }}
               disabled={isDisconnectingSlackSurvey}
+              className="w-full sm:w-auto"
             >
               {isDisconnectingSlackSurvey ? (
                 <>
@@ -5812,7 +5838,7 @@ export default function IntegrationsPage() {
                   Disconnecting...
                 </>
               ) : (
-                "Disconnect"
+                'Disconnect'
               )}
             </Button>
           </DialogFooter>
