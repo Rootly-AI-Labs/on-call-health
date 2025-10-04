@@ -497,13 +497,28 @@ async def get_slack_status(
     
     # Build response data based on connection type
     if integration:
-        # Manual SlackIntegration
+        # Manual SlackIntegration - fetch workspace name from Slack API
+        workspace_name = None
+        try:
+            # Get workspace name from Slack API
+            team_response = requests.get(
+                "https://slack.com/api/team.info",
+                headers={"Authorization": f"Bearer {slack_token}"}
+            )
+            if team_response.ok:
+                team_data = team_response.json()
+                if team_data.get("ok"):
+                    workspace_name = team_data.get("team", {}).get("name")
+        except Exception as e:
+            logger.warning(f"Could not fetch workspace name: {e}")
+
         response_data = {
             "connected": True,
             "integration": {
                 "id": integration.id,
                 "slack_user_id": integration.slack_user_id,
                 "workspace_id": integration.workspace_id,
+                "workspace_name": workspace_name,
                 "token_source": integration.token_source,
                 "is_oauth": integration.is_oauth,
                 "supports_refresh": integration.supports_refresh,
