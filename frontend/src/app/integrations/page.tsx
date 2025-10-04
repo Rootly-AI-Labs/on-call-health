@@ -3629,9 +3629,6 @@ export default function IntegrationsPage() {
                     >
                       <CheckCircle className="w-4 h-4" />
                       <span>Connected</span>
-                      {slackIntegration.connection_type === 'oauth' && slackIntegration.workspace_name && (
-                        <span className="ml-2 text-xs text-green-700">({slackIntegration.workspace_name})</span>
-                      )}
                     </button>
                   ) : process.env.NEXT_PUBLIC_SLACK_CLIENT_ID ? (
                     <Button
