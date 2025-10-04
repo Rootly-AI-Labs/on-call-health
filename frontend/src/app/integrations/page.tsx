@@ -5821,23 +5821,23 @@ export default function IntegrationsPage() {
               </svg>
               Disconnect Slack Survey Integration?
             </DialogTitle>
-            <DialogDescription className="space-y-3 pt-2">
-              <p className="text-base font-medium text-gray-900">
-                Are you sure you want to disconnect?
-              </p>
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4 space-y-2">
-                <p className="text-sm font-medium text-red-900">This will:</p>
-                <ul className="text-sm text-red-800 space-y-1 list-disc list-inside">
-                  <li>Disable the <code className="bg-red-100 px-1 rounded font-mono text-xs">/burnout-survey</code> command in your Slack workspace</li>
-                  <li>Stop all automated survey delivery</li>
-                  <li>Remove access to survey features for all team members</li>
-                </ul>
-              </div>
-              <p className="text-sm text-gray-600">
-                You will need to reconnect to re-enable these features.
-              </p>
+            <DialogDescription>
+              Are you sure you want to disconnect?
             </DialogDescription>
           </DialogHeader>
+          <div className="space-y-3 py-4">
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 space-y-2">
+              <p className="text-sm font-medium text-red-900">This will:</p>
+              <ul className="text-sm text-red-800 space-y-1 list-disc list-inside">
+                <li>Disable the <code className="bg-red-100 px-1 rounded font-mono text-xs">/burnout-survey</code> command in your Slack workspace</li>
+                <li>Stop all automated survey delivery</li>
+                <li>Remove access to survey features for all team members</li>
+              </ul>
+            </div>
+            <p className="text-sm text-gray-600">
+              You will need to reconnect to re-enable these features.
+            </p>
+          </div>
           <DialogFooter>
             <Button
               variant="outline"
