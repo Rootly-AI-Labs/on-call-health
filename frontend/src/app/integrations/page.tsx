@@ -3670,10 +3670,11 @@ export default function IntegrationsPage() {
                         console.log('Redirect URI being sent:', redirectUri)
                         console.log('Full OAuth URL:', `https://slack.com/oauth/v2/authorize?client_id=${clientId}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUri)}`)
 
-                        const slackAuthUrl = `https://slack.com/oauth/v2/authorize?client_id=${clientId}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUri)}`
+                        const slackAuthUrl = `https://slack.com/oauth/v2/authorize?client_id=${clientId}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(state)}`
 
                         console.log('Installing official OnCall Burnout Slack app for org:', currentUser?.organization_id)
-                        window.open(slackAuthUrl, '_blank')
+                        // Use window.location to navigate in same tab so auth token is preserved
+                        window.location.href = slackAuthUrl
                       }}
                       className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
                     >
