@@ -5854,7 +5854,7 @@ export default function IntegrationsPage() {
                   const authToken = localStorage.getItem('auth_token')
                   if (!authToken) return
 
-                  const response = await fetch(`${API_BASE}/api/integrations/slack/disconnect`, {
+                  const response = await fetch(`${API_BASE}/integrations/slack/disconnect`, {
                     method: 'DELETE',
                     headers: {
                       'Authorization': `Bearer ${authToken}`
