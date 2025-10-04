@@ -360,6 +360,7 @@ export default function IntegrationsPage() {
   const [githubDisconnectDialogOpen, setGithubDisconnectDialogOpen] = useState(false)
   const [slackDisconnectDialogOpen, setSlackDisconnectDialogOpen] = useState(false)
   const [slackSurveyDisconnectDialogOpen, setSlackSurveyDisconnectDialogOpen] = useState(false)
+  const [slackSurveyConfirmDisconnectOpen, setSlackSurveyConfirmDisconnectOpen] = useState(false)
   const [isDisconnectingGithub, setIsDisconnectingGithub] = useState(false)
   const [isDisconnectingSlack, setIsDisconnectingSlack] = useState(false)
   const [isDisconnectingSlackSurvey, setIsDisconnectingSlackSurvey] = useState(false)
@@ -5798,6 +5799,55 @@ export default function IntegrationsPage() {
             </Button>
             <Button
               variant="destructive"
+              onClick={() => {
+                setSlackSurveyDisconnectDialogOpen(false)
+                setSlackSurveyConfirmDisconnectOpen(true)
+              }}
+              className="w-full sm:w-auto"
+            >
+              Disconnect
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Slack Survey Disconnect Confirmation Dialog - Step 2 */}
+      <Dialog open={slackSurveyConfirmDisconnectOpen} onOpenChange={setSlackSurveyConfirmDisconnectOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center text-red-600">
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              Disconnect Slack Survey Integration?
+            </DialogTitle>
+            <DialogDescription className="space-y-3 pt-2">
+              <p className="text-base font-medium text-gray-900">
+                Are you sure you want to disconnect?
+              </p>
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 space-y-2">
+                <p className="text-sm font-medium text-red-900">This will:</p>
+                <ul className="text-sm text-red-800 space-y-1 list-disc list-inside">
+                  <li>Disable the <code className="bg-red-100 px-1 rounded font-mono text-xs">/burnout-survey</code> command in your Slack workspace</li>
+                  <li>Stop all automated survey delivery</li>
+                  <li>Remove access to survey features for all team members</li>
+                </ul>
+              </div>
+              <p className="text-sm text-gray-600">
+                You will need to reconnect to re-enable these features.
+              </p>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setSlackSurveyConfirmDisconnectOpen(false)}
+              disabled={isDisconnectingSlackSurvey}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
               onClick={async () => {
                 setIsDisconnectingSlackSurvey(true)
                 try {
@@ -5813,7 +5863,7 @@ export default function IntegrationsPage() {
 
                   if (response.ok) {
                     toast.success('Slack Survey integration disconnected')
-                    setSlackSurveyDisconnectDialogOpen(false)
+                    setSlackSurveyConfirmDisconnectOpen(false)
                     window.location.reload()
                   } else {
                     const error = await response.json()
@@ -5827,7 +5877,6 @@ export default function IntegrationsPage() {
                 }
               }}
               disabled={isDisconnectingSlackSurvey}
-              className="w-full sm:w-auto"
             >
               {isDisconnectingSlackSurvey ? (
                 <>
@@ -5835,7 +5884,7 @@ export default function IntegrationsPage() {
                   Disconnecting...
                 </>
               ) : (
-                'Disconnect'
+                'Yes, Disconnect'
               )}
             </Button>
           </DialogFooter>
