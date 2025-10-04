@@ -18,6 +18,9 @@ from ...auth.integration_oauth import slack_integration_oauth
 from ...core.config import settings
 from ...services.notification_service import NotificationService
 
+# Set up logger
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/slack", tags=["slack-integration"])
 
 # Helper function to get the user isolation key (organization_id or user_id for beta)
