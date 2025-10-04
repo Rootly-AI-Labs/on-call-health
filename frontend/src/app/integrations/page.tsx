@@ -777,6 +777,16 @@ export default function IntegrationsPage() {
       })
 
       const slackData = response.ok ? await response.json() : { integration: null }
+
+      console.log('📊 Slack integration status loaded:', {
+        connected: slackData.connected,
+        connectionType: slackData.integration?.connection_type,
+        workspaceName: slackData.integration?.workspace_name,
+        workspaceId: slackData.integration?.workspace_id,
+        isOAuth: slackData.integration?.is_oauth,
+        hasIntegrationId: !!slackData.integration?.id
+      })
+
       setSlackIntegration(slackData.integration)
       localStorage.setItem('slack_integration', JSON.stringify(slackData))
     } catch (error) {
@@ -5900,25 +5910,49 @@ export default function IntegrationsPage() {
                 setIsDisconnectingSlackSurvey(true)
                 try {
                   const authToken = localStorage.getItem('auth_token')
-                  if (!authToken) return
+                  if (!authToken) {
+                    console.error('No auth token found')
+                    return
+                  }
 
-                  const response = await fetch(`${API_BASE}/integrations/slack/disconnect`, {
+                  const url = `${API_BASE}/integrations/slack/disconnect`
+                  console.log('🔌 Disconnect request:', {
+                    url,
+                    method: 'DELETE',
+                    hasAuth: !!authToken,
+                    tokenPreview: authToken.substring(0, 20) + '...'
+                  })
+
+                  const response = await fetch(url, {
                     method: 'DELETE',
                     headers: {
                       'Authorization': `Bearer ${authToken}`
                     }
                   })
 
+                  console.log('📡 Disconnect response:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    ok: response.ok,
+                    headers: Object.fromEntries(response.headers.entries())
+                  })
+
                   if (response.ok) {
+                    const result = await response.json()
+                    console.log('✅ Disconnect success:', result)
                     toast.success('Slack Survey integration disconnected')
                     setSlackSurveyConfirmDisconnectOpen(false)
                     window.location.reload()
                   } else {
                     const error = await response.json()
+                    console.error('❌ Disconnect failed:', {
+                      status: response.status,
+                      error
+                    })
                     toast.error(error.detail || 'Failed to disconnect Slack')
                   }
                 } catch (error) {
-                  console.error('Failed to disconnect Slack Survey:', error)
+                  console.error('💥 Disconnect exception:', error)
                   toast.error('Failed to disconnect Slack Survey integration')
                 } finally {
                   setIsDisconnectingSlackSurvey(false)
