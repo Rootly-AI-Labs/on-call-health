@@ -930,12 +930,22 @@ async def disconnect_slack(
 ):
     """
     Disconnect Slack integration for current user.
+    Handles both manual SlackIntegration and OAuth SlackWorkspaceMapping.
     """
+    # Check for manual SlackIntegration first
     integration = db.query(SlackIntegration).filter(
         SlackIntegration.user_id == current_user.id
     ).first()
-    
+
+    # If no manual integration, check for OAuth workspace mapping
+    workspace_mapping = None
     if not integration:
+        workspace_mapping = db.query(SlackWorkspaceMapping).filter(
+            SlackWorkspaceMapping.owner_user_id == current_user.id,
+            SlackWorkspaceMapping.status == 'active'
+        ).first()
+
+    if not integration and not workspace_mapping:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Slack integration not found"
@@ -943,17 +953,28 @@ async def disconnect_slack(
     
     try:
         # Remove Slack data from user correlations (organization-scoped)
-        correlations = db.query(UserCorrelation).filter(
-            UserCorrelation.organization_id == current_user.organization_id
-        ).all()
+        if current_user.organization_id:
+            correlations = db.query(UserCorrelation).filter(
+                UserCorrelation.organization_id == current_user.organization_id
+            ).all()
+        else:
+            # Beta mode: use user_id
+            correlations = db.query(UserCorrelation).filter(
+                UserCorrelation.user_id == current_user.id
+            ).all()
 
         for correlation in correlations:
             correlation.slack_user_id = None
-        
-        # Delete the integration
-        db.delete(integration)
+
+        # Delete the integration or workspace mapping
+        if integration:
+            db.delete(integration)
+        elif workspace_mapping:
+            workspace_mapping.status = 'disconnected'
+            # Note: We mark as disconnected rather than deleting to preserve history
+
         db.commit()
-        
+
         return {
             "success": True,
             "message": "Slack integration disconnected successfully"
