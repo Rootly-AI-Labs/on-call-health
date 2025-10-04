@@ -256,30 +256,15 @@ export function SlackSurveyTabs({
       {/* Setup Tab */}
       <TabsContent value="setup" className="space-y-4 mt-4">
         <div className="bg-white rounded-lg border p-4 space-y-4">
-          {!slackIntegration && process.env.NEXT_PUBLIC_SLACK_CLIENT_ID && (
+          {!slackIntegration && !process.env.NEXT_PUBLIC_SLACK_CLIENT_ID && (
             <div className="text-center py-4">
-              <Button
-                onClick={handleSlackConnect}
-                className="inline-flex items-center space-x-2 bg-purple-600 hover:bg-purple-700 text-white px-6 py-3"
-              >
-                <SlackIcon />
-                <span>Connect Slack Workspace</span>
-              </Button>
-              <p className="text-sm text-gray-600 mt-3">
-                Connect your Slack workspace to enable the /burnout-survey command
-              </p>
-            </div>
-          )}
-
-          {!process.env.NEXT_PUBLIC_SLACK_CLIENT_ID && (
-            <div className="text-center py-2">
               <p className="text-sm text-gray-600 mb-4">
-                The official Slack app is not currently configured. Contact support to enable Slack integration.
+                The official Slack app is not currently configured. Use the "Add to Slack" button above to connect your workspace.
               </p>
             </div>
           )}
 
-          <div className="border-t pt-4">
+          <div className={!slackIntegration ? "" : "border-t pt-4"}>
             <h4 className="font-medium text-gray-900 mb-3">How it works:</h4>
             <div className="space-y-3">
               <div className="flex items-start space-x-3">

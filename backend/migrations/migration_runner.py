@@ -302,6 +302,16 @@ class MigrationRunner:
                     """
                 ]
             },
+            {
+                "name": "006_make_slack_user_id_nullable",
+                "description": "Make slack_user_id nullable in slack_integrations for OAuth bot tokens",
+                "sql": [
+                    """
+                    ALTER TABLE slack_integrations
+                    ALTER COLUMN slack_user_id DROP NOT NULL
+                    """
+                ]
+            },
             # Add future migrations here with incrementing numbers
             # {
             #     "name": "006_add_user_preferences",
