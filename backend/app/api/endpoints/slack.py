@@ -549,13 +549,17 @@ async def get_slack_status(
         }
     else:
         # OAuth SlackWorkspaceMapping
+        workspace_name_oauth = workspace_mapping.workspace_name
+        if not workspace_name_oauth:
+            logger.warning(f"OAuth workspace {workspace_mapping.workspace_id} has no name in database")
+
         response_data = {
             "connected": True,
             "integration": {
                 "id": workspace_mapping.id,
                 "slack_user_id": None,  # Not stored in workspace mapping
                 "workspace_id": workspace_mapping.workspace_id,
-                "workspace_name": workspace_mapping.workspace_name,
+                "workspace_name": workspace_name_oauth or workspace_mapping.workspace_id,  # Fallback to ID
                 "token_source": "oauth",
                 "is_oauth": True,
                 "supports_refresh": False,
