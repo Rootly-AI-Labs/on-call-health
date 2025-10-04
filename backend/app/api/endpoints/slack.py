@@ -932,10 +932,14 @@ async def disconnect_slack(
     Disconnect Slack integration for current user.
     Handles both manual SlackIntegration and OAuth SlackWorkspaceMapping.
     """
+    logger.info(f"Disconnect request from user {current_user.id} (email: {current_user.email})")
+
     # Check for manual SlackIntegration first
     integration = db.query(SlackIntegration).filter(
         SlackIntegration.user_id == current_user.id
     ).first()
+
+    logger.info(f"Manual integration found: {integration is not None}")
 
     # If no manual integration, check for OAuth workspace mapping
     workspace_mapping = None
@@ -945,7 +949,10 @@ async def disconnect_slack(
             SlackWorkspaceMapping.status == 'active'
         ).first()
 
+        logger.info(f"OAuth workspace mapping found: {workspace_mapping is not None}")
+
     if not integration and not workspace_mapping:
+        logger.warning(f"No Slack integration found for user {current_user.id}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Slack integration not found"
