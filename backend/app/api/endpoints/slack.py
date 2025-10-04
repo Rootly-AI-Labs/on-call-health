@@ -500,15 +500,17 @@ async def get_slack_status(
         # Manual SlackIntegration - fetch workspace name from Slack API
         workspace_name = None
         try:
+            import httpx
             # Get workspace name from Slack API
-            team_response = requests.get(
-                "https://slack.com/api/team.info",
-                headers={"Authorization": f"Bearer {slack_token}"}
-            )
-            if team_response.ok:
-                team_data = team_response.json()
-                if team_data.get("ok"):
-                    workspace_name = team_data.get("team", {}).get("name")
+            async with httpx.AsyncClient() as client:
+                team_response = await client.get(
+                    "https://slack.com/api/team.info",
+                    headers={"Authorization": f"Bearer {slack_token}"}
+                )
+                if team_response.status_code == 200:
+                    team_data = team_response.json()
+                    if team_data.get("ok"):
+                        workspace_name = team_data.get("team", {}).get("name")
         except Exception as e:
             logger.warning(f"Could not fetch workspace name: {e}")
 
