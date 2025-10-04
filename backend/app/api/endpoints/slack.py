@@ -435,16 +435,22 @@ async def get_slack_status(
     channels_error = None
     token_preview = None
     webhook_preview = None
-    
+    access_token = None  # Initialize to None
+
     try:
-        # Decrypt token and get preview
-        access_token = decrypt_token(integration.slack_token)
-        token_preview = f"...{access_token[-4:]}" if access_token else None
-        
-        # Get webhook preview if available
-        if integration.webhook_url:
-            webhook_preview = f"...{integration.webhook_url[-4:]}"
-        
+        # Decrypt token and get preview (only for manual integrations)
+        if integration:
+            access_token = decrypt_token(integration.slack_token)
+            token_preview = f"...{access_token[-4:]}" if access_token else None
+
+            # Get webhook preview if available
+            if integration.webhook_url:
+                webhook_preview = f"...{integration.webhook_url[-4:]}"
+
+        if not access_token:
+            # No token to fetch channels with
+            raise Exception("No access token available")
+
         headers = {
             "Authorization": f"Bearer {access_token}",
             "Content-Type": "application/json"
