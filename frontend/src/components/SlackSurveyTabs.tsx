@@ -216,7 +216,7 @@ export function SlackSurveyTabs({
 
         const formData = new FormData()
         formData.append('workspace_id', slackIntegration.workspace_id)
-        formData.append('workspace_name', slackIntegration.workspace_name || 'My Workspace')
+        formData.append('workspace_name', slackIntegration.workspace_name || slackIntegration.workspace_id)
 
         const registerResponse = await fetch(`${API_BASE}/integrations/slack/workspace/register`, {
           method: 'POST',
