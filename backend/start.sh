@@ -67,6 +67,15 @@ else
     echo "   Check logs above for details"
 fi
 
+# Make slack_user_id nullable for OAuth integrations
+echo "🔄 Making slack_user_id nullable..."
+if python make_slack_user_id_nullable.py; then
+    echo "✅ Slack user ID migration completed!"
+else
+    echo "⚠️  Slack user ID migration failed, but continuing startup..."
+    echo "   Check logs above for details"
+fi
+
 # Create tables (safe - won't recreate existing tables)
 echo "🏗️  Ensuring all database tables exist..."
 python -c "
