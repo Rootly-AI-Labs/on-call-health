@@ -35,6 +35,11 @@
   - Added localStorage persistence across OAuth redirect
 - ✅ Reduced backend logging verbosity for production (2025-10-06)
   - Added LOG_LEVEL environment variable support
+- ✅ Fixed analysis 404 errors (2025-10-06)
+  - Added organization_id field to analyses on creation
+  - **Disabled organization_id filtering to avoid prod regressions**
+  - Analyses now filter by user_id only (original behavior)
+  - Multi-tenant filtering can be re-enabled later when stable
 
 ---
 
@@ -51,7 +56,7 @@
 ### Modified Tables (4)
 1. `users` - Added org relationship and role management
 2. `user_correlations` - Added multi-tenancy support, name field, and integration_ids
-3. `analyses` - Added organization_id
+3. `analyses` - Added organization_id (field exists but not used for filtering yet)
 4. `slack_integrations` - Added workspace fields, made slack_user_id nullable
 
 ---
@@ -486,6 +491,7 @@ When merge happens, migrations will run in this order:
 6. Migration 005 - UserBurnoutReports personal_circumstances field
 7. Migration 006 - Slack slack_user_id nullable ⭐
 
+**Total migrations**: 6 (not 7 - migration 007 was removed)
 **Total estimated time**: 60-90 seconds (depending on data volume)
 
 ---
@@ -501,8 +507,10 @@ After merge and deployment:
 - [ ] `user_correlations.integration_ids` column exists
 - [ ] `user_burnout_reports.personal_circumstances` column exists
 - [ ] `slack_integrations.slack_user_id` is nullable
+- [ ] `analyses.organization_id` column exists (but not used for filtering)
 - [ ] No SQL errors in deployment logs
 - [ ] Users can log in and access dashboard
+- [ ] **Analyses can be created and retrieved without 404 errors** ⭐
 - [ ] Slack OAuth connect/disconnect works in single attempt
 - [ ] Slack surveys work end-to-end with user notifications
 - [ ] Beta tokens can sync users
