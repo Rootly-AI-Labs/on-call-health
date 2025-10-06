@@ -365,6 +365,7 @@ export default function IntegrationsPage() {
   const [isDisconnectingGithub, setIsDisconnectingGithub] = useState(false)
   const [isDisconnectingSlack, setIsDisconnectingSlack] = useState(false)
   const [isDisconnectingSlackSurvey, setIsDisconnectingSlackSurvey] = useState(false)
+  const [isConnectingSlackOAuth, setIsConnectingSlackOAuth] = useState(false)
   const [slackPermissions, setSlackPermissions] = useState<any>(null)
   const [isLoadingPermissions, setIsLoadingPermissions] = useState(false)
 
@@ -3746,12 +3747,25 @@ export default function IntegrationsPage() {
                         const slackAuthUrl = `https://slack.com/oauth/v2/authorize?client_id=${clientId}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(state)}`
 
                         console.log('Installing official OnCall Burnout Slack app for org:', currentUser?.organization_id)
+
+                        // Show loading state and toast
+                        setIsConnectingSlackOAuth(true)
+                        toast.info('Redirecting to Slack...')
+
                         // Use window.location to navigate in same tab so auth token is preserved
                         window.location.href = slackAuthUrl
                       }}
-                      className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
+                      disabled={isConnectingSlackOAuth}
+                      className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      Add to Slack
+                      {isConnectingSlackOAuth ? (
+                        <span className="flex items-center space-x-2">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Connecting...</span>
+                        </span>
+                      ) : (
+                        'Add to Slack'
+                      )}
                     </Button>
                   ) : (
                     <div className="inline-flex items-center space-x-2 bg-gray-100 text-gray-500 px-4 py-2 rounded-lg text-sm font-medium">
