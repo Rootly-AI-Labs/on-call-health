@@ -272,8 +272,13 @@ class SurveyScheduler:
             UserCorrelation.slack_user_id.isnot(None)  # Must have Slack ID
         ).all()
 
-        recipients = []
+        # Use a dict to deduplicate by user_id (in case user has multiple UserCorrelation records)
+        recipients_dict = {}
         for user, correlation, preference in users:
+            # Skip if we already processed this user
+            if user.id in recipients_dict:
+                continue
+
             # Check if user opted out (default is opted-in)
             if preference and not preference.receive_daily_surveys:
                 continue
@@ -284,14 +289,14 @@ class SurveyScheduler:
             if is_reminder and preference and not preference.receive_reminders:
                 continue
 
-            recipients.append({
+            recipients_dict[user.id] = {
                 'user_id': user.id,
                 'slack_user_id': correlation.slack_user_id,
                 'email': user.email,
                 'name': user.name or correlation.name
-            })
+            }
 
-        return recipients
+        return list(recipients_dict.values())
 
 
 # Global scheduler instance
