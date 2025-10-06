@@ -106,7 +106,9 @@ async def slack_oauth_callback(
         if state:
             import base64
             try:
+                logger.info(f"🔍 Raw state parameter: {state}")
                 decoded_state = json.loads(base64.b64decode(state + '=='))  # Add padding
+                logger.info(f"🔍 Full decoded state: {decoded_state}")
                 organization_id = decoded_state.get("orgId")
                 user_email = decoded_state.get("email")
                 logger.info(f"📋 Decoded state - org_id: {organization_id}, email: {user_email}")

@@ -3684,11 +3684,15 @@ export default function IntegrationsPage() {
 
                         // Add state parameter to track which organization is installing
                         const currentUser = userInfo // Assuming userInfo contains org info
-                        const state = currentUser ? btoa(JSON.stringify({
-                          orgId: currentUser.organization_id,
-                          userId: currentUser.id,
-                          email: currentUser.email
-                        })) : ''
+                        console.log('🔍 Current userInfo:', userInfo)
+                        const stateData = {
+                          orgId: currentUser?.organization_id,
+                          userId: currentUser?.id,
+                          email: currentUser?.email
+                        }
+                        console.log('🔍 State data to encode:', stateData)
+                        const state = currentUser ? btoa(JSON.stringify(stateData)) : ''
+                        console.log('🔍 Encoded state:', state)
 
                         // Debug: Test without state parameter first
                         console.log('Redirect URI being sent:', redirectUri)
