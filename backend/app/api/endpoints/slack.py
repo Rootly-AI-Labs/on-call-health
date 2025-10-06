@@ -197,6 +197,11 @@ async def slack_oauth_callback(
             SlackWorkspaceMapping.workspace_id == workspace_id
         ).first()
 
+        # Use owner's organization_id if not provided in state
+        if not organization_id and owner_user.organization_id:
+            organization_id = owner_user.organization_id
+            logger.info(f"Using owner's organization_id: {organization_id}")
+
         if existing_mapping:
             # Update existing mapping
             existing_mapping.workspace_name = workspace_name
