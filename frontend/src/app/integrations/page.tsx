@@ -587,6 +587,12 @@ export default function IntegrationsPage() {
       return null
     }
 
+    // Check if we're returning from OAuth and set loading state
+    const isReturningFromOAuth = localStorage.getItem('slack_oauth_in_progress')
+    if (isReturningFromOAuth) {
+      setIsConnectingSlackOAuth(true)
+    }
+
     // Show debug info as temporary toast for troubleshooting
     if (window.location.search.includes('slack_connected')) {
       toast.info(`Debug: OAuth redirect detected`, {
@@ -628,6 +634,10 @@ export default function IntegrationsPage() {
               // Connection confirmed! Reload all integrations to update UI
               await loadAllIntegrationsOptimized()
 
+              // Clear OAuth loading state
+              localStorage.removeItem('slack_oauth_in_progress')
+              setIsConnectingSlackOAuth(false)
+
               toast.dismiss(loadingToastId)
               if (status === 'pending_user_association') {
                 toast.success(`🎉 Slack app installed successfully!`, {
@@ -649,6 +659,8 @@ export default function IntegrationsPage() {
             setTimeout(checkConnection, pollInterval)
           } else {
             // Max retries reached, show warning
+            localStorage.removeItem('slack_oauth_in_progress')
+            setIsConnectingSlackOAuth(false)
             toast.dismiss(loadingToastId)
             toast.warning('Connection verification timed out', {
               description: 'Your Slack workspace was added, but verification took longer than expected. Try refreshing the page.',
@@ -660,6 +672,8 @@ export default function IntegrationsPage() {
           if (retries < maxRetries) {
             setTimeout(checkConnection, pollInterval)
           } else {
+            localStorage.removeItem('slack_oauth_in_progress')
+            setIsConnectingSlackOAuth(false)
             toast.dismiss(loadingToastId)
             toast.error('Failed to verify connection', {
               description: 'Please refresh the page to check your Slack connection status.',
@@ -671,6 +685,10 @@ export default function IntegrationsPage() {
       // Start checking immediately
       checkConnection()
     } else if (slackConnected === 'false') {
+      // Clear OAuth loading state
+      localStorage.removeItem('slack_oauth_in_progress')
+      setIsConnectingSlackOAuth(false)
+
       // Show error toast
       const errorParam = urlParams.get('error')
       const errorMessage = errorParam ? decodeURIComponent(errorParam) : 'Unknown error occurred'
@@ -3757,8 +3775,9 @@ export default function IntegrationsPage() {
 
                         const slackAuthUrl = `https://slack.com/oauth/v2/authorize?client_id=${clientId}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(state)}`
 
-                        // Show loading state and toast
+                        // Show loading state and persist in localStorage
                         setIsConnectingSlackOAuth(true)
+                        localStorage.setItem('slack_oauth_in_progress', 'true')
                         toast.info('Redirecting to Slack...')
 
                         // Use window.location to navigate in same tab so auth token is preserved
