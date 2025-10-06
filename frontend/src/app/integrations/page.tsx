@@ -6064,7 +6064,9 @@ export default function IntegrationsPage() {
 
                   if (response.ok) {
                     const result = await response.json()
-                    setSlackSurveyConfirmDisconnectOpen(false)
+
+                    // Small delay to ensure backend has processed the disconnect
+                    await new Promise(resolve => setTimeout(resolve, 300))
 
                     // Fetch updated Slack status without showing loading on other cards
                     const slackResponse = await fetch(`${API_BASE}/integrations/slack/status`, {
@@ -6078,6 +6080,9 @@ export default function IntegrationsPage() {
                       localStorage.setItem('slack_integration', JSON.stringify(slackData))
                       localStorage.setItem('all_integrations_timestamp', Date.now().toString())
                     }
+
+                    // Close dialog and show success after state update
+                    setSlackSurveyConfirmDisconnectOpen(false)
 
                     toast.success('Slack Survey integration disconnected', {
                       description: 'Your workspace has been disconnected successfully.',

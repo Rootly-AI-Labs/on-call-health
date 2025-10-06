@@ -1030,10 +1030,11 @@ async def disconnect_slack(
         for correlation in correlations:
             correlation.slack_user_id = None
 
-        # Delete the integration or workspace mapping
+        # Delete the integration AND mark workspace mapping as disconnected
         if integration:
             db.delete(integration)
-        elif workspace_mapping:
+
+        if workspace_mapping:
             workspace_mapping.status = 'disconnected'
             # Note: We mark as disconnected rather than deleting to preserve history
 
