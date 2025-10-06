@@ -219,6 +219,18 @@ class SurveyScheduler:
                         message=message_template
                     )
                     sent_count += 1
+
+                    # Create notification for the user who received the survey
+                    try:
+                        notification_service = NotificationService(db)
+                        notification_service.create_survey_received_notification(
+                            user_id=user['user_id'],
+                            organization_id=organization_id,
+                            is_reminder=is_reminder
+                        )
+                    except Exception as notif_error:
+                        logger.error(f"Failed to create notification for user {user['user_id']}: {str(notif_error)}")
+
                 except Exception as e:
                     logger.error(f"Failed to send DM to user {user['user_id']}: {str(e)}")
                     failed_count += 1

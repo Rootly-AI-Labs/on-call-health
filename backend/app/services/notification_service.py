@@ -309,6 +309,41 @@ class NotificationService:
         self.db.commit()
         return notifications
 
+    def create_survey_received_notification(
+        self,
+        user_id: int,
+        organization_id: int,
+        is_reminder: bool = False
+    ) -> UserNotification:
+        """
+        Create notification when a user receives a survey DM.
+
+        Args:
+            user_id: User who received the survey
+            organization_id: Organization ID
+            is_reminder: True if this is a reminder, False if initial survey
+        """
+        if is_reminder:
+            title = "Survey reminder sent"
+            message = "A reminder to complete your burnout survey was sent to you via Slack DM."
+        else:
+            title = "Survey received"
+            message = "A burnout survey was sent to you via Slack DM. Please take 2 minutes to complete it."
+
+        notification = UserNotification(
+            user_id=user_id,
+            organization_id=organization_id,
+            type='survey',
+            title=title,
+            message=message,
+            action_url="/dashboard",
+            action_text="View Dashboard",
+            priority='normal'
+        )
+        self.db.add(notification)
+        self.db.commit()
+        return notification
+
     def cleanup_expired_notifications(self):
         """Clean up expired notifications."""
         expired = self.db.query(UserNotification).filter(
