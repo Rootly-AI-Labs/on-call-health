@@ -140,17 +140,11 @@ class UserSyncService:
             email = email.lower().strip()
 
             # Check if correlation already exists
-            # In beta mode (no org_id), check by user_id; otherwise use organization_id
-            if organization_id:
-                correlation = self.db.query(UserCorrelation).filter(
-                    UserCorrelation.organization_id == organization_id,
-                    UserCorrelation.email == email
-                ).first()
-            else:
-                correlation = self.db.query(UserCorrelation).filter(
-                    UserCorrelation.user_id == user_id,
-                    UserCorrelation.email == email
-                ).first()
+            # Check by (user_id, email) to match the unique constraint
+            correlation = self.db.query(UserCorrelation).filter(
+                UserCorrelation.user_id == user_id,
+                UserCorrelation.email == email
+            ).first()
 
             if correlation:
                 # Update existing correlation
