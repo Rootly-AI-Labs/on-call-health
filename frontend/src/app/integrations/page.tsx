@@ -629,6 +629,21 @@ export default function IntegrationsPage() {
       setTimeout(() => {
         loadAllIntegrationsOptimized()
       }, 1000)
+    } else if (slackConnected === 'false') {
+      // Show error toast
+      const errorParam = urlParams.get('error')
+      const errorMessage = errorParam ? decodeURIComponent(errorParam) : 'Unknown error occurred'
+
+      toast.error('Failed to connect Slack', {
+        description: errorMessage,
+        duration: 8000,
+      })
+
+      console.error('❌ Slack OAuth error:', errorMessage)
+
+      // Clean up URL parameters
+      const newUrl = window.location.pathname
+      window.history.replaceState({}, '', newUrl)
     }
   }, [])
 

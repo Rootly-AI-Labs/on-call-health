@@ -96,6 +96,8 @@ async def slack_oauth_callback(
     Handle Slack OAuth callback for workspace-level app installation.
     Creates a workspace mapping and redirects to the frontend with success status.
     """
+    logger.info(f"🔵 Slack OAuth callback received - code: {code[:20]}..., state: {state[:50] if state else 'None'}...")
+
     try:
         # Parse state parameter to get organization info
         organization_id = None
@@ -107,8 +109,10 @@ async def slack_oauth_callback(
                 decoded_state = json.loads(base64.b64decode(state + '=='))  # Add padding
                 organization_id = decoded_state.get("orgId")
                 user_email = decoded_state.get("email")
-            except:
+                logger.info(f"📋 Decoded state - org_id: {organization_id}, email: {user_email}")
+            except Exception as state_error:
                 # If state parsing fails, continue without org mapping
+                logger.warning(f"⚠️ Failed to parse state parameter: {state_error}")
                 pass
 
         # Exchange code for token using Slack's OAuth API
@@ -145,9 +149,12 @@ async def slack_oauth_callback(
             token_data = token_response.json()
 
             if not token_data.get("ok"):
+                error_msg = token_data.get('error', 'Unknown error')
+                logger.error(f"❌ Slack OAuth token exchange failed: {error_msg}")
+                logger.error(f"Full token response: {token_data}")
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Slack OAuth error: {token_data.get('error', 'Unknown error')}"
+                    detail=f"Slack OAuth error: {error_msg}"
                 )
 
             # Extract token and team info
@@ -227,6 +234,7 @@ async def slack_oauth_callback(
             db.add(slack_integration)
 
         db.commit()
+        logger.info(f"✅ Slack OAuth successful - workspace: {workspace_name}, workspace_id: {workspace_id}")
 
         # Redirect to frontend with success message
         frontend_url = settings.FRONTEND_URL or "http://localhost:3000"
@@ -234,15 +242,27 @@ async def slack_oauth_callback(
 
         from fastapi.responses import RedirectResponse
         return RedirectResponse(url=redirect_url, status_code=302)
-        
-    except HTTPException:
-        raise
+
+    except HTTPException as he:
+        logger.error(f"❌ Slack OAuth HTTPException: {he.detail}")
+        # Redirect to frontend with error
+        frontend_url = settings.FRONTEND_URL or "http://localhost:3000"
+        from fastapi.responses import RedirectResponse
+        import urllib.parse
+        error_msg = urllib.parse.quote(str(he.detail))
+        redirect_url = f"{frontend_url}/integrations?slack_connected=false&error={error_msg}"
+        return RedirectResponse(url=redirect_url, status_code=302)
     except Exception as e:
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to connect Slack integration: {str(e)}"
-        )
+        logger.error(f"❌ Slack OAuth unexpected error: {str(e)}")
+        logger.exception(e)
+        # Redirect to frontend with error
+        frontend_url = settings.FRONTEND_URL or "http://localhost:3000"
+        from fastapi.responses import RedirectResponse
+        import urllib.parse
+        error_msg = urllib.parse.quote(f"Unexpected error: {str(e)}")
+        redirect_url = f"{frontend_url}/integrations?slack_connected=false&error={error_msg}"
+        return RedirectResponse(url=redirect_url, status_code=302)
 
 @router.get("/check-scopes")
 async def check_slack_scopes(
