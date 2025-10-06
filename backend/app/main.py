@@ -106,11 +106,13 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # Specific methods only
     allow_headers=[
         "Accept",
-        "Accept-Language", 
+        "Accept-Language",
         "Content-Language",
         "Content-Type",
         "Authorization",
-        "X-Requested-With"
+        "X-Requested-With",
+        "Cache-Control",
+        "Pragma"
     ],  # Specific headers only
 )
 
