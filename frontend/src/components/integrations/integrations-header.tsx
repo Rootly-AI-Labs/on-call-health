@@ -3,7 +3,7 @@
 import { RefreshCw, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { NotificationBell } from "@/components/notifications"
+import { NotificationDrawer } from "@/components/notifications"
 
 interface IntegrationsHeaderProps {
   userInfo: {name: string, email: string, avatar?: string} | null
@@ -58,7 +58,7 @@ export function IntegrationsHeader({
             </Button>
 
             {/* Notifications */}
-            <NotificationBell />
+            <NotificationDrawer />
 
             {/* User avatar */}
             {userInfo && (

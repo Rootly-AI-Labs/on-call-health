@@ -93,7 +93,7 @@ import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { MappingDrawer } from "@/components/mapping-drawer"
-import { NotificationBell } from "@/components/notifications"
+import { NotificationDrawer } from "@/components/notifications"
 import ManualSurveyDeliveryModal from "@/components/ManualSurveyDeliveryModal"
 import { SlackSurveyTabs } from "@/components/SlackSurveyTabs"
 import { useForm } from "react-hook-form"
@@ -2635,7 +2635,7 @@ export default function IntegrationsPage() {
 
           <div className="flex items-center space-x-4">
             {/* Notifications */}
-            <NotificationBell />
+            <NotificationDrawer />
 
             {/* User Account Indicator */}
             {userInfo ? (

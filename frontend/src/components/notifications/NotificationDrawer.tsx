@@ -12,7 +12,7 @@ import {
 import { useNotifications } from '@/hooks/useNotifications'
 import NotificationItem from './NotificationItem'
 
-export function NotificationBell() {
+export function NotificationDrawer() {
   const [isOpen, setIsOpen] = useState(false)
   const {
     notifications,
@@ -73,8 +73,8 @@ export function NotificationBell() {
         </Button>
       </SheetTrigger>
 
-      <SheetContent side="right" className="w-[400px] sm:w-[600px] p-0">
-        <SheetHeader className="border-b border-gray-200 px-6 py-4">
+      <SheetContent side="right" className="w-[400px] sm:w-[600px] p-0 flex flex-col h-full">
+        <SheetHeader className="border-b border-gray-200 px-6 py-4 flex-shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-gray-100">
@@ -101,7 +101,7 @@ export function NotificationBell() {
         </SheetHeader>
 
         {/* Notifications List */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto" style={{ minHeight: 0 }}>
           <div className="divide-y divide-gray-200">
             {isLoading && notifications.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -151,4 +151,4 @@ export function NotificationBell() {
   )
 }
 
-export default NotificationBell
+export default NotificationDrawer
