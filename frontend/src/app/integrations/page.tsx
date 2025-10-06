@@ -639,8 +639,11 @@ export default function IntegrationsPage() {
           if (response.ok) {
             const data = await response.json()
             if (data.connected) {
-              // Connection confirmed! Force refresh to get latest integration data
-              await loadAllIntegrationsOptimized(true)
+              // Update Slack integration state directly without reloading other cards
+              setSlackIntegration(data.integration)
+              // Update cache
+              localStorage.setItem('slack_integration', JSON.stringify(data))
+              localStorage.setItem('all_integrations_timestamp', Date.now().toString())
 
               // Clear OAuth loading state
               localStorage.removeItem('slack_oauth_in_progress')
@@ -6063,8 +6066,18 @@ export default function IntegrationsPage() {
                     const result = await response.json()
                     setSlackSurveyConfirmDisconnectOpen(false)
 
-                    // Force refresh to get latest integration data
-                    await loadAllIntegrationsOptimized(true)
+                    // Fetch updated Slack status without showing loading on other cards
+                    const slackResponse = await fetch(`${API_BASE}/integrations/slack/status`, {
+                      headers: { 'Authorization': `Bearer ${authToken}` }
+                    })
+
+                    if (slackResponse.ok) {
+                      const slackData = await slackResponse.json()
+                      setSlackIntegration(slackData.integration)
+                      // Update cache
+                      localStorage.setItem('slack_integration', JSON.stringify(slackData))
+                      localStorage.setItem('all_integrations_timestamp', Date.now().toString())
+                    }
 
                     toast.success('Slack Survey integration disconnected', {
                       description: 'Your workspace has been disconnected successfully.',
