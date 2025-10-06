@@ -205,12 +205,13 @@ async def run_burnout_analysis(
         
         analysis = Analysis(
             user_id=current_user.id,
+            organization_id=current_user.organization_id,  # Add organization_id for multi-tenancy
             rootly_integration_id=db_integration_id,  # Null for beta integrations
-            
+
             # NEW: Store integration details directly for simple frontend display
             integration_name=integration.name,  # "PagerDuty (Beta Access)", "Failwhale Tales", etc.
             platform=integration.platform,      # "rootly", "pagerduty"
-            
+
             time_range=request.time_range,
             status="pending",
             config={
@@ -303,22 +304,24 @@ async def list_analyses(
     db: Session = Depends(get_db)
 ):
     """List all previous analyses for the current user."""
+    # Simplified: Filter by user_id only (no organization_id requirement)
+    # TODO: Re-enable organization_id filtering after multi-tenant migration is stable
     query = db.query(Analysis).filter(Analysis.user_id == current_user.id)
-    
+
     # Filter by integration if specified
     if integration_id:
-        # Verify the integration belongs to the user
+        # Verify the integration belongs to current user
         integration = db.query(RootlyIntegration).filter(
             RootlyIntegration.id == integration_id,
             RootlyIntegration.user_id == current_user.id
         ).first()
-        
+
         if not integration:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Integration not found"
             )
-        
+
         query = query.filter(Analysis.rootly_integration_id == integration_id)
     
     # Get total count
@@ -363,9 +366,15 @@ async def get_analysis_by_uuid(
 ):
     """Get a specific analysis result by UUID."""
     try:
+        if not current_user.organization_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User must be part of an organization to view analyses"
+            )
+
         analysis = db.query(Analysis).filter(
             Analysis.uuid == analysis_uuid,
-            Analysis.user_id == current_user.id
+            Analysis.organization_id == current_user.organization_id
         ).first()
     except Exception:
         # UUID column doesn't exist yet
@@ -377,7 +386,7 @@ async def get_analysis_by_uuid(
     if not analysis:
         # Get the most recent analysis for this user to suggest as alternative
         most_recent = db.query(Analysis).filter(
-            Analysis.user_id == current_user.id,
+            Analysis.organization_id == current_user.organization_id,
             Analysis.status == "completed"
         ).order_by(Analysis.created_at.desc()).first()
         
@@ -416,23 +425,25 @@ async def get_analysis(
     db: Session = Depends(get_db)
 ):
     """Get a specific analysis result."""
+    # Simplified: Filter by user_id only (no organization_id requirement)
+    # TODO: Re-enable organization_id filtering after multi-tenant migration is stable
     analysis = db.query(Analysis).filter(
         Analysis.id == analysis_id,
         Analysis.user_id == current_user.id
     ).first()
-    
+
     if not analysis:
         # Get the most recent analysis for this user to suggest as alternative
         most_recent = db.query(Analysis).filter(
             Analysis.user_id == current_user.id,
             Analysis.status == "completed"
         ).order_by(Analysis.created_at.desc()).first()
-        
+
         error_detail = "Analysis not found"
         if most_recent:
             most_recent_id = getattr(most_recent, 'uuid', None) or most_recent.id
             error_detail = f"Analysis not found. Most recent analysis available: {most_recent_id}"
-        
+
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=error_detail
@@ -473,6 +484,12 @@ async def get_analysis_by_identifier(
     db: Session = Depends(get_db)
 ):
     """Get a specific analysis result by UUID or integer ID."""
+    if not current_user.organization_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User must be part of an organization to view analyses"
+        )
+
     analysis = None
     
     # Try UUID first if it looks like a UUID
@@ -480,7 +497,7 @@ async def get_analysis_by_identifier(
         try:
             analysis = db.query(Analysis).filter(
                 Analysis.uuid == analysis_identifier,
-                Analysis.user_id == current_user.id
+                Analysis.organization_id == current_user.organization_id
             ).first()
         except Exception:
             # UUID column might not exist yet, fall back to integer
@@ -492,7 +509,7 @@ async def get_analysis_by_identifier(
             analysis_id = int(analysis_identifier)
             analysis = db.query(Analysis).filter(
                 Analysis.id == analysis_id,
-                Analysis.user_id == current_user.id
+                Analysis.organization_id == current_user.organization_id
             ).first()
         except ValueError:
             # Not a valid integer either
@@ -501,7 +518,7 @@ async def get_analysis_by_identifier(
     if not analysis:
         # Get the most recent analysis for this user to suggest as alternative
         most_recent = db.query(Analysis).filter(
-            Analysis.user_id == current_user.id,
+            Analysis.organization_id == current_user.organization_id,
             Analysis.status == "completed"
         ).order_by(Analysis.created_at.desc()).first()
         
@@ -542,7 +559,7 @@ async def delete_analysis(
     """Delete a specific analysis."""
     analysis = db.query(Analysis).filter(
         Analysis.id == analysis_id,
-        Analysis.user_id == current_user.id
+        Analysis.organization_id == current_user.organization_id
     ).first()
     
     if not analysis:
@@ -569,7 +586,7 @@ async def regenerate_analysis_trends(
     """Regenerate daily trends data for an existing analysis."""
     analysis = db.query(Analysis).filter(
         Analysis.id == analysis_id,
-        Analysis.user_id == current_user.id
+        Analysis.organization_id == current_user.organization_id
     ).first()
     
     if not analysis:
@@ -716,7 +733,7 @@ async def verify_analysis_consistency(
     """Verify data consistency for an analysis across all components."""
     analysis = db.query(Analysis).filter(
         Analysis.id == analysis_id,
-        Analysis.user_id == current_user.id
+        Analysis.organization_id == current_user.organization_id
     ).first()
     
     if not analysis:
@@ -900,10 +917,15 @@ async def get_historical_trends(
     db: Session = Depends(get_db)
 ):
     """Get daily incident trends from the most recent analysis period."""
-    
+    if not current_user.organization_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User must be part of an organization to view analyses"
+        )
+
     # Find the most recent completed analysis
     query = db.query(Analysis).filter(
-        Analysis.user_id == current_user.id,
+        Analysis.organization_id == current_user.organization_id,
         Analysis.status == "completed",
         Analysis.results.isnot(None)
     )
@@ -1288,7 +1310,7 @@ async def get_analysis_daily_trends(
     # Get the analysis
     analysis = db.query(Analysis).filter(
         Analysis.id == analysis_id,
-        Analysis.user_id == current_user.id
+        Analysis.organization_id == current_user.organization_id
     ).first()
     
     if not analysis:
@@ -1403,7 +1425,7 @@ async def get_user_github_daily_commits(
     # Get the analysis to determine the date range
     analysis = db.query(Analysis).filter(
         Analysis.id == analysis_id,
-        Analysis.user_id == current_user.id
+        Analysis.organization_id == current_user.organization_id
     ).first()
     
     if not analysis:
@@ -1530,7 +1552,7 @@ async def get_analysis_github_commits_timeline(
     # Get the analysis
     analysis = db.query(Analysis).filter(
         Analysis.id == analysis_id,
-        Analysis.user_id == current_user.id
+        Analysis.organization_id == current_user.organization_id
     ).first()
     
     if not analysis:
@@ -1845,7 +1867,7 @@ async def get_member_daily_health(
     # Get the analysis
     analysis = db.query(Analysis).filter(
         Analysis.id == analysis_id,
-        Analysis.user_id == current_user.id
+        Analysis.organization_id == current_user.organization_id
     ).first()
     
     if not analysis:

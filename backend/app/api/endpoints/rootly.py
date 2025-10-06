@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from ...models import get_db, User, RootlyIntegration
+from ...models import get_db, User, RootlyIntegration, UserCorrelation
 from ...auth.dependencies import get_current_active_user
 from ...core.rootly_client import RootlyAPIClient
 from ...core.rate_limiting import integration_rate_limit
@@ -780,9 +780,384 @@ async def debug_rootly_incidents(
             debug_info["processed_data"]["user_fetch_error"] = str(e)
         
         return debug_info
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Debug failed: {str(e)}"
+        )
+
+
+@router.get("/integrations/{integration_id}/users")
+async def get_integration_users(
+    integration_id: str,  # Changed to str to support beta IDs like "beta-rootly"
+    limit: int = 100,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Fetch all users from a specific Rootly/PagerDuty integration.
+    Used to show team members who can submit burnout surveys.
+    Supports both numeric IDs and beta integration string IDs.
+    """
+    try:
+        # Check if this is a beta integration (string ID like "beta-rootly")
+        if integration_id in ["beta-rootly", "beta-pagerduty"]:
+            # Use environment variable token for beta integrations
+            if integration_id == "beta-rootly":
+                beta_token = os.getenv('ROOTLY_API_TOKEN')
+                platform = "rootly"
+                integration_name = "Rootly (Beta Access)"
+            else:  # beta-pagerduty
+                beta_token = os.getenv('PAGERDUTY_API_TOKEN')
+                platform = "pagerduty"
+                integration_name = "PagerDuty (Beta Access)"
+
+            if not beta_token:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Beta {platform} token not configured"
+                )
+
+            # Fetch users using beta token
+            if platform == "rootly":
+                from app.core.rootly_client import RootlyAPIClient
+                client = RootlyAPIClient(beta_token)
+                users = await client.get_users(limit=limit)
+
+                formatted_users = []
+                for user in users:
+                    # Rootly API uses JSONAPI format with attributes nested
+                    attrs = user.get("attributes", {})
+                    user_email = attrs.get("email")
+
+                    # Check for existing user correlations
+                    user_correlations = db.query(UserCorrelation).filter(
+                        UserCorrelation.email == user_email
+                    ).all()
+
+                    # Collect unique GitHub usernames
+                    github_usernames = list(set([
+                        uc.github_username for uc in user_correlations
+                        if uc.github_username
+                    ]))
+
+                    formatted_users.append({
+                        "id": user.get("id"),
+                        "email": user_email,
+                        "name": attrs.get("name") or attrs.get("full_name"),
+                        "platform": "rootly",
+                        "platform_user_id": user.get("id"),
+                        "github_usernames": github_usernames,
+                        "has_github_mapping": len(github_usernames) > 0
+                    })
+
+                return {
+                    "integration_id": integration_id,
+                    "integration_name": integration_name,
+                    "platform": "rootly",
+                    "total_users": len(formatted_users),
+                    "users": formatted_users
+                }
+            else:  # pagerduty
+                from app.core.pagerduty_client import PagerDutyAPIClient
+                client = PagerDutyAPIClient(beta_token)
+                users = await client.get_users(limit=limit)
+
+                formatted_users = []
+                for user in users:
+                    formatted_users.append({
+                        "id": user.get("id"),
+                        "email": user.get("email"),
+                        "name": user.get("name"),
+                        "platform": "pagerduty",
+                        "platform_user_id": user.get("id")
+                    })
+
+                return {
+                    "integration_id": integration_id,
+                    "integration_name": integration_name,
+                    "platform": "pagerduty",
+                    "total_users": len(formatted_users),
+                    "users": formatted_users
+                }
+
+        # Handle regular (non-beta) numeric integration IDs
+        try:
+            numeric_id = int(integration_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid integration ID: {integration_id}"
+            )
+
+        # Get the integration and verify it belongs to the user
+        integration = db.query(RootlyIntegration).filter(
+            RootlyIntegration.id == numeric_id,
+            RootlyIntegration.user_id == current_user.id
+        ).first()
+
+        if not integration:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Integration not found"
+            )
+
+        # Fetch users based on platform
+        if integration.platform == "rootly":
+            from app.core.rootly_client import RootlyAPIClient
+            client = RootlyAPIClient(integration.api_token)
+            users = await client.get_users(limit=limit)
+
+            # Format user data
+            formatted_users = []
+            for user in users:
+                # Rootly API uses JSONAPI format with attributes nested
+                attrs = user.get("attributes", {})
+                user_email = attrs.get("email")
+
+                # Check for existing user correlations
+                user_correlations = db.query(UserCorrelation).filter(
+                    UserCorrelation.email == user_email
+                ).all()
+
+                # Collect unique GitHub usernames
+                github_usernames = list(set([
+                    uc.github_username for uc in user_correlations
+                    if uc.github_username
+                ]))
+
+                formatted_users.append({
+                    "id": user.get("id"),
+                    "email": user_email,
+                    "name": attrs.get("name") or attrs.get("full_name"),
+                    "platform": "rootly",
+                    "platform_user_id": user.get("id"),
+                    "github_usernames": github_usernames,
+                    "has_github_mapping": len(github_usernames) > 0
+                })
+
+            return {
+                "integration_id": integration_id,
+                "integration_name": integration.name,
+                "platform": "rootly",
+                "total_users": len(formatted_users),
+                "users": formatted_users
+            }
+
+        elif integration.platform == "pagerduty":
+            from app.core.pagerduty_client import PagerDutyAPIClient
+            client = PagerDutyAPIClient(integration.api_token)
+            users = await client.get_users(limit=limit)
+
+            # Format user data
+            formatted_users = []
+            for user in users:
+                formatted_users.append({
+                    "id": user.get("id"),
+                    "email": user.get("email"),
+                    "name": user.get("name"),
+                    "platform": "pagerduty",
+                    "platform_user_id": user.get("id")
+                })
+
+            return {
+                "integration_id": integration_id,
+                "integration_name": integration.name,
+                "platform": "pagerduty",
+                "total_users": len(formatted_users),
+                "users": formatted_users
+            }
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Platform {integration.platform} not supported for user fetching"
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to fetch users from integration {integration_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch users: {str(e)}"
+        )
+
+@router.post("/integrations/{integration_id}/sync-users")
+async def sync_integration_users(
+    integration_id: str,  # Support both numeric and beta IDs
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Sync all users from a Rootly/PagerDuty integration to UserCorrelation table.
+    
+    This ensures ALL team members can submit burnout surveys via Slack,
+    not just those who appear in incident data.
+    
+    Returns sync statistics showing how many users were created/updated.
+    """
+    try:
+        from app.services.user_sync_service import UserSyncService
+        import os
+        from app.core.rootly_client import RootlyAPIClient
+        from app.core.pagerduty_client import PagerDutyAPIClient
+
+        # Handle beta integrations - use shared tokens from env
+        if integration_id in ["beta-rootly", "beta-pagerduty"]:
+            sync_service = UserSyncService(db)
+
+            # Get beta token from environment
+            if integration_id == "beta-rootly":
+                beta_token = os.getenv('ROOTLY_API_TOKEN')
+                if not beta_token:
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail="Beta Rootly token not configured"
+                    )
+                # Fetch users directly from API
+                client = RootlyAPIClient(beta_token)
+                raw_users = await client.get_users(limit=1000)
+                users = []
+                for user in raw_users:
+                    attrs = user.get("attributes", {})
+                    users.append({
+                        "id": user.get("id"),
+                        "email": attrs.get("email"),
+                        "name": attrs.get("name") or attrs.get("full_name"),
+                        "platform": "rootly"
+                    })
+                platform = "rootly"
+            else:  # beta-pagerduty
+                beta_token = os.getenv('PAGERDUTY_API_TOKEN')
+                if not beta_token:
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail="Beta PagerDuty token not configured"
+                    )
+                # Fetch users directly from API
+                client = PagerDutyAPIClient(beta_token)
+                raw_users = await client.get_users(limit=1000)
+                users = []
+                for user in raw_users:
+                    users.append({
+                        "id": user.get("id"),
+                        "email": user.get("email"),
+                        "name": user.get("name"),
+                        "platform": "pagerduty"
+                    })
+                platform = "pagerduty"
+
+            # Sync to user_correlations with organization_id
+            stats = sync_service.sync_users_from_list(
+                users=users,
+                platform=platform,
+                current_user=current_user,
+                integration_id=integration_id
+            )
+
+            return {
+                "success": True,
+                "message": f"Successfully synced {stats['total']} users from beta integration",
+                "stats": stats
+            }
+
+        # Regular integration - convert to integer
+        try:
+            numeric_id = int(integration_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid integration ID: {integration_id}"
+            )
+
+        # Sync users from database integration
+        sync_service = UserSyncService(db)
+        stats = await sync_service.sync_integration_users(
+            integration_id=numeric_id,
+            current_user=current_user
+        )
+
+        return {
+            "success": True,
+            "message": f"Successfully synced {stats['total']} users from integration",
+            "stats": stats
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error syncing integration users: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to sync users: {str(e)}"
+        )
+
+@router.get("/synced-users")
+async def get_synced_users(
+    integration_id: str = None,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all synced users from UserCorrelation table for the current user.
+    These are team members who can submit burnout surveys via Slack.
+    Optionally filter by integration_id to show only users from a specific organization.
+    """
+    try:
+        from sqlalchemy import func, cast, String
+
+        # Fetch all user correlations for this user's organization (multi-tenancy)
+        query = db.query(UserCorrelation).filter(
+            UserCorrelation.organization_id == current_user.organization_id
+        )
+
+        # Get all correlations, then filter in Python
+        # This is simpler and works across all database types
+        correlations = query.order_by(UserCorrelation.name).all()
+
+        # Filter by integration_id if provided (check if value is in JSON array)
+        if integration_id:
+            filtered_correlations = []
+            for corr in correlations:
+                # Only include if integration_id is in the integration_ids array
+                # Skip users with NULL integration_ids (not yet synced from any org)
+                if corr.integration_ids and integration_id in corr.integration_ids:
+                    filtered_correlations.append(corr)
+            correlations = filtered_correlations
+
+        # Format the response
+        synced_users = []
+        for corr in correlations:
+            # Determine platform based on which fields are populated
+            platforms = []
+            if corr.rootly_email:
+                platforms.append("rootly")
+            if corr.pagerduty_user_id:
+                platforms.append("pagerduty")
+            if corr.github_username:
+                platforms.append("github")
+            if corr.slack_user_id:
+                platforms.append("slack")
+
+            synced_users.append({
+                "id": corr.id,
+                "name": corr.name,
+                "email": corr.email,
+                "platforms": platforms,
+                "github_username": corr.github_username,
+                "slack_user_id": corr.slack_user_id,
+                "created_at": corr.created_at.isoformat() if corr.created_at else None
+            })
+
+        return {
+            "total": len(synced_users),
+            "users": synced_users
+        }
+
+    except Exception as e:
+        logger.error(f"Error fetching synced users: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch synced users: {str(e)}"
         )

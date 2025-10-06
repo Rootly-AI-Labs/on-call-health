@@ -29,15 +29,23 @@ for attempt in range(max_attempts):
         time.sleep(2)
 "
 
-# Run database migrations using simple migration runner
+# Run database migrations using centralized migration runner
 echo "🔄 Running database migrations..."
 echo "📂 Current directory: $(pwd)"
 
-if python simple_migration.py; then
+if python migrations/migration_runner.py; then
     echo "✅ All migrations completed successfully!"
 else
-    echo "⚠️  Migration failed, but continuing startup..."
-    echo "   Check logs above for details"
+    echo "⚠️  Some migrations failed - check logs above for details"
+    echo "   Continuing startup anyway..."
+fi
+
+# Run survey message update migration (optional, non-critical)
+echo "🔄 Updating survey messages..."
+if python update_survey_messages.py; then
+    echo "✅ Survey messages updated successfully!"
+else
+    echo "⚠️  Survey message update failed, but continuing startup..."
 fi
 
 # Create tables (safe - won't recreate existing tables)

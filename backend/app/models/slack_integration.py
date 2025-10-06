@@ -12,7 +12,7 @@ class SlackIntegration(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     slack_token = Column(Text, nullable=True)  # Encrypted Slack token
-    slack_user_id = Column(String(20), nullable=False)  # Slack user ID (e.g., U01234567)
+    slack_user_id = Column(String(20), nullable=True)  # Slack user ID (e.g., U01234567) - nullable for bot tokens
     workspace_id = Column(String(20), nullable=False)  # Slack workspace/team ID
     webhook_url = Column(Text, nullable=True)  # Slack webhook URL for posting messages
     token_source = Column(String(20), default="oauth")  # 'oauth' or 'manual'

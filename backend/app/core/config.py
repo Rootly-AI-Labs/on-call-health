@@ -21,6 +21,9 @@ class Settings:
     JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "your-secret-key-change-in-production")
     JWT_ALGORITHM: str = "HS256"
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
+
+    # Frontend URL for survey links
+    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
     
     # OAuth - Google
     GOOGLE_CLIENT_ID: Optional[str] = os.getenv("GOOGLE_CLIENT_ID")
@@ -35,14 +38,15 @@ class Settings:
     # OAuth - Slack
     SLACK_CLIENT_ID: Optional[str] = os.getenv("SLACK_CLIENT_ID")
     SLACK_CLIENT_SECRET: Optional[str] = os.getenv("SLACK_CLIENT_SECRET")
+    SLACK_SIGNING_SECRET: Optional[str] = os.getenv("SLACK_SIGNING_SECRET")
     SLACK_REDIRECT_URI: str = os.getenv("SLACK_REDIRECT_URI", "http://localhost:8000/auth/slack/callback")
-    
-    # Frontend URL
-    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
     
     # Environment detection
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
-    
+
+    # Logging configuration
+    LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
+
     # Rootly API
     ROOTLY_API_BASE_URL: str = os.getenv("ROOTLY_API_BASE_URL", "https://api.rootly.com")
 

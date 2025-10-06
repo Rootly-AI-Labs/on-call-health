@@ -21,6 +21,15 @@ from ...core.config import settings
 router = APIRouter(prefix="/github", tags=["github-integration"])
 logger = logging.getLogger(__name__)
 
+# Helper function to validate user has organization
+def require_organization(user: User) -> None:
+    """Raise HTTPException if user doesn't belong to an organization."""
+    if not user.organization_id:
+        raise HTTPException(
+            status_code=400,
+            detail="You must belong to an organization to use this feature. Please contact support."
+        )
+
 # Simple encryption for tokens (in production, use proper key management)
 def get_encryption_key():
     """Get or create encryption key for tokens."""
@@ -139,18 +148,19 @@ async def github_callback(
             )
             db.add(integration)
         
-        # Update user correlations
+        # Update user correlations (organization-scoped for multi-tenancy)
         for email in email_addresses:
             existing_correlation = db.query(UserCorrelation).filter(
-                UserCorrelation.user_id == current_user.id,
+                UserCorrelation.organization_id == current_user.organization_id,
                 UserCorrelation.email == email
             ).first()
-            
+
             if existing_correlation:
                 existing_correlation.github_username = github_username
             else:
                 correlation = UserCorrelation(
                     user_id=current_user.id,
+                    organization_id=current_user.organization_id,
                     email=email,
                     github_username=github_username
                 )
@@ -495,18 +505,19 @@ async def connect_github_with_token(
             )
             db.add(integration)
         
-        # Update user correlations
+        # Update user correlations (organization-scoped for multi-tenancy)
         for email in email_addresses:
             existing_correlation = db.query(UserCorrelation).filter(
-                UserCorrelation.user_id == current_user.id,
+                UserCorrelation.organization_id == current_user.organization_id,
                 UserCorrelation.email == email
             ).first()
-            
+
             if existing_correlation:
                 existing_correlation.github_username = github_username
             else:
                 correlation = UserCorrelation(
                     user_id=current_user.id,
+                    organization_id=current_user.organization_id,
                     email=email,
                     github_username=github_username
                 )
@@ -554,11 +565,11 @@ async def disconnect_github(
         )
     
     try:
-        # Remove GitHub data from user correlations
+        # Remove GitHub data from user correlations (organization-scoped)
         correlations = db.query(UserCorrelation).filter(
-            UserCorrelation.user_id == current_user.id
+            UserCorrelation.organization_id == current_user.organization_id
         ).all()
-        
+
         for correlation in correlations:
             correlation.github_username = None
         

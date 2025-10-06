@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Dialog,
   DialogContent,
@@ -82,12 +83,19 @@ import {
   ArrowUp,
   ArrowDown,
   LogOut,
+  UserPlus,
+  Mail,
+  Send,
+  MessageSquare,
 } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { MappingDrawer } from "@/components/mapping-drawer"
+import { NotificationDrawer } from "@/components/notifications"
+import ManualSurveyDeliveryModal from "@/components/ManualSurveyDeliveryModal"
+import { SlackSurveyTabs } from "@/components/SlackSurveyTabs"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -234,8 +242,9 @@ interface GitHubIntegration {
 
 interface SlackIntegration {
   id: number
-  slack_user_id: string
+  slack_user_id: string | null
   workspace_id: string
+  workspace_name?: string
   token_source: "oauth" | "manual"
   is_oauth: boolean
   supports_refresh: boolean
@@ -247,6 +256,9 @@ interface SlackIntegration {
   channel_names?: string[]
   token_preview?: string
   webhook_preview?: string
+  connection_type?: "oauth" | "manual"
+  status?: string
+  owner_user_id?: number
 }
 
 interface PreviewData {
@@ -272,11 +284,11 @@ export default function IntegrationsPage() {
   // State management
   const [integrations, setIntegrations] = useState<Integration[]>([])
   const [loadingRootly, setLoadingRootly] = useState(true)
-  const [loadingPagerDuty, setLoadingPagerDuty] = useState(true) 
+  const [loadingPagerDuty, setLoadingPagerDuty] = useState(true)
   const [loadingGitHub, setLoadingGitHub] = useState(true)
   const [loadingSlack, setLoadingSlack] = useState(true)
   const [reloadingIntegrations, setReloadingIntegrations] = useState(false)
-  const [userInfo, setUserInfo] = useState<{name: string, email: string, avatar?: string} | null>(null)
+  const [userInfo, setUserInfo] = useState<{name: string, email: string, avatar?: string, organization_id?: number, id?: number, role?: string} | null>(null)
   const [activeTab, setActiveTab] = useState<"rootly" | "pagerduty" | null>(null)
   const [backUrl, setBackUrl] = useState<string>('/dashboard')
   const [selectedOrganization, setSelectedOrganization] = useState<string>("")
@@ -303,7 +315,18 @@ export default function IntegrationsPage() {
   const [savingInlineMapping, setSavingInlineMapping] = useState(false)
   const [validatingGithub, setValidatingGithub] = useState(false)
   const [githubValidation, setGithubValidation] = useState<{valid: boolean, message?: string} | null>(null)
-  
+
+  // Invite modal state
+  const [showInviteModal, setShowInviteModal] = useState(false)
+  const [inviteEmail, setInviteEmail] = useState("")
+  const [inviteRole, setInviteRole] = useState("manager")
+  const [isInviting, setIsInviting] = useState(false)
+
+  // Organization members and invitations state
+  const [orgMembers, setOrgMembers] = useState([])
+  const [pendingInvitations, setPendingInvitations] = useState([])
+  const [loadingOrgData, setLoadingOrgData] = useState(false)
+
   // Sorting state
   const [sortField, setSortField] = useState<'email' | 'status' | 'data' | 'method'>('email')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
@@ -337,11 +360,27 @@ export default function IntegrationsPage() {
   // Disconnect confirmation state
   const [githubDisconnectDialogOpen, setGithubDisconnectDialogOpen] = useState(false)
   const [slackDisconnectDialogOpen, setSlackDisconnectDialogOpen] = useState(false)
+  const [slackSurveyDisconnectDialogOpen, setSlackSurveyDisconnectDialogOpen] = useState(false)
+  const [slackSurveyConfirmDisconnectOpen, setSlackSurveyConfirmDisconnectOpen] = useState(false)
   const [isDisconnectingGithub, setIsDisconnectingGithub] = useState(false)
   const [isDisconnectingSlack, setIsDisconnectingSlack] = useState(false)
+  const [isDisconnectingSlackSurvey, setIsDisconnectingSlackSurvey] = useState(false)
+  const [isConnectingSlackOAuth, setIsConnectingSlackOAuth] = useState(false)
   const [slackPermissions, setSlackPermissions] = useState<any>(null)
   const [isLoadingPermissions, setIsLoadingPermissions] = useState(false)
-  
+
+  // Team members state
+  const [teamMembers, setTeamMembers] = useState<any[]>([])
+  const [loadingTeamMembers, setLoadingTeamMembers] = useState(false)
+  const [teamMembersError, setTeamMembersError] = useState<string | null>(null)
+  const [syncedUsers, setSyncedUsers] = useState<any[]>([])
+  const [loadingSyncedUsers, setLoadingSyncedUsers] = useState(false)
+  const [showSyncedUsers, setShowSyncedUsers] = useState(false)
+  const [teamMembersDrawerOpen, setTeamMembersDrawerOpen] = useState(false)
+
+  // Manual survey delivery modal state
+  const [showManualSurveyModal, setShowManualSurveyModal] = useState(false)
+
   // AI Integration state
   const [llmToken, setLlmToken] = useState('')
   const [llmModel, setLlmModel] = useState('gpt-4o-mini')
@@ -413,58 +452,68 @@ export default function IntegrationsPage() {
     
     // Load saved organization preference
     const savedOrg = localStorage.getItem('selected_organization')
+    // Accept both numeric IDs and beta string IDs (like "beta-rootly")
     if (savedOrg) {
       setSelectedOrganization(savedOrg)
     }
-    
-    // Load user info from localStorage
+
+    // Load user info from localStorage first for immediate display
     const userName = localStorage.getItem('user_name')
     const userEmail = localStorage.getItem('user_email')
     const userAvatar = localStorage.getItem('user_avatar')
-    
-    
-    // Check for valid, non-empty strings (not "null", "undefined", or empty)
-    const validUserName = userName && userName !== 'null' && userName !== 'undefined' && userName.trim() !== ''
-    const validUserEmail = userEmail && userEmail !== 'null' && userEmail !== 'undefined' && userEmail.trim() !== ''
-    
-    if (validUserName && validUserEmail) {
+    const userRole = localStorage.getItem('user_role')
+    const userId = localStorage.getItem('user_id')
+    const userOrgId = localStorage.getItem('user_organization_id')
+
+    // Set initial state from localStorage
+    if (userName && userEmail) {
       setUserInfo({
         name: userName,
         email: userEmail,
-        avatar: (userAvatar && userAvatar !== 'null' && userAvatar !== 'undefined') ? userAvatar : undefined
+        avatar: userAvatar || undefined,
+        role: userRole || 'member',
+        id: userId ? parseInt(userId) : undefined,
+        organization_id: userOrgId ? parseInt(userOrgId) : undefined
       })
-    } else {
-      
-      // Try to fetch user info from API as fallback
-      const authToken = localStorage.getItem('auth_token')
-      if (authToken) {
-        const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-        fetch(`${API_BASE}/auth/user/me`, {
-          headers: { 
-            'Authorization': `Bearer ${authToken}`,
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache'
-          }
-        })
-        .then(response => response.json())
-        .then(userData => {
-          if (userData.name && userData.email) {
-            setUserInfo({
-              name: userData.name,
-              email: userData.email,
-              avatar: userData.avatar || undefined
-            })
-            // Store in localStorage for future use
-            localStorage.setItem('user_name', userData.name)
-            localStorage.setItem('user_email', userData.email)
-            if (userData.avatar) {
-              localStorage.setItem('user_avatar', userData.avatar)
-            }
-          }
-        })
-        .catch(error => {
-        })
-      }
+    }
+
+    // Then fetch fresh data in background to update if needed
+    const authToken = localStorage.getItem('auth_token')
+    if (authToken) {
+      const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'
+      fetch(`${API_BASE}/auth/user/me`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        }
+      })
+      .then(response => {
+        if (!response.ok) throw new Error('Failed to fetch')
+        return response.json()
+      })
+      .then(userData => {
+        if (userData.name && userData.email) {
+          setUserInfo({
+            name: userData.name,
+            email: userData.email,
+            avatar: userData.avatar || undefined,
+            role: userData.role || 'member',
+            id: userData.id,
+            organization_id: userData.organization_id
+          })
+          // Update localStorage with fresh data
+          localStorage.setItem('user_name', userData.name)
+          localStorage.setItem('user_email', userData.email)
+          localStorage.setItem('user_role', userData.role || 'member')
+          if (userData.avatar) localStorage.setItem('user_avatar', userData.avatar)
+          if (userData.id) localStorage.setItem('user_id', userData.id.toString())
+          if (userData.organization_id) localStorage.setItem('user_organization_id', userData.organization_id.toString())
+        }
+      })
+      .catch(error => {
+        // Silently fail - we already loaded from localStorage
+      })
     }
     
     // Determine back navigation based on referrer
@@ -495,6 +544,175 @@ export default function IntegrationsPage() {
       loadSlackPermissions()
     }
   }, [slackIntegration, activeEnhancementTab])
+
+  // Load organization data when invite modal opens
+  useEffect(() => {
+    if (showInviteModal) {
+      loadOrganizationData()
+    }
+  }, [showInviteModal])
+
+  // Handle Slack OAuth success redirect
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const slackConnected = urlParams.get('slack_connected')
+    const workspace = urlParams.get('workspace')
+    const status = urlParams.get('status')
+
+    // Check auth token after OAuth redirect
+    const authToken = localStorage.getItem('auth_token')
+
+    // Debug: Log all URL parameters (persist across redirects)
+    const debugInfo = {
+      fullUrl: window.location.href,
+      search: window.location.search,
+      slackConnected,
+      workspace,
+      status,
+      hasAuthToken: !!authToken,
+      allParams: Object.fromEntries(urlParams.entries()),
+      timestamp: new Date().toISOString()
+    }
+
+    // Store in sessionStorage for persistence
+    sessionStorage.setItem('slack_oauth_debug', JSON.stringify(debugInfo))
+
+    // Add global debug function for manual checking
+    ;(window as any).getSlackOAuthDebug = () => {
+      const stored = sessionStorage.getItem('slack_oauth_debug')
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        return parsed
+      }
+      return null
+    }
+
+    // Check if we're returning from OAuth and set loading state
+    const isReturningFromOAuth = localStorage.getItem('slack_oauth_in_progress')
+    if (isReturningFromOAuth) {
+      setIsConnectingSlackOAuth(true)
+
+      // If we have the OAuth in progress flag but no success params yet,
+      // it means the redirect is still happening or failed silently
+      if (slackConnected !== 'true' && slackConnected !== 'false') {
+        // Keep showing loading for a bit, then timeout
+        setTimeout(() => {
+          const stillInProgress = localStorage.getItem('slack_oauth_in_progress')
+          if (stillInProgress && !window.location.search.includes('slack_connected')) {
+            localStorage.removeItem('slack_oauth_in_progress')
+            setIsConnectingSlackOAuth(false)
+            toast.warning('OAuth redirect timed out', {
+              description: 'Please try connecting again.',
+            })
+          }
+        }, 10000) // 10 second timeout
+      }
+    }
+
+    if (slackConnected === 'true' && workspace) {
+      // Show loading toast immediately
+      const loadingToastId = toast.loading('Verifying Slack connection...', {
+        description: 'Please wait while we confirm your workspace connection.',
+      })
+
+      // Clean up URL parameters
+      const newUrl = window.location.pathname
+      window.history.replaceState({}, '', newUrl)
+
+      // Poll for connection status with retries
+      let retries = 0
+      const maxRetries = 15
+      const pollInterval = 500
+
+      const checkConnection = async () => {
+        try {
+          retries++
+
+          // Check if Slack is now connected
+          const authToken = localStorage.getItem('auth_token')
+          if (!authToken) return
+
+          const response = await fetch(`${API_BASE}/integrations/slack/status`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+          })
+
+          if (response.ok) {
+            const data = await response.json()
+            if (data.connected) {
+              // Update Slack integration state directly without reloading other cards
+              setSlackIntegration(data.integration)
+              // Update cache
+              localStorage.setItem('slack_integration', JSON.stringify(data))
+              localStorage.setItem('all_integrations_timestamp', Date.now().toString())
+
+              // Clear OAuth loading state
+              localStorage.removeItem('slack_oauth_in_progress')
+              setIsConnectingSlackOAuth(false)
+
+              toast.dismiss(loadingToastId)
+              if (status === 'pending_user_association') {
+                toast.success(`🎉 Slack app installed successfully!`, {
+                  description: `Connected to "${decodeURIComponent(workspace)}" workspace. The /burnout-survey command is now available.`,
+                  duration: 6000,
+                })
+              } else {
+                toast.success(`🎉 Slack integration connected!`, {
+                  description: `Successfully connected to "${decodeURIComponent(workspace)}" workspace.`,
+                  duration: 5000,
+                })
+              }
+              return
+            }
+          }
+
+          // Not connected yet, retry if we haven't exceeded max retries
+          if (retries < maxRetries) {
+            setTimeout(checkConnection, pollInterval)
+          } else {
+            // Max retries reached, show warning
+            localStorage.removeItem('slack_oauth_in_progress')
+            setIsConnectingSlackOAuth(false)
+            toast.dismiss(loadingToastId)
+            toast.warning('Connection verification timed out', {
+              description: 'Your Slack workspace was added, but verification took longer than expected. Try refreshing the page.',
+              duration: 8000,
+            })
+          }
+        } catch (error) {
+          if (retries < maxRetries) {
+            setTimeout(checkConnection, pollInterval)
+          } else {
+            localStorage.removeItem('slack_oauth_in_progress')
+            setIsConnectingSlackOAuth(false)
+            toast.dismiss(loadingToastId)
+            toast.error('Failed to verify connection', {
+              description: 'Please refresh the page to check your Slack connection status.',
+            })
+          }
+        }
+      }
+
+      // Start checking immediately
+      checkConnection()
+    } else if (slackConnected === 'false') {
+      // Clear OAuth loading state
+      localStorage.removeItem('slack_oauth_in_progress')
+      setIsConnectingSlackOAuth(false)
+
+      // Show error toast
+      const errorParam = urlParams.get('error')
+      const errorMessage = errorParam ? decodeURIComponent(errorParam) : 'Unknown error occurred'
+
+      toast.error('Failed to connect Slack', {
+        description: errorMessage,
+        duration: 8000,
+      })
+
+      // Clean up URL parameters
+      const newUrl = window.location.pathname
+      window.history.replaceState({}, '', newUrl)
+    }
+  }, [])
 
   // Load each provider independently for better UX
   const loadRootlyIntegrations = async (forceRefresh = false) => {
@@ -650,6 +868,7 @@ export default function IntegrationsPage() {
       })
 
       const slackData = response.ok ? await response.json() : { integration: null }
+
       setSlackIntegration(slackData.integration)
       localStorage.setItem('slack_integration', JSON.stringify(slackData))
     } catch (error) {
@@ -701,6 +920,144 @@ export default function IntegrationsPage() {
       console.error('Background refresh failed:', error)
     } finally {
       setRefreshingInBackground(false)
+    }
+  }
+
+  // Invite function
+  const handleInvite = async () => {
+    if (!inviteEmail.trim()) {
+      toast.error("Please enter an email address")
+      return
+    }
+
+    setIsInviting(true)
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) {
+        toast.error("Authentication required")
+        return
+      }
+
+      const apiUrl = `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/invitations/create`
+
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: inviteEmail.trim(),
+          role: inviteRole
+        })
+      })
+
+      if (!response.ok) {
+        const responseText = await response.text()
+
+        // Try to parse as JSON, fallback to text
+        let errorMessage = 'Failed to send invitation'
+        try {
+          const errorData = JSON.parse(responseText)
+          errorMessage = errorData.detail || errorMessage
+        } catch {
+          errorMessage = responseText.includes('<!DOCTYPE')
+            ? 'API server not available or wrong URL'
+            : responseText
+        }
+
+        throw new Error(errorMessage)
+      }
+
+      const data = await response.json()
+      toast.success(`Invitation sent to ${inviteEmail}! They'll receive a notification and can accept within 30 days.`)
+
+      // Reset form and refresh organization data
+      setInviteEmail("")
+      setInviteRole("member")
+      setShowInviteModal(false)
+
+      // Refresh the organization data to show the new invitation
+      await loadOrganizationData()
+
+    } catch (error) {
+      console.error('Failed to send invitation:', error)
+      toast.error(error instanceof Error ? error.message : "Failed to send invitation")
+    } finally {
+      setIsInviting(false)
+    }
+  }
+
+  // Handle role change for organization members
+  const handleRoleChange = async (userId: number, newRole: string) => {
+    const authToken = localStorage.getItem('auth_token')
+    if (!authToken) {
+      toast.error("Authentication required")
+      return
+    }
+
+    try {
+      const response = await fetch(`${API_BASE}/api/auth/users/${userId}/role?new_role=${newRole}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+        }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        toast.success(data.message || `Role updated successfully`)
+        // Reload organization data to reflect the change
+        await loadOrganizationData()
+      } else {
+        const errorData = await response.json()
+        throw new Error(errorData.detail || 'Failed to update role')
+      }
+    } catch (error) {
+      console.error('Failed to update role:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to update role')
+    }
+  }
+
+  // Load organization members and pending invitations
+  const loadOrganizationData = async () => {
+    const authToken = localStorage.getItem('auth_token')
+    if (!authToken) return
+
+    setLoadingOrgData(true)
+    try {
+      // Load organization members
+      const membersResponse = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/invitations/organization/members`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+        }
+      })
+
+      if (membersResponse.ok) {
+        const membersData = await membersResponse.json()
+        setOrgMembers(membersData.members || [])
+      } else {
+        const errorText = await membersResponse.text()
+      }
+
+      // Load pending invitations
+      const invitationsResponse = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/invitations/pending`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+        }
+      })
+
+      if (invitationsResponse.ok) {
+        const invitationsData = await invitationsResponse.json()
+        setPendingInvitations(invitationsData.invitations || [])
+      } else {
+        const errorText = await invitationsResponse.text()
+      }
+
+    } catch (error) {
+      console.error('Failed to load organization data:', error)
+    } finally {
+      setLoadingOrgData(false)
     }
   }
 
@@ -1578,6 +1935,197 @@ export default function IntegrationsPage() {
     }
   }
 
+  // Fetch team members from selected organization
+  const fetchTeamMembers = async () => {
+    if (!selectedOrganization) {
+      toast.error('Please select an organization first')
+      return
+    }
+    setLoadingTeamMembers(true)
+    setTeamMembersError(null)
+
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) {
+        toast.error('Please log in to view team members')
+        return
+      }
+
+      const response = await fetch(`${API_BASE}/rootly/integrations/${selectedOrganization}/users`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setTeamMembers(data.users || [])
+        setTeamMembersDrawerOpen(true)
+        toast.success(`Loaded ${data.total_users} team members from ${data.integration_name}`)
+      } else {
+        const errorData = await response.json()
+        throw new Error(errorData.detail || 'Failed to fetch team members')
+      }
+    } catch (error) {
+      console.error('Error fetching team members:', error)
+      const errorMsg = error instanceof Error ? error.message : 'Failed to fetch team members'
+      setTeamMembersError(errorMsg)
+      toast.error(errorMsg)
+    } finally {
+      setLoadingTeamMembers(false)
+    }
+  }
+
+  // Sync users to UserCorrelation table
+  const syncUsersToCorrelation = async () => {
+    if (!selectedOrganization) {
+      toast.error('Please select an organization first')
+      return
+    }
+    setLoadingTeamMembers(true)
+    setTeamMembersError(null)
+
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) {
+        toast.error('Please log in to sync users')
+        return
+      }
+
+      const response = await fetch(`${API_BASE}/rootly/integrations/${selectedOrganization}/sync-users`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        const stats = data.stats || data
+        toast.success(
+          `Synced ${stats.created} new users, updated ${stats.updated} existing users. ` +
+          `All team members can now submit burnout surveys via Slack!`
+        )
+        // Reload the members list and fetch synced users (without showing another toast)
+        await fetchTeamMembers()
+        await fetchSyncedUsers(false)
+      } else {
+        const errorData = await response.json()
+        throw new Error(errorData.detail || 'Failed to sync users')
+      }
+    } catch (error) {
+      console.error('Error syncing users:', error)
+      const errorMsg = error instanceof Error ? error.message : 'Failed to sync users'
+      setTeamMembersError(errorMsg)
+      toast.error(errorMsg)
+    } finally {
+      setLoadingTeamMembers(false)
+    }
+  }
+
+  // Sync Slack user IDs to UserCorrelation records
+  const syncSlackUserIds = async () => {
+    setLoadingTeamMembers(true)
+
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) {
+        toast.error('Please log in to sync Slack user IDs')
+        return
+      }
+
+      const response = await fetch(`${API_BASE}/integrations/slack/sync-user-ids`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        const stats = data.stats || {}
+        toast.success(
+          `Synced Slack IDs for ${stats.updated} users! ` +
+          `${stats.skipped} users skipped (no matching Slack account).`
+        )
+        // Refresh synced users list
+        await fetchSyncedUsers(false)
+      } else {
+        const errorData = await response.json()
+        throw new Error(errorData.detail || 'Failed to sync Slack user IDs')
+      }
+    } catch (error) {
+      console.error('Error syncing Slack user IDs:', error)
+      const errorMsg = error instanceof Error ? error.message : 'Failed to sync Slack user IDs'
+      toast.error(errorMsg)
+    } finally {
+      setLoadingTeamMembers(false)
+    }
+  }
+
+  // Fetch synced users from database
+  const fetchSyncedUsers = async (showToast = true) => {
+
+    if (!selectedOrganization) {
+      toast.error('Please select an organization first')
+      return
+    }
+
+    setLoadingSyncedUsers(true)
+
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) {
+        toast.error('Please log in to view synced users')
+        return
+      }
+
+      const response = await fetch(`${API_BASE}/rootly/synced-users?integration_id=${selectedOrganization}`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        const users = data.users || []
+        setSyncedUsers(users)
+        setShowSyncedUsers(true)
+        setTeamMembersDrawerOpen(true)
+
+        // If no users found, automatically sync them (but not for beta integrations)
+        if (users.length === 0 && !selectedOrganization.startsWith('beta-')) {
+          toast.info('No synced users found. Syncing now...')
+          setLoadingSyncedUsers(false) // Reset loading state before syncing
+          await syncUsersToCorrelation()
+          // syncUsersToCorrelation will call fetchSyncedUsers again after syncing
+          return
+        }
+
+        if (showToast) {
+          if (users.length === 0) {
+            toast.info('Beta integrations show users from shared access. Use "Sync Members" with your own integration to enable survey submissions.')
+          } else {
+            toast.success(`Found ${data.total} synced users`)
+          }
+        }
+      } else {
+        const errorData = await response.json()
+        throw new Error(errorData.detail || 'Failed to fetch synced users')
+      }
+    } catch (error) {
+      console.error('Error fetching synced users:', error)
+      const errorMsg = error instanceof Error ? error.message : 'Failed to fetch synced users'
+      toast.error(errorMsg)
+    } finally {
+      setLoadingSyncedUsers(false)
+    }
+  }
+
   // Inline mapping edit handlers
   const startInlineEdit = (mappingId: number | string, currentValue: string = '') => {
     // Don't allow editing of manual mappings inline since they already exist
@@ -2059,7 +2607,7 @@ export default function IntegrationsPage() {
   }
 
   const filteredIntegrations = integrations.filter(integration => {
-    if (activeTab === null) return false
+    if (activeTab === null) return true // Show all integrations when no tab selected
     return integration.platform === activeTab
   })
 
@@ -2072,14 +2620,6 @@ export default function IntegrationsPage() {
       <header className="bg-white/80 backdrop-blur-sm border-b border-slate-200 sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            {backUrl && (
-              <Link href={backUrl}>
-                <Button variant="ghost" size="sm" className="flex items-center space-x-2">
-                  <ArrowLeft className="w-4 h-4" />
-                  <span>Back</span>
-                </Button>
-              </Link>
-            )}
             <div className="flex items-center space-x-3">
               <h1 className="text-2xl font-bold text-slate-900">Manage Integrations</h1>
               
@@ -2093,7 +2633,10 @@ export default function IntegrationsPage() {
             </div>
           </div>
 
-          <div className="flex items-center">
+          <div className="flex items-center space-x-4">
+            {/* Notifications */}
+            <NotificationDrawer />
+
             {/* User Account Indicator */}
             {userInfo ? (
               <DropdownMenu>
@@ -2116,10 +2659,26 @@ export default function IntegrationsPage() {
                     <div>
                       <div className="font-medium text-gray-900">{userInfo.name}</div>
                       <div className="text-xs text-gray-500">{userInfo.email}</div>
+                      <div className="text-xs text-gray-400 mt-1 capitalize">
+                        {userInfo.role?.replace('_', ' ') || 'Member'}
+                      </div>
                     </div>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem 
+                  {/* Temporarily hidden for beta - everyone is an org admin */}
+                  {/* {(userInfo.role === 'org_admin' || userInfo.role === 'super_admin') && (
+                    <>
+                      <DropdownMenuItem
+                        className="px-2 py-1.5 cursor-pointer"
+                        onClick={() => setShowInviteModal(true)}
+                      >
+                        <UserPlus className="w-4 h-4 mr-2" />
+                        Org Management
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                    </>
+                  )} */}
+                  <DropdownMenuItem
                     className="text-red-600 hover:text-red-700 hover:bg-red-50 px-2 py-1.5 cursor-pointer"
                     onClick={() => {
                       // Clear all user data
@@ -2309,8 +2868,8 @@ export default function IntegrationsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="pb-6">
-              <Select 
-                value={selectedOrganization} 
+              <Select
+                value={selectedOrganization}
                 onValueChange={(value) => {
                   // Only show toast if selecting a different organization
                   if (value !== selectedOrganization) {
@@ -2319,7 +2878,7 @@ export default function IntegrationsPage() {
                       toast.success(`${selected.name} has been set as your default organization.`)
                     }
                   }
-                  
+
                   setSelectedOrganization(value)
                   // Save to localStorage for persistence
                   localStorage.setItem('selected_organization', value)
@@ -2858,7 +3417,7 @@ export default function IntegrationsPage() {
             )}
 
             {/* Existing Integrations */}
-            {activeTab === null ? (
+            {(activeTab === null && !selectedOrganization && integrations.length === 0) ? (
               <div className="text-center py-12">
                 <Shield className="w-12 h-12 mx-auto text-slate-300 mb-4" />
                 <p className="text-lg font-medium mb-2 text-slate-700">Choose a platform to get started</p>
@@ -2901,7 +3460,7 @@ export default function IntegrationsPage() {
                   </div>
                 </CardContent>
               </Card>
-            ) : filteredIntegrations.length > 0 ? (
+            ) : integrations.length > 0 && filteredIntegrations.length > 0 ? (
               <Card className="max-w-2xl mx-auto">
                 <CardContent className="p-6 space-y-4">
                   {filteredIntegrations.map((integration) => (
@@ -3139,6 +3698,530 @@ export default function IntegrationsPage() {
                 <p className="text-sm">Add a Rootly or PagerDuty integration to get started!</p>
               </div>
             )}
+        </div>
+
+        {/* User-Reported Connection Section */}
+        <div className="mt-16 space-y-8">
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-slate-900 mb-3">User-Reported Insights</h2>
+            <p className="text-lg text-slate-600 mb-2">
+              Enable team members to share their own burnout insights
+            </p>
+            <p className="text-slate-500">
+              Collect direct feedback through Slack commands and web surveys
+            </p>
+          </div>
+
+          <div className="max-w-2xl mx-auto space-y-6">
+            {/* Slack Survey with Tabs */}
+            <Card className="border-2 border-purple-200 bg-purple-50/30">
+              <CardHeader className="pb-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                      <svg className="w-6 h-6" viewBox="0 0 124 124" fill="none">
+                        <path d="M26.3996 78.2003C26.3996 84.7003 21.2996 89.8003 14.7996 89.8003C8.29961 89.8003 3.19961 84.7003 3.19961 78.2003C3.19961 71.7003 8.29961 66.6003 14.7996 66.6003H26.3996V78.2003Z" fill="#E01E5A"/>
+                        <path d="M32.2996 78.2003C32.2996 71.7003 37.3996 66.6003 43.8996 66.6003C50.3996 66.6003 55.4996 71.7003 55.4996 78.2003V109.2C55.4996 115.7 50.3996 120.8 43.8996 120.8C37.3996 120.8 32.2996 115.7 32.2996 109.2V78.2003Z" fill="#E01E5A"/>
+                        <path d="M43.8996 26.4003C37.3996 26.4003 32.2996 21.3003 32.2996 14.8003C32.2996 8.30026 37.3996 3.20026 43.8996 3.20026C50.3996 3.20026 55.4996 8.30026 55.4996 14.8003V26.4003H43.8996Z" fill="#36C5F0"/>
+                        <path d="M43.8996 32.3003C50.3996 32.3003 55.4996 37.4003 55.4996 43.9003C55.4996 50.4003 50.3996 55.5003 43.8996 55.5003H12.8996C6.39961 55.5003 1.29961 50.4003 1.29961 43.9003C1.29961 37.4003 6.39961 32.3003 12.8996 32.3003H43.8996Z" fill="#36C5F0"/>
+                        <path d="M95.5996 43.9003C95.5996 37.4003 100.7 32.3003 107.2 32.3003C113.7 32.3003 118.8 37.4003 118.8 43.9003C118.8 50.4003 113.7 55.5003 107.2 55.5003H95.5996V43.9003Z" fill="#2EB67D"/>
+                        <path d="M89.6996 43.9003C89.6996 50.4003 84.5996 55.5003 78.0996 55.5003C71.5996 55.5003 66.4996 50.4003 66.4996 43.9003V12.9003C66.4996 6.40026 71.5996 1.30026 78.0996 1.30026C84.5996 1.30026 89.6996 6.40026 89.6996 12.9003V43.9003Z" fill="#2EB67D"/>
+                        <path d="M78.0996 95.6003C84.5996 95.6003 89.6996 100.7 89.6996 107.2C89.6996 113.7 84.5996 118.8 78.0996 118.8C71.5996 118.8 66.4996 113.7 66.4996 107.2V95.6003H78.0996Z" fill="#ECB22E"/>
+                        <path d="M78.0996 89.7003C71.5996 89.7003 66.4996 84.6003 66.4996 78.1003C66.4996 71.6003 71.5996 66.5003 78.0996 66.5003H109.1C115.6 66.5003 120.7 71.6003 120.7 78.1003C120.7 84.6003 115.6 89.7003 109.1 89.7003H78.0996Z" fill="#ECB22E"/>
+                      </svg>
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg text-gray-900">Slack Survey</CardTitle>
+                      <p className="text-sm text-gray-600">Let team members report burnout scores directly in Slack</p>
+                    </div>
+                  </div>
+
+                  {/* Slack Connection Status */}
+                  {slackIntegration ? (
+                    <button
+                      onClick={() => setSlackSurveyDisconnectDialogOpen(true)}
+                      disabled={isDisconnectingSlackSurvey}
+                      className="inline-flex items-center space-x-2 bg-green-100 text-green-800 px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isDisconnectingSlackSurvey ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Disconnecting...</span>
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle className="w-4 h-4" />
+                          <span>Connected</span>
+                        </>
+                      )}
+                    </button>
+                  ) : process.env.NEXT_PUBLIC_SLACK_CLIENT_ID ? (
+                    <Button
+                      onClick={() => {
+                        // Official OnCall Burnout Detector Slack App
+                        // This single app can be installed by any organization
+                        const clientId = process.env.NEXT_PUBLIC_SLACK_CLIENT_ID
+                        const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL
+
+                        if (!backendUrl) {
+                          toast.error('Backend URL not configured. Please contact support.')
+                          return
+                        }
+
+                        // Include organization context in callback URL so backend knows which org is installing
+                        const redirectUri = `${backendUrl}/integrations/slack/oauth/callback`
+                        const scopes = 'commands,chat:write,team:read'
+
+                        // Add state parameter to track which organization is installing
+                        const currentUser = userInfo // Assuming userInfo contains org info
+                        const stateData = {
+                          orgId: currentUser?.organization_id,
+                          userId: currentUser?.id,
+                          email: currentUser?.email
+                        }
+                        const state = currentUser ? btoa(JSON.stringify(stateData)) : ''
+
+                        const slackAuthUrl = `https://slack.com/oauth/v2/authorize?client_id=${clientId}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(state)}`
+
+                        // Show loading state and persist in localStorage
+                        setIsConnectingSlackOAuth(true)
+                        localStorage.setItem('slack_oauth_in_progress', 'true')
+                        toast.info('Redirecting to Slack...')
+
+                        // Use window.location to navigate in same tab so auth token is preserved
+                        window.location.href = slackAuthUrl
+                      }}
+                      disabled={isConnectingSlackOAuth}
+                      className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isConnectingSlackOAuth ? (
+                        <span className="flex items-center space-x-2">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Connecting...</span>
+                        </span>
+                      ) : (
+                        'Add to Slack'
+                      )}
+                    </Button>
+                  ) : (
+                    <div className="inline-flex items-center space-x-2 bg-gray-100 text-gray-500 px-4 py-2 rounded-lg text-sm font-medium">
+                      <svg className="w-4 h-4" viewBox="0 0 124 124" fill="currentColor">
+                        <path d="M26.3996 78.2003C26.3996 84.7003 21.2996 89.8003 14.7996 89.8003C8.29961 89.8003 3.19961 84.7003 3.19961 78.2003C3.19961 71.7003 8.29961 66.6003 14.7996 66.6003H26.3996V78.2003Z"/>
+                        <path d="M32.2996 78.2003C32.2996 71.7003 37.3996 66.6003 43.8996 66.6003C50.3996 66.6003 55.4996 71.7003 55.4996 78.2003V109.2C55.4996 115.7 50.3996 120.8 43.8996 120.8C37.3996 120.8 32.2996 115.7 32.2996 109.2V78.2003Z"/>
+                        <path d="M43.8996 26.4003C37.3996 26.4003 32.2996 21.3003 32.2996 14.8003C32.2996 8.30026 37.3996 3.20026 43.8996 3.20026C50.3996 3.20026 55.4996 8.30026 55.4996 14.8003V26.4003H43.8996Z"/>
+                      </svg>
+                      <span>Slack App Not Configured</span>
+                    </div>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                {loadingSlack ? (
+                  <div className="space-y-6 animate-pulse">
+                    {/* Skeleton for "Connect Slack Workspace" button */}
+                    <div className="flex flex-col items-center justify-center py-8 space-y-3">
+                      <div className="w-64 h-12 bg-gray-200 rounded-lg"></div>
+                      <div className="w-96 h-4 bg-gray-200 rounded"></div>
+                    </div>
+
+                    {/* Skeleton for "How it works" section */}
+                    <div className="space-y-4">
+                      <div className="w-32 h-6 bg-gray-200 rounded"></div>
+                      <div className="space-y-4">
+                        <div className="flex items-start space-x-3">
+                          <div className="w-8 h-8 bg-gray-200 rounded-full flex-shrink-0"></div>
+                          <div className="flex-1 space-y-2">
+                            <div className="w-3/4 h-4 bg-gray-200 rounded"></div>
+                          </div>
+                        </div>
+                        <div className="flex items-start space-x-3">
+                          <div className="w-8 h-8 bg-gray-200 rounded-full flex-shrink-0"></div>
+                          <div className="flex-1 space-y-2">
+                            <div className="w-2/3 h-4 bg-gray-200 rounded"></div>
+                            <div className="w-full h-20 bg-gray-200 rounded-lg mt-2"></div>
+                          </div>
+                        </div>
+                        <div className="flex items-start space-x-3">
+                          <div className="w-8 h-8 bg-gray-200 rounded-full flex-shrink-0"></div>
+                          <div className="flex-1 space-y-2">
+                            <div className="w-3/4 h-4 bg-gray-200 rounded"></div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Skeleton for footer */}
+                    <div className="flex items-center justify-between pt-4 border-t">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-4 h-4 bg-gray-200 rounded"></div>
+                        <div className="w-48 h-4 bg-gray-200 rounded"></div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <div className="w-4 h-4 bg-gray-200 rounded"></div>
+                        <div className="w-40 h-4 bg-gray-200 rounded"></div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <SlackSurveyTabs
+                    slackIntegration={slackIntegration}
+                    selectedOrganization={selectedOrganization}
+                    integrations={integrations}
+                    teamMembers={teamMembers}
+                    loadingTeamMembers={loadingTeamMembers}
+                    loadingSyncedUsers={loadingSyncedUsers}
+                    userInfo={userInfo}
+                    fetchTeamMembers={fetchTeamMembers}
+                    syncUsersToCorrelation={syncUsersToCorrelation}
+                    fetchSyncedUsers={fetchSyncedUsers}
+                    setShowManualSurveyModal={setShowManualSurveyModal}
+                    loadSlackPermissions={loadSlackPermissions}
+                    toast={toast}
+                  />
+                )}
+              </CardContent>
+            </Card>
+
+            {/* OLD SLACK SURVEY CONTENT - TO BE REMOVED AFTER TESTING */}
+            <Card className="border-2 border-purple-200 bg-purple-50/30" style={{display: 'none'}}>
+              <CardHeader className="pb-4">
+                <div className="text-sm text-gray-500">Old content hidden - remove after testing</div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="bg-white rounded-lg border p-4 space-y-4">
+                  {!process.env.NEXT_PUBLIC_SLACK_CLIENT_ID && (
+                    <div className="text-center py-2">
+                      <p className="text-sm text-gray-600 mb-4">
+                        The official Slack app is not currently configured. You can still use the manual Slack integration below to connect your workspace with webhook URL and bot token.
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="border-t pt-4">
+                    <h4 className="font-medium text-gray-900 mb-3">How it works:</h4>
+                    <div className="space-y-3">
+                      <div className="flex items-start space-x-3">
+                        <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <span className="text-green-600 text-xs font-bold">1</span>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-700"><strong>Authorize the app</strong> to add slash commands to your Slack workspace</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start space-x-3">
+                        <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <span className="text-green-600 text-xs font-bold">2</span>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-700"><strong>Team members type</strong> <code className="bg-gray-100 px-1 rounded text-xs">/burnout-survey</code></p>
+                          <div className="bg-slate-800 rounded p-3 font-mono text-sm text-green-400 mt-2">
+                            <div>/burnout-survey</div>
+                            <div className="text-slate-400 mt-1">→ Opens 2-minute burnout survey with 3 questions</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start space-x-3">
+                        <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <span className="text-green-600 text-xs font-bold">3</span>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-700"><strong>Survey responses appear automatically</strong> in your burnout analysis to validate automated detection</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Workspace Details for OAuth Connections */}
+                {slackIntegration?.connection_type === 'oauth' && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <h4 className="font-medium text-blue-900 mb-2 flex items-center">
+                      <Building className="w-4 h-4 mr-2" />
+                      Registered Workspace
+                    </h4>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <span className="text-blue-700 font-medium">Workspace:</span>
+                        <p className="text-blue-900">{slackIntegration.workspace_name || 'Unknown'}</p>
+                      </div>
+                      <div>
+                        <span className="text-blue-700 font-medium">Status:</span>
+                        <p className="text-blue-900 capitalize">{slackIntegration.status || 'Active'}</p>
+                      </div>
+                      <div>
+                        <span className="text-blue-700 font-medium">Registered:</span>
+                        <p className="text-blue-900">{new Date(slackIntegration.connected_at).toLocaleDateString()}</p>
+                      </div>
+                      <div>
+                        <span className="text-blue-700 font-medium">Workspace ID:</span>
+                        <p className="text-blue-900 font-mono text-xs">{slackIntegration.workspace_id}</p>
+                      </div>
+                    </div>
+                    <div className="mt-3 pt-3 border-t border-blue-200">
+                      <p className="text-xs text-blue-800">
+                        💡 The <code className="bg-blue-100 px-1 rounded">/burnout-survey</code> command will only show analyses for your organization
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Workspace Registration Fix Button - Always show when Slack connected */}
+                {slackIntegration && (
+                  <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <h4 className="font-medium text-yellow-900 mb-2 flex items-center text-sm">
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                      Troubleshooting
+                    </h4>
+                    <p className="text-xs text-yellow-800 mb-3">
+                      If the <code className="bg-yellow-100 px-1 rounded">/burnout-survey</code> command shows "workspace not registered" error, click below to fix:
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={async () => {
+                        try {
+                          const authToken = localStorage.getItem('auth_token')
+                          if (!authToken) {
+                            toast.error('Please log in to check workspace status')
+                            return
+                          }
+
+                          // Check workspace status
+                          const statusResponse = await fetch(`${API_BASE}/integrations/slack/workspace/status`, {
+                            headers: {
+                              'Authorization': `Bearer ${authToken}`,
+                              'Content-Type': 'application/json'
+                            }
+                          })
+
+                          if (!statusResponse.ok) {
+                            toast.error('Failed to check workspace status')
+                            return
+                          }
+
+                          const statusData = await statusResponse.json()
+
+                          if (statusData.diagnosis.has_workspace_mapping) {
+                            toast.success('✅ Workspace is properly registered! /burnout-survey command should work.')
+                          } else {
+                            // Need to register workspace
+                            if (!slackIntegration?.workspace_id) {
+                              toast.error('No workspace ID found. Please reconnect Slack.')
+                              return
+                            }
+
+                            const formData = new FormData()
+                            formData.append('workspace_id', slackIntegration.workspace_id)
+                            formData.append('workspace_name', slackIntegration.workspace_name || slackIntegration.workspace_id)
+
+                            const registerResponse = await fetch(`${API_BASE}/integrations/slack/workspace/register`, {
+                              method: 'POST',
+                              headers: {
+                                'Authorization': `Bearer ${authToken}`
+                              },
+                              body: formData
+                            })
+
+                            if (registerResponse.ok) {
+                              const registerData = await registerResponse.json()
+                              toast.success('✅ Workspace registered! /burnout-survey command should now work. Try the command again.')
+
+                              // Reload Slack integration to update UI
+                              await loadSlackPermissions()
+                            } else {
+                              const errorData = await registerResponse.json()
+                              toast.error(`Failed to register workspace: ${errorData.detail || 'Unknown error'}`)
+                            }
+                          }
+                        } catch (error) {
+                          console.error('Error checking/fixing workspace:', error)
+                          toast.error('Error checking workspace status')
+                        }
+                      }}
+                      className="w-full text-xs"
+                    >
+                      <svg className="w-3 h-3 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Check & Fix Workspace Registration
+                    </Button>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between pt-2">
+                  <div className="flex items-center space-x-2 text-sm text-gray-500">
+                    <Users className="w-4 h-4" />
+                    <span>Available to all workspace members</span>
+                  </div>
+                  <div className="flex items-center space-x-2 text-xs text-gray-400">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                    <span>Secure OAuth authentication</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Team Members for Survey Correlation - NOW IN TABS ABOVE */}
+            {false && slackIntegration && selectedOrganization && (
+              <Card className="border-2 border-purple-200 bg-purple-50/30" style={{display: 'none'}}>
+                <CardHeader className="pb-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                        <Users className="w-6 h-6 text-purple-600" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-lg text-gray-900">Team Members</CardTitle>
+                        <p className="text-sm text-gray-600">Users from your organization who can submit surveys</p>
+                      </div>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="bg-white rounded-lg border p-4">
+                    <div className="mb-4">
+                      <h4 className="font-medium text-gray-900 mb-2">Survey Correlation</h4>
+                      <p className="text-sm text-gray-600 mb-3">
+                        When team members submit a <code className="bg-gray-100 px-1 rounded text-xs">/burnout-survey</code>,
+                        we match them to their profile using:
+                      </p>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex items-start space-x-2">
+                          <div className="w-5 h-5 bg-purple-100 rounded flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <span className="text-purple-600 text-xs">1</span>
+                          </div>
+                          <div>
+                            <span className="font-medium text-gray-900">Slack email</span> matches
+                            <span className="font-medium text-gray-900"> Rootly/PagerDuty email</span>
+                          </div>
+                        </div>
+                        <div className="flex items-start space-x-2">
+                          <div className="w-5 h-5 bg-purple-100 rounded flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <span className="text-purple-600 text-xs">2</span>
+                          </div>
+                          <div>
+                            Survey response is linked to their burnout analysis profile
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="border-t pt-4">
+                      <div className="mb-4">
+                        <h4 className="font-medium text-gray-900 mb-3">
+                          Team Members from {integrations.find(i => i.id.toString() === selectedOrganization)?.name}
+                        </h4>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            onClick={fetchTeamMembers}
+                            disabled={loadingTeamMembers || !selectedOrganization}
+                            size="sm"
+                            variant="outline"
+                            className="flex items-center space-x-2"
+                          >
+                            {loadingTeamMembers ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <span>Loading...</span>
+                              </>
+                            ) : (
+                              <>
+                                <RefreshCw className="w-4 h-4" />
+                                <span>Load Members</span>
+                              </>
+                            )}
+                          </Button>
+                          <Button
+                            onClick={syncUsersToCorrelation}
+                            disabled={loadingTeamMembers || !selectedOrganization || teamMembers.length === 0}
+                            size="sm"
+                            variant="default"
+                            className="flex items-center space-x-2 bg-purple-600 hover:bg-purple-700"
+                          >
+                            {loadingTeamMembers ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <span>Syncing...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Database className="w-4 h-4" />
+                                <span>Sync to Survey System</span>
+                              </>
+                            )}
+                          </Button>
+                          {slackIntegration?.workspace_id && (
+                            <Button
+                              onClick={syncSlackUserIds}
+                              disabled={loadingTeamMembers}
+                              size="sm"
+                              variant="default"
+                              className="flex items-center space-x-2 bg-green-600 hover:bg-green-700"
+                            >
+                              {loadingTeamMembers ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                  <span>Syncing...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <MessageSquare className="w-4 h-4" />
+                                  <span>Sync Slack IDs</span>
+                                </>
+                              )}
+                            </Button>
+                          )}
+                          <Button
+                            onClick={() => fetchSyncedUsers()}
+                            disabled={loadingSyncedUsers}
+                            size="sm"
+                            variant="outline"
+                            className="flex items-center space-x-2"
+                          >
+                            {loadingSyncedUsers ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <span>Loading...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Users2 className="w-4 h-4" />
+                                <span>View Synced Users</span>
+                              </>
+                            )}
+                          </Button>
+                          {(userInfo?.role === 'super_admin' || userInfo?.role === 'org_admin') && (
+                            <Button
+                              onClick={() => setShowManualSurveyModal(true)}
+                              size="sm"
+                              className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700"
+                            >
+                              <Send className="w-4 h-4" />
+                              <span>Send Survey Now</span>
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="text-sm text-gray-600">
+                        <p className="mb-2">Click "Load Members" to view users from your organization who can submit burnout surveys.</p>
+                        <p className="text-xs text-gray-500">
+                          After loading, use "Sync to Survey System" to ensure all team members can submit surveys via Slack,
+                          even if they haven't been involved in incidents yet.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </div>
 
         {/* GitHub and Slack Integrations Section */}
@@ -3766,56 +4849,56 @@ export default function IntegrationsPage() {
                 </CardHeader>
                 <CardContent className="p-8 pt-0">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                    <div className="flex items-center space-x-2">
-                      <Key className="w-4 h-4 text-gray-400" />
-                      <div>
-                        <div className="font-medium">Webhook URL</div>
-                        <div className="text-gray-600 font-mono text-xs">
-                          {slackIntegration.webhook_preview || 'Not configured'}
+                      <div className="flex items-center space-x-2">
+                        <Key className="w-4 h-4 text-gray-400" />
+                        <div>
+                          <div className="font-medium">Webhook URL</div>
+                          <div className="text-gray-600 font-mono text-xs">
+                            {slackIntegration.webhook_preview || 'Not configured'}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Key className="w-4 h-4 text-gray-400" />
+                        <div>
+                          <div className="font-medium">Bot Token</div>
+                          <div className="text-gray-600 font-mono text-xs">
+                            {slackIntegration.token_preview || 'Not available'}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Building className="w-4 h-4 text-gray-400" />
+                        <div>
+                          <div className="font-medium">Workspace ID</div>
+                          <div className="text-gray-600 font-mono text-xs">{slackIntegration.workspace_id}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Calendar className="w-4 h-4 text-gray-400" />
+                        <div>
+                          <div className="font-medium">Connected</div>
+                          <div className="text-gray-600">{new Date(slackIntegration.connected_at).toLocaleDateString()}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Clock className="w-4 h-4 text-gray-400" />
+                        <div>
+                          <div className="font-medium">Last Updated</div>
+                          <div className="text-gray-600">{new Date(slackIntegration.last_updated).toLocaleDateString()}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Users className="w-4 h-4 text-gray-400" />
+                        <div>
+                          <div className="font-medium">User ID</div>
+                          <div className="text-gray-600 font-mono text-xs">{slackIntegration.slack_user_id}</div>
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <Key className="w-4 h-4 text-gray-400" />
-                      <div>
-                        <div className="font-medium">Bot Token</div>
-                        <div className="text-gray-600 font-mono text-xs">
-                          {slackIntegration.token_preview || 'Not available'}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Building className="w-4 h-4 text-gray-400" />
-                      <div>
-                        <div className="font-medium">Workspace ID</div>
-                        <div className="text-gray-600 font-mono text-xs">{slackIntegration.workspace_id}</div>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Calendar className="w-4 h-4 text-gray-400" />
-                      <div>
-                        <div className="font-medium">Connected</div>
-                        <div className="text-gray-600">{new Date(slackIntegration.connected_at).toLocaleDateString()}</div>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Clock className="w-4 h-4 text-gray-400" />
-                      <div>
-                        <div className="font-medium">Last Updated</div>
-                        <div className="text-gray-600">{new Date(slackIntegration.last_updated).toLocaleDateString()}</div>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Users className="w-4 h-4 text-gray-400" />
-                      <div>
-                        <div className="font-medium">User ID</div>
-                        <div className="text-gray-600 font-mono text-xs">{slackIntegration.slack_user_id}</div>
-                      </div>
-                    </div>
-                  </div>
 
                   {/* Permissions Section */}
-                  <div className="border-t pt-4">
+                  <div className="border-t pt-4 mt-6">
                     <div className="flex items-center justify-between mb-3">
                       <h4 className="font-medium text-sm">Bot Permissions</h4>
                       {isLoadingPermissions ? (
@@ -3873,7 +4956,7 @@ export default function IntegrationsPage() {
                       </div>
                     )}
                   </div>
-                  
+
                   {/* Bot Channels Section */}
                   <div className="mt-6">
                     <div className="flex items-center justify-between mb-3">
@@ -3891,7 +4974,7 @@ export default function IntegrationsPage() {
                       </div>
                     ) : (
                       <div className="text-xs text-gray-500">
-                        {slackPermissions?.errors?.includes('not_in_channel') 
+                        {slackPermissions?.errors?.includes('not_in_channel')
                           ? 'Bot is not in any channels. Add it to channels in Slack.'
                           : 'No channels found'}
                       </div>
@@ -4829,7 +5912,7 @@ export default function IntegrationsPage() {
           <DialogHeader>
             <DialogTitle>Disconnect Slack Integration</DialogTitle>
             <DialogDescription>
-              Are you sure you want to disconnect your Slack integration? 
+              Are you sure you want to disconnect your Slack integration?
               This will remove access to your Slack workspace data and you'll need to reconnect to use Slack features again.
             </DialogDescription>
           </DialogHeader>
@@ -4853,6 +5936,176 @@ export default function IntegrationsPage() {
                 </>
               ) : (
                 "Disconnect Slack"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Slack Survey Workspace Info & Disconnect Dialog */}
+      <Dialog open={slackSurveyDisconnectDialogOpen} onOpenChange={setSlackSurveyDisconnectDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center">
+              <Building className="w-5 h-5 mr-2 text-blue-600" />
+              Registered Workspace
+            </DialogTitle>
+            <DialogDescription>
+              Your Slack workspace connection details
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm font-medium text-gray-700">Workspace</p>
+                <p className="text-sm text-gray-900 mt-1">{slackIntegration?.workspace_name || 'Unknown'}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-700">Connection</p>
+                <p className="text-sm text-gray-900 mt-1 capitalize">
+                  {slackIntegration?.connection_type === 'oauth' ? 'OAuth' : 'Token'}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-700">Connected</p>
+                <p className="text-sm text-gray-900 mt-1">
+                  {slackIntegration?.connected_at ? new Date(slackIntegration.connected_at).toLocaleDateString() : 'N/A'}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-700">Workspace ID</p>
+                <p className="text-sm text-gray-900 mt-1 font-mono text-xs">
+                  {slackIntegration?.workspace_id || 'N/A'}
+                </p>
+              </div>
+            </div>
+            <div className="pt-3 border-t border-gray-200">
+              <p className="text-xs text-gray-600">
+                💡 The <code className="bg-gray-100 px-1 rounded">/burnout-survey</code> command will only show analyses for your organization
+              </p>
+            </div>
+          </div>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setSlackSurveyDisconnectDialogOpen(false)}
+              className="w-full sm:w-auto"
+            >
+              Close
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setSlackSurveyDisconnectDialogOpen(false)
+                setSlackSurveyConfirmDisconnectOpen(true)
+              }}
+              className="w-full sm:w-auto"
+            >
+              Disconnect
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Slack Survey Disconnect Confirmation Dialog - Step 2 */}
+      <Dialog open={slackSurveyConfirmDisconnectOpen} onOpenChange={setSlackSurveyConfirmDisconnectOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center text-red-600">
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              Disconnect Slack Survey Integration?
+            </DialogTitle>
+            <DialogDescription>
+              Are you sure you want to disconnect?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-4">
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 space-y-2">
+              <p className="text-sm font-medium text-red-900">This will:</p>
+              <ul className="text-sm text-red-800 space-y-1 list-disc list-inside">
+                <li>Disable the <code className="bg-red-100 px-1 rounded font-mono text-xs">/burnout-survey</code> command in your Slack workspace</li>
+                <li>Stop all automated survey delivery</li>
+                <li>Remove access to survey features for all team members</li>
+              </ul>
+            </div>
+            <p className="text-sm text-gray-600">
+              You will need to reconnect to re-enable these features.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setSlackSurveyConfirmDisconnectOpen(false)}
+              disabled={isDisconnectingSlackSurvey}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={async () => {
+                setIsDisconnectingSlackSurvey(true)
+                try {
+                  const authToken = localStorage.getItem('auth_token')
+                  if (!authToken) {
+                    toast.error('Authentication required')
+                    return
+                  }
+
+                  const url = `${API_BASE}/integrations/slack/disconnect`
+
+                  const response = await fetch(url, {
+                    method: 'DELETE',
+                    headers: {
+                      'Authorization': `Bearer ${authToken}`
+                    }
+                  })
+
+                  if (response.ok) {
+                    const result = await response.json()
+
+                    // Small delay to ensure backend has processed the disconnect
+                    await new Promise(resolve => setTimeout(resolve, 300))
+
+                    // Fetch updated Slack status without showing loading on other cards
+                    const slackResponse = await fetch(`${API_BASE}/integrations/slack/status`, {
+                      headers: { 'Authorization': `Bearer ${authToken}` }
+                    })
+
+                    if (slackResponse.ok) {
+                      const slackData = await slackResponse.json()
+                      setSlackIntegration(slackData.integration)
+                      // Update cache
+                      localStorage.setItem('slack_integration', JSON.stringify(slackData))
+                      localStorage.setItem('all_integrations_timestamp', Date.now().toString())
+                    }
+
+                    // Close dialog and show success after state update
+                    setSlackSurveyConfirmDisconnectOpen(false)
+
+                    toast.success('Slack Survey integration disconnected', {
+                      description: 'Your workspace has been disconnected successfully.',
+                    })
+                  } else {
+                    const error = await response.json()
+                    toast.error(error.detail || 'Failed to disconnect Slack')
+                  }
+                } catch (error) {
+                  toast.error('Failed to disconnect Slack Survey integration')
+                } finally {
+                  setIsDisconnectingSlackSurvey(false)
+                }
+              }}
+              disabled={isDisconnectingSlackSurvey}
+            >
+              {isDisconnectingSlackSurvey ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Disconnecting...
+                </>
+              ) : (
+                'Yes, Disconnect'
               )}
             </Button>
           </DialogFooter>
@@ -4897,24 +6150,355 @@ export default function IntegrationsPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Organization Management Modal */}
+      <Dialog open={showInviteModal} onOpenChange={setShowInviteModal}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <Users className="w-5 h-5" />
+              <span>Organization Management</span>
+            </DialogTitle>
+            <DialogDescription>
+              Invite new members and manage your organization
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Role descriptions - at the top of modal */}
+          <div className="mt-4 px-4 py-3 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg">
+            <div className="space-y-1.5 text-xs">
+              <div className="flex items-baseline space-x-2">
+                <span className="font-semibold text-gray-900 min-w-[80px]">Org Admin</span>
+                <span className="text-gray-700">Everything a Manager can do, plus manage integrations, invite members, and configure settings</span>
+              </div>
+              <div className="flex items-baseline space-x-2">
+                <span className="font-semibold text-gray-900 min-w-[80px]">Manager</span>
+                <span className="text-gray-700">Full access to view team burnout data, run analyses, and send surveys</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            {/* Invite New Member Section */}
+            <div className="p-6 border rounded-lg bg-gradient-to-br from-purple-50 to-white">
+              <div className="flex items-start space-x-4">
+                <div className="flex-shrink-0 w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                  <Mail className="w-5 h-5 text-purple-600" />
+                </div>
+                <div className="flex-1 space-y-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">Invite Team Member</h3>
+                    <p className="text-sm text-gray-500 mt-1">Send an invitation to join your organization</p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label htmlFor="invite-email" className="block text-sm font-medium text-gray-700 mb-1.5">
+                        Email Address
+                      </label>
+                      <Input
+                        id="invite-email"
+                        type="email"
+                        placeholder="colleague@company.com"
+                        value={inviteEmail}
+                        onChange={(e) => setInviteEmail(e.target.value)}
+                        className="w-full"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="invite-role" className="block text-sm font-medium text-gray-700 mb-1.5">
+                        Role
+                      </label>
+                      <select
+                        id="invite-role"
+                        value={inviteRole}
+                        onChange={(e) => setInviteRole(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
+                      >
+                        <option value="manager">Manager</option>
+                        <option value="org_admin">Org Admin</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <Button
+                    onClick={handleInvite}
+                    disabled={isInviting || !inviteEmail.trim()}
+                    className="w-full md:w-auto bg-purple-600 hover:bg-purple-700"
+                  >
+                    {isInviting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Sending Invitation...
+                      </>
+                    ) : (
+                      <>
+                        <Mail className="w-4 h-4 mr-2" />
+                        Send Invitation
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* Current Members & Pending Invitations */}
+            {loadingOrgData ? (
+              <div className="text-center py-8">
+                <Loader2 className="w-8 h-8 mx-auto mb-4 animate-spin text-gray-400" />
+                <p className="text-gray-500">Loading organization data...</p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* Current Members */}
+                {orgMembers.length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-medium mb-3 flex items-center space-x-2">
+                      <Users className="w-5 h-5" />
+                      <span>Organization Members ({orgMembers.length})</span>
+                    </h3>
+                    <div className="border rounded-lg overflow-hidden">
+                      <div className="bg-gray-50 px-4 py-2 border-b">
+                        <div className="grid grid-cols-3 gap-4 text-sm font-medium text-gray-700">
+                          <div>Name</div>
+                          <div>Email</div>
+                          <div>Role</div>
+                        </div>
+                      </div>
+                      <div className="max-h-60 overflow-y-auto">
+                        {orgMembers.map((member: any) => (
+                          <div key={member.id} className="px-4 py-3 border-b last:border-b-0 bg-white hover:bg-gray-50">
+                            <div className="grid grid-cols-3 gap-4 text-sm items-center">
+                              <div className="font-medium text-gray-900">
+                                {member.name}
+                                {member.is_current_user && (
+                                  <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">You</span>
+                                )}
+                              </div>
+                              <div className="text-gray-600">{member.email}</div>
+                              <div>
+                                {member.is_current_user ? (
+                                  <span className="inline-block px-2 py-1 text-xs rounded-full bg-green-100 text-green-800 capitalize">
+                                    {member.role?.replace('_', ' ') || 'member'}
+                                  </span>
+                                ) : (
+                                  <select
+                                    value={member.role || 'manager'}
+                                    onChange={(e) => handleRoleChange(member.id, e.target.value)}
+                                    className="text-xs px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
+                                    disabled={userInfo?.role !== 'org_admin'}
+                                  >
+                                    <option value="manager">Manager</option>
+                                    <option value="org_admin">Org Admin</option>
+                                  </select>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Pending Invitations */}
+                {pendingInvitations.length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-medium mb-3 flex items-center space-x-2">
+                      <Mail className="w-5 h-5" />
+                      <span>Pending Invitations ({pendingInvitations.length})</span>
+                    </h3>
+                    <div className="border rounded-lg overflow-hidden">
+                      <div className="bg-gray-50 px-4 py-2 border-b">
+                        <div className="grid grid-cols-5 gap-4 text-sm font-medium text-gray-700">
+                          <div>Email</div>
+                          <div>Role</div>
+                          <div>Invited By</div>
+                          <div>Sent</div>
+                          <div>Expires</div>
+                        </div>
+                      </div>
+                      <div className="max-h-60 overflow-y-auto">
+                        {pendingInvitations.map((invitation: any) => (
+                          <div key={invitation.id} className="px-4 py-3 border-b last:border-b-0 bg-yellow-50">
+                            <div className="grid grid-cols-5 gap-4 text-sm">
+                              <div className="font-medium text-gray-900">{invitation.email}</div>
+                              <div>
+                                <span className="inline-block px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800 capitalize">
+                                  {invitation.role?.replace('_', ' ') || 'member'}
+                                </span>
+                              </div>
+                              <div className="text-gray-600">{invitation.invited_by?.name || 'Unknown'}</div>
+                              <div className="text-gray-500 text-xs">
+                                {new Date(invitation.created_at).toLocaleDateString()}
+                              </div>
+                              <div className="text-gray-500 text-xs">
+                                {invitation.is_expired ? (
+                                  <span className="text-red-600">Expired</span>
+                                ) : (
+                                  new Date(invitation.expires_at).toLocaleDateString()
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Empty State */}
+                {!loadingOrgData && orgMembers.length === 0 && pendingInvitations.length === 0 && (
+                  <div className="text-center py-8 text-gray-500">
+                    <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p>No organization members or pending invitations found</p>
+                    <p className="text-sm mt-1">Start by inviting team members above</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowInviteModal(false)
+                setInviteEmail("")
+                setInviteRole("member")
+              }}
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Powered by Rootly AI Footer */}
       <div className="mt-12 pt-8 border-t border-gray-200 text-center">
-        <a 
-          href="https://rootly.com" 
-          target="_blank" 
+        <a
+          href="https://rootly.com"
+          target="_blank"
           rel="noopener noreferrer"
           className="inline-flex flex-col items-center space-y-1 hover:opacity-80 transition-opacity"
         >
           <span className="text-lg text-gray-600">powered by</span>
-          <Image 
-            src="/images/rootly-ai-logo.png" 
-            alt="Rootly AI" 
-            width={200} 
+          <Image
+            src="/images/rootly-ai-logo.png"
+            alt="Rootly AI"
+            width={200}
             height={80}
             className="h-12 w-auto"
           />
         </a>
       </div>
+
+      {/* Team Members Drawer */}
+      <Sheet open={teamMembersDrawerOpen} onOpenChange={setTeamMembersDrawerOpen}>
+        <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Team Members</SheetTitle>
+            <SheetDescription>
+              Users from {integrations.find(i => i.id.toString() === selectedOrganization)?.name || 'your organization'} who can submit burnout surveys
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="mt-6 space-y-4">
+            {/* Show synced users only */}
+            {syncedUsers.length > 0 ? (
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-gray-900">
+                    Team Members ({syncedUsers.length})
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    {slackIntegration?.workspace_id && (
+                      <Button
+                        onClick={syncSlackUserIds}
+                        disabled={loadingTeamMembers}
+                        size="sm"
+                        variant="outline"
+                        className="flex items-center space-x-2 border-green-300 text-green-700 hover:bg-green-50"
+                      >
+                        {loadingTeamMembers ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span>Syncing...</span>
+                          </>
+                        ) : (
+                          <>
+                            <MessageSquare className="w-4 h-4" />
+                            <span>Sync Slack IDs</span>
+                          </>
+                        )}
+                      </Button>
+                    )}
+                    <Badge className="text-xs bg-green-100 text-green-700 border-green-300">
+                      Can Submit Surveys
+                    </Badge>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-600 mb-3">
+                  These users can submit burnout surveys via Slack /burnout-survey command
+                </p>
+                <div className="space-y-2 max-h-[600px] overflow-y-auto">
+                  {syncedUsers.map((user: any) => (
+                    <div
+                      key={user.id}
+                      className="bg-white border border-gray-200 rounded-lg p-3 hover:border-purple-300 transition-colors"
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center space-x-3">
+                          <Avatar className="h-10 w-10">
+                            <AvatarFallback className="bg-purple-100 text-purple-700 text-sm font-medium">
+                              {user.name?.substring(0, 2).toUpperCase() || user.email?.substring(0, 2).toUpperCase() || '??'}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">
+                              {user.name || 'Unknown'}
+                            </div>
+                            <div className="text-xs text-gray-600">
+                              {user.email}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-1">
+                          {user.platforms?.map((platform: string) => (
+                            <Badge key={platform} variant="secondary" className="text-xs">
+                              {platform}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                      {user.github_username && (
+                        <div className="pl-13 text-xs text-gray-500">
+                          GitHub: <span className="font-mono">{user.github_username}</span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-12 text-gray-500">
+                <Users className="w-12 h-12 mx-auto mb-4 opacity-40" />
+                <p className="text-sm font-medium mb-2">No team members synced yet</p>
+                <p className="text-xs">Close this drawer and click "Sync Members" to add team members who can submit surveys</p>
+              </div>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Manual Survey Delivery Modal */}
+      <ManualSurveyDeliveryModal
+        isOpen={showManualSurveyModal}
+        onClose={() => setShowManualSurveyModal(false)}
+        onSuccess={() => {
+          // Refresh notifications or show success message
+          toast.success("Survey delivery initiated successfully")
+        }}
+      />
     </div>
   )
 }

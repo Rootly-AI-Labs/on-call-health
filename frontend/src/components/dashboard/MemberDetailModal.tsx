@@ -4,14 +4,13 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Progress } from "@/components/ui/progress"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, Cell } from "recharts"
 import { Info, RefreshCw, BarChart3 } from "lucide-react"
 import { useState, useEffect } from "react"
-import { BurnoutFactorsV0 } from "@/components/BurnoutFactorsV0"
 
 // Individual Daily Health Chart component
 function IndividualDailyHealthChart({ memberData, analysisId, currentAnalysis }: {
@@ -288,13 +287,11 @@ export function MemberDetailModal({
                     </div>
                   </div>
                 </DialogTitle>
+                <DialogDescription id="member-detail-description" className="sr-only">
+                  Detailed burnout analysis and daily health timeline for team member.
+                  Shows burnout risk factors, incident response metrics, and daily health scores.
+                </DialogDescription>
               </DialogHeader>
-
-          {/* Hidden description for accessibility */}
-          <div id="member-detail-description" className="sr-only">
-            Detailed burnout analysis and daily health timeline for team member. 
-            Shows burnout risk factors, incident response metrics, and daily health scores.
-          </div>
           
           {(() => {
             // Use only CBI scores - no legacy fallbacks
@@ -357,8 +354,8 @@ export function MemberDetailModal({
             {/* Overall Burnout Assessment */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Card>
-                <CardContent className="p-6 text-center">
-                  <p className="text-sm text-gray-600 mb-3">Overall Risk Level</p>
+                <CardContent className="p-4 text-center">
+                  <p className="text-sm text-gray-600 mb-2">Overall Risk Level</p>
                   {(() => {
                     // Calculate CBI-based risk level when available
                     const getCBIRiskLevel = () => {
@@ -372,32 +369,32 @@ export function MemberDetailModal({
                       // No CBI score available - default to unknown risk
                       return { level: 'unknown', label: 'Unknown Risk' };
                     };
-
+                    
                     const riskInfo = getCBIRiskLevel();
                     const getCBIColor = (level: string) => {
                       switch(level) {
                         case 'critical': return 'bg-red-100 text-red-800 border-red-300';
-                        case 'poor': return 'bg-red-50 text-red-600 border-red-200';
+                        case 'poor': return 'bg-red-50 text-red-600 border-red-200'; 
                         case 'fair': return 'bg-yellow-50 text-yellow-600 border-yellow-200';
                         case 'healthy': return 'bg-green-50 text-green-600 border-green-200';
                         default: return 'bg-gray-50 text-gray-600 border-gray-200';
                       }
                     };
-
+                    
                     return (
-                      <Badge className={`px-3 py-1 ${getCBIColor(riskInfo.level)} mb-4`}>
+                      <Badge className={`px-3 py-1 ${getCBIColor(riskInfo.level)}`}>
                         {riskInfo.label}
                       </Badge>
                     );
                   })()}
-                  <div className="mt-2">
-                    <div className={`text-3xl font-bold mb-2 ${(() => {
+                  <div className="mt-3">
+                    <div className={`text-2xl font-bold ${(() => {
                       if (memberData?.cbi_score !== undefined) {
                         // Color the CBI score based on risk level
                         const score = memberData.cbi_score;
                         if (score < 25) return 'text-green-600';      // Healthy
                         if (score < 50) return 'text-yellow-600';     // Fair
-                        if (score < 75) return 'text-orange-600';     // Poor
+                        if (score < 75) return 'text-orange-600';     // Poor  
                         return 'text-red-600';                       // Critical
                       }
                       return 'text-gray-900'; // Legacy fallback
@@ -407,61 +404,91 @@ export function MemberDetailModal({
                         'No Score Available'
                       }
                     </div>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-xs text-gray-500">
                       {memberData?.cbi_score !== undefined ? 'CBI Score' : 'No Score Available'}
                     </p>
                   </div>
                 </CardContent>
               </Card>
-
+              
               <Card>
-                <CardContent className="p-6 text-center">
-                  <p className="text-sm text-gray-600 mb-3">Incidents Handled</p>
-                  {(() => {
-                    const incidentCount = memberData?.incident_count || 0;
-                    const getIncidentLevel = () => {
-                      if (incidentCount === 0) return { level: 'none', label: 'No Activity' };
-                      if (incidentCount < 5) return { level: 'low', label: 'Low Volume' };
-                      if (incidentCount < 15) return { level: 'moderate', label: 'Moderate' };
-                      if (incidentCount < 30) return { level: 'high', label: 'High Volume' };
-                      return { level: 'critical', label: 'Very High' };
-                    };
-
-                    const incidentInfo = getIncidentLevel();
-                    const getIncidentColor = (level: string) => {
-                      switch(level) {
-                        case 'none': return 'bg-gray-100 text-gray-600 border-gray-300';
-                        case 'low': return 'bg-green-100 text-green-600 border-green-300';
-                        case 'moderate': return 'bg-blue-100 text-blue-600 border-blue-300';
-                        case 'high': return 'bg-yellow-100 text-yellow-600 border-yellow-300';
-                        case 'critical': return 'bg-red-100 text-red-600 border-red-300';
-                        default: return 'bg-gray-100 text-gray-600 border-gray-300';
-                      }
-                    };
-
-                    return (
-                      <Badge className={`px-3 py-1 ${getIncidentColor(incidentInfo.level)} mb-4`}>
-                        {incidentInfo.label}
-                      </Badge>
-                    );
-                  })()}
-                  <div className="mt-2">
-                    <div className="text-3xl font-bold text-blue-600 mb-2">
-                      {memberData?.incident_count || 0}
-                    </div>
-                    <p className="text-sm text-gray-500">Past 30 days</p>
+                <CardContent className="p-4 text-center">
+                  <p className="text-sm text-gray-600 mb-2">Incidents Handled</p>
+                  <div className="text-2xl font-bold text-blue-600">
+                    {memberData?.incident_count || 0}
                   </div>
+                  <p className="text-xs text-gray-500">Past 30 days</p>
                 </CardContent>
               </Card>
-
+              
             </div>
             
-            {/* CBI Burnout Factors */}
+            {/* CBI Burnout Analysis */}
             <Card>
               <CardContent className="p-4">
-                <h4 className="text-xl font-semibold text-gray-900 mb-4">Burnout Factors</h4>
+                <h4 className="font-semibold text-gray-900 mb-2">Burnout Analysis</h4>
                 {memberData?.cbi_reasoning ? (
-                  <BurnoutFactorsV0 cbiReasoning={memberData.cbi_reasoning} />
+                  <div className="space-y-6">
+                    {/* Contributing Factors */}
+                    <div className="space-y-3">
+                      <h5 className="text-sm font-semibold text-gray-900 mb-3 pb-1 border-b border-gray-200">
+                        Factors
+                      </h5>
+                      <div className="space-y-2">
+                        {memberData.cbi_reasoning.slice(1).map((reason: string, index: number) => {
+                          const cleanReason = reason.replace(/^[\s]*[•·\-*]\s*/, '').trim();
+                          
+                          // Skip section headers
+                          const isSectionHeader = cleanReason.endsWith(':');
+                          if (isSectionHeader) return null;
+                          
+                          return (
+                            <div key={index} className="px-3 py-2 bg-gray-50 rounded-md border text-sm text-gray-700">
+                              {cleanReason}
+                            </div>
+                          );
+                        }).filter(Boolean)}
+                      </div>
+                    </div>
+
+                    {/* Dimensional Breakdown */}
+                    {memberData.cbi_breakdown && (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-green-50 rounded-lg p-3">
+                          <div className="flex items-center space-x-1 mb-1">
+                            <div className="text-xs font-medium text-green-600 uppercase">Personal</div>
+                            <div className="relative group">
+                              <Info className="w-3 h-3 text-green-500 cursor-help" />
+                              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg w-72 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                                <div className="font-semibold mb-1">Personal Burnout - What We Measure</div>
+                                <div>• Incident frequency (incidents per week)<br/>• After-hours work patterns<br/>• Weekend activity levels<br/>• Sleep disruption indicators<br/>• Overall workload intensity relative to team baseline</div>
+                                <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-900"></div>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-lg font-bold text-green-700">
+                            {memberData.cbi_breakdown.personal?.toFixed(0)}/100
+                          </div>
+                        </div>
+                        <div className="bg-blue-50 rounded-lg p-3">
+                          <div className="flex items-center space-x-1 mb-1">
+                            <div className="text-xs font-medium text-blue-600 uppercase">Work-Related</div>
+                            <div className="relative group">
+                              <Info className="w-3 h-3 text-blue-500 cursor-help" />
+                              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg w-72 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                                <div className="font-semibold mb-1">Work-Related Burnout - What We Measure</div>
+                                <div>• Incident response time patterns<br/>• Severity-weighted incident load<br/>• GitHub commit activity and timing<br/>• Slack communication patterns<br/>• Work-life boundary violations (late night/weekend work)</div>
+                                <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-900"></div>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-lg font-bold text-blue-700">
+                            {memberData.cbi_breakdown.work_related?.toFixed(0)}/100
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 ) : (
                   <p className="text-sm text-gray-500 italic">
                     CBI burnout analysis not available. Run a new analysis to see detailed burnout factors.
@@ -527,17 +554,17 @@ export function MemberDetailModal({
                         value: selectedMember.factors?.weekendWork || 0
                       },
                       { 
-                        factor: 'Response Time', 
-                        value: selectedMember.factors?.responseTime || 0
-                      },
-                      { 
                         factor: 'Incident Load', 
                         value: selectedMember.factors?.incidentLoad || 0
+                      },
+                      { 
+                        factor: 'Response Time', 
+                        value: selectedMember.factors?.responseTime || 0
                       }
                     ]}>
                       <PolarGrid />
                       <PolarAngleAxis dataKey="factor" tick={{ fontSize: 11 }} />
-                      <PolarRadiusAxis domain={[0, 10]} tick={{ fontSize: 9 }} angle={90}/>
+                      <PolarRadiusAxis domain={[0, 10]} tick={{ fontSize: 9 }} angle={90} reversed={true} />
                       <Radar
                         name="Risk Level"
                         dataKey="value"

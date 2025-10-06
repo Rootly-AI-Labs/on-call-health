@@ -123,9 +123,218 @@ class MigrationRunner:
                     """
                 ]
             },
+            {
+                "name": "001b_create_organizations_tables",
+                "description": "Create organizations, invitations, and notifications tables for multi-org support",
+                "sql": [
+                    """
+                    CREATE TABLE IF NOT EXISTS organizations (
+                        id SERIAL PRIMARY KEY,
+                        name VARCHAR(255) NOT NULL,
+                        domain VARCHAR(255) UNIQUE NOT NULL,
+                        slug VARCHAR(100) UNIQUE NOT NULL,
+                        status VARCHAR(20) DEFAULT 'active',
+                        plan_type VARCHAR(50) DEFAULT 'free',
+                        max_users INTEGER DEFAULT 50,
+                        max_analyses_per_month INTEGER DEFAULT 5,
+                        primary_contact_email VARCHAR(255),
+                        billing_email VARCHAR(255),
+                        website VARCHAR(255),
+                        settings JSON DEFAULT '{}',
+                        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_organizations_domain ON organizations(domain)
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_organizations_slug ON organizations(slug)
+                    """,
+                    """
+                    CREATE TABLE IF NOT EXISTS organization_invitations (
+                        id SERIAL PRIMARY KEY,
+                        organization_id INTEGER REFERENCES organizations(id),
+                        email VARCHAR(255) NOT NULL,
+                        role VARCHAR(20) DEFAULT 'user',
+                        invited_by INTEGER REFERENCES users(id),
+                        token VARCHAR(255) UNIQUE,
+                        expires_at TIMESTAMP WITH TIME ZONE,
+                        status VARCHAR(20) DEFAULT 'pending',
+                        used_at TIMESTAMP WITH TIME ZONE,
+                        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_invitations_email ON organization_invitations(email)
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_invitations_token ON organization_invitations(token)
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_invitations_status ON organization_invitations(status)
+                    """,
+                    """
+                    CREATE TABLE IF NOT EXISTS user_notifications (
+                        id SERIAL PRIMARY KEY,
+                        user_id INTEGER REFERENCES users(id),
+                        email VARCHAR(255),
+                        organization_id INTEGER REFERENCES organizations(id),
+                        type VARCHAR(50) NOT NULL,
+                        title VARCHAR(255) NOT NULL,
+                        message TEXT,
+                        action_url VARCHAR(500),
+                        action_text VARCHAR(100),
+                        organization_invitation_id INTEGER REFERENCES organization_invitations(id),
+                        analysis_id INTEGER REFERENCES analyses(id),
+                        status VARCHAR(20) DEFAULT 'unread',
+                        priority VARCHAR(20) DEFAULT 'normal',
+                        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                        read_at TIMESTAMP WITH TIME ZONE,
+                        expires_at TIMESTAMP WITH TIME ZONE
+                    )
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON user_notifications(user_id)
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_notifications_email ON user_notifications(email)
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_notifications_status ON user_notifications(status)
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON user_notifications(created_at)
+                    """,
+                    """
+                    ALTER TABLE users
+                    ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id),
+                    ADD COLUMN IF NOT EXISTS role VARCHAR(20) DEFAULT 'user',
+                    ADD COLUMN IF NOT EXISTS joined_org_at TIMESTAMP WITH TIME ZONE,
+                    ADD COLUMN IF NOT EXISTS last_active_at TIMESTAMP WITH TIME ZONE,
+                    ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'active'
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_users_organization_id ON users(organization_id)
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_users_role ON users(role)
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_users_status ON users(status)
+                    """,
+                    """
+                    ALTER TABLE analyses
+                    ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id)
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_analyses_organization_id ON analyses(organization_id)
+                    """
+                ]
+            },
+            {
+                "name": "002_add_organization_id_to_user_correlations",
+                "description": "Add organization_id to user_correlations for multi-tenancy support",
+                "sql": [
+                    """
+                    ALTER TABLE user_correlations
+                    ADD COLUMN IF NOT EXISTS organization_id INTEGER
+                    """,
+                    """
+                    ALTER TABLE user_correlations
+                    DROP CONSTRAINT IF EXISTS fk_user_correlations_organization
+                    """,
+                    """
+                    ALTER TABLE user_correlations
+                    ADD CONSTRAINT fk_user_correlations_organization
+                    FOREIGN KEY (organization_id) REFERENCES organizations(id)
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_user_correlations_organization_id
+                    ON user_correlations(organization_id)
+                    """,
+                    """
+                    UPDATE user_correlations uc
+                    SET organization_id = u.organization_id
+                    FROM users u
+                    WHERE uc.user_id = u.id
+                    AND uc.organization_id IS NULL
+                    AND u.organization_id IS NOT NULL
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_user_correlations_org_email
+                    ON user_correlations(organization_id, email)
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_user_correlations_org_slack
+                    ON user_correlations(organization_id, slack_user_id)
+                    WHERE slack_user_id IS NOT NULL
+                    """
+                ]
+            },
+            {
+                "name": "003_add_name_to_user_correlations",
+                "description": "Add name field to user_correlations for display names",
+                "sql": [
+                    """
+                    ALTER TABLE user_correlations
+                    ADD COLUMN IF NOT EXISTS name VARCHAR(255)
+                    """
+                ]
+            },
+            {
+                "name": "004_add_integration_ids_to_user_correlations",
+                "description": "Add integration_ids array to user_correlations for multi-integration support",
+                "sql": [
+                    """
+                    ALTER TABLE user_correlations
+                    ADD COLUMN IF NOT EXISTS integration_ids JSON
+                    """
+                ]
+            },
+            {
+                "name": "005_add_personal_circumstances_to_reports",
+                "description": "Add personal circumstances field to user_burnout_reports",
+                "sql": [
+                    """
+                    ALTER TABLE user_burnout_reports
+                    ADD COLUMN IF NOT EXISTS personal_circumstances TEXT
+                    """
+                ]
+            },
+            {
+                "name": "006_make_slack_user_id_nullable",
+                "description": "Make slack_user_id nullable in slack_integrations for OAuth bot tokens",
+                "sql": [
+                    """
+                    ALTER TABLE slack_integrations
+                    ALTER COLUMN slack_user_id DROP NOT NULL
+                    """
+                ]
+            },
+            {
+                "name": "007_add_unique_constraint_user_correlation",
+                "description": "Add unique constraint on (user_id, email) to prevent duplicate correlations",
+                "sql": [
+                    """
+                    -- Remove any existing duplicates (keep the most recent one)
+                    DELETE FROM user_correlations a
+                    USING user_correlations b
+                    WHERE a.id < b.id
+                    AND a.user_id = b.user_id
+                    AND a.email = b.email
+                    """,
+                    """
+                    -- Add unique constraint
+                    ALTER TABLE user_correlations
+                    ADD CONSTRAINT IF NOT EXISTS uq_user_correlation_user_email
+                    UNIQUE (user_id, email)
+                    """
+                ]
+            },
             # Add future migrations here with incrementing numbers
             # {
-            #     "name": "002_add_user_preferences",
+            #     "name": "008_add_user_preferences",
             #     "description": "Add user preferences table",
             #     "sql": ["CREATE TABLE IF NOT EXISTS user_preferences (...)"]
             # }

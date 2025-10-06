@@ -104,8 +104,15 @@ export default function AuthSuccessPage() {
         if (userData.name && userData.email) {
           localStorage.setItem('user_name', userData.name)
           localStorage.setItem('user_email', userData.email)
+          localStorage.setItem('user_role', userData.role || 'member')
           if (userData.avatar) {
             localStorage.setItem('user_avatar', userData.avatar)
+          }
+          if (userData.id) {
+            localStorage.setItem('user_id', userData.id.toString())
+          }
+          if (userData.organization_id) {
+            localStorage.setItem('user_organization_id', userData.organization_id.toString())
           }
         }
         

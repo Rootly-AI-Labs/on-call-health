@@ -31,6 +31,9 @@ pydantic-settings
 pytz
 python-dateutil
 
+# Scheduling
+apscheduler
+
 # Sentiment analysis
 vaderSentiment
 

@@ -37,10 +37,11 @@ test.db
 .env
 secrets.env
 
-# All markdown files except README (internal documentation not for public release)
+# All markdown files except README and critical docs (internal documentation not for public release)
 *.md
 !README.md
 !frontend/README.md
+!DATABASE_MIGRATION_COMPARISON.md
 
 # IDEs
 .vscode/
@@ -89,6 +90,10 @@ backend/audit_*.py
 backend/investigate_*.py
 backend/query_*.py
 backend/railway_*.py
+backend/fix_*.py
+backend/migrate_*.py
+backend/promote_*.py
+backend/check_*.py
 backend/app/services/*_backup.py
 backend/app/services/*_v2.py
 query_db.sh
