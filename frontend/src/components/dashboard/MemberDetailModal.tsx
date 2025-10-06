@@ -4,7 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Progress } from "@/components/ui/progress"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -287,13 +287,11 @@ export function MemberDetailModal({
                     </div>
                   </div>
                 </DialogTitle>
+                <DialogDescription id="member-detail-description" className="sr-only">
+                  Detailed burnout analysis and daily health timeline for team member.
+                  Shows burnout risk factors, incident response metrics, and daily health scores.
+                </DialogDescription>
               </DialogHeader>
-
-          {/* Hidden description for accessibility */}
-          <div id="member-detail-description" className="sr-only">
-            Detailed burnout analysis and daily health timeline for team member. 
-            Shows burnout risk factors, incident response metrics, and daily health scores.
-          </div>
           
           {(() => {
             // Use only CBI scores - no legacy fallbacks
