@@ -199,9 +199,11 @@ async def security_middleware(request: Request, call_next: Callable) -> Response
         process_time = time.time() - start_time
         response.headers["X-Process-Time"] = str(process_time)
         
-        # Log security events
-        if response.status_code >= 400:
-            logger.info(f"🛡️  Security response: {response.status_code} for {request.method} {request_path}")
+        # Log security events (only errors, not warnings)
+        if response.status_code >= 500:
+            logger.warning(f"Security response: {response.status_code} for {request.method} {request_path}")
+        elif response.status_code >= 400:
+            logger.debug(f"Security response: {response.status_code} for {request.method} {request_path}")
         
         return response
         

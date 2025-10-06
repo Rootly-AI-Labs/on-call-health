@@ -96,7 +96,7 @@ async def slack_oauth_callback(
     Handle Slack OAuth callback for workspace-level app installation.
     Creates a workspace mapping and redirects to the frontend with success status.
     """
-    logger.info(f"🔵 Slack OAuth callback received - code: {code[:20]}..., state: {state[:50] if state else 'None'}...")
+    logger.debug(f"Slack OAuth callback received - code: {code[:20]}..., state: {state[:50] if state else 'None'}...")
 
     try:
         # Parse state parameter to get organization info
@@ -106,15 +106,15 @@ async def slack_oauth_callback(
         if state:
             import base64
             try:
-                logger.info(f"🔍 Raw state parameter: {state}")
+                logger.debug(f"Raw state parameter: {state}")
                 decoded_state = json.loads(base64.b64decode(state + '=='))  # Add padding
-                logger.info(f"🔍 Full decoded state: {decoded_state}")
+                logger.debug(f"Full decoded state: {decoded_state}")
                 organization_id = decoded_state.get("orgId")
                 user_email = decoded_state.get("email")
-                logger.info(f"📋 Decoded state - org_id: {organization_id}, email: {user_email}")
+                logger.debug(f"Decoded state - org_id: {organization_id}, email: {user_email}")
             except Exception as state_error:
                 # If state parsing fails, continue without org mapping
-                logger.warning(f"⚠️ Failed to parse state parameter: {state_error}")
+                logger.warning(f"Failed to parse state parameter: {state_error}")
                 pass
 
         # Exchange code for token using Slack's OAuth API
@@ -244,9 +244,7 @@ async def slack_oauth_callback(
         db.commit()
 
         # Log what was created
-        logger.info(f"📝 Created workspace mapping: workspace_id={workspace_id}, organization_id={organization_id}, owner_user_id={owner_user.id}")
-        logger.info(f"📝 Created Slack integration: user_id={owner_user.id}, workspace_id={workspace_id}")
-        logger.info(f"✅ Slack OAuth successful - workspace: {workspace_name}, workspace_id: {workspace_id}")
+        logger.info(f"Slack OAuth successful - workspace: {workspace_name}, workspace_id: {workspace_id}, organization_id: {organization_id}")
 
         # Redirect to frontend with success message
         frontend_url = settings.FRONTEND_URL or "http://localhost:3000"
@@ -254,7 +252,7 @@ async def slack_oauth_callback(
         encoded_workspace = urllib.parse.quote(workspace_name) if workspace_name else "unknown"
         redirect_url = f"{frontend_url}/integrations?slack_connected=true&workspace={encoded_workspace}"
 
-        logger.info(f"🔗 Redirecting to: {redirect_url}")
+        logger.debug(f"Redirecting to: {redirect_url}")
 
         from fastapi.responses import RedirectResponse
         return RedirectResponse(url=redirect_url, status_code=302)
@@ -441,20 +439,12 @@ async def get_slack_status(
     Get Slack integration status for current user.
     Checks both SlackIntegration (manual setup) and SlackWorkspaceMapping (OAuth setup).
     """
-    logger.info(f"🔍 Checking Slack status for user {current_user.id} (org: {current_user.organization_id})")
-
-    # Debug: Show ALL workspace mappings
-    all_mappings = db.query(SlackWorkspaceMapping).all()
-    logger.info(f"🔍 Total workspace mappings in DB: {len(all_mappings)}")
-    for m in all_mappings:
-        logger.info(f"  - Mapping {m.id}: workspace_id={m.workspace_id}, org_id={m.organization_id}, owner={m.owner_user_id}, status={m.status}")
+    logger.debug(f"Checking Slack status for user {current_user.id} (org: {current_user.organization_id})")
 
     # Check for manual SlackIntegration first
     integration = db.query(SlackIntegration).filter(
         SlackIntegration.user_id == current_user.id
     ).first()
-
-    logger.info(f"Manual integration found: {integration is not None}")
 
     # If no manual integration, check for OAuth workspace mapping
     workspace_mapping = None
@@ -465,9 +455,6 @@ async def get_slack_status(
                 SlackWorkspaceMapping.organization_id == current_user.organization_id,
                 SlackWorkspaceMapping.status == 'active'
             ).first()
-            logger.info(f"Org workspace mapping query - org_id={current_user.organization_id}, found: {workspace_mapping is not None}")
-            if workspace_mapping:
-                logger.info(f"Found workspace mapping: id={workspace_mapping.id}, workspace_id={workspace_mapping.workspace_id}, workspace_name={workspace_mapping.workspace_name}")
 
         # Also check if user is the owner of any workspace mapping
         if not workspace_mapping:
@@ -475,14 +462,12 @@ async def get_slack_status(
                 SlackWorkspaceMapping.owner_user_id == current_user.id,
                 SlackWorkspaceMapping.status == 'active'
             ).first()
-            logger.info(f"Owner workspace mapping found: {workspace_mapping is not None}")
 
         # If we have a workspace mapping, get the SlackIntegration for that workspace
         if workspace_mapping:
             integration = db.query(SlackIntegration).filter(
                 SlackIntegration.workspace_id == workspace_mapping.workspace_id
             ).first()
-            logger.info(f"Integration for workspace {workspace_mapping.workspace_id}: {integration is not None}")
 
     if not integration and not workspace_mapping:
         return {
@@ -579,7 +564,7 @@ async def get_slack_status(
                         team_data = team_response.json()
                         if team_data.get("ok"):
                             workspace_name = team_data.get("team", {}).get("name")
-                            logger.info(f"Successfully fetched workspace name: {workspace_name}")
+                            logger.debug(f"Successfully fetched workspace name: {workspace_name}")
                         else:
                             logger.warning(f"Slack team.info API returned ok=false: {team_data.get('error')}")
                     else:
@@ -612,7 +597,7 @@ async def get_slack_status(
         # OAuth SlackWorkspaceMapping
         workspace_name_oauth = workspace_mapping.workspace_name
         if not workspace_name_oauth:
-            logger.warning(f"OAuth workspace {workspace_mapping.workspace_id} has no name in database")
+            logger.debug(f"OAuth workspace {workspace_mapping.workspace_id} has no name in database")
 
         response_data = {
             "connected": True,
@@ -993,14 +978,12 @@ async def disconnect_slack(
     Disconnect Slack integration for current user.
     Handles both manual SlackIntegration and OAuth SlackWorkspaceMapping.
     """
-    logger.info(f"Disconnect request from user {current_user.id} (email: {current_user.email})")
+    logger.debug(f"Disconnect request from user {current_user.id} (email: {current_user.email})")
 
     # Check for manual SlackIntegration first
     integration = db.query(SlackIntegration).filter(
         SlackIntegration.user_id == current_user.id
     ).first()
-
-    logger.info(f"Manual integration found: {integration is not None}")
 
     # If no manual integration, check for OAuth workspace mapping
     workspace_mapping = None
@@ -1009,8 +992,6 @@ async def disconnect_slack(
             SlackWorkspaceMapping.owner_user_id == current_user.id,
             SlackWorkspaceMapping.status == 'active'
         ).first()
-
-        logger.info(f"OAuth workspace mapping found: {workspace_mapping is not None}")
 
     if not integration and not workspace_mapping:
         logger.warning(f"No Slack integration found for user {current_user.id}")
@@ -1065,7 +1046,7 @@ async def sync_slack_user_ids(
     Fetch Slack workspace members and sync their Slack user IDs to UserCorrelation records.
     Matches by email address.
     """
-    logger.info(f"Sync Slack user IDs request from user {current_user.id} (org: {current_user.organization_id})")
+    logger.debug(f"Sync Slack user IDs request from user {current_user.id} (org: {current_user.organization_id})")
 
     if not current_user.organization_id:
         raise HTTPException(
@@ -1129,7 +1110,7 @@ async def sync_slack_user_ids(
                 )
 
             members = data.get("members", [])
-            logger.info(f"Fetched {len(members)} Slack workspace members")
+            logger.debug(f"Fetched {len(members)} Slack workspace members")
 
             # Build email -> slack_user_id mapping
             email_to_slack_id = {}
@@ -1142,7 +1123,7 @@ async def sync_slack_user_ids(
                 if email and slack_id:
                     email_to_slack_id[email.lower()] = slack_id
 
-            logger.info(f"Built mapping for {len(email_to_slack_id)} Slack users with emails")
+            logger.debug(f"Built mapping for {len(email_to_slack_id)} Slack users with emails")
 
             # Get all UserCorrelation records for this organization
             correlations = db.query(UserCorrelation).filter(
@@ -1165,10 +1146,10 @@ async def sync_slack_user_ids(
                 if slack_id:
                     correlation.slack_user_id = slack_id
                     updated_count += 1
-                    logger.info(f"Matched {user_email} -> {slack_id}")
+                    logger.debug(f"Matched {user_email} -> {slack_id}")
                 else:
                     skipped_count += 1
-                    logger.info(f"No Slack match found for {user_email}")
+                    logger.debug(f"No Slack match found for {user_email}")
 
             db.commit()
 

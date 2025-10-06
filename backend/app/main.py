@@ -12,7 +12,25 @@ from .core.rate_limiting import limiter, custom_rate_limit_exceeded_handler
 from .middleware.security import security_middleware
 from .api.endpoints import auth, rootly, analysis, analyses, pagerduty, github, slack, llm, mappings, manual_mappings, debug_mappings, migrate, admin, notifications, invitations, surveys
 
+# Configure logging based on environment variable
+LOG_LEVEL = getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO)
+logging.basicConfig(
+    level=LOG_LEVEL,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+
+# Set specific loggers to WARNING in production to reduce noise
+if settings.ENVIRONMENT == "production" or LOG_LEVEL >= logging.WARNING:
+    # Reduce verbosity for noisy modules
+    logging.getLogger("app.api.endpoints.slack").setLevel(logging.WARNING)
+    logging.getLogger("app.services.survey_scheduler").setLevel(logging.WARNING)
+    logging.getLogger("app.middleware.security").setLevel(logging.WARNING)
+    logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+
 logger = logging.getLogger(__name__)
+logger.info(f"Starting application with log level: {settings.LOG_LEVEL}")
 
 # Create FastAPI application
 app = FastAPI(
@@ -76,8 +94,8 @@ def get_cors_origins():
     # Remove duplicates while preserving order
     origins = list(dict.fromkeys(origins))
 
-    # Log CORS origins for debugging
-    logger.info(f"🌐 CORS allowed origins: {origins}")
+    # Log CORS origins for debugging (only in debug mode)
+    logger.debug(f"CORS allowed origins: {origins}")
 
     return origins
 
@@ -159,4 +177,4 @@ app.include_router(admin.router, prefix="/api", tags=["admin"])
 app.include_router(notifications.router, prefix="/api", tags=["notifications"])
 app.include_router(invitations.router, prefix="/api", tags=["invitations"])
 app.include_router(surveys.router, prefix="/api/surveys", tags=["surveys"])
-logger.info("✅ Surveys router registered successfully")
+logger.debug("Surveys router registered successfully")

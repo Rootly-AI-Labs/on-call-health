@@ -33,12 +33,12 @@ class SurveyScheduler:
     def start(self):
         """Start the scheduler."""
         self.scheduler.start()
-        logger.info("Survey scheduler started")
+        logger.debug("Survey scheduler started")
 
     def stop(self):
         """Stop the scheduler."""
         self.scheduler.shutdown()
-        logger.info("Survey scheduler stopped")
+        logger.debug("Survey scheduler stopped")
 
     def schedule_organization_surveys(self, db: Session):
         """
@@ -56,7 +56,7 @@ class SurveyScheduler:
         for schedule in schedules:
             self._add_schedule_job(schedule, db)
 
-        logger.info(f"Scheduled surveys for {len(schedules)} organizations")
+        logger.debug(f"Scheduled surveys for {len(schedules)} organizations")
 
     def _add_schedule_job(self, schedule: SurveySchedule, db: Session):
         """
@@ -91,7 +91,7 @@ class SurveyScheduler:
             replace_existing=True
         )
 
-        logger.info(
+        logger.debug(
             f"Scheduled daily surveys for org {schedule.organization_id} "
             f"at {send_hour:02d}:{send_minute:02d} {schedule.timezone}"
         )
@@ -135,7 +135,7 @@ class SurveyScheduler:
                 replace_existing=True
             )
 
-            logger.info(
+            logger.debug(
                 f"Scheduled reminders for org {schedule.organization_id} "
                 f"at {reminder_hour:02d}:{reminder_minute:02d} {schedule.timezone}"
             )
@@ -151,7 +151,7 @@ class SurveyScheduler:
         """
         try:
             message_type = "reminder" if is_reminder else "initial survey"
-            logger.info(f"Starting {message_type} delivery for organization {organization_id}")
+            logger.debug(f"Starting {message_type} delivery for organization {organization_id}")
 
             # Get organization's Slack workspace
             workspace_mapping = db.query(SlackWorkspaceMapping).filter(

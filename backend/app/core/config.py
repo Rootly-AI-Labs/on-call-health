@@ -43,7 +43,10 @@ class Settings:
     
     # Environment detection
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
-    
+
+    # Logging configuration
+    LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
+
     # Rootly API
     ROOTLY_API_BASE_URL: str = os.getenv("ROOTLY_API_BASE_URL", "https://api.rootly.com")
 
