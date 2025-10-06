@@ -322,10 +322,11 @@ export function NotificationPanel() {
       </DropdownMenuTrigger>
 
       <DropdownMenuContent
-        className="w-96 p-0"
+        className="w-96 p-0 max-h-[80vh]"
         align="end"
         side="bottom"
         sideOffset={8}
+        onWheel={(e) => e.stopPropagation()}
       >
         <div className="border-b border-gray-200 p-4">
           <div className="flex items-center justify-between">
@@ -359,7 +360,7 @@ export function NotificationPanel() {
           )}
         </div>
 
-        <div className="max-h-96 overflow-y-auto">
+        <div className="max-h-96 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
           <div className="p-4">
             {isLoading ? (
               <div className="text-center text-gray-500 py-8">
