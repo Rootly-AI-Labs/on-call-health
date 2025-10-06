@@ -3823,6 +3823,7 @@ export default function IntegrationsPage() {
                     userInfo={userInfo}
                     fetchTeamMembers={fetchTeamMembers}
                     syncUsersToCorrelation={syncUsersToCorrelation}
+                    syncSlackUserIds={syncSlackUserIds}
                     fetchSyncedUsers={fetchSyncedUsers}
                     setShowManualSurveyModal={setShowManualSurveyModal}
                     loadSlackPermissions={loadSlackPermissions}
