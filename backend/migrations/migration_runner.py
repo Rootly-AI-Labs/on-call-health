@@ -325,10 +325,18 @@ class MigrationRunner:
                     AND a.email = b.email
                     """,
                     """
-                    -- Add unique constraint
-                    ALTER TABLE user_correlations
-                    ADD CONSTRAINT IF NOT EXISTS uq_user_correlation_user_email
-                    UNIQUE (user_id, email)
+                    -- Add unique constraint (only if it doesn't exist)
+                    DO $$
+                    BEGIN
+                        IF NOT EXISTS (
+                            SELECT 1 FROM pg_constraint
+                            WHERE conname = 'uq_user_correlation_user_email'
+                        ) THEN
+                            ALTER TABLE user_correlations
+                            ADD CONSTRAINT uq_user_correlation_user_email
+                            UNIQUE (user_id, email);
+                        END IF;
+                    END $$;
                     """
                 ]
             },
