@@ -6037,9 +6037,18 @@ export default function IntegrationsPage() {
 
                   if (response.ok) {
                     const result = await response.json()
-                    toast.success('Slack Survey integration disconnected')
                     setSlackSurveyConfirmDisconnectOpen(false)
-                    window.location.reload()
+
+                    // Show loading toast during reload
+                    toast.loading('Disconnecting and refreshing...', {
+                      description: 'Please wait while we update your integration status.',
+                      duration: Infinity
+                    })
+
+                    // Small delay to ensure toast is visible before reload
+                    setTimeout(() => {
+                      window.location.reload()
+                    }, 300)
                   } else {
                     const error = await response.json()
                     console.error('❌ Disconnect failed:', {
