@@ -90,6 +90,10 @@ backend/audit_*.py
 backend/investigate_*.py
 backend/query_*.py
 backend/railway_*.py
+backend/fix_*.py
+backend/migrate_*.py
+backend/promote_*.py
+backend/check_*.py
 backend/app/services/*_backup.py
 backend/app/services/*_v2.py
 query_db.sh
