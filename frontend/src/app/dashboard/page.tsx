@@ -2356,15 +2356,25 @@ export default function Dashboard() {
                 })
                 )}
                 
-                {/* Infinite Scroll Trigger */}
+                {/* Load More Button */}
                 {hasMoreAnalyses && !sidebarCollapsed && (
-                  <div ref={infiniteScrollTrigger} className="px-3 py-2 min-h-[40px] flex items-center justify-center">
-                    {loadingMoreAnalyses && (
-                      <div className="flex items-center space-x-2">
-                        <div className="w-3 h-3 border border-gray-300 border-t-transparent rounded-full animate-spin" />
-                        <span className="text-xs text-gray-400">Loading more...</span>
-                      </div>
-                    )}
+                  <div className="px-3 py-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => loadPreviousAnalyses(true)}
+                      disabled={loadingMoreAnalyses || analysisRunning}
+                      className="w-full border-gray-500 bg-gray-800 text-gray-200 hover:bg-gray-700 hover:text-white hover:border-gray-400 text-xs"
+                    >
+                      {(loadingMoreAnalyses || (!initialDataLoaded && previousAnalyses.length === 0)) ? (
+                        <>
+                          <div className="w-3 h-3 border border-gray-300 border-t-transparent rounded-full animate-spin mr-2" />
+                          Loading...
+                        </>
+                      ) : (
+                        <>+ {Math.min(3, totalAnalysesCount - previousAnalyses.length)} more</>
+                      )}
+                    </Button>
                   </div>
                 )}
               </div>
