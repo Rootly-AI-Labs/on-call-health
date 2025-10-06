@@ -591,14 +591,22 @@ export default function IntegrationsPage() {
     const isReturningFromOAuth = localStorage.getItem('slack_oauth_in_progress')
     if (isReturningFromOAuth) {
       setIsConnectingSlackOAuth(true)
-    }
 
-    // Show debug info as temporary toast for troubleshooting
-    if (window.location.search.includes('slack_connected')) {
-      toast.info(`Debug: OAuth redirect detected`, {
-        description: `URL: ${window.location.search.substring(0, 100)}...`,
-        duration: 8000,
-      })
+      // If we have the OAuth in progress flag but no success params yet,
+      // it means the redirect is still happening or failed silently
+      if (slackConnected !== 'true' && slackConnected !== 'false') {
+        // Keep showing loading for a bit, then timeout
+        setTimeout(() => {
+          const stillInProgress = localStorage.getItem('slack_oauth_in_progress')
+          if (stillInProgress && !window.location.search.includes('slack_connected')) {
+            localStorage.removeItem('slack_oauth_in_progress')
+            setIsConnectingSlackOAuth(false)
+            toast.warning('OAuth redirect timed out', {
+              description: 'Please try connecting again.',
+            })
+          }
+        }, 10000) // 10 second timeout
+      }
     }
 
     if (slackConnected === 'true' && workspace) {
@@ -668,7 +676,6 @@ export default function IntegrationsPage() {
             })
           }
         } catch (error) {
-          console.error('Error checking Slack connection:', error)
           if (retries < maxRetries) {
             setTimeout(checkConnection, pollInterval)
           } else {
@@ -697,8 +704,6 @@ export default function IntegrationsPage() {
         description: errorMessage,
         duration: 8000,
       })
-
-      console.error('❌ Slack OAuth error:', errorMessage)
 
       // Clean up URL parameters
       const newUrl = window.location.pathname
@@ -6041,7 +6046,7 @@ export default function IntegrationsPage() {
                 try {
                   const authToken = localStorage.getItem('auth_token')
                   if (!authToken) {
-                    console.error('No auth token found')
+                    toast.error('Authentication required')
                     return
                   }
 
@@ -6066,14 +6071,9 @@ export default function IntegrationsPage() {
                     })
                   } else {
                     const error = await response.json()
-                    console.error('❌ Disconnect failed:', {
-                      status: response.status,
-                      error
-                    })
                     toast.error(error.detail || 'Failed to disconnect Slack')
                   }
                 } catch (error) {
-                  console.error('💥 Disconnect exception:', error)
                   toast.error('Failed to disconnect Slack Survey integration')
                 } finally {
                   setIsDisconnectingSlackSurvey(false)
