@@ -29,51 +29,23 @@ for attempt in range(max_attempts):
         time.sleep(2)
 "
 
-# Run database migrations using simple migration runner
+# Run database migrations using centralized migration runner
 echo "🔄 Running database migrations..."
 echo "📂 Current directory: $(pwd)"
 
-if python simple_migration.py; then
+if python migrations/migration_runner.py; then
     echo "✅ All migrations completed successfully!"
 else
-    echo "⚠️  Migration failed, but continuing startup..."
-    echo "   Check logs above for details"
+    echo "⚠️  Some migrations failed - check logs above for details"
+    echo "   Continuing startup anyway..."
 fi
 
-# Run integration_ids column migration
-echo "🔄 Running integration_ids migration..."
-if python add_integration_id_to_user_correlations.py; then
-    echo "✅ Integration IDs migration completed successfully!"
-else
-    echo "⚠️  Integration IDs migration failed, but continuing startup..."
-    echo "   Check logs above for details"
-fi
-
-# Run survey message update migration
+# Run survey message update migration (optional, non-critical)
 echo "🔄 Updating survey messages..."
 if python update_survey_messages.py; then
     echo "✅ Survey messages updated successfully!"
 else
     echo "⚠️  Survey message update failed, but continuing startup..."
-    echo "   Check logs above for details"
-fi
-
-# Run personal circumstances column migration
-echo "🔄 Adding personal circumstances column..."
-if python add_personal_circumstances_column.py; then
-    echo "✅ Personal circumstances column migration completed!"
-else
-    echo "⚠️  Personal circumstances migration failed, but continuing startup..."
-    echo "   Check logs above for details"
-fi
-
-# Make slack_user_id nullable for OAuth integrations
-echo "🔄 Making slack_user_id nullable..."
-if python make_slack_user_id_nullable.py; then
-    echo "✅ Slack user ID migration completed!"
-else
-    echo "⚠️  Slack user ID migration failed, but continuing startup..."
-    echo "   Check logs above for details"
 fi
 
 # Create tables (safe - won't recreate existing tables)
