@@ -86,6 +86,7 @@ import {
   UserPlus,
   Mail,
   Send,
+  MessageSquare,
 } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
@@ -1966,9 +1967,9 @@ export default function IntegrationsPage() {
           `Synced ${stats.created} new users, updated ${stats.updated} existing users. ` +
           `All team members can now submit burnout surveys via Slack!`
         )
-        // Reload the members list and fetch synced users
+        // Reload the members list and fetch synced users (without showing another toast)
         await fetchTeamMembers()
-        await fetchSyncedUsers()
+        await fetchSyncedUsers(false)
       } else {
         const errorData = await response.json()
         throw new Error(errorData.detail || 'Failed to sync users')
@@ -1983,8 +1984,50 @@ export default function IntegrationsPage() {
     }
   }
 
+  // Sync Slack user IDs to UserCorrelation records
+  const syncSlackUserIds = async () => {
+    console.log('Syncing Slack user IDs to UserCorrelation')
+    setLoadingTeamMembers(true)
+
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) {
+        toast.error('Please log in to sync Slack user IDs')
+        return
+      }
+
+      const response = await fetch(`${API_BASE}/integrations/slack/sync-user-ids`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        const stats = data.stats || {}
+        toast.success(
+          `Synced Slack IDs for ${stats.updated} users! ` +
+          `${stats.skipped} users skipped (no matching Slack account).`
+        )
+        // Refresh synced users list
+        await fetchSyncedUsers(false)
+      } else {
+        const errorData = await response.json()
+        throw new Error(errorData.detail || 'Failed to sync Slack user IDs')
+      }
+    } catch (error) {
+      console.error('Error syncing Slack user IDs:', error)
+      const errorMsg = error instanceof Error ? error.message : 'Failed to sync Slack user IDs'
+      toast.error(errorMsg)
+    } finally {
+      setLoadingTeamMembers(false)
+    }
+  }
+
   // Fetch synced users from database
-  const fetchSyncedUsers = async () => {
+  const fetchSyncedUsers = async (showToast = true) => {
     console.log('Fetching synced users from database')
 
     if (!selectedOrganization) {
@@ -2024,10 +2067,12 @@ export default function IntegrationsPage() {
           return
         }
 
-        if (users.length === 0) {
-          toast.info('Beta integrations show users from shared access. Use "Sync Members" with your own integration to enable survey submissions.')
-        } else {
-          toast.success(`Found ${data.total} synced users`)
+        if (showToast) {
+          if (users.length === 0) {
+            toast.info('Beta integrations show users from shared access. Use "Sync Members" with your own integration to enable survey submissions.')
+          } else {
+            toast.success(`Found ${data.total} synced users`)
+          }
         }
       } else {
         const errorData = await response.json()
@@ -4063,8 +4108,29 @@ export default function IntegrationsPage() {
                               </>
                             )}
                           </Button>
+                          {slackIntegration?.workspace_id && (
+                            <Button
+                              onClick={syncSlackUserIds}
+                              disabled={loadingTeamMembers}
+                              size="sm"
+                              variant="default"
+                              className="flex items-center space-x-2 bg-green-600 hover:bg-green-700"
+                            >
+                              {loadingTeamMembers ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                  <span>Syncing...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <MessageSquare className="w-4 h-4" />
+                                  <span>Sync Slack IDs</span>
+                                </>
+                              )}
+                            </Button>
+                          )}
                           <Button
-                            onClick={fetchSyncedUsers}
+                            onClick={() => fetchSyncedUsers()}
                             disabled={loadingSyncedUsers}
                             size="sm"
                             variant="outline"

@@ -1056,6 +1056,145 @@ async def disconnect_slack(
         )
 
 
+@router.post("/sync-user-ids")
+async def sync_slack_user_ids(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Fetch Slack workspace members and sync their Slack user IDs to UserCorrelation records.
+    Matches by email address.
+    """
+    logger.info(f"Sync Slack user IDs request from user {current_user.id} (org: {current_user.organization_id})")
+
+    if not current_user.organization_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Organization required to sync Slack user IDs"
+        )
+
+    # Get the workspace mapping and bot token
+    workspace_mapping = db.query(SlackWorkspaceMapping).filter(
+        SlackWorkspaceMapping.organization_id == current_user.organization_id,
+        SlackWorkspaceMapping.status == 'active'
+    ).first()
+
+    if not workspace_mapping:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No active Slack workspace connection found"
+        )
+
+    # Get the bot token from SlackIntegration
+    slack_integration = db.query(SlackIntegration).filter(
+        SlackIntegration.workspace_id == workspace_mapping.workspace_id
+    ).first()
+
+    if not slack_integration:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Slack bot token not found"
+        )
+
+    try:
+        access_token = decrypt_token(slack_integration.slack_token)
+    except Exception as e:
+        logger.error(f"Failed to decrypt Slack token: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to decrypt Slack token"
+        )
+
+    # Fetch Slack workspace members
+    try:
+        import httpx
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                "https://slack.com/api/users.list",
+                headers={"Authorization": f"Bearer {access_token}"}
+            )
+
+            if response.status_code != 200:
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail=f"Slack API returned status {response.status_code}"
+                )
+
+            data = response.json()
+            if not data.get("ok"):
+                error = data.get("error", "unknown")
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail=f"Slack API error: {error}"
+                )
+
+            members = data.get("members", [])
+            logger.info(f"Fetched {len(members)} Slack workspace members")
+
+            # Build email -> slack_user_id mapping
+            email_to_slack_id = {}
+            for member in members:
+                if member.get("deleted") or member.get("is_bot"):
+                    continue
+                profile = member.get("profile", {})
+                email = profile.get("email")
+                slack_id = member.get("id")
+                if email and slack_id:
+                    email_to_slack_id[email.lower()] = slack_id
+
+            logger.info(f"Built mapping for {len(email_to_slack_id)} Slack users with emails")
+
+            # Get all UserCorrelation records for this organization
+            correlations = db.query(UserCorrelation).filter(
+                UserCorrelation.organization_id == current_user.organization_id
+            ).all()
+
+            updated_count = 0
+            skipped_count = 0
+
+            for correlation in correlations:
+                # Get the user's email
+                user = db.query(User).filter(User.id == correlation.user_id).first()
+                if not user or not user.email:
+                    skipped_count += 1
+                    continue
+
+                user_email = user.email.lower()
+                slack_id = email_to_slack_id.get(user_email)
+
+                if slack_id:
+                    correlation.slack_user_id = slack_id
+                    updated_count += 1
+                    logger.info(f"Matched {user_email} -> {slack_id}")
+                else:
+                    skipped_count += 1
+                    logger.info(f"No Slack match found for {user_email}")
+
+            db.commit()
+
+            return {
+                "success": True,
+                "message": f"Synced Slack user IDs for {updated_count} users",
+                "stats": {
+                    "total_slack_members": len(members),
+                    "members_with_email": len(email_to_slack_id),
+                    "user_correlations": len(correlations),
+                    "updated": updated_count,
+                    "skipped": skipped_count
+                }
+            }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to sync Slack user IDs: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to sync Slack user IDs: {str(e)}"
+        )
+
+
 # Survey-related models and endpoints
 class SlackSurveySubmission(BaseModel):
     """Model for Slack burnout survey submissions."""
