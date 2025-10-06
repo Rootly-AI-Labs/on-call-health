@@ -558,6 +558,14 @@ export default function IntegrationsPage() {
     const workspace = urlParams.get('workspace')
     const status = urlParams.get('status')
 
+    // Check auth token after OAuth redirect
+    const authToken = localStorage.getItem('auth_token')
+    console.log('🔐 Auth check after OAuth redirect:', {
+      hasToken: !!authToken,
+      tokenLength: authToken?.length,
+      tokenPreview: authToken?.substring(0, 20) + '...'
+    })
+
     // Debug: Log all URL parameters (persist across redirects)
     const debugInfo = {
       fullUrl: window.location.href,
@@ -565,6 +573,7 @@ export default function IntegrationsPage() {
       slackConnected,
       workspace,
       status,
+      hasAuthToken: !!authToken,
       allParams: Object.fromEntries(urlParams.entries()),
       timestamp: new Date().toISOString()
     }
