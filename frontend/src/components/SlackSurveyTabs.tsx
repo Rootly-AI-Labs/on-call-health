@@ -171,9 +171,20 @@ export function SlackSurveyTabs({
       return
     }
 
+    if (!userInfo?.organization_id || !userInfo?.email) {
+      toast.error('Organization information required. Please refresh and try again.')
+      return
+    }
+
+    // Encode state with organization info for the callback
+    const state = btoa(JSON.stringify({
+      orgId: userInfo.organization_id,
+      email: userInfo.email
+    }))
+
     const redirectUri = `${backendUrl}/integrations/slack/oauth/callback`
     const scopes = 'commands,chat:write,team:read'
-    const slackAuthUrl = `https://slack.com/oauth/v2/authorize?client_id=${clientId}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUri)}`
+    const slackAuthUrl = `https://slack.com/oauth/v2/authorize?client_id=${clientId}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(state)}`
 
     window.open(slackAuthUrl, '_blank')
   }
