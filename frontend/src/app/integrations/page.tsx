@@ -2008,9 +2008,9 @@ export default function IntegrationsPage() {
           `Synced ${stats.created} new users, updated ${stats.updated} existing users. ` +
           `All team members can now submit burnout surveys via Slack!`
         )
-        // Reload the members list and fetch synced users (without showing another toast)
+        // Reload the members list and fetch synced users (without showing another toast or auto-syncing again)
         await fetchTeamMembers()
-        await fetchSyncedUsers(false)
+        await fetchSyncedUsers(false, false)
       } else {
         const errorData = await response.json()
         throw new Error(errorData.detail || 'Failed to sync users')
@@ -2067,7 +2067,7 @@ export default function IntegrationsPage() {
   }
 
   // Fetch synced users from database
-  const fetchSyncedUsers = async (showToast = true) => {
+  const fetchSyncedUsers = async (showToast = true, autoSync = true) => {
 
     if (!selectedOrganization) {
       toast.error('Please select an organization first')
@@ -2098,7 +2098,8 @@ export default function IntegrationsPage() {
         setTeamMembersDrawerOpen(true)
 
         // If no users found, automatically sync them (but not for beta integrations)
-        if (users.length === 0 && !selectedOrganization.startsWith('beta-')) {
+        // Only auto-sync once to prevent infinite loops
+        if (users.length === 0 && !selectedOrganization.startsWith('beta-') && autoSync) {
           toast.info('No synced users found. Syncing now...')
           setLoadingSyncedUsers(false) // Reset loading state before syncing
           await syncUsersToCorrelation()
