@@ -615,12 +615,11 @@ export default function IntegrationsPage() {
 
       // Poll for connection status with retries
       let retries = 0
-      const maxRetries = 10
-      const pollInterval = 1000
+      const maxRetries = 15
+      const pollInterval = 500
 
       const checkConnection = async () => {
         try {
-          await loadAllIntegrationsOptimized()
           retries++
 
           // Check if Slack is now connected
@@ -634,7 +633,9 @@ export default function IntegrationsPage() {
           if (response.ok) {
             const data = await response.json()
             if (data.connected) {
-              // Connection confirmed!
+              // Connection confirmed! Reload all integrations to update UI
+              await loadAllIntegrationsOptimized()
+
               toast.dismiss(loadingToastId)
               if (status === 'pending_user_association') {
                 toast.success(`🎉 Slack app installed successfully!`, {
@@ -675,8 +676,8 @@ export default function IntegrationsPage() {
         }
       }
 
-      // Start checking after a brief delay
-      setTimeout(checkConnection, 500)
+      // Start checking immediately
+      checkConnection()
     } else if (slackConnected === 'false') {
       // Show error toast
       const errorParam = urlParams.get('error')
