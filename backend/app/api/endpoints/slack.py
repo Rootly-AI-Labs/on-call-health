@@ -238,7 +238,11 @@ async def slack_oauth_callback(
 
         # Redirect to frontend with success message
         frontend_url = settings.FRONTEND_URL or "http://localhost:3000"
-        redirect_url = f"{frontend_url}/integrations?slack_connected=true&workspace={workspace_name}"
+        import urllib.parse
+        encoded_workspace = urllib.parse.quote(workspace_name) if workspace_name else "unknown"
+        redirect_url = f"{frontend_url}/integrations?slack_connected=true&workspace={encoded_workspace}"
+
+        logger.info(f"🔗 Redirecting to: {redirect_url}")
 
         from fastapi.responses import RedirectResponse
         return RedirectResponse(url=redirect_url, status_code=302)
@@ -425,19 +429,25 @@ async def get_slack_status(
     Get Slack integration status for current user.
     Checks both SlackIntegration (manual setup) and SlackWorkspaceMapping (OAuth setup).
     """
+    logger.info(f"🔍 Checking Slack status for user {current_user.id} (org: {current_user.organization_id})")
+
     # Check for manual SlackIntegration first
     integration = db.query(SlackIntegration).filter(
         SlackIntegration.user_id == current_user.id
     ).first()
 
+    logger.info(f"Manual integration found: {integration is not None}")
+
     # If no manual integration, check for OAuth workspace mapping
     workspace_mapping = None
     if not integration:
         # Check if there's a workspace mapping for this user's organization
-        workspace_mapping = db.query(SlackWorkspaceMapping).filter(
-            SlackWorkspaceMapping.organization_id == current_user.organization_id,
-            SlackWorkspaceMapping.status == 'active'
-        ).first()
+        if current_user.organization_id:
+            workspace_mapping = db.query(SlackWorkspaceMapping).filter(
+                SlackWorkspaceMapping.organization_id == current_user.organization_id,
+                SlackWorkspaceMapping.status == 'active'
+            ).first()
+            logger.info(f"Org workspace mapping found: {workspace_mapping is not None}")
 
         # Also check if user is the owner of any workspace mapping
         if not workspace_mapping:
@@ -445,6 +455,14 @@ async def get_slack_status(
                 SlackWorkspaceMapping.owner_user_id == current_user.id,
                 SlackWorkspaceMapping.status == 'active'
             ).first()
+            logger.info(f"Owner workspace mapping found: {workspace_mapping is not None}")
+
+        # If we have a workspace mapping, get the SlackIntegration for that workspace
+        if workspace_mapping:
+            integration = db.query(SlackIntegration).filter(
+                SlackIntegration.workspace_id == workspace_mapping.workspace_id
+            ).first()
+            logger.info(f"Integration for workspace {workspace_mapping.workspace_id}: {integration is not None}")
 
     if not integration and not workspace_mapping:
         return {
