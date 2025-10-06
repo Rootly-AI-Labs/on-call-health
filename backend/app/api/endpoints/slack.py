@@ -985,28 +985,28 @@ async def disconnect_slack(
         SlackIntegration.user_id == current_user.id
     ).first()
 
-    # If no manual integration, check for OAuth workspace mapping
+    # Always check for OAuth workspace mapping (not just when no manual integration)
     workspace_mapping = None
-    if not integration:
-        # Check if there's a workspace mapping for this user's organization
-        if current_user.organization_id:
-            workspace_mapping = db.query(SlackWorkspaceMapping).filter(
-                SlackWorkspaceMapping.organization_id == current_user.organization_id,
-                SlackWorkspaceMapping.status == 'active'
-            ).first()
 
-        # Also check if user is the owner of any workspace mapping
-        if not workspace_mapping:
-            workspace_mapping = db.query(SlackWorkspaceMapping).filter(
-                SlackWorkspaceMapping.owner_user_id == current_user.id,
-                SlackWorkspaceMapping.status == 'active'
-            ).first()
+    # Check if there's a workspace mapping for this user's organization
+    if current_user.organization_id:
+        workspace_mapping = db.query(SlackWorkspaceMapping).filter(
+            SlackWorkspaceMapping.organization_id == current_user.organization_id,
+            SlackWorkspaceMapping.status == 'active'
+        ).first()
 
-        # If we have a workspace mapping, get the SlackIntegration for that workspace
-        if workspace_mapping:
-            integration = db.query(SlackIntegration).filter(
-                SlackIntegration.workspace_id == workspace_mapping.workspace_id
-            ).first()
+    # Also check if user is the owner of any workspace mapping
+    if not workspace_mapping:
+        workspace_mapping = db.query(SlackWorkspaceMapping).filter(
+            SlackWorkspaceMapping.owner_user_id == current_user.id,
+            SlackWorkspaceMapping.status == 'active'
+        ).first()
+
+    # If we have a workspace mapping but no integration yet, get the SlackIntegration for that workspace
+    if workspace_mapping and not integration:
+        integration = db.query(SlackIntegration).filter(
+            SlackIntegration.workspace_id == workspace_mapping.workspace_id
+        ).first()
 
     if not integration and not workspace_mapping:
         logger.warning(f"No Slack integration found for user {current_user.id}")
