@@ -442,6 +442,12 @@ async def get_slack_status(
     """
     logger.info(f"🔍 Checking Slack status for user {current_user.id} (org: {current_user.organization_id})")
 
+    # Debug: Show ALL workspace mappings
+    all_mappings = db.query(SlackWorkspaceMapping).all()
+    logger.info(f"🔍 Total workspace mappings in DB: {len(all_mappings)}")
+    for m in all_mappings:
+        logger.info(f"  - Mapping {m.id}: workspace_id={m.workspace_id}, org_id={m.organization_id}, owner={m.owner_user_id}, status={m.status}")
+
     # Check for manual SlackIntegration first
     integration = db.query(SlackIntegration).filter(
         SlackIntegration.user_id == current_user.id
