@@ -604,33 +604,79 @@ export default function IntegrationsPage() {
     }
 
     if (slackConnected === 'true' && workspace) {
-      // Show success toast
-      if (status === 'pending_user_association') {
-        toast.success(`🎉 Slack app installed successfully!`, {
-          description: `Added to "${decodeURIComponent(workspace)}" workspace. The /burnout-survey command is now available.`,
-          duration: 6000,
-        })
-
-        // Fallback alert for debugging
-        console.log('SUCCESS TOAST SHOULD HAVE APPEARED: Slack app installed!')
-      } else {
-        toast.success(`🎉 Slack integration connected!`, {
-          description: `Successfully connected to "${decodeURIComponent(workspace)}" workspace.`,
-          duration: 5000,
-        })
-
-        // Fallback alert for debugging
-        console.log('SUCCESS TOAST SHOULD HAVE APPEARED: Slack integration connected!')
-      }
+      // Show loading toast immediately
+      const loadingToastId = toast.loading('Verifying Slack connection...', {
+        description: 'Please wait while we confirm your workspace connection.',
+      })
 
       // Clean up URL parameters
       const newUrl = window.location.pathname
       window.history.replaceState({}, '', newUrl)
 
-      // Refresh integrations to show updated status
-      setTimeout(() => {
-        loadAllIntegrationsOptimized()
-      }, 1000)
+      // Poll for connection status with retries
+      let retries = 0
+      const maxRetries = 10
+      const pollInterval = 1000
+
+      const checkConnection = async () => {
+        try {
+          await loadAllIntegrationsOptimized()
+          retries++
+
+          // Check if Slack is now connected
+          const authToken = localStorage.getItem('auth_token')
+          if (!authToken) return
+
+          const response = await fetch(`${API_BASE}/integrations/slack/status`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+          })
+
+          if (response.ok) {
+            const data = await response.json()
+            if (data.connected) {
+              // Connection confirmed!
+              toast.dismiss(loadingToastId)
+              if (status === 'pending_user_association') {
+                toast.success(`🎉 Slack app installed successfully!`, {
+                  description: `Connected to "${decodeURIComponent(workspace)}" workspace. The /burnout-survey command is now available.`,
+                  duration: 6000,
+                })
+              } else {
+                toast.success(`🎉 Slack integration connected!`, {
+                  description: `Successfully connected to "${decodeURIComponent(workspace)}" workspace.`,
+                  duration: 5000,
+                })
+              }
+              return
+            }
+          }
+
+          // Not connected yet, retry if we haven't exceeded max retries
+          if (retries < maxRetries) {
+            setTimeout(checkConnection, pollInterval)
+          } else {
+            // Max retries reached, show warning
+            toast.dismiss(loadingToastId)
+            toast.warning('Connection verification timed out', {
+              description: 'Your Slack workspace was added, but verification took longer than expected. Try refreshing the page.',
+              duration: 8000,
+            })
+          }
+        } catch (error) {
+          console.error('Error checking Slack connection:', error)
+          if (retries < maxRetries) {
+            setTimeout(checkConnection, pollInterval)
+          } else {
+            toast.dismiss(loadingToastId)
+            toast.error('Failed to verify connection', {
+              description: 'Please refresh the page to check your Slack connection status.',
+            })
+          }
+        }
+      }
+
+      // Start checking after a brief delay
+      setTimeout(checkConnection, 500)
     } else if (slackConnected === 'false') {
       // Show error toast
       const errorParam = urlParams.get('error')
