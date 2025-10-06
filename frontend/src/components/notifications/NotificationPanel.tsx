@@ -322,13 +322,19 @@ export function NotificationPanel() {
       </DropdownMenuTrigger>
 
       <DropdownMenuContent
-        className="w-96 p-0 max-h-[80vh]"
+        className="w-96 p-0 max-h-[80vh] overflow-hidden"
         align="end"
         side="bottom"
         sideOffset={8}
-        onWheel={(e) => e.stopPropagation()}
+        onPointerDownOutside={(e) => {
+          // Don't close when clicking inside scrollable area
+          const target = e.target as HTMLElement;
+          if (target.closest('.notification-scroll-area')) {
+            e.preventDefault();
+          }
+        }}
       >
-        <div className="border-b border-gray-200 p-4">
+        <div className="border-b border-gray-200 p-4 flex-shrink-0">
           <div className="flex items-center justify-between">
             <h3 className="font-semibold text-sm">Notifications</h3>
             <div className="flex items-center space-x-2">
@@ -360,7 +366,7 @@ export function NotificationPanel() {
           )}
         </div>
 
-        <div className="max-h-96 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+        <div className="notification-scroll-area max-h-96 overflow-y-scroll overflow-x-hidden" style={{ scrollbarWidth: 'thin' }}>
           <div className="p-4">
             {isLoading ? (
               <div className="text-center text-gray-500 py-8">
@@ -389,7 +395,7 @@ export function NotificationPanel() {
           </div>
         </div>
 
-        <div className="border-t border-gray-200 p-3 text-center">
+        <div className="border-t border-gray-200 p-3 text-center flex-shrink-0">
           <Button
             variant="ghost"
             size="sm"
