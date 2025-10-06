@@ -75,8 +75,10 @@ def get_cors_origins():
     
     # Remove duplicates while preserving order
     origins = list(dict.fromkeys(origins))
-    
-    
+
+    # Log CORS origins for debugging
+    logger.info(f"🌐 CORS allowed origins: {origins}")
+
     return origins
 
 app.add_middleware(

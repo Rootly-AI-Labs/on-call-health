@@ -87,8 +87,13 @@ async def security_middleware(request: Request, call_next: Callable) -> Response
     Security middleware to validate requests and add security headers.
     """
     start_time = time.time()
-    
+
     try:
+        # Skip validation for OPTIONS preflight requests (CORS)
+        if request.method == "OPTIONS":
+            response = await call_next(request)
+            return response
+
         # 1. Request size validation - HARDENED
         content_length = request.headers.get("content-length")
         if content_length:
