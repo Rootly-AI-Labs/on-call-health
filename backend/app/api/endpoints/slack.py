@@ -241,6 +241,10 @@ async def slack_oauth_callback(
             db.add(slack_integration)
 
         db.commit()
+
+        # Log what was created
+        logger.info(f"📝 Created workspace mapping: workspace_id={workspace_id}, organization_id={organization_id}, owner_user_id={owner_user.id}")
+        logger.info(f"📝 Created Slack integration: user_id={owner_user.id}, workspace_id={workspace_id}")
         logger.info(f"✅ Slack OAuth successful - workspace: {workspace_name}, workspace_id: {workspace_id}")
 
         # Redirect to frontend with success message
