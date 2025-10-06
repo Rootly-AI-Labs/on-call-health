@@ -3752,10 +3752,20 @@ export default function IntegrationsPage() {
                   {slackIntegration ? (
                     <button
                       onClick={() => setSlackSurveyDisconnectDialogOpen(true)}
-                      className="inline-flex items-center space-x-2 bg-green-100 text-green-800 px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-200 transition-colors"
+                      disabled={isDisconnectingSlackSurvey}
+                      className="inline-flex items-center space-x-2 bg-green-100 text-green-800 px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <CheckCircle className="w-4 h-4" />
-                      <span>Connected</span>
+                      {isDisconnectingSlackSurvey ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Disconnecting...</span>
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle className="w-4 h-4" />
+                          <span>Connected</span>
+                        </>
+                      )}
                     </button>
                   ) : process.env.NEXT_PUBLIC_SLACK_CLIENT_ID ? (
                     <Button
