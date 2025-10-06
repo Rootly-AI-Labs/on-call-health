@@ -631,8 +631,8 @@ export default function IntegrationsPage() {
           if (response.ok) {
             const data = await response.json()
             if (data.connected) {
-              // Connection confirmed! Reload all integrations to update UI
-              await loadAllIntegrationsOptimized()
+              // Connection confirmed! Force refresh to get latest integration data
+              await loadAllIntegrationsOptimized(true)
 
               // Clear OAuth loading state
               localStorage.removeItem('slack_oauth_in_progress')
@@ -6058,16 +6058,12 @@ export default function IntegrationsPage() {
                     const result = await response.json()
                     setSlackSurveyConfirmDisconnectOpen(false)
 
-                    // Show loading toast during reload
-                    toast.loading('Disconnecting and refreshing...', {
-                      description: 'Please wait while we update your integration status.',
-                      duration: Infinity
-                    })
+                    // Force refresh to get latest integration data
+                    await loadAllIntegrationsOptimized(true)
 
-                    // Small delay to ensure toast is visible before reload
-                    setTimeout(() => {
-                      window.location.reload()
-                    }, 300)
+                    toast.success('Slack Survey integration disconnected', {
+                      description: 'Your workspace has been disconnected successfully.',
+                    })
                   } else {
                     const error = await response.json()
                     console.error('❌ Disconnect failed:', {
