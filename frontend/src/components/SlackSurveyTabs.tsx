@@ -131,7 +131,6 @@ export function SlackSurveyTabs({
         send_reminder: false,
         reminder_hours_after: 5
       }
-      console.log('💾 Saving schedule:', payload) // Debug logging
 
       // Add 2 second delay for better UX feedback
       const [response] = await Promise.all([
@@ -148,7 +147,6 @@ export function SlackSurveyTabs({
 
       if (response.ok) {
         const responseData = await response.json()
-        console.log('✅ Save response:', responseData) // Debug logging
         toast.success('Schedule saved successfully')
         // Reload schedule from DB to ensure we display exactly what's saved
         await loadSchedule()

@@ -56,20 +56,6 @@ export default function useDashboard() {
   // Debug function to inspect cache (accessible in browser console)
   useEffect(() => {
     (window as any).debugAnalysisCache = () => {
-      console.log('🔍 Current Analysis Cache:', {
-        analysis: {
-          size: analysisCache.size,
-          keys: Array.from(analysisCache.keys())
-        },
-        trends: {
-          size: trendsCache.size,
-          keys: Array.from(trendsCache.keys())
-        },
-        githubTimeline: {
-          size: githubTimelineCache.size,
-          keys: Array.from(githubTimelineCache.keys())
-        }
-      })
       return { analysisCache, trendsCache, githubTimelineCache }
     }
   }, [analysisCache, trendsCache, githubTimelineCache])

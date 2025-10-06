@@ -513,7 +513,6 @@ export default function IntegrationsPage() {
       })
       .catch(error => {
         // Silently fail - we already loaded from localStorage
-        console.warn('Could not refresh user info from API:', error.message)
       })
     }
     
@@ -562,11 +561,6 @@ export default function IntegrationsPage() {
 
     // Check auth token after OAuth redirect
     const authToken = localStorage.getItem('auth_token')
-    console.log('🔐 Auth check after OAuth redirect:', {
-      hasToken: !!authToken,
-      tokenLength: authToken?.length,
-      tokenPreview: authToken?.substring(0, 20) + '...'
-    })
 
     // Debug: Log all URL parameters (persist across redirects)
     const debugInfo = {
@@ -588,10 +582,8 @@ export default function IntegrationsPage() {
       const stored = sessionStorage.getItem('slack_oauth_debug')
       if (stored) {
         const parsed = JSON.parse(stored)
-        console.log('Stored OAuth debug info:', parsed)
         return parsed
       }
-      console.log('No OAuth debug info found in sessionStorage')
       return null
     }
 
@@ -851,15 +843,6 @@ export default function IntegrationsPage() {
 
       const slackData = response.ok ? await response.json() : { integration: null }
 
-      console.log('📊 Slack integration status loaded:', {
-        connected: slackData.connected,
-        connectionType: slackData.integration?.connection_type,
-        workspaceName: slackData.integration?.workspace_name,
-        workspaceId: slackData.integration?.workspace_id,
-        isOAuth: slackData.integration?.is_oauth,
-        hasIntegrationId: !!slackData.integration?.id
-      })
-
       setSlackIntegration(slackData.integration)
       localStorage.setItem('slack_integration', JSON.stringify(slackData))
     } catch (error) {
@@ -930,7 +913,6 @@ export default function IntegrationsPage() {
       }
 
       const apiUrl = `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/invitations/create`
-      console.log('Making invitation request to:', apiUrl)
 
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -944,12 +926,8 @@ export default function IntegrationsPage() {
         })
       })
 
-      console.log('Response status:', response.status)
-      console.log('Response headers:', response.headers)
-
       if (!response.ok) {
         const responseText = await response.text()
-        console.log('Error response body:', responseText)
 
         // Try to parse as JSON, fallback to text
         let errorMessage = 'Failed to send invitation'
@@ -1033,9 +1011,7 @@ export default function IntegrationsPage() {
         const membersData = await membersResponse.json()
         setOrgMembers(membersData.members || [])
       } else {
-        console.log('Failed to load organization members:', membersResponse.status)
         const errorText = await membersResponse.text()
-        console.log('Members error response:', errorText)
       }
 
       // Load pending invitations
@@ -1049,9 +1025,7 @@ export default function IntegrationsPage() {
         const invitationsData = await invitationsResponse.json()
         setPendingInvitations(invitationsData.invitations || [])
       } else {
-        console.log('Failed to load pending invitations:', invitationsResponse.status)
         const errorText = await invitationsResponse.text()
-        console.log('Invitations error response:', errorText)
       }
 
     } catch (error) {
@@ -1941,8 +1915,6 @@ export default function IntegrationsPage() {
       toast.error('Please select an organization first')
       return
     }
-
-    console.log('Fetching team members for integration:', selectedOrganization)
     setLoadingTeamMembers(true)
     setTeamMembersError(null)
 
@@ -1962,11 +1934,8 @@ export default function IntegrationsPage() {
 
       if (response.ok) {
         const data = await response.json()
-        console.log('Setting team members:', data.users?.length, 'members')
-        console.log('Opening drawer...')
         setTeamMembers(data.users || [])
         setTeamMembersDrawerOpen(true)
-        console.log('Drawer state set to true')
         toast.success(`Loaded ${data.total_users} team members from ${data.integration_name}`)
       } else {
         const errorData = await response.json()
@@ -1988,8 +1957,6 @@ export default function IntegrationsPage() {
       toast.error('Please select an organization first')
       return
     }
-
-    console.log('Syncing users to UserCorrelation for integration:', selectedOrganization)
     setLoadingTeamMembers(true)
     setTeamMembersError(null)
 
@@ -2034,7 +2001,6 @@ export default function IntegrationsPage() {
 
   // Sync Slack user IDs to UserCorrelation records
   const syncSlackUserIds = async () => {
-    console.log('Syncing Slack user IDs to UserCorrelation')
     setLoadingTeamMembers(true)
 
     try {
@@ -2076,7 +2042,6 @@ export default function IntegrationsPage() {
 
   // Fetch synced users from database
   const fetchSyncedUsers = async (showToast = true) => {
-    console.log('Fetching synced users from database')
 
     if (!selectedOrganization) {
       toast.error('Please select an organization first')
@@ -2880,13 +2845,9 @@ export default function IntegrationsPage() {
               <Select
                 value={selectedOrganization}
                 onValueChange={(value) => {
-                  console.log('onValueChange called with value:', value, 'type:', typeof value)
-                  console.log('Available integrations:', integrations.map(i => ({ id: i.id, name: i.name })))
-
                   // Only show toast if selecting a different organization
                   if (value !== selectedOrganization) {
                     const selected = integrations.find(i => i.id.toString() === value)
-                    console.log('Found selected integration:', selected)
                     if (selected) {
                       toast.success(`${selected.name} has been set as your default organization.`)
                     }
@@ -3787,23 +3748,14 @@ export default function IntegrationsPage() {
 
                         // Add state parameter to track which organization is installing
                         const currentUser = userInfo // Assuming userInfo contains org info
-                        console.log('🔍 Current userInfo:', userInfo)
                         const stateData = {
                           orgId: currentUser?.organization_id,
                           userId: currentUser?.id,
                           email: currentUser?.email
                         }
-                        console.log('🔍 State data to encode:', stateData)
                         const state = currentUser ? btoa(JSON.stringify(stateData)) : ''
-                        console.log('🔍 Encoded state:', state)
-
-                        // Debug: Test without state parameter first
-                        console.log('Redirect URI being sent:', redirectUri)
-                        console.log('Full OAuth URL:', `https://slack.com/oauth/v2/authorize?client_id=${clientId}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUri)}`)
 
                         const slackAuthUrl = `https://slack.com/oauth/v2/authorize?client_id=${clientId}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(state)}`
-
-                        console.log('Installing official OnCall Burnout Slack app for org:', currentUser?.organization_id)
 
                         // Show loading state and toast
                         setIsConnectingSlackOAuth(true)
@@ -4025,7 +3977,6 @@ export default function IntegrationsPage() {
                           }
 
                           const statusData = await statusResponse.json()
-                          console.log('Workspace status:', statusData)
 
                           if (statusData.diagnosis.has_workspace_mapping) {
                             toast.success('✅ Workspace is properly registered! /burnout-survey command should work.')
@@ -4051,7 +4002,6 @@ export default function IntegrationsPage() {
                             if (registerResponse.ok) {
                               const registerData = await registerResponse.json()
                               toast.success('✅ Workspace registered! /burnout-survey command should now work. Try the command again.')
-                              console.log('Workspace registered:', registerData)
 
                               // Reload Slack integration to update UI
                               await loadSlackPermissions()
@@ -6077,12 +6027,6 @@ export default function IntegrationsPage() {
                   }
 
                   const url = `${API_BASE}/integrations/slack/disconnect`
-                  console.log('🔌 Disconnect request:', {
-                    url,
-                    method: 'DELETE',
-                    hasAuth: !!authToken,
-                    tokenPreview: authToken.substring(0, 20) + '...'
-                  })
 
                   const response = await fetch(url, {
                     method: 'DELETE',
@@ -6091,16 +6035,8 @@ export default function IntegrationsPage() {
                     }
                   })
 
-                  console.log('📡 Disconnect response:', {
-                    status: response.status,
-                    statusText: response.statusText,
-                    ok: response.ok,
-                    headers: Object.fromEntries(response.headers.entries())
-                  })
-
                   if (response.ok) {
                     const result = await response.json()
-                    console.log('✅ Disconnect success:', result)
                     toast.success('Slack Survey integration disconnected')
                     setSlackSurveyConfirmDisconnectOpen(false)
                     window.location.reload()
