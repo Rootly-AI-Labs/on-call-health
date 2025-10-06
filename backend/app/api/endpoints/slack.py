@@ -458,7 +458,9 @@ async def get_slack_status(
                 SlackWorkspaceMapping.organization_id == current_user.organization_id,
                 SlackWorkspaceMapping.status == 'active'
             ).first()
-            logger.info(f"Org workspace mapping found: {workspace_mapping is not None}")
+            logger.info(f"Org workspace mapping query - org_id={current_user.organization_id}, found: {workspace_mapping is not None}")
+            if workspace_mapping:
+                logger.info(f"Found workspace mapping: id={workspace_mapping.id}, workspace_id={workspace_mapping.workspace_id}, workspace_name={workspace_mapping.workspace_name}")
 
         # Also check if user is the owner of any workspace mapping
         if not workspace_mapping:
