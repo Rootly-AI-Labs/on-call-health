@@ -124,21 +124,22 @@ async def slack_oauth_callback(
             frontend_url = settings.FRONTEND_URL or "http://localhost:3000"
             backend_base = settings.DATABASE_URL.replace("postgresql://", "https://").split("@")[1].split("/")[0] if settings.DATABASE_URL else "localhost:8000"
 
-            # For Railway deployment, use environment variable or construct from DATABASE_URL
-            if "railway" in str(settings.DATABASE_URL):
-                # Try to get from environment variable first
-                backend_url = os.getenv("BACKEND_URL")
-                if not backend_url:
-                    # Fallback: construct from DATABASE_URL
-                    # Extract service name from DATABASE_URL: postgres://user:pass@servicename.railway.internal:5432/db
+            # Get backend URL from environment variable (preferred) or construct it
+            backend_url = os.getenv("BACKEND_URL")
+
+            if not backend_url:
+                # Fallback: detect environment from DATABASE_URL
+                if "railway" in str(settings.DATABASE_URL):
                     if "production" in str(settings.DATABASE_URL):
                         backend_url = "https://rootly-burnout-detector-web-production.up.railway.app"
                     else:
                         backend_url = "https://rootly-burnout-detector-web-development.up.railway.app"
-            else:
-                backend_url = "http://localhost:8000"
+                else:
+                    # Local development
+                    backend_url = "http://localhost:8000"
 
             redirect_uri = f"{backend_url}/integrations/slack/oauth/callback"
+            logger.debug(f"Using redirect_uri for token exchange: {redirect_uri}")
 
             token_response = await client.post(
                 "https://slack.com/api/oauth.v2.access",
