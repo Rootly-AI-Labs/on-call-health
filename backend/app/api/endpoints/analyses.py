@@ -205,12 +205,13 @@ async def run_burnout_analysis(
         
         analysis = Analysis(
             user_id=current_user.id,
+            organization_id=current_user.organization_id,  # Add organization_id for multi-tenancy
             rootly_integration_id=db_integration_id,  # Null for beta integrations
-            
+
             # NEW: Store integration details directly for simple frontend display
             integration_name=integration.name,  # "PagerDuty (Beta Access)", "Failwhale Tales", etc.
             platform=integration.platform,      # "rootly", "pagerduty"
-            
+
             time_range=request.time_range,
             status="pending",
             config={
