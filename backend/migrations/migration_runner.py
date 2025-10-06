@@ -312,9 +312,29 @@ class MigrationRunner:
                     """
                 ]
             },
+            {
+                "name": "007_add_unique_constraint_user_correlation",
+                "description": "Add unique constraint on (user_id, email) to prevent duplicate correlations",
+                "sql": [
+                    """
+                    -- Remove any existing duplicates (keep the most recent one)
+                    DELETE FROM user_correlations a
+                    USING user_correlations b
+                    WHERE a.id < b.id
+                    AND a.user_id = b.user_id
+                    AND a.email = b.email
+                    """,
+                    """
+                    -- Add unique constraint
+                    ALTER TABLE user_correlations
+                    ADD CONSTRAINT IF NOT EXISTS uq_user_correlation_user_email
+                    UNIQUE (user_id, email)
+                    """
+                ]
+            },
             # Add future migrations here with incrementing numbers
             # {
-            #     "name": "006_add_user_preferences",
+            #     "name": "008_add_user_preferences",
             #     "description": "Add user preferences table",
             #     "sql": ["CREATE TABLE IF NOT EXISTS user_preferences (...)"]
             # }

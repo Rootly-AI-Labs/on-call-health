@@ -37,10 +37,11 @@ test.db
 .env
 secrets.env
 
-# All markdown files except README (internal documentation not for public release)
+# All markdown files except README and critical docs (internal documentation not for public release)
 *.md
 !README.md
 !frontend/README.md
+!DATABASE_MIGRATION_COMPARISON.md
 
 # IDEs
 .vscode/

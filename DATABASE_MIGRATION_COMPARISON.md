@@ -490,8 +490,9 @@ When merge happens, migrations will run in this order:
 5. Migration 004 - UserCorrelations integration_ids field
 6. Migration 005 - UserBurnoutReports personal_circumstances field
 7. Migration 006 - Slack slack_user_id nullable ⭐
+8. Migration 007 - UserCorrelations unique constraint (user_id, email) ⭐
 
-**Total migrations**: 6 (not 7 - migration 007 was removed)
+**Total migrations**: 7
 **Total estimated time**: 60-90 seconds (depending on data volume)
 
 ---
@@ -501,12 +502,13 @@ When merge happens, migrations will run in this order:
 After merge and deployment:
 
 - [ ] All 6 new tables exist in production
-- [ ] All 6 migrations (001, 001b, 002, 003, 004, 005, 006) show as "completed"
+- [ ] All 7 migrations (001, 001b, 002, 003, 004, 005, 006, 007) show as "completed"
 - [ ] `user_correlations.organization_id` is populated for 95%+ of records
 - [ ] `user_correlations.name` column exists
 - [ ] `user_correlations.integration_ids` column exists
 - [ ] `user_burnout_reports.personal_circumstances` column exists
 - [ ] `slack_integrations.slack_user_id` is nullable
+- [ ] `user_correlations` has unique constraint on (user_id, email) ⭐
 - [ ] `analyses.organization_id` column exists (but not used for filtering)
 - [ ] No SQL errors in deployment logs
 - [ ] Users can log in and access dashboard
