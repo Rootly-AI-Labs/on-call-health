@@ -3823,7 +3823,6 @@ export default function IntegrationsPage() {
                     userInfo={userInfo}
                     fetchTeamMembers={fetchTeamMembers}
                     syncUsersToCorrelation={syncUsersToCorrelation}
-                    syncSlackUserIds={syncSlackUserIds}
                     fetchSyncedUsers={fetchSyncedUsers}
                     setShowManualSurveyModal={setShowManualSurveyModal}
                     loadSlackPermissions={loadSlackPermissions}
@@ -6362,9 +6361,32 @@ export default function IntegrationsPage() {
                   <h3 className="text-sm font-semibold text-gray-900">
                     Team Members ({syncedUsers.length})
                   </h3>
-                  <Badge className="text-xs bg-green-100 text-green-700 border-green-300">
-                    Can Submit Surveys
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    {slackIntegration?.workspace_id && (
+                      <Button
+                        onClick={syncSlackUserIds}
+                        disabled={loadingTeamMembers}
+                        size="sm"
+                        variant="outline"
+                        className="flex items-center space-x-2 border-green-300 text-green-700 hover:bg-green-50"
+                      >
+                        {loadingTeamMembers ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span>Syncing...</span>
+                          </>
+                        ) : (
+                          <>
+                            <MessageSquare className="w-4 h-4" />
+                            <span>Sync Slack IDs</span>
+                          </>
+                        )}
+                      </Button>
+                    )}
+                    <Badge className="text-xs bg-green-100 text-green-700 border-green-300">
+                      Can Submit Surveys
+                    </Badge>
+                  </div>
                 </div>
                 <p className="text-xs text-gray-600 mb-3">
                   These users can submit burnout surveys via Slack /burnout-survey command

@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { CheckCircle, Users, Send, RefreshCw, Database, Users2, Loader2, Building, Clock, MessageSquare } from "lucide-react"
+import { CheckCircle, Users, Send, RefreshCw, Database, Users2, Loader2, Building, Clock } from "lucide-react"
 
 interface SlackSurveyTabsProps {
   slackIntegration: any
@@ -18,7 +18,6 @@ interface SlackSurveyTabsProps {
   userInfo: any
   fetchTeamMembers: () => void
   syncUsersToCorrelation: () => void
-  syncSlackUserIds: () => void
   fetchSyncedUsers: () => void
   setShowManualSurveyModal: (show: boolean) => void
   loadSlackPermissions: () => void
@@ -48,7 +47,6 @@ export function SlackSurveyTabs({
   userInfo,
   fetchTeamMembers,
   syncUsersToCorrelation,
-  syncSlackUserIds,
   fetchSyncedUsers,
   setShowManualSurveyModal,
   loadSlackPermissions,
@@ -401,27 +399,6 @@ export function SlackSurveyTabs({
                     </>
                   )}
                 </Button>
-                {slackIntegration?.workspace_id && (
-                  <Button
-                    onClick={syncSlackUserIds}
-                    disabled={loadingTeamMembers}
-                    size="sm"
-                    variant="outline"
-                    className="flex items-center space-x-2 border-green-300 text-green-700 hover:bg-green-50"
-                  >
-                    {loadingTeamMembers ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>Syncing...</span>
-                      </>
-                    ) : (
-                      <>
-                        <MessageSquare className="w-4 h-4" />
-                        <span>Sync Slack IDs</span>
-                      </>
-                    )}
-                  </Button>
-                )}
                 <Button
                   onClick={fetchSyncedUsers}
                   disabled={loadingSyncedUsers}
