@@ -671,6 +671,67 @@ class TokenWebhookRequest(BaseModel):
     token: str
     webhook_url: str
 
+class FeatureToggleRequest(BaseModel):
+    feature: str  # 'survey' or 'sentiment'
+    enabled: bool
+
+@router.post("/features/toggle")
+async def toggle_slack_feature(
+    request: FeatureToggleRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Toggle a Slack feature (survey or sentiment analysis) for the current user's workspace.
+    Only works for OAuth-based integrations.
+    """
+    try:
+        # Find the user's OAuth workspace mapping
+        workspace_mapping = db.query(SlackWorkspaceMapping).filter(
+            SlackWorkspaceMapping.owner_user_id == current_user.id,
+            SlackWorkspaceMapping.token_source == "oauth"
+        ).first()
+
+        if not workspace_mapping:
+            raise HTTPException(
+                status_code=404,
+                detail="No OAuth Slack workspace found for this user"
+            )
+
+        # Validate feature name
+        if request.feature not in ['survey', 'sentiment']:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid feature name. Must be 'survey' or 'sentiment'"
+            )
+
+        # Update the appropriate feature flag
+        if request.feature == 'survey':
+            workspace_mapping.survey_enabled = request.enabled
+            logger.info(f"User {current_user.id} toggled survey to {request.enabled} for workspace {workspace_mapping.workspace_id}")
+        elif request.feature == 'sentiment':
+            workspace_mapping.sentiment_enabled = request.enabled
+            logger.info(f"User {current_user.id} toggled sentiment to {request.enabled} for workspace {workspace_mapping.workspace_id}")
+
+        db.commit()
+
+        return {
+            "success": True,
+            "feature": request.feature,
+            "enabled": request.enabled,
+            "workspace_id": workspace_mapping.workspace_id
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error toggling Slack feature: {e}")
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to toggle feature: {str(e)}"
+        )
+
 @router.post("/token")
 async def connect_slack_with_token(
     request: TokenRequest,

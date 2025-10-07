@@ -24,6 +24,7 @@ interface UnifiedSlackCardProps {
   fetchSyncedUsers: () => void
   setShowManualSurveyModal: (show: boolean) => void
   loadSlackPermissions: () => void
+  loadSlackStatus?: () => void
   setSlackSurveyDisconnectDialogOpen: (open: boolean) => void
   setIsConnectingSlackOAuth: (connecting: boolean) => void
   toast: any
@@ -58,6 +59,7 @@ export function UnifiedSlackCard({
   fetchSyncedUsers,
   setShowManualSurveyModal,
   loadSlackPermissions,
+  loadSlackStatus,
   setSlackSurveyDisconnectDialogOpen,
   setIsConnectingSlackOAuth,
   toast
@@ -100,16 +102,52 @@ export function UnifiedSlackCard({
   }
 
   const handleFeatureToggle = async (feature: 'survey' | 'sentiment', enabled: boolean) => {
-    // TODO: Implement API call to update feature flags
-    // For now, just update local state
-    if (feature === 'survey') {
-      setSurveyEnabled(enabled)
-    } else {
-      setSentimentEnabled(enabled)
-    }
+    const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL
 
-    // This will need to call an API endpoint to update the feature flags in the backend
-    toast.info(`${feature === 'survey' ? 'Survey Delivery' : 'Sentiment Analysis'} ${enabled ? 'enabled' : 'disabled'}`)
+    try {
+      // Optimistically update UI
+      if (feature === 'survey') {
+        setSurveyEnabled(enabled)
+      } else {
+        setSentimentEnabled(enabled)
+      }
+
+      // Call backend API to persist the change
+      const response = await fetch(`${backendUrl}/integrations/slack/features/toggle`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          feature,
+          enabled
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to toggle feature')
+      }
+
+      const data = await response.json()
+      toast.success(`${feature === 'survey' ? 'Survey Delivery' : 'Sentiment Analysis'} ${enabled ? 'enabled' : 'disabled'}`)
+
+      // Reload Slack status to ensure UI is in sync with backend
+      if (loadSlackStatus) {
+        loadSlackStatus()
+      }
+    } catch (error) {
+      console.error('Error toggling feature:', error)
+
+      // Revert optimistic update on error
+      if (feature === 'survey') {
+        setSurveyEnabled(!enabled)
+      } else {
+        setSentimentEnabled(!enabled)
+      }
+
+      toast.error(`Failed to ${enabled ? 'enable' : 'disable'} ${feature === 'survey' ? 'Survey Delivery' : 'Sentiment Analysis'}`)
+    }
   }
 
   if (loadingSlack) {
