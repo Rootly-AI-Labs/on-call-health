@@ -1152,6 +1152,8 @@ export default function IntegrationsPage() {
   const pagerdutyCount = integrations.filter(i => i.platform === 'pagerduty').length
 
   // Helper booleans to distinguish between Slack Survey (OAuth) and Enhanced Integration (webhook/token)
+  // Note: Backend returns ONE integration at a time - either OAuth or manual, not both simultaneously
+  // Users must choose one integration type. If they want to switch, they disconnect one and connect the other.
   const hasSlackSurvey = slackIntegration?.connection_type === 'oauth'
   const hasSlackEnhanced = slackIntegration && slackIntegration.connection_type !== 'oauth'
 
