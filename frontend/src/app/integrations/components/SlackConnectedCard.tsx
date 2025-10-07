@@ -70,14 +70,6 @@ export function SlackConnectedCard({
             <Button
               size="sm"
               variant="ghost"
-              onClick={onTest}
-              className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-            >
-              <RotateCcw className="w-4 h-4" />
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
               onClick={onDisconnect}
               className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
             >
@@ -140,17 +132,8 @@ export function SlackConnectedCard({
         <div className="border-t pt-4 mt-6">
           <div className="flex items-center justify-between mb-3">
             <h4 className="font-medium text-sm">Bot Permissions</h4>
-            {isLoadingPermissions ? (
+            {isLoadingPermissions && (
               <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
-            ) : (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onLoadPermissions}
-                className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-              >
-                <RotateCcw className="w-4 h-4" />
-              </Button>
             )}
           </div>
           {slackPermissions ? (
@@ -191,7 +174,7 @@ export function SlackConnectedCard({
             </div>
           ) : (
             <div className="text-xs text-gray-500">
-              Click "Test" or the refresh icon to check permissions
+              Permissions will be checked automatically from "Check & Fix Workspace Registration"
             </div>
           )}
         </div>

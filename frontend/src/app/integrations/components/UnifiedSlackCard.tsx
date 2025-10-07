@@ -101,6 +101,69 @@ export function UnifiedSlackCard({
     window.location.href = slackAuthUrl
   }
 
+  const handleWorkspaceCheck = async () => {
+    const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL
+    const authToken = localStorage.getItem('auth_token')
+
+    if (!authToken) {
+      toast.error('Please log in to check workspace status')
+      return
+    }
+
+    try {
+      const statusResponse = await fetch(`${backendUrl}/integrations/slack/workspace/status`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (!statusResponse.ok) {
+        toast.error('Failed to check workspace status')
+        return
+      }
+
+      const statusData = await statusResponse.json()
+
+      if (statusData.diagnosis.has_workspace_mapping) {
+        const workspaceName = statusData.organization_workspace_mappings?.[0]?.workspace_name ||
+                             statusData.user_workspace_mappings?.[0]?.workspace_name ||
+                             'Unknown workspace'
+        toast.success(`✅ Workspace is properly registered! /burnout-survey command should work.\n\nRegistered workspace: ${workspaceName}`)
+      } else {
+        if (!slackIntegration?.workspace_id) {
+          toast.error('No workspace ID found. Please reconnect Slack.')
+          return
+        }
+
+        const formData = new FormData()
+        formData.append('workspace_id', slackIntegration.workspace_id)
+        formData.append('workspace_name', slackIntegration.workspace_name || slackIntegration.workspace_id)
+
+        const registerResponse = await fetch(`${backendUrl}/integrations/slack/workspace/register`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: formData
+        })
+
+        if (registerResponse.ok) {
+          toast.success('✅ Workspace registered! /burnout-survey command should now work.')
+          if (loadSlackPermissions) {
+            loadSlackPermissions()
+          }
+        } else {
+          const errorData = await registerResponse.json()
+          toast.error(`Failed to register workspace: ${errorData.detail || 'Unknown error'}`)
+        }
+      }
+    } catch (error) {
+      console.error('Error checking/fixing workspace:', error)
+      toast.error('Error checking workspace status')
+    }
+  }
+
   const handleFeatureToggle = async (feature: 'survey' | 'sentiment', enabled: boolean) => {
     const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL
 
@@ -313,6 +376,32 @@ export function UnifiedSlackCard({
 
               <div className="text-xs text-gray-500 bg-blue-50 border border-blue-200 rounded-lg p-3">
                 <strong>Note:</strong> Toggling features on/off does not require reconnecting. Your permissions remain the same.
+              </div>
+
+              {/* Workspace Registration Check */}
+              <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                <div className="flex items-start space-x-3">
+                  <svg className="w-5 h-5 text-gray-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <div className="flex-1">
+                    <h4 className="font-medium text-sm text-gray-900 mb-1">Workspace Registration</h4>
+                    <p className="text-xs text-gray-600 mb-3">
+                      If the <code className="bg-gray-200 px-1 rounded">/burnout-survey</code> command shows "workspace not registered" error, click below to fix:
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleWorkspaceCheck}
+                      className="text-xs"
+                    >
+                      <svg className="w-3 h-3 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Check & Fix Workspace Registration
+                    </Button>
+                  </div>
+                </div>
               </div>
             </div>
 

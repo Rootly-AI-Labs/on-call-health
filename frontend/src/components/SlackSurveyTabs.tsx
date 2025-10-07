@@ -189,65 +189,6 @@ export function SlackSurveyTabs({
     window.open(slackAuthUrl, '_blank')
   }
 
-  const handleWorkspaceCheck = async () => {
-    try {
-      const authToken = localStorage.getItem('auth_token')
-      if (!authToken) {
-        toast.error('Please log in to check workspace status')
-        return
-      }
-
-      const statusResponse = await fetch(`${API_BASE}/integrations/slack/workspace/status`, {
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'Content-Type': 'application/json'
-        }
-      })
-
-      if (!statusResponse.ok) {
-        toast.error('Failed to check workspace status')
-        return
-      }
-
-      const statusData = await statusResponse.json()
-
-      if (statusData.diagnosis.has_workspace_mapping) {
-        // Get workspace name from mappings
-        const workspaceName = statusData.organization_workspace_mappings?.[0]?.workspace_name ||
-                             statusData.user_workspace_mappings?.[0]?.workspace_name ||
-                             'Unknown workspace'
-        toast.success(`✅ Workspace is properly registered! /burnout-survey command should work.\n\nRegistered workspace: ${workspaceName}`)
-      } else {
-        if (!slackIntegration?.workspace_id) {
-          toast.error('No workspace ID found. Please reconnect Slack.')
-          return
-        }
-
-        const formData = new FormData()
-        formData.append('workspace_id', slackIntegration.workspace_id)
-        formData.append('workspace_name', slackIntegration.workspace_name || slackIntegration.workspace_id)
-
-        const registerResponse = await fetch(`${API_BASE}/integrations/slack/workspace/register`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${authToken}`
-          },
-          body: formData
-        })
-
-        if (registerResponse.ok) {
-          toast.success('✅ Workspace registered! /burnout-survey command should now work.')
-          await loadSlackPermissions()
-        } else {
-          const errorData = await registerResponse.json()
-          toast.error(`Failed to register workspace: ${errorData.detail || 'Unknown error'}`)
-        }
-      }
-    } catch (error) {
-      console.error('Error checking/fixing workspace:', error)
-      toast.error('Error checking workspace status')
-    }
-  }
 
   return (
     <>
@@ -310,34 +251,6 @@ export function SlackSurveyTabs({
           </div>
         </div>
 
-
-        {/* Troubleshooting - Collapsible */}
-        {slackIntegration && (
-          <details className="border border-gray-200 rounded-lg">
-            <summary className="cursor-pointer p-3 hover:bg-gray-50 rounded-lg text-sm text-gray-600 flex items-center">
-              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              Troubleshooting
-            </summary>
-            <div className="p-4 border-t border-gray-200 bg-gray-50">
-              <p className="text-xs text-gray-600 mb-3">
-                If the <code className="bg-gray-200 px-1 rounded">/burnout-survey</code> command shows "workspace not registered" error, click below to fix:
-              </p>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleWorkspaceCheck}
-                className="w-full text-xs"
-              >
-                <svg className="w-3 h-3 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                Check & Fix Workspace Registration
-              </Button>
-            </div>
-          </details>
-        )}
 
         <div className="flex items-center justify-between pt-2 text-sm text-gray-500">
           <div className="flex items-center space-x-2">
