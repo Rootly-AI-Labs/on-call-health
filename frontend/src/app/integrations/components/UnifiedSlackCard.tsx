@@ -199,7 +199,7 @@ export function UnifiedSlackCard({
                         e.stopPropagation()
                         setEnableSlackSurvey(e.target.checked)
                       }}
-                      className="w-5 h-5 text-purple-600 rounded focus:ring-purple-500 mt-0.5"
+                      className="w-5 h-5 text-gray-900 rounded focus:ring-gray-500 mt-0.5"
                     />
                     <div className="flex-1">
                       <div className="flex items-center space-x-2 mb-1">
@@ -229,7 +229,7 @@ export function UnifiedSlackCard({
                         e.stopPropagation()
                         setEnableSlackSentiment(e.target.checked)
                       }}
-                      className="w-5 h-5 text-purple-600 rounded focus:ring-purple-500 mt-0.5"
+                      className="w-5 h-5 text-gray-900 rounded focus:ring-gray-500 mt-0.5"
                     />
                     <div className="flex-1">
                       <div className="flex items-center space-x-2 mb-1">
