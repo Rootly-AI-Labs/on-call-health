@@ -1232,62 +1232,41 @@ async def sync_slack_user_ids(
 
             logger.debug(f"Built mapping for {len(email_to_slack_id)} Slack users with emails")
 
-            # Get all UserCorrelation records for this user (by email for lookup)
+            # Get all UserCorrelation records for this user
             correlations = db.query(UserCorrelation).filter(
                 UserCorrelation.user_id == current_user.id
             ).all()
 
-            # Build email -> UserCorrelation mapping for quick lookup
-            email_to_correlation = {}
-            for corr in correlations:
-                if corr.email:
-                    email_to_correlation[corr.email.lower()] = corr
-
             updated_count = 0
-            created_count = 0
             skipped_count = 0
 
-            # Iterate through Slack workspace members
-            for email, slack_id in email_to_slack_id.items():
-                correlation = email_to_correlation.get(email)
+            for correlation in correlations:
+                # Use the correlation's email directly
+                if not correlation.email:
+                    skipped_count += 1
+                    continue
 
-                if correlation:
-                    # Update existing UserCorrelation record
-                    if correlation.slack_user_id != slack_id:
-                        correlation.slack_user_id = slack_id
-                        updated_count += 1
-                        logger.debug(f"Updated {email} -> {slack_id}")
+                user_email = correlation.email.lower()
+                slack_id = email_to_slack_id.get(user_email)
+
+                if slack_id:
+                    correlation.slack_user_id = slack_id
+                    updated_count += 1
+                    logger.debug(f"Matched {user_email} -> {slack_id}")
                 else:
-                    # Create new UserCorrelation record for Slack-only users
-                    # These are users in the Slack workspace who aren't in Rootly data yet
-                    new_correlation = UserCorrelation(
-                        user_id=current_user.id,
-                        organization_id=current_user.organization_id,
-                        email=email,
-                        name=None,  # We don't have name from Slack API in this flow
-                        slack_user_id=slack_id,
-                        integration_ids=["slack-workspace"]  # Special marker for Slack-synced users
-                    )
-                    db.add(new_correlation)
-                    created_count += 1
-                    logger.debug(f"Created new UserCorrelation for {email} -> {slack_id}")
+                    skipped_count += 1
+                    logger.debug(f"No Slack match found for {user_email}")
 
             db.commit()
 
-            total_synced = updated_count + created_count
-            message = f"Synced Slack user IDs for {total_synced} users"
-            if created_count > 0:
-                message += f" ({created_count} new users added from Slack workspace)"
-
             return {
                 "success": True,
-                "message": message,
+                "message": f"Synced Slack user IDs for {updated_count} users",
                 "stats": {
                     "total_slack_members": len(members),
                     "members_with_email": len(email_to_slack_id),
                     "user_correlations": len(correlations),
                     "updated": updated_count,
-                    "created": created_count,
                     "skipped": skipped_count
                 }
             }
