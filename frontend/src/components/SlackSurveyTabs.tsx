@@ -526,7 +526,11 @@ export function SlackSurveyTabs({
                         </svg>
                       </button>
                       <div className="text-2xl font-semibold text-gray-900 my-1 w-12 text-center">
-                        {scheduleTime.split(':')[0]}
+                        {(() => {
+                          const hour = parseInt(scheduleTime.split(':')[0])
+                          const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour
+                          return String(displayHour).padStart(2, '0')
+                        })()}
                       </div>
                       <button
                         onClick={() => {
