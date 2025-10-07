@@ -1841,39 +1841,39 @@ export default function IntegrationsPage() {
             )}
         </div>
 
-        {/* User-Reported Connection Section */}
-        <SurveyFeedbackSection
-          slackIntegration={slackIntegration}
-          loadingSlack={loadingSlack}
-          isConnectingSlackOAuth={isConnectingSlackOAuth}
-          isDisconnectingSlackSurvey={isDisconnectingSlackSurvey}
-          userInfo={userInfo}
-          selectedOrganization={selectedOrganization}
-          integrations={integrations}
-          teamMembers={teamMembers}
-          loadingTeamMembers={loadingTeamMembers}
-          loadingSyncedUsers={loadingSyncedUsers}
-          fetchTeamMembers={fetchTeamMembers}
-          syncUsersToCorrelation={syncUsersToCorrelation}
-          fetchSyncedUsers={fetchSyncedUsers}
-          setShowManualSurveyModal={setShowManualSurveyModal}
-          loadSlackPermissions={loadSlackPermissions}
-          setSlackSurveyDisconnectDialogOpen={setSlackSurveyDisconnectDialogOpen}
-          setIsConnectingSlackOAuth={setIsConnectingSlackOAuth}
-          toast={toast}
-        />
-
-        {/* GitHub and Slack Integrations Section */}
+        {/* Enhanced Integrations Section */}
         <div className="mt-16 space-y-8">
           <div className="text-center">
             <h2 className="text-2xl font-bold text-slate-900 mb-3">Enhanced Integrations</h2>
             <p className="text-lg text-slate-600 mb-2">
-              Add GitHub and Slack for deeper burnout analysis
+              Connect GitHub and Slack for deeper insights
             </p>
             <p className="text-slate-500">
-              Analyze code patterns and communication trends to get additional insights
+              Analyze code patterns, team communication, and collect direct feedback
             </p>
           </div>
+
+          {/* Slack Integration (Surveys & Sentiment) */}
+          <SurveyFeedbackSection
+            slackIntegration={slackIntegration}
+            loadingSlack={loadingSlack}
+            isConnectingSlackOAuth={isConnectingSlackOAuth}
+            isDisconnectingSlackSurvey={isDisconnectingSlackSurvey}
+            userInfo={userInfo}
+            selectedOrganization={selectedOrganization}
+            integrations={integrations}
+            teamMembers={teamMembers}
+            loadingTeamMembers={loadingTeamMembers}
+            loadingSyncedUsers={loadingSyncedUsers}
+            fetchTeamMembers={fetchTeamMembers}
+            syncUsersToCorrelation={syncUsersToCorrelation}
+            fetchSyncedUsers={fetchSyncedUsers}
+            setShowManualSurveyModal={setShowManualSurveyModal}
+            loadSlackPermissions={loadSlackPermissions}
+            setSlackSurveyDisconnectDialogOpen={setSlackSurveyDisconnectDialogOpen}
+            setIsConnectingSlackOAuth={setIsConnectingSlackOAuth}
+            toast={toast}
+          />
 
           <div className="grid md:grid-cols-2 gap-8 mb-8 max-w-2xl mx-auto">
             {/* GitHub Card */}
