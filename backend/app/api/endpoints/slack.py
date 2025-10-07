@@ -1145,9 +1145,9 @@ async def sync_slack_user_ids(
 
             logger.debug(f"Built mapping for {len(email_to_slack_id)} Slack users with emails")
 
-            # Get all UserCorrelation records for this organization
+            # Get all UserCorrelation records for this user
             correlations = db.query(UserCorrelation).filter(
-                UserCorrelation.organization_id == current_user.organization_id
+                UserCorrelation.user_id == current_user.id
             ).all()
 
             updated_count = 0
