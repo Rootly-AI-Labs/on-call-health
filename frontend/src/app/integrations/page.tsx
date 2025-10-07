@@ -126,7 +126,6 @@ import * as AIHandlers from "./handlers/ai-handlers"
 import * as MappingHandlers from "./handlers/mapping-handlers"
 import * as Utils from "./utils"
 import { GitHubIntegrationCard } from "./components/GitHubIntegrationCard"
-import { SlackIntegrationCard } from "./components/SlackIntegrationCard"
 import { GitHubConnectedCard } from "./components/GitHubConnectedCard"
 import { SlackConnectedCard } from "./components/SlackConnectedCard"
 import { RootlyIntegrationForm } from "./components/RootlyIntegrationForm"
@@ -154,6 +153,10 @@ export default function IntegrationsPage() {
   const [githubIntegration, setGithubIntegration] = useState<GitHubIntegration | null>(null)
   const [slackIntegration, setSlackIntegration] = useState<SlackIntegration | null>(null)
   const [activeEnhancementTab, setActiveEnhancementTab] = useState<"github" | "slack" | null>(null)
+
+  // Slack feature selection for OAuth
+  const [enableSlackSurvey, setEnableSlackSurvey] = useState(true) // Default both enabled
+  const [enableSlackSentiment, setEnableSlackSentiment] = useState(true)
   
   // Mapping data state
   const [showMappingDialog, setShowMappingDialog] = useState(false)
@@ -1957,53 +1960,90 @@ export default function IntegrationsPage() {
                           )}
                         </button>
                       ) : process.env.NEXT_PUBLIC_SLACK_CLIENT_ID ? (
-                        <Button
-                          onClick={() => {
-                            // Official OnCall Burnout Detector Slack App
-                            // This single app can be installed by any organization
-                            const clientId = process.env.NEXT_PUBLIC_SLACK_CLIENT_ID
-                            const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL
+                        <div className="flex flex-col items-end space-y-3">
+                          {/* Feature Selection Checkboxes */}
+                          <div className="flex flex-col space-y-2 text-sm">
+                            <label className="flex items-center space-x-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={enableSlackSurvey}
+                                onChange={(e) => setEnableSlackSurvey(e.target.checked)}
+                                className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500"
+                              />
+                              <span className="text-gray-700">Enable Survey Delivery (/burnout-survey)</span>
+                            </label>
+                            <label className="flex items-center space-x-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={enableSlackSentiment}
+                                onChange={(e) => setEnableSlackSentiment(e.target.checked)}
+                                className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500"
+                              />
+                              <span className="text-gray-700">Enable Sentiment Analysis (Read Messages)</span>
+                            </label>
+                          </div>
 
-                            if (!backendUrl) {
-                              toast.error('Backend URL not configured. Please contact support.')
-                              return
-                            }
+                          <Button
+                            onClick={() => {
+                              // Validate at least one feature is selected
+                              if (!enableSlackSurvey && !enableSlackSentiment) {
+                                toast.error('Please select at least one feature to enable')
+                                return
+                              }
 
-                            // Include organization context in callback URL so backend knows which org is installing
-                            const redirectUri = `${backendUrl}/integrations/slack/oauth/callback`
-                            const scopes = 'commands,chat:write,team:read'
+                              const clientId = process.env.NEXT_PUBLIC_SLACK_CLIENT_ID
+                              const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL
 
-                            // Add state parameter to track which organization is installing
-                            const currentUser = userInfo // Assuming userInfo contains org info
-                            const stateData = {
-                              orgId: currentUser?.organization_id,
-                              userId: currentUser?.id,
-                              email: currentUser?.email
-                            }
-                            const state = currentUser ? btoa(JSON.stringify(stateData)) : ''
+                              if (!backendUrl) {
+                                toast.error('Backend URL not configured. Please contact support.')
+                                return
+                              }
 
-                            const slackAuthUrl = `https://slack.com/oauth/v2/authorize?client_id=${clientId}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(state)}`
+                              // Build dynamic scopes based on feature selection
+                              const scopesArray = []
+                              if (enableSlackSurvey) {
+                                scopesArray.push('commands', 'chat:write', 'team:read')
+                              }
+                              if (enableSlackSentiment) {
+                                scopesArray.push('channels:history', 'channels:read', 'users:read', 'users:read.email')
+                              }
+                              const scopes = Array.from(new Set(scopesArray)).join(',') // Remove duplicates
 
-                            // Show loading state and persist in localStorage
-                            setIsConnectingSlackOAuth(true)
-                            localStorage.setItem('slack_oauth_in_progress', 'true')
-                            toast.info('Redirecting to Slack...')
+                              // Include feature flags in state parameter
+                              const redirectUri = `${backendUrl}/integrations/slack/oauth/callback`
+                              const currentUser = userInfo
+                              const stateData = {
+                                orgId: currentUser?.organization_id,
+                                userId: currentUser?.id,
+                                email: currentUser?.email,
+                                enableSurvey: enableSlackSurvey,
+                                enableSentiment: enableSlackSentiment
+                              }
+                              const state = currentUser ? btoa(JSON.stringify(stateData)) : ''
 
-                            // Use window.location to navigate in same tab so auth token is preserved
-                            window.location.href = slackAuthUrl
-                          }}
-                          disabled={isConnectingSlackOAuth}
-                          className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {isConnectingSlackOAuth ? (
-                            <span className="flex items-center space-x-2">
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                              <span>Connecting...</span>
-                            </span>
-                          ) : (
-                            'Add to Slack'
-                          )}
-                        </Button>
+                              const slackAuthUrl = `https://slack.com/oauth/v2/authorize?client_id=${clientId}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(state)}`
+
+                              // Show loading state and persist in localStorage
+                              setIsConnectingSlackOAuth(true)
+                              localStorage.setItem('slack_oauth_in_progress', 'true')
+                              toast.info('Redirecting to Slack...')
+
+                              // Use window.location to navigate in same tab so auth token is preserved
+                              window.location.href = slackAuthUrl
+                            }}
+                            disabled={isConnectingSlackOAuth || (!enableSlackSurvey && !enableSlackSentiment)}
+                            className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {isConnectingSlackOAuth ? (
+                              <span className="flex items-center space-x-2">
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <span>Connecting...</span>
+                              </span>
+                            ) : (
+                              'Add to Slack'
+                            )}
+                          </Button>
+                        </div>
                       ) : (
                         <div className="inline-flex items-center space-x-2 bg-gray-100 text-gray-500 px-4 py-2 rounded-lg text-sm font-medium">
                           <svg className="w-4 h-4" viewBox="0 0 124 124" fill="currentColor">
@@ -2496,12 +2536,40 @@ export default function IntegrationsPage() {
               />
             )}
 
-            {/* Slack Webhook Form */}
-            {activeEnhancementTab === 'slack' && !hasSlackEnhanced && (
-              <SlackIntegrationCard
-                onConnect={handleSlackConnect}
-                isConnecting={isConnectingSlack}
-              />
+            {/* Slack Sentiment Analysis - OAuth Only */}
+            {activeEnhancementTab === 'slack' && !slackIntegration && (
+              <Card className="border-purple-200 bg-purple-50/30 max-w-2xl mx-auto">
+                <CardHeader>
+                  <CardTitle className="text-lg">Slack Sentiment Analysis</CardTitle>
+                  <p className="text-sm text-gray-600 mt-2">
+                    Sentiment analysis is now configured via the main Slack OAuth flow above.
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="bg-white rounded-lg border p-4">
+                      <h4 className="font-medium text-gray-900 mb-3">To enable sentiment analysis:</h4>
+                      <ol className="space-y-2 text-sm text-gray-700">
+                        <li className="flex items-start space-x-2">
+                          <span className="font-semibold text-purple-600">1.</span>
+                          <span>Scroll up to the "Slack Survey" section</span>
+                        </li>
+                        <li className="flex items-start space-x-2">
+                          <span className="font-semibold text-purple-600">2.</span>
+                          <span>Check the "Enable Sentiment Analysis (Read Messages)" checkbox</span>
+                        </li>
+                        <li className="flex items-start space-x-2">
+                          <span className="font-semibold text-purple-600">3.</span>
+                          <span>Click "Add to Slack" to authorize the integration</span>
+                        </li>
+                      </ol>
+                    </div>
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-900">
+                      <strong>Note:</strong> You can enable both survey delivery and sentiment analysis together, or choose just one feature.
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             )}
 
             {/* Connected GitHub Status */}

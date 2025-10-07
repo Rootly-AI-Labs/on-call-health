@@ -340,9 +340,34 @@ class MigrationRunner:
                     """
                 ]
             },
+            {
+                "name": "008_add_slack_feature_flags",
+                "description": "Add feature flags to slack_workspace_mappings for survey and sentiment analysis",
+                "sql": [
+                    """
+                    ALTER TABLE slack_workspace_mappings
+                    ADD COLUMN IF NOT EXISTS survey_enabled BOOLEAN DEFAULT FALSE
+                    """,
+                    """
+                    ALTER TABLE slack_workspace_mappings
+                    ADD COLUMN IF NOT EXISTS sentiment_enabled BOOLEAN DEFAULT FALSE
+                    """,
+                    """
+                    ALTER TABLE slack_workspace_mappings
+                    ADD COLUMN IF NOT EXISTS granted_scopes VARCHAR(500)
+                    """,
+                    """
+                    -- Set survey_enabled=true for existing OAuth installations (backward compatibility)
+                    UPDATE slack_workspace_mappings
+                    SET survey_enabled = TRUE
+                    WHERE registered_via = 'oauth'
+                    AND survey_enabled IS NULL OR survey_enabled = FALSE
+                    """
+                ]
+            },
             # Add future migrations here with incrementing numbers
             # {
-            #     "name": "008_add_user_preferences",
+            #     "name": "009_add_user_preferences",
             #     "description": "Add user preferences table",
             #     "sql": ["CREATE TABLE IF NOT EXISTS user_preferences (...)"]
             # }

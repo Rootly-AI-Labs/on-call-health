@@ -100,9 +100,11 @@ async def slack_oauth_callback(
     logger.debug(f"Slack OAuth callback received - code: {code[:20]}..., state: {state[:50] if state else 'None'}...")
 
     try:
-        # Parse state parameter to get organization info
+        # Parse state parameter to get organization info and feature flags
         organization_id = None
         user_email = None
+        enable_survey = True  # Default to True for backward compatibility
+        enable_sentiment = False  # Default to False
 
         if state:
             import base64
@@ -112,9 +114,11 @@ async def slack_oauth_callback(
                 logger.debug(f"Full decoded state: {decoded_state}")
                 organization_id = decoded_state.get("orgId")
                 user_email = decoded_state.get("email")
-                logger.debug(f"Decoded state - org_id: {organization_id}, email: {user_email}")
+                enable_survey = decoded_state.get("enableSurvey", True)  # Default True
+                enable_sentiment = decoded_state.get("enableSentiment", False)  # Default False
+                logger.debug(f"Decoded state - org_id: {organization_id}, email: {user_email}, survey: {enable_survey}, sentiment: {enable_sentiment}")
             except Exception as state_error:
-                # If state parsing fails, continue without org mapping
+                # If state parsing fails, continue without org mapping and use defaults
                 logger.warning(f"Failed to parse state parameter: {state_error}")
                 pass
 
@@ -174,6 +178,7 @@ async def slack_oauth_callback(
             team_info = token_data.get("team", {})
             workspace_id = team_info.get("id")
             workspace_name = team_info.get("name")
+            granted_scopes = token_data.get("scope", "")  # Get granted scopes from OAuth response
 
             if not access_token or not workspace_id:
                 raise HTTPException(
@@ -220,29 +225,38 @@ async def slack_oauth_callback(
             existing_mapping.status = 'active'
             if organization_id:
                 existing_mapping.organization_id = organization_id
+            # Update feature flags based on user selection
+            existing_mapping.survey_enabled = enable_survey
+            existing_mapping.sentiment_enabled = enable_sentiment
+            existing_mapping.granted_scopes = granted_scopes
             mapping = existing_mapping
         else:
-            # Create new mapping
+            # Create new mapping with feature flags
             mapping = SlackWorkspaceMapping(
                 workspace_id=workspace_id,
                 workspace_name=workspace_name,
                 organization_id=organization_id,
                 owner_user_id=owner_user.id,
-                status='active'
+                status='active',
+                survey_enabled=enable_survey,
+                sentiment_enabled=enable_sentiment,
+                granted_scopes=granted_scopes
             )
             db.add(mapping)
 
         # Store the bot token separately in a SlackIntegration record for the workspace
-        # This is a simplified approach - in production you might want a dedicated bot token table
+        # IMPORTANT: Query by BOTH workspace_id AND token_source to avoid overwriting manual integrations
         slack_integration = db.query(SlackIntegration).filter(
-            SlackIntegration.workspace_id == workspace_id
+            SlackIntegration.workspace_id == workspace_id,
+            SlackIntegration.token_source == "oauth"  # Only update OAuth integrations
         ).first()
 
         if slack_integration:
+            # Update existing OAuth integration
             slack_integration.slack_token = encrypt_token(access_token)
             slack_integration.updated_at = datetime.utcnow()
         else:
-            # Create a workspace-level integration record
+            # Create new OAuth integration (won't conflict with manual integrations)
             slack_integration = SlackIntegration(
                 user_id=owner_user.id,
                 slack_token=encrypt_token(access_token),
@@ -253,8 +267,14 @@ async def slack_oauth_callback(
 
         db.commit()
 
-        # Log what was created
-        logger.info(f"Slack OAuth successful - workspace: {workspace_name}, workspace_id: {workspace_id}, organization_id: {organization_id}")
+        # Log what was created with feature flags
+        features = []
+        if enable_survey:
+            features.append("survey")
+        if enable_sentiment:
+            features.append("sentiment")
+        features_str = "+".join(features) if features else "none"
+        logger.info(f"Slack OAuth successful - workspace: {workspace_name}, workspace_id: {workspace_id}, organization_id: {organization_id}, features: {features_str}")
 
         # Redirect to frontend with success message
         frontend_url = settings.FRONTEND_URL or "http://localhost:3000"
@@ -629,7 +649,11 @@ async def get_slack_status(
                 "webhook_preview": None,
                 "connection_type": "oauth",
                 "status": workspace_mapping.status,
-                "owner_user_id": workspace_mapping.owner_user_id
+                "owner_user_id": workspace_mapping.owner_user_id,
+                # Feature flags for OAuth integrations
+                "survey_enabled": workspace_mapping.survey_enabled if hasattr(workspace_mapping, 'survey_enabled') else False,
+                "sentiment_enabled": workspace_mapping.sentiment_enabled if hasattr(workspace_mapping, 'sentiment_enabled') else False,
+                "granted_scopes": workspace_mapping.granted_scopes if hasattr(workspace_mapping, 'granted_scopes') else None
             }
         }
     
