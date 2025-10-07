@@ -1121,8 +1121,12 @@ async def get_synced_users(
             filtered_correlations = []
             for corr in correlations:
                 # Only include if integration_id is in the integration_ids array
+                # Also include users with "slack-workspace" marker (synced directly from Slack)
                 # Skip users with NULL integration_ids (not yet synced from any org)
-                if corr.integration_ids and integration_id in corr.integration_ids:
+                if corr.integration_ids and (
+                    integration_id in corr.integration_ids or
+                    "slack-workspace" in corr.integration_ids
+                ):
                     filtered_correlations.append(corr)
             correlations = filtered_correlations
 
