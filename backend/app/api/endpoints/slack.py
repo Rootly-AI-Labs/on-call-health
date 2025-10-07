@@ -1154,13 +1154,12 @@ async def sync_slack_user_ids(
             skipped_count = 0
 
             for correlation in correlations:
-                # Get the user's email
-                user = db.query(User).filter(User.id == correlation.user_id).first()
-                if not user or not user.email:
+                # Use the correlation's email directly
+                if not correlation.email:
                     skipped_count += 1
                     continue
 
-                user_email = user.email.lower()
+                user_email = correlation.email.lower()
                 slack_id = email_to_slack_id.get(user_email)
 
                 if slack_id:
