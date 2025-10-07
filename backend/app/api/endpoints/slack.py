@@ -1072,17 +1072,11 @@ async def sync_slack_user_ids(
     Fetch Slack workspace members and sync their Slack user IDs to UserCorrelation records.
     Matches by email address.
     """
-    logger.debug(f"Sync Slack user IDs request from user {current_user.id} (org: {current_user.organization_id})")
+    logger.debug(f"Sync Slack user IDs request from user {current_user.id}")
 
-    if not current_user.organization_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Organization required to sync Slack user IDs"
-        )
-
-    # Get the workspace mapping and bot token
+    # Get the workspace mapping and bot token for this user
     workspace_mapping = db.query(SlackWorkspaceMapping).filter(
-        SlackWorkspaceMapping.organization_id == current_user.organization_id,
+        SlackWorkspaceMapping.owner_user_id == current_user.id,
         SlackWorkspaceMapping.status == 'active'
     ).first()
 
