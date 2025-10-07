@@ -3,6 +3,8 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
 import { CheckCircle, Loader2 } from "lucide-react"
 import { SlackSurveyTabs } from "@/components/SlackSurveyTabs"
 
@@ -60,19 +62,12 @@ export function UnifiedSlackCard({
   setIsConnectingSlackOAuth,
   toast
 }: UnifiedSlackCardProps) {
-  const [enableSlackSurvey, setEnableSlackSurvey] = useState(true)
-  const [enableSlackSentiment, setEnableSlackSentiment] = useState(true)
+  const [surveyEnabled, setSurveyEnabled] = useState(slackIntegration?.survey_enabled ?? true)
+  const [sentimentEnabled, setSentimentEnabled] = useState(slackIntegration?.sentiment_enabled ?? true)
 
   const isConnected = !!slackIntegration
-  const surveyEnabled = slackIntegration?.survey_enabled ?? false
-  const sentimentEnabled = slackIntegration?.sentiment_enabled ?? false
 
   const handleSlackConnect = () => {
-    if (!enableSlackSurvey && !enableSlackSentiment) {
-      toast.error('Please select at least one feature to enable')
-      return
-    }
-
     const clientId = process.env.NEXT_PUBLIC_SLACK_CLIENT_ID
     const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL
 
@@ -81,24 +76,17 @@ export function UnifiedSlackCard({
       return
     }
 
-    // Build dynamic scopes based on feature selection
-    const scopesArray = []
-    if (enableSlackSurvey) {
-      scopesArray.push('commands', 'chat:write', 'team:read')
-    }
-    if (enableSlackSentiment) {
-      scopesArray.push('channels:history', 'channels:read', 'users:read', 'users:read.email')
-    }
-    const scopes = Array.from(new Set(scopesArray)).join(',')
+    // Request ALL scopes upfront (both features enabled by default)
+    const scopes = 'commands,chat:write,team:read,channels:history,channels:read,users:read,users:read.email'
 
-    // Include feature flags in state parameter
+    // Include feature flags in state parameter - both enabled by default
     const redirectUri = `${backendUrl}/integrations/slack/oauth/callback`
     const stateData = {
       orgId: userInfo?.organization_id,
       userId: userInfo?.id,
       email: userInfo?.email,
-      enableSurvey: enableSlackSurvey,
-      enableSentiment: enableSlackSentiment
+      enableSurvey: true,  // Always true on initial connection
+      enableSentiment: true  // Always true on initial connection
     }
     const state = userInfo ? btoa(JSON.stringify(stateData)) : ''
 
@@ -109,6 +97,19 @@ export function UnifiedSlackCard({
     toast.info('Redirecting to Slack...')
 
     window.location.href = slackAuthUrl
+  }
+
+  const handleFeatureToggle = async (feature: 'survey' | 'sentiment', enabled: boolean) => {
+    // TODO: Implement API call to update feature flags
+    // For now, just update local state
+    if (feature === 'survey') {
+      setSurveyEnabled(enabled)
+    } else {
+      setSentimentEnabled(enabled)
+    }
+
+    // This will need to call an API endpoint to update the feature flags in the backend
+    toast.info(`${feature === 'survey' ? 'Survey Delivery' : 'Sentiment Analysis'} ${enabled ? 'enabled' : 'disabled'}`)
   }
 
   if (loadingSlack) {
@@ -146,7 +147,7 @@ export function UnifiedSlackCard({
               <p className="text-sm text-gray-600">
                 {isConnected
                   ? slackIntegration.workspace_name || 'Connected to workspace'
-                  : 'Connect your Slack workspace for surveys and sentiment analysis'
+                  : 'Connect Slack for surveys and sentiment analysis'
                 }
               </p>
             </div>
@@ -178,128 +179,102 @@ export function UnifiedSlackCard({
       <CardContent className="space-y-6">
         {!isConnected ? (
           <>
-            {/* Feature Selection */}
-            <div>
-              <h4 className="text-sm font-medium text-gray-900 mb-3">Choose features to enable:</h4>
-              <div className="space-y-3">
-                {/* Survey Feature Card */}
-                <div
-                  className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${
-                    enableSlackSurvey
-                      ? 'border-purple-400 bg-purple-50'
-                      : 'border-gray-200 bg-white hover:border-gray-300'
-                  }`}
-                  onClick={() => setEnableSlackSurvey(!enableSlackSurvey)}
-                >
-                  <div className="flex items-start space-x-3">
-                    <input
-                      type="checkbox"
-                      checked={enableSlackSurvey}
-                      onChange={(e) => {
-                        e.stopPropagation()
-                        setEnableSlackSurvey(e.target.checked)
-                      }}
-                      className="w-5 h-5 text-gray-900 rounded focus:ring-gray-500 mt-0.5"
-                    />
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2 mb-1">
-                        <h5 className="font-medium text-gray-900">Survey Delivery</h5>
-                      </div>
-                      <p className="text-sm text-gray-600">
-                        Let team members report burnout via <code className="bg-gray-100 px-1 rounded text-xs">/burnout-survey</code> command and automated DMs
-                      </p>
-                    </div>
+            {/* Pre-Connection: Simple description and button */}
+            <div className="space-y-4">
+              <div className="bg-white rounded-lg border p-4">
+                <h4 className="font-medium text-gray-900 mb-2">What you'll get:</h4>
+                <ul className="space-y-2 text-sm text-gray-600">
+                  <li className="flex items-start space-x-2">
+                    <span className="text-green-600 mt-0.5">✓</span>
+                    <span><strong>Survey Delivery:</strong> Let team members report burnout via /burnout-survey command and automated DMs</span>
+                  </li>
+                  <li className="flex items-start space-x-2">
+                    <span className="text-green-600 mt-0.5">✓</span>
+                    <span><strong>Sentiment Analysis:</strong> Analyze channel messages to detect burnout patterns and communication trends</span>
+                  </li>
+                </ul>
+              </div>
+
+              {/* Connect Button */}
+              {process.env.NEXT_PUBLIC_SLACK_CLIENT_ID ? (
+                <div className="flex justify-center pt-2">
+                  <Button
+                    onClick={handleSlackConnect}
+                    disabled={isConnectingSlackOAuth}
+                    className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2.5 text-base"
+                    size="lg"
+                  >
+                    {isConnectingSlackOAuth ? (
+                      <span className="flex items-center space-x-2">
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        <span>Connecting...</span>
+                      </span>
+                    ) : (
+                      <span className="flex items-center space-x-2">
+                        <SlackIcon />
+                        <span>Add to Slack</span>
+                      </span>
+                    )}
+                  </Button>
+                </div>
+              ) : (
+                <div className="text-center py-4">
+                  <div className="inline-flex items-center space-x-2 bg-gray-100 text-gray-500 px-4 py-2 rounded-lg text-sm font-medium">
+                    <SlackIcon />
+                    <span>Slack App Not Configured</span>
                   </div>
                 </div>
+              )}
 
-                {/* Sentiment Analysis Feature Card */}
-                <div
-                  className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${
-                    enableSlackSentiment
-                      ? 'border-purple-400 bg-purple-50'
-                      : 'border-gray-200 bg-white hover:border-gray-300'
-                  }`}
-                  onClick={() => setEnableSlackSentiment(!enableSlackSentiment)}
-                >
-                  <div className="flex items-start space-x-3">
-                    <input
-                      type="checkbox"
-                      checked={enableSlackSentiment}
-                      onChange={(e) => {
-                        e.stopPropagation()
-                        setEnableSlackSentiment(e.target.checked)
-                      }}
-                      className="w-5 h-5 text-gray-900 rounded focus:ring-gray-500 mt-0.5"
-                    />
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2 mb-1">
-                        <h5 className="font-medium text-gray-900">Sentiment Analysis</h5>
-                      </div>
-                      <p className="text-sm text-gray-600">
-                        Analyze channel messages to detect burnout patterns and communication trends
-                      </p>
-                    </div>
-                  </div>
-                </div>
+              <div className="text-xs text-gray-500 text-center">
+                <p>Both features will be enabled by default. You can toggle them on/off after connecting.</p>
               </div>
-            </div>
-
-            {/* Connect Button */}
-            {process.env.NEXT_PUBLIC_SLACK_CLIENT_ID ? (
-              <div className="flex justify-center pt-2">
-                <Button
-                  onClick={handleSlackConnect}
-                  disabled={isConnectingSlackOAuth || (!enableSlackSurvey && !enableSlackSentiment)}
-                  className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2.5 text-base"
-                  size="lg"
-                >
-                  {isConnectingSlackOAuth ? (
-                    <span className="flex items-center space-x-2">
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      <span>Connecting...</span>
-                    </span>
-                  ) : (
-                    <span className="flex items-center space-x-2">
-                      <SlackIcon />
-                      <span>Add to Slack</span>
-                    </span>
-                  )}
-                </Button>
-              </div>
-            ) : (
-              <div className="text-center py-4">
-                <div className="inline-flex items-center space-x-2 bg-gray-100 text-gray-500 px-4 py-2 rounded-lg text-sm font-medium">
-                  <SlackIcon />
-                  <span>Slack App Not Configured</span>
-                </div>
-              </div>
-            )}
-
-            <div className="text-xs text-gray-500 text-center">
-              <p>You can enable both features or choose just one. Features can be modified later.</p>
             </div>
           </>
         ) : (
           <>
-            {/* Connected State - Show Enabled Features */}
-            <div>
-              <h4 className="text-sm font-medium text-gray-900 mb-3">Enabled Features:</h4>
-              <div className="space-y-2">
-                {surveyEnabled && (
-                  <div className="flex items-center space-x-2 text-sm text-green-700 bg-green-50 px-3 py-2 rounded-lg">
-                    <CheckCircle className="w-4 h-4" />
-                    <span>Survey Delivery</span>
+            {/* Post-Connection: Toggle switches for features */}
+            <div className="space-y-4">
+              <div className="bg-white rounded-lg border divide-y">
+                {/* Survey Delivery Toggle */}
+                <div className="p-4 flex items-center justify-between">
+                  <div className="flex-1">
+                    <Label htmlFor="survey-toggle" className="text-base font-medium text-gray-900 cursor-pointer">
+                      Survey Delivery
+                    </Label>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Let team members report burnout via /burnout-survey command
+                    </p>
                   </div>
-                )}
-                {sentimentEnabled && (
-                  <div className="flex items-center space-x-2 text-sm text-green-700 bg-green-50 px-3 py-2 rounded-lg">
-                    <CheckCircle className="w-4 h-4" />
-                    <span>Sentiment Analysis</span>
+                  <Switch
+                    id="survey-toggle"
+                    checked={surveyEnabled}
+                    onCheckedChange={(checked) => handleFeatureToggle('survey', checked)}
+                    className="ml-4"
+                  />
+                </div>
+
+                {/* Sentiment Analysis Toggle */}
+                <div className="p-4 flex items-center justify-between">
+                  <div className="flex-1">
+                    <Label htmlFor="sentiment-toggle" className="text-base font-medium text-gray-900 cursor-pointer">
+                      Sentiment Analysis
+                    </Label>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Analyze channel messages for burnout patterns
+                    </p>
                   </div>
-                )}
-                {!surveyEnabled && !sentimentEnabled && (
-                  <div className="text-sm text-gray-500 italic">No features enabled</div>
-                )}
+                  <Switch
+                    id="sentiment-toggle"
+                    checked={sentimentEnabled}
+                    onCheckedChange={(checked) => handleFeatureToggle('sentiment', checked)}
+                    className="ml-4"
+                  />
+                </div>
+              </div>
+
+              <div className="text-xs text-gray-500 bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <strong>Note:</strong> Toggling features on/off does not require reconnecting. Your permissions remain the same.
               </div>
             </div>
 
