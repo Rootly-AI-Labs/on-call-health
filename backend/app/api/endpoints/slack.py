@@ -1122,8 +1122,10 @@ async def sync_slack_user_ids(
                 )
 
             data = response.json()
+            logger.debug(f"Slack API response: ok={data.get('ok')}, error={data.get('error')}")
             if not data.get("ok"):
                 error = data.get("error", "unknown")
+                logger.error(f"Slack API returned error: {error}")
                 raise HTTPException(
                     status_code=status.HTTP_502_BAD_GATEWAY,
                     detail=f"Slack API error: {error}"
@@ -1188,7 +1190,9 @@ async def sync_slack_user_ids(
         raise
     except Exception as e:
         db.rollback()
+        import traceback
         logger.error(f"Failed to sync Slack user IDs: {e}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to sync Slack user IDs: {str(e)}"
