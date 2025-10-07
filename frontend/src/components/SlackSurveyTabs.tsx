@@ -183,7 +183,7 @@ export function SlackSurveyTabs({
     }))
 
     const redirectUri = `${backendUrl}/integrations/slack/oauth/callback`
-    const scopes = 'commands,chat:write,team:read'
+    const scopes = 'commands,chat:write,team:read,users:read,users:read.email'
     const slackAuthUrl = `https://slack.com/oauth/v2/authorize?client_id=${clientId}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(state)}`
 
     window.open(slackAuthUrl, '_blank')
