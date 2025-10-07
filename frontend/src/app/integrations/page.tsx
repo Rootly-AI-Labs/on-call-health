@@ -1151,6 +1151,10 @@ export default function IntegrationsPage() {
   const rootlyCount = integrations.filter(i => i.platform === 'rootly').length
   const pagerdutyCount = integrations.filter(i => i.platform === 'pagerduty').length
 
+  // Helper booleans to distinguish between Slack Survey (OAuth) and Enhanced Integration (webhook/token)
+  const hasSlackSurvey = slackIntegration?.connection_type === 'oauth'
+  const hasSlackEnhanced = slackIntegration && slackIntegration.connection_type !== 'oauth'
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
       {/* Header */}
@@ -1932,7 +1936,7 @@ export default function IntegrationsPage() {
                       </div>
 
                       {/* Slack Connection Status */}
-                      {slackIntegration ? (
+                      {hasSlackSurvey ? (
                         <button
                           onClick={() => setSlackSurveyDisconnectDialogOpen(true)}
                           disabled={isDisconnectingSlackSurvey}
@@ -2012,7 +2016,7 @@ export default function IntegrationsPage() {
                   </CardHeader>
                   <CardContent>
                     <SlackSurveyTabs
-                    slackIntegration={slackIntegration}
+                    slackIntegration={hasSlackSurvey ? slackIntegration : null}
                     selectedOrganization={selectedOrganization}
                     integrations={integrations}
                     teamMembers={teamMembers}
@@ -2491,7 +2495,7 @@ export default function IntegrationsPage() {
             )}
 
             {/* Slack Webhook Form */}
-            {activeEnhancementTab === 'slack' && !slackIntegration && (
+            {activeEnhancementTab === 'slack' && !hasSlackEnhanced && (
               <SlackIntegrationCard
                 onConnect={handleSlackConnect}
                 isConnecting={isConnectingSlack}
@@ -2511,7 +2515,7 @@ export default function IntegrationsPage() {
             )}
 
             {/* Connected Slack Status */}
-            {activeEnhancementTab === 'slack' && slackIntegration && (
+            {activeEnhancementTab === 'slack' && hasSlackEnhanced && (
               <Card className="border-green-200 bg-green-50 max-w-2xl mx-auto">
                 <CardHeader className="p-8">
                   <div className="flex items-center justify-between">
