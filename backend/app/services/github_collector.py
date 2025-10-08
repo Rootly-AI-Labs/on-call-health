@@ -525,7 +525,7 @@ class GitHubCollector:
                                 break
                                 
                         elif resp.status == 401:
-                            logger.error("GitHub API authentication failed")
+                            logger.error(f"GitHub API authentication failed for user {username} - token may be expired or invalid")
                             return None
                         elif resp.status == 403:
                             logger.error("GitHub API rate limit exceeded or forbidden")
