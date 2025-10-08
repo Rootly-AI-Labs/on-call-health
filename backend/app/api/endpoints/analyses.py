@@ -1654,7 +1654,10 @@ async def get_analysis_github_commits_timeline(
             "message": "GitHub integration not configured. Please connect your GitHub account or contact support.",
             "data": None
         }
-    
+
+    # Log token status (mask the actual value)
+    logger.info(f"GitHub token available: {bool(github_token)}, length: {len(github_token) if github_token else 0}")
+
     # Initialize GitHub collector
     from ...services.github_collector import GitHubCollector
     collector = GitHubCollector()
