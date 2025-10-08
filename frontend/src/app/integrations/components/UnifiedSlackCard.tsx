@@ -374,34 +374,23 @@ export function UnifiedSlackCard({
                 </div>
               </div>
 
-              <div className="text-xs text-gray-500 bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <strong>Note:</strong> Toggling features on/off does not require reconnecting. Your permissions remain the same.
-              </div>
-
-              {/* Workspace Registration Check */}
-              <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                <div className="flex items-start space-x-3">
-                  <svg className="w-5 h-5 text-gray-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <div className="flex-1">
-                    <h4 className="font-medium text-sm text-gray-900 mb-1">Workspace Registration</h4>
-                    <p className="text-xs text-gray-600 mb-3">
-                      If the <code className="bg-gray-200 px-1 rounded">/burnout-survey</code> command shows "workspace not registered" error, click below to fix:
-                    </p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleWorkspaceCheck}
-                      className="text-xs"
-                    >
-                      <svg className="w-3 h-3 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      Check & Fix Workspace Registration
-                    </Button>
-                  </div>
+              <div className="text-xs text-gray-500 bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center justify-between">
+                <div>
+                  <strong>Note:</strong> Toggling features on/off does not require reconnecting. Your permissions remain the same.
                 </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleWorkspaceCheck}
+                  className="text-xs ml-4 shrink-0"
+                  title="Fix 'workspace not registered' error"
+                >
+                  <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  Fix Registration
+                </Button>
               </div>
             </div>
 
