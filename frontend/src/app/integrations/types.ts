@@ -132,6 +132,9 @@ export interface SlackIntegration {
   connection_type?: "oauth" | "manual"
   status?: string
   owner_user_id?: number
+  survey_enabled?: boolean
+  sentiment_enabled?: boolean
+  granted_scopes?: string
 }
 
 export interface PreviewData {

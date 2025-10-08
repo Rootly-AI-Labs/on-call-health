@@ -2045,20 +2045,24 @@ export default function Dashboard() {
                               </div>
                             </div>
                             <Switch
-                              checked={includeSlack && !!slackIntegration}
+                              checked={includeSlack && !!slackIntegration && slackIntegration.sentiment_enabled === true}
                               onCheckedChange={(checked) => {
                                 if (!slackIntegration) {
                                   toast.error("Slack not connected - please connect on integrations page")
+                                } else if (!slackIntegration.sentiment_enabled) {
+                                  toast.error("Slack sentiment analysis is disabled. Enable it in the integrations page.")
                                 } else {
                                   setIncludeSlack(checked)
                                 }
                               }}
-                              disabled={false}
+                              disabled={!slackIntegration || !slackIntegration.sentiment_enabled}
                             />
                           </div>
                           <p className="text-xs text-gray-600 mb-1">Communication patterns</p>
                           <p className="text-xs text-gray-500">
-                            {slackIntegration?.total_channels ? `${slackIntegration.total_channels} channels` : (slackIntegration ? 'Connected' : 'Not connected')}
+                            {!slackIntegration ? 'Not connected' :
+                             !slackIntegration.sentiment_enabled ? 'Connected (sentiment disabled)' :
+                             slackIntegration.total_channels ? `${slackIntegration.total_channels} channels` : 'Connected'}
                           </p>
                         </>
                       )}
