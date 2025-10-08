@@ -4,7 +4,6 @@ Service for sending Slack DMs with interactive survey buttons.
 import logging
 import httpx
 from typing import Optional
-from ..api.endpoints.slack import decrypt_token
 
 logger = logging.getLogger(__name__)
 
@@ -26,15 +25,15 @@ class SlackDMSender:
         Send a DM to a user with a button to open the burnout survey.
 
         Args:
-            slack_token: Encrypted Slack bot token
+            slack_token: Decrypted Slack bot token (ready to use)
             slack_user_id: Slack user ID (e.g., U01234567)
             user_id: Internal user ID
             organization_id: Organization ID
             message: Custom message (uses default if None)
         """
         try:
-            # Decrypt token
-            decrypted_token = decrypt_token(slack_token)
+            # Token is already decrypted by SlackTokenService
+            decrypted_token = slack_token
 
             # Default message if none provided
             if not message:

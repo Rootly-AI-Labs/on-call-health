@@ -545,7 +545,7 @@ async def toggle_slack_feature(
         # Find the user's OAuth workspace mapping
         workspace_mapping = db.query(SlackWorkspaceMapping).filter(
             SlackWorkspaceMapping.owner_user_id == current_user.id,
-            SlackWorkspaceMapping.token_source == "oauth"
+            SlackWorkspaceMapping.status == 'active'
         ).first()
 
         if not workspace_mapping:
