@@ -588,6 +588,49 @@ async def toggle_slack_feature(
             detail=f"Failed to toggle feature: {str(e)}"
         )
 
+@router.delete("/disconnect")
+async def disconnect_slack(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Disconnect Slack OAuth integration by deactivating the workspace mapping.
+    This keeps the data but marks the workspace as inactive.
+    """
+    try:
+        # Find the user's OAuth workspace mapping
+        workspace_mapping = db.query(SlackWorkspaceMapping).filter(
+            SlackWorkspaceMapping.owner_user_id == current_user.id,
+            SlackWorkspaceMapping.status == 'active'
+        ).first()
+
+        if not workspace_mapping:
+            raise HTTPException(
+                status_code=404,
+                detail="No active Slack workspace found for this user"
+            )
+
+        # Mark as inactive instead of deleting (preserves historical data)
+        workspace_mapping.status = 'inactive'
+        db.commit()
+
+        logger.info(f"User {current_user.id} disconnected Slack workspace {workspace_mapping.workspace_id}")
+
+        return {
+            "success": True,
+            "message": "Slack workspace disconnected successfully"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error disconnecting Slack: {e}")
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to disconnect Slack: {str(e)}"
+        )
+
 @router.post("/sync-user-ids")
 async def sync_slack_user_ids(
     current_user: User = Depends(get_current_user),
