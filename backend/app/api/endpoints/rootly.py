@@ -46,8 +46,9 @@ async def test_rootly_token_preview(
     db: Session = Depends(get_db)
 ):
     """Test Rootly token and return preview info without saving."""
-    # Test the token first
-    client = RootlyAPIClient(token_request.token)
+    # Test the token first (strip whitespace)
+    token = token_request.token.strip()
+    client = RootlyAPIClient(token)
     test_result = await client.test_connection()
     
     logger.info(f"Rootly test connection: {test_result.get('status', 'unknown')} - {test_result.get('organization_name', 'N/A')}")
@@ -78,7 +79,7 @@ async def test_rootly_token_preview(
     # Check if user already has this exact token (only active integrations)
     existing_token = db.query(RootlyIntegration).filter(
         RootlyIntegration.user_id == current_user.id,
-        RootlyIntegration.api_token == token_request.token,
+        RootlyIntegration.api_token == token,  # Use stripped token
         RootlyIntegration.is_active == True
     ).first()
     
@@ -133,8 +134,11 @@ async def add_rootly_integration(
     db: Session = Depends(get_db)
 ):
     """Add a new Rootly integration after testing."""
+    # Strip whitespace from token
+    token = integration_data.token.strip()
+
     # Test the token again to ensure it's still valid
-    client = RootlyAPIClient(integration_data.token)
+    client = RootlyAPIClient(token)
     test_result = await client.test_connection()
     
     if test_result["status"] != "success":
@@ -150,7 +154,7 @@ async def add_rootly_integration(
     # Check if user already has this exact token (prevent duplicates, only active integrations)
     existing_token = db.query(RootlyIntegration).filter(
         RootlyIntegration.user_id == current_user.id,
-        RootlyIntegration.api_token == integration_data.token,
+        RootlyIntegration.api_token == token,  # Use stripped token
         RootlyIntegration.is_active == True
     ).first()
     
@@ -184,7 +188,7 @@ async def add_rootly_integration(
         user_id=current_user.id,
         name=integration_data.name,
         organization_name=organization_name,
-        api_token=integration_data.token,
+        api_token=token,  # Use stripped token
         total_users=total_users,
         is_default=is_first_integration,  # First integration becomes default
         is_active=True,

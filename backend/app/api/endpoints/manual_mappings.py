@@ -531,8 +531,21 @@ async def run_github_mapping(
             # Get users from this integration
             if integration.platform == "rootly":
                 from ...core.rootly_client import RootlyAPIClient
-                client = RootlyAPIClient(integration.api_token)
-                users_data = await client.get_users()
+                # Strip token to handle any whitespace issues
+                api_token = integration.api_token.strip() if integration.api_token else None
+                if not api_token:
+                    logger.error(f"Integration {integration.id} has empty API token")
+                    continue
+
+                client = RootlyAPIClient(api_token)
+                try:
+                    users_data = await client.get_users()
+                except Exception as e:
+                    logger.error(f"Failed to fetch users from Rootly integration {integration.id}: {e}")
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Cannot fetch users from Rootly integration '{integration.name}'. The API token may be invalid or expired. Please check your Rootly integration and reconnect if needed."
+                    )
                 for user in users_data:
                     # Extract from nested attributes structure
                     attributes = user.get("attributes", {})
