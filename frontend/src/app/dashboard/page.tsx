@@ -1335,15 +1335,6 @@ export default function Dashboard() {
                             </div>
                             <span className="text-gray-900">GitHub Activity</span>
                           </CardTitle>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => openMappingDrawer('github')}
-                            className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 hover:text-blue-800 hover:border-blue-300"
-                          >
-                            <Users className="w-4 h-4 mr-2" />
-                            View Mappings
-                          </Button>
                         </div>
                       </CardHeader>
                       <CardContent className="space-y-4">
@@ -1366,21 +1357,12 @@ export default function Dashboard() {
                                   </svg>
                                 </div>
                                 <h3 className="text-lg font-medium text-gray-900 mb-2">No GitHub Data Available</h3>
-                                <p className="text-sm text-gray-500 mb-4">
-                                  {currentAnalysis?.analysis_data?.data_sources?.github_data 
+                                <p className="text-sm text-gray-500">
+                                  {currentAnalysis?.analysis_data?.data_sources?.github_data
                                     ? "No GitHub activity found for team members in this analysis period"
                                     : "GitHub integration not connected or no team members mapped to GitHub accounts"
                                   }
                                 </p>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => openMappingDrawer('github')}
-                                  className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
-                                >
-                                  <Users className="w-4 h-4 mr-2" />
-                                  Configure GitHub Mappings
-                                </Button>
                               </div>
                             )
                           }
@@ -1531,15 +1513,6 @@ export default function Dashboard() {
                             </div>
                             <span className="text-gray-900">Slack Communications</span>
                           </CardTitle>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => openMappingDrawer('slack')}
-                            className="bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100 hover:text-purple-800 hover:border-purple-300"
-                          >
-                            <Users className="w-4 h-4 mr-2" />
-                            View Mappings
-                          </Button>
                         </div>
                       </CardHeader>
                       <CardContent className="space-y-4">
@@ -1571,21 +1544,12 @@ export default function Dashboard() {
                                   </svg>
                                 </div>
                                 <h3 className="text-lg font-medium text-gray-900 mb-2">No Slack Data Available</h3>
-                                <p className="text-sm text-gray-500 mb-4">
-                                  {currentAnalysis?.analysis_data?.data_sources?.slack_data 
+                                <p className="text-sm text-gray-500">
+                                  {currentAnalysis?.analysis_data?.data_sources?.slack_data
                                     ? "No Slack communication activity found for team members in this analysis period"
                                     : "Slack integration not connected or no team members mapped to Slack accounts"
                                   }
                                 </p>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => openMappingDrawer('slack')}
-                                  className="bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100"
-                                >
-                                  <Users className="w-4 h-4 mr-2" />
-                                  Configure Slack Mappings
-                                </Button>
                               </div>
                             )
                           }
