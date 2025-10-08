@@ -65,7 +65,7 @@ export function UnifiedSlackCard({
   toast
 }: UnifiedSlackCardProps) {
   const [surveyEnabled, setSurveyEnabled] = useState(slackIntegration?.survey_enabled ?? true)
-  const [sentimentEnabled, setSentimentEnabled] = useState(slackIntegration?.sentiment_enabled ?? true)
+  const [communicationPatternsEnabled, setCommunicationPatternsEnabled] = useState(slackIntegration?.communication_patterns_enabled ?? true)
 
   const isConnected = !!slackIntegration
 
@@ -88,7 +88,7 @@ export function UnifiedSlackCard({
       userId: userInfo?.id,
       email: userInfo?.email,
       enableSurvey: true,  // Always true on initial connection
-      enableSentiment: true  // Always true on initial connection
+      enableCommunicationPatterns: true  // Always true on initial connection
     }
     const state = userInfo ? btoa(JSON.stringify(stateData)) : ''
 
@@ -164,7 +164,7 @@ export function UnifiedSlackCard({
     }
   }
 
-  const handleFeatureToggle = async (feature: 'survey' | 'sentiment', enabled: boolean) => {
+  const handleFeatureToggle = async (feature: 'survey' | 'communication_patterns', enabled: boolean) => {
     const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL
 
     try {
@@ -172,7 +172,7 @@ export function UnifiedSlackCard({
       if (feature === 'survey') {
         setSurveyEnabled(enabled)
       } else {
-        setSentimentEnabled(enabled)
+        setCommunicationPatternsEnabled(enabled)
       }
 
       // Call backend API to persist the change
@@ -193,7 +193,7 @@ export function UnifiedSlackCard({
       }
 
       const data = await response.json()
-      toast.success(`${feature === 'survey' ? 'Survey Delivery' : 'Sentiment Analysis'} ${enabled ? 'enabled' : 'disabled'}`)
+      toast.success(`${feature === 'survey' ? 'Survey Delivery' : 'Communication Patterns'} ${enabled ? 'enabled' : 'disabled'}`)
 
       // Reload Slack status to ensure UI is in sync with backend
       if (loadSlackStatus) {
@@ -206,10 +206,10 @@ export function UnifiedSlackCard({
       if (feature === 'survey') {
         setSurveyEnabled(!enabled)
       } else {
-        setSentimentEnabled(!enabled)
+        setCommunicationPatternsEnabled(!enabled)
       }
 
-      toast.error(`Failed to ${enabled ? 'enable' : 'disable'} ${feature === 'survey' ? 'Survey Delivery' : 'Sentiment Analysis'}`)
+      toast.error(`Failed to ${enabled ? 'enable' : 'disable'} ${feature === 'survey' ? 'Survey Delivery' : 'Communication Patterns'}`)
     }
   }
 
@@ -291,7 +291,7 @@ export function UnifiedSlackCard({
                   </li>
                   <li className="flex items-start space-x-2">
                     <span className="text-green-600 mt-0.5">✓</span>
-                    <span><strong>Sentiment Analysis:</strong> Analyze channel messages to detect burnout patterns and communication trends</span>
+                    <span><strong>Communication Patterns:</strong> Analyze channel messages to detect burnout patterns and communication trends</span>
                   </li>
                 </ul>
               </div>
@@ -355,20 +355,20 @@ export function UnifiedSlackCard({
                   />
                 </div>
 
-                {/* Sentiment Analysis Toggle */}
+                {/* Communication Patterns Toggle */}
                 <div className="p-4 flex items-center justify-between">
                   <div className="flex-1">
-                    <Label htmlFor="sentiment-toggle" className="text-base font-medium text-gray-900 cursor-pointer">
-                      Sentiment Analysis
+                    <Label htmlFor="communication-patterns-toggle" className="text-base font-medium text-gray-900 cursor-pointer">
+                      Communication Patterns
                     </Label>
                     <p className="text-sm text-gray-600 mt-1">
                       Analyze channel messages for burnout patterns
                     </p>
                   </div>
                   <Switch
-                    id="sentiment-toggle"
-                    checked={sentimentEnabled}
-                    onCheckedChange={(checked) => handleFeatureToggle('sentiment', checked)}
+                    id="communication-patterns-toggle"
+                    checked={communicationPatternsEnabled}
+                    onCheckedChange={(checked) => handleFeatureToggle('communication_patterns', checked)}
                     className="ml-4"
                   />
                 </div>

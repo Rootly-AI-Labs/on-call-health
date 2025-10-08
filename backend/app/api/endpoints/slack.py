@@ -104,7 +104,7 @@ async def slack_oauth_callback(
         organization_id = None
         user_email = None
         enable_survey = True  # Default to True for backward compatibility
-        enable_sentiment = False  # Default to False
+        enable_communication_patterns = False  # Default to False
 
         if state:
             import base64
@@ -115,8 +115,8 @@ async def slack_oauth_callback(
                 organization_id = decoded_state.get("orgId")
                 user_email = decoded_state.get("email")
                 enable_survey = decoded_state.get("enableSurvey", True)  # Default True
-                enable_sentiment = decoded_state.get("enableSentiment", False)  # Default False
-                logger.debug(f"Decoded state - org_id: {organization_id}, email: {user_email}, survey: {enable_survey}, sentiment: {enable_sentiment}")
+                enable_communication_patterns = decoded_state.get("enableCommunicationPatterns", False)  # Default False
+                logger.debug(f"Decoded state - org_id: {organization_id}, email: {user_email}, survey: {enable_survey}, communication_patterns: {enable_communication_patterns}")
             except Exception as state_error:
                 # If state parsing fails, continue without org mapping and use defaults
                 logger.warning(f"Failed to parse state parameter: {state_error}")
@@ -227,7 +227,7 @@ async def slack_oauth_callback(
                 existing_mapping.organization_id = organization_id
             # Update feature flags based on user selection
             existing_mapping.survey_enabled = enable_survey
-            existing_mapping.sentiment_enabled = enable_sentiment
+            existing_mapping.communication_patterns_enabled = enable_communication_patterns
             existing_mapping.granted_scopes = granted_scopes
             mapping = existing_mapping
         else:
@@ -239,7 +239,7 @@ async def slack_oauth_callback(
                 owner_user_id=owner_user.id,
                 status='active',
                 survey_enabled=enable_survey,
-                sentiment_enabled=enable_sentiment,
+                communication_patterns_enabled=enable_communication_patterns,
                 granted_scopes=granted_scopes
             )
             db.add(mapping)
@@ -271,8 +271,8 @@ async def slack_oauth_callback(
         features = []
         if enable_survey:
             features.append("survey")
-        if enable_sentiment:
-            features.append("sentiment")
+        if enable_communication_patterns:
+            features.append("communication_patterns")
         features_str = "+".join(features) if features else "none"
         logger.info(f"Slack OAuth successful - workspace: {workspace_name}, workspace_id: {workspace_id}, organization_id: {organization_id}, features: {features_str}")
 
@@ -522,13 +522,13 @@ async def get_slack_status(
             "owner_user_id": workspace_mapping.owner_user_id,
             # Feature flags for OAuth integrations
             "survey_enabled": workspace_mapping.survey_enabled if hasattr(workspace_mapping, 'survey_enabled') else False,
-            "sentiment_enabled": workspace_mapping.sentiment_enabled if hasattr(workspace_mapping, 'sentiment_enabled') else False,
+            "communication_patterns_enabled": workspace_mapping.communication_patterns_enabled if hasattr(workspace_mapping, 'communication_patterns_enabled') else False,
             "granted_scopes": workspace_mapping.granted_scopes if hasattr(workspace_mapping, 'granted_scopes') else None
         }
     }
 
 class FeatureToggleRequest(BaseModel):
-    feature: str  # 'survey' or 'sentiment'
+    feature: str  # 'survey' or 'communication_patterns'
     enabled: bool
 
 @router.post("/features/toggle")
@@ -538,7 +538,7 @@ async def toggle_slack_feature(
     db: Session = Depends(get_db)
 ):
     """
-    Toggle a Slack feature (survey or sentiment analysis) for the current user's workspace.
+    Toggle a Slack feature (survey or communication patterns analysis) for the current user's workspace.
     Only works for OAuth-based integrations.
     """
     try:
@@ -555,19 +555,19 @@ async def toggle_slack_feature(
             )
 
         # Validate feature name
-        if request.feature not in ['survey', 'sentiment']:
+        if request.feature not in ['survey', 'communication_patterns']:
             raise HTTPException(
                 status_code=400,
-                detail="Invalid feature name. Must be 'survey' or 'sentiment'"
+                detail="Invalid feature name. Must be 'survey' or 'communication_patterns'"
             )
 
         # Update the appropriate feature flag
         if request.feature == 'survey':
             workspace_mapping.survey_enabled = request.enabled
             logger.info(f"User {current_user.id} toggled survey to {request.enabled} for workspace {workspace_mapping.workspace_id}")
-        elif request.feature == 'sentiment':
-            workspace_mapping.sentiment_enabled = request.enabled
-            logger.info(f"User {current_user.id} toggled sentiment to {request.enabled} for workspace {workspace_mapping.workspace_id}")
+        elif request.feature == 'communication_patterns':
+            workspace_mapping.communication_patterns_enabled = request.enabled
+            logger.info(f"User {current_user.id} toggled communication_patterns to {request.enabled} for workspace {workspace_mapping.workspace_id}")
 
         db.commit()
 

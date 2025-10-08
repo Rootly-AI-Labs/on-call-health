@@ -349,19 +349,19 @@ async def _run_analysis_task_impl(db, analysis_id: int, integration_id: int, day
         if user:
             feature_config = slack_service.get_feature_config_for_user(user)
 
-            # Only retrieve token if sentiment analysis is enabled
-            if feature_config and feature_config.sentiment_enabled:
+            # Only retrieve token if communication patterns analysis is enabled
+            if feature_config and feature_config.communication_patterns_enabled:
                 slack_token = slack_service.get_oauth_token_for_user(user)
                 if slack_token:
                     logger.info(
                         f"Retrieved Slack OAuth token for user {user_id} (org {user.organization_id}) "
-                        f"- sentiment analysis enabled"
+                        f"- communication patterns analysis enabled"
                     )
                 else:
-                    logger.warning(f"Sentiment enabled but no Slack token available for user {user_id}")
+                    logger.warning(f"Communication patterns enabled but no Slack token available for user {user_id}")
             else:
                 logger.debug(
-                    f"Slack sentiment analysis not enabled for user {user_id} "
+                    f"Slack communication patterns analysis not enabled for user {user_id} "
                     f"(survey: {feature_config.survey_enabled if feature_config else 'N/A'})"
                 )
         
