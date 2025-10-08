@@ -126,10 +126,9 @@ import * as AIHandlers from "./handlers/ai-handlers"
 import * as MappingHandlers from "./handlers/mapping-handlers"
 import * as Utils from "./utils"
 import { GitHubIntegrationCard } from "./components/GitHubIntegrationCard"
-import { SlackIntegrationCard } from "./components/SlackIntegrationCard"
 import { GitHubConnectedCard } from "./components/GitHubConnectedCard"
-import { SlackConnectedCard } from "./components/SlackConnectedCard"
 import { RootlyIntegrationForm } from "./components/RootlyIntegrationForm"
+import { SurveyFeedbackSection } from "./components/SurveyFeedbackSection"
 import { PagerDutyIntegrationForm } from "./components/PagerDutyIntegrationForm"
 import { DeleteIntegrationDialog } from "./dialogs/DeleteIntegrationDialog"
 import { GitHubDisconnectDialog } from "./dialogs/GitHubDisconnectDialog"
@@ -154,6 +153,10 @@ export default function IntegrationsPage() {
   const [githubIntegration, setGithubIntegration] = useState<GitHubIntegration | null>(null)
   const [slackIntegration, setSlackIntegration] = useState<SlackIntegration | null>(null)
   const [activeEnhancementTab, setActiveEnhancementTab] = useState<"github" | "slack" | null>(null)
+
+  // Slack feature selection for OAuth
+  const [enableSlackSurvey, setEnableSlackSurvey] = useState(true) // Default both enabled
+  const [enableSlackSentiment, setEnableSlackSentiment] = useState(true)
   
   // Mapping data state
   const [showMappingDialog, setShowMappingDialog] = useState(false)
@@ -1151,6 +1154,12 @@ export default function IntegrationsPage() {
   const rootlyCount = integrations.filter(i => i.platform === 'rootly').length
   const pagerdutyCount = integrations.filter(i => i.platform === 'pagerduty').length
 
+  // Helper booleans to distinguish between Slack Survey (OAuth) and Enhanced Integration (webhook/token)
+  // Note: Backend returns ONE integration at a time - either OAuth or manual, not both simultaneously
+  // Users must choose one integration type. If they want to switch, they disconnect one and connect the other.
+  const hasSlackSurvey = slackIntegration?.connection_type === 'oauth'
+  const hasSlackEnhanced = slackIntegration && slackIntegration.connection_type !== 'oauth'
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
       {/* Header */}
@@ -1831,557 +1840,15 @@ export default function IntegrationsPage() {
             )}
         </div>
 
-        {/* User-Reported Connection Section */}
-        <div className="mt-16 space-y-8">
-          <div className="text-center">
-            <h2 className="text-2xl font-bold text-slate-900 mb-3">User-Reported Insights</h2>
-            <p className="text-lg text-slate-600 mb-2">
-              Enable team members to share their own burnout insights
-            </p>
-            <p className="text-slate-500">
-              Collect direct feedback through Slack commands and web surveys
-            </p>
-          </div>
-
-          <div className="max-w-2xl mx-auto space-y-6">
-            {/* Slack Survey with Tabs */}
-            <Card className="border-2 border-purple-200 bg-purple-50/30">
-              {loadingSlack ? (
-                <>
-                  <CardHeader className="pb-4">
-                    <div className="flex items-center justify-between animate-pulse">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-gray-200 rounded-lg"></div>
-                        <div className="space-y-2">
-                          <div className="w-32 h-5 bg-gray-200 rounded"></div>
-                          <div className="w-64 h-4 bg-gray-200 rounded"></div>
-                        </div>
-                      </div>
-                      <div className="w-24 h-9 bg-gray-200 rounded-lg"></div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-6 animate-pulse">
-                      {/* Skeleton for "Connect Slack Workspace" button */}
-                      <div className="flex flex-col items-center justify-center py-8 space-y-3">
-                        <div className="w-64 h-12 bg-gray-200 rounded-lg"></div>
-                        <div className="w-96 h-4 bg-gray-200 rounded"></div>
-                      </div>
-
-                      {/* Skeleton for "How it works" section */}
-                      <div className="space-y-4">
-                        <div className="w-32 h-6 bg-gray-200 rounded"></div>
-                        <div className="space-y-4">
-                          <div className="flex items-start space-x-3">
-                            <div className="w-8 h-8 bg-gray-200 rounded-full flex-shrink-0"></div>
-                            <div className="flex-1 space-y-2">
-                              <div className="w-3/4 h-4 bg-gray-200 rounded"></div>
-                            </div>
-                          </div>
-                          <div className="flex items-start space-x-3">
-                            <div className="w-8 h-8 bg-gray-200 rounded-full flex-shrink-0"></div>
-                            <div className="flex-1 space-y-2">
-                              <div className="w-2/3 h-4 bg-gray-200 rounded"></div>
-                              <div className="w-full h-20 bg-gray-200 rounded-lg mt-2"></div>
-                            </div>
-                          </div>
-                          <div className="flex items-start space-x-3">
-                            <div className="w-8 h-8 bg-gray-200 rounded-full flex-shrink-0"></div>
-                            <div className="flex-1 space-y-2">
-                              <div className="w-3/4 h-4 bg-gray-200 rounded"></div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Skeleton for footer */}
-                      <div className="flex items-center justify-between pt-4 border-t">
-                        <div className="flex items-center space-x-2">
-                          <div className="w-4 h-4 bg-gray-200 rounded"></div>
-                          <div className="w-48 h-4 bg-gray-200 rounded"></div>
-                        </div>
-                      <div className="flex items-center space-x-2">
-                        <div className="w-4 h-4 bg-gray-200 rounded"></div>
-                        <div className="w-40 h-4 bg-gray-200 rounded"></div>
-                      </div>
-                    </div>
-                  </div>
-                  </CardContent>
-                </>
-              ) : (
-                <>
-                  <CardHeader className="pb-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                          <svg className="w-6 h-6" viewBox="0 0 124 124" fill="none">
-                            <path d="M26.3996 78.2003C26.3996 84.7003 21.2996 89.8003 14.7996 89.8003C8.29961 89.8003 3.19961 84.7003 3.19961 78.2003C3.19961 71.7003 8.29961 66.6003 14.7996 66.6003H26.3996V78.2003Z" fill="#E01E5A"/>
-                            <path d="M32.2996 78.2003C32.2996 71.7003 37.3996 66.6003 43.8996 66.6003C50.3996 66.6003 55.4996 71.7003 55.4996 78.2003V109.2C55.4996 115.7 50.3996 120.8 43.8996 120.8C37.3996 120.8 32.2996 115.7 32.2996 109.2V78.2003Z" fill="#E01E5A"/>
-                            <path d="M43.8996 26.4003C37.3996 26.4003 32.2996 21.3003 32.2996 14.8003C32.2996 8.30026 37.3996 3.20026 43.8996 3.20026C50.3996 3.20026 55.4996 8.30026 55.4996 14.8003V26.4003H43.8996Z" fill="#36C5F0"/>
-                            <path d="M43.8996 32.3003C50.3996 32.3003 55.4996 37.4003 55.4996 43.9003C55.4996 50.4003 50.3996 55.5003 43.8996 55.5003H12.8996C6.39961 55.5003 1.29961 50.4003 1.29961 43.9003C1.29961 37.4003 6.39961 32.3003 12.8996 32.3003H43.8996Z" fill="#36C5F0"/>
-                            <path d="M95.5996 43.9003C95.5996 37.4003 100.7 32.3003 107.2 32.3003C113.7 32.3003 118.8 37.4003 118.8 43.9003C118.8 50.4003 113.7 55.5003 107.2 55.5003H95.5996V43.9003Z" fill="#2EB67D"/>
-                            <path d="M89.6996 43.9003C89.6996 50.4003 84.5996 55.5003 78.0996 55.5003C71.5996 55.5003 66.4996 50.4003 66.4996 43.9003V12.9003C66.4996 6.40026 71.5996 1.30026 78.0996 1.30026C84.5996 1.30026 89.6996 6.40026 89.6996 12.9003V43.9003Z" fill="#2EB67D"/>
-                            <path d="M78.0996 95.6003C84.5996 95.6003 89.6996 100.7 89.6996 107.2C89.6996 113.7 84.5996 118.8 78.0996 118.8C71.5996 118.8 66.4996 113.7 66.4996 107.2V95.6003H78.0996Z" fill="#ECB22E"/>
-                            <path d="M78.0996 89.7003C71.5996 89.7003 66.4996 84.6003 66.4996 78.1003C66.4996 71.6003 71.5996 66.5003 78.0996 66.5003H109.1C115.6 66.5003 120.7 71.6003 120.7 78.1003C120.7 84.6003 115.6 89.7003 109.1 89.7003H78.0996Z" fill="#ECB22E"/>
-                          </svg>
-                        </div>
-                        <div>
-                          <CardTitle className="text-lg text-gray-900">Slack Survey</CardTitle>
-                          <p className="text-sm text-gray-600">Let team members report burnout scores directly in Slack</p>
-                        </div>
-                      </div>
-
-                      {/* Slack Connection Status */}
-                      {slackIntegration ? (
-                        <button
-                          onClick={() => setSlackSurveyDisconnectDialogOpen(true)}
-                          disabled={isDisconnectingSlackSurvey}
-                          className="inline-flex items-center space-x-2 bg-green-100 text-green-800 px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {isDisconnectingSlackSurvey ? (
-                            <>
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                              <span>Disconnecting...</span>
-                            </>
-                          ) : (
-                            <>
-                              <CheckCircle className="w-4 h-4" />
-                              <span>Connected</span>
-                            </>
-                          )}
-                        </button>
-                      ) : process.env.NEXT_PUBLIC_SLACK_CLIENT_ID ? (
-                        <Button
-                          onClick={() => {
-                            // Official OnCall Burnout Detector Slack App
-                            // This single app can be installed by any organization
-                            const clientId = process.env.NEXT_PUBLIC_SLACK_CLIENT_ID
-                            const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL
-
-                            if (!backendUrl) {
-                              toast.error('Backend URL not configured. Please contact support.')
-                              return
-                            }
-
-                            // Include organization context in callback URL so backend knows which org is installing
-                            const redirectUri = `${backendUrl}/integrations/slack/oauth/callback`
-                            const scopes = 'commands,chat:write,team:read'
-
-                            // Add state parameter to track which organization is installing
-                            const currentUser = userInfo // Assuming userInfo contains org info
-                            const stateData = {
-                              orgId: currentUser?.organization_id,
-                              userId: currentUser?.id,
-                              email: currentUser?.email
-                            }
-                            const state = currentUser ? btoa(JSON.stringify(stateData)) : ''
-
-                            const slackAuthUrl = `https://slack.com/oauth/v2/authorize?client_id=${clientId}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(state)}`
-
-                            // Show loading state and persist in localStorage
-                            setIsConnectingSlackOAuth(true)
-                            localStorage.setItem('slack_oauth_in_progress', 'true')
-                            toast.info('Redirecting to Slack...')
-
-                            // Use window.location to navigate in same tab so auth token is preserved
-                            window.location.href = slackAuthUrl
-                          }}
-                          disabled={isConnectingSlackOAuth}
-                          className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {isConnectingSlackOAuth ? (
-                            <span className="flex items-center space-x-2">
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                              <span>Connecting...</span>
-                            </span>
-                          ) : (
-                            'Add to Slack'
-                          )}
-                        </Button>
-                      ) : (
-                        <div className="inline-flex items-center space-x-2 bg-gray-100 text-gray-500 px-4 py-2 rounded-lg text-sm font-medium">
-                          <svg className="w-4 h-4" viewBox="0 0 124 124" fill="currentColor">
-                            <path d="M26.3996 78.2003C26.3996 84.7003 21.2996 89.8003 14.7996 89.8003C8.29961 89.8003 3.19961 84.7003 3.19961 78.2003C3.19961 71.7003 8.29961 66.6003 14.7996 66.6003H26.3996V78.2003Z"/>
-                            <path d="M32.2996 78.2003C32.2996 71.7003 37.3996 66.6003 43.8996 66.6003C50.3996 66.6003 55.4996 71.7003 55.4996 78.2003V109.2C55.4996 115.7 50.3996 120.8 43.8996 120.8C37.3996 120.8 32.2996 115.7 32.2996 109.2V78.2003Z"/>
-                            <path d="M43.8996 26.4003C37.3996 26.4003 32.2996 21.3003 32.2996 14.8003C32.2996 8.30026 37.3996 3.20026 43.8996 3.20026C50.3996 3.20026 55.4996 8.30026 55.4996 14.8003V26.4003H43.8996Z"/>
-                          </svg>
-                          <span>Slack App Not Configured</span>
-                        </div>
-                      )}
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <SlackSurveyTabs
-                    slackIntegration={slackIntegration}
-                    selectedOrganization={selectedOrganization}
-                    integrations={integrations}
-                    teamMembers={teamMembers}
-                    loadingTeamMembers={loadingTeamMembers}
-                    loadingSyncedUsers={loadingSyncedUsers}
-                    userInfo={userInfo}
-                    fetchTeamMembers={fetchTeamMembers}
-                    syncUsersToCorrelation={syncUsersToCorrelation}
-                    fetchSyncedUsers={fetchSyncedUsers}
-                    setShowManualSurveyModal={setShowManualSurveyModal}
-                    loadSlackPermissions={loadSlackPermissions}
-                    toast={toast}
-                  />
-                  </CardContent>
-                </>
-              )}
-            </Card>
-
-            {/* OLD SLACK SURVEY CONTENT - TO BE REMOVED AFTER TESTING */}
-            <Card className="border-2 border-purple-200 bg-purple-50/30" style={{display: 'none'}}>
-              <CardHeader className="pb-4">
-                <div className="text-sm text-gray-500">Old content hidden - remove after testing</div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="bg-white rounded-lg border p-4 space-y-4">
-                  {!process.env.NEXT_PUBLIC_SLACK_CLIENT_ID && (
-                    <div className="text-center py-2">
-                      <p className="text-sm text-gray-600 mb-4">
-                        The official Slack app is not currently configured. You can still use the manual Slack integration below to connect your workspace with webhook URL and bot token.
-                      </p>
-                    </div>
-                  )}
-
-                  <div className="border-t pt-4">
-                    <h4 className="font-medium text-gray-900 mb-3">How it works:</h4>
-                    <div className="space-y-3">
-                      <div className="flex items-start space-x-3">
-                        <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                          <span className="text-green-600 text-xs font-bold">1</span>
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-700"><strong>Authorize the app</strong> to add slash commands to your Slack workspace</p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-start space-x-3">
-                        <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                          <span className="text-green-600 text-xs font-bold">2</span>
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-700"><strong>Team members type</strong> <code className="bg-gray-100 px-1 rounded text-xs">/burnout-survey</code></p>
-                          <div className="bg-slate-800 rounded p-3 font-mono text-sm text-green-400 mt-2">
-                            <div>/burnout-survey</div>
-                            <div className="text-slate-400 mt-1">→ Opens 2-minute burnout survey with 3 questions</div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-start space-x-3">
-                        <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                          <span className="text-green-600 text-xs font-bold">3</span>
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-700"><strong>Survey responses appear automatically</strong> in your burnout analysis to validate automated detection</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Workspace Details for OAuth Connections */}
-                {slackIntegration?.connection_type === 'oauth' && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <h4 className="font-medium text-blue-900 mb-2 flex items-center">
-                      <Building className="w-4 h-4 mr-2" />
-                      Registered Workspace
-                    </h4>
-                    <div className="grid grid-cols-2 gap-3 text-sm">
-                      <div>
-                        <span className="text-blue-700 font-medium">Workspace:</span>
-                        <p className="text-blue-900">{slackIntegration.workspace_name || 'Unknown'}</p>
-                      </div>
-                      <div>
-                        <span className="text-blue-700 font-medium">Status:</span>
-                        <p className="text-blue-900 capitalize">{slackIntegration.status || 'Active'}</p>
-                      </div>
-                      <div>
-                        <span className="text-blue-700 font-medium">Registered:</span>
-                        <p className="text-blue-900">{new Date(slackIntegration.connected_at).toLocaleDateString()}</p>
-                      </div>
-                      <div>
-                        <span className="text-blue-700 font-medium">Workspace ID:</span>
-                        <p className="text-blue-900 font-mono text-xs">{slackIntegration.workspace_id}</p>
-                      </div>
-                    </div>
-                    <div className="mt-3 pt-3 border-t border-blue-200">
-                      <p className="text-xs text-blue-800">
-                        💡 The <code className="bg-blue-100 px-1 rounded">/burnout-survey</code> command will only show analyses for your organization
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Workspace Registration Fix Button - Always show when Slack connected */}
-                {slackIntegration && (
-                  <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                    <h4 className="font-medium text-yellow-900 mb-2 flex items-center text-sm">
-                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                      </svg>
-                      Troubleshooting
-                    </h4>
-                    <p className="text-xs text-yellow-800 mb-3">
-                      If the <code className="bg-yellow-100 px-1 rounded">/burnout-survey</code> command shows "workspace not registered" error, click below to fix:
-                    </p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={async () => {
-                        try {
-                          const authToken = localStorage.getItem('auth_token')
-                          if (!authToken) {
-                            toast.error('Please log in to check workspace status')
-                            return
-                          }
-
-                          // Check workspace status
-                          const statusResponse = await fetch(`${API_BASE}/integrations/slack/workspace/status`, {
-                            headers: {
-                              'Authorization': `Bearer ${authToken}`,
-                              'Content-Type': 'application/json'
-                            }
-                          })
-
-                          if (!statusResponse.ok) {
-                            toast.error('Failed to check workspace status')
-                            return
-                          }
-
-                          const statusData = await statusResponse.json()
-
-                          if (statusData.diagnosis.has_workspace_mapping) {
-                            toast.success('✅ Workspace is properly registered! /burnout-survey command should work.')
-                          } else {
-                            // Need to register workspace
-                            if (!slackIntegration?.workspace_id) {
-                              toast.error('No workspace ID found. Please reconnect Slack.')
-                              return
-                            }
-
-                            const formData = new FormData()
-                            formData.append('workspace_id', slackIntegration.workspace_id)
-                            formData.append('workspace_name', slackIntegration.workspace_name || slackIntegration.workspace_id)
-
-                            const registerResponse = await fetch(`${API_BASE}/integrations/slack/workspace/register`, {
-                              method: 'POST',
-                              headers: {
-                                'Authorization': `Bearer ${authToken}`
-                              },
-                              body: formData
-                            })
-
-                            if (registerResponse.ok) {
-                              const registerData = await registerResponse.json()
-                              toast.success('✅ Workspace registered! /burnout-survey command should now work. Try the command again.')
-
-                              // Reload Slack integration to update UI
-                              await loadSlackPermissions()
-                            } else {
-                              const errorData = await registerResponse.json()
-                              toast.error(`Failed to register workspace: ${errorData.detail || 'Unknown error'}`)
-                            }
-                          }
-                        } catch (error) {
-                          console.error('Error checking/fixing workspace:', error)
-                          toast.error('Error checking workspace status')
-                        }
-                      }}
-                      className="w-full text-xs"
-                    >
-                      <svg className="w-3 h-3 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      Check & Fix Workspace Registration
-                    </Button>
-                  </div>
-                )}
-
-                <div className="flex items-center justify-between pt-2">
-                  <div className="flex items-center space-x-2 text-sm text-gray-500">
-                    <Users className="w-4 h-4" />
-                    <span>Available to all workspace members</span>
-                  </div>
-                  <div className="flex items-center space-x-2 text-xs text-gray-400">
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                    </svg>
-                    <span>Secure OAuth authentication</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Team Members for Survey Correlation - NOW IN TABS ABOVE */}
-            {false && slackIntegration && selectedOrganization && (
-              <Card className="border-2 border-purple-200 bg-purple-50/30" style={{display: 'none'}}>
-                <CardHeader className="pb-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                        <Users className="w-6 h-6 text-purple-600" />
-                      </div>
-                      <div>
-                        <CardTitle className="text-lg text-gray-900">Team Members</CardTitle>
-                        <p className="text-sm text-gray-600">Users from your organization who can submit surveys</p>
-                      </div>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="bg-white rounded-lg border p-4">
-                    <div className="mb-4">
-                      <h4 className="font-medium text-gray-900 mb-2">Survey Correlation</h4>
-                      <p className="text-sm text-gray-600 mb-3">
-                        When team members submit a <code className="bg-gray-100 px-1 rounded text-xs">/burnout-survey</code>,
-                        we match them to their profile using:
-                      </p>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex items-start space-x-2">
-                          <div className="w-5 h-5 bg-purple-100 rounded flex items-center justify-center flex-shrink-0 mt-0.5">
-                            <span className="text-purple-600 text-xs">1</span>
-                          </div>
-                          <div>
-                            <span className="font-medium text-gray-900">Slack email</span> matches
-                            <span className="font-medium text-gray-900"> Rootly/PagerDuty email</span>
-                          </div>
-                        </div>
-                        <div className="flex items-start space-x-2">
-                          <div className="w-5 h-5 bg-purple-100 rounded flex items-center justify-center flex-shrink-0 mt-0.5">
-                            <span className="text-purple-600 text-xs">2</span>
-                          </div>
-                          <div>
-                            Survey response is linked to their burnout analysis profile
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="border-t pt-4">
-                      <div className="mb-4">
-                        <h4 className="font-medium text-gray-900 mb-3">
-                          Team Members from {integrations.find(i => i.id.toString() === selectedOrganization)?.name}
-                        </h4>
-                        <div className="flex flex-wrap gap-2">
-                          <Button
-                            onClick={fetchTeamMembers}
-                            disabled={loadingTeamMembers || !selectedOrganization}
-                            size="sm"
-                            variant="outline"
-                            className="flex items-center space-x-2"
-                          >
-                            {loadingTeamMembers ? (
-                              <>
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                                <span>Loading...</span>
-                              </>
-                            ) : (
-                              <>
-                                <RefreshCw className="w-4 h-4" />
-                                <span>Load Members</span>
-                              </>
-                            )}
-                          </Button>
-                          <Button
-                            onClick={syncUsersToCorrelation}
-                            disabled={loadingTeamMembers || !selectedOrganization || teamMembers.length === 0}
-                            size="sm"
-                            variant="default"
-                            className="flex items-center space-x-2 bg-purple-600 hover:bg-purple-700"
-                          >
-                            {loadingTeamMembers ? (
-                              <>
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                                <span>Syncing...</span>
-                              </>
-                            ) : (
-                              <>
-                                <Database className="w-4 h-4" />
-                                <span>Sync to Survey System</span>
-                              </>
-                            )}
-                          </Button>
-                          {slackIntegration?.workspace_id && (
-                            <Button
-                              onClick={syncSlackUserIds}
-                              disabled={loadingTeamMembers}
-                              size="sm"
-                              variant="default"
-                              className="flex items-center space-x-2 bg-green-600 hover:bg-green-700"
-                            >
-                              {loadingTeamMembers ? (
-                                <>
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                  <span>Syncing...</span>
-                                </>
-                              ) : (
-                                <>
-                                  <MessageSquare className="w-4 h-4" />
-                                  <span>Sync Slack IDs</span>
-                                </>
-                              )}
-                            </Button>
-                          )}
-                          <Button
-                            onClick={() => fetchSyncedUsers()}
-                            disabled={loadingSyncedUsers}
-                            size="sm"
-                            variant="outline"
-                            className="flex items-center space-x-2"
-                          >
-                            {loadingSyncedUsers ? (
-                              <>
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                                <span>Loading...</span>
-                              </>
-                            ) : (
-                              <>
-                                <Users2 className="w-4 h-4" />
-                                <span>View Synced Users</span>
-                              </>
-                            )}
-                          </Button>
-                          {(userInfo?.role === 'super_admin' || userInfo?.role === 'org_admin') && (
-                            <Button
-                              onClick={() => setShowManualSurveyModal(true)}
-                              size="sm"
-                              className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700"
-                            >
-                              <Send className="w-4 h-4" />
-                              <span>Send Survey Now</span>
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="text-sm text-gray-600">
-                        <p className="mb-2">Click "Load Members" to view users from your organization who can submit burnout surveys.</p>
-                        <p className="text-xs text-gray-500">
-                          After loading, use "Sync to Survey System" to ensure all team members can submit surveys via Slack,
-                          even if they haven't been involved in incidents yet.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        </div>
-
-        {/* GitHub and Slack Integrations Section */}
+        {/* Enhanced Integrations Section */}
         <div className="mt-16 space-y-8">
           <div className="text-center">
             <h2 className="text-2xl font-bold text-slate-900 mb-3">Enhanced Integrations</h2>
             <p className="text-lg text-slate-600 mb-2">
-              Add GitHub and Slack for deeper burnout analysis
+              Connect GitHub and Slack for deeper insights
             </p>
             <p className="text-slate-500">
-              Analyze code patterns and communication trends to get additional insights
+              Analyze code patterns, team communication, and collect direct feedback
             </p>
           </div>
 
@@ -2490,11 +1957,27 @@ export default function IntegrationsPage() {
               />
             )}
 
-            {/* Slack Webhook Form */}
-            {activeEnhancementTab === 'slack' && !slackIntegration && (
-              <SlackIntegrationCard
-                onConnect={handleSlackConnect}
-                isConnecting={isConnectingSlack}
+            {/* Slack Integration - OAuth Only */}
+            {activeEnhancementTab === 'slack' && (
+              <SurveyFeedbackSection
+                slackIntegration={slackIntegration}
+                loadingSlack={loadingSlack}
+                isConnectingSlackOAuth={isConnectingSlackOAuth}
+                isDisconnectingSlackSurvey={isDisconnectingSlackSurvey}
+                userInfo={userInfo}
+                selectedOrganization={selectedOrganization}
+                integrations={integrations}
+                teamMembers={teamMembers}
+                loadingTeamMembers={loadingTeamMembers}
+                loadingSyncedUsers={loadingSyncedUsers}
+                fetchTeamMembers={fetchTeamMembers}
+                syncUsersToCorrelation={syncUsersToCorrelation}
+                fetchSyncedUsers={fetchSyncedUsers}
+                setShowManualSurveyModal={setShowManualSurveyModal}
+                loadSlackPermissions={loadSlackPermissions}
+                setSlackSurveyDisconnectDialogOpen={setSlackSurveyDisconnectDialogOpen}
+                setIsConnectingSlackOAuth={setIsConnectingSlackOAuth}
+                toast={toast}
               />
             )}
 
@@ -2510,202 +1993,6 @@ export default function IntegrationsPage() {
               />
             )}
 
-            {/* Connected Slack Status */}
-            {activeEnhancementTab === 'slack' && slackIntegration && (
-              <Card className="border-green-200 bg-green-50 max-w-2xl mx-auto">
-                <CardHeader className="p-8">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 rounded-lg flex items-center justify-center">
-                        <Image
-                          src="/images/slack-logo.png"
-                          alt="Slack"
-                          width={40}
-                          height={40}
-                          className="h-10 w-10 object-contain"
-                        />
-                      </div>
-                      <div>
-                        <CardTitle>Slack Connected</CardTitle>
-                        <CardDescription>User ID: {slackIntegration.slack_user_id}</CardDescription>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => openMappingDrawer('slack')}
-                        disabled={loadingMappingData}
-                        className="bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100 hover:text-purple-800 hover:border-purple-300"
-                        title="View and manage Slack user mappings"
-                      >
-                        {loadingMappingData && selectedMappingPlatform === 'slack' ? (
-                          <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Loading...
-                          </>
-                        ) : (
-                          <>
-                            <Users className="w-4 h-4 mr-2" />
-                            View Mappings
-                          </>
-                        )}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={handleSlackTest}
-                        className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                      >
-                        <RotateCcw className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setSlackDisconnectDialogOpen(true)}
-                        className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-8 pt-0">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                      <div className="flex items-center space-x-2">
-                        <Key className="w-4 h-4 text-gray-400" />
-                        <div>
-                          <div className="font-medium">Webhook URL</div>
-                          <div className="text-gray-600 font-mono text-xs">
-                            {slackIntegration.webhook_preview || 'Not configured'}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Key className="w-4 h-4 text-gray-400" />
-                        <div>
-                          <div className="font-medium">Bot Token</div>
-                          <div className="text-gray-600 font-mono text-xs">
-                            {slackIntegration.token_preview || 'Not available'}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Building className="w-4 h-4 text-gray-400" />
-                        <div>
-                          <div className="font-medium">Workspace ID</div>
-                          <div className="text-gray-600 font-mono text-xs">{slackIntegration.workspace_id}</div>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Calendar className="w-4 h-4 text-gray-400" />
-                        <div>
-                          <div className="font-medium">Connected</div>
-                          <div className="text-gray-600">{new Date(slackIntegration.connected_at).toLocaleDateString()}</div>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Clock className="w-4 h-4 text-gray-400" />
-                        <div>
-                          <div className="font-medium">Last Updated</div>
-                          <div className="text-gray-600">{new Date(slackIntegration.last_updated).toLocaleDateString()}</div>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Users className="w-4 h-4 text-gray-400" />
-                        <div>
-                          <div className="font-medium">User ID</div>
-                          <div className="text-gray-600 font-mono text-xs">{slackIntegration.slack_user_id}</div>
-                        </div>
-                      </div>
-                    </div>
-
-                  {/* Permissions Section */}
-                  <div className="border-t pt-4 mt-6">
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="font-medium text-sm">Bot Permissions</h4>
-                      {isLoadingPermissions ? (
-                        <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
-                      ) : (
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          onClick={loadSlackPermissions}
-                          className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                        >
-                          <RotateCcw className="w-4 h-4" />
-                        </Button>
-                      )}
-                    </div>
-                    {slackPermissions ? (
-                      <div className="grid grid-cols-1 gap-2">
-                        {Object.entries(slackPermissions)
-                          .filter(([permission]) => ['channels_access', 'users_access', 'channels_history'].includes(permission))
-                          .map(([permission, hasAccess]) => {
-                          const isGranted = hasAccess === true
-                          const permissionLabels: { [key: string]: string } = {
-                            'channels_access': 'Channel Access',
-                            'users_access': 'User Access', 
-                            'channels_history': 'Channel History'
-                          }
-                          
-                          return (
-                            <div key={permission} className="flex items-center justify-between text-xs">
-                              <span className="text-gray-600">{permissionLabels[permission] || permission}</span>
-                              <div className="flex items-center space-x-1">
-                                {isGranted ? (
-                                  <>
-                                    <CheckCircle className="w-3 h-3 text-green-500" />
-                                    <span className="text-green-600 font-medium">Granted</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <AlertCircle className="w-3 h-3 text-red-500" />
-                                    <span className="text-red-600 font-medium">
-                                      {permission === 'channels_history' && slackPermissions.errors?.includes('not_in_channel') 
-                                        ? 'Bot not in channels' 
-                                        : 'Missing'}
-                                    </span>
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    ) : (
-                      <div className="text-xs text-gray-500">
-                        Click "Test" or the refresh icon to check permissions
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Bot Channels Section */}
-                  <div className="mt-6">
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="font-medium text-sm">Bot Channels</h4>
-                    </div>
-                    {slackIntegration?.channel_names && slackIntegration.channel_names.length > 0 ? (
-                      <div className="space-y-1">
-                        {slackIntegration.channel_names.map((channelName: string) => (
-                          <div key={channelName} className="flex items-center space-x-2 text-xs">
-                            <span className="text-gray-400">#</span>
-                            <span className="text-gray-700">{channelName}</span>
-                            <CheckCircle className="w-3 h-3 text-green-500" />
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-xs text-gray-500">
-                        {slackPermissions?.errors?.includes('not_in_channel')
-                          ? 'Bot is not in any channels. Add it to channels in Slack.'
-                          : 'No channels found'}
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
           </div>
         </div>
 

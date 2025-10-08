@@ -17,6 +17,7 @@ from ..models.slack_workspace_mapping import SlackWorkspaceMapping
 from ..models.user_burnout_report import UserBurnoutReport
 from .slack_dm_sender import SlackDMSender
 from .notification_service import NotificationService
+from .slack_token_service import get_slack_token_for_organization, SlackTokenService
 
 logger = logging.getLogger(__name__)
 
@@ -153,23 +154,21 @@ class SurveyScheduler:
             message_type = "reminder" if is_reminder else "initial survey"
             logger.debug(f"Starting {message_type} delivery for organization {organization_id}")
 
-            # Get organization's Slack workspace
-            workspace_mapping = db.query(SlackWorkspaceMapping).filter(
-                SlackWorkspaceMapping.organization_id == organization_id,
-                SlackWorkspaceMapping.status == 'active'
-            ).first()
+            # Check if survey feature is enabled for this organization
+            slack_service = SlackTokenService(db)
+            feature_config = slack_service.get_feature_config_for_organization(organization_id)
 
-            if not workspace_mapping:
-                logger.warning(f"No active Slack workspace for org {organization_id}")
+            if not feature_config or not feature_config.survey_enabled:
+                logger.info(
+                    f"Survey feature not enabled for org {organization_id}, skipping {message_type} delivery"
+                )
                 return
 
-            # Get Slack token
-            slack_integration = db.query(SlackIntegration).filter(
-                SlackIntegration.workspace_id == workspace_mapping.workspace_id
-            ).first()
+            # Get Slack OAuth token for this organization
+            slack_token = get_slack_token_for_organization(db, organization_id)
 
-            if not slack_integration:
-                logger.warning(f"No Slack integration for workspace {workspace_mapping.workspace_id}")
+            if not slack_token:
+                logger.warning(f"No Slack OAuth token available for org {organization_id}")
                 return
 
             # Get all users in organization who should receive surveys
@@ -212,7 +211,7 @@ class SurveyScheduler:
                             continue
 
                     await self.dm_sender.send_survey_dm(
-                        slack_token=slack_integration.slack_token,
+                        slack_token=slack_token,
                         slack_user_id=user['slack_user_id'],
                         user_id=user['user_id'],
                         organization_id=organization_id,

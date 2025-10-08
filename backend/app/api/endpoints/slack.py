@@ -100,9 +100,11 @@ async def slack_oauth_callback(
     logger.debug(f"Slack OAuth callback received - code: {code[:20]}..., state: {state[:50] if state else 'None'}...")
 
     try:
-        # Parse state parameter to get organization info
+        # Parse state parameter to get organization info and feature flags
         organization_id = None
         user_email = None
+        enable_survey = True  # Default to True for backward compatibility
+        enable_communication_patterns = False  # Default to False
 
         if state:
             import base64
@@ -112,9 +114,11 @@ async def slack_oauth_callback(
                 logger.debug(f"Full decoded state: {decoded_state}")
                 organization_id = decoded_state.get("orgId")
                 user_email = decoded_state.get("email")
-                logger.debug(f"Decoded state - org_id: {organization_id}, email: {user_email}")
+                enable_survey = decoded_state.get("enableSurvey", True)  # Default True
+                enable_communication_patterns = decoded_state.get("enableCommunicationPatterns", False)  # Default False
+                logger.debug(f"Decoded state - org_id: {organization_id}, email: {user_email}, survey: {enable_survey}, communication_patterns: {enable_communication_patterns}")
             except Exception as state_error:
-                # If state parsing fails, continue without org mapping
+                # If state parsing fails, continue without org mapping and use defaults
                 logger.warning(f"Failed to parse state parameter: {state_error}")
                 pass
 
@@ -174,6 +178,7 @@ async def slack_oauth_callback(
             team_info = token_data.get("team", {})
             workspace_id = team_info.get("id")
             workspace_name = team_info.get("name")
+            granted_scopes = token_data.get("scope", "")  # Get granted scopes from OAuth response
 
             if not access_token or not workspace_id:
                 raise HTTPException(
@@ -220,29 +225,38 @@ async def slack_oauth_callback(
             existing_mapping.status = 'active'
             if organization_id:
                 existing_mapping.organization_id = organization_id
+            # Update feature flags based on user selection
+            existing_mapping.survey_enabled = enable_survey
+            existing_mapping.communication_patterns_enabled = enable_communication_patterns
+            existing_mapping.granted_scopes = granted_scopes
             mapping = existing_mapping
         else:
-            # Create new mapping
+            # Create new mapping with feature flags
             mapping = SlackWorkspaceMapping(
                 workspace_id=workspace_id,
                 workspace_name=workspace_name,
                 organization_id=organization_id,
                 owner_user_id=owner_user.id,
-                status='active'
+                status='active',
+                survey_enabled=enable_survey,
+                communication_patterns_enabled=enable_communication_patterns,
+                granted_scopes=granted_scopes
             )
             db.add(mapping)
 
         # Store the bot token separately in a SlackIntegration record for the workspace
-        # This is a simplified approach - in production you might want a dedicated bot token table
+        # IMPORTANT: Query by BOTH workspace_id AND token_source to avoid overwriting manual integrations
         slack_integration = db.query(SlackIntegration).filter(
-            SlackIntegration.workspace_id == workspace_id
+            SlackIntegration.workspace_id == workspace_id,
+            SlackIntegration.token_source == "oauth"  # Only update OAuth integrations
         ).first()
 
         if slack_integration:
+            # Update existing OAuth integration
             slack_integration.slack_token = encrypt_token(access_token)
             slack_integration.updated_at = datetime.utcnow()
         else:
-            # Create a workspace-level integration record
+            # Create new OAuth integration (won't conflict with manual integrations)
             slack_integration = SlackIntegration(
                 user_id=owner_user.id,
                 slack_token=encrypt_token(access_token),
@@ -253,8 +267,14 @@ async def slack_oauth_callback(
 
         db.commit()
 
-        # Log what was created
-        logger.info(f"Slack OAuth successful - workspace: {workspace_name}, workspace_id: {workspace_id}, organization_id: {organization_id}")
+        # Log what was created with feature flags
+        features = []
+        if enable_survey:
+            features.append("survey")
+        if enable_communication_patterns:
+            features.append("communication_patterns")
+        features_str = "+".join(features) if features else "none"
+        logger.info(f"Slack OAuth successful - workspace: {workspace_name}, workspace_id: {workspace_id}, organization_id: {organization_id}, features: {features_str}")
 
         # Redirect to frontend with success message
         frontend_url = settings.FRONTEND_URL or "http://localhost:3000"
@@ -446,556 +466,12 @@ async def get_slack_status(
     db: Session = Depends(get_db)
 ):
     """
-    Get Slack integration status for current user.
-    Checks both SlackIntegration (manual setup) and SlackWorkspaceMapping (OAuth setup).
+    Get Slack OAuth integration status for current user.
+    Only checks SlackWorkspaceMapping (OAuth setup).
     """
     logger.debug(f"Checking Slack status for user {current_user.id} (org: {current_user.organization_id})")
 
-    # Check for manual SlackIntegration first
-    integration = db.query(SlackIntegration).filter(
-        SlackIntegration.user_id == current_user.id
-    ).first()
-
-    # If no manual integration, check for OAuth workspace mapping
-    workspace_mapping = None
-    if not integration:
-        # Check if there's a workspace mapping for this user's organization
-        if current_user.organization_id:
-            workspace_mapping = db.query(SlackWorkspaceMapping).filter(
-                SlackWorkspaceMapping.organization_id == current_user.organization_id,
-                SlackWorkspaceMapping.status == 'active'
-            ).first()
-
-        # Also check if user is the owner of any workspace mapping
-        if not workspace_mapping:
-            workspace_mapping = db.query(SlackWorkspaceMapping).filter(
-                SlackWorkspaceMapping.owner_user_id == current_user.id,
-                SlackWorkspaceMapping.status == 'active'
-            ).first()
-
-        # If we have a workspace mapping, get the SlackIntegration for that workspace
-        if workspace_mapping:
-            integration = db.query(SlackIntegration).filter(
-                SlackIntegration.workspace_id == workspace_mapping.workspace_id
-            ).first()
-
-    if not integration and not workspace_mapping:
-        return {
-            "connected": False,
-            "integration": None
-        }
-    
-    # Get channel count and names dynamically
-    total_channels = 0
-    channel_names = []
-    channels_error = None
-    token_preview = None
-    webhook_preview = None
-    access_token = None  # Initialize to None
-
-    try:
-        # Decrypt token and get preview (only for manual integrations)
-        if integration:
-            access_token = decrypt_token(integration.slack_token)
-            token_preview = f"...{access_token[-4:]}" if access_token else None
-
-            # Get webhook preview if available
-            if integration.webhook_url:
-                webhook_preview = f"...{integration.webhook_url[-4:]}"
-
-        if not access_token:
-            # No token to fetch channels with
-            raise Exception("No access token available")
-
-        headers = {
-            "Authorization": f"Bearer {access_token}",
-            "Content-Type": "application/json"
-        }
-        
-        import httpx
-        async with httpx.AsyncClient() as client:
-            # Try to get public channels first (requires channels:read scope)
-            channels_response = await client.get(
-                "https://slack.com/api/conversations.list", 
-                headers=headers,
-                params={"types": "public_channel", "limit": 1000}
-            )
-            if channels_response.status_code == 200:
-                channels_data = channels_response.json()
-                if channels_data.get("ok", False):
-                    channels = channels_data.get("channels", [])
-                    total_channels = len(channels)
-                    # Extract channel names (limit to first 10 for display)
-                    channel_names = [ch.get("name", "") for ch in channels[:10] if ch.get("name")]
-                    logging.getLogger(__name__).info(f"Successfully got {total_channels} public channels")
-                else:
-                    channels_error = channels_data.get("error", "unknown_error")
-                    logging.getLogger(__name__).error(f"Slack API error for channels: {channels_error}")
-            else:
-                channels_error = f"HTTP {channels_response.status_code}"
-                logging.getLogger(__name__).error(f"Slack API HTTP error for channels: {channels_error}")
-                
-            # If public channels failed, try with minimal scope (may work with some tokens)
-            if total_channels == 0 and not channels_error:
-                try:
-                    basic_response = await client.get(
-                        "https://slack.com/api/conversations.list", 
-                        headers=headers,
-                        params={"limit": 100}  # No specific type - uses default
-                    )
-                    if basic_response.status_code == 200:
-                        basic_data = basic_response.json()
-                        if basic_data.get("ok", False):
-                            channels = basic_data.get("channels", [])
-                            total_channels = len(channels)
-                            channel_names = [ch.get("name", "") for ch in channels[:10] if ch.get("name")]
-                            logging.getLogger(__name__).info(f"Fallback: got {total_channels} channels with basic request")
-                except Exception:
-                    pass  # Fallback failed, keep original count
-    except Exception as e:
-        channels_error = str(e)
-        # Only log as warning since this is just a preview/test, not critical functionality
-        logging.getLogger(__name__).warning(f"Slack API preview failed for channels: {channels_error[:100]}...")
-    
-    # Build response data based on connection type
-    if integration:
-        # Manual SlackIntegration - fetch workspace name from Slack API
-        workspace_name = None
-        try:
-            import httpx
-            # Get workspace name from Slack API using the already decrypted token
-            if access_token:
-                async with httpx.AsyncClient() as client:
-                    team_response = await client.get(
-                        "https://slack.com/api/team.info",
-                        headers={"Authorization": f"Bearer {access_token}"}
-                    )
-                    if team_response.status_code == 200:
-                        team_data = team_response.json()
-                        if team_data.get("ok"):
-                            workspace_name = team_data.get("team", {}).get("name")
-                            logger.debug(f"Successfully fetched workspace name: {workspace_name}")
-                        else:
-                            logger.warning(f"Slack team.info API returned ok=false: {team_data.get('error')}")
-                    else:
-                        logger.warning(f"Slack team.info API returned status {team_response.status_code}")
-        except Exception as e:
-            logger.warning(f"Could not fetch workspace name: {e}")
-
-        response_data = {
-            "connected": True,
-            "integration": {
-                "id": integration.id,
-                "slack_user_id": integration.slack_user_id,
-                "workspace_id": integration.workspace_id,
-                "workspace_name": workspace_name,
-                "token_source": integration.token_source,
-                "is_oauth": integration.is_oauth,
-                "supports_refresh": integration.supports_refresh,
-                "has_webhook": integration.webhook_url is not None,
-                "webhook_configured": integration.webhook_url is not None,
-                "connected_at": integration.created_at.isoformat(),
-                "last_updated": integration.updated_at.isoformat(),
-                "total_channels": total_channels,
-                "channel_names": channel_names,
-                "token_preview": token_preview,
-                "webhook_preview": webhook_preview,
-                "connection_type": "manual"
-            }
-        }
-    else:
-        # OAuth SlackWorkspaceMapping
-        workspace_name_oauth = workspace_mapping.workspace_name
-        if not workspace_name_oauth:
-            logger.debug(f"OAuth workspace {workspace_mapping.workspace_id} has no name in database")
-
-        response_data = {
-            "connected": True,
-            "integration": {
-                "id": workspace_mapping.id,
-                "slack_user_id": None,  # Not stored in workspace mapping
-                "workspace_id": workspace_mapping.workspace_id,
-                "workspace_name": workspace_name_oauth or workspace_mapping.workspace_id,  # Fallback to ID
-                "token_source": "oauth",
-                "is_oauth": True,
-                "supports_refresh": False,
-                "has_webhook": False,
-                "webhook_configured": False,
-                "connected_at": workspace_mapping.registered_at.isoformat(),
-                "last_updated": workspace_mapping.registered_at.isoformat(),
-                "total_channels": 0,  # Not fetched for workspace mappings
-                "channel_names": [],
-                "token_preview": None,
-                "webhook_preview": None,
-                "connection_type": "oauth",
-                "status": workspace_mapping.status,
-                "owner_user_id": workspace_mapping.owner_user_id
-            }
-        }
-    
-    # Add error information if there was an issue getting channel count
-    if channels_error:
-        response_data["integration"]["channels_error"] = channels_error
-        response_data["integration"]["channels_error_message"] = f"Unable to fetch channels: {channels_error}"
-    
-    return response_data
-
-class TokenRequest(BaseModel):
-    token: str
-
-class TokenWebhookRequest(BaseModel):
-    token: str
-    webhook_url: str
-
-@router.post("/token")
-async def connect_slack_with_token(
-    request: TokenRequest,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """
-    Connect Slack integration using a personal access token.
-    """
-    try:
-        # Validate token by making a test API call
-        headers = {
-            "Authorization": f"Bearer {request.token}",
-            "Content-Type": "application/json"
-        }
-        
-        # Test the token by getting auth info
-        import httpx
-        async with httpx.AsyncClient() as client:
-            response = await client.get("https://slack.com/api/auth.test", headers=headers)
-            
-            if response.status_code != 200:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Failed to validate Slack token"
-                )
-            
-            auth_info = response.json()
-            if not auth_info.get("ok", False):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Invalid Slack token: {auth_info.get('error', 'Unknown error')}"
-                )
-            
-            slack_user_id = auth_info.get("user_id")
-            workspace_id = auth_info.get("team_id")
-            
-            if not slack_user_id or not workspace_id:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Failed to get Slack user ID or workspace ID from token"
-                )
-            
-            # Get user info (optional)
-            user_email = None
-            user_name = None
-            try:
-                user_response = await client.get(
-                    "https://slack.com/api/users.info", 
-                    headers=headers, 
-                    params={"user": slack_user_id}
-                )
-                if user_response.status_code == 200:
-                    user_data = user_response.json()
-                    if user_data.get("ok", False):
-                        user_profile = user_data.get("user", {}).get("profile", {})
-                        user_email = user_profile.get("email")
-                        user_name = user_profile.get("real_name") or user_profile.get("display_name")
-            except Exception:
-                pass  # User info is optional
-            
-            # Get channel count (optional)
-            total_channels = 0
-            try:
-                # Get public channels
-                channels_response = await client.get(
-                    "https://slack.com/api/conversations.list", 
-                    headers=headers,
-                    params={"types": "public_channel,private_channel", "limit": 1000}
-                )
-                if channels_response.status_code == 200:
-                    channels_data = channels_response.json()
-                    if channels_data.get("ok", False):
-                        channels = channels_data.get("channels", [])
-                        total_channels = len(channels)
-            except Exception:
-                pass  # Channel count is optional
-        
-        # Encrypt the token
-        encrypted_token = encrypt_token(request.token)
-        
-        # Check if integration already exists
-        existing_integration = db.query(SlackIntegration).filter(
-            SlackIntegration.user_id == current_user.id
-        ).first()
-        
-        if existing_integration:
-            # Update existing integration
-            existing_integration.slack_token = encrypted_token
-            existing_integration.slack_user_id = slack_user_id
-            existing_integration.workspace_id = workspace_id
-            existing_integration.webhook_url = None  # Clear webhook URL for token-only setup
-            existing_integration.token_source = "manual"
-            existing_integration.updated_at = datetime.utcnow()
-            integration = existing_integration
-        else:
-            # Create new integration
-            integration = SlackIntegration(
-                user_id=current_user.id,
-                slack_token=encrypted_token,
-                slack_user_id=slack_user_id,
-                workspace_id=workspace_id,
-                webhook_url=None,  # No webhook URL for token-only setup
-                token_source="manual"
-            )
-            db.add(integration)
-        
-        # Update user correlations if email is available
-        if user_email:
-            # Use organization_id for multi-tenancy
-            existing_correlation = db.query(UserCorrelation).filter(
-                UserCorrelation.organization_id == current_user.organization_id,
-                UserCorrelation.email == user_email
-            ).first()
-
-            if existing_correlation:
-                existing_correlation.slack_user_id = slack_user_id
-            else:
-                correlation = UserCorrelation(
-                    user_id=current_user.id,
-                    organization_id=current_user.organization_id,
-                    email=user_email,
-                    slack_user_id=slack_user_id
-                )
-                db.add(correlation)
-        
-        db.commit()
-        
-        return {
-            "success": True,
-            "message": "Slack integration connected successfully with personal access token",
-            "integration": {
-                "id": integration.id,
-                "slack_user_id": slack_user_id,
-                "workspace_id": workspace_id,
-                "token_source": "manual",
-                "user_email": user_email,
-                "user_name": user_name,
-                "total_channels": total_channels
-            }
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to connect Slack integration: {str(e)}"
-        )
-
-@router.post("/setup")
-async def setup_slack_with_token_and_webhook(
-    request: TokenWebhookRequest,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """
-    Connect Slack integration using both a bot token and webhook URL.
-    This provides full functionality for data collection and notifications.
-    """
-    try:
-        # Validate webhook URL format
-        if not request.webhook_url.startswith("https://hooks.slack.com/services/"):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid Slack webhook URL format. Should start with https://hooks.slack.com/services/"
-            )
-        
-        # Validate token by making a test API call
-        headers = {
-            "Authorization": f"Bearer {request.token}",
-            "Content-Type": "application/json"
-        }
-        
-        # Test the token by getting auth info
-        import httpx
-        async with httpx.AsyncClient() as client:
-            response = await client.get("https://slack.com/api/auth.test", headers=headers)
-            
-            if response.status_code != 200:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Failed to validate Slack token"
-                )
-            
-            auth_info = response.json()
-            if not auth_info.get("ok", False):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Invalid Slack token: {auth_info.get('error', 'Unknown error')}"
-                )
-            
-            slack_user_id = auth_info.get("user_id")
-            workspace_id = auth_info.get("team_id")
-            
-            if not slack_user_id or not workspace_id:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Failed to get Slack user ID or workspace ID from token"
-                )
-            
-            # Test webhook URL by sending a test message
-            try:
-                webhook_test_response = await client.post(
-                    request.webhook_url,
-                    json={
-                        "text": "🔗 Slack integration test from Rootly Burnout Detector",
-                        "username": "Rootly Bot",
-                        "icon_emoji": ":robot_face:"
-                    }
-                )
-                if webhook_test_response.status_code != 200:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="Webhook URL test failed. Please check the URL and permissions."
-                    )
-            except httpx.RequestError:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Unable to reach webhook URL. Please check the URL."
-                )
-            
-            # Get user info (optional)
-            user_email = None
-            user_name = None
-            try:
-                user_response = await client.get(
-                    "https://slack.com/api/users.info", 
-                    headers=headers, 
-                    params={"user": slack_user_id}
-                )
-                if user_response.status_code == 200:
-                    user_data = user_response.json()
-                    if user_data.get("ok", False):
-                        user_profile = user_data.get("user", {}).get("profile", {})
-                        user_email = user_profile.get("email")
-                        user_name = user_profile.get("real_name") or user_profile.get("display_name")
-            except Exception:
-                pass  # User info is optional
-            
-            # Get channel count (optional)
-            total_channels = 0
-            try:
-                channels_response = await client.get(
-                    "https://slack.com/api/conversations.list", 
-                    headers=headers,
-                    params={"types": "public_channel,private_channel", "limit": 1000}
-                )
-                if channels_response.status_code == 200:
-                    channels_data = channels_response.json()
-                    if channels_data.get("ok", False):
-                        channels = channels_data.get("channels", [])
-                        total_channels = len(channels)
-            except Exception:
-                pass  # Channel count is optional
-        
-        # Encrypt the token
-        encrypted_token = encrypt_token(request.token)
-        
-        # Check if integration already exists
-        existing_integration = db.query(SlackIntegration).filter(
-            SlackIntegration.user_id == current_user.id
-        ).first()
-        
-        if existing_integration:
-            # Update existing integration
-            existing_integration.slack_token = encrypted_token
-            existing_integration.slack_user_id = slack_user_id
-            existing_integration.workspace_id = workspace_id
-            existing_integration.webhook_url = request.webhook_url
-            existing_integration.token_source = "manual"
-            existing_integration.updated_at = datetime.utcnow()
-            integration = existing_integration
-        else:
-            # Create new integration
-            integration = SlackIntegration(
-                user_id=current_user.id,
-                slack_token=encrypted_token,
-                slack_user_id=slack_user_id,
-                workspace_id=workspace_id,
-                webhook_url=request.webhook_url,
-                token_source="manual"
-            )
-            db.add(integration)
-        
-        # Update user correlations if email is available
-        if user_email:
-            # Use organization_id for multi-tenancy
-            existing_correlation = db.query(UserCorrelation).filter(
-                UserCorrelation.organization_id == current_user.organization_id,
-                UserCorrelation.email == user_email
-            ).first()
-
-            if existing_correlation:
-                existing_correlation.slack_user_id = slack_user_id
-            else:
-                correlation = UserCorrelation(
-                    user_id=current_user.id,
-                    organization_id=current_user.organization_id,
-                    email=user_email,
-                    slack_user_id=slack_user_id
-                )
-                db.add(correlation)
-        
-        db.commit()
-        
-        return {
-            "success": True,
-            "message": "Slack integration connected successfully with bot token and webhook URL",
-            "integration": {
-                "id": integration.id,
-                "slack_user_id": slack_user_id,
-                "workspace_id": workspace_id,
-                "has_webhook": True,
-                "token_source": "manual",
-                "user_email": user_email,
-                "user_name": user_name,
-                "total_channels": total_channels
-            }
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to connect Slack integration: {str(e)}"
-        )
-
-
-@router.delete("/disconnect")
-async def disconnect_slack(
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """
-    Disconnect Slack integration for current user.
-    Handles both manual SlackIntegration and OAuth SlackWorkspaceMapping.
-    """
-    logger.debug(f"Disconnect request from user {current_user.id} (email: {current_user.email})")
-
-    # Check for manual SlackIntegration first
-    integration = db.query(SlackIntegration).filter(
-        SlackIntegration.user_id == current_user.id
-    ).first()
-
-    # Always check for OAuth workspace mapping (not just when no manual integration)
+    # Check for OAuth workspace mapping
     workspace_mapping = None
 
     # Check if there's a workspace mapping for this user's organization
@@ -1012,56 +488,148 @@ async def disconnect_slack(
             SlackWorkspaceMapping.status == 'active'
         ).first()
 
-    # If we have a workspace mapping but no integration yet, get the SlackIntegration for that workspace
-    if workspace_mapping and not integration:
-        integration = db.query(SlackIntegration).filter(
-            SlackIntegration.workspace_id == workspace_mapping.workspace_id
+    if not workspace_mapping:
+        return {
+            "connected": False,
+            "integration": None
+        }
+
+    # OAuth SlackWorkspaceMapping
+    workspace_name = workspace_mapping.workspace_name
+    if not workspace_name:
+        logger.debug(f"OAuth workspace {workspace_mapping.workspace_id} has no name in database")
+
+    return {
+        "connected": True,
+        "integration": {
+            "id": workspace_mapping.id,
+            "slack_user_id": None,  # Not stored in workspace mapping
+            "workspace_id": workspace_mapping.workspace_id,
+            "workspace_name": workspace_name or workspace_mapping.workspace_id,  # Fallback to ID
+            "token_source": "oauth",
+            "is_oauth": True,
+            "supports_refresh": False,
+            "has_webhook": False,
+            "webhook_configured": False,
+            "connected_at": workspace_mapping.registered_at.isoformat(),
+            "last_updated": workspace_mapping.registered_at.isoformat(),
+            "total_channels": 0,
+            "channel_names": [],
+            "token_preview": None,
+            "webhook_preview": None,
+            "connection_type": "oauth",
+            "status": workspace_mapping.status,
+            "owner_user_id": workspace_mapping.owner_user_id,
+            # Feature flags for OAuth integrations
+            "survey_enabled": workspace_mapping.survey_enabled if hasattr(workspace_mapping, 'survey_enabled') else False,
+            "communication_patterns_enabled": workspace_mapping.communication_patterns_enabled if hasattr(workspace_mapping, 'communication_patterns_enabled') else False,
+            "granted_scopes": workspace_mapping.granted_scopes if hasattr(workspace_mapping, 'granted_scopes') else None
+        }
+    }
+
+class FeatureToggleRequest(BaseModel):
+    feature: str  # 'survey' or 'communication_patterns'
+    enabled: bool
+
+@router.post("/features/toggle")
+async def toggle_slack_feature(
+    request: FeatureToggleRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Toggle a Slack feature (survey or communication patterns analysis) for the current user's workspace.
+    Only works for OAuth-based integrations.
+    """
+    try:
+        # Find the user's OAuth workspace mapping
+        workspace_mapping = db.query(SlackWorkspaceMapping).filter(
+            SlackWorkspaceMapping.owner_user_id == current_user.id,
+            SlackWorkspaceMapping.status == 'active'
         ).first()
 
-    if not integration and not workspace_mapping:
-        logger.warning(f"No Slack integration found for user {current_user.id}")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Slack integration not found"
-        )
-    
-    try:
-        # Remove Slack data from user correlations (organization-scoped)
-        if current_user.organization_id:
-            correlations = db.query(UserCorrelation).filter(
-                UserCorrelation.organization_id == current_user.organization_id
-            ).all()
-        else:
-            # Beta mode: use user_id
-            correlations = db.query(UserCorrelation).filter(
-                UserCorrelation.user_id == current_user.id
-            ).all()
+        if not workspace_mapping:
+            raise HTTPException(
+                status_code=404,
+                detail="No OAuth Slack workspace found for this user"
+            )
 
-        for correlation in correlations:
-            correlation.slack_user_id = None
+        # Validate feature name
+        if request.feature not in ['survey', 'communication_patterns']:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid feature name. Must be 'survey' or 'communication_patterns'"
+            )
 
-        # Delete the integration AND mark workspace mapping as disconnected
-        if integration:
-            db.delete(integration)
-
-        if workspace_mapping:
-            workspace_mapping.status = 'disconnected'
-            # Note: We mark as disconnected rather than deleting to preserve history
+        # Update the appropriate feature flag
+        if request.feature == 'survey':
+            workspace_mapping.survey_enabled = request.enabled
+            logger.info(f"User {current_user.id} toggled survey to {request.enabled} for workspace {workspace_mapping.workspace_id}")
+        elif request.feature == 'communication_patterns':
+            workspace_mapping.communication_patterns_enabled = request.enabled
+            logger.info(f"User {current_user.id} toggled communication_patterns to {request.enabled} for workspace {workspace_mapping.workspace_id}")
 
         db.commit()
 
         return {
             "success": True,
-            "message": "Slack integration disconnected successfully"
+            "feature": request.feature,
+            "enabled": request.enabled,
+            "workspace_id": workspace_mapping.workspace_id
         }
-        
+
+    except HTTPException:
+        raise
     except Exception as e:
+        logger.error(f"Error toggling Slack feature: {e}")
         db.rollback()
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to disconnect Slack integration: {str(e)}"
+            status_code=500,
+            detail=f"Failed to toggle feature: {str(e)}"
         )
 
+@router.delete("/disconnect")
+async def disconnect_slack(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Disconnect Slack OAuth integration by deactivating the workspace mapping.
+    This keeps the data but marks the workspace as inactive.
+    """
+    try:
+        # Find the user's OAuth workspace mapping
+        workspace_mapping = db.query(SlackWorkspaceMapping).filter(
+            SlackWorkspaceMapping.owner_user_id == current_user.id,
+            SlackWorkspaceMapping.status == 'active'
+        ).first()
+
+        if not workspace_mapping:
+            raise HTTPException(
+                status_code=404,
+                detail="No active Slack workspace found for this user"
+            )
+
+        # Mark as inactive instead of deleting (preserves historical data)
+        workspace_mapping.status = 'inactive'
+        db.commit()
+
+        logger.info(f"User {current_user.id} disconnected Slack workspace {workspace_mapping.workspace_id}")
+
+        return {
+            "success": True,
+            "message": "Slack workspace disconnected successfully"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error disconnecting Slack: {e}")
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to disconnect Slack: {str(e)}"
+        )
 
 @router.post("/sync-user-ids")
 async def sync_slack_user_ids(

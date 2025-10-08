@@ -340,9 +340,54 @@ class MigrationRunner:
                     """
                 ]
             },
+            {
+                "name": "008_add_slack_feature_flags",
+                "description": "Add feature flags to slack_workspace_mappings for survey and communication patterns analysis",
+                "sql": [
+                    """
+                    ALTER TABLE slack_workspace_mappings
+                    ADD COLUMN IF NOT EXISTS survey_enabled BOOLEAN DEFAULT FALSE
+                    """,
+                    """
+                    ALTER TABLE slack_workspace_mappings
+                    ADD COLUMN IF NOT EXISTS communication_patterns_enabled BOOLEAN DEFAULT FALSE
+                    """,
+                    """
+                    ALTER TABLE slack_workspace_mappings
+                    ADD COLUMN IF NOT EXISTS granted_scopes VARCHAR(500)
+                    """,
+                    """
+                    -- Set survey_enabled=true for existing OAuth installations (backward compatibility)
+                    UPDATE slack_workspace_mappings
+                    SET survey_enabled = TRUE
+                    WHERE registered_via = 'oauth'
+                    AND survey_enabled IS NULL OR survey_enabled = FALSE
+                    """
+                ]
+            },
+            {
+                "name": "009_rename_sentiment_to_communication_patterns",
+                "description": "Rename sentiment_enabled column to communication_patterns_enabled",
+                "sql": [
+                    """
+                    -- Check if sentiment_enabled column exists and rename it
+                    DO $$
+                    BEGIN
+                        IF EXISTS (
+                            SELECT 1 FROM information_schema.columns
+                            WHERE table_name = 'slack_workspace_mappings'
+                            AND column_name = 'sentiment_enabled'
+                        ) THEN
+                            ALTER TABLE slack_workspace_mappings
+                            RENAME COLUMN sentiment_enabled TO communication_patterns_enabled;
+                        END IF;
+                    END $$;
+                    """
+                ]
+            },
             # Add future migrations here with incrementing numbers
             # {
-            #     "name": "008_add_user_preferences",
+            #     "name": "009_add_user_preferences",
             #     "description": "Add user preferences table",
             #     "sql": ["CREATE TABLE IF NOT EXISTS user_preferences (...)"]
             # }

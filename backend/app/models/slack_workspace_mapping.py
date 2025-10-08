@@ -1,7 +1,7 @@
 """
 Slack workspace mapping model for correlating Slack workspaces to organizations.
 """
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, UniqueConstraint, Boolean
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from .base import Base
@@ -32,6 +32,11 @@ class SlackWorkspaceMapping(Base):
     # Status
     status = Column(String(20), default="active")  # "active", "suspended", "pending"
 
+    # Feature flags - what capabilities are enabled for this workspace
+    survey_enabled = Column(Boolean, default=False)  # Slash command surveys via /burnout
+    communication_patterns_enabled = Column(Boolean, default=False)  # Communication patterns analysis
+    granted_scopes = Column(String(500), nullable=True)  # Comma-separated list of OAuth scopes
+
     # Relationships
     owner = relationship("User", back_populates="owned_slack_workspaces")
     organization = relationship("Organization", back_populates="workspace_mappings")
@@ -50,7 +55,10 @@ class SlackWorkspaceMapping(Base):
             'owner_user_id': self.owner_user_id,
             'organization_domain': self.organization_domain,
             'registered_at': self.registered_at.isoformat() if self.registered_at else None,
-            'status': self.status
+            'status': self.status,
+            'survey_enabled': self.survey_enabled,
+            'communication_patterns_enabled': self.communication_patterns_enabled,
+            'granted_scopes': self.granted_scopes
         }
 
     @property

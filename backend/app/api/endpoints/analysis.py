@@ -14,6 +14,7 @@ from ...auth.dependencies import get_current_active_user
 from ...core.rootly_client import RootlyAPIClient
 from ...services.unified_burnout_analyzer import UnifiedBurnoutAnalyzer
 from ...services.github_only_burnout_analyzer import GitHubOnlyBurnoutAnalyzer
+from ...services.slack_token_service import get_slack_token_for_user, SlackTokenService
 from ...core.rate_limiting import analysis_rate_limit
 from ...core.input_validation import AnalysisRequest as ValidatedAnalysisRequest
 
@@ -333,7 +334,7 @@ async def _run_analysis_task_impl(db, analysis_id: int, integration_id: int, day
         # Get user for LLM token access and check available integrations
         user = db.query(User).filter(User.id == user_id).first()
         has_llm_token = user and user.llm_token and user.llm_provider
-        
+
         # Check for GitHub integration
         from ...models import GitHubIntegration
         github_integration = db.query(GitHubIntegration).filter(
@@ -341,6 +342,28 @@ async def _run_analysis_task_impl(db, analysis_id: int, integration_id: int, day
             GitHubIntegration.github_token.isnot(None)
         ).first()
         has_github = bool(github_integration)
+
+        # Get Slack OAuth token and feature config for this user's organization
+        slack_token = None
+        slack_service = SlackTokenService(db)
+        if user:
+            feature_config = slack_service.get_feature_config_for_user(user)
+
+            # Only retrieve token if communication patterns analysis is enabled
+            if feature_config and feature_config.communication_patterns_enabled:
+                slack_token = slack_service.get_oauth_token_for_user(user)
+                if slack_token:
+                    logger.info(
+                        f"Retrieved Slack OAuth token for user {user_id} (org {user.organization_id}) "
+                        f"- communication patterns analysis enabled"
+                    )
+                else:
+                    logger.warning(f"Communication patterns enabled but no Slack token available for user {user_id}")
+            else:
+                logger.debug(
+                    f"Slack communication patterns analysis not enabled for user {user_id} "
+                    f"(survey: {feature_config.survey_enabled if feature_config else 'N/A'})"
+                )
         
         # Attempt to collect incident data to determine if GitHub-only analysis is needed
         incident_data_available = False
@@ -439,13 +462,23 @@ async def _run_analysis_task_impl(db, analysis_id: int, integration_id: int, day
                 set_user_context(user)
                 logger.info(f"Set user context for AI analysis (LLM provider: {user.llm_provider})")
             
-            # Initialize UnifiedBurnoutAnalyzer
+            # Get GitHub token if available
+            github_token = None
+            if has_github:
+                from ...api.endpoints.github import decrypt_token as decrypt_github_token
+                try:
+                    github_token = decrypt_github_token(github_integration.github_token)
+                    logger.info(f"Retrieved GitHub token for user {user_id}")
+                except Exception as e:
+                    logger.error(f"Failed to decrypt GitHub token: {e}")
+
+            # Initialize UnifiedBurnoutAnalyzer with all available integrations
             analyzer = UnifiedBurnoutAnalyzer(
                 api_token=integration.api_token,
                 platform=integration.platform,
                 enable_ai=has_llm_token,
-                github_token=None,  # TODO: Add GitHub integration
-                slack_token=None    # TODO: Add Slack integration
+                github_token=github_token,
+                slack_token=slack_token
             )
             
             # Run analysis

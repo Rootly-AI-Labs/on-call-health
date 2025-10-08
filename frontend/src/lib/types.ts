@@ -36,6 +36,9 @@ export interface SlackIntegration {
   connected_at: string
   last_updated: string
   total_channels?: number
+  survey_enabled?: boolean
+  communication_patterns_enabled?: boolean
+  granted_scopes?: string
 }
 
 export interface OrganizationMember {
