@@ -368,6 +368,12 @@ class UserSyncService:
             # Match each user
             for correlation in correlations:
                 try:
+                    # Skip users without names (can't match without a name)
+                    if not correlation.name:
+                        logger.debug(f"⏭️  Skipping {correlation.email} - no name available")
+                        skipped += 1
+                        continue
+
                     # Use name for matching (email is secondary)
                     github_username = await matcher.match_name_to_github(
                         full_name=correlation.name,
