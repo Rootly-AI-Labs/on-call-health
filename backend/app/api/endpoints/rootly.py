@@ -1060,6 +1060,16 @@ async def sync_integration_users(
                 integration_id=integration_id
             )
 
+            # After syncing, try to match GitHub usernames
+            github_stats = await sync_service._match_github_usernames(current_user)
+            if github_stats:
+                stats['github_matched'] = github_stats['matched']
+                stats['github_skipped'] = github_stats['skipped']
+                logger.info(
+                    f"GitHub matching: {github_stats['matched']} users matched, "
+                    f"{github_stats['skipped']} skipped"
+                )
+
             return {
                 "success": True,
                 "message": f"Successfully synced {stats['total']} users from beta integration",
