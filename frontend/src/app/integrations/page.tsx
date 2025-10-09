@@ -238,8 +238,185 @@ export default function IntegrationsPage() {
   const [showSyncedUsers, setShowSyncedUsers] = useState(false)
   const [teamMembersDrawerOpen, setTeamMembersDrawerOpen] = useState(false)
 
+  // GitHub username editing state
+  const [editingUserId, setEditingUserId] = useState<number | null>(null)
+  const [editingUsername, setEditingUsername] = useState<string>('')
+  const [githubOrgMembers, setGithubOrgMembers] = useState<string[]>([])
+  const [loadingOrgMembers, setLoadingOrgMembers] = useState(false)
+  const [savingUsername, setSavingUsername] = useState(false)
+
   // Manual survey delivery modal state
   const [showManualSurveyModal, setShowManualSurveyModal] = useState(false)
+
+  // Survey recipient selection state
+  const [selectedRecipients, setSelectedRecipients] = useState<Set<number>>(new Set())
+  const [savedRecipients, setSavedRecipients] = useState<Set<number>>(new Set()) // Track what's saved in DB
+  const [savingRecipients, setSavingRecipients] = useState(false)
+
+  // Check if there are unsaved changes
+  const hasUnsavedChanges = () => {
+    if (selectedRecipients.size !== savedRecipients.size) return true
+    for (const id of Array.from(selectedRecipients)) {
+      if (!savedRecipients.has(id)) return true
+    }
+    return false
+  }
+
+  // GitHub org members handlers
+  const fetchGitHubOrgMembers = async () => {
+    if (!githubIntegration) return
+
+    setLoadingOrgMembers(true)
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) {
+        toast.error('Please log in to load GitHub members')
+        return
+      }
+
+      const response = await fetch(`${API_BASE}/github/org-members`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`
+        }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setGithubOrgMembers(data.members || [])
+        console.log(`Loaded ${data.total_members} GitHub org members for autocomplete`)
+      } else {
+        const error = await response.json()
+        console.error('Failed to load GitHub org members:', error)
+      }
+    } catch (error) {
+      console.error('Error fetching GitHub org members:', error)
+    } finally {
+      setLoadingOrgMembers(false)
+    }
+  }
+
+  const startEditingGitHubUsername = (userId: number, currentUsername: string | null) => {
+    setEditingUserId(userId)
+    setEditingUsername(currentUsername || '')
+  }
+
+  const cancelEditingGitHubUsername = () => {
+    setEditingUserId(null)
+    setEditingUsername('')
+  }
+
+  const saveGitHubUsername = async (userId: number) => {
+    setSavingUsername(true)
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) {
+        toast.error('Please log in to update GitHub username')
+        return
+      }
+
+      const response = await fetch(
+        `${API_BASE}/rootly/user-correlation/${userId}/github-username?github_username=${encodeURIComponent(editingUsername)}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${authToken}`
+          }
+        }
+      )
+
+      if (response.ok) {
+        const data = await response.json()
+        if (editingUsername === '') {
+          toast.success('GitHub username mapping cleared')
+        } else {
+          toast.success(`GitHub username updated to ${editingUsername}`)
+        }
+
+        // Refresh synced users list - simple re-fetch
+        const selectedOrg = selectedOrganization || integrations.find(i => i.is_default)?.id?.toString()
+        if (selectedOrg) {
+          setLoadingSyncedUsers(true)
+          try {
+            const authToken = localStorage.getItem('auth_token')
+            const response = await fetch(`${API_BASE}/rootly/synced-users?integration_id=${selectedOrg}`, {
+              headers: {
+                'Authorization': `Bearer ${authToken}`
+              }
+            })
+            if (response.ok) {
+              const data = await response.json()
+              setSyncedUsers(data.users || [])
+            }
+          } catch (error) {
+            console.error('Error refreshing synced users:', error)
+          } finally {
+            setLoadingSyncedUsers(false)
+          }
+        }
+
+        cancelEditingGitHubUsername()
+      } else {
+        const error = await response.json()
+        toast.error(error.detail || 'Failed to update GitHub username')
+      }
+    } catch (error) {
+      console.error('Error updating GitHub username:', error)
+      toast.error('Failed to update GitHub username')
+    } finally {
+      setSavingUsername(false)
+    }
+  }
+
+  // Survey recipient handlers
+  const saveSurveyRecipients = async () => {
+    if (!selectedOrganization) {
+      toast.error('No organization selected')
+      return
+    }
+
+    setSavingRecipients(true)
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) {
+        toast.error('Please log in to save recipients')
+        return
+      }
+
+      const recipientIds = Array.from(selectedRecipients)
+      const response = await fetch(
+        `${API_BASE}/rootly/integrations/${selectedOrganization}/survey-recipients`,
+        {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${authToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(recipientIds)
+        }
+      )
+
+      if (response.ok) {
+        const data = await response.json()
+        // Update savedRecipients to match what was just saved
+        setSavedRecipients(new Set(selectedRecipients))
+        toast.success(data.message || 'Survey recipients saved successfully')
+      } else {
+        const error = await response.json()
+        toast.error(error.detail || 'Failed to save recipients')
+      }
+    } catch (error) {
+      console.error('Error saving recipients:', error)
+      toast.error('Failed to save recipients')
+    } finally {
+      setSavingRecipients(false)
+    }
+  }
+
+  // Discard changes and revert to saved state
+  const discardRecipientChanges = () => {
+    setSelectedRecipients(new Set(savedRecipients))
+    toast.info('Changes discarded')
+  }
 
   // AI Integration state
   const [llmToken, setLlmToken] = useState('')
@@ -411,6 +588,44 @@ export default function IntegrationsPage() {
       loadOrganizationData()
     }
   }, [showInviteModal])
+
+  // Fetch GitHub org members when GitHub is connected
+  useEffect(() => {
+    if (githubIntegration && teamMembersDrawerOpen && showSyncedUsers) {
+      fetchGitHubOrgMembers()
+    }
+  }, [githubIntegration, teamMembersDrawerOpen, showSyncedUsers])
+
+  // Load saved survey recipients when drawer opens (only if no unsaved changes)
+  useEffect(() => {
+    const loadSavedRecipients = async () => {
+      if (!teamMembersDrawerOpen || !selectedOrganization) return
+
+      try {
+        const authToken = localStorage.getItem('auth_token')
+        if (!authToken) return
+
+        const response = await fetch(
+          `${API_BASE}/rootly/integrations/${selectedOrganization}/survey-recipients`,
+          {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+          }
+        )
+
+        if (response.ok) {
+          const data = await response.json()
+          const recipientIds = new Set<number>(data.recipient_ids || [])
+          // Update both current and saved state
+          setSelectedRecipients(recipientIds)
+          setSavedRecipients(recipientIds)
+        }
+      } catch (error) {
+        console.error('Error loading saved recipients:', error)
+      }
+    }
+
+    loadSavedRecipients()
+  }, [teamMembersDrawerOpen, selectedOrganization])
 
   // Handle Slack OAuth success redirect
   useEffect(() => {
@@ -1852,6 +2067,44 @@ export default function IntegrationsPage() {
             </p>
           </div>
 
+          {/* Sync Members Card */}
+          <div className="max-w-2xl mx-auto">
+            <Card className={`border-2 ${selectedOrganization ? 'border-purple-200 bg-purple-50' : 'border-gray-200 bg-gray-50'}`}>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${selectedOrganization ? 'bg-purple-600' : 'bg-gray-300'}`}>
+                      <Users className={`w-6 h-6 ${selectedOrganization ? 'text-white' : 'text-gray-500'}`} />
+                    </div>
+                    <div>
+                      <h3 className={`text-lg font-semibold ${selectedOrganization ? 'text-slate-900' : 'text-gray-900'}`}>
+                        Team Members
+                      </h3>
+                      <p className={`text-sm ${selectedOrganization ? 'text-slate-600' : 'text-gray-600'}`}>
+                        {selectedOrganization ? (
+                          <>View and manage synced team members {syncedUsers.length > 0 && `(${syncedUsers.length} synced)`}</>
+                        ) : (
+                          'Select an organization above to view team members'
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    onClick={() => {
+                      setTeamMembersDrawerOpen(true)
+                      fetchSyncedUsers(false, false)
+                    }}
+                    disabled={!selectedOrganization}
+                    className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                  >
+                    <Users className="w-4 h-4 mr-2" />
+                    View Members
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
           <div className="grid md:grid-cols-2 gap-8 mb-8 max-w-2xl mx-auto">
             {/* GitHub Card */}
             {loadingGitHub ? (
@@ -3040,10 +3293,52 @@ export default function IntegrationsPage() {
       <Sheet open={teamMembersDrawerOpen} onOpenChange={setTeamMembersDrawerOpen}>
         <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
           <SheetHeader>
-            <SheetTitle>Team Members</SheetTitle>
-            <SheetDescription>
-              Users from {integrations.find(i => i.id.toString() === selectedOrganization)?.name || 'your organization'} who can submit burnout surveys
-            </SheetDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <SheetTitle>Team Members</SheetTitle>
+                <SheetDescription>
+                  Users from {integrations.find(i => i.id.toString() === selectedOrganization)?.name || 'your organization'} who can submit burnout surveys
+                </SheetDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={syncUsersToCorrelation}
+                  disabled={loadingTeamMembers}
+                  variant="outline"
+                  size="sm"
+                >
+                  {loadingTeamMembers ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Syncing...
+                    </>
+                  ) : (
+                    <>
+                      <Users className="w-4 h-4 mr-2" />
+                      Sync Members
+                    </>
+                  )}
+                </Button>
+                <Button
+                  onClick={saveSurveyRecipients}
+                  disabled={savingRecipients || !hasUnsavedChanges()}
+                  className="bg-purple-600 hover:bg-purple-700"
+                  size="sm"
+                >
+                  {savingRecipients ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4 mr-2" />
+                      {selectedRecipients.size === 0 ? 'Reset to All Users' : hasUnsavedChanges() ? 'Save Changes' : 'Saved'}
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
           </SheetHeader>
 
           <div className="mt-6 space-y-4">
@@ -3076,51 +3371,224 @@ export default function IntegrationsPage() {
                         )}
                       </Button>
                     )}
-                    <Badge className="text-xs bg-green-100 text-green-700 border-green-300">
-                      Can Submit Surveys
-                    </Badge>
                   </div>
                 </div>
-                <p className="text-xs text-gray-600 mb-3">
-                  These users can submit burnout surveys via Slack /burnout-survey command
-                </p>
-                <div className="space-y-2 max-h-[600px] overflow-y-auto">
-                  {syncedUsers.map((user: any) => (
-                    <div
-                      key={user.id}
-                      className="bg-white border border-gray-200 rounded-lg p-3 hover:border-purple-300 transition-colors"
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center space-x-3">
-                          <Avatar className="h-10 w-10">
-                            <AvatarFallback className="bg-purple-100 text-purple-700 text-sm font-medium">
-                              {user.name?.substring(0, 2).toUpperCase() || user.email?.substring(0, 2).toUpperCase() || '??'}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <div className="text-sm font-medium text-gray-900">
-                              {user.name || 'Unknown'}
+                <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-blue-900 font-medium">
+                      ✓ Check users to send them automated burnout survey invitations via Slack
+                    </p>
+                    <div className="text-xs font-semibold text-blue-900 bg-blue-100 px-2 py-1 rounded">
+                      {selectedRecipients.size === 0 ? syncedUsers.length : selectedRecipients.size} / {syncedUsers.length} will receive surveys
+                    </div>
+                  </div>
+                  {hasUnsavedChanges() && (
+                    <p className="text-xs text-orange-600 mt-2 font-medium">
+                      ⚠️ You have unsaved changes. Click "Save Changes" to apply.
+                    </p>
+                  )}
+                </div>
+
+                {/* Quick filter buttons */}
+                <div className="flex items-center gap-2 mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                  <span className="text-xs font-medium text-gray-600">Quick Actions:</span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      const oncallUserIds = syncedUsers
+                        .filter(u => u.is_oncall)
+                        .map(u => u.id)
+                      setSelectedRecipients(new Set(oncallUserIds))
+                      toast.success(`Selected ${oncallUserIds.length} on-call users`)
+                    }}
+                    className="h-7 text-xs"
+                  >
+                    Select On-Call ({syncedUsers.filter(u => u.is_oncall).length})
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      const allUserIds = syncedUsers.map(u => u.id)
+                      setSelectedRecipients(new Set(allUserIds))
+                      toast.success('Selected all users')
+                    }}
+                    className="h-7 text-xs"
+                  >
+                    Select All
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setSelectedRecipients(new Set())
+                      toast.success('Deselected all users')
+                    }}
+                    className="h-7 text-xs"
+                  >
+                    Deselect All
+                  </Button>
+                </div>
+                <div className="space-y-2 pb-20">
+                  {syncedUsers.map((user: any) => {
+                    const isSelected = selectedRecipients.has(user.id)
+                    return (
+                      <div
+                        key={user.id}
+                        onClick={() => {
+                          const newSelected = new Set(selectedRecipients)
+                          if (isSelected) {
+                            newSelected.delete(user.id)
+                          } else {
+                            newSelected.add(user.id)
+                          }
+                          setSelectedRecipients(newSelected)
+                        }}
+                        className={`bg-white border rounded-lg p-3 transition-all cursor-pointer ${
+                          isSelected
+                            ? 'border-purple-400 bg-purple-50'
+                            : 'border-gray-200 hover:border-purple-300'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center space-x-3">
+                            {/* Checkbox */}
+                            <div className="relative">
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => {}} // Handled by parent div onClick
+                                className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500 cursor-pointer"
+                              />
                             </div>
-                            <div className="text-xs text-gray-600">
-                              {user.email}
+
+                            {/* Avatar with on-call indicator */}
+                            <div className="relative">
+                              <Avatar className="h-10 w-10">
+                                <AvatarFallback className="bg-purple-100 text-purple-700 text-sm font-medium">
+                                  {user.name?.substring(0, 2).toUpperCase() || user.email?.substring(0, 2).toUpperCase() || '??'}
+                                </AvatarFallback>
+                              </Avatar>
+                              {user.is_oncall && (
+                                <div
+                                  className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white"
+                                  title="Currently on-call"
+                                />
+                              )}
+                            </div>
+
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium text-gray-900">
+                                  {user.name || 'Unknown'}
+                                </span>
+                                {user.is_oncall && (
+                                  <Badge className="text-xs bg-green-100 text-green-700 border-green-300">
+                                    On-Call
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="text-xs text-gray-600">
+                                {user.email}
+                              </div>
                             </div>
                           </div>
+                          <div className="flex items-center space-x-1">
+                            {user.platforms?.map((platform: string) => (
+                              <Badge key={platform} variant="secondary" className="text-xs">
+                                {platform}
+                              </Badge>
+                            ))}
+                          </div>
                         </div>
-                        <div className="flex items-center space-x-1">
-                          {user.platforms?.map((platform: string) => (
-                            <Badge key={platform} variant="secondary" className="text-xs">
-                              {platform}
-                            </Badge>
-                          ))}
-                        </div>
+                      {/* GitHub username section - always show, with edit capability */}
+                      <div className="pl-13 mt-2" onClick={(e) => e.stopPropagation()}>
+                        {editingUserId === user.id ? (
+                          // Edit mode
+                          <div className="flex items-center space-x-2">
+                            <Select
+                              value={editingUsername}
+                              onValueChange={setEditingUsername}
+                              disabled={savingUsername}
+                            >
+                              <SelectTrigger className="h-8 text-xs flex-1">
+                                <SelectValue placeholder="Select GitHub username..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="">
+                                  <span className="text-gray-400 italic">Clear mapping</span>
+                                </SelectItem>
+                                {githubOrgMembers.length > 0 ? (
+                                  githubOrgMembers.map(username => (
+                                    <SelectItem key={username} value={username}>
+                                      {username}
+                                    </SelectItem>
+                                  ))
+                                ) : (
+                                  <div className="text-xs text-gray-400 p-2">
+                                    {loadingOrgMembers ? 'Loading...' : 'No GitHub members found'}
+                                  </div>
+                                )}
+                              </SelectContent>
+                            </Select>
+                            <Button
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                saveGitHubUsername(user.id)
+                              }}
+                              disabled={savingUsername}
+                              className="h-8 px-2"
+                            >
+                              {savingUsername ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              ) : (
+                                <Check className="w-3 h-3" />
+                              )}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                cancelEditingGitHubUsername()
+                              }}
+                              disabled={savingUsername}
+                              className="h-8 px-2"
+                            >
+                              <X className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        ) : (
+                          // Display mode
+                          <div className="flex items-center justify-between text-xs">
+                            <div className="text-gray-500">
+                              GitHub: {user.github_username ? (
+                                <span className="font-mono text-gray-700">{user.github_username}</span>
+                              ) : (
+                                <span className="text-gray-400 italic">Not mapped</span>
+                              )}
+                            </div>
+                            {githubIntegration && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  startEditingGitHubUsername(user.id, user.github_username)
+                                }}
+                                className="h-6 px-2 text-gray-400 hover:text-gray-700"
+                              >
+                                <Edit3 className="w-3 h-3" />
+                              </Button>
+                            )}
+                          </div>
+                        )}
                       </div>
-                      {user.github_username && (
-                        <div className="pl-13 text-xs text-gray-500">
-                          GitHub: <span className="font-mono">{user.github_username}</span>
-                        </div>
-                      )}
                     </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
             ) : (

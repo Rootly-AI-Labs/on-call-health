@@ -86,10 +86,15 @@ export async function syncUsersToCorrelation(
     if (response.ok) {
       const data = await response.json()
       const stats = data.stats || data
-      toast.success(
-        `Synced ${stats.created} new users, updated ${stats.updated} existing users. ` +
-        `All team members can now submit burnout surveys via Slack!`
-      )
+
+      // Build success message with GitHub matching info
+      let message = `Synced ${stats.created} new users, updated ${stats.updated} existing users.`
+      if (stats.github_matched !== undefined) {
+        message += ` Matched ${stats.github_matched} users to GitHub.`
+      }
+      message += ` All team members can now submit burnout surveys via Slack!`
+
+      toast.success(message)
       // Reload the members list and fetch synced users (without showing another toast or auto-syncing again)
       await fetchTeamMembers()
       await fetchSyncedUsers(false, false)

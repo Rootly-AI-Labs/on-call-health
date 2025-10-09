@@ -385,9 +385,19 @@ class MigrationRunner:
                     """
                 ]
             },
+            {
+                "name": "010_add_survey_recipients_to_integrations",
+                "description": "Add survey_recipients JSON field to rootly_integrations for storing selected survey recipients",
+                "sql": [
+                    """
+                    ALTER TABLE rootly_integrations
+                    ADD COLUMN IF NOT EXISTS survey_recipients JSON
+                    """
+                ]
+            },
             # Add future migrations here with incrementing numbers
             # {
-            #     "name": "009_add_user_preferences",
+            #     "name": "011_add_user_preferences",
             #     "description": "Add user preferences table",
             #     "sql": ["CREATE TABLE IF NOT EXISTS user_preferences (...)"]
             # }

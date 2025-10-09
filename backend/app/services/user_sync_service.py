@@ -1,13 +1,15 @@
 """
 Service for syncing all users from Rootly/PagerDuty to UserCorrelation table.
 Ensures all team members can submit burnout surveys regardless of incident involvement.
+Includes smart GitHub username matching using ML/AI-powered matching.
 """
 import logging
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 from sqlalchemy.orm import Session
-from app.models import User, UserCorrelation, RootlyIntegration
+from app.models import User, UserCorrelation, RootlyIntegration, GitHubIntegration
 from app.core.rootly_client import RootlyAPIClient
 from app.core.pagerduty_client import PagerDutyAPIClient
+from app.services.enhanced_github_matcher import EnhancedGitHubMatcher
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +65,16 @@ class UserSyncService:
                 f"Synced {stats['created']} new users, updated {stats['updated']} existing users "
                 f"from {integration.platform} integration {integration_id}"
             )
+
+            # After syncing Rootly/PagerDuty users, try to match GitHub usernames
+            github_stats = await self._match_github_usernames(current_user)
+            if github_stats:
+                stats['github_matched'] = github_stats['matched']
+                stats['github_skipped'] = github_stats['skipped']
+                logger.info(
+                    f"GitHub matching: {github_stats['matched']} users matched, "
+                    f"{github_stats['skipped']} skipped"
+                )
 
             return stats
 
@@ -278,3 +290,114 @@ class UserSyncService:
                 total_stats["errors"].append(error_msg)
 
         return total_stats
+
+    def _get_github_integration(self, user: User) -> Optional[GitHubIntegration]:
+        """Get the user's GitHub integration with token."""
+        from cryptography.fernet import Fernet
+        import base64
+        from app.core.config import settings
+
+        github_int = self.db.query(GitHubIntegration).filter(
+            GitHubIntegration.user_id == user.id,
+            GitHubIntegration.github_token.isnot(None)
+        ).first()
+
+        if not github_int:
+            logger.info(f"No GitHub integration found for user {user.id}")
+            return None
+
+        # Decrypt token
+        try:
+            key = settings.JWT_SECRET_KEY.encode()
+            key = base64.urlsafe_b64encode(key[:32].ljust(32, b'\0'))
+            fernet = Fernet(key)
+            github_int.decrypted_token = fernet.decrypt(github_int.github_token.encode()).decode()
+        except Exception as e:
+            logger.error(f"Failed to decrypt GitHub token: {e}")
+            return None
+
+        return github_int
+
+    async def _match_github_usernames(self, user: User) -> Optional[Dict[str, int]]:
+        """
+        Match all synced users to GitHub usernames using smart AI/ML matching.
+
+        This uses the EnhancedGitHubMatcher which performs:
+        - Name similarity matching (fuzzy matching)
+        - Username pattern matching
+        - Organization member lookup
+
+        Returns statistics about matching results.
+        """
+        try:
+            # Get GitHub integration
+            github_int = self._get_github_integration(user)
+            if not github_int:
+                logger.info("Skipping GitHub matching - no GitHub integration configured")
+                return None
+
+            # Get organizations from integration
+            organizations = github_int.organizations if isinstance(github_int.organizations, list) else []
+            if not organizations:
+                logger.info("Skipping GitHub matching - no organizations configured")
+                return None
+
+            logger.info(f"Starting GitHub username matching for orgs: {organizations}")
+
+            # Initialize matcher
+            matcher = EnhancedGitHubMatcher(
+                github_token=github_int.decrypted_token,
+                organizations=organizations
+            )
+
+            # Get all synced users without GitHub usernames
+            correlations = self.db.query(UserCorrelation).filter(
+                UserCorrelation.user_id == user.id,
+                UserCorrelation.github_username.is_(None)
+            ).all()
+
+            if not correlations:
+                logger.info("No users need GitHub matching")
+                return {"matched": 0, "skipped": 0}
+
+            logger.info(f"Found {len(correlations)} users to match with GitHub")
+
+            matched = 0
+            skipped = 0
+
+            # Match each user
+            for correlation in correlations:
+                try:
+                    # Use name for matching (email is secondary)
+                    github_username = await matcher.match_name_to_github(
+                        full_name=correlation.name,
+                        fallback_email=correlation.email
+                    )
+
+                    if github_username:
+                        correlation.github_username = github_username
+                        matched += 1
+                        logger.info(f"✅ Matched {correlation.name} ({correlation.email}) -> {github_username}")
+                    else:
+                        skipped += 1
+                        logger.debug(f"❌ No GitHub match for {correlation.name} ({correlation.email})")
+
+                except Exception as e:
+                    logger.warning(f"Error matching {correlation.email}: {e}")
+                    skipped += 1
+
+            # Commit all matches
+            if matched > 0:
+                self.db.commit()
+                logger.info(f"✅ Committed {matched} GitHub username matches")
+
+            return {
+                "matched": matched,
+                "skipped": skipped,
+                "total": len(correlations)
+            }
+
+        except Exception as e:
+            logger.error(f"Error in GitHub matching: {e}")
+            self.db.rollback()
+            return None
