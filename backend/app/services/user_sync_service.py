@@ -292,9 +292,10 @@ class UserSyncService:
         return total_stats
 
     def _get_github_integration(self, user: User) -> Optional[GitHubIntegration]:
-        """Get the user's GitHub integration with token."""
+        """Get the user's GitHub integration with token, fallback to env var."""
         from cryptography.fernet import Fernet
         import base64
+        import os
         from app.core.config import settings
 
         github_int = self.db.query(GitHubIntegration).filter(
@@ -302,21 +303,30 @@ class UserSyncService:
             GitHubIntegration.github_token.isnot(None)
         ).first()
 
-        if not github_int:
-            logger.info(f"No GitHub integration found for user {user.id}")
-            return None
+        if github_int:
+            # Decrypt token from database
+            try:
+                key = settings.JWT_SECRET_KEY.encode()
+                key = base64.urlsafe_b64encode(key[:32].ljust(32, b'\0'))
+                fernet = Fernet(key)
+                github_int.decrypted_token = fernet.decrypt(github_int.github_token.encode()).decode()
+                return github_int
+            except Exception as e:
+                logger.error(f"Failed to decrypt GitHub token: {e}")
+                # Fall through to env var fallback
 
-        # Decrypt token
-        try:
-            key = settings.JWT_SECRET_KEY.encode()
-            key = base64.urlsafe_b64encode(key[:32].ljust(32, b'\0'))
-            fernet = Fernet(key)
-            github_int.decrypted_token = fernet.decrypt(github_int.github_token.encode()).decode()
-        except Exception as e:
-            logger.error(f"Failed to decrypt GitHub token: {e}")
-            return None
+        # Fallback to environment variable (for Railway/beta)
+        beta_token = os.getenv('GITHUB_TOKEN')
+        if beta_token:
+            logger.info(f"No user GitHub integration found for user {user.id}, using beta token from environment")
+            # Create a temporary GitHubIntegration object with beta token
+            temp_int = GitHubIntegration()
+            temp_int.decrypted_token = beta_token
+            temp_int.organizations = ['rootlyhq', 'Rootly-AI-Labs']  # Default orgs for beta
+            return temp_int
 
-        return github_int
+        logger.info(f"No GitHub integration found for user {user.id}")
+        return None
 
     async def _match_github_usernames(self, user: User) -> Optional[Dict[str, int]]:
         """
