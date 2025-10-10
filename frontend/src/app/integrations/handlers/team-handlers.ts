@@ -59,7 +59,8 @@ export async function syncUsersToCorrelation(
   setLoadingTeamMembers: (loading: boolean) => void,
   setTeamMembersError: (error: string | null) => void,
   fetchTeamMembers: () => Promise<void>,
-  fetchSyncedUsers: (showToast?: boolean, autoSync?: boolean) => Promise<void>
+  fetchSyncedUsers: (showToast?: boolean, autoSync?: boolean) => Promise<void>,
+  onProgress?: (message: string) => void
 ): Promise<void> {
   if (!selectedOrganization) {
     toast.error('Please select an organization first')
@@ -69,12 +70,14 @@ export async function syncUsersToCorrelation(
   setTeamMembersError(null)
 
   try {
+    onProgress?.('🔄 Starting sync process...')
     const authToken = localStorage.getItem('auth_token')
     if (!authToken) {
       toast.error('Please log in to sync users')
       return
     }
 
+    onProgress?.('📡 Connecting to API...')
     const response = await fetch(`${API_BASE}/rootly/integrations/${selectedOrganization}/sync-users`, {
       method: 'POST',
       headers: {
@@ -84,8 +87,16 @@ export async function syncUsersToCorrelation(
     })
 
     if (response.ok) {
+      onProgress?.('✅ Received response from server')
       const data = await response.json()
       const stats = data.stats || data
+
+      onProgress?.(`📊 Created ${stats.created} new users`)
+      onProgress?.(`🔄 Updated ${stats.updated} existing users`)
+      if (stats.github_matched !== undefined) {
+        onProgress?.(`🐙 Matched ${stats.github_matched} users to GitHub`)
+        onProgress?.(`⏭️  Skipped ${stats.github_skipped || 0} GitHub matches`)
+      }
 
       // Build success message with GitHub matching info
       let message = `Synced ${stats.created} new users, updated ${stats.updated} existing users.`
@@ -95,15 +106,18 @@ export async function syncUsersToCorrelation(
       message += ` All team members can now submit burnout surveys via Slack!`
 
       toast.success(message)
+      onProgress?.('🔄 Reloading team members...')
       // Reload the members list and fetch synced users (without showing another toast or auto-syncing again)
       await fetchTeamMembers()
       await fetchSyncedUsers(false, false)
+      onProgress?.('✅ Sync completed successfully!')
     } else {
       const errorData = await response.json()
       throw new Error(errorData.detail || 'Failed to sync users')
     }
   } catch (error) {
     console.error('Error syncing users:', error)
+    onProgress?.(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`)
     const errorMsg = error instanceof Error ? error.message : 'Failed to sync users'
     setTeamMembersError(errorMsg)
     toast.error(errorMsg)
