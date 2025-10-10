@@ -3504,8 +3504,32 @@ export default function IntegrationsPage() {
                           </div>
                           <div className="flex items-center space-x-1">
                             {user.platforms?.map((platform: string) => {
-                              const isPagerDuty = platform.toLowerCase() === 'pagerduty'
-                              const isRootly = platform.toLowerCase() === 'rootly'
+                              const platformLower = platform.toLowerCase()
+                              const isPagerDuty = platformLower === 'pagerduty'
+                              const isRootly = platformLower === 'rootly'
+                              const isGitHub = platformLower === 'github'
+                              const isSlack = platformLower === 'slack'
+
+                              // Show logo for GitHub and Slack
+                              if (isGitHub || isSlack) {
+                                return (
+                                  <div
+                                    key={platform}
+                                    className="flex items-center justify-center w-6 h-6 rounded bg-gray-100"
+                                    title={platform}
+                                  >
+                                    <Image
+                                      src={isGitHub ? '/images/github-logo.png' : '/images/slack-logo.png'}
+                                      alt={platform}
+                                      width={16}
+                                      height={16}
+                                      className="object-contain"
+                                    />
+                                  </div>
+                                )
+                              }
+
+                              // Show colored badge for Rootly and PagerDuty
                               return (
                                 <Badge
                                   key={platform}
