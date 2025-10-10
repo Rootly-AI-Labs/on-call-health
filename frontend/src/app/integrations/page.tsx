@@ -1033,10 +1033,13 @@ export default function IntegrationsPage() {
       })
 
       const rootlyIntegrations = rootlyData.integrations.map((i: Integration) => ({ ...i, platform: 'rootly' }))
-      const pagerdutyIntegrations = pagerdutyData.integrations || []
+      const pagerdutyIntegrations = (pagerdutyData.integrations || []).map((i: Integration) => ({ ...i, platform: 'pagerduty' }))
 
       const allIntegrations = [...rootlyIntegrations, ...pagerdutyIntegrations]
       console.log('📦 Setting integrations:', allIntegrations.length, 'total')
+      console.log('📦 Rootly integrations:', rootlyIntegrations)
+      console.log('📦 PagerDuty integrations:', pagerdutyIntegrations)
+      console.log('📦 Active tab:', activeTab)
       setIntegrations(allIntegrations)
       setGithubIntegration(githubData.connected ? githubData.integration : null)
       setSlackIntegration(slackData.integration)
