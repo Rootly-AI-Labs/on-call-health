@@ -3434,7 +3434,12 @@ export default function IntegrationsPage() {
                   </Button>
                 </div>
                 <div className="space-y-2 pb-20">
-                  {syncedUsers.map((user: any) => {
+                  {loadingSyncedUsers ? (
+                    <div className="flex flex-col items-center justify-center py-12 space-y-4">
+                      <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
+                      <p className="text-sm text-gray-600">Loading team members...</p>
+                    </div>
+                  ) : syncedUsers.map((user: any) => {
                     const isSelected = selectedRecipients.has(user.id)
                     return (
                       <div
