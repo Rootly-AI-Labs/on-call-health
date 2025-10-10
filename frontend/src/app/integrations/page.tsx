@@ -274,7 +274,7 @@ export default function IntegrationsPage() {
         return
       }
 
-      const response = await fetch(`${API_BASE}/github/org-members`, {
+      const response = await fetch(`${API_BASE}/integrations/github/org-members`, {
         headers: {
           'Authorization': `Bearer ${authToken}`
         }
@@ -3503,11 +3503,23 @@ export default function IntegrationsPage() {
                             </div>
                           </div>
                           <div className="flex items-center space-x-1">
-                            {user.platforms?.map((platform: string) => (
-                              <Badge key={platform} variant="secondary" className="text-xs">
-                                {platform}
-                              </Badge>
-                            ))}
+                            {user.platforms?.map((platform: string) => {
+                              const isPagerDuty = platform.toLowerCase() === 'pagerduty'
+                              const isRootly = platform.toLowerCase() === 'rootly'
+                              return (
+                                <Badge
+                                  key={platform}
+                                  variant="secondary"
+                                  className={`text-xs ${
+                                    isPagerDuty ? 'bg-green-100 text-green-700 border-green-300' :
+                                    isRootly ? 'bg-purple-100 text-purple-700 border-purple-300' :
+                                    ''
+                                  }`}
+                                >
+                                  {platform}
+                                </Badge>
+                              )
+                            })}
                           </div>
                         </div>
                       {/* GitHub username section - always show, with edit capability */}
