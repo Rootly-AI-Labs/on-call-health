@@ -3322,24 +3322,27 @@ export default function IntegrationsPage() {
                     </>
                   )}
                 </Button>
-                <Button
-                  onClick={saveSurveyRecipients}
-                  disabled={savingRecipients || !hasUnsavedChanges()}
-                  className="bg-purple-600 hover:bg-purple-700"
-                  size="sm"
-                >
-                  {savingRecipients ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Check className="w-4 h-4 mr-2" />
-                      {selectedRecipients.size === 0 ? 'Reset to All Users' : hasUnsavedChanges() ? 'Save Changes' : 'Saved'}
-                    </>
-                  )}
-                </Button>
+                {/* Hide save button for beta integrations */}
+                {selectedOrganization && !['beta-rootly', 'beta-pagerduty'].includes(selectedOrganization) && (
+                  <Button
+                    onClick={saveSurveyRecipients}
+                    disabled={savingRecipients || !hasUnsavedChanges()}
+                    className="bg-purple-600 hover:bg-purple-700"
+                    size="sm"
+                  >
+                    {savingRecipients ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-4 h-4 mr-2" />
+                        {selectedRecipients.size === 0 ? 'Reset to All Users' : hasUnsavedChanges() ? 'Save Changes' : 'Saved'}
+                      </>
+                    )}
+                  </Button>
+                )}
               </div>
             </div>
           </SheetHeader>
@@ -3385,7 +3388,11 @@ export default function IntegrationsPage() {
                       {selectedRecipients.size === 0 ? syncedUsers.length : selectedRecipients.size} / {syncedUsers.length} will receive surveys
                     </div>
                   </div>
-                  {hasUnsavedChanges() && (
+                  {selectedOrganization && ['beta-rootly', 'beta-pagerduty'].includes(selectedOrganization) ? (
+                    <p className="text-xs text-amber-700 mt-2 font-medium">
+                      ℹ️ Beta integrations send surveys to all synced users. Add a personal integration to customize recipients.
+                    </p>
+                  ) : hasUnsavedChanges() && (
                     <p className="text-xs text-orange-600 mt-2 font-medium">
                       ⚠️ You have unsaved changes. Click "Save Changes" to apply.
                     </p>
