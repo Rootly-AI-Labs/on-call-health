@@ -1025,10 +1025,18 @@ export default function IntegrationsPage() {
       const githubData = (githubResponse as any).ok && (githubResponse as Response).json ? await (githubResponse as Response).json() : { connected: false, integration: null }
       const slackData = (slackResponse as any).ok && (slackResponse as Response).json ? await (slackResponse as Response).json() : { integration: null }
 
+      console.log('📊 Integration data loaded:', {
+        rootly: rootlyData.integrations?.length || 0,
+        pagerduty: pagerdutyData.integrations?.length || 0,
+        github: githubData.connected ? 'connected' : 'not connected',
+        slack: slackData.integration ? 'connected' : 'not connected'
+      })
+
       const rootlyIntegrations = rootlyData.integrations.map((i: Integration) => ({ ...i, platform: 'rootly' }))
       const pagerdutyIntegrations = pagerdutyData.integrations || []
 
       const allIntegrations = [...rootlyIntegrations, ...pagerdutyIntegrations]
+      console.log('📦 Setting integrations:', allIntegrations.length, 'total')
       setIntegrations(allIntegrations)
       setGithubIntegration(githubData.connected ? githubData.integration : null)
       setSlackIntegration(slackData.integration)
