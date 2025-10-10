@@ -983,25 +983,47 @@ export default function IntegrationsPage() {
         return
       }
 
+      // Add 10 second timeout to prevent hanging
+      const fetchWithTimeout = (url: string, options: any, timeout = 10000) => {
+        return Promise.race([
+          fetch(url, options),
+          new Promise<Response>((_, reject) =>
+            setTimeout(() => reject(new Error('Request timeout')), timeout)
+          )
+        ])
+      }
+
       const [rootlyResponse, pagerdutyResponse, githubResponse, slackResponse] = await Promise.all([
-        fetch(`${API_BASE}/rootly/integrations`, {
+        fetchWithTimeout(`${API_BASE}/rootly/integrations`, {
           headers: { 'Authorization': `Bearer ${authToken}` }
+        }).catch((err) => {
+          console.error('Rootly API error:', err)
+          return { ok: false }
         }),
-        fetch(`${API_BASE}/pagerduty/integrations`, {
+        fetchWithTimeout(`${API_BASE}/pagerduty/integrations`, {
           headers: { 'Authorization': `Bearer ${authToken}` }
+        }).catch((err) => {
+          console.error('PagerDuty API error:', err)
+          return { ok: false }
         }),
-        fetch(`${API_BASE}/integrations/github/status`, {
+        fetchWithTimeout(`${API_BASE}/integrations/github/status`, {
           headers: { 'Authorization': `Bearer ${authToken}` }
-        }).catch(() => ({ ok: false })),
-        fetch(`${API_BASE}/integrations/slack/status`, {
+        }).catch((err) => {
+          console.error('GitHub API error:', err)
+          return { ok: false }
+        }),
+        fetchWithTimeout(`${API_BASE}/integrations/slack/status`, {
           headers: { 'Authorization': `Bearer ${authToken}` }
-        }).catch(() => ({ ok: false }))
+        }).catch((err) => {
+          console.error('Slack API error:', err)
+          return { ok: false }
+        })
       ])
 
-      const rootlyData = rootlyResponse.ok ? await rootlyResponse.json() : { integrations: [] }
-      const pagerdutyData = pagerdutyResponse.ok ? await pagerdutyResponse.json() : { integrations: [] }
-      const githubData = (githubResponse as Response).ok ? await (githubResponse as Response).json() : { connected: false, integration: null }
-      const slackData = (slackResponse as Response).ok ? await (slackResponse as Response).json() : { integration: null }
+      const rootlyData = (rootlyResponse as any).ok && (rootlyResponse as Response).json ? await (rootlyResponse as Response).json() : { integrations: [] }
+      const pagerdutyData = (pagerdutyResponse as any).ok && (pagerdutyResponse as Response).json ? await (pagerdutyResponse as Response).json() : { integrations: [] }
+      const githubData = (githubResponse as any).ok && (githubResponse as Response).json ? await (githubResponse as Response).json() : { connected: false, integration: null }
+      const slackData = (slackResponse as any).ok && (slackResponse as Response).json ? await (slackResponse as Response).json() : { integration: null }
 
       const rootlyIntegrations = rootlyData.integrations.map((i: Integration) => ({ ...i, platform: 'rootly' }))
       const pagerdutyIntegrations = pagerdutyData.integrations || []
