@@ -3486,11 +3486,36 @@ export default function IntegrationsPage() {
                               )}
                             </div>
 
-                            <div>
+                            <div className="flex-1">
                               <div className="flex items-center gap-2">
                                 <span className="text-sm font-medium text-gray-900">
                                   {user.name || 'Unknown'}
                                 </span>
+                                {/* GitHub and Slack logos */}
+                                {user.platforms?.map((platform: string) => {
+                                  const platformLower = platform.toLowerCase()
+                                  const isGitHub = platformLower === 'github'
+                                  const isSlack = platformLower === 'slack'
+
+                                  if (isGitHub || isSlack) {
+                                    return (
+                                      <div
+                                        key={platform}
+                                        className="flex items-center justify-center w-4 h-4"
+                                        title={platform}
+                                      >
+                                        <Image
+                                          src={isGitHub ? '/images/github-logo.png' : '/images/slack-logo.png'}
+                                          alt={platform}
+                                          width={14}
+                                          height={14}
+                                          className="object-contain"
+                                        />
+                                      </div>
+                                    )
+                                  }
+                                  return null
+                                })}
                                 {user.is_oncall && (
                                   <Badge className="text-xs bg-green-100 text-green-700 border-green-300">
                                     On-Call
@@ -3503,46 +3528,28 @@ export default function IntegrationsPage() {
                             </div>
                           </div>
                           <div className="flex items-center space-x-1">
+                            {/* Rootly and PagerDuty badges */}
                             {user.platforms?.map((platform: string) => {
                               const platformLower = platform.toLowerCase()
                               const isPagerDuty = platformLower === 'pagerduty'
                               const isRootly = platformLower === 'rootly'
-                              const isGitHub = platformLower === 'github'
-                              const isSlack = platformLower === 'slack'
 
-                              // Show logo for GitHub and Slack
-                              if (isGitHub || isSlack) {
+                              if (isPagerDuty || isRootly) {
                                 return (
-                                  <div
+                                  <Badge
                                     key={platform}
-                                    className="flex items-center justify-center w-6 h-6 rounded bg-gray-100"
-                                    title={platform}
+                                    variant="secondary"
+                                    className={`text-xs ${
+                                      isPagerDuty ? 'bg-green-100 text-green-700 border-green-300' :
+                                      isRootly ? 'bg-purple-100 text-purple-700 border-purple-300' :
+                                      ''
+                                    }`}
                                   >
-                                    <Image
-                                      src={isGitHub ? '/images/github-logo.png' : '/images/slack-logo.png'}
-                                      alt={platform}
-                                      width={16}
-                                      height={16}
-                                      className="object-contain"
-                                    />
-                                  </div>
+                                    {platform}
+                                  </Badge>
                                 )
                               }
-
-                              // Show colored badge for Rootly and PagerDuty
-                              return (
-                                <Badge
-                                  key={platform}
-                                  variant="secondary"
-                                  className={`text-xs ${
-                                    isPagerDuty ? 'bg-green-100 text-green-700 border-green-300' :
-                                    isRootly ? 'bg-purple-100 text-purple-700 border-purple-300' :
-                                    ''
-                                  }`}
-                                >
-                                  {platform}
-                                </Badge>
-                              )
+                              return null
                             })}
                           </div>
                         </div>
