@@ -5,7 +5,7 @@ from typing import Dict, Any, List
 from datetime import datetime, timedelta
 import logging
 import os
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Body
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -1361,7 +1361,7 @@ async def get_synced_users(
 @router.put("/integrations/{integration_id}/survey-recipients")
 async def update_survey_recipients(
     integration_id: str,
-    recipient_ids: List[int],
+    recipient_ids: List[int] = Body(...),
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
