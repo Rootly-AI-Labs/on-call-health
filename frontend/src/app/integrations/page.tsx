@@ -314,8 +314,11 @@ export default function IntegrationsPage() {
         return
       }
 
+      // Convert __clear__ sentinel to empty string
+      const usernameToSave = editingUsername === '__clear__' ? '' : editingUsername
+
       const response = await fetch(
-        `${API_BASE}/rootly/user-correlation/${userId}/github-username?github_username=${encodeURIComponent(editingUsername)}`,
+        `${API_BASE}/rootly/user-correlation/${userId}/github-username?github_username=${encodeURIComponent(usernameToSave)}`,
         {
           method: 'PATCH',
           headers: {
@@ -326,10 +329,10 @@ export default function IntegrationsPage() {
 
       if (response.ok) {
         const data = await response.json()
-        if (editingUsername === '') {
+        if (usernameToSave === '') {
           toast.success('GitHub username mapping cleared')
         } else {
-          toast.success(`GitHub username updated to ${editingUsername}`)
+          toast.success(`GitHub username updated to ${usernameToSave}`)
         }
 
         // Refresh synced users list - simple re-fetch
@@ -3516,7 +3519,7 @@ export default function IntegrationsPage() {
                                 <SelectValue placeholder="Select GitHub username..." />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="">
+                                <SelectItem value="__clear__">
                                   <span className="text-gray-400 italic">Clear mapping</span>
                                 </SelectItem>
                                 {githubOrgMembers.length > 0 ? (
