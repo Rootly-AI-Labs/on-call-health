@@ -376,7 +376,7 @@ class UserSyncService:
             skipped = 0
 
             # Match each user
-            for correlation in correlations:
+            for i, correlation in enumerate(correlations):
                 try:
                     # Skip users without names (can't match without a name)
                     if not correlation.name:
@@ -394,11 +394,14 @@ class UserSyncService:
                         correlation.github_username = github_username
                         matched += 1
                         logger.info(f"✅ Matched {correlation.name} ({correlation.email}) -> {github_username}")
-                        # Commit immediately after each match to prevent data loss on interruption
-                        self.db.commit()
                     else:
                         skipped += 1
                         logger.debug(f"❌ No GitHub match for {correlation.name} ({correlation.email})")
+
+                    # Commit in batches of 10 to balance performance and data safety
+                    if (i + 1) % 10 == 0:
+                        self.db.commit()
+                        logger.debug(f"💾 Committed batch of matches ({i + 1}/{len(correlations)})")
 
                 except Exception as e:
                     logger.warning(f"Error matching {correlation.email}: {e}")
@@ -407,6 +410,7 @@ class UserSyncService:
 
             # Final commit for any remaining changes
             if matched > 0:
+                self.db.commit()
                 logger.info(f"✅ Completed {matched} GitHub username matches")
 
             return {

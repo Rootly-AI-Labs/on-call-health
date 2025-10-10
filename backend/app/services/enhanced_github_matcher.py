@@ -162,16 +162,16 @@ class EnhancedGitHubMatcher:
     async def _get_all_org_members_with_profiles(self, session) -> List[Dict]:
         """Get all organization members with their profile information."""
         all_members = []
-        
+
         try:
             if not self.organizations:
                 logger.warning("No organizations configured for member fetching")
                 return all_members
-                
+
             for org in self.organizations:
                 try:
                     logger.info(f"🔄 Fetching members from organization: {org}")
-                    
+
                     # Get org members list
                     if org not in self._org_members_cache:
                         members = await self._get_org_members(org, session)
@@ -179,42 +179,59 @@ class EnhancedGitHubMatcher:
                         logger.info(f"📥 Cached {len(members)} usernames for {org}")
                     else:
                         logger.info(f"📦 Using cached members for {org}: {len(self._org_members_cache[org])} members")
-                    
-                    # Get profiles for each member (with rate limiting)
-                    member_count = 0
-                    profiles_loaded = 0
-                    
-                    for username in self._org_members_cache[org]:
-                        try:
-                            # Add rate limiting to prevent API overload
-                            if member_count > 0 and member_count % 5 == 0:
-                                await asyncio.sleep(1)  # Pause every 5 requests
-                            
-                            profile = await self._get_github_user_profile(username, session)
+
+                    # Check if we have cached profiles already (persist across sync runs)
+                    cache_key = f"{org}_profiles"
+                    if cache_key in _GLOBAL_MEMBER_PROFILES_CACHE:
+                        cached_profiles = _GLOBAL_MEMBER_PROFILES_CACHE[cache_key]
+                        all_members.extend(cached_profiles)
+                        logger.info(f"📦 Using {len(cached_profiles)} cached profiles for {org}")
+                        continue
+
+                    # Batch fetch profiles concurrently (much faster than sequential)
+                    org_profiles = []
+                    usernames = list(self._org_members_cache[org])
+
+                    # Process in batches of 10 to avoid overwhelming the API
+                    batch_size = 10
+                    for i in range(0, len(usernames), batch_size):
+                        batch = usernames[i:i + batch_size]
+
+                        # Fetch all profiles in this batch concurrently
+                        tasks = [self._get_github_user_profile(username, session) for username in batch]
+                        profiles = await asyncio.gather(*tasks, return_exceptions=True)
+
+                        # Process results
+                        for username, profile in zip(batch, profiles):
+                            if isinstance(profile, Exception):
+                                logger.debug(f"Error fetching profile for {username}: {profile}")
+                                continue
+
                             if profile:
-                                # Only store name, skip email since GitHub emails are often private
                                 profile_name = profile.get('name', '') or ''
-                                all_members.append({
+                                org_profiles.append({
                                     'username': username,
                                     'name': profile_name.lower() if profile_name else '',
                                     'organization': org
                                 })
-                                profiles_loaded += 1
-                            member_count += 1
-                            
-                        except Exception as e:
-                            logger.debug(f"Error fetching profile for {username}: {e}")
-                            continue  # Skip this user and continue with others
-                            
-                    logger.info(f"✅ Loaded {profiles_loaded} profiles from {org} ({member_count} total members)")
-                    
+
+                        # Small delay between batches to respect rate limits
+                        if i + batch_size < len(usernames):
+                            await asyncio.sleep(0.5)
+
+                    # Cache profiles globally for this org
+                    _GLOBAL_MEMBER_PROFILES_CACHE[cache_key] = org_profiles
+                    all_members.extend(org_profiles)
+
+                    logger.info(f"✅ Loaded {len(org_profiles)} profiles from {org} (batched)")
+
                 except Exception as org_error:
                     logger.error(f"Error fetching members for org {org}: {org_error}")
                     continue  # Skip this org and continue with others
-                
+
         except Exception as e:
             logger.error(f"Critical error in member fetching: {e}")
-            
+
         return all_members
     
     async def _match_name_against_members(self, full_name: str, members: List[Dict], fallback_email: Optional[str] = None) -> Optional[str]:
