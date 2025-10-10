@@ -394,6 +394,8 @@ class UserSyncService:
                         correlation.github_username = github_username
                         matched += 1
                         logger.info(f"✅ Matched {correlation.name} ({correlation.email}) -> {github_username}")
+                        # Commit immediately after each match to prevent data loss on interruption
+                        self.db.commit()
                     else:
                         skipped += 1
                         logger.debug(f"❌ No GitHub match for {correlation.name} ({correlation.email})")
@@ -401,11 +403,11 @@ class UserSyncService:
                 except Exception as e:
                     logger.warning(f"Error matching {correlation.email}: {e}")
                     skipped += 1
+                    self.db.rollback()  # Rollback failed match
 
-            # Commit all matches
+            # Final commit for any remaining changes
             if matched > 0:
-                self.db.commit()
-                logger.info(f"✅ Committed {matched} GitHub username matches")
+                logger.info(f"✅ Completed {matched} GitHub username matches")
 
             return {
                 "matched": matched,
