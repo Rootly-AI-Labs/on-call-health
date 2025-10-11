@@ -132,7 +132,8 @@ class UnifiedBurnoutAnalyzer:
             # Fetch data
             extraction_start = datetime.now()
             data = await self._fetch_analysis_data(time_range_days)
-            
+            data_fetch_duration = (datetime.now() - extraction_start).total_seconds()
+
             # Check if data was successfully fetched
             if data is None:
                 logger.error("Data is None after fetch")
