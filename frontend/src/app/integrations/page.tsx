@@ -995,26 +995,22 @@ export default function IntegrationsPage() {
       const [rootlyResponse, pagerdutyResponse, githubResponse, slackResponse] = await Promise.all([
         fetchWithTimeout(`${API_BASE}/rootly/integrations`, {
           headers: { 'Authorization': `Bearer ${authToken}` }
-        }).catch((err) => {
-          console.error('Rootly API error:', err)
+        }).catch(() => {
           return { ok: false }
         }),
         fetchWithTimeout(`${API_BASE}/pagerduty/integrations`, {
           headers: { 'Authorization': `Bearer ${authToken}` }
-        }).catch((err) => {
-          console.error('PagerDuty API error:', err)
+        }).catch(() => {
           return { ok: false }
         }),
         fetchWithTimeout(`${API_BASE}/integrations/github/status`, {
           headers: { 'Authorization': `Bearer ${authToken}` }
-        }).catch((err) => {
-          console.error('GitHub API error:', err)
+        }).catch(() => {
           return { ok: false }
         }),
         fetchWithTimeout(`${API_BASE}/integrations/slack/status`, {
           headers: { 'Authorization': `Bearer ${authToken}` }
-        }).catch((err) => {
-          console.error('Slack API error:', err)
+        }).catch(() => {
           return { ok: false }
         })
       ])
