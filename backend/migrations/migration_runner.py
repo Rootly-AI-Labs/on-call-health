@@ -395,6 +395,30 @@ class MigrationRunner:
                     """
                 ]
             },
+            {
+                "name": "011_ensure_user_correlation_platform_fields",
+                "description": "Ensure github_username and slack_user_id fields exist in user_correlations for analytics",
+                "sql": [
+                    """
+                    ALTER TABLE user_correlations
+                    ADD COLUMN IF NOT EXISTS github_username VARCHAR(100)
+                    """,
+                    """
+                    ALTER TABLE user_correlations
+                    ADD COLUMN IF NOT EXISTS slack_user_id VARCHAR(20)
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_user_correlations_github_username
+                    ON user_correlations(github_username)
+                    WHERE github_username IS NOT NULL
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_user_correlations_slack_user_id
+                    ON user_correlations(slack_user_id)
+                    WHERE slack_user_id IS NOT NULL
+                    """
+                ]
+            },
             # Add future migrations here with incrementing numbers
             # {
             #     "name": "011_add_user_preferences",
