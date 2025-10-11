@@ -1142,52 +1142,21 @@ async def sync_integration_users(
                 detail=f"Invalid integration ID: {integration_id}"
             )
 
-        # Sync users from database integration with SMART SYNC
+        # Sync users from database integration
         sync_service = UserSyncService(db)
 
-        # Get GitHub token if available (for smart correlation)
-        github_token = None
-        github_integration = db.query(GitHubIntegration).filter(
-            GitHubIntegration.user_id == current_user.id
-        ).first()
-        if github_integration and github_integration.github_token:
-            from ..endpoints.github import decrypt_token as decrypt_github_token
-            github_token = decrypt_github_token(github_integration.github_token)
-            logger.info("Using personal GitHub token for smart sync correlation")
-        else:
-            # Fallback to beta token
-            github_token = os.getenv('GITHUB_TOKEN')
-            if github_token:
-                logger.info("Using beta GitHub token for smart sync correlation")
-
-        # Get Slack token if available (for smart correlation)
-        slack_token = None
-        from ...services.slack_token_service import SlackTokenService
-        slack_service = SlackTokenService(db)
-        slack_token = slack_service.get_oauth_token_for_user(current_user)
-        if slack_token:
-            logger.info("Using Slack OAuth token for smart sync correlation")
-
-        # Perform smart sync with GitHub/Slack correlation
+        # Perform sync - GitHub matching is handled internally by _match_github_usernames()
         stats = await sync_service.sync_integration_users(
             integration_id=numeric_id,
-            current_user=current_user,
-            github_token=github_token,
-            slack_token=slack_token
+            current_user=current_user
         )
 
         # Build detailed message
         message_parts = [f"Successfully synced {stats['total']} users from integration"]
-        if github_token and stats.get('github_correlation'):
-            gh_stats = stats['github_correlation']
-            message_parts.append(
-                f"GitHub: {gh_stats['successful']}/{gh_stats['attempted']} correlated"
-            )
-        if slack_token and stats.get('slack_correlation'):
-            sl_stats = stats['slack_correlation']
-            message_parts.append(
-                f"Slack: {sl_stats['successful']}/{sl_stats['attempted']} correlated"
-            )
+        if stats.get('github_matched'):
+            message_parts.append(f"GitHub: {stats['github_matched']} users matched")
+        if stats.get('github_skipped'):
+            message_parts.append(f"({stats['github_skipped']} skipped)")
 
         return {
             "success": True,
