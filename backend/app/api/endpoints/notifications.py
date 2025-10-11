@@ -67,21 +67,6 @@ async def mark_all_notifications_read(
         "count": count
     }
 
-@router.delete("/{notification_id}")
-async def dismiss_notification(
-    notification_id: int,
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-) -> Dict[str, Any]:
-    """Dismiss a notification."""
-
-    notification_service = NotificationService(db)
-
-    if notification_service.dismiss_notification(notification_id, current_user):
-        return {"message": "Notification dismissed"}
-    else:
-        raise HTTPException(status_code=404, detail="Notification not found")
-
 @router.delete("/clear-all")
 async def clear_all_notifications(
     current_user: User = Depends(get_current_active_user),
@@ -96,6 +81,21 @@ async def clear_all_notifications(
         "message": f"Cleared {count} notifications",
         "count": count
     }
+
+@router.delete("/{notification_id}")
+async def dismiss_notification(
+    notification_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    """Dismiss a notification."""
+
+    notification_service = NotificationService(db)
+
+    if notification_service.dismiss_notification(notification_id, current_user):
+        return {"message": "Notification dismissed"}
+    else:
+        raise HTTPException(status_code=404, detail="Notification not found")
 
 @router.get("/unread-count")
 async def get_unread_count(
