@@ -255,7 +255,7 @@ class RootlyAPIClient:
         """
         Get on-call shifts for a specific time period.
         Returns list of shifts with user information for the exact analysis timeframe.
-        
+
         This handles historical schedules - if your analysis period is 30 days ago,
         it will fetch who was on-call during that historical period.
         """
@@ -263,50 +263,53 @@ class RootlyAPIClient:
             # Format dates for API (Rootly expects ISO format)
             start_str = start_date.strftime('%Y-%m-%dT%H:%M:%S.%fZ')
             end_str = end_date.strftime('%Y-%m-%dT%H:%M:%S.%fZ')
-            
+
             params = {
                 'filter[starts_at][gte]': start_str,
                 'filter[ends_at][lte]': end_str,
                 'include': 'user',  # Include user data in response
                 'page[size]': 100   # Get up to 100 shifts per request
             }
-            
+
             all_shifts = []
             page = 1
-            
+
             async with httpx.AsyncClient() as client:
                 while True:
                     params['page[number]'] = page
-                    
+
                     response = await client.get(
-                        f"{self.base_url}/v1/shifts",
+                        f"{self.base_url}/v1/on_call_shifts",
                         headers=self.headers,
                         params=params,
                         timeout=30.0
                     )
-                    
+
                     if response.status_code == 200:
                         data = response.json()
                         shifts = data.get('data', [])
-                        
+
                         if not shifts:
                             break
-                            
+
                         all_shifts.extend(shifts)
-                        
+
                         # Check if there are more pages
                         links = data.get('links', {})
                         if not links.get('next'):
                             break
-                            
+
                         page += 1
+                    elif response.status_code == 404:
+                        logger.warning(f"On-call shifts endpoint not found (404). This Rootly instance may not have on-call scheduling enabled.")
+                        break
                     else:
                         logger.error(f"Failed to fetch on-call shifts: {response.status_code} - {response.text}")
                         break
-                
+
                 logger.info(f"Retrieved {len(all_shifts)} on-call shifts for period {start_str} to {end_str}")
                 return all_shifts
-                    
+
         except Exception as e:
             logger.error(f"Error fetching on-call shifts: {e}")
             return []
@@ -360,11 +363,11 @@ class RootlyAPIClient:
                     for user_id in user_ids:
                         try:
                             response = await client.get(
-                                f"{self.base_url}/users/{user_id}",
+                                f"{self.base_url}/v1/users/{user_id}",
                                 headers=self.headers,
                                 timeout=10.0
                             )
-                            
+
                             if response.status_code == 200:
                                 user_data = response.json()
                                 if 'data' in user_data:
@@ -372,7 +375,7 @@ class RootlyAPIClient:
                                     email = attributes.get('email')
                                     if email:
                                         on_call_user_emails.add(email.lower().strip())
-                                        
+
                         except Exception as e:
                             logger.warning(f"Error fetching user {user_id}: {e}")
                             continue
