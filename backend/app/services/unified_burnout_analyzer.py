@@ -429,8 +429,7 @@ class UnifiedBurnoutAnalyzer:
                         logger.info(f"GitHub data keys: {list(github_data.keys())[:5]}")  # Log first 5 keys
                     except Exception as e:
                         logger.error(f"GitHub data collection failed: {e}")
-                else:
-                
+
                 if self.features['slack']:
                     logger.info(f"Collecting Slack data for {len(team_names)} team members using names")
                     logger.info(f"Team names: {team_names[:5]}...")  # Log first 5 names
