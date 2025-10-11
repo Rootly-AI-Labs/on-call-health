@@ -255,21 +255,40 @@ async def list_integrations(
             "token_suffix": f"****{integration.api_token[-4:]}" if integration.api_token and len(integration.api_token) >= 4 else "****"
         }
 
-        # Check permissions for each integration
+        # Check permissions for each integration with 5s timeout
         if integration.api_token:
             try:
                 logger.info(f"🔍 [ROOTLY] Checking permissions for {integration.name}...")
                 client = RootlyAPIClient(integration.api_token)
-                permissions = await client.check_permissions()
-                integration_data["permissions"] = permissions
-                logger.info(f"🔍 [ROOTLY] Permissions check took {time.time() - perm_start:.2f}s")
+
+                # Add 5 second timeout for permission checks
+                import asyncio
+                try:
+                    permissions = await asyncio.wait_for(
+                        client.check_permissions(),
+                        timeout=5.0
+                    )
+                    integration_data["permissions"] = permissions
+                    logger.info(f"🔍 [ROOTLY] Permissions check took {time.time() - perm_start:.2f}s")
+                except asyncio.TimeoutError:
+                    logger.warning(f"🔍 [ROOTLY] Permission check timed out after 5s for {integration.name}")
+                    integration_data["permissions"] = {
+                        "users": {"access": None, "error": "Rootly API timeout - check back later"},
+                        "incidents": {"access": None, "error": "Rootly API timeout - check back later"}
+                    }
             except Exception as e:
                 logger.warning(f"🔍 [ROOTLY] Permission check failed after {time.time() - perm_start:.2f}s: {str(e)}")
                 # If we can't check permissions, include a note
                 integration_data["permissions"] = {
-                    "users": {"access": False, "error": f"Permission check failed: {str(e)}"},
-                    "incidents": {"access": False, "error": f"Permission check failed: {str(e)}"}
+                    "users": {"access": None, "error": f"Rootly API unavailable: {str(e)}"},
+                    "incidents": {"access": None, "error": f"Rootly API unavailable: {str(e)}"}
                 }
+        else:
+            # No token stored
+            integration_data["permissions"] = {
+                "users": {"access": None, "error": "No API token configured"},
+                "incidents": {"access": None, "error": "No API token configured"}
+            }
 
         result_integrations.append(integration_data)
     
@@ -284,13 +303,30 @@ async def list_integrations(
             client = RootlyAPIClient(beta_rootly_token)
 
             logger.info(f"🔍 [ROOTLY] Calling test_connection()...")
-            test_result = await client.test_connection()
-            logger.info(f"🔍 [ROOTLY] test_connection() took {time.time() - beta_start:.2f}s")
+            try:
+                test_result = await asyncio.wait_for(
+                    client.test_connection(),
+                    timeout=5.0
+                )
+                logger.info(f"🔍 [ROOTLY] test_connection() took {time.time() - beta_start:.2f}s")
+            except asyncio.TimeoutError:
+                logger.warning(f"🔍 [ROOTLY] test_connection() timed out after 5s")
+                test_result = {"status": "timeout", "account_info": {}}
 
             perm_start_beta = time.time()
             logger.info(f"🔍 [ROOTLY] Calling check_permissions()...")
-            permissions = await client.check_permissions()
-            logger.info(f"🔍 [ROOTLY] check_permissions() took {time.time() - perm_start_beta:.2f}s")
+            try:
+                permissions = await asyncio.wait_for(
+                    client.check_permissions(),
+                    timeout=5.0
+                )
+                logger.info(f"🔍 [ROOTLY] check_permissions() took {time.time() - perm_start_beta:.2f}s")
+            except asyncio.TimeoutError:
+                logger.warning(f"🔍 [ROOTLY] check_permissions() timed out after 5s")
+                permissions = {
+                    "users": {"access": None, "error": "Rootly API timeout"},
+                    "incidents": {"access": None, "error": "Rootly API timeout"}
+                }
             
             logger.info(f"Beta Rootly test_result: {test_result}")
             account_info = test_result.get("account_info", {})
