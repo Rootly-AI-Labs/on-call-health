@@ -710,9 +710,9 @@ export default function useDashboard() {
         }
       })
 
+      // Treat both 200 and 404 as success (404 means already deleted)
+      if (response.ok || response.status === 404) {
 
-      if (response.ok) {
-        
         // Immediately remove from local state - be more explicit about ID matching
         setPreviousAnalyses(prev => {
           const filtered = prev.filter(a => {
@@ -721,22 +721,22 @@ export default function useDashboard() {
           })
           return filtered
         })
-        
+
         // If the deleted analysis was currently selected, clear it
         if (currentAnalysis?.id === analysisToDelete.id) {
           setCurrentAnalysis(null)
           updateURLWithAnalysis(null)
         }
-        
+
         toast.success("Analysis deleted")
-        
+
         // Close dialog and reset state
         setDeleteDialogOpen(false)
         setAnalysisToDelete(null)
-        
+
         // Also reload from server to ensure consistency
         setTimeout(() => loadPreviousAnalyses(), 500)
-        
+
       } else {
         const errorData = await response.json()
         throw new Error(errorData.detail || 'Failed to delete analysis')
