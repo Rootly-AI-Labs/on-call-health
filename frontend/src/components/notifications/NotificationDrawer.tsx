@@ -23,6 +23,7 @@ export function NotificationDrawer() {
     markAsRead,
     dismiss,
     markAllAsRead,
+    clearAll,
     handleAction
   } = useNotifications()
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -87,16 +88,28 @@ export function NotificationDrawer() {
                 </p>
               </div>
             </div>
-            {unreadCount > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={markAllAsRead}
-                className="text-sm text-gray-500 hover:text-gray-700"
-              >
-                Mark all read
-              </Button>
-            )}
+            <div className="flex gap-2">
+              {unreadCount > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={markAllAsRead}
+                  className="text-sm text-gray-500 hover:text-gray-700"
+                >
+                  Mark all read
+                </Button>
+              )}
+              {notifications.length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearAll}
+                  className="text-sm text-red-500 hover:text-red-700"
+                >
+                  Clear all
+                </Button>
+              )}
+            </div>
           </div>
         </SheetHeader>
 

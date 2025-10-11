@@ -260,6 +260,20 @@ class NotificationService:
 
         return False
 
+    def clear_all_notifications(self, user: User) -> int:
+        """Clear all notifications for a user by marking them as dismissed."""
+        notifications = self.db.query(UserNotification).filter(
+            ((UserNotification.user_id == user.id) |
+             (UserNotification.email == user.email)),
+            UserNotification.status != 'dismissed'
+        ).all()
+
+        for notification in notifications:
+            notification.status = 'dismissed'
+
+        self.db.commit()
+        return len(notifications)
+
     def create_survey_delivery_notification(
         self,
         organization_id: int,
