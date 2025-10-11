@@ -23,8 +23,8 @@ async def collect_team_slack_data_with_mapping(
     """
     recorder = MappingRecorder() if user_id else None
     
-    # Call original function
-    slack_data = await original_collect_team_slack_data(team_identifiers, days, slack_token, mock_mode, use_names)
+    # Call original function with user_id for UserCorrelation lookup
+    slack_data = await original_collect_team_slack_data(team_identifiers, days, slack_token, mock_mode, use_names, user_id)
     
     # Record mapping attempts if we have user context
     if recorder and user_id:
