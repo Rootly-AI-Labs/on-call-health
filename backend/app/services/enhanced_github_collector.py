@@ -56,6 +56,11 @@ async def collect_team_github_data_with_mapping(
             email_to_github = {uc.email: uc.github_username for uc in user_correlations}
             logger.info(f"🚀 FAST MODE: Found {len(email_to_github)} synced GitHub mappings")
 
+            if len(email_to_github) == 0:
+                logger.warning(f"🚀 FAST MODE: No GitHub mappings found in UserCorrelation table")
+                logger.warning(f"🚀 FAST MODE: Please click 'Sync Members' on the integrations page to populate GitHub usernames")
+                logger.warning(f"🚀 FAST MODE: Analysis will continue without GitHub data")
+
             # Generate mock data for users with synced mappings
             for email in team_emails:
                 github_username = email_to_github.get(email)
