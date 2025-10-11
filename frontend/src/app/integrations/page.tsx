@@ -3329,14 +3329,14 @@ export default function IntegrationsPage() {
       <Sheet open={teamMembersDrawerOpen} onOpenChange={setTeamMembersDrawerOpen}>
         <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
           <SheetHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex items-start justify-between pr-10 gap-4">
               <div>
                 <SheetTitle>Team Members ({syncedUsers.length})</SheetTitle>
                 <SheetDescription>
-                  Users from {integrations.find(i => i.id.toString() === selectedOrganization)?.name || 'your organization'} who can submit burnout surveys
+                  Sync will match {integrations.find(i => i.id.toString() === selectedOrganization)?.name || 'organization'} users with GitHub and Slack accounts
                 </SheetDescription>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3 flex-shrink-0">
                 <Button
                   onClick={async () => {
                     await syncUsersToCorrelation()
@@ -3345,8 +3345,8 @@ export default function IntegrationsPage() {
                     }
                   }}
                   disabled={loadingTeamMembers}
-                  variant="outline"
-                  size="sm"
+                  className="bg-purple-600 hover:bg-purple-700 text-white"
+                  size="default"
                 >
                   {loadingTeamMembers ? (
                     <>
@@ -3365,8 +3365,8 @@ export default function IntegrationsPage() {
                   <Button
                     onClick={saveSurveyRecipients}
                     disabled={savingRecipients}
-                    className="bg-purple-600 hover:bg-purple-700"
-                    size="sm"
+                    variant="outline"
+                    size="default"
                   >
                     {savingRecipients ? (
                       <>
@@ -3430,9 +3430,11 @@ export default function IntegrationsPage() {
                     size="sm"
                     variant="outline"
                     onClick={() => {
-                      const allUserIds = syncedUsers.map(u => u.id)
-                      setSelectedRecipients(new Set(allUserIds))
-                      toast.success('Selected all users')
+                      const slackConnectedUserIds = syncedUsers
+                        .filter(u => u.platforms?.some((p: string) => p.toLowerCase() === 'slack'))
+                        .map(u => u.id)
+                      setSelectedRecipients(new Set(slackConnectedUserIds))
+                      toast.success(`Selected ${slackConnectedUserIds.length} Slack-connected users`)
                     }}
                     className="h-7 text-xs"
                   >
