@@ -2605,17 +2605,17 @@ async def run_analysis_task(
             # Ensure analyzer_service is properly initialized
             if not analyzer_service:
                 raise Exception("Analyzer service is None - initialization failed")
-            
+
             # Log analyzer type for debugging
             logger.info(f"BACKGROUND_TASK: Using analyzer type: {type(analyzer_service).__name__}")
-            
+
             # Call UnifiedBurnoutAnalyzer
             logger.info(f"BACKGROUND_TASK: Calling UnifiedBurnoutAnalyzer.analyze_burnout()")
             logger.info(f"BACKGROUND_TASK: Analysis parameters - time_range_days={time_range}, include_weekends={include_weekends}, user_id={user_id}, analysis_id={analysis_id}")
-            
+
             # Add progress tracking
             logger.info(f"BACKGROUND_TASK: Starting analysis execution at {datetime.now()}")
-            
+
             results = await asyncio.wait_for(
                 analyzer_service.analyze_burnout(
                     time_range_days=time_range,
@@ -2625,8 +2625,14 @@ async def run_analysis_task(
                 ),
                 timeout=480.0  # 8 minutes - aggressive timeout to fail faster
             )
-            
+
             logger.info(f"BACKGROUND_TASK: Analysis execution completed at {datetime.now()}")
+
+            # Check if analysis was deleted during execution
+            analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
+            if not analysis:
+                logger.info(f"BACKGROUND_TASK: Analysis {analysis_id} was deleted during execution, stopping")
+                return
             
             # Validate results
             if not results:
@@ -2674,20 +2680,27 @@ async def run_analysis_task(
             logger.error(f"BACKGROUND_TASK: Timeout occurred at {datetime.now()}")
             logger.error(f"BACKGROUND_TASK: Analysis was stuck - likely during incident data collection phase (causing 85% progress hang)")
             logger.error(f"BACKGROUND_TASK: This typically happens when Rootly API pagination takes too long")
-            
+
             analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
-            if analysis:
-                analysis.status = "failed"
-                analysis.error_message = "Analysis timed out after 8 minutes - likely stuck during incident data collection (85% progress hang). Try with a shorter time range or check Rootly API connectivity."
-                analysis.completed_at = datetime.now()
-                db.commit()
-                logger.info(f"BACKGROUND_TASK: Updated analysis {analysis_id} status to failed due to timeout")
+            if not analysis:
+                logger.info(f"BACKGROUND_TASK: Analysis {analysis_id} was deleted, not updating status")
+                return
+
+            analysis.status = "failed"
+            analysis.error_message = "Analysis timed out after 8 minutes - likely stuck during incident data collection (85% progress hang). Try with a shorter time range or check Rootly API connectivity."
+            analysis.completed_at = datetime.now()
+            db.commit()
+            logger.info(f"BACKGROUND_TASK: Updated analysis {analysis_id} status to failed due to timeout")
                 
         except Exception as analysis_error:
             # Handle analysis-specific errors
             logger.error(f"BACKGROUND_TASK: Analysis {analysis_id} failed: {analysis_error}")
-            
+
             analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
+            if not analysis:
+                logger.info(f"BACKGROUND_TASK: Analysis {analysis_id} was deleted, not updating status")
+                return
+
             if analysis:
                 # Check if this is a permission error - if so, fail immediately
                 error_message = str(analysis_error)
