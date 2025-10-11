@@ -227,15 +227,23 @@ async def list_integrations(
     db: Session = Depends(get_db)
 ):
     """List all Rootly integrations for the current user with permissions."""
+    import time
+    start_time = time.time()
+    logger.info(f"🔍 [ROOTLY] Starting list_integrations for user {current_user.id}")
+
     integrations = db.query(RootlyIntegration).filter(
         RootlyIntegration.user_id == current_user.id,
         RootlyIntegration.is_active == True,
         RootlyIntegration.platform == "rootly"
     ).order_by(RootlyIntegration.created_at.desc()).all()
-    
+
+    logger.info(f"🔍 [ROOTLY] DB query took {time.time() - start_time:.2f}s, found {len(integrations)} integrations")
     result_integrations = []
     
-    for integration in integrations:
+    for idx, integration in enumerate(integrations):
+        perm_start = time.time()
+        logger.info(f"🔍 [ROOTLY] Processing integration {idx+1}/{len(integrations)}: {integration.name}")
+
         integration_data = {
             "id": integration.id,
             "name": integration.name,
@@ -246,32 +254,43 @@ async def list_integrations(
             "last_used_at": integration.last_used_at.isoformat() if integration.last_used_at else None,
             "token_suffix": f"****{integration.api_token[-4:]}" if integration.api_token and len(integration.api_token) >= 4 else "****"
         }
-        
+
         # Check permissions for each integration
         if integration.api_token:
             try:
+                logger.info(f"🔍 [ROOTLY] Checking permissions for {integration.name}...")
                 client = RootlyAPIClient(integration.api_token)
                 permissions = await client.check_permissions()
                 integration_data["permissions"] = permissions
+                logger.info(f"🔍 [ROOTLY] Permissions check took {time.time() - perm_start:.2f}s")
             except Exception as e:
+                logger.warning(f"🔍 [ROOTLY] Permission check failed after {time.time() - perm_start:.2f}s: {str(e)}")
                 # If we can't check permissions, include a note
                 integration_data["permissions"] = {
                     "users": {"access": False, "error": f"Permission check failed: {str(e)}"},
                     "incidents": {"access": False, "error": f"Permission check failed: {str(e)}"}
                 }
-        
+
         result_integrations.append(integration_data)
     
     # Add beta fallback integration if available
+    beta_start = time.time()
     beta_rootly_token = os.getenv('ROOTLY_API_TOKEN')
-    logger.info(f"Beta Rootly token check: exists={beta_rootly_token is not None}, length={len(beta_rootly_token) if beta_rootly_token else 0}")
+    logger.info(f"🔍 [ROOTLY] Beta token check: exists={beta_rootly_token is not None}, length={len(beta_rootly_token) if beta_rootly_token else 0}")
     if beta_rootly_token:
         try:
             # Test the beta token and get organization info
-            logger.info(f"Testing beta Rootly token: {beta_rootly_token[:10]}...")
+            logger.info(f"🔍 [ROOTLY] Testing beta token: {beta_rootly_token[:10]}...")
             client = RootlyAPIClient(beta_rootly_token)
+
+            logger.info(f"🔍 [ROOTLY] Calling test_connection()...")
             test_result = await client.test_connection()
+            logger.info(f"🔍 [ROOTLY] test_connection() took {time.time() - beta_start:.2f}s")
+
+            perm_start_beta = time.time()
+            logger.info(f"🔍 [ROOTLY] Calling check_permissions()...")
             permissions = await client.check_permissions()
+            logger.info(f"🔍 [ROOTLY] check_permissions() took {time.time() - perm_start_beta:.2f}s")
             
             logger.info(f"Beta Rootly test_result: {test_result}")
             account_info = test_result.get("account_info", {})
@@ -312,9 +331,9 @@ async def list_integrations(
                     "permissions": permissions
                 }
                 result_integrations.insert(0, beta_integration)
-                logger.info(f"Added fallback beta Rootly integration for user {current_user.id}")
+                logger.info(f"🔍 [ROOTLY] Added fallback beta Rootly integration for user {current_user.id}")
         except Exception as e:
-            logger.warning(f"Failed to add beta Rootly integration: {str(e)}")
+            logger.error(f"🔍 [ROOTLY] Failed to add beta integration after {time.time() - beta_start:.2f}s: {str(e)}")
             # Add fallback integration even on exception
             beta_integration = {
                 "id": "beta-rootly",
@@ -329,8 +348,10 @@ async def list_integrations(
                 "permissions": {}
             }
             result_integrations.insert(0, beta_integration)
-            logger.info(f"Added exception fallback beta Rootly integration for user {current_user.id}")
-    
+            logger.info(f"🔍 [ROOTLY] Added exception fallback beta Rootly integration for user {current_user.id}")
+
+    total_time = time.time() - start_time
+    logger.info(f"🔍 [ROOTLY] COMPLETE: Returning {len(result_integrations)} integrations, total time: {total_time:.2f}s")
     return {
         "integrations": result_integrations
     }
