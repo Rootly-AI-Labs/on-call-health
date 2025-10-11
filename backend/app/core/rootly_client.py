@@ -278,16 +278,23 @@ class RootlyAPIClient:
                 while True:
                     params['page[number]'] = page
 
+                    url = f"{self.base_url}/v1/on_call_shifts"
+                    logger.info(f"🗓️ ROOTLY ON_CALL: Fetching shifts from {url} with params: {params}")
+
                     response = await client.get(
-                        f"{self.base_url}/v1/on_call_shifts",
+                        url,
                         headers=self.headers,
                         params=params,
                         timeout=30.0
                     )
 
+                    logger.info(f"🗓️ ROOTLY ON_CALL: Response status: {response.status_code}")
+
                     if response.status_code == 200:
                         data = response.json()
                         shifts = data.get('data', [])
+
+                        logger.info(f"🗓️ ROOTLY ON_CALL: Found {len(shifts)} shifts on page {page}")
 
                         if not shifts:
                             break
@@ -301,13 +308,14 @@ class RootlyAPIClient:
 
                         page += 1
                     elif response.status_code == 404:
-                        logger.warning(f"On-call shifts endpoint not found (404). This Rootly instance may not have on-call scheduling enabled.")
+                        logger.warning(f"🗓️ ROOTLY ON_CALL: Endpoint not found (404). Response: {response.text}")
+                        logger.warning(f"🗓️ ROOTLY ON_CALL: This Rootly instance may not have on-call scheduling enabled.")
                         break
                     else:
-                        logger.error(f"Failed to fetch on-call shifts: {response.status_code} - {response.text}")
+                        logger.error(f"🗓️ ROOTLY ON_CALL: Failed to fetch shifts: {response.status_code} - {response.text}")
                         break
 
-                logger.info(f"Retrieved {len(all_shifts)} on-call shifts for period {start_str} to {end_str}")
+                logger.info(f"🗓️ ROOTLY ON_CALL: Total retrieved: {len(all_shifts)} on-call shifts for period {start_str} to {end_str}")
                 return all_shifts
 
         except Exception as e:
