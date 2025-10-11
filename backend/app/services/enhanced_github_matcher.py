@@ -171,7 +171,6 @@ class EnhancedGitHubMatcher:
                     if org not in self._org_members_cache:
                         members = await self._get_org_members(org, session)
                         self._org_members_cache[org] = members
-                    else:
 
                     # Check if we have cached profiles already (persist across sync runs)
                     cache_key = f"{org}_profiles"
