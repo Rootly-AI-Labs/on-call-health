@@ -62,11 +62,8 @@ class EnhancedGitHubMatcher:
         # Check cache first
         if email_lower in self._email_cache:
             return self._email_cache[email_lower]
-        
-        # Extract name parts from email
-        email_parts = self._extract_name_from_email(email)
-        
-        # OLD APPROACH DEPRECATED: This method should not be used anymore
+
+        # DEPRECATED: This method should not be used anymore
         # Instead use match_name_to_github() which is optimized
         logger.warning(f"⚠️  match_email_to_github() is deprecated. Use match_name_to_github() instead for {email}")
         return None
