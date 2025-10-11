@@ -2614,17 +2614,28 @@ async def run_analysis_task(
             logger.info(f"BACKGROUND_TASK: Analysis parameters - time_range_days={time_range}, include_weekends={include_weekends}, user_id={user_id}, analysis_id={analysis_id}")
 
             # Add progress tracking
-            logger.info(f"BACKGROUND_TASK: Starting analysis execution at {datetime.now()}")
+            logger.info(f"🚀 BACKGROUND_TASK: Starting analysis execution at {datetime.now()}")
+            logger.info(f"🚀 BACKGROUND_TASK: Analysis {analysis_id} - time_range={time_range}, include_weekends={include_weekends}")
+            logger.info(f"🚀 BACKGROUND_TASK: Analysis {analysis_id} - user_id={user_id}, analyzer_type={type(analyzer_service).__name__}")
 
-            results = await asyncio.wait_for(
-                analyzer_service.analyze_burnout(
-                    time_range_days=time_range,
-                    include_weekends=include_weekends,
-                    user_id=user_id,
-                    analysis_id=analysis_id
-                ),
-                timeout=900.0  # 15 minutes timeout
-            )
+            try:
+                results = await asyncio.wait_for(
+                    analyzer_service.analyze_burnout(
+                        time_range_days=time_range,
+                        include_weekends=include_weekends,
+                        user_id=user_id,
+                        analysis_id=analysis_id
+                    ),
+                    timeout=900.0  # 15 minutes timeout
+                )
+                logger.info(f"✅ BACKGROUND_TASK: Analysis {analysis_id} completed successfully")
+                logger.info(f"✅ BACKGROUND_TASK: Results type: {type(results)}, keys: {results.keys() if isinstance(results, dict) else 'N/A'}")
+            except Exception as analyze_error:
+                logger.error(f"❌ BACKGROUND_TASK: Analysis {analysis_id} failed during analyze_burnout()")
+                logger.error(f"❌ BACKGROUND_TASK: Error type: {type(analyze_error).__name__}")
+                logger.error(f"❌ BACKGROUND_TASK: Error message: {str(analyze_error)}")
+                logger.error(f"❌ BACKGROUND_TASK: Full traceback:", exc_info=True)
+                raise
 
             logger.info(f"BACKGROUND_TASK: Analysis execution completed at {datetime.now()}")
 
