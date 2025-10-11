@@ -524,9 +524,7 @@ export default function useDashboard() {
         }
       }
     } catch (error) {
-      console.error('Unexpected error in loadPreviousAnalyses:', error)
-
-      // Check if this is a network connectivity issue
+      // Check if this is a network connectivity issue (expected during Railway startup)
       const isNetworkError = error instanceof Error && (
         error.message.includes('fetch') ||
         error.message.includes('network') ||
@@ -534,6 +532,11 @@ export default function useDashboard() {
         error.message.includes('TypeError') ||
         error.name === 'TypeError'
       )
+
+      // Only log non-network errors
+      if (!isNetworkError) {
+        console.error('Unexpected error in loadPreviousAnalyses:', error)
+      }
 
       if (isNetworkError) {
         toast.error("Cannot connect to backend")
