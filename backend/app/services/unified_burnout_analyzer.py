@@ -127,30 +127,17 @@ class UnifiedBurnoutAnalyzer:
         - Burnout factors
         """
         analysis_start_time = datetime.now()
-        logger.info(f"🔍 BURNOUT ANALYSIS START: Beginning {time_range_days}-day burnout analysis at {analysis_start_time.isoformat()}")
-        
-        # IMMEDIATE DEBUG - This should show up in Railway logs RIGHT AWAY
-        print(f"🚨 RAILWAY DEBUG: Analysis starting at {analysis_start_time}")
-        print(f"🚨 RAILWAY DEBUG: Platform = {self.platform}")
-        print(f"🚨 RAILWAY DEBUG: NEW SCORING ALGORITHM ACTIVE")
-        logger.error(f"🚨 RAILWAY FORCE LOG: NEW SCORING ALGORITHM DEPLOYED - {analysis_start_time}")
-        
+
         try:
-            # Fetch data from Rootly
-            data_fetch_start = datetime.now()
-            logger.info(f"🔍 BURNOUT ANALYSIS: Step 1 - Fetching data for {time_range_days}-day analysis")
+            # Fetch data
             data = await self._fetch_analysis_data(time_range_days)
-            data_fetch_duration = (datetime.now() - data_fetch_start).total_seconds()
-            logger.info(f"🔍 BURNOUT ANALYSIS: Step 1 completed in {data_fetch_duration:.2f}s - Data type: {type(data)}, is_none: {data is None}")
             
-            # Check if data was successfully fetched (data should never be None due to fallbacks)
+            # Check if data was successfully fetched
             if data is None:
-                logger.error("🔍 BURNOUT ANALYSIS: CRITICAL ERROR - Data is None after _fetch_analysis_data")
-                raise Exception("Failed to fetch data from Rootly API - no data returned")
-            
-            # Extract users and incidents (with additional safety checks)
-            extraction_start = datetime.now()
-            logger.info(f"🔍 BURNOUT ANALYSIS: Step 2 - Extracting users and incidents from {time_range_days}-day data")
+                logger.error("Data is None after fetch")
+                raise Exception("Failed to fetch data from API")
+
+            # Extract users and incidents
             users = data.get("users", []) if data else []
 
             # create map with user time zones
@@ -167,7 +154,6 @@ class UnifiedBurnoutAnalyzer:
             metadata = data.get("collection_metadata", {}) if data else {}
             
             # COMPREHENSIVE DATA VALIDATION AND ANALYSIS
-            logger.info(f"🔍 UNIFIED ANALYZER: DATA VALIDATION for {self.platform.upper()}")
             logger.info(f"   - Platform: {self.platform}")
             logger.info(f"   - Raw data keys: {list(data.keys()) if data else 'None'}")
             logger.info(f"   - Users extracted: {len(users)}")
@@ -177,13 +163,11 @@ class UnifiedBurnoutAnalyzer:
             # Validate user data structure
             if users:
                 sample_user = users[0]
-                logger.info(f"🔍 UNIFIED ANALYZER: Sample user structure:")
                 logger.info(f"   - Keys: {list(sample_user.keys()) if isinstance(sample_user, dict) else 'Not a dict'}")
                 logger.info(f"   - Sample: ID={sample_user.get('id')}, Name={sample_user.get('name')}, Email={sample_user.get('email')}")
             
             # Validate incident data structure and assignments
             if incidents:
-                logger.info(f"🔍 UNIFIED ANALYZER: Incident assignment analysis:")
                 incidents_with_assignments = 0
                 sample_incident = incidents[0]
                 
@@ -253,7 +237,6 @@ class UnifiedBurnoutAnalyzer:
                 
                 matching_user_ids = user_ids_from_users.intersection(incident_user_ids)
                 
-                logger.info(f"🔍 UNIFIED ANALYZER: User ID Cross-Reference:")
                 logger.info(f"   - User IDs from users list: {len(user_ids_from_users)} ({list(user_ids_from_users)[:5]})")
                 logger.info(f"   - User IDs from incident assignments: {len(incident_user_ids)} ({list(incident_user_ids)[:5]})")
                 logger.info(f"   - Matching user IDs: {len(matching_user_ids)} ({list(matching_user_ids)[:5]})")
@@ -280,11 +263,9 @@ class UnifiedBurnoutAnalyzer:
                     # Continue with analysis - this might be a quiet period
             
             extraction_duration = (datetime.now() - extraction_start).total_seconds()
-            logger.info(f"🔍 BURNOUT ANALYSIS: Step 2 completed in {extraction_duration:.3f}s - {len(users)} users, {len(incidents)} incidents")
             
             # Step 2.5: Filter to only on-call users (NEW FEATURE)
             oncall_filter_start = datetime.now()
-            logger.info(f"🔍 BURNOUT ANALYSIS: Step 2.5 - Filtering to on-call users only for {time_range_days}-day period")
             
             try:
                 # Get on-call schedule data for the analysis period
@@ -348,7 +329,6 @@ class UnifiedBurnoutAnalyzer:
                 users = data.get("users", [])
             
             oncall_filter_duration = (datetime.now() - oncall_filter_start).total_seconds()
-            logger.info(f"🔍 BURNOUT ANALYSIS: Step 2.5 completed in {oncall_filter_duration:.3f}s - Now analyzing {len(users)} on-call users")
             
             # Log potential issues based on data patterns
             if len(users) == 0:
@@ -437,7 +417,6 @@ class UnifiedBurnoutAnalyzer:
                     logger.warning(f"   - Check if {self.platform} data structure matches expectation")
                 
                 if self.features['github']:
-                    logger.info(f"🔍 UNIFIED ANALYZER: Collecting GitHub data for {len(team_emails)} team members")
                     logger.info(f"Team emails: {team_emails[:5]}...")  # Log first 5 emails
                     try:
                         logger.info(f"GitHub config - token: {'present' if self.github_token else 'missing'}")
@@ -447,12 +426,10 @@ class UnifiedBurnoutAnalyzer:
                             user_id=user_id, analysis_id=analysis_id, source_platform=self.platform,
                             email_to_name=email_to_name
                         )
-                        logger.info(f"🔍 UNIFIED ANALYZER: Collected GitHub data for {len(github_data)} users")
                         logger.info(f"GitHub data keys: {list(github_data.keys())[:5]}")  # Log first 5 keys
                     except Exception as e:
                         logger.error(f"GitHub data collection failed: {e}")
                 else:
-                    logger.info(f"🔍 UNIFIED ANALYZER: GitHub integration disabled - skipping")
                 
                 if self.features['slack']:
                     logger.info(f"Collecting Slack data for {len(team_names)} team members using names")
@@ -472,8 +449,6 @@ class UnifiedBurnoutAnalyzer:
             # Analyze team burnout
             try:
                 team_analysis_start = datetime.now()
-                logger.info(f"🔍 BURNOUT ANALYSIS: Step 3 - Analyzing team data for {time_range_days}-day analysis")
-                logger.info(f"🔍 BURNOUT ANALYSIS: Team analysis inputs - {len(users)} users, {len(incidents)} incidents")
                 team_analysis = self._analyze_team_data(
                     users, 
                     incidents, 
@@ -483,11 +458,9 @@ class UnifiedBurnoutAnalyzer:
                     slack_data
                 )
                 team_analysis_duration = (datetime.now() - team_analysis_start).total_seconds()
-                logger.info(f"🔍 BURNOUT ANALYSIS: Step 3 completed in {team_analysis_duration:.2f}s")
                 
                 # Log team analysis results
                 members_analyzed = len(team_analysis.get("members", [])) if team_analysis else 0
-                logger.info(f"🔍 BURNOUT ANALYSIS: Team analysis generated results for {members_analyzed} members")
                 
             except Exception as e:
                 team_analysis_duration = (datetime.now() - team_analysis_start).total_seconds() if 'team_analysis_start' in locals() else 0
@@ -501,7 +474,6 @@ class UnifiedBurnoutAnalyzer:
             team_health = None
             
             # Create data sources structure
-            logger.info(f"🔍 BURNOUT ANALYSIS: Step 6 - Creating data source structure")
             data_sources = {
                 "incident_data": True,
                 "github_data": self.features['github'],
@@ -511,13 +483,11 @@ class UnifiedBurnoutAnalyzer:
             # Create GitHub insights if enabled
             github_insights = None
             if self.features['github']:
-                logger.info(f"🔍 UNIFIED ANALYZER: Calculating GitHub insights")
                 github_insights = self._calculate_github_insights(github_data)
             
             # Create Slack insights if enabled  
             slack_insights = None
             if self.features['slack']:
-                logger.info(f"🔍 UNIFIED ANALYZER: Calculating Slack insights")
                 slack_insights = self._calculate_slack_insights(slack_data)
 
             # GITHUB CORRELATION: Match GitHub contributors to team members
@@ -554,25 +524,19 @@ class UnifiedBurnoutAnalyzer:
             
             # Calculate overall team health AFTER GitHub burnout adjustment
             health_calc_start = datetime.now()
-            logger.info(f"🔍 BURNOUT ANALYSIS: Step 4 - Calculating team health for {time_range_days}-day analysis")
             team_health = self._calculate_team_health(team_analysis["members"])
             health_calc_duration = (datetime.now() - health_calc_start).total_seconds()
-            logger.info(f"🔍 BURNOUT ANALYSIS: Step 4 completed in {health_calc_duration:.3f}s - Health score: {team_health.get('overall_score', 'N/A')}")
             
             # If GitHub features are disabled, calculate team health here
             if not self.features['github'] or not github_insights:
                 health_calc_start = datetime.now()
-                logger.info(f"🔍 BURNOUT ANALYSIS: Step 4 - Calculating team health for {time_range_days}-day analysis")
                 team_health = self._calculate_team_health(team_analysis["members"])
                 health_calc_duration = (datetime.now() - health_calc_start).total_seconds()
-                logger.info(f"🔍 BURNOUT ANALYSIS: Step 4 completed in {health_calc_duration:.3f}s - Health score: {team_health.get('overall_score', 'N/A')}")
             
             # Generate insights and recommendations
             insights_start = datetime.now()
-            logger.info(f"🔍 BURNOUT ANALYSIS: Step 5 - Generating insights and recommendations")
             insights = self._generate_insights(team_analysis, team_health)
             insights_duration = (datetime.now() - insights_start).total_seconds()
-            logger.info(f"🔍 BURNOUT ANALYSIS: Step 5 completed in {insights_duration:.3f}s - Generated {len(insights)} insights")
 
             # Calculate period summary for consistent UI display
             team_overall_score = team_health.get("overall_score", 0.0)  # This is already health scale 0-10
@@ -672,7 +636,6 @@ class UnifiedBurnoutAnalyzer:
             # Enhance with AI analysis if enabled
             ai_start = datetime.now()
             if self.features['ai']:
-                logger.info(f"🔍 UNIFIED ANALYZER: Step 7 - AI enhancement for {time_range_days}-day analysis")
                 available_integrations = []
                 if self.features['github']:
                     available_integrations.append('github')
@@ -681,18 +644,14 @@ class UnifiedBurnoutAnalyzer:
                 
                 result = await self._enhance_with_ai_analysis(result, available_integrations)
                 ai_duration = (datetime.now() - ai_start).total_seconds()
-                logger.info(f"🔍 UNIFIED ANALYZER: Step 7 completed in {ai_duration:.2f}s - AI enhanced: {result.get('ai_enhanced', False)}")
             else:
-                logger.info(f"🔍 UNIFIED ANALYZER: AI enhancement disabled - skipping")
                 result["ai_enhanced"] = False
                 ai_duration = 0
             
             # Calculate total analysis time and log completion
             total_analysis_duration = (datetime.now() - analysis_start_time).total_seconds()
-            logger.info(f"🔍 BURNOUT ANALYSIS COMPLETE: {time_range_days}-day analysis finished in {total_analysis_duration:.2f}s")
             
             # Log performance breakdown
-            logger.info(f"🔍 BURNOUT ANALYSIS BREAKDOWN:")
             logger.info(f"  - Data fetch: {data_fetch_duration:.2f}s")
             logger.info(f"  - Team analysis: {team_analysis_duration:.2f}s")
             logger.info(f"  - Health calculation: {health_calc_duration:.3f}s")
@@ -732,7 +691,6 @@ class UnifiedBurnoutAnalyzer:
                 members = team_analysis.get("members") if team_analysis and isinstance(team_analysis, dict) else []
                 members_count = len(members) if isinstance(members, list) else 0
                 incidents_count = len(incidents) if isinstance(incidents, list) else 0
-                logger.info(f"🔍 BURNOUT ANALYSIS SUCCESS: Analyzed {members_count} members using {incidents_count} incidents over {time_range_days} days")
             except Exception as metrics_error:
                 logger.warning(f"Error logging success metrics: {metrics_error}")
             

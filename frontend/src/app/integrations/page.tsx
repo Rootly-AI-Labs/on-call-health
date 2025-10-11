@@ -283,7 +283,6 @@ export default function IntegrationsPage() {
       if (response.ok) {
         const data = await response.json()
         setGithubOrgMembers(data.members || [])
-        console.log(`Loaded ${data.total_members} GitHub org members for autocomplete`)
       } else {
         const error = await response.json()
         console.error('Failed to load GitHub org members:', error)
@@ -1025,21 +1024,10 @@ export default function IntegrationsPage() {
       const githubData = (githubResponse as any).ok && (githubResponse as Response).json ? await (githubResponse as Response).json() : { connected: false, integration: null }
       const slackData = (slackResponse as any).ok && (slackResponse as Response).json ? await (slackResponse as Response).json() : { integration: null }
 
-      console.log('📊 Integration data loaded:', {
-        rootly: rootlyData.integrations?.length || 0,
-        pagerduty: pagerdutyData.integrations?.length || 0,
-        github: githubData.connected ? 'connected' : 'not connected',
-        slack: slackData.integration ? 'connected' : 'not connected'
-      })
-
       const rootlyIntegrations = rootlyData.integrations.map((i: Integration) => ({ ...i, platform: 'rootly' }))
       const pagerdutyIntegrations = (pagerdutyData.integrations || []).map((i: Integration) => ({ ...i, platform: 'pagerduty' }))
 
       const allIntegrations = [...rootlyIntegrations, ...pagerdutyIntegrations]
-      console.log('📦 Setting integrations:', allIntegrations.length, 'total')
-      console.log('📦 Rootly integrations:', rootlyIntegrations)
-      console.log('📦 PagerDuty integrations:', pagerdutyIntegrations)
-      console.log('📦 Active tab:', activeTab)
       setIntegrations(allIntegrations)
       setGithubIntegration(githubData.connected ? githubData.integration : null)
       setSlackIntegration(slackData.integration)
