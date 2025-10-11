@@ -130,6 +130,7 @@ class UnifiedBurnoutAnalyzer:
 
         try:
             # Fetch data
+            extraction_start = datetime.now()
             data = await self._fetch_analysis_data(time_range_days)
             
             # Check if data was successfully fetched
