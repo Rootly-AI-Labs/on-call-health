@@ -35,8 +35,6 @@ async def collect_team_github_data_with_mapping(
     # FAST MODE: Only use existing synced mappings from integrations page
     # This avoids redundant GitHub API calls since users are synced via "Sync Members"
     if fast_mode and user_id:
-        logger.info(f"🚀 FAST MODE: Using synced GitHub mappings from UserCorrelation for {len(team_emails)} emails")
-
         from .github_collector import GitHubCollector
         from ..models import UserCorrelation
         from ..models import SessionLocal
@@ -55,32 +53,25 @@ async def collect_team_github_data_with_mapping(
 
             # Create a lookup dict: email -> github_username
             email_to_github = {uc.email: uc.github_username for uc in user_correlations}
-            logger.info(f"🚀 FAST MODE: Found {len(email_to_github)} synced GitHub mappings")
 
             if len(email_to_github) == 0:
-                logger.warning(f"🚀 FAST MODE: No GitHub mappings found in UserCorrelation table")
-                logger.warning(f"🚀 FAST MODE: Please click 'Sync Members' on the integrations page to populate GitHub usernames")
-                logger.warning(f"🚀 FAST MODE: Analysis will continue without GitHub data")
+                logger.warning(f"💻 GitHub: No synced usernames found in UserCorrelation")
 
             # Generate mock data for users with synced mappings
             for email in team_emails:
                 github_username = email_to_github.get(email)
                 if github_username:
-                    logger.info(f"🚀 FAST MODE: Using synced mapping {email} -> {github_username}")
                     github_data[email] = collector._generate_mock_github_data(
                         github_username, email,
                         datetime.now() - timedelta(days=days),
                         datetime.now()
                     )
-                else:
-                    logger.info(f"🚀 FAST MODE: No synced mapping for {email}, skipping")
 
             return github_data
         finally:
             db.close()
     
     if use_smart_caching and user_id:
-        logger.info(f"🧠 SMART CACHING: Using GitHubMappingService for {len(team_emails)} emails")
         try:
             from .github_mapping_service import GitHubMappingService
             mapping_service = GitHubMappingService()
@@ -94,11 +85,8 @@ async def collect_team_github_data_with_mapping(
                 email_to_name=email_to_name
             )
         except Exception as e:
-            logger.error(f"Smart caching failed, falling back to original logic: {e}")
+            logger.error(f"💻 GitHub: Smart caching failed: {e}")
             # Fall through to original logic
-    
-    # Original logic (Phase 1) - fallback or when smart caching disabled
-    logger.info(f"📦 ORIGINAL LOGIC: Using enhanced collector for {len(team_emails)} emails")
     recorder = MappingRecorder() if user_id else None
     
     # Phase 1.3: Track processed emails to prevent duplicates within this analysis session
@@ -156,7 +144,7 @@ async def collect_team_github_data_with_mapping(
                 if github_username:
                     # All mappings are now discovered via API
                     mapping_method = "api_discovery"
-                    
+
                     recorder.record_successful_mapping(
                         user_id=user_id,
                         analysis_id=analysis_id,
@@ -167,7 +155,7 @@ async def collect_team_github_data_with_mapping(
                         mapping_method=mapping_method,
                         data_points_count=data_points
                     )
-                    logger.info(f"✓ Recorded successful GitHub mapping: {email} -> {github_username} ({data_points} data points) via {mapping_method}")
+                    logger.info(f"💻 GitHub: {email} -> {github_username} ({data_points} data points)")
                 else:
                     # Data collected but no clear username
                     recorder.record_successful_mapping(
@@ -180,7 +168,6 @@ async def collect_team_github_data_with_mapping(
                         mapping_method="api_collection",
                         data_points_count=data_points
                     )
-                    logger.info(f"? Recorded GitHub data collection: {email} -> unknown user ({data_points} data points)")
             else:
                 # Failed mapping
                 recorder.record_failed_mapping(
@@ -192,6 +179,5 @@ async def collect_team_github_data_with_mapping(
                     error_message="No GitHub data found for email",
                     mapping_method="email_search"
                 )
-                logger.info(f"✗ Recorded failed GitHub mapping: {email} -> no data found")
     
     return github_data

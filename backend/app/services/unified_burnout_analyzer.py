@@ -419,61 +419,28 @@ class UnifiedBurnoutAnalyzer:
                     logger.warning(f"   - Check if {self.platform} data structure matches expectation")
                 
                 if self.features['github']:
-                    logger.info(f"💻 Collecting GitHub data for {len(team_emails)} team members")
-                    logger.info(f"💻 Team emails: {team_emails[:5]}...")  # Log first 5 emails
                     try:
-                        logger.info(f"💻 GitHub config - token: {'present' if self.github_token else 'missing'}, user_id: {user_id}")
-
+                        logger.info(f"💻 GitHub: Collecting data for {len(team_emails)} members")
                         github_data = await collect_team_github_data_with_mapping(
                             team_emails, time_range_days, self.github_token,
                             user_id=user_id, analysis_id=analysis_id, source_platform=self.platform,
                             email_to_name=email_to_name
                         )
-                        logger.info(f"✅ Collected GitHub data for {len(github_data)} users")
-                        logger.info(f"✅ GitHub data keys: {list(github_data.keys())[:5]}")  # Log first 5 keys
-
-                        # Log detailed GitHub results
-                        for email, data in github_data.items():
-                            if isinstance(data, dict):
-                                metrics = data.get('metrics', {})
-                                commits = metrics.get('total_commits', 0)
-                                prs = metrics.get('total_pull_requests', 0)
-                                logger.info(f"✅ GitHub - {email}: {commits} commits, {prs} PRs")
-                            else:
-                                logger.warning(f"⚠️  GitHub - {email}: unexpected data type {type(data)}")
-
+                        logger.info(f"💻 GitHub: Collected {len(github_data)} users with data")
                     except Exception as e:
-                        logger.error(f"❌ GitHub data collection failed: {e}", exc_info=True)
+                        logger.error(f"❌ GitHub collection failed: {e}")
 
                 if self.features['slack']:
-                    logger.info(f"📱 Collecting Slack data for {len(team_names)} team members using names")
-                    logger.info(f"📱 Team names: {team_names[:5]}...")  # Log first 5 names
                     try:
-                        logger.info(f"📱 Slack config - token: {'present' if self.slack_token else 'missing'}, user_id: {user_id}")
-
-                        # Use names for Slack correlation instead of emails
                         slack_data = await collect_team_slack_data_with_mapping(
                             team_names, time_range_days, self.slack_token, use_names=True,
                             user_id=user_id, analysis_id=analysis_id, source_platform=self.platform
                         )
-                        logger.info(f"✅ Collected Slack data for {len(slack_data)} users")
-
-                        # Log detailed Slack results
-                        for name, data in slack_data.items():
-                            if isinstance(data, dict):
-                                msg_count = data.get('message_count', 0) or len(data.get('messages', []))
-                                logger.info(f"✅ Slack - {name}: {msg_count} messages")
-                            else:
-                                logger.warning(f"⚠️  Slack - {name}: unexpected data type {type(data)}")
-
                     except Exception as e:
-                        logger.error(f"❌ Slack data collection failed: {e}", exc_info=True)
+                        logger.error(f"❌ Slack collection failed: {e}")
             
             # Analyze team burnout
             try:
-                logger.info(f"📊 Starting team burnout analysis")
-                logger.info(f"📊 Input - users: {len(users)}, incidents: {len(incidents)}, github_data: {len(github_data)}, slack_data: {len(slack_data)}")
-                team_analysis_start = datetime.now()
                 team_analysis = self._analyze_team_data(
                     users,
                     incidents,
@@ -482,16 +449,8 @@ class UnifiedBurnoutAnalyzer:
                     github_data,
                     slack_data
                 )
-                team_analysis_duration = (datetime.now() - team_analysis_start).total_seconds()
-
-                # Log team analysis results
-                members_analyzed = len(team_analysis.get("members", [])) if team_analysis else 0
-                logger.info(f"✅ Team analysis completed in {team_analysis_duration:.2f}s - {members_analyzed} members analyzed")
-
             except Exception as e:
-                logger.error(f"❌ Team analysis failed: {e}", exc_info=True)
-                team_analysis_duration = (datetime.now() - team_analysis_start).total_seconds() if 'team_analysis_start' in locals() else 0
-                logger.error(f"🔍 BURNOUT ANALYSIS: Step 3 FAILED after {team_analysis_duration:.2f}s: {e}")
+                logger.error(f"❌ Team analysis failed: {e}")
                 logger.error(f"🔍 BURNOUT ANALYSIS: Users data - type: {type(users)}, length: {len(users) if users else 'N/A'}")
                 logger.error(f"🔍 BURNOUT ANALYSIS: Incidents data - type: {type(incidents)}, length: {len(incidents) if incidents else 'N/A'}")
                 logger.error(f"🔍 BURNOUT ANALYSIS: Metadata type: {type(metadata)}")

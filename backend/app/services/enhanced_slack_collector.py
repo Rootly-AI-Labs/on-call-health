@@ -34,10 +34,18 @@ async def collect_team_slack_data_with_mapping(
                 data_points = 0
                 user_data = slack_data[identifier]
                 
-                # Count data points
+                # Count data points from various possible locations
                 if isinstance(user_data, dict):
+                    # Check for messages array
                     data_points += len(user_data.get("messages", []))
+                    # Check for message_count field
                     data_points += user_data.get("message_count", 0)
+                    # Check for metrics.total_messages (most common format)
+                    if "metrics" in user_data and isinstance(user_data["metrics"], dict):
+                        data_points += user_data["metrics"].get("total_messages", 0)
+                    # Check for activity_data.messages_sent
+                    if "activity_data" in user_data and isinstance(user_data["activity_data"], dict):
+                        data_points += user_data["activity_data"].get("messages_sent", 0)
                 
                 # Try to extract the Slack user ID from the data
                 slack_user_id = None
