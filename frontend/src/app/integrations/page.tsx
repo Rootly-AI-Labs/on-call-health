@@ -3331,14 +3331,19 @@ export default function IntegrationsPage() {
           <SheetHeader>
             <div className="flex items-center justify-between">
               <div>
-                <SheetTitle>Team Members</SheetTitle>
+                <SheetTitle>Team Members ({syncedUsers.length})</SheetTitle>
                 <SheetDescription>
                   Users from {integrations.find(i => i.id.toString() === selectedOrganization)?.name || 'your organization'} who can submit burnout surveys
                 </SheetDescription>
               </div>
               <div className="flex items-center gap-2">
                 <Button
-                  onClick={syncUsersToCorrelation}
+                  onClick={async () => {
+                    await syncUsersToCorrelation()
+                    if (slackIntegration?.workspace_id) {
+                      await syncSlackUserIds()
+                    }
+                  }}
                   disabled={loadingTeamMembers}
                   variant="outline"
                   size="sm"
@@ -3355,11 +3360,11 @@ export default function IntegrationsPage() {
                     </>
                   )}
                 </Button>
-                {/* Hide save button for beta integrations */}
-                {selectedOrganization && !['beta-rootly', 'beta-pagerduty'].includes(selectedOrganization) && (
+                {/* Hide save button for beta integrations, only show when there are unsaved changes */}
+                {selectedOrganization && !['beta-rootly', 'beta-pagerduty'].includes(selectedOrganization) && hasUnsavedChanges() && (
                   <Button
                     onClick={saveSurveyRecipients}
-                    disabled={savingRecipients || !hasUnsavedChanges()}
+                    disabled={savingRecipients}
                     className="bg-purple-600 hover:bg-purple-700"
                     size="sm"
                   >
@@ -3371,7 +3376,7 @@ export default function IntegrationsPage() {
                     ) : (
                       <>
                         <Check className="w-4 h-4 mr-2" />
-                        {selectedRecipients.size === 0 ? 'Reset to All Users' : hasUnsavedChanges() ? 'Save Changes' : 'Saved'}
+                        Save Changes
                       </>
                     )}
                   </Button>
@@ -3384,41 +3389,13 @@ export default function IntegrationsPage() {
             {/* Show synced users only */}
             {syncedUsers.length > 0 ? (
               <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-gray-900">
-                    Team Members ({syncedUsers.length})
-                  </h3>
-                  <div className="flex items-center gap-2">
-                    {slackIntegration?.workspace_id && (
-                      <Button
-                        onClick={syncSlackUserIds}
-                        disabled={loadingTeamMembers}
-                        size="sm"
-                        variant="outline"
-                        className="flex items-center space-x-2 border-green-300 text-green-700 hover:bg-green-50"
-                      >
-                        {loadingTeamMembers ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            <span>Syncing...</span>
-                          </>
-                        ) : (
-                          <>
-                            <MessageSquare className="w-4 h-4" />
-                            <span>Sync Slack IDs</span>
-                          </>
-                        )}
-                      </Button>
-                    )}
-                  </div>
-                </div>
                 <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                   <div className="flex items-center justify-between">
                     <p className="text-xs text-blue-900 font-medium">
                       ✓ Check users to send them automated burnout survey invitations via Slack
                     </p>
                     <div className="text-xs font-semibold text-blue-900 bg-blue-100 px-2 py-1 rounded">
-                      {selectedRecipients.size === 0 ? syncedUsers.length : selectedRecipients.size} / {syncedUsers.length} will receive surveys
+                      {selectedRecipients.size || 0} / {syncedUsers.length} will receive surveys
                     </div>
                   </div>
                   {selectedOrganization && ['beta-rootly', 'beta-pagerduty'].includes(selectedOrganization) ? (
