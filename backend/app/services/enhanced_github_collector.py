@@ -47,8 +47,8 @@ async def collect_team_github_data_with_mapping(
             github_data = {}
 
             # Query UserCorrelation for synced GitHub usernames
+            # Don't filter by user_id - allow lookups across the organization
             user_correlations = db.query(UserCorrelation).filter(
-                UserCorrelation.user_id == user_id,
                 UserCorrelation.email.in_(team_emails),
                 UserCorrelation.github_username.isnot(None)
             ).all()

@@ -120,34 +120,33 @@ class SlackCollector:
         logger.info(f"Slack correlation attempt for {user_identifier} (is_name: {is_name}), token={'present' if token else 'missing'}, user_id={user_id}")
 
         # PRIORITY 1: Check UserCorrelation table for synced Slack IDs
-        if user_id:
+        # Query by name/email WITHOUT user_id filter for cross-user lookups
+        try:
+            from ..models import SessionLocal, UserCorrelation
+            db = SessionLocal()
             try:
-                from ..models import SessionLocal, UserCorrelation
-                db = SessionLocal()
-                try:
-                    # Query by name or email depending on is_name flag
-                    if is_name:
-                        correlation = db.query(UserCorrelation).filter(
-                            UserCorrelation.user_id == user_id,
-                            UserCorrelation.name == user_identifier,
-                            UserCorrelation.slack_user_id.isnot(None)
-                        ).first()
-                    else:
-                        correlation = db.query(UserCorrelation).filter(
-                            UserCorrelation.user_id == user_id,
-                            UserCorrelation.email == user_identifier,
-                            UserCorrelation.slack_user_id.isnot(None)
-                        ).first()
+                # Query by name or email depending on is_name flag
+                # Don't filter by user_id - allow lookups across the organization
+                if is_name:
+                    correlation = db.query(UserCorrelation).filter(
+                        UserCorrelation.name == user_identifier,
+                        UserCorrelation.slack_user_id.isnot(None)
+                    ).first()
+                else:
+                    correlation = db.query(UserCorrelation).filter(
+                        UserCorrelation.email == user_identifier,
+                        UserCorrelation.slack_user_id.isnot(None)
+                    ).first()
 
-                    if correlation and correlation.slack_user_id:
-                        logger.info(f"✅ Found Slack ID via UserCorrelation (synced): {user_identifier} -> {correlation.slack_user_id}")
-                        return correlation.slack_user_id
-                    else:
-                        logger.info(f"No synced Slack ID found in UserCorrelation for {user_identifier}")
-                finally:
-                    db.close()
-            except Exception as e:
-                logger.warning(f"Error querying UserCorrelation for Slack ID: {e}")
+                if correlation and correlation.slack_user_id:
+                    logger.info(f"✅ Found Slack ID via UserCorrelation (synced): {user_identifier} -> {correlation.slack_user_id}")
+                    return correlation.slack_user_id
+                else:
+                    logger.info(f"No synced Slack ID found in UserCorrelation for {user_identifier}")
+            finally:
+                db.close()
+        except Exception as e:
+            logger.warning(f"Error querying UserCorrelation for Slack ID: {e}")
 
         # PRIORITY 2: Try API-based discovery if token available
         if token:
