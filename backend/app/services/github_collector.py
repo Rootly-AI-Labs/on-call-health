@@ -33,43 +33,25 @@ class GitHubCollector:
         
         # GitHub organizations to search
         self.organizations = ["Rootly-AI-Labs", "rootlyhq"]
-        
-        # Predefined email mappings (from original config, to handle cases where GitHub email != Rootly email)
-        self.predefined_email_mappings = {
-            "spencer.cheng@rootly.com": "spencerhcheng",
-            "jasmeet.singh@rootly.com": "jasmeetluthra", 
-            "sylvain@rootly.com": "sylvainkalache",
-            "christo.mitov@rootly.com": "christomitov",
-            "ibrahim@rootly.com": "ibrahimelchami",
-            "weihan@rootly.com": "weihanli101",
-            "alex.mingoia@rootly.com": "alexmingoia",
-            "quentin@rootly.com": "kwent",
-            "gideon@rootly.com": "gid-rootly",
-            "dan@rootly.com": "dansadler1",
-            # Additional mappings for Integration ID 3 users
-            "nicholas@rootly.com": "nronas",
-            "kumbi@rootly.com": "kumbirai"
-        }
-        
+
         # Cache for email mapping
         self._email_mapping_cache = None
         
     async def _correlate_email_to_github(self, email: str, token: str, user_id: Optional[int] = None, full_name: Optional[str] = None) -> Optional[str]:
         """
         Correlate an email address to a GitHub username using multiple strategies.
-        
+
         This checks in order:
         1. Manual mappings from user_mappings table (highest priority)
-        2. Predefined mappings (hardcoded)
-        3. Enhanced matching algorithm with multiple strategies
-        4. Legacy discovered email mappings from organization members
+        2. Enhanced matching algorithm with multiple strategies
+        3. Legacy discovered email mappings from organization members
         """
         logger.info(f"GitHub correlation attempt for {email}, token={'present' if token else 'missing'}, user_id={user_id}")
-        
+
         if not token:
             logger.warning("No GitHub token provided for correlation")
             return None
-            
+
         try:
             # FIRST: Check manual mappings from user_mappings table (highest priority)
             if user_id:
@@ -77,17 +59,8 @@ class GitHubCollector:
                 if manual_username:
                     logger.info(f"Found GitHub correlation via MANUAL mapping: {email} -> {manual_username}")
                     return manual_username
-            
-            # SECOND: Check predefined mappings (hardcoded)
-            logger.info(f"Checking predefined mappings for {email}. Available mappings: {list(self.predefined_email_mappings.keys())}")
-            username = self.predefined_email_mappings.get(email)
-            if username:
-                logger.info(f"Found GitHub correlation via predefined mapping: {email} -> {username}")
-                return username
-            else:
-                logger.warning(f"No predefined mapping found for {email}")
-            
-            # THIRD: Use enhanced matching algorithm with name-based fallback
+
+            # SECOND: Use enhanced matching algorithm with name-based fallback
             try:
                 from .enhanced_github_matcher import EnhancedGitHubMatcher
                 matcher = EnhancedGitHubMatcher(token, self.organizations)

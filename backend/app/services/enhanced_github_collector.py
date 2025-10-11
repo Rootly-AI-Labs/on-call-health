@@ -30,30 +30,48 @@ async def collect_team_github_data_with_mapping(
     # OPTIMIZATION: Check if we should use fast mode for analysis performance
     fast_mode = os.getenv('GITHUB_FAST_MODE', 'true').lower() == 'true'
     
-    # FAST MODE: Only use predefined mappings during analysis for speed
-    if fast_mode:
-        logger.info(f"🚀 FAST MODE: Only using predefined mappings for {len(team_emails)} emails")
-        
+    # FAST MODE: Only use existing database mappings during analysis for speed
+    # This avoids redundant GitHub API calls since users are synced via integrations page
+    if fast_mode and user_id:
+        logger.info(f"🚀 FAST MODE: Using existing database mappings for {len(team_emails)} emails")
+
         from .github_collector import GitHubCollector
-        collector = GitHubCollector()
-        github_data = {}
-        
-        # Only check predefined mappings
-        for email in team_emails:
-            if email in collector.predefined_email_mappings:
-                github_username = collector.predefined_email_mappings[email]
-                logger.info(f"🚀 FAST MODE: Found predefined mapping {email} -> {github_username}")
-                
-                # Generate mock data with the known username
-                github_data[email] = collector._generate_mock_github_data(
-                    github_username, email, 
-                    datetime.now() - timedelta(days=days),
-                    datetime.now()
-                )
-            else:
-                logger.info(f"🚀 FAST MODE: No predefined mapping for {email}, skipping")
-        
-        return github_data
+        from ..models import IntegrationMapping
+        from ..models import SessionLocal
+
+        db = SessionLocal()
+        try:
+            collector = GitHubCollector()
+            github_data = {}
+
+            # Query all existing successful mappings for this user
+            existing_mappings = db.query(IntegrationMapping).filter(
+                IntegrationMapping.user_id == user_id,
+                IntegrationMapping.source_identifier.in_(team_emails),
+                IntegrationMapping.target_platform == "github",
+                IntegrationMapping.mapping_successful == True
+            ).all()
+
+            # Create a lookup dict
+            email_to_github = {m.source_identifier: m.target_identifier for m in existing_mappings}
+            logger.info(f"🚀 FAST MODE: Found {len(email_to_github)} existing mappings in database")
+
+            # Generate mock data for users with existing mappings
+            for email in team_emails:
+                github_username = email_to_github.get(email)
+                if github_username:
+                    logger.info(f"🚀 FAST MODE: Using mapping {email} -> {github_username}")
+                    github_data[email] = collector._generate_mock_github_data(
+                        github_username, email,
+                        datetime.now() - timedelta(days=days),
+                        datetime.now()
+                    )
+                else:
+                    logger.info(f"🚀 FAST MODE: No existing mapping for {email}, skipping")
+
+            return github_data
+        finally:
+            db.close()
     
     if use_smart_caching and user_id:
         logger.info(f"🧠 SMART CACHING: Using GitHubMappingService for {len(team_emails)} emails")
@@ -122,27 +140,16 @@ async def collect_team_github_data_with_mapping(
                 
                 # Try to extract the GitHub username from the data
                 github_username = None
-                
-                # First, check predefined mappings
-                from .github_collector import GitHubCollector
-                collector = GitHubCollector()
-                if email in collector.predefined_email_mappings:
-                    github_username = collector.predefined_email_mappings[email]
-                    logger.info(f"Found predefined mapping: {email} -> {github_username}")
-                
-                # If no predefined mapping, try to extract from data
-                if not github_username:
-                    if isinstance(user_data, dict) and "username" in user_data:
-                        github_username = user_data["username"]
-                    elif isinstance(user_data, dict) and "github_username" in user_data:
-                        github_username = user_data["github_username"]
-                
+
+                # Extract from data
+                if isinstance(user_data, dict) and "username" in user_data:
+                    github_username = user_data["username"]
+                elif isinstance(user_data, dict) and "github_username" in user_data:
+                    github_username = user_data["github_username"]
+
                 if github_username:
-                    # Determine mapping method based on how we found the username
-                    if email in collector.predefined_email_mappings:
-                        mapping_method = "predefined_mapping"
-                    else:
-                        mapping_method = "api_discovery"
+                    # All mappings are now discovered via API
+                    mapping_method = "api_discovery"
                     
                     recorder.record_successful_mapping(
                         user_id=user_id,
