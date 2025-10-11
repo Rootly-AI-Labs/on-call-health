@@ -2623,7 +2623,7 @@ async def run_analysis_task(
                     user_id=user_id,
                     analysis_id=analysis_id
                 ),
-                timeout=480.0  # 8 minutes - aggressive timeout to fail faster
+                timeout=900.0  # 15 minutes timeout
             )
 
             logger.info(f"BACKGROUND_TASK: Analysis execution completed at {datetime.now()}")
