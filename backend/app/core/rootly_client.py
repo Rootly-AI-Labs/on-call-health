@@ -253,73 +253,69 @@ class RootlyAPIClient:
     
     async def get_on_call_shifts(self, start_date: datetime, end_date: datetime) -> List[Dict[str, Any]]:
         """
-        Get on-call shifts for a specific time period.
-        Returns list of shifts with user information for the exact analysis timeframe.
+        Get on-call shifts for a specific time period from Rootly.
 
-        This handles historical schedules - if your analysis period is 30 days ago,
-        it will fetch who was on-call during that historical period.
+        Rootly API structure:
+        1. First get all schedules via /v1/schedules
+        2. For each schedule, get shifts via /v1/schedules/{id}/shifts with date filters
         """
         try:
             # Format dates for API (Rootly expects ISO format)
             start_str = start_date.strftime('%Y-%m-%dT%H:%M:%S.%fZ')
             end_str = end_date.strftime('%Y-%m-%dT%H:%M:%S.%fZ')
 
-            params = {
-                'filter[starts_at][gte]': start_str,
-                'filter[ends_at][lte]': end_str,
-                'include': 'user',  # Include user data in response
-                'page[size]': 100   # Get up to 100 shifts per request
-            }
-
             all_shifts = []
-            page = 1
 
             async with httpx.AsyncClient() as client:
-                while True:
-                    params['page[number]'] = page
+                # Step 1: Get all schedules
+                logger.info(f"🗓️ ROOTLY ON_CALL: Fetching all schedules")
+                schedules_response = await client.get(
+                    f"{self.base_url}/v1/schedules",
+                    headers=self.headers,
+                    params={"page[size]": 100},
+                    timeout=30.0
+                )
 
-                    url = f"{self.base_url}/v1/on_call_shifts"
-                    logger.info(f"🗓️ ROOTLY ON_CALL: Fetching shifts from {url} with params: {params}")
+                if schedules_response.status_code != 200:
+                    logger.error(f"🗓️ ROOTLY ON_CALL: Failed to fetch schedules: {schedules_response.status_code}")
+                    return []
 
-                    response = await client.get(
-                        url,
+                schedules_data = schedules_response.json()
+                schedules = schedules_data.get('data', [])
+                logger.info(f"🗓️ ROOTLY ON_CALL: Found {len(schedules)} schedules")
+
+                # Step 2: For each schedule, get shifts in the time range
+                for schedule in schedules:
+                    schedule_id = schedule.get('id')
+                    schedule_name = schedule.get('attributes', {}).get('name', 'Unknown')
+
+                    logger.info(f"🗓️ ROOTLY ON_CALL: Fetching shifts for schedule: {schedule_name} (ID: {schedule_id})")
+
+                    shifts_response = await client.get(
+                        f"{self.base_url}/v1/schedules/{schedule_id}/shifts",
                         headers=self.headers,
-                        params=params,
+                        params={
+                            'filter[starts_at][gte]': start_str,
+                            'filter[ends_at][lte]': end_str,
+                            'include': 'user',
+                            'page[size]': 100
+                        },
                         timeout=30.0
                     )
 
-                    logger.info(f"🗓️ ROOTLY ON_CALL: Response status: {response.status_code}")
-
-                    if response.status_code == 200:
-                        data = response.json()
-                        shifts = data.get('data', [])
-
-                        logger.info(f"🗓️ ROOTLY ON_CALL: Found {len(shifts)} shifts on page {page}")
-
-                        if not shifts:
-                            break
-
+                    if shifts_response.status_code == 200:
+                        shifts_data = shifts_response.json()
+                        shifts = shifts_data.get('data', [])
+                        logger.info(f"🗓️ ROOTLY ON_CALL: Found {len(shifts)} shifts in schedule {schedule_name}")
                         all_shifts.extend(shifts)
-
-                        # Check if there are more pages
-                        links = data.get('links', {})
-                        if not links.get('next'):
-                            break
-
-                        page += 1
-                    elif response.status_code == 404:
-                        logger.warning(f"🗓️ ROOTLY ON_CALL: Endpoint not found (404). Response: {response.text}")
-                        logger.warning(f"🗓️ ROOTLY ON_CALL: This Rootly instance may not have on-call scheduling enabled.")
-                        break
                     else:
-                        logger.error(f"🗓️ ROOTLY ON_CALL: Failed to fetch shifts: {response.status_code} - {response.text}")
-                        break
+                        logger.warning(f"🗓️ ROOTLY ON_CALL: Failed to fetch shifts for schedule {schedule_name}: {shifts_response.status_code}")
 
-                logger.info(f"🗓️ ROOTLY ON_CALL: Total retrieved: {len(all_shifts)} on-call shifts for period {start_str} to {end_str}")
+                logger.info(f"🗓️ ROOTLY ON_CALL: Total retrieved: {len(all_shifts)} on-call shifts across all schedules")
                 return all_shifts
 
         except Exception as e:
-            logger.error(f"Error fetching on-call shifts: {e}")
+            logger.error(f"🗓️ ROOTLY ON_CALL: Error fetching on-call shifts: {e}")
             return []
     
     async def extract_on_call_users_from_shifts(self, shifts: List[Dict[str, Any]]) -> set:
