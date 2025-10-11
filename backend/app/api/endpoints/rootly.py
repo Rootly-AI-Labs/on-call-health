@@ -238,12 +238,12 @@ async def list_integrations(
     ).order_by(RootlyIntegration.created_at.desc()).all()
 
     logger.info(f"🔍 [ROOTLY] DB query took {time.time() - start_time:.2f}s, found {len(integrations)} integrations")
-    result_integrations = []
-    
-    for idx, integration in enumerate(integrations):
-        perm_start = time.time()
-        logger.info(f"🔍 [ROOTLY] Processing integration {idx+1}/{len(integrations)}: {integration.name}")
 
+    # Prepare base integration data first (fast, no API calls)
+    result_integrations = []
+    permission_tasks = []
+
+    for idx, integration in enumerate(integrations):
         integration_data = {
             "id": integration.id,
             "name": integration.name,
@@ -254,43 +254,53 @@ async def list_integrations(
             "last_used_at": integration.last_used_at.isoformat() if integration.last_used_at else None,
             "token_suffix": f"****{integration.api_token[-4:]}" if integration.api_token and len(integration.api_token) >= 4 else "****"
         }
+        result_integrations.append(integration_data)
 
-        # Check permissions for each integration with 5s timeout
+        # Queue permission check task if token exists
         if integration.api_token:
-            try:
-                logger.info(f"🔍 [ROOTLY] Checking permissions for {integration.name}...")
-                client = RootlyAPIClient(integration.api_token)
-
-                # Add 5 second timeout for permission checks
-                import asyncio
-                try:
-                    permissions = await asyncio.wait_for(
-                        client.check_permissions(),
-                        timeout=5.0
-                    )
-                    integration_data["permissions"] = permissions
-                    logger.info(f"🔍 [ROOTLY] Permissions check took {time.time() - perm_start:.2f}s")
-                except asyncio.TimeoutError:
-                    logger.warning(f"🔍 [ROOTLY] Permission check timed out after 5s for {integration.name}")
-                    integration_data["permissions"] = {
-                        "users": {"access": None, "error": "Rootly API timeout - check back later"},
-                        "incidents": {"access": None, "error": "Rootly API timeout - check back later"}
-                    }
-            except Exception as e:
-                logger.warning(f"🔍 [ROOTLY] Permission check failed after {time.time() - perm_start:.2f}s: {str(e)}")
-                # If we can't check permissions, include a note
-                integration_data["permissions"] = {
-                    "users": {"access": None, "error": f"Rootly API unavailable: {str(e)}"},
-                    "incidents": {"access": None, "error": f"Rootly API unavailable: {str(e)}"}
-                }
+            client = RootlyAPIClient(integration.api_token)
+            permission_tasks.append((idx, client.check_permissions()))
         else:
-            # No token stored
+            # No token - set immediately
             integration_data["permissions"] = {
                 "users": {"access": None, "error": "No API token configured"},
                 "incidents": {"access": None, "error": "No API token configured"}
             }
 
-        result_integrations.append(integration_data)
+    # Run all permission checks in parallel with 5s timeout each
+    if permission_tasks:
+        import asyncio
+        logger.info(f"🔍 [ROOTLY] Checking permissions for {len(permission_tasks)} integrations in parallel...")
+        perm_start = time.time()
+
+        async def check_with_timeout(idx, task):
+            try:
+                result = await asyncio.wait_for(task, timeout=5.0)
+                return (idx, result, None)
+            except asyncio.TimeoutError:
+                return (idx, None, "timeout")
+            except Exception as e:
+                return (idx, None, str(e))
+
+        # Run all checks concurrently
+        results = await asyncio.gather(*[check_with_timeout(idx, task) for idx, task in permission_tasks])
+
+        # Apply results
+        for idx, permissions, error in results:
+            if error == "timeout":
+                result_integrations[idx]["permissions"] = {
+                    "users": {"access": None, "error": "Rootly API timeout - check back later"},
+                    "incidents": {"access": None, "error": "Rootly API timeout - check back later"}
+                }
+            elif error:
+                result_integrations[idx]["permissions"] = {
+                    "users": {"access": None, "error": f"Rootly API unavailable: {error}"},
+                    "incidents": {"access": None, "error": f"Rootly API unavailable: {error}"}
+                }
+            else:
+                result_integrations[idx]["permissions"] = permissions
+
+        logger.info(f"🔍 [ROOTLY] All permission checks completed in {time.time() - perm_start:.2f}s")
     
     # Add beta fallback integration if available
     beta_start = time.time()
@@ -302,31 +312,29 @@ async def list_integrations(
             logger.info(f"🔍 [ROOTLY] Testing beta token: {beta_rootly_token[:10]}...")
             client = RootlyAPIClient(beta_rootly_token)
 
-            logger.info(f"🔍 [ROOTLY] Calling test_connection()...")
-            try:
-                test_result = await asyncio.wait_for(
-                    client.test_connection(),
-                    timeout=5.0
-                )
-                logger.info(f"🔍 [ROOTLY] test_connection() took {time.time() - beta_start:.2f}s")
-            except asyncio.TimeoutError:
-                logger.warning(f"🔍 [ROOTLY] test_connection() timed out after 5s")
-                test_result = {"status": "timeout", "account_info": {}}
+            # Run test_connection and check_permissions in parallel
+            logger.info(f"🔍 [ROOTLY] Running test_connection() and check_permissions() in parallel...")
 
-            perm_start_beta = time.time()
-            logger.info(f"🔍 [ROOTLY] Calling check_permissions()...")
-            try:
-                permissions = await asyncio.wait_for(
-                    client.check_permissions(),
-                    timeout=5.0
-                )
-                logger.info(f"🔍 [ROOTLY] check_permissions() took {time.time() - perm_start_beta:.2f}s")
-            except asyncio.TimeoutError:
-                logger.warning(f"🔍 [ROOTLY] check_permissions() timed out after 5s")
-                permissions = {
-                    "users": {"access": None, "error": "Rootly API timeout"},
-                    "incidents": {"access": None, "error": "Rootly API timeout"}
-                }
+            async def test_with_timeout():
+                try:
+                    return await asyncio.wait_for(client.test_connection(), timeout=5.0)
+                except asyncio.TimeoutError:
+                    return {"status": "timeout", "account_info": {}}
+
+            async def perms_with_timeout():
+                try:
+                    return await asyncio.wait_for(client.check_permissions(), timeout=5.0)
+                except asyncio.TimeoutError:
+                    return {
+                        "users": {"access": None, "error": "Rootly API timeout"},
+                        "incidents": {"access": None, "error": "Rootly API timeout"}
+                    }
+
+            test_result, permissions = await asyncio.gather(
+                test_with_timeout(),
+                perms_with_timeout()
+            )
+            logger.info(f"🔍 [ROOTLY] Beta checks completed in {time.time() - beta_start:.2f}s")
             
             logger.info(f"Beta Rootly test_result: {test_result}")
             account_info = test_result.get("account_info", {})

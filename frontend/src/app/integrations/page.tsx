@@ -982,8 +982,8 @@ export default function IntegrationsPage() {
         return
       }
 
-      // Add 10 second timeout to prevent hanging
-      const fetchWithTimeout = (url: string, options: any, timeout = 10000) => {
+      // Add 15 second timeout to prevent hanging (increased for parallel permission checks)
+      const fetchWithTimeout = (url: string, options: any, timeout = 15000) => {
         return Promise.race([
           fetch(url, options),
           new Promise<Response>((_, reject) =>
