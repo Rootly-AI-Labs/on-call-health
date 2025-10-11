@@ -28,7 +28,8 @@ async def collect_team_github_data_with_mapping(
     use_smart_caching = os.getenv('USE_SMART_GITHUB_CACHING', 'true').lower() == 'true'
     
     # OPTIMIZATION: Check if we should use fast mode for analysis performance
-    fast_mode = os.getenv('GITHUB_FAST_MODE', 'true').lower() == 'true'
+    # Disabled by default until users have synced mappings via integrations page
+    fast_mode = os.getenv('GITHUB_FAST_MODE', 'false').lower() == 'true'
     
     # FAST MODE: Only use existing database mappings during analysis for speed
     # This avoids redundant GitHub API calls since users are synced via integrations page
