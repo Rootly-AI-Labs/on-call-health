@@ -28,16 +28,16 @@ async def collect_team_github_data_with_mapping(
     use_smart_caching = os.getenv('USE_SMART_GITHUB_CACHING', 'true').lower() == 'true'
     
     # OPTIMIZATION: Check if we should use fast mode for analysis performance
-    # Disabled by default until users have synced mappings via integrations page
-    fast_mode = os.getenv('GITHUB_FAST_MODE', 'false').lower() == 'true'
+    # Enabled by default - uses synced GitHub mappings from "Sync Members" on integrations page
+    fast_mode = os.getenv('GITHUB_FAST_MODE', 'true').lower() == 'true'
     
-    # FAST MODE: Only use existing database mappings during analysis for speed
-    # This avoids redundant GitHub API calls since users are synced via integrations page
+    # FAST MODE: Only use existing synced mappings from integrations page
+    # This avoids redundant GitHub API calls since users are synced via "Sync Members"
     if fast_mode and user_id:
-        logger.info(f"🚀 FAST MODE: Using existing database mappings for {len(team_emails)} emails")
+        logger.info(f"🚀 FAST MODE: Using synced GitHub mappings from UserCorrelation for {len(team_emails)} emails")
 
         from .github_collector import GitHubCollector
-        from ..models import IntegrationMapping
+        from ..models import UserCorrelation
         from ..models import SessionLocal
 
         db = SessionLocal()
@@ -45,30 +45,29 @@ async def collect_team_github_data_with_mapping(
             collector = GitHubCollector()
             github_data = {}
 
-            # Query all existing successful mappings for this user
-            existing_mappings = db.query(IntegrationMapping).filter(
-                IntegrationMapping.user_id == user_id,
-                IntegrationMapping.source_identifier.in_(team_emails),
-                IntegrationMapping.target_platform == "github",
-                IntegrationMapping.mapping_successful == True
+            # Query UserCorrelation for synced GitHub usernames
+            user_correlations = db.query(UserCorrelation).filter(
+                UserCorrelation.user_id == user_id,
+                UserCorrelation.email.in_(team_emails),
+                UserCorrelation.github_username.isnot(None)
             ).all()
 
-            # Create a lookup dict
-            email_to_github = {m.source_identifier: m.target_identifier for m in existing_mappings}
-            logger.info(f"🚀 FAST MODE: Found {len(email_to_github)} existing mappings in database")
+            # Create a lookup dict: email -> github_username
+            email_to_github = {uc.email: uc.github_username for uc in user_correlations}
+            logger.info(f"🚀 FAST MODE: Found {len(email_to_github)} synced GitHub mappings")
 
-            # Generate mock data for users with existing mappings
+            # Generate mock data for users with synced mappings
             for email in team_emails:
                 github_username = email_to_github.get(email)
                 if github_username:
-                    logger.info(f"🚀 FAST MODE: Using mapping {email} -> {github_username}")
+                    logger.info(f"🚀 FAST MODE: Using synced mapping {email} -> {github_username}")
                     github_data[email] = collector._generate_mock_github_data(
                         github_username, email,
                         datetime.now() - timedelta(days=days),
                         datetime.now()
                     )
                 else:
-                    logger.info(f"🚀 FAST MODE: No existing mapping for {email}, skipping")
+                    logger.info(f"🚀 FAST MODE: No synced mapping for {email}, skipping")
 
             return github_data
         finally:
