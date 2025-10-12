@@ -418,26 +418,31 @@ class UnifiedBurnoutAnalyzer:
                     logger.warning(f"   - Only {len(team_emails)}/{len(users)} users have emails ({len(team_emails)/len(users)*100:.1f}%)")
                     logger.warning(f"   - Check if {self.platform} data structure matches expectation")
                 
-                if self.features['github']:
-                    try:
-                        logger.info(f"💻 GitHub: Collecting data for {len(team_emails)} members")
-                        github_data = await collect_team_github_data_with_mapping(
-                            team_emails, time_range_days, self.github_token,
-                            user_id=user_id, analysis_id=analysis_id, source_platform=self.platform,
-                            email_to_name=email_to_name
-                        )
-                        logger.info(f"💻 GitHub: Collected {len(github_data)} users with data")
-                    except Exception as e:
-                        logger.error(f"❌ GitHub collection failed: {e}")
+                # Skip GitHub/Slack for large teams to prevent timeout
+                max_team_size = 20
+                if len(team_emails) > max_team_size:
+                    logger.warning(f"⚠️ Team size ({len(team_emails)}) exceeds limit ({max_team_size}), skipping GitHub/Slack to prevent timeout")
+                else:
+                    if self.features['github']:
+                        try:
+                            logger.info(f"💻 GitHub: Collecting data for {len(team_emails)} members")
+                            github_data = await collect_team_github_data_with_mapping(
+                                team_emails, time_range_days, self.github_token,
+                                user_id=user_id, analysis_id=analysis_id, source_platform=self.platform,
+                                email_to_name=email_to_name
+                            )
+                            logger.info(f"💻 GitHub: Collected {len(github_data)} users with data")
+                        except Exception as e:
+                            logger.error(f"❌ GitHub collection failed: {e}")
 
-                if self.features['slack']:
-                    try:
-                        slack_data = await collect_team_slack_data_with_mapping(
-                            team_names, time_range_days, self.slack_token, use_names=True,
-                            user_id=user_id, analysis_id=analysis_id, source_platform=self.platform
-                        )
-                    except Exception as e:
-                        logger.error(f"❌ Slack collection failed: {e}")
+                    if self.features['slack']:
+                        try:
+                            slack_data = await collect_team_slack_data_with_mapping(
+                                team_names, time_range_days, self.slack_token, use_names=True,
+                                user_id=user_id, analysis_id=analysis_id, source_platform=self.platform
+                            )
+                        except Exception as e:
+                            logger.error(f"❌ Slack collection failed: {e}")
             
             # Analyze team burnout
             try:
