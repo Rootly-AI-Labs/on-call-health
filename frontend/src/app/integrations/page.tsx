@@ -911,22 +911,33 @@ export default function IntegrationsPage() {
       ])
 
       // Update state silently
-      const allIntegrations = [
-        ...rootlyData.integrations.map((i: any) => ({ ...i, platform: 'rootly' })),
-        ...pagerdutyData.integrations.map((i: any) => ({ ...i, platform: 'pagerduty' }))
-      ]
+      const rootlyIntegrations = (rootlyData.integrations || []).map((i: any) => ({ ...i, platform: 'rootly' }))
+      const pagerdutyIntegrations = (pagerdutyData.integrations || []).map((i: any) => ({ ...i, platform: 'pagerduty' }))
+      const allIntegrations = [...rootlyIntegrations, ...pagerdutyIntegrations]
 
-      setIntegrations(allIntegrations)
-      setGithubIntegration(githubData.connected ? githubData.integration : null)
-      setSlackIntegration(slackData.integration)
+      console.log('Background refresh fetched:', {
+        rootlyCount: rootlyIntegrations.length,
+        pagerdutyCount: pagerdutyIntegrations.length,
+        total: allIntegrations.length
+      })
 
-      // Update cache with fresh data
-      localStorage.setItem('all_integrations', JSON.stringify(allIntegrations))
-      localStorage.setItem('all_integrations_timestamp', Date.now().toString())
-      localStorage.setItem('github_integration', JSON.stringify(githubData))
-      localStorage.setItem('slack_integration', JSON.stringify(slackData))
+      // Only update state if we got data (don't overwrite with empty arrays from failed requests)
+      if (allIntegrations.length > 0 || (rootlyResponse.ok && pagerdutyResponse.ok)) {
+        setIntegrations(allIntegrations)
+        setGithubIntegration(githubData.connected ? githubData.integration : null)
+        setSlackIntegration(slackData.integration)
+
+        // Update cache with fresh data
+        localStorage.setItem('all_integrations', JSON.stringify(allIntegrations))
+        localStorage.setItem('all_integrations_timestamp', Date.now().toString())
+        localStorage.setItem('github_integration', JSON.stringify(githubData))
+        localStorage.setItem('slack_integration', JSON.stringify(slackData))
+      } else {
+        console.warn('Skipping background refresh - no data received or requests failed')
+      }
 
     } catch (error) {
+      console.error('Background refresh error:', error)
     }
   }
   
@@ -1020,10 +1031,17 @@ export default function IntegrationsPage() {
       const githubData = (githubResponse as any).ok && (githubResponse as Response).json ? await (githubResponse as Response).json() : { connected: false, integration: null }
       const slackData = (slackResponse as any).ok && (slackResponse as Response).json ? await (slackResponse as Response).json() : { integration: null }
 
-      const rootlyIntegrations = rootlyData.integrations.map((i: Integration) => ({ ...i, platform: 'rootly' }))
+      const rootlyIntegrations = (rootlyData.integrations || []).map((i: Integration) => ({ ...i, platform: 'rootly' }))
       const pagerdutyIntegrations = (pagerdutyData.integrations || []).map((i: Integration) => ({ ...i, platform: 'pagerduty' }))
 
       const allIntegrations = [...rootlyIntegrations, ...pagerdutyIntegrations]
+
+      console.log('Main API load fetched:', {
+        rootlyCount: rootlyIntegrations.length,
+        pagerdutyCount: pagerdutyIntegrations.length,
+        total: allIntegrations.length
+      })
+
       setIntegrations(allIntegrations)
       setGithubIntegration(githubData.connected ? githubData.integration : null)
       setSlackIntegration(slackData.integration)
