@@ -1389,6 +1389,16 @@ export default function IntegrationsPage() {
   const rootlyCount = integrations.filter(i => i.platform === 'rootly').length
   const pagerdutyCount = integrations.filter(i => i.platform === 'pagerduty').length
 
+  // Debug logging
+  console.log('Integrations page state:', {
+    integrationsCount: integrations.length,
+    filteredCount: filteredIntegrations.length,
+    activeTab,
+    rootlyCount,
+    pagerdutyCount,
+    integrations: integrations.map(i => ({ id: i.id, name: i.name, platform: i.platform }))
+  })
+
   // Helper booleans to distinguish between Slack Survey (OAuth) and Enhanced Integration (webhook/token)
   // Note: Backend returns ONE integration at a time - either OAuth or manual, not both simultaneously
   // Users must choose one integration type. If they want to switch, they disconnect one and connect the other.
