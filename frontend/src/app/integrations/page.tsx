@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -810,6 +810,7 @@ export default function IntegrationsPage() {
 
   // ✨ PHASE 1 OPTIMIZATION: Instant cache loading with background refresh
   const [refreshingInBackground, setRefreshingInBackground] = useState(false)
+  const isLoadingRef = useRef(false)
   
   // Synchronous cache reading for instant display
   const loadFromCacheSync = () => {
@@ -983,11 +984,13 @@ export default function IntegrationsPage() {
   
   // Original API loading logic (extracted for reuse)
   const loadAllIntegrationsAPI = async () => {
-    // Prevent concurrent calls by checking if already loading
-    if (loadingRootly || loadingPagerDuty) {
+    // Prevent concurrent calls using a ref (not state, since state starts as true)
+    if (isLoadingRef.current) {
       console.log('Skipping API call - already loading')
       return
     }
+
+    isLoadingRef.current = true
 
     // Set individual loading states to true
     setLoadingRootly(true)
@@ -997,6 +1000,7 @@ export default function IntegrationsPage() {
     try {
       const authToken = localStorage.getItem('auth_token')
       if (!authToken) {
+        isLoadingRef.current = false
         router.push('/auth/success')
         return
       }
@@ -1065,6 +1069,11 @@ export default function IntegrationsPage() {
 
       if (!shouldUpdate) {
         console.warn('Skipping main API update - both requests failed and we have existing data')
+        isLoadingRef.current = false
+        setLoadingRootly(false)
+        setLoadingPagerDuty(false)
+        setLoadingGitHub(false)
+        setLoadingSlack(false)
         return
       }
 
@@ -1097,6 +1106,7 @@ export default function IntegrationsPage() {
       setLoadingPagerDuty(false)
       setLoadingGitHub(false)
       setLoadingSlack(false)
+      isLoadingRef.current = false
     }
   }
 
