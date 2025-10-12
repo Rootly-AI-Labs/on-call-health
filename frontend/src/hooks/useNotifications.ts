@@ -39,10 +39,10 @@ export function useNotifications() {
         setHasMore(data.has_more || false)
         setOffset(currentOffset + data.notifications.length)
       } else {
-        console.error('Failed to fetch notifications:', response.status)
+        // Silently fail - notifications are not critical
       }
     } catch (error) {
-      console.error('Error fetching notifications:', error)
+      // Silently fail - notifications are not critical
     } finally {
       setIsLoading(false)
     }

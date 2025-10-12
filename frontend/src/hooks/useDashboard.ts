@@ -1405,7 +1405,9 @@ export default function useDashboard() {
               }
             })
           } catch (networkError) {
-            throw new Error('Cannot connect to backend server during polling')
+            // Network error (including CORS errors from 502) - silently retry
+            pollRetryCount++
+            return
           }
 
           if (pollResponse.ok) {
@@ -1415,9 +1417,13 @@ export default function useDashboard() {
             setAnalysisRunning(false)
             setCurrentRunningAnalysisId(null)
             toast.error("Analysis was deleted or no longer exists")
-            
+
             // Try to load the most recent analysis as fallback
             await loadPreviousAnalyses()
+            return
+          } else if (pollResponse.status === 502 || pollResponse.status === 503) {
+            // Backend temporarily unavailable - silently retry
+            pollRetryCount++
             return
           } else {
             // Other HTTP errors - treat as polling failure
