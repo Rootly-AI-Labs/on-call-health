@@ -918,11 +918,15 @@ export default function IntegrationsPage() {
       console.log('Background refresh fetched:', {
         rootlyCount: rootlyIntegrations.length,
         pagerdutyCount: pagerdutyIntegrations.length,
-        total: allIntegrations.length
+        total: allIntegrations.length,
+        rootlyOk: rootlyResponse.ok,
+        pagerdutyOk: pagerdutyResponse.ok
       })
 
-      // Only update state if we got data (don't overwrite with empty arrays from failed requests)
-      if (allIntegrations.length > 0 || (rootlyResponse.ok && pagerdutyResponse.ok)) {
+      // Only skip update if requests failed - otherwise update even if empty (which is valid)
+      if (!rootlyResponse.ok && !pagerdutyResponse.ok) {
+        console.warn('Skipping background refresh - both API requests failed')
+      } else {
         setIntegrations(allIntegrations)
         setGithubIntegration(githubData.connected ? githubData.integration : null)
         setSlackIntegration(slackData.integration)
@@ -932,8 +936,6 @@ export default function IntegrationsPage() {
         localStorage.setItem('all_integrations_timestamp', Date.now().toString())
         localStorage.setItem('github_integration', JSON.stringify(githubData))
         localStorage.setItem('slack_integration', JSON.stringify(slackData))
-      } else {
-        console.warn('Skipping background refresh - no data received or requests failed')
       }
 
     } catch (error) {
