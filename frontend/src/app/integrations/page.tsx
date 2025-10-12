@@ -983,6 +983,12 @@ export default function IntegrationsPage() {
   
   // Original API loading logic (extracted for reuse)
   const loadAllIntegrationsAPI = async () => {
+    // Prevent concurrent calls by checking if already loading
+    if (loadingRootly || loadingPagerDuty) {
+      console.log('Skipping API call - already loading')
+      return
+    }
+
     // Set individual loading states to true
     setLoadingRootly(true)
     setLoadingPagerDuty(true)
