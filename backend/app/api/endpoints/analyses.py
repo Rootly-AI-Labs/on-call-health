@@ -2444,7 +2444,12 @@ async def run_analysis_task(
     from datetime import datetime
     import logging
     import os
-    
+    import sys
+
+    # Force output to stderr to ensure we see it
+    sys.stderr.write(f"\n🔥🔥🔥 BACKGROUND TASK STARTED: Analysis {analysis_id} 🔥🔥🔥\n")
+    sys.stderr.flush()
+
     logger = logging.getLogger(__name__)
     logger.info(f"BACKGROUND_TASK: Starting analysis {analysis_id} with timeout mechanism")
     logger.info(f"BACKGROUND_TASK: GitHub/Slack params - include_github: {include_github}, include_slack: {include_slack}")
