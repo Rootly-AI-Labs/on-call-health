@@ -1008,13 +1008,15 @@ export default function IntegrationsPage() {
       const [rootlyResponse, pagerdutyResponse, githubResponse, slackResponse] = await Promise.all([
         fetchWithTimeout(`${API_BASE}/rootly/integrations`, {
           headers: { 'Authorization': `Bearer ${authToken}` }
-        }).catch(() => {
-          return { ok: false }
+        }).catch((error) => {
+          console.error('Rootly API request failed:', error.message)
+          return { ok: false, error: error.message }
         }),
         fetchWithTimeout(`${API_BASE}/pagerduty/integrations`, {
           headers: { 'Authorization': `Bearer ${authToken}` }
-        }).catch(() => {
-          return { ok: false }
+        }).catch((error) => {
+          console.error('PagerDuty API request failed:', error.message)
+          return { ok: false, error: error.message }
         }),
         fetchWithTimeout(`${API_BASE}/integrations/github/status`, {
           headers: { 'Authorization': `Bearer ${authToken}` }
@@ -1032,6 +1034,11 @@ export default function IntegrationsPage() {
       const pagerdutyData = (pagerdutyResponse as any).ok && (pagerdutyResponse as Response).json ? await (pagerdutyResponse as Response).json() : { integrations: [] }
       const githubData = (githubResponse as any).ok && (githubResponse as Response).json ? await (githubResponse as Response).json() : { connected: false, integration: null }
       const slackData = (slackResponse as any).ok && (slackResponse as Response).json ? await (slackResponse as Response).json() : { integration: null }
+
+      console.log('API responses:', {
+        rootly: { ok: (rootlyResponse as any).ok, error: (rootlyResponse as any).error, dataCount: rootlyData.integrations?.length || 0 },
+        pagerduty: { ok: (pagerdutyResponse as any).ok, error: (pagerdutyResponse as any).error, dataCount: pagerdutyData.integrations?.length || 0 }
+      })
 
       const rootlyIntegrations = (rootlyData.integrations || []).map((i: Integration) => ({ ...i, platform: 'rootly' }))
       const pagerdutyIntegrations = (pagerdutyData.integrations || []).map((i: Integration) => ({ ...i, platform: 'pagerduty' }))
