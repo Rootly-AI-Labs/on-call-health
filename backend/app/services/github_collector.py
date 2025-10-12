@@ -180,10 +180,12 @@ class GitHubCollector:
         Returns:
             GitHub username if found, None otherwise
         """
+        logger.info(f"🔍 [SYNCED_MEMBERS] Checking for email: {email}, user_id: {user_id}")
+
         try:
             database_url = os.getenv('DATABASE_URL')
             if not database_url:
-                logger.warning("DATABASE_URL not set, cannot check synced members")
+                logger.warning("🔍 [SYNCED_MEMBERS] DATABASE_URL not set, cannot check synced members")
                 return None
 
             engine = create_engine(database_url)
@@ -200,6 +202,7 @@ class GitHubCollector:
                 LIMIT 1
             """
 
+            logger.info(f"🔍 [SYNCED_MEMBERS] Executing query for user_id={user_id}, email={email}")
             result = conn.execute(
                 text(query),
                 {'user_id': user_id, 'email': email}
@@ -209,14 +212,14 @@ class GitHubCollector:
 
             if row:
                 username = row[0]
-                logger.info(f"Found synced GitHub member: {email} -> {username}")
+                logger.info(f"✅ [SYNCED_MEMBERS] Found synced GitHub member: {email} -> {username}")
                 return username
             else:
-                logger.debug(f"No synced GitHub member found for {email}")
+                logger.info(f"❌ [SYNCED_MEMBERS] No synced GitHub member found for {email}")
                 return None
 
         except Exception as e:
-            logger.error(f"Error checking synced members: {e}")
+            logger.error(f"❌ [SYNCED_MEMBERS] Error checking synced members for {email}: {e}")
             return None
 
     async def _build_email_mapping(self, token: str) -> Dict[str, str]:
@@ -323,19 +326,22 @@ class GitHubCollector:
         
     async def _fetch_real_github_data(self, username: str, email: str, start_date: datetime, end_date: datetime, token: str) -> Dict:
         """Fetch real GitHub data using the GitHub API with enterprise resilience."""
-        
+
+        logger.info(f"🚀 [GITHUB_API] Starting real API fetch for {username} ({email})")
+        logger.info(f"🚀 [GITHUB_API] Date range: {start_date.date()} to {end_date.date()}")
+
         headers = {
             'Authorization': f'token {token}',
             'Accept': 'application/vnd.github.v3+json',
             'User-Agent': 'Rootly-Burnout-Detector'
         }
-        
+
         since_iso = start_date.isoformat()
         until_iso = end_date.isoformat()
-        
+
         # Fetch user info
         user_url = f"https://api.github.com/users/{username}"
-        
+
         try:
             # Phase 2.3: Use API manager for resilient GitHub API calls
             from .github_api_manager import github_api_manager
@@ -375,13 +381,17 @@ class GitHubCollector:
                             raise aiohttp.ClientError(f"GitHub API error for PRs: {resp.status}")
             
             # Execute with enterprise resilience patterns
+            logger.info(f"📡 [GITHUB_API] Fetching commits for {username}...")
             commits_data = await github_api_manager.safe_api_call(fetch_commits, max_retries=3)
             total_commits = commits_data.get('total_count', 0) if commits_data else 0
-            
+            logger.info(f"✅ [GITHUB_API] Commits fetched: {total_commits}")
+
+            logger.info(f"📡 [GITHUB_API] Fetching PRs for {username}...")
             prs_data = await github_api_manager.safe_api_call(fetch_prs, max_retries=3)
             total_prs = prs_data.get('total_count', 0) if prs_data else 0
-            
-            logger.info(f"📊 GitHub API calls completed - Commits: {total_commits}, PRs: {total_prs}")
+            logger.info(f"✅ [GITHUB_API] PRs fetched: {total_prs}")
+
+            logger.info(f"📊 [GITHUB_API] GitHub API calls completed for {username} - Commits: {total_commits}, PRs: {total_prs}")
             
             # For now, estimate other metrics based on commits/PRs
             # In a full implementation, we'd make additional API calls
@@ -577,36 +587,44 @@ class GitHubCollector:
     async def collect_github_data_for_user(self, user_email: str, days: int = 30, github_token: str = None, user_id: Optional[int] = None, full_name: Optional[str] = None) -> Optional[Dict]:
         """
         Collect GitHub activity data for a single user using email correlation.
-        
+
         Args:
             user_email: User's email to correlate with GitHub
             days: Number of days to analyze
             github_token: GitHub API token for authentication
             user_id: User ID for checking manual mappings
-            
+
         Returns:
             GitHub activity data or None if no correlation found
         """
+        logger.info(f"📊 [GITHUB_COLLECTION] Starting collection for email: {user_email}, user_id: {user_id}, days: {days}")
+        logger.info(f"📊 [GITHUB_COLLECTION] Token present: {bool(github_token)}, Full name: {full_name}")
+
         # Use email-based correlation to find GitHub username
         github_username = await self._correlate_email_to_github(user_email, github_token, user_id, full_name)
-        
+
         if not github_username:
-            logger.warning(f"No GitHub username found for email {user_email}")
+            logger.warning(f"❌ [GITHUB_COLLECTION] No GitHub username found for email {user_email}")
             return None
-            
-        logger.info(f"Collecting GitHub data for {github_username} ({user_email})")
-        
+
+        logger.info(f"✅ [GITHUB_COLLECTION] Found username: {github_username} for {user_email}")
+
         # Set up date range
         end_date = datetime.now()
         start_date = end_date - timedelta(days=days)
-        
+
         # Use real GitHub API if token provided
         if github_token:
-            logger.info(f"Using real GitHub API for {github_username} with token: {github_token[:10]}...")
-            return await self._fetch_real_github_data(github_username, user_email, start_date, end_date, github_token)
+            logger.info(f"🔑 [GITHUB_COLLECTION] Using real GitHub API for {github_username} with token: {github_token[:10]}...")
+            result = await self._fetch_real_github_data(github_username, user_email, start_date, end_date, github_token)
+            if result:
+                logger.info(f"✅ [GITHUB_COLLECTION] Successfully fetched data for {github_username}: {result.get('metrics', {}).get('total_commits', 0)} commits")
+            else:
+                logger.warning(f"❌ [GITHUB_COLLECTION] Failed to fetch data for {github_username}")
+            return result
         else:
             # No GitHub token available, use mock data for now
-            logger.warning(f"No GitHub token available for {github_username}, using mock data")
+            logger.warning(f"⚠️ [GITHUB_COLLECTION] No GitHub token available for {github_username}, using mock data")
             return self._generate_mock_github_data(github_username, user_email, start_date, end_date)
     
     def _generate_mock_github_data(self, username: str, email: str, start_date: datetime, end_date: datetime) -> Dict:
