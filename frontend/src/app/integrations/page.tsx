@@ -481,13 +481,13 @@ export default function IntegrationsPage() {
   useEffect(() => {
     // ✨ PHASE 1 OPTIMIZATION: Re-enabled with API endpoint fixes
     loadAllIntegrationsOptimized()
-    
+
     // 🚨 ROLLBACK: Individual loading functions (fallback disabled)
     // loadRootlyIntegrations()
-    // loadPagerDutyIntegrations() 
+    // loadPagerDutyIntegrations()
     // loadGitHubIntegration()
     // loadSlackIntegration()
-    loadLlmConfig()
+    // loadLlmConfig() // Disabled - AI is always enabled with system token
     
     // Load saved organization preference
     const savedOrg = localStorage.getItem('selected_organization')
