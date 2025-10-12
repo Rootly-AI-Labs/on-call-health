@@ -445,6 +445,7 @@ class UnifiedBurnoutAnalyzer:
                             logger.error(f"❌ Slack collection failed: {e}")
             
             # Analyze team burnout
+            team_analysis_start = datetime.now()
             try:
                 team_analysis = self._analyze_team_data(
                     users,
@@ -454,6 +455,7 @@ class UnifiedBurnoutAnalyzer:
                     github_data,
                     slack_data
                 )
+                team_analysis_duration = (datetime.now() - team_analysis_start).total_seconds()
             except Exception as e:
                 logger.error(f"❌ Team analysis failed: {e}")
                 logger.error(f"🔍 BURNOUT ANALYSIS: Users data - type: {type(users)}, length: {len(users) if users else 'N/A'}")
