@@ -419,7 +419,8 @@ class UnifiedBurnoutAnalyzer:
                     logger.warning(f"   - Check if {self.platform} data structure matches expectation")
                 
                 # Skip GitHub/Slack for large teams to prevent timeout
-                max_team_size = 20
+                # Increased limit since we now use synced members (fast lookups) instead of API discovery
+                max_team_size = 100
                 if len(team_emails) > max_team_size:
                     logger.warning(f"⚠️ Team size ({len(team_emails)}) exceeds limit ({max_team_size}), skipping GitHub/Slack to prevent timeout")
                 else:
