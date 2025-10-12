@@ -1041,8 +1041,19 @@ export default function IntegrationsPage() {
       console.log('Main API load fetched:', {
         rootlyCount: rootlyIntegrations.length,
         pagerdutyCount: pagerdutyIntegrations.length,
-        total: allIntegrations.length
+        total: allIntegrations.length,
+        rootlyOk: (rootlyResponse as any).ok,
+        pagerdutyOk: (pagerdutyResponse as any).ok
       })
+
+      // Don't overwrite existing good data with empty responses from failed requests
+      // Only update if we got successful responses OR if we currently have no data
+      const shouldUpdate = (rootlyResponse as any).ok || (pagerdutyResponse as any).ok || integrations.length === 0
+
+      if (!shouldUpdate) {
+        console.warn('Skipping main API update - both requests failed and we have existing data')
+        return
+      }
 
       setIntegrations(allIntegrations)
       setGithubIntegration(githubData.connected ? githubData.integration : null)
