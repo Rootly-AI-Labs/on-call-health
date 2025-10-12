@@ -2613,6 +2613,7 @@ async def run_analysis_task(
             logger.info(f"BACKGROUND_TASK: Calling UnifiedBurnoutAnalyzer.analyze_burnout()")
             logger.info(f"BACKGROUND_TASK: Analysis parameters - time_range_days={time_range}, include_weekends={include_weekends}, user_id={user_id}, analysis_id={analysis_id}")
 
+            logger.info(f"⏳ Analysis {analysis_id}: Starting analyze_burnout()")
             try:
                 results = await asyncio.wait_for(
                     analyzer_service.analyze_burnout(
@@ -2623,11 +2624,10 @@ async def run_analysis_task(
                     ),
                     timeout=900.0  # 15 minutes timeout
                 )
+                logger.info(f"✅ Analysis {analysis_id}: analyze_burnout() completed")
             except Exception as analyze_error:
                 logger.error(f"❌ Analysis {analysis_id} failed: {str(analyze_error)}")
                 raise
-
-            logger.info(f"BACKGROUND_TASK: Analysis execution completed at {datetime.now()}")
 
             # Check if analysis was deleted during execution
             analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
@@ -2665,15 +2665,17 @@ async def run_analysis_task(
                 logger.warning(f"A/B testing monitoring failed: {monitoring_error}")
             
             # Update analysis with results
+            logger.info(f"💾 Analysis {analysis_id}: Saving results to database")
             analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
             if analysis:
                 analysis.status = "completed"
                 analysis.results = results
                 analysis.completed_at = datetime.now()
+                logger.info(f"💾 Analysis {analysis_id}: Committing to database")
                 db.commit()
-                logger.info(f"BACKGROUND_TASK: Successfully saved results for analysis {analysis_id}")
+                logger.info(f"✅ Analysis {analysis_id}: Successfully saved and committed")
             else:
-                logger.error(f"BACKGROUND_TASK: Analysis {analysis_id} not found when trying to save results")
+                logger.error(f"❌ Analysis {analysis_id}: Not found when trying to save results")
                 
         except asyncio.TimeoutError:
             # Handle timeout
