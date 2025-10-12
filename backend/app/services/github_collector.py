@@ -53,14 +53,21 @@ class GitHubCollector:
             return None
 
         try:
-            # FIRST: Check manual mappings from user_mappings table (highest priority)
+            # FIRST: Check user_correlations table for synced members (from "Sync Members" feature)
+            if user_id:
+                synced_username = await self._check_synced_members(email, user_id)
+                if synced_username:
+                    logger.info(f"Found GitHub correlation via SYNCED MEMBER: {email} -> {synced_username}")
+                    return synced_username
+
+            # SECOND: Check manual mappings from user_mappings table
             if user_id:
                 manual_username = await self._check_manual_mappings(email, user_id)
                 if manual_username:
                     logger.info(f"Found GitHub correlation via MANUAL mapping: {email} -> {manual_username}")
                     return manual_username
 
-            # SECOND: Use enhanced matching algorithm with name-based fallback
+            # THIRD: Use enhanced matching algorithm with name-based fallback
             try:
                 from .enhanced_github_matcher import EnhancedGitHubMatcher
                 matcher = EnhancedGitHubMatcher(token, self.organizations)
@@ -161,7 +168,57 @@ class GitHubCollector:
         except Exception as e:
             logger.error(f"Error checking manual mappings: {e}")
             return None
-    
+
+    async def _check_synced_members(self, email: str, user_id: int) -> Optional[str]:
+        """
+        Check user_correlations table for synced GitHub usernames (from Sync Members feature).
+
+        Args:
+            email: The email address to look up
+            user_id: The user ID who owns the correlations
+
+        Returns:
+            GitHub username if found, None otherwise
+        """
+        try:
+            database_url = os.getenv('DATABASE_URL')
+            if not database_url:
+                logger.warning("DATABASE_URL not set, cannot check synced members")
+                return None
+
+            engine = create_engine(database_url)
+            conn = engine.connect()
+
+            # Query for synced member - match by email
+            query = """
+                SELECT github_username
+                FROM user_correlations
+                WHERE user_id = :user_id
+                  AND email = :email
+                  AND github_username IS NOT NULL
+                  AND github_username != ''
+                LIMIT 1
+            """
+
+            result = conn.execute(
+                text(query),
+                {'user_id': user_id, 'email': email}
+            )
+            row = result.fetchone()
+            conn.close()
+
+            if row:
+                username = row[0]
+                logger.info(f"Found synced GitHub member: {email} -> {username}")
+                return username
+            else:
+                logger.debug(f"No synced GitHub member found for {email}")
+                return None
+
+        except Exception as e:
+            logger.error(f"Error checking synced members: {e}")
+            return None
+
     async def _build_email_mapping(self, token: str) -> Dict[str, str]:
         """
         Build mapping of email addresses to GitHub usernames by discovering org members
