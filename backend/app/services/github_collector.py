@@ -54,64 +54,24 @@ class GitHubCollector:
 
         try:
             # FIRST: Check user_correlations table for synced members (from "Sync Members" feature)
-            if user_id:
-                synced_username = await self._check_synced_members(email, user_id)
-                if synced_username:
-                    logger.info(f"Found GitHub correlation via SYNCED MEMBER: {email} -> {synced_username}")
-                    return synced_username
+            synced_username = await self._check_synced_members(email, user_id)
+            if synced_username:
+                logger.info(f"Found GitHub correlation via SYNCED MEMBER: {email} -> {synced_username}")
+                return synced_username
 
-            # SECOND: Check manual mappings from user_mappings table
+            # SECOND: Check manual mappings from user_mappings table (mapping drawer)
             if user_id:
                 manual_username = await self._check_manual_mappings(email, user_id)
                 if manual_username:
                     logger.info(f"Found GitHub correlation via MANUAL mapping: {email} -> {manual_username}")
                     return manual_username
 
-            # THIRD: Use enhanced matching algorithm with name-based fallback
-            try:
-                from .enhanced_github_matcher import EnhancedGitHubMatcher
-                matcher = EnhancedGitHubMatcher(token, self.organizations)
-                
-                # Try email-based matching first
-                username = await matcher.match_email_to_github(email, full_name)
-                if username:
-                    logger.info(f"Found GitHub correlation via ENHANCED email matching: {email} -> {username}")
-                    return username
-                
-                # If email matching failed and we have a name, try name-based matching
-                if not username and full_name:
-                    logger.info(f"Email matching failed for {email}, trying name-based matching for '{full_name}'")
-                    username = await matcher.match_name_to_github(full_name, fallback_email=email)
-                    if username:
-                        logger.info(f"Found GitHub correlation via ENHANCED name matching: '{full_name}' -> {username}")
-                        return username
-                
-            except Exception as e:
-                logger.warning(f"Enhanced matcher failed, falling back to legacy: {e}")
-                # Don't continue with expensive legacy approaches during analysis
-                logger.info(f"Skipping legacy approaches to improve analysis performance for {email}")
-                return None
-            
-            # OPTIMIZATION: Skip expensive legacy email mapping cache during analysis
-            logger.info(f"Skipping expensive legacy email mapping cache to improve analysis performance")
+            # IMPORTANT: No fallback matching during analysis!
+            # All GitHub username correlations should be done via "Sync Members" on integrations page.
+            # This keeps analysis fast and predictable.
+            logger.info(f"⚠️ No synced GitHub username found for {email}. Use 'Sync Members' to add GitHub usernames.")
             return None
-            
-            # FOURTH: Legacy approach - build email mapping if not cached (DISABLED for performance)
-            if False and self._email_mapping_cache is None:
-                logger.info("Building email mapping cache from GitHub API")
-                self._email_mapping_cache = await self._build_email_mapping(token)
-                
-            # Look up the email (case insensitive)
-            email_lower = email.lower()
-            username = self._email_mapping_cache.get(email_lower)
-            
-            if username:
-                logger.info(f"Found GitHub correlation via discovered mapping: {email} -> {username}")
-                return username
-            else:
-                logger.warning(f"No GitHub correlation found for {email}")
-                return None
-            
+
         except Exception as e:
             logger.error(f"Error correlating email {email} to GitHub: {e}")
             return None
