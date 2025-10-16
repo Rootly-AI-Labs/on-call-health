@@ -191,21 +191,21 @@ class GitHubCollector:
             engine = create_engine(database_url)
             conn = engine.connect()
 
-            # Query for synced member - match by email
+            # Query for synced member - match by email only (don't filter by user_id)
+            # This allows synced members to be shared across the organization
             query = """
                 SELECT github_username
                 FROM user_correlations
-                WHERE user_id = :user_id
-                  AND email = :email
+                WHERE email = :email
                   AND github_username IS NOT NULL
                   AND github_username != ''
                 LIMIT 1
             """
 
-            logger.info(f"🔍 [SYNCED_MEMBERS] Executing query for user_id={user_id}, email={email}")
+            logger.info(f"🔍 [SYNCED_MEMBERS] Executing query for email={email} (organization-wide)")
             result = conn.execute(
                 text(query),
-                {'user_id': user_id, 'email': email}
+                {'email': email}
             )
             row = result.fetchone()
             conn.close()
