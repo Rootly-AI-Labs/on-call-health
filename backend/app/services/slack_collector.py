@@ -105,21 +105,22 @@ class SlackCollector:
         """
         Correlate a user identifier (email or name) to a Slack user ID.
 
-        Strategy priority:
+        Strategy:
         1. Query UserCorrelation table for synced Slack IDs (from "Sync Members" feature)
-        2. For names, return name for bot message matching
-        3. Check hardcoded mappings (legacy fallback)
-        4. Try API discovery if token available
+
+        IMPORTANT: No fallback matching during analysis!
+        All Slack user correlations should be done via "Sync Members" on integrations page.
+        This keeps analysis fast and predictable.
 
         Args:
             user_identifier: Email or name to correlate
-            token: Slack API token
+            token: Slack API token (not used during analysis)
             is_name: True if user_identifier is a name, False if email
             user_id: User ID for querying UserCorrelation table
         """
-        logger.info(f"Slack correlation attempt for {user_identifier} (is_name: {is_name}), token={'present' if token else 'missing'}, user_id={user_id}")
+        logger.info(f"🔍 [SLACK_CORRELATION] Checking synced members for {user_identifier} (is_name: {is_name}), user_id={user_id}")
 
-        # PRIORITY 1: Check UserCorrelation table for synced Slack IDs
+        # Check UserCorrelation table for synced Slack IDs
         # Query by name/email WITHOUT user_id filter for cross-user lookups
         try:
             from ..models import SessionLocal, UserCorrelation
@@ -139,27 +140,19 @@ class SlackCollector:
                     ).first()
 
                 if correlation and correlation.slack_user_id:
-                    logger.info(f"✅ Found Slack ID via UserCorrelation (synced): {user_identifier} -> {correlation.slack_user_id}")
+                    logger.info(f"✅ [SLACK_CORRELATION] Found synced Slack member: {user_identifier} -> {correlation.slack_user_id}")
                     return correlation.slack_user_id
                 else:
-                    logger.info(f"No synced Slack ID found in UserCorrelation for {user_identifier}")
+                    logger.info(f"⚠️ [SLACK_CORRELATION] No synced Slack member found for {user_identifier}. Use 'Sync Members' to add Slack users.")
             finally:
                 db.close()
         except Exception as e:
-            logger.warning(f"Error querying UserCorrelation for Slack ID: {e}")
+            logger.warning(f"❌ [SLACK_CORRELATION] Error querying UserCorrelation for Slack ID: {e}")
 
-        # PRIORITY 2: Try API-based discovery if token available
-        if token:
-            try:
-                logger.info(f"Attempting Slack API discovery for {user_identifier}")
-                slack_user_id = await self._discover_slack_user_by_email(user_identifier, token)
-                if slack_user_id:
-                    logger.info(f"Found Slack correlation via API: {user_identifier} -> {slack_user_id}")
-                    return slack_user_id
-            except Exception as e:
-                logger.error(f"Error discovering Slack user via API for {user_identifier}: {e}")
-
-        logger.warning(f"❌ No Slack correlation found for {user_identifier}")
+        # IMPORTANT: No fallback matching during analysis!
+        # All Slack username correlations should be done via "Sync Members" on integrations page.
+        # This keeps analysis fast and predictable.
+        logger.info(f"⚠️ No synced Slack user found for {user_identifier}. Use 'Sync Members' to add Slack users.")
         return None
 
     async def _correlate_email_to_slack(self, email: str, token: str = None) -> Optional[str]:
