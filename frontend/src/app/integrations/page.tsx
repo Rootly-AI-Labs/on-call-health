@@ -2155,6 +2155,7 @@ export default function IntegrationsPage() {
                   </div>
                   <Button
                     onClick={() => {
+                      setLoadingSyncedUsers(true)
                       setTeamMembersDrawerOpen(true)
                       fetchSyncedUsers(false, false)
                     }}
