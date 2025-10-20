@@ -118,8 +118,6 @@ class SlackCollector:
             is_name: True if user_identifier is a name, False if email
             user_id: User ID for querying UserCorrelation table
         """
-        logger.info(f"🔍 [SLACK_CORRELATION] Checking synced members for {user_identifier} (is_name: {is_name}), user_id={user_id}")
-
         # Check UserCorrelation table for synced Slack IDs
         # Query by name/email WITHOUT user_id filter for cross-user lookups
         try:
@@ -140,14 +138,14 @@ class SlackCollector:
                     ).first()
 
                 if correlation and correlation.slack_user_id:
-                    logger.info(f"✅ [SLACK_CORRELATION] Found synced Slack member: {user_identifier} -> {correlation.slack_user_id}")
+                    logger.info(f"✅ Found synced Slack member: {user_identifier} -> {correlation.slack_user_id}")
                     return correlation.slack_user_id
                 else:
-                    logger.info(f"⚠️ [SLACK_CORRELATION] No synced Slack member found for {user_identifier}. Use 'Sync Members' to add Slack users.")
+                    return None
             finally:
                 db.close()
         except Exception as e:
-            logger.warning(f"❌ [SLACK_CORRELATION] Error querying UserCorrelation for Slack ID: {e}")
+            logger.warning(f"Error querying UserCorrelation for Slack ID: {e}")
 
         # IMPORTANT: No fallback matching during analysis!
         # All Slack username correlations should be done via "Sync Members" on integrations page.

@@ -916,17 +916,9 @@ export default function IntegrationsPage() {
       const pagerdutyIntegrations = (pagerdutyData.integrations || []).map((i: any) => ({ ...i, platform: 'pagerduty' }))
       const allIntegrations = [...rootlyIntegrations, ...pagerdutyIntegrations]
 
-      console.log('Background refresh fetched:', {
-        rootlyCount: rootlyIntegrations.length,
-        pagerdutyCount: pagerdutyIntegrations.length,
-        total: allIntegrations.length,
-        rootlyOk: rootlyResponse.ok,
-        pagerdutyOk: pagerdutyResponse.ok
-      })
-
       // Only skip update if requests failed - otherwise update even if empty (which is valid)
       if (!rootlyResponse.ok && !pagerdutyResponse.ok) {
-        console.warn('Skipping background refresh - both API requests failed')
+        // Both requests failed, keep existing data
       } else {
         setIntegrations(allIntegrations)
         setGithubIntegration(githubData.connected ? githubData.integration : null)
@@ -986,7 +978,6 @@ export default function IntegrationsPage() {
   const loadAllIntegrationsAPI = async () => {
     // Prevent concurrent calls using a ref (not state, since state starts as true)
     if (isLoadingRef.current) {
-      console.log('Skipping API call - already loading')
       return
     }
 
@@ -1045,30 +1036,16 @@ export default function IntegrationsPage() {
       const githubData = (githubResponse as any).ok && (githubResponse as Response).json ? await (githubResponse as Response).json() : { connected: false, integration: null }
       const slackData = (slackResponse as any).ok && (slackResponse as Response).json ? await (slackResponse as Response).json() : { integration: null }
 
-      console.log('API responses:', {
-        rootly: { ok: (rootlyResponse as any).ok, error: (rootlyResponse as any).error, dataCount: rootlyData.integrations?.length || 0 },
-        pagerduty: { ok: (pagerdutyResponse as any).ok, error: (pagerdutyResponse as any).error, dataCount: pagerdutyData.integrations?.length || 0 }
-      })
-
       const rootlyIntegrations = (rootlyData.integrations || []).map((i: Integration) => ({ ...i, platform: 'rootly' }))
       const pagerdutyIntegrations = (pagerdutyData.integrations || []).map((i: Integration) => ({ ...i, platform: 'pagerduty' }))
 
       const allIntegrations = [...rootlyIntegrations, ...pagerdutyIntegrations]
-
-      console.log('Main API load fetched:', {
-        rootlyCount: rootlyIntegrations.length,
-        pagerdutyCount: pagerdutyIntegrations.length,
-        total: allIntegrations.length,
-        rootlyOk: (rootlyResponse as any).ok,
-        pagerdutyOk: (pagerdutyResponse as any).ok
-      })
 
       // Don't overwrite existing good data with empty responses from failed requests
       // Only update if we got successful responses OR if we currently have no data
       const shouldUpdate = (rootlyResponse as any).ok || (pagerdutyResponse as any).ok || integrations.length === 0
 
       if (!shouldUpdate) {
-        console.warn('Skipping main API update - both requests failed and we have existing data')
         isLoadingRef.current = false
         setLoadingRootly(false)
         setLoadingPagerDuty(false)
@@ -1442,16 +1419,6 @@ export default function IntegrationsPage() {
 
   const rootlyCount = integrations.filter(i => i.platform === 'rootly').length
   const pagerdutyCount = integrations.filter(i => i.platform === 'pagerduty').length
-
-  // Debug logging
-  console.log('Integrations page state:', {
-    integrationsCount: integrations.length,
-    filteredCount: filteredIntegrations.length,
-    activeTab,
-    rootlyCount,
-    pagerdutyCount,
-    integrations: integrations.map(i => ({ id: i.id, name: i.name, platform: i.platform }))
-  })
 
   // Helper booleans to distinguish between Slack Survey (OAuth) and Enhanced Integration (webhook/token)
   // Note: Backend returns ONE integration at a time - either OAuth or manual, not both simultaneously
