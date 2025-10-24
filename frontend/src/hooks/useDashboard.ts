@@ -300,11 +300,9 @@ export default function useDashboard() {
             }
         })
 
-        // Wait for React state updates to complete before marking as loaded
-        // Increased delay to ensure currentAnalysis is set after loadPreviousAnalyses completes
-        setTimeout(() => {
-          setInitialDataLoaded(true)
-        }, 1500)
+        // Mark as loaded - the data is ready even if currentAnalysis isn't set yet
+        // The UI will update when currentAnalysis is set in the next render
+        setInitialDataLoaded(true)
       } catch (error) {
         // Always set to true to prevent endless loading, even if some data fails
         setInitialDataLoaded(true)
@@ -429,7 +427,7 @@ export default function useDashboard() {
     fetchPlatformMappings()
   }, [])
 
-  const loadPreviousAnalyses = async (append = false) => {
+  const loadPreviousAnalyses = async (append = false): Promise<boolean> => {
     // CRITICAL: Set loading state FIRST before any async operations
     if (append) {
       setLoadingMoreAnalyses(true)
@@ -438,7 +436,7 @@ export default function useDashboard() {
     try {
       const authToken = localStorage.getItem('auth_token')
       if (!authToken) {
-        return
+        return false
       }
 
       let response
@@ -492,11 +490,6 @@ export default function useDashboard() {
         setTotalAnalysesCount(data.total || newAnalyses.length)
         setHasMoreAnalyses(newAnalyses.length === 3 && (!data.total || previousAnalyses.length + newAnalyses.length < data.total))
 
-        // If this is the initial load (not append) and we got an empty array, ensure initial data is marked as loaded
-        if (!append && newAnalyses.length === 0) {
-          setTimeout(() => setInitialDataLoaded(true), 50)
-        }
-
         // If no specific analysis is loaded and we have analyses, load the most recent one (only for initial load)
         if (!append) {
           const urlParams = new URLSearchParams(window.location.search)
@@ -508,6 +501,8 @@ export default function useDashboard() {
             // Platform mappings will be fetched by the dedicated useEffect
           }
         }
+
+        return newAnalyses.length > 0
       } else {
         // Handle API errors (401, 404, 500, etc.)
         let errorText = 'Unknown error'
@@ -526,6 +521,7 @@ export default function useDashboard() {
         } else {
           toast.error("Failed to load analyses")
         }
+        return false
       }
     } catch (error) {
       console.error('Unexpected error in loadPreviousAnalyses:', error)
@@ -544,6 +540,7 @@ export default function useDashboard() {
       } else {
         toast.error("Error loading analyses")
       }
+      return false
     } finally {
       // CRITICAL: ALWAYS reset loading state in finally block
       if (append) {
