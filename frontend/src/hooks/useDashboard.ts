@@ -292,7 +292,7 @@ export default function useDashboard() {
           loadPreviousAnalyses(),
           loadIntegrations(false, false) // Don't force refresh, don't show global loading
         ])
-        
+
         // Log any failures but don't block the UI
         results.forEach((result, index) => {
           const functionNames = ['loadPreviousAnalyses', 'loadIntegrations']
@@ -300,10 +300,11 @@ export default function useDashboard() {
             }
         })
 
-        // Longer delay to ensure state updates have propagated and currentAnalysis is set
+        // Wait for React state updates to complete before marking as loaded
+        // Increased delay to ensure currentAnalysis is set after loadPreviousAnalyses completes
         setTimeout(() => {
           setInitialDataLoaded(true)
-        }, 500)
+        }, 1500)
       } catch (error) {
         // Always set to true to prevent endless loading, even if some data fails
         setInitialDataLoaded(true)
