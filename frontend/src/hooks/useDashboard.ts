@@ -275,7 +275,7 @@ export default function useDashboard() {
       }
     }
     document.addEventListener('visibilitychange', visibilityHandler)
-    
+
     const loadInitialData = async () => {
       try {
         // If we already have cached data, mark as loaded immediately
@@ -283,7 +283,10 @@ export default function useDashboard() {
           setInitialDataLoaded(true)
           return
         }
-        
+
+        // Set loading state to prevent "Setup Required" from flashing
+        setLoadingIntegrations(true)
+
         // Load data with individual error handling to prevent blocking
         const results = await Promise.allSettled([
           loadPreviousAnalyses(),
@@ -296,11 +299,11 @@ export default function useDashboard() {
           if (result.status === 'rejected') {
             }
         })
-        
-        // Small delay to ensure state updates have propagated
+
+        // Longer delay to ensure state updates have propagated and currentAnalysis is set
         setTimeout(() => {
           setInitialDataLoaded(true)
-        }, 100)
+        }, 500)
       } catch (error) {
         // Always set to true to prevent endless loading, even if some data fails
         setInitialDataLoaded(true)

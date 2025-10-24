@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 
@@ -9,8 +9,13 @@ export default function AuthSuccessPage() {
   const router = useRouter()
   const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing')
   const [error, setError] = useState<string | null>(null)
+  const hasAttemptedAuth = useRef(false)
 
   useEffect(() => {
+    // Prevent double execution in React Strict Mode
+    if (hasAttemptedAuth.current) return
+    hasAttemptedAuth.current = true
+
     // ✅ ENTERPRISE PATTERN: 2-Step Server-Side Token Exchange
     const authenticateUser = async () => {
       try {
