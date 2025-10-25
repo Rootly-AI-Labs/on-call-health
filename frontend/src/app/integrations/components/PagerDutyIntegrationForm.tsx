@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"
@@ -37,6 +37,15 @@ export function PagerDutyIntegrationForm({
 }: PagerDutyIntegrationFormProps) {
   const [showInstructions, setShowInstructions] = useState(false)
   const [showToken, setShowToken] = useState(false)
+
+  const tokenValue = form.watch('pagerdutyToken')
+
+  // Auto-validate token when it's fully entered and valid format
+  useEffect(() => {
+    if (tokenValue && isValidToken(tokenValue) && connectionStatus === 'idle') {
+      onTest('pagerduty', tokenValue)
+    }
+  }, [tokenValue])
 
   return (
     <Card className="border-green-200 max-w-2xl mx-auto">
@@ -82,7 +91,7 @@ export function PagerDutyIntegrationForm({
 
         {/* Form */}
         <Form {...form}>
-          <form onSubmit={form.handleSubmit((data) => onTest('pagerduty', data.pagerdutyToken))} className="space-y-4">
+          <form onSubmit={form.handleSubmit(() => {})} className="space-y-4">
             <FormField
               control={form.control}
               name="pagerdutyToken"
@@ -137,6 +146,16 @@ export function PagerDutyIntegrationForm({
               )}
             />
 
+            {/* Validating Status */}
+            {isTestingConnection && (
+              <Alert className="border-green-200 bg-green-50">
+                <Loader2 className="h-4 w-4 text-green-600 animate-spin" />
+                <AlertDescription className="text-green-800">
+                  Validating token and checking permissions...
+                </AlertDescription>
+              </Alert>
+            )}
+
             {/* Connection Status */}
             {connectionStatus === 'success' && previewData && (
               <>
@@ -145,7 +164,6 @@ export function PagerDutyIntegrationForm({
                   <AlertDescription className="text-green-800">
                     <div className="space-y-2">
                       <p className="font-semibold">✅ Token validated!</p>
-                      <p className="text-sm text-green-700">Ready to add this PagerDuty integration to your dashboard.</p>
                       <div className="space-y-1 text-sm">
                         <p><span className="font-medium">Organization:</span> {previewData.organization_name}</p>
                         <p><span className="font-medium">Users:</span> {previewData.total_users}</p>
@@ -154,24 +172,26 @@ export function PagerDutyIntegrationForm({
                   </AlertDescription>
                 </Alert>
 
-                <FormField
-                  control={form.control}
-                  name="nickname"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Integration Name (optional)</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          placeholder={previewData.suggested_name || previewData.organization_name}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        Give this integration a custom name
-                      </FormDescription>
-                    </FormItem>
-                  )}
-                />
+                {previewData.can_add && (
+                  <FormField
+                    control={form.control}
+                    name="nickname"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Integration Name (optional)</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            placeholder={previewData.suggested_name || previewData.organization_name}
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Give this integration a custom name
+                        </FormDescription>
+                      </FormItem>
+                    )}
+                  />
+                )}
               </>
             )}
 
@@ -193,46 +213,26 @@ export function PagerDutyIntegrationForm({
               </Alert>
             )}
 
-            <div className="flex space-x-3">
+            {connectionStatus === 'success' && previewData?.can_add && (
               <Button
-                type="submit"
-                disabled={isTestingConnection || !isValidToken(form.watch('pagerdutyToken') || '')}
-                className="bg-green-600 hover:bg-green-700"
+                type="button"
+                onClick={onAdd}
+                disabled={isAdding}
+                className="bg-green-600 hover:bg-green-700 w-full"
               >
-                {isTestingConnection ? (
+                {isAdding ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Testing Connection...
+                    Adding Integration...
                   </>
                 ) : (
                   <>
-                    <Shield className="w-4 h-4 mr-2" />
-                    Test Connection
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Integration
                   </>
                 )}
               </Button>
-
-              {connectionStatus === 'success' && previewData?.can_add && (
-                <Button
-                  type="button"
-                  onClick={onAdd}
-                  disabled={isAdding}
-                  className="bg-green-600 hover:bg-green-700"
-                >
-                  {isAdding ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Adding...
-                    </>
-                  ) : (
-                    <>
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Integration
-                    </>
-                  )}
-                </Button>
-              )}
-            </div>
+            )}
           </form>
         </Form>
       </CardContent>

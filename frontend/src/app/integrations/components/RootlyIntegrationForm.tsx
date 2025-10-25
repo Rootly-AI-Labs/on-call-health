@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Image from "next/image"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -38,6 +38,15 @@ export function RootlyIntegrationForm({
 }: RootlyIntegrationFormProps) {
   const [showInstructions, setShowInstructions] = useState(false)
   const [showToken, setShowToken] = useState(false)
+
+  const tokenValue = form.watch('rootlyToken')
+
+  // Auto-validate token when it's fully entered and valid format
+  useEffect(() => {
+    if (tokenValue && isValidToken(tokenValue) && connectionStatus === 'idle') {
+      onTest('rootly', tokenValue)
+    }
+  }, [tokenValue])
 
   return (
     <Card className="border-purple-200 max-w-2xl mx-auto">
@@ -84,7 +93,7 @@ export function RootlyIntegrationForm({
 
         {/* Form */}
         <Form {...form}>
-          <form onSubmit={form.handleSubmit((data) => onTest('rootly', data.rootlyToken))} className="space-y-4">
+          <form onSubmit={form.handleSubmit(() => {})} className="space-y-4">
             <FormField
               control={form.control}
               name="rootlyToken"
@@ -139,75 +148,72 @@ export function RootlyIntegrationForm({
               )}
             />
 
+            {/* Validating Status */}
+            {isTestingConnection && (
+              <Alert className="border-purple-200 bg-purple-50">
+                <Loader2 className="h-4 w-4 text-purple-600 animate-spin" />
+                <AlertDescription className="text-purple-800">
+                  Validating token and checking permissions...
+                </AlertDescription>
+              </Alert>
+            )}
+
             {/* Connection Status */}
             {connectionStatus === 'success' && previewData && (
               <>
-                <Alert className="border-purple-200 bg-purple-50">
-                  <CheckCircle className="h-4 w-4 text-purple-600" />
-                  <AlertDescription className="text-purple-800">
-                    <div className="space-y-2">
-                      <p className="font-semibold">✅ Token validated! Permissions verified.</p>
-                      <p className="text-sm text-purple-700">Ready to add this Rootly integration to your dashboard.</p>
-                      <div className="space-y-1 text-sm">
-                        <p><span className="font-medium">Organization:</span> {previewData.organization_name}</p>
-                        <p><span className="font-medium">Users:</span> {previewData.total_users}</p>
-                        {previewData.permissions && (
-                          <div className="mt-2">
-                            <p className="font-medium">Permissions:</p>
-                            <div className="grid grid-cols-2 gap-2 mt-1">
-                              <div className="flex items-center">
-                                {previewData.permissions.users?.access ? (
-                                  <CheckCircle className="w-3 h-3 text-green-600 mr-1" />
-                                ) : (
-                                  <AlertCircle className="w-3 h-3 text-red-600 mr-1" />
-                                )}
-                                <span className="text-xs">Users</span>
-                              </div>
-                              <div className="flex items-center">
-                                {previewData.permissions.incidents?.access ? (
-                                  <CheckCircle className="w-3 h-3 text-green-600 mr-1" />
-                                ) : (
-                                  <AlertCircle className="w-3 h-3 text-red-600 mr-1" />
-                                )}
-                                <span className="text-xs">Incidents</span>
-                              </div>
-                            </div>
-                            {(!previewData.permissions.users?.access || !previewData.permissions.incidents?.access) && (
-                              <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs">
-                                <p className="font-medium text-red-800">Missing permissions:</p>
-                                {!previewData.permissions.users?.access && (
-                                  <p className="text-red-700">• Users: {previewData.permissions.users?.error}</p>
-                                )}
-                                {!previewData.permissions.incidents?.access && (
-                                  <p className="text-red-700">• Incidents: {previewData.permissions.incidents?.error}</p>
-                                )}
-                              </div>
-                            )}
-                          </div>
+                {previewData.permissions?.users?.access && previewData.permissions?.incidents?.access ? (
+                  <Alert className="border-green-200 bg-green-50">
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <AlertDescription className="text-green-800">
+                      <div className="space-y-2">
+                        <p className="font-semibold">✅ Token validated! Permissions verified.</p>
+                        <div className="space-y-1 text-sm">
+                          <p><span className="font-medium">Organization:</span> {previewData.organization_name}</p>
+                          <p><span className="font-medium">Users:</span> {previewData.total_users}</p>
+                        </div>
+                      </div>
+                    </AlertDescription>
+                  </Alert>
+                ) : (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      <p className="font-semibold mb-2">❌ Missing required permissions</p>
+                      <p className="text-sm mb-2">This token does not have the required permissions to analyze burnout data.</p>
+                      <div className="mt-2 text-sm space-y-1">
+                        <p className="font-medium">Required permissions:</p>
+                        {!previewData.permissions?.users?.access && (
+                          <p>• <strong>Users:</strong> {previewData.permissions?.users?.error || "Read access required"}</p>
+                        )}
+                        {!previewData.permissions?.incidents?.access && (
+                          <p>• <strong>Incidents:</strong> {previewData.permissions?.incidents?.error || "Read access required"}</p>
                         )}
                       </div>
-                    </div>
-                  </AlertDescription>
-                </Alert>
+                      <p className="text-sm mt-2">Please create a new API token with the required permissions and try again.</p>
+                    </AlertDescription>
+                  </Alert>
+                )}
 
-                <FormField
-                  control={form.control}
-                  name="nickname"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Integration Name (optional)</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          placeholder={previewData.suggested_name || previewData.organization_name}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        Give this integration a custom name
-                      </FormDescription>
-                    </FormItem>
-                  )}
-                />
+                {previewData.can_add && previewData.permissions?.users?.access && previewData.permissions?.incidents?.access && (
+                  <FormField
+                    control={form.control}
+                    name="nickname"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Integration Name (optional)</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            placeholder={previewData.suggested_name || previewData.organization_name}
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Give this integration a custom name
+                        </FormDescription>
+                      </FormItem>
+                    )}
+                  />
+                )}
               </>
             )}
 
@@ -229,46 +235,26 @@ export function RootlyIntegrationForm({
               </Alert>
             )}
 
-            <div className="flex space-x-3">
+            {connectionStatus === 'success' && previewData?.can_add && previewData.permissions?.users?.access && previewData.permissions?.incidents?.access && (
               <Button
-                type="submit"
-                disabled={isTestingConnection || !isValidToken(form.watch('rootlyToken') || '')}
-                className="bg-purple-600 hover:bg-purple-700"
+                type="button"
+                onClick={onAdd}
+                disabled={isAdding}
+                className="bg-green-600 hover:bg-green-700 w-full"
               >
-                {isTestingConnection ? (
+                {isAdding ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Testing Connection...
+                    Adding Integration...
                   </>
                 ) : (
                   <>
-                    <Shield className="w-4 h-4 mr-2" />
-                    Test Connection
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Integration
                   </>
                 )}
               </Button>
-
-              {connectionStatus === 'success' && previewData?.can_add && (
-                <Button
-                  type="button"
-                  onClick={onAdd}
-                  disabled={isAdding}
-                  className="bg-green-600 hover:bg-green-700"
-                >
-                  {isAdding ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Adding...
-                    </>
-                  ) : (
-                    <>
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Integration
-                    </>
-                  )}
-                </Button>
-              )}
-            </div>
+            )}
           </form>
         </Form>
       </CardContent>
