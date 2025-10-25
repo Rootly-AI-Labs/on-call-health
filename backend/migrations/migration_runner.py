@@ -385,6 +385,20 @@ class MigrationRunner:
                     """
                 ]
             },
+            {
+                "name": "010_add_organization_id_to_user_burnout_reports",
+                "description": "Add organization_id to user_burnout_reports table",
+                "sql": [
+                    """
+                    ALTER TABLE user_burnout_reports
+                    ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id)
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_user_burnout_reports_organization_id
+                    ON user_burnout_reports(organization_id)
+                    """
+                ]
+            },
             # Add future migrations here with incrementing numbers
             # {
             #     "name": "009_add_user_preferences",
