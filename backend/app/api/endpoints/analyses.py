@@ -323,10 +323,17 @@ async def list_analyses(
             )
 
         query = query.filter(Analysis.rootly_integration_id == integration_id)
-    
+
+    # Fast check: if offset is 0, first check if any analyses exist
+    # This optimizes the common case of new users with no analyses
+    if offset == 0:
+        exists = db.query(query.exists()).scalar()
+        if not exists:
+            return AnalysisListResponse(analyses=[], total=0)
+
     # Get total count
     total = query.count()
-    
+
     # Apply pagination and ordering
     analyses = query.order_by(Analysis.created_at.desc()).offset(offset).limit(limit).all()
     
