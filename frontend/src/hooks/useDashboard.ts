@@ -259,7 +259,8 @@ export default function useDashboard() {
         // Set loading to false when using cache
         setLoadingIntegrations(false)
         setHasDataFromCache(true)
-        
+        setInitialDataLoaded(true) // Mark as loaded since we have cached data
+
         // Still need to load previous analyses when using cache
         loadPreviousAnalyses()
 
