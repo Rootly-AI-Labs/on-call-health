@@ -1169,17 +1169,15 @@ export default function IntegrationsPage() {
       <header className="bg-white/80 backdrop-blur-sm border-b border-slate-200 sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-3">
-              <h1 className="text-2xl font-bold text-slate-900">Manage Integrations</h1>
-              
-              {/* ✨ PHASE 1: Background refresh indicator */}
-              {refreshingInBackground && (
-                <div className="flex items-center space-x-2">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                  <span className="text-xs text-blue-600 font-medium">Refreshing...</span>
-                </div>
-              )}
-            </div>
+            <h1 className="text-2xl font-bold text-slate-900">Manage Integrations</h1>
+
+            {/* ✨ PHASE 1: Background refresh indicator */}
+            {refreshingInBackground && (
+              <div className="flex items-center space-x-2">
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                <span className="text-xs text-blue-600 font-medium">Refreshing...</span>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center space-x-4">
@@ -1268,14 +1266,14 @@ export default function IntegrationsPage() {
           </p>
         </div>
 
-        {/* Dashboard Organization Selector - Moved to top */}
+        {/* Dashboard Organization Selector */}
         {integrations.length > 0 && (
-          <div className="sticky top-0 z-10 bg-white border-b-2 border-purple-200 shadow-sm mb-6 -mx-4 px-4 py-3">
-            <div className="container mx-auto max-w-2xl">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <Settings className="w-4 h-4 text-purple-600" />
-                  <span className="font-medium text-slate-900 text-sm">Dashboard</span>
+          <div className="max-w-2xl mx-auto mb-6">
+            <div className="bg-white border-2 border-slate-200 rounded-lg p-4 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 text-slate-700 flex-shrink-0">
+                  <Settings className="w-5 h-5 text-purple-600" />
+                  <span className="font-semibold">Active Organization</span>
                 </div>
                 <Select
                   value={selectedOrganization}
@@ -1293,20 +1291,20 @@ export default function IntegrationsPage() {
                     localStorage.setItem('selected_organization', value)
                   }}
                 >
-                  <SelectTrigger className="w-full max-w-md h-9 text-sm bg-white">
+                  <SelectTrigger className="flex-1 h-10 bg-slate-50 border-slate-300 hover:bg-slate-100 transition-colors">
                     <SelectValue placeholder="Select organization">
                       {selectedOrganization && (() => {
                         const selected = integrations.find(i => i.id.toString() === selectedOrganization)
                         if (selected) {
                           return (
                             <div className="flex items-center justify-between w-full">
-                              <div className="flex items-center">
-                                <div className={`w-2 h-2 rounded-full mr-2 ${
+                              <div className="flex items-center gap-2">
+                                <div className={`w-2.5 h-2.5 rounded-full ${
                                   selected.platform === 'rootly' ? 'bg-purple-500' : 'bg-green-500'
                                 }`}></div>
-                                <span className="truncate">{selected.name}</span>
+                                <span className="font-medium">{selected.name}</span>
                               </div>
-                              <Star className="w-3 h-3 text-yellow-500 fill-yellow-500 ml-2 flex-shrink-0" />
+                              <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 flex-shrink-0" />
                             </div>
                           )
                         }
@@ -1314,7 +1312,7 @@ export default function IntegrationsPage() {
                       })()}
                     </SelectValue>
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="max-w-md">
                     {/* Group integrations by platform */}
                     {(() => {
                       const rootlyIntegrations = integrations.filter(i => i.platform === 'rootly')
@@ -1325,21 +1323,25 @@ export default function IntegrationsPage() {
                           {/* Rootly Organizations */}
                           {rootlyIntegrations.length > 0 && (
                             <>
-                              <div className="px-2 py-1.5 text-xs font-medium text-gray-500 bg-gray-50 border-b">
-                                <div className="flex items-center">
-                                  <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
-                                  Rootly
+                              <div className="px-3 py-2 text-xs font-semibold text-slate-600 bg-slate-50 border-b border-slate-200">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-2.5 h-2.5 bg-purple-500 rounded-full"></div>
+                                  Rootly Organizations
                                 </div>
                               </div>
                               {rootlyIntegrations.map((integration) => (
-                                <SelectItem key={integration.id} value={integration.id.toString()}>
-                                  <div className="flex items-center justify-between w-full">
-                                    <div className="flex items-center">
-                                      <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
-                                      {integration.name}
+                                <SelectItem
+                                  key={integration.id}
+                                  value={integration.id.toString()}
+                                  className="cursor-pointer"
+                                >
+                                  <div className="flex items-center justify-between w-full gap-2">
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-2.5 h-2.5 bg-purple-500 rounded-full"></div>
+                                      <span className="font-medium">{integration.name}</span>
                                     </div>
                                     {selectedOrganization === integration.id.toString() && (
-                                      <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 ml-2" />
+                                      <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 flex-shrink-0" />
                                     )}
                                   </div>
                                 </SelectItem>
@@ -1351,23 +1353,27 @@ export default function IntegrationsPage() {
                           {pagerdutyIntegrations.length > 0 && (
                             <>
                               {rootlyIntegrations.length > 0 && (
-                                <div className="my-1 border-t border-gray-200"></div>
+                                <div className="my-1 border-t border-slate-200"></div>
                               )}
-                              <div className="px-2 py-1.5 text-xs font-medium text-gray-500 bg-gray-50 border-b">
-                                <div className="flex items-center">
-                                  <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                                  PagerDuty
+                              <div className="px-3 py-2 text-xs font-semibold text-slate-600 bg-slate-50 border-b border-slate-200">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-2.5 h-2.5 bg-green-500 rounded-full"></div>
+                                  PagerDuty Organizations
                                 </div>
                               </div>
                               {pagerdutyIntegrations.map((integration) => (
-                                <SelectItem key={integration.id} value={integration.id.toString()}>
-                                  <div className="flex items-center justify-between w-full">
-                                    <div className="flex items-center">
-                                      <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                                      {integration.name}
+                                <SelectItem
+                                  key={integration.id}
+                                  value={integration.id.toString()}
+                                  className="cursor-pointer"
+                                >
+                                  <div className="flex items-center justify-between w-full gap-2">
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-2.5 h-2.5 bg-green-500 rounded-full"></div>
+                                      <span className="font-medium">{integration.name}</span>
                                     </div>
                                     {selectedOrganization === integration.id.toString() && (
-                                      <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 ml-2" />
+                                      <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 flex-shrink-0" />
                                     )}
                                   </div>
                                 </SelectItem>
@@ -1384,42 +1390,38 @@ export default function IntegrationsPage() {
           </div>
         )}
 
-        {/* Ready for Analysis CTA - Only show when not adding new integration */}
-        {!addingPlatform && (
-          <>
-            {(loadingRootly || loadingPagerDuty) ? (
-              <div className="bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 rounded-lg p-6 mb-8 max-w-2xl mx-auto animate-pulse">
-                <div className="text-center">
-                  <div className="w-12 h-12 bg-gray-300 rounded-full mx-auto mb-4"></div>
-                  <div className="h-6 bg-gray-300 rounded w-80 mx-auto mb-2"></div>
-                  <div className="h-4 bg-gray-300 rounded w-96 mx-auto mb-2"></div>
-                  <div className="h-4 bg-gray-300 rounded w-72 mx-auto mb-4"></div>
-                  <div className="h-10 bg-gray-300 rounded w-40 mx-auto"></div>
-                </div>
+        {/* Ready for Analysis CTA - Always visible when integrations exist */}
+        {(loadingRootly || loadingPagerDuty) ? (
+          <div className="bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 rounded-lg p-6 mb-8 max-w-2xl mx-auto animate-pulse">
+            <div className="text-center">
+              <div className="w-12 h-12 bg-gray-300 rounded-full mx-auto mb-4"></div>
+              <div className="h-6 bg-gray-300 rounded w-80 mx-auto mb-2"></div>
+              <div className="h-4 bg-gray-300 rounded w-96 mx-auto mb-2"></div>
+              <div className="h-4 bg-gray-300 rounded w-72 mx-auto mb-4"></div>
+              <div className="h-10 bg-gray-300 rounded w-40 mx-auto"></div>
+            </div>
+          </div>
+        ) : integrations.length > 0 && (
+          <div className="bg-gradient-to-r from-purple-50 to-green-50 border border-purple-200 rounded-lg p-6 mb-8 max-w-2xl mx-auto">
+            <div className="text-center">
+              <div className="w-12 h-12 bg-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle className="w-6 h-6 text-white" />
               </div>
-            ) : integrations.length > 0 && (
-              <div className="bg-gradient-to-r from-purple-50 to-green-50 border border-purple-200 rounded-lg p-6 mb-8 max-w-2xl mx-auto">
-                <div className="text-center">
-                  <div className="w-12 h-12 bg-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <CheckCircle className="w-6 h-6 text-white" />
-                  </div>
-                  <h3 className="text-xl font-semibold text-slate-900 mb-2">
-                    Ready to analyze your team's burnout risk!
-                  </h3>
-                  <p className="text-slate-600 mb-4">
-                    You have {integrations.length} integration{integrations.length > 1 ? 's' : ''} connected.
-                    Run your first analysis to identify burnout patterns across your team.
-                  </p>
-                  <Link href="/dashboard">
-                    <Button className="bg-purple-600 hover:bg-purple-700 text-white">
-                      <Activity className="w-4 h-4 mr-2" />
-                      Go to Dashboard
-                    </Button>
-                  </Link>
-                </div>
-              </div>
-            )}
-          </>
+              <h3 className="text-xl font-semibold text-slate-900 mb-2">
+                Ready to analyze your team's burnout risk!
+              </h3>
+              <p className="text-slate-600 mb-4">
+                You have {integrations.length} integration{integrations.length > 1 ? 's' : ''} connected.
+                Run your first analysis to identify burnout patterns across your team.
+              </p>
+              <Link href="/dashboard">
+                <Button className="bg-purple-600 hover:bg-purple-700 text-white">
+                  <Activity className="w-4 h-4 mr-2" />
+                  Go to Dashboard
+                </Button>
+              </Link>
+            </div>
+          </div>
         )}
 
         {/* Platform Selection Cards */}
