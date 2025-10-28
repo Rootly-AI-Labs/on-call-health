@@ -148,7 +148,8 @@ export default function IntegrationsPage() {
   const [activeTab, setActiveTab] = useState<"rootly" | "pagerduty" | null>(null)
   const [backUrl, setBackUrl] = useState<string>('/dashboard')
   const [selectedOrganization, setSelectedOrganization] = useState<string>("")
-  
+  const [navigatingToDashboard, setNavigatingToDashboard] = useState(false)
+
   // GitHub/Slack integration state
   const [githubIntegration, setGithubIntegration] = useState<GitHubIntegration | null>(null)
   const [slackIntegration, setSlackIntegration] = useState<SlackIntegration | null>(null)
@@ -1414,12 +1415,26 @@ export default function IntegrationsPage() {
                 You have {integrations.length} integration{integrations.length > 1 ? 's' : ''} connected.
                 Run your first analysis to identify burnout patterns across your team.
               </p>
-              <Link href="/dashboard">
-                <Button className="bg-purple-600 hover:bg-purple-700 text-white">
-                  <Activity className="w-4 h-4 mr-2" />
-                  Go to Dashboard
-                </Button>
-              </Link>
+              <Button
+                className="bg-purple-600 hover:bg-purple-700 text-white"
+                onClick={() => {
+                  setNavigatingToDashboard(true)
+                  router.push('/dashboard')
+                }}
+                disabled={navigatingToDashboard}
+              >
+                {navigatingToDashboard ? (
+                  <>
+                    <div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Loading Dashboard...
+                  </>
+                ) : (
+                  <>
+                    <Activity className="w-4 h-4 mr-2" />
+                    Go to Dashboard
+                  </>
+                )}
+              </Button>
             </div>
           </div>
         )}
