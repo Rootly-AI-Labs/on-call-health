@@ -450,7 +450,7 @@ export default function useDashboard() {
         setSelectedIntegration(savedOrg)
       }
     }
-  }, [integrations, selectedIntegration])
+  }, [integrations]) // Removed selectedIntegration from deps to prevent unnecessary re-renders
 
   const loadPreviousAnalyses = async (append = false): Promise<boolean> => {
     // CRITICAL: Set loading state FIRST before any async operations
