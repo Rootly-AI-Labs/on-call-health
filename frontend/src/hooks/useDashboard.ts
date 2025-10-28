@@ -199,6 +199,12 @@ export default function useDashboard() {
         localStorage.setItem('last_integrations_refresh', now.toString())
         loadIntegrations(true, false)
       }
+
+      // Also sync selected organization from localStorage when page gains focus
+      const savedOrg = localStorage.getItem('selected_organization')
+      if (savedOrg && savedOrg !== selectedIntegration) {
+        setSelectedIntegration(savedOrg)
+      }
     }
 
     // Load cached integrations FIRST (before event listeners)
@@ -323,22 +329,27 @@ export default function useDashboard() {
         try {
           const updatedIntegrations = JSON.parse(e.newValue)
           setIntegrations(updatedIntegrations)
-          
+
           // Also check for GitHub/Slack updates
           const githubCache = localStorage.getItem('github_integration')
           const slackCache = localStorage.getItem('slack_integration')
-          
+
           if (githubCache) {
             const githubData = JSON.parse(githubCache)
             setGithubIntegration(githubData.connected ? githubData.integration : null)
           }
-          
+
           if (slackCache) {
             const slackData = JSON.parse(slackCache)
             setSlackIntegration(slackData.integration)
           }
         } catch (e) {
         }
+      }
+
+      // Listen for changes to selected organization
+      if (e.key === 'selected_organization' && e.newValue) {
+        setSelectedIntegration(e.newValue)
       }
     }
     
@@ -427,6 +438,19 @@ export default function useDashboard() {
   useEffect(() => {
     fetchPlatformMappings()
   }, [])
+
+  // Sync selectedIntegration with localStorage when integrations change
+  // This ensures the dashboard uses the correct organization after user changes it on integrations page
+  useEffect(() => {
+    if (integrations.length > 0) {
+      const savedOrg = localStorage.getItem('selected_organization')
+
+      // Only update if saved org exists in integrations and is different from current selection
+      if (savedOrg && integrations.find(i => i.id.toString() === savedOrg) && savedOrg !== selectedIntegration) {
+        setSelectedIntegration(savedOrg)
+      }
+    }
+  }, [integrations, selectedIntegration])
 
   const loadPreviousAnalyses = async (append = false): Promise<boolean> => {
     // CRITICAL: Set loading state FIRST before any async operations
