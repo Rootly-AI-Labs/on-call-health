@@ -1244,17 +1244,22 @@ export default function useDashboard() {
       }
     }
 
-    // If no integration selected but we have integrations available, auto-select the first one
+    // Always check localStorage for the latest selected organization
+    // This ensures we use the correct org even if state is stale
+    const savedOrg = localStorage.getItem('selected_organization')
     let integrationToUse = selectedIntegration
-    if (!integrationToUse && currentIntegrations.length > 0) {
-      // Use saved preference or first available
-      const savedOrg = localStorage.getItem('selected_organization')
-      if (savedOrg && currentIntegrations.find(i => i.id.toString() === savedOrg)) {
-        integrationToUse = savedOrg
-      } else {
-        integrationToUse = currentIntegrations[0].id.toString()
-        localStorage.setItem('selected_organization', integrationToUse)
+
+    // Prefer localStorage value if it exists and is valid
+    if (savedOrg && currentIntegrations.find(i => i.id.toString() === savedOrg)) {
+      integrationToUse = savedOrg
+      // Update state if it's different
+      if (integrationToUse !== selectedIntegration) {
+        setSelectedIntegration(integrationToUse)
       }
+    } else if (!integrationToUse && currentIntegrations.length > 0) {
+      // Fallback to first available if no saved preference
+      integrationToUse = currentIntegrations[0].id.toString()
+      localStorage.setItem('selected_organization', integrationToUse)
       setSelectedIntegration(integrationToUse)
     }
 
