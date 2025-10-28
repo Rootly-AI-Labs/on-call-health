@@ -599,8 +599,8 @@ class RootlyAPIClient:
             users_start = datetime.now()
             incidents_start = datetime.now()
             
-            logger.info(f"🔍 USER FETCH: Starting user collection for {days_back}-day analysis (limit: 1000)")
-            users_task = self.get_users(limit=1000)  # Get all users
+            logger.info(f"🔍 USER FETCH: Starting user collection for {days_back}-day analysis (limit: 10000)")
+            users_task = self.get_users(limit=10000)  # Get all users (increased from 1000)
             
             # Use conservative incident limits to prevent timeout on longer analyses
             incident_limits_by_range = {
