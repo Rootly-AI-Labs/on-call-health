@@ -421,6 +421,15 @@ export default function IntegrationsPage() {
     toast.info('Changes discarded')
   }
 
+  // Handle drawer close - reset selections if there are unsaved changes
+  const handleDrawerClose = (open: boolean) => {
+    if (!open && hasUnsavedChanges()) {
+      // Reset to saved state when closing with unsaved changes
+      setSelectedRecipients(new Set(savedRecipients))
+    }
+    setTeamMembersDrawerOpen(open)
+  }
+
   // AI Integration state
   const [llmToken, setLlmToken] = useState('')
   const [llmModel, setLlmModel] = useState('gpt-4o-mini')
@@ -1281,7 +1290,9 @@ export default function IntegrationsPage() {
       setTeamMembersDrawerOpen,
       syncUsersToCorrelation,
       showToast,
-      autoSync
+      autoSync,
+      setSelectedRecipients,
+      setSavedRecipients
     )
   }
 
@@ -3383,7 +3394,7 @@ export default function IntegrationsPage() {
       </div>
 
       {/* Team Members Drawer */}
-      <Sheet open={teamMembersDrawerOpen} onOpenChange={setTeamMembersDrawerOpen}>
+      <Sheet open={teamMembersDrawerOpen} onOpenChange={handleDrawerClose}>
         <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
           <SheetHeader>
             <div className="flex items-start justify-between pr-10 gap-4">
@@ -3419,24 +3430,36 @@ export default function IntegrationsPage() {
                 </Button>
                 {/* Hide save button for beta integrations, only show when there are unsaved changes */}
                 {selectedOrganization && !['beta-rootly', 'beta-pagerduty'].includes(selectedOrganization) && hasUnsavedChanges() && (
-                  <Button
-                    onClick={saveSurveyRecipients}
-                    disabled={savingRecipients}
-                    variant="outline"
-                    size="default"
-                  >
-                    {savingRecipients ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <Check className="w-4 h-4 mr-2" />
-                        Save Changes
-                      </>
-                    )}
-                  </Button>
+                  <>
+                    <Button
+                      onClick={discardRecipientChanges}
+                      disabled={savingRecipients}
+                      variant="ghost"
+                      size="default"
+                    >
+                      <X className="w-4 h-4 mr-2" />
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={saveSurveyRecipients}
+                      disabled={savingRecipients}
+                      variant="default"
+                      size="default"
+                      className="bg-purple-600 hover:bg-purple-700"
+                    >
+                      {savingRecipients ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Check className="w-4 h-4 mr-2" />
+                          Save Changes
+                        </>
+                      )}
+                    </Button>
+                  </>
                 )}
               </div>
             </div>

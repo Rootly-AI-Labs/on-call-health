@@ -183,7 +183,9 @@ export async function fetchSyncedUsers(
   setTeamMembersDrawerOpen: (open: boolean) => void,
   syncUsersToCorrelation: () => Promise<void>,
   showToast: boolean = true,
-  autoSync: boolean = true
+  autoSync: boolean = true,
+  setSelectedRecipients?: (recipients: Set<number>) => void,
+  setSavedRecipients?: (recipients: Set<number>) => void
 ): Promise<void> {
   if (!selectedOrganization) {
     toast.error('Please select an organization first')
@@ -199,19 +201,38 @@ export async function fetchSyncedUsers(
       return
     }
 
-    const response = await fetch(`${API_BASE}/rootly/synced-users?integration_id=${selectedOrganization}`, {
-      headers: {
-        'Authorization': `Bearer ${authToken}`,
-        'Content-Type': 'application/json'
-      }
-    })
+    // Fetch both synced users and saved recipients in parallel
+    const [usersResponse, recipientsResponse] = await Promise.all([
+      fetch(`${API_BASE}/rootly/synced-users?integration_id=${selectedOrganization}`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json'
+        }
+      }),
+      // Only fetch recipients for non-beta integrations
+      selectedOrganization.startsWith('beta-') ? Promise.resolve(null) :
+        fetch(`${API_BASE}/rootly/integrations/${selectedOrganization}/survey-recipients`, {
+          headers: {
+            'Authorization': `Bearer ${authToken}`,
+            'Content-Type': 'application/json'
+          }
+        })
+    ])
 
-    if (response.ok) {
-      const data = await response.json()
+    if (usersResponse.ok) {
+      const data = await usersResponse.json()
       const users = data.users || []
       setSyncedUsers(users)
       setShowSyncedUsers(true)
       setTeamMembersDrawerOpen(true)
+
+      // Load saved recipients if provided setters exist
+      if (recipientsResponse && recipientsResponse.ok && setSelectedRecipients && setSavedRecipients) {
+        const recipientsData = await recipientsResponse.json()
+        const savedIds = new Set<number>(recipientsData.recipient_ids || [])
+        setSelectedRecipients(savedIds)
+        setSavedRecipients(savedIds)
+      }
 
       // If no users found, automatically sync them (but not for beta integrations)
       // Only auto-sync once to prevent infinite loops
@@ -231,7 +252,7 @@ export async function fetchSyncedUsers(
         }
       }
     } else {
-      const errorData = await response.json()
+      const errorData = await usersResponse.json()
       throw new Error(errorData.detail || 'Failed to fetch synced users')
     }
   } catch (error) {
