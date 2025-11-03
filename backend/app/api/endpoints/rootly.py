@@ -1314,40 +1314,57 @@ async def get_synced_users(
                 from app.core.rootly_client import RootlyAPIClient
                 from app.core.pagerduty_client import PagerDutyAPIClient
 
+                client = None
+
                 # Get the integration to determine platform
                 if integration_id in ["beta-rootly", "beta-pagerduty"]:
+                    logger.info(f"📞 Fetching on-call status for beta integration: {integration_id}")
                     if integration_id == "beta-rootly":
                         beta_token = os.getenv('ROOTLY_API_TOKEN')
                         if beta_token:
                             client = RootlyAPIClient(beta_token)
+                            logger.info("✅ Created Rootly client for beta integration")
                     else:
                         beta_token = os.getenv('PAGERDUTY_API_TOKEN')
                         if beta_token:
                             client = PagerDutyAPIClient(beta_token)
+                            logger.info("✅ Created PagerDuty client for beta integration")
                 else:
                     try:
                         numeric_id = int(integration_id)
+                        logger.info(f"📞 Fetching on-call status for integration_id: {numeric_id}")
                         integration = db.query(RootlyIntegration).filter(
                             RootlyIntegration.id == numeric_id,
                             RootlyIntegration.user_id == current_user.id
                         ).first()
 
                         if integration:
+                            logger.info(f"✅ Found integration: {integration.name} (platform: {integration.platform})")
                             if integration.platform == "rootly":
                                 client = RootlyAPIClient(integration.api_token)
+                                logger.info("✅ Created Rootly API client")
                             elif integration.platform == "pagerduty":
                                 client = PagerDutyAPIClient(integration.api_token)
+                                logger.info("✅ Created PagerDuty API client")
+                        else:
+                            logger.warning(f"⚠️  No integration found with id {numeric_id} for user {current_user.id}")
                     except ValueError:
-                        pass
+                        logger.warning(f"⚠️  Invalid integration_id format: {integration_id}")
 
                 # Fetch on-call shifts
-                if 'client' in locals():
+                if client:
+                    logger.info("🔍 Fetching on-call shifts...")
                     end_date = datetime.now() + timedelta(hours=1)
                     start_date = datetime.now() - timedelta(hours=24)
                     on_call_shifts = await client.get_on_call_shifts(start_date, end_date)
                     oncall_emails = await client.extract_on_call_users_from_shifts(on_call_shifts)
+                    logger.info(f"✅ Found {len(oncall_emails)} on-call users: {list(oncall_emails)}")
+                else:
+                    logger.warning("⚠️  No client created, skipping on-call status fetch")
             except Exception as e:
-                logger.warning(f"Failed to fetch on-call status: {str(e)}")
+                logger.error(f"❌ Failed to fetch on-call status: {str(e)}")
+                import traceback
+                logger.error(traceback.format_exc())
                 # Continue without on-call status
 
         # Format the response
