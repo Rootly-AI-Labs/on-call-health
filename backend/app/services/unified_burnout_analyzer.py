@@ -181,41 +181,28 @@ class UnifiedBurnoutAnalyzer:
         """
         analysis_start_time = datetime.now()
 
-        # Check if using mock data (define at function scope)
-        use_mock_data = os.getenv("USE_MOCK_DATA", "false").lower() == "true"
-
-        logger.info(f"🔍 BURNOUT ANALYSIS START: Beginning {time_range_days}-day burnout analysis at {analysis_start_time.isoformat()}")
-
-        # IMMEDIATE DEBUG - This should show up in Railway logs RIGHT AWAY
-        print(f"🚨 RAILWAY DEBUG: Analysis starting at {analysis_start_time}")
-        print(f"🚨 RAILWAY DEBUG: Platform = {self.platform}")
-        print(f"🚨 RAILWAY DEBUG: NEW SCORING ALGORITHM ACTIVE")
-        logger.error(f"🚨 RAILWAY FORCE LOG: NEW SCORING ALGORITHM DEPLOYED - {analysis_start_time}")
+        logger.info(f"Starting {time_range_days}-day burnout analysis")
 
         try:
             # Fetch data from Rootly/PagerDuty OR load mock data
             data_fetch_start = datetime.now()
 
             if self.use_mock_data:
-                # Load mock data instead of API call
-                logger.info(f"🎭 MOCK MODE: Loading scenario '{self.mock_scenario}' instead of API call")
+                # Load mock data instead of API call for testing
+                logger.info(f"🎭 Loading mock scenario: {self.mock_scenario}")
                 data = self._load_mock_data()
             else:
                 # Real API call
-                logger.info(f"🔍 BURNOUT ANALYSIS: Step 1 - Fetching data for {time_range_days}-day analysis")
                 data = await self._fetch_analysis_data(time_range_days)
 
             data_fetch_duration = (datetime.now() - data_fetch_start).total_seconds()
-            logger.info(f"🔍 BURNOUT ANALYSIS: Step 1 completed in {data_fetch_duration:.2f}s - Data type: {type(data)}, is_none: {data is None}")
-            
-            # Check if data was successfully fetched (data should never be None due to fallbacks)
+
+            # Check if data was successfully fetched
             if data is None:
-                logger.error("🔍 BURNOUT ANALYSIS: CRITICAL ERROR - Data is None after _fetch_analysis_data")
-                raise Exception("Failed to fetch data from Rootly API - no data returned")
-            
-            # Extract users and incidents (with additional safety checks)
-            extraction_start = datetime.now()
-            logger.info(f"🔍 BURNOUT ANALYSIS: Step 2 - Extracting users and incidents from {time_range_days}-day data")
+                logger.error("Data fetch failed - no data returned")
+                raise Exception("Failed to fetch data from API")
+
+            # Extract users and incidents
             users = data.get("users", []) if data else []
 
             # create map with user time zones
@@ -232,7 +219,6 @@ class UnifiedBurnoutAnalyzer:
             metadata = data.get("collection_metadata", {}) if data else {}
             
             # COMPREHENSIVE DATA VALIDATION AND ANALYSIS
-            logger.info(f"🔍 UNIFIED ANALYZER: DATA VALIDATION for {self.platform.upper()}")
             logger.info(f"   - Platform: {self.platform}")
             logger.info(f"   - Raw data keys: {list(data.keys()) if data else 'None'}")
             logger.info(f"   - Users extracted: {len(users)}")
@@ -242,13 +228,11 @@ class UnifiedBurnoutAnalyzer:
             # Validate user data structure
             if users:
                 sample_user = users[0]
-                logger.info(f"🔍 UNIFIED ANALYZER: Sample user structure:")
                 logger.info(f"   - Keys: {list(sample_user.keys()) if isinstance(sample_user, dict) else 'Not a dict'}")
                 logger.info(f"   - Sample: ID={sample_user.get('id')}, Name={sample_user.get('name')}, Email={sample_user.get('email')}")
             
             # Validate incident data structure and assignments
             if incidents:
-                logger.info(f"🔍 UNIFIED ANALYZER: Incident assignment analysis:")
                 incidents_with_assignments = 0
                 sample_incident = incidents[0]
                 
@@ -318,7 +302,6 @@ class UnifiedBurnoutAnalyzer:
                 
                 matching_user_ids = user_ids_from_users.intersection(incident_user_ids)
                 
-                logger.info(f"🔍 UNIFIED ANALYZER: User ID Cross-Reference:")
                 logger.info(f"   - User IDs from users list: {len(user_ids_from_users)} ({list(user_ids_from_users)[:5]})")
                 logger.info(f"   - User IDs from incident assignments: {len(incident_user_ids)} ({list(incident_user_ids)[:5]})")
                 logger.info(f"   - Matching user IDs: {len(matching_user_ids)} ({list(matching_user_ids)[:5]})")
@@ -345,65 +328,44 @@ class UnifiedBurnoutAnalyzer:
                     # Continue with analysis - this might be a quiet period
             
             extraction_duration = (datetime.now() - extraction_start).total_seconds()
-            logger.info(f"🔍 BURNOUT ANALYSIS: Step 2 completed in {extraction_duration:.3f}s - {len(users)} users, {len(incidents)} incidents")
-            
-            # Step 2.5: Filter to only on-call users (NEW FEATURE)
+
+            # Step 2.5: Filter to only on-call users
             oncall_filter_start = datetime.now()
-            logger.info(f"🔍 BURNOUT ANALYSIS: Step 2.5 - Filtering to on-call users only for {time_range_days}-day period")
 
             # Skip on-call filtering when using mock data (no API client available)
             if self.use_mock_data:
-                logger.info(f"🎭 MOCK MODE: Skipping on-call filtering (analyzing all mock users)")
+                logger.info(f"🎭 Skipping on-call filtering in mock mode - analyzing all users")
                 oncall_filter_duration = (datetime.now() - oncall_filter_start).total_seconds()
-                logger.info(f"🔍 BURNOUT ANALYSIS: Step 2.5 completed in {oncall_filter_duration:.3f}s - Analyzing all {len(users)} users (mock mode)")
             else:
                 try:
                     # Get on-call schedule data for the analysis period
                     start_date = datetime.now() - timedelta(days=time_range_days)
                     end_date = datetime.now()
-                    logger.info(f"🗓️ ON_CALL_FILTERING: Attempting to fetch on-call shifts from {start_date.isoformat()} to {end_date.isoformat()}")
-                    logger.info(f"🗓️ ON_CALL_FILTERING: Client type: {type(self.client).__name__}, Platform: {self.platform}")
+                    logger.info(f"Fetching on-call shifts from {start_date.date()} to {end_date.date()}")
 
                     on_call_shifts = await self.client.get_on_call_shifts(start_date, end_date)
-                    logger.info(f"🗓️ ON_CALL_FILTERING: Retrieved {len(on_call_shifts)} on-call shifts")
-
                     on_call_user_emails = await self.client.extract_on_call_users_from_shifts(on_call_shifts)
-                    logger.info(f"🗓️ ON_CALL_FILTERING: Extracted {len(on_call_user_emails)} unique on-call user emails")
-                    logger.info(f"🗓️ ON_CALL_FILTERING: On-call emails: {list(on_call_user_emails)[:5]}{'...' if len(on_call_user_emails) > 5 else ''}")
 
-                    logger.info(f"🗓️ ON_CALL_FILTERING: Found {len(on_call_user_emails)} users who were on-call during the {time_range_days}-day period")
-                    logger.info(f"🗓️ ON_CALL_FILTERING: Total team members: {len(users)}, On-call members: {len(on_call_user_emails)}")
+                    logger.info(f"Found {len(on_call_user_emails)} on-call users during period")
 
                     if on_call_user_emails:
                         # Filter users to only those who were on-call during the period
                         original_user_count = len(users)
                         filtered_users = []
 
-                        # Debug: Log all user emails for comparison
-                        all_user_emails = []
                         for user in users:
                             user_email = self._get_user_email_from_user(user)
-                            all_user_emails.append(user_email)
                             if user_email and user_email.lower() in on_call_user_emails:
                                 filtered_users.append(user)
 
-                        logger.info(f"🗓️ ON_CALL_FILTERING: All user emails in team: {all_user_emails[:5]}{'...' if len(all_user_emails) > 5 else ''}")
-
                         users = filtered_users
-                        logger.info(f"🗓️ ON_CALL_FILTERING: Filtered from {original_user_count} total users to {len(users)} on-call users")
+                        logger.info(f"Filtered from {original_user_count} to {len(users)} on-call users")
 
                         if len(users) == 0:
-                            logger.error(f"🗓️ ON_CALL_FILTERING: CRITICAL - No matching users found between team emails and on-call emails!")
-                            logger.error(f"🗓️ ON_CALL_FILTERING: Team emails: {all_user_emails}")
-                            logger.error(f"🗓️ ON_CALL_FILTERING: On-call emails: {list(on_call_user_emails)}")
-                            logger.error(f"🗓️ ON_CALL_FILTERING: Falling back to all users to prevent empty analysis")
+                            logger.error(f"No matching users found - falling back to all users")
                             users = []  # Reset to original users list (will be handled below)
-                        else:
-                            # Log the on-call users for verification
-                            oncall_names = [self._get_user_name_from_user(user) for user in users]
-                            logger.info(f"🗓️ ON_CALL_FILTERING: On-call users being analyzed: {', '.join(oncall_names[:10])}{'...' if len(oncall_names) > 10 else ''}")
                     else:
-                        logger.warning(f"🗓️ ON_CALL_FILTERING: No on-call shifts found for the period, analyzing all users as fallback")
+                        logger.warning(f"No on-call shifts found for period - analyzing all users as fallback")
 
                 except Exception as e:
                     logger.error(f"🗓️ ON_CALL_FILTERING: Error fetching on-call data: {e}")
@@ -419,7 +381,6 @@ class UnifiedBurnoutAnalyzer:
                 users = data.get("users", [])
             
             oncall_filter_duration = (datetime.now() - oncall_filter_start).total_seconds()
-            logger.info(f"🔍 BURNOUT ANALYSIS: Step 2.5 completed in {oncall_filter_duration:.3f}s - Now analyzing {len(users)} on-call users")
             
             # Log potential issues based on data patterns
             if len(users) == 0:
@@ -527,79 +488,49 @@ class UnifiedBurnoutAnalyzer:
                     logger.warning(f"🔍 EMAIL EXTRACTION: ⚠️ LOW EXTRACTION RATE!")
                     logger.warning(f"   - Only {len(team_emails)}/{len(users)} users have emails ({len(team_emails)/len(users)*100:.1f}%)")
                     logger.warning(f"   - Check if {self.platform} data structure matches expectation")
-                
-                if self.features['github']:
-                    logger.info(f"🔍 UNIFIED ANALYZER: Collecting GitHub data for {len(team_emails)} team members")
-                    logger.info(f"Team emails: {team_emails[:5]}...")  # Log first 5 emails
-                    try:
-                        logger.info(f"GitHub config - token: {'present' if self.github_token else 'missing'}")
-                        
-                        github_data = await collect_team_github_data_with_mapping(
-                            team_emails, time_range_days, self.github_token,
-                            user_id=user_id, analysis_id=analysis_id, source_platform=self.platform,
-                            email_to_name=email_to_name
-                        )
-                        logger.info(f"🔍 UNIFIED ANALYZER: Collected GitHub data for {len(github_data)} users")
-                        logger.info(f"GitHub data keys: {list(github_data.keys())[:5]}")  # Log first 5 keys
 
-                        # # Write raw GitHub data to file
-                        # try:
-                        #     with open('github_raw.txt', 'w', encoding='utf-8') as f:
-                        #         f.write(json.dumps(github_data, indent=2, default=str))
-                        #     logger.info(f"✅ Written raw GitHub data to github_raw.txt")
-                        # except Exception as e:
-                        #     logger.error(f"Failed to write GitHub raw data to file: {e}")
-                    except Exception as e:
-                        logger.error(f"GitHub data collection failed: {e}")
+                # Skip GitHub/Slack for large teams to prevent timeout
+                # Increased limit since we now use synced members (fast lookups)
+                max_team_size = 100
+                if len(team_emails) > max_team_size:
+                    logger.warning(f"Team size ({len(team_emails)}) exceeds limit ({max_team_size}) - skipping GitHub/Slack")
                 else:
-                    logger.info(f"🔍 UNIFIED ANALYZER: GitHub integration disabled - skipping")
-                
-                if self.features['slack']:
-                    logger.info(f"Collecting Slack data for {len(team_names)} team members using names")
-                    logger.info(f"Team names: {team_names[:5]}...")  # Log first 5 names
-                    try:
-                        logger.info(f"Slack config - token: {'present' if self.slack_token else 'missing'}")
-                        
-                        # Use names for Slack correlation instead of emails
-                        slack_data = await collect_team_slack_data_with_mapping(
-                            team_names, time_range_days, self.slack_token, use_names=True,
-                            user_id=user_id, analysis_id=analysis_id, source_platform=self.platform
-                        )
-                        logger.info(f"Collected Slack data for {len(slack_data)} users")
+                    if self.features['github']:
+                        try:
+                            logger.info(f"Collecting GitHub data for {len(team_emails)} members")
+                            github_data = await collect_team_github_data_with_mapping(
+                                team_emails, time_range_days, self.github_token,
+                                user_id=user_id, analysis_id=analysis_id, source_platform=self.platform,
+                                email_to_name=email_to_name
+                            )
+                            logger.info(f"Collected GitHub data for {len(github_data)} users")
+                        except Exception as e:
+                            logger.error(f"GitHub collection failed: {e}")
 
-                        # # Write raw Slack data to file
-                        # try:
-                        #     with open('slack_raw.txt', 'w', encoding='utf-8') as f:
-                        #         f.write(json.dumps(slack_data, indent=2, default=str))
-                        #     logger.info(f"✅ Written raw Slack data to slack_raw.txt")
-                        # except Exception as e:
-                        #     logger.error(f"Failed to write Slack raw data to file: {e}")
-                    except Exception as e:
-                        logger.error(f"Slack data collection failed: {e}")
+                    if self.features['slack']:
+                        try:
+                            slack_data = await collect_team_slack_data_with_mapping(
+                                team_names, time_range_days, self.slack_token, use_names=True,
+                                user_id=user_id, analysis_id=analysis_id, source_platform=self.platform
+                            )
+                            logger.info(f"Collected Slack data for {len(slack_data)} users")
+                        except Exception as e:
+                            logger.error(f"Slack collection failed: {e}")
             
             # Analyze team burnout
+            team_analysis_start = datetime.now()
             try:
-                team_analysis_start = datetime.now()
-                logger.info(f"🔍 BURNOUT ANALYSIS: Step 3 - Analyzing team data for {time_range_days}-day analysis")
-                logger.info(f"🔍 BURNOUT ANALYSIS: Team analysis inputs - {len(users)} users, {len(incidents)} incidents")
                 team_analysis = self._analyze_team_data(
-                    users, 
-                    incidents, 
+                    users,
+                    incidents,
                     metadata,
                     include_weekends,
                     github_data,
                     slack_data
                 )
                 team_analysis_duration = (datetime.now() - team_analysis_start).total_seconds()
-                logger.info(f"🔍 BURNOUT ANALYSIS: Step 3 completed in {team_analysis_duration:.2f}s")
-                
-                # Log team analysis results
-                members_analyzed = len(team_analysis.get("members", [])) if team_analysis else 0
-                logger.info(f"🔍 BURNOUT ANALYSIS: Team analysis generated results for {members_analyzed} members")
-                
             except Exception as e:
-                team_analysis_duration = (datetime.now() - team_analysis_start).total_seconds() if 'team_analysis_start' in locals() else 0
-                logger.error(f"🔍 BURNOUT ANALYSIS: Step 3 FAILED after {team_analysis_duration:.2f}s: {e}")
+                logger.error(f"❌ Team analysis failed: {e}")
                 logger.error(f"🔍 BURNOUT ANALYSIS: Users data - type: {type(users)}, length: {len(users) if users else 'N/A'}")
                 logger.error(f"🔍 BURNOUT ANALYSIS: Incidents data - type: {type(incidents)}, length: {len(incidents) if incidents else 'N/A'}")
                 logger.error(f"🔍 BURNOUT ANALYSIS: Metadata type: {type(metadata)}")
@@ -609,7 +540,6 @@ class UnifiedBurnoutAnalyzer:
             team_health = None
             
             # Create data sources structure
-            logger.info(f"🔍 BURNOUT ANALYSIS: Step 6 - Creating data source structure")
             data_sources = {
                 "incident_data": True,
                 "github_data": self.features['github'],
@@ -619,13 +549,11 @@ class UnifiedBurnoutAnalyzer:
             # Create GitHub insights if enabled
             github_insights = None
             if self.features['github']:
-                logger.info(f"🔍 UNIFIED ANALYZER: Calculating GitHub insights")
                 github_insights = self._calculate_github_insights(github_data)
             
             # Create Slack insights if enabled  
             slack_insights = None
             if self.features['slack']:
-                logger.info(f"🔍 UNIFIED ANALYZER: Calculating Slack insights")
                 slack_insights = self._calculate_slack_insights(slack_data)
 
             # GITHUB CORRELATION: Match GitHub contributors to team members
@@ -662,25 +590,19 @@ class UnifiedBurnoutAnalyzer:
             
             # Calculate overall team health AFTER GitHub burnout adjustment
             health_calc_start = datetime.now()
-            logger.info(f"🔍 BURNOUT ANALYSIS: Step 4 - Calculating team health for {time_range_days}-day analysis")
             team_health = self._calculate_team_health(team_analysis["members"])
             health_calc_duration = (datetime.now() - health_calc_start).total_seconds()
-            logger.info(f"🔍 BURNOUT ANALYSIS: Step 4 completed in {health_calc_duration:.3f}s - Health score: {team_health.get('overall_score', 'N/A')}")
             
             # If GitHub features are disabled, calculate team health here
             if not self.features['github'] or not github_insights:
                 health_calc_start = datetime.now()
-                logger.info(f"🔍 BURNOUT ANALYSIS: Step 4 - Calculating team health for {time_range_days}-day analysis")
                 team_health = self._calculate_team_health(team_analysis["members"])
                 health_calc_duration = (datetime.now() - health_calc_start).total_seconds()
-                logger.info(f"🔍 BURNOUT ANALYSIS: Step 4 completed in {health_calc_duration:.3f}s - Health score: {team_health.get('overall_score', 'N/A')}")
             
             # Generate insights and recommendations
             insights_start = datetime.now()
-            logger.info(f"🔍 BURNOUT ANALYSIS: Step 5 - Generating insights and recommendations")
             insights = self._generate_insights(team_analysis, team_health)
             insights_duration = (datetime.now() - insights_start).total_seconds()
-            logger.info(f"🔍 BURNOUT ANALYSIS: Step 5 completed in {insights_duration:.3f}s - Generated {len(insights)} insights")
 
             # Calculate period summary for consistent UI display
             team_overall_score = team_health.get("overall_score", 0.0)  # This is already health scale 0-10
@@ -780,7 +702,6 @@ class UnifiedBurnoutAnalyzer:
             # Enhance with AI analysis if enabled
             ai_start = datetime.now()
             if self.features['ai']:
-                logger.info(f"🔍 UNIFIED ANALYZER: Step 7 - AI enhancement for {time_range_days}-day analysis")
                 available_integrations = []
                 if self.features['github']:
                     available_integrations.append('github')
@@ -789,18 +710,14 @@ class UnifiedBurnoutAnalyzer:
                 
                 result = await self._enhance_with_ai_analysis(result, available_integrations)
                 ai_duration = (datetime.now() - ai_start).total_seconds()
-                logger.info(f"🔍 UNIFIED ANALYZER: Step 7 completed in {ai_duration:.2f}s - AI enhanced: {result.get('ai_enhanced', False)}")
             else:
-                logger.info(f"🔍 UNIFIED ANALYZER: AI enhancement disabled - skipping")
                 result["ai_enhanced"] = False
                 ai_duration = 0
             
             # Calculate total analysis time and log completion
             total_analysis_duration = (datetime.now() - analysis_start_time).total_seconds()
-            logger.info(f"🔍 BURNOUT ANALYSIS COMPLETE: {time_range_days}-day analysis finished in {total_analysis_duration:.2f}s")
             
             # Log performance breakdown
-            logger.info(f"🔍 BURNOUT ANALYSIS BREAKDOWN:")
             logger.info(f"  - Data fetch: {data_fetch_duration:.2f}s")
             logger.info(f"  - Team analysis: {team_analysis_duration:.2f}s")
             logger.info(f"  - Health calculation: {health_calc_duration:.3f}s")
@@ -840,25 +757,13 @@ class UnifiedBurnoutAnalyzer:
                 members = team_analysis_data.get("members") if team_analysis_data and isinstance(team_analysis_data, dict) else []
                 members_count = len(members) if isinstance(members, list) else 0
                 incidents_count = len(incidents) if isinstance(incidents, list) else 0
-                logger.info(f"🔍 BURNOUT ANALYSIS SUCCESS: Analyzed {members_count} members using {incidents_count} incidents over {time_range_days} days")
+                logger.info(f"Analysis complete: {members_count} members analyzed using {incidents_count} incidents")
 
-                # Enhanced logging for mock data (use_mock_data is defined at function scope)
-                if use_mock_data:
-                    logger.info("="*80)
-                    logger.info("🎭 FINAL MOCK DATA ANALYSIS RESULTS")
-                    logger.info(f"🎭 Total members in result: {members_count}")
-                    if members_count > 0:
-                        logger.info(f"🎭 Member details:")
-                        for member in members[:5]:  # Show first 5
-                            name = member.get('name', 'Unknown')
-                            score = member.get('burnout_score', 'N/A')
-                            risk = member.get('risk_level', 'N/A')
-                            has_github = 'github_insights' in member
-                            has_slack = 'slack_insights' in member
-                            logger.info(f"     - {name}: Score={score}, Risk={risk}, GitHub={has_github}, Slack={has_slack}")
-                    else:
-                        logger.error(f"🎭 ERROR: No members in final result!")
-                    logger.info("="*80)
+                # Enhanced logging for mock data
+                if self.use_mock_data:
+                    logger.info(f"🎭 Mock data analysis results: {members_count} members")
+                    if members_count == 0:
+                        logger.error(f"🎭 ERROR: No members in mock result!")
             except Exception as metrics_error:
                 logger.warning(f"Error logging success metrics: {metrics_error}")
             
