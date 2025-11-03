@@ -272,11 +272,13 @@ class RootlyAPIClient:
 
                 schedules_data = schedules_response.json()
                 schedules = schedules_data.get('data', [])
+                logger.info(f"📅 Found {len(schedules)} on-call schedules")
 
                 # Step 2: For each schedule, get shifts in the time range
                 for schedule in schedules:
                     schedule_id = schedule.get('id')
                     schedule_name = schedule.get('attributes', {}).get('name', 'Unknown')
+                    logger.info(f"📅 Checking schedule '{schedule_name}' (id: {schedule_id}) for shifts between {start_str} and {end_str}")
 
                     shifts_response = await client.get(
                         f"{self.base_url}/v1/schedules/{schedule_id}/shifts",
@@ -293,10 +295,15 @@ class RootlyAPIClient:
                     if shifts_response.status_code == 200:
                         shifts_data = shifts_response.json()
                         shifts = shifts_data.get('data', [])
+                        logger.info(f"✅ Schedule '{schedule_name}': Found {len(shifts)} shifts")
+                        if len(shifts) > 0:
+                            # Log first shift for debugging
+                            logger.info(f"📝 Sample shift data: {shifts[0]}")
                         all_shifts.extend(shifts)
                     else:
-                        logger.warning(f"Failed to fetch shifts for schedule {schedule_name}: {shifts_response.status_code}")
+                        logger.warning(f"❌ Failed to fetch shifts for schedule {schedule_name}: {shifts_response.status_code}")
 
+                logger.info(f"📊 Total shifts found across all schedules: {len(all_shifts)}")
                 return all_shifts
 
         except Exception as e:
