@@ -1765,8 +1765,8 @@ export default function Dashboard() {
           {/* Empty State or Loading State */}
           {!analysisRunning && !currentAnalysis && !searchParams.get('analysis') && (
             <>
-              {/* Show loading state if initial data hasn't loaded yet */}
-              {!initialDataLoaded ? (
+              {/* Show loading state if initial data hasn't loaded yet OR if we have analyses but currentAnalysis isn't set */}
+              {!initialDataLoaded || (previousAnalyses.length > 0 && !currentAnalysis) ? (
                 <Card className="text-center p-8">
                   <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                     <div className="w-8 h-8 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>

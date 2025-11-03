@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 
@@ -9,8 +9,13 @@ export default function AuthSuccessPage() {
   const router = useRouter()
   const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing')
   const [error, setError] = useState<string | null>(null)
+  const hasAttemptedAuth = useRef(false)
 
   useEffect(() => {
+    // Prevent double execution in React Strict Mode
+    if (hasAttemptedAuth.current) return
+    hasAttemptedAuth.current = true
+
     // ✅ ENTERPRISE PATTERN: 2-Step Server-Side Token Exchange
     const authenticateUser = async () => {
       try {
@@ -71,7 +76,8 @@ export default function AuthSuccessPage() {
         // Additional explicit clearing of potential problematic keys
         const explicitKeysToRemove = [
           'user_name', 'user_email', 'user_avatar', 'user_id',
-          'current_user', 'userInfo', 'userData', 'user_profile'
+          'current_user', 'userInfo', 'userData', 'user_profile',
+          'last_integrations_refresh' // Force fresh integration load on next page
         ]
         explicitKeysToRemove.forEach(key => {
           if (localStorage.getItem(key)) {
@@ -118,10 +124,10 @@ export default function AuthSuccessPage() {
         
         // Set success status
         setStatus('success')
-        
-        // Redirect to integrations page after a brief delay
+
+        // Redirect to dashboard after a brief delay
         setTimeout(() => {
-          router.push('/integrations')
+          router.push('/dashboard')
         }, 1500)
         
       } catch (err) {
@@ -188,7 +194,7 @@ export default function AuthSuccessPage() {
           Authentication Successful!
         </h2>
         <p className="text-gray-600">
-          Redirecting to integrations page...
+          Redirecting to dashboard...
         </p>
       </div>
     </div>

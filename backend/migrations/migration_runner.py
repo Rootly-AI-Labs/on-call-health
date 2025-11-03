@@ -386,7 +386,21 @@ class MigrationRunner:
                 ]
             },
             {
-                "name": "010_add_survey_recipients_to_integrations",
+                "name": "010_add_organization_id_to_user_burnout_reports",
+                "description": "Add organization_id to user_burnout_reports table",
+                "sql": [
+                    """
+                    ALTER TABLE user_burnout_reports
+                    ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id)
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_user_burnout_reports_organization_id
+                    ON user_burnout_reports(organization_id)
+                    """
+                ]
+            },
+            {
+                "name": "011_add_survey_recipients_to_integrations",
                 "description": "Add survey_recipients JSON field to rootly_integrations for storing selected survey recipients",
                 "sql": [
                     """
@@ -396,7 +410,7 @@ class MigrationRunner:
                 ]
             },
             {
-                "name": "011_ensure_user_correlation_platform_fields",
+                "name": "012_ensure_user_correlation_platform_fields",
                 "description": "Ensure github_username and slack_user_id fields exist in user_correlations for analytics",
                 "sql": [
                     """

@@ -85,7 +85,7 @@ class UserSyncService:
     async def _fetch_rootly_users(self, api_token: str) -> List[Dict[str, Any]]:
         """Fetch all users from Rootly API."""
         client = RootlyAPIClient(api_token)
-        raw_users = await client.get_users(limit=1000)  # Fetch up to 1000 users
+        raw_users = await client.get_users(limit=10000)  # Fetch up to 1000 users
 
         # Extract from JSONAPI format
         users = []
@@ -103,7 +103,7 @@ class UserSyncService:
     async def _fetch_pagerduty_users(self, api_token: str) -> List[Dict[str, Any]]:
         """Fetch all users from PagerDuty API."""
         client = PagerDutyAPIClient(api_token)
-        raw_users = await client.get_users(limit=1000)
+        raw_users = await client.get_users(limit=10000)
 
         # PagerDuty format (may need adjustment based on actual API response)
         users = []

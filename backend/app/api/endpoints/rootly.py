@@ -1086,7 +1086,7 @@ async def sync_integration_users(
                     )
                 # Fetch users directly from API
                 client = RootlyAPIClient(beta_token)
-                raw_users = await client.get_users(limit=1000)
+                raw_users = await client.get_users(limit=10000)
                 users = []
                 for user in raw_users:
                     attrs = user.get("attributes", {})
@@ -1106,7 +1106,7 @@ async def sync_integration_users(
                     )
                 # Fetch users directly from API
                 client = PagerDutyAPIClient(beta_token)
-                raw_users = await client.get_users(limit=1000)
+                raw_users = await client.get_users(limit=10000)
                 users = []
                 for user in raw_users:
                     users.append({

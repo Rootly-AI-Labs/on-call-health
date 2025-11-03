@@ -199,6 +199,12 @@ export default function useDashboard() {
         localStorage.setItem('last_integrations_refresh', now.toString())
         loadIntegrations(true, false)
       }
+
+      // Also sync selected organization from localStorage when page gains focus
+      const savedOrg = localStorage.getItem('selected_organization')
+      if (savedOrg && savedOrg !== selectedIntegration) {
+        setSelectedIntegration(savedOrg)
+      }
     }
 
     // Load cached integrations FIRST (before event listeners)
@@ -259,7 +265,8 @@ export default function useDashboard() {
         // Set loading to false when using cache
         setLoadingIntegrations(false)
         setHasDataFromCache(true)
-        
+        setInitialDataLoaded(true) // Mark as loaded since we have cached data
+
         // Still need to load previous analyses when using cache
         loadPreviousAnalyses()
 
@@ -275,7 +282,7 @@ export default function useDashboard() {
       }
     }
     document.addEventListener('visibilitychange', visibilityHandler)
-    
+
     const loadInitialData = async () => {
       try {
         // If we already have cached data, mark as loaded immediately
@@ -283,24 +290,26 @@ export default function useDashboard() {
           setInitialDataLoaded(true)
           return
         }
-        
+
+        // Set loading state to prevent "Setup Required" from flashing
+        setLoadingIntegrations(true)
+
         // Load data with individual error handling to prevent blocking
         const results = await Promise.allSettled([
           loadPreviousAnalyses(),
           loadIntegrations(false, false) // Don't force refresh, don't show global loading
         ])
-        
+
         // Log any failures but don't block the UI
         results.forEach((result, index) => {
           const functionNames = ['loadPreviousAnalyses', 'loadIntegrations']
           if (result.status === 'rejected') {
             }
         })
-        
-        // Small delay to ensure state updates have propagated
-        setTimeout(() => {
-          setInitialDataLoaded(true)
-        }, 100)
+
+        // Mark as loaded - the data is ready even if currentAnalysis isn't set yet
+        // The UI will update when currentAnalysis is set in the next render
+        setInitialDataLoaded(true)
       } catch (error) {
         // Always set to true to prevent endless loading, even if some data fails
         setInitialDataLoaded(true)
@@ -320,22 +329,27 @@ export default function useDashboard() {
         try {
           const updatedIntegrations = JSON.parse(e.newValue)
           setIntegrations(updatedIntegrations)
-          
+
           // Also check for GitHub/Slack updates
           const githubCache = localStorage.getItem('github_integration')
           const slackCache = localStorage.getItem('slack_integration')
-          
+
           if (githubCache) {
             const githubData = JSON.parse(githubCache)
             setGithubIntegration(githubData.connected ? githubData.integration : null)
           }
-          
+
           if (slackCache) {
             const slackData = JSON.parse(slackCache)
             setSlackIntegration(slackData.integration)
           }
         } catch (e) {
         }
+      }
+
+      // Listen for changes to selected organization
+      if (e.key === 'selected_organization' && e.newValue) {
+        setSelectedIntegration(e.newValue)
       }
     }
     
@@ -425,7 +439,20 @@ export default function useDashboard() {
     fetchPlatformMappings()
   }, [])
 
-  const loadPreviousAnalyses = async (append = false) => {
+  // Sync selectedIntegration with localStorage when integrations change
+  // This ensures the dashboard uses the correct organization after user changes it on integrations page
+  useEffect(() => {
+    if (integrations.length > 0) {
+      const savedOrg = localStorage.getItem('selected_organization')
+
+      // Only update if saved org exists in integrations and is different from current selection
+      if (savedOrg && integrations.find(i => i.id.toString() === savedOrg) && savedOrg !== selectedIntegration) {
+        setSelectedIntegration(savedOrg)
+      }
+    }
+  }, [integrations]) // Removed selectedIntegration from deps to prevent unnecessary re-renders
+
+  const loadPreviousAnalyses = async (append = false): Promise<boolean> => {
     // CRITICAL: Set loading state FIRST before any async operations
     if (append) {
       setLoadingMoreAnalyses(true)
@@ -434,7 +461,7 @@ export default function useDashboard() {
     try {
       const authToken = localStorage.getItem('auth_token')
       if (!authToken) {
-        return
+        return false
       }
 
       let response
@@ -488,11 +515,6 @@ export default function useDashboard() {
         setTotalAnalysesCount(data.total || newAnalyses.length)
         setHasMoreAnalyses(newAnalyses.length === 3 && (!data.total || previousAnalyses.length + newAnalyses.length < data.total))
 
-        // If this is the initial load (not append) and we got an empty array, ensure initial data is marked as loaded
-        if (!append && newAnalyses.length === 0) {
-          setTimeout(() => setInitialDataLoaded(true), 50)
-        }
-
         // If no specific analysis is loaded and we have analyses, load the most recent one (only for initial load)
         if (!append) {
           const urlParams = new URLSearchParams(window.location.search)
@@ -504,6 +526,8 @@ export default function useDashboard() {
             // Platform mappings will be fetched by the dedicated useEffect
           }
         }
+
+        return newAnalyses.length > 0
       } else {
         // Handle API errors (401, 404, 500, etc.)
         let errorText = 'Unknown error'
@@ -522,6 +546,7 @@ export default function useDashboard() {
         } else {
           toast.error("Failed to load analyses")
         }
+        return false
       }
     } catch (error) {
       // Check if this is a network connectivity issue (expected during Railway startup)
@@ -543,6 +568,7 @@ export default function useDashboard() {
       } else {
         toast.error("Error loading analyses")
       }
+      return false
     } finally {
       // CRITICAL: ALWAYS reset loading state in finally block
       if (append) {
@@ -1221,17 +1247,22 @@ export default function useDashboard() {
       }
     }
 
-    // If no integration selected but we have integrations available, auto-select the first one
+    // Always check localStorage for the latest selected organization
+    // This ensures we use the correct org even if state is stale
+    const savedOrg = localStorage.getItem('selected_organization')
     let integrationToUse = selectedIntegration
-    if (!integrationToUse && currentIntegrations.length > 0) {
-      // Use saved preference or first available
-      const savedOrg = localStorage.getItem('selected_organization')
-      if (savedOrg && currentIntegrations.find(i => i.id.toString() === savedOrg)) {
-        integrationToUse = savedOrg
-      } else {
-        integrationToUse = currentIntegrations[0].id.toString()
-        localStorage.setItem('selected_organization', integrationToUse)
+
+    // Prefer localStorage value if it exists and is valid
+    if (savedOrg && currentIntegrations.find(i => i.id.toString() === savedOrg)) {
+      integrationToUse = savedOrg
+      // Update state if it's different
+      if (integrationToUse !== selectedIntegration) {
+        setSelectedIntegration(integrationToUse)
       }
+    } else if (!integrationToUse && currentIntegrations.length > 0) {
+      // Fallback to first available if no saved preference
+      integrationToUse = currentIntegrations[0].id.toString()
+      localStorage.setItem('selected_organization', integrationToUse)
       setSelectedIntegration(integrationToUse)
     }
 

@@ -152,16 +152,8 @@ async def run_burnout_analysis(
                     detail="Integration not found or not active"
                 )
         
-        # Check API permissions before starting analysis
-        # Use beta token if available for permission check
+        # Check API permissions before starting analysis using customer's token
         check_token = integration.api_token
-        beta_rootly_token = os.getenv('ROOTLY_API_TOKEN')
-        beta_pagerduty_token = os.getenv('PAGERDUTY_API_TOKEN')
-        
-        if integration.platform == "rootly" and beta_rootly_token:
-            check_token = beta_rootly_token
-        elif integration.platform == "pagerduty" and beta_pagerduty_token:
-            check_token = beta_pagerduty_token
         
         try:
             # Check permissions based on platform
@@ -323,10 +315,17 @@ async def list_analyses(
             )
 
         query = query.filter(Analysis.rootly_integration_id == integration_id)
-    
+
+    # Fast check: if offset is 0, first check if any analyses exist
+    # This optimizes the common case of new users with no analyses
+    if offset == 0:
+        exists = db.query(query.exists()).scalar()
+        if not exists:
+            return AnalysisListResponse(analyses=[], total=0)
+
     # Get total count
     total = query.count()
-    
+
     # Apply pagination and ordering
     analyses = query.order_by(Analysis.created_at.desc()).offset(offset).limit(limit).all()
     
@@ -2487,18 +2486,10 @@ async def run_analysis_task(
             cleared_count = recorder.clear_analysis_mappings(analysis_id)
             logger.info(f"BACKGROUND_TASK: Cleared {cleared_count} existing mappings for analysis {analysis_id}")
         
-        # Check for beta testing fallback tokens first
-        beta_rootly_token = os.getenv('ROOTLY_API_TOKEN')
-        beta_pagerduty_token = os.getenv('PAGERDUTY_API_TOKEN')
-        
-        # Use beta token if available, otherwise use user's configured token
+        # Use the customer's token - beta tokens are handled separately during integration creation
+        # DO NOT override customer tokens with beta tokens here!
         effective_api_token = api_token
-        if platform == "rootly" and beta_rootly_token:
-            effective_api_token = beta_rootly_token
-            logger.info(f"BACKGROUND_TASK: Using beta Rootly token for analysis {analysis_id}")
-        elif platform == "pagerduty" and beta_pagerduty_token:
-            effective_api_token = beta_pagerduty_token
-            logger.info(f"BACKGROUND_TASK: Using beta PagerDuty token for analysis {analysis_id}")
+        logger.info(f"BACKGROUND_TASK: Using customer token for analysis {analysis_id} (integration_id: {integration_id})")
         
         # Fetch user-specific integration tokens if needed
         slack_token = None

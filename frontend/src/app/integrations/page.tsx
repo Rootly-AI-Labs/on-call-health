@@ -148,7 +148,8 @@ export default function IntegrationsPage() {
   const [activeTab, setActiveTab] = useState<"rootly" | "pagerduty" | null>(null)
   const [backUrl, setBackUrl] = useState<string>('/dashboard')
   const [selectedOrganization, setSelectedOrganization] = useState<string>("")
-  
+  const [navigatingToDashboard, setNavigatingToDashboard] = useState(false)
+
   // GitHub/Slack integration state
   const [githubIntegration, setGithubIntegration] = useState<GitHubIntegration | null>(null)
   const [slackIntegration, setSlackIntegration] = useState<SlackIntegration | null>(null)
@@ -440,6 +441,9 @@ export default function IntegrationsPage() {
   const [isAddingRootly, setIsAddingRootly] = useState(false)
   const [isAddingPagerDuty, setIsAddingPagerDuty] = useState(false)
   const [copied, setCopied] = useState(false)
+
+  // Ref for scrolling to form
+  const formSectionRef = useRef<HTMLDivElement>(null)
   
   // Edit/Delete state
   const [editingIntegration, setEditingIntegration] = useState<number | null>(null)
@@ -1537,17 +1541,138 @@ export default function IntegrationsPage() {
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
         {/* Introduction Text */}
-        <div className="text-center mb-8 max-w-3xl mx-auto">
-          <h2 className="text-2xl font-bold text-slate-900 mb-3">Connect Your Incident Management Platform</h2>
-          <p className="text-lg text-slate-600 mb-2">
-            Integrate with your incident management tool to analyze team burnout patterns
-          </p>
-          <p className="text-slate-500">
-            We analyze incident response patterns, on-call schedules, and workload distribution to identify burnout risk across your team
+        <div className="text-center mb-6 max-w-2xl mx-auto">
+          <h2 className="text-2xl font-bold text-slate-900 mb-2">Connect Your Platform</h2>
+          <p className="text-slate-600">
+            Integrate with Rootly or PagerDuty to analyze team burnout patterns
           </p>
         </div>
 
-        {/* Ready for Analysis CTA */}
+        {/* Dashboard Organization Selector */}
+        {integrations.length > 0 && (
+          <div className="max-w-2xl mx-auto mb-6">
+            <div className="bg-white border-2 border-slate-200 rounded-lg p-4 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 text-slate-700 flex-shrink-0">
+                  <Settings className="w-5 h-5 text-purple-600" />
+                  <span className="font-semibold">Active Organization</span>
+                </div>
+                <Select
+                  value={selectedOrganization}
+                  onValueChange={(value) => {
+                    // Only show toast if selecting a different organization
+                    if (value !== selectedOrganization) {
+                      const selected = integrations.find(i => i.id.toString() === value)
+                      if (selected) {
+                        toast.success(`${selected.name} set as default`)
+                      }
+                    }
+
+                    setSelectedOrganization(value)
+                    // Save to localStorage for persistence
+                    localStorage.setItem('selected_organization', value)
+                  }}
+                >
+                  <SelectTrigger className="flex-1 h-10 bg-slate-50 border-slate-300 hover:bg-slate-100 transition-colors">
+                    <SelectValue placeholder="Select organization">
+                      {selectedOrganization && (() => {
+                        const selected = integrations.find(i => i.id.toString() === selectedOrganization)
+                        if (selected) {
+                          return (
+                            <div className="flex items-center justify-between w-full">
+                              <div className="flex items-center gap-2">
+                                <div className={`w-2.5 h-2.5 rounded-full ${
+                                  selected.platform === 'rootly' ? 'bg-purple-500' : 'bg-green-500'
+                                }`}></div>
+                                <span className="font-medium">{selected.name}</span>
+                              </div>
+                              <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 flex-shrink-0" />
+                            </div>
+                          )
+                        }
+                        return null
+                      })()}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent className="max-w-md">
+                    {/* Group integrations by platform */}
+                    {(() => {
+                      const rootlyIntegrations = integrations.filter(i => i.platform === 'rootly')
+                      const pagerdutyIntegrations = integrations.filter(i => i.platform === 'pagerduty')
+
+                      return (
+                        <>
+                          {/* Rootly Organizations */}
+                          {rootlyIntegrations.length > 0 && (
+                            <>
+                              <div className="px-3 py-2 text-xs font-semibold text-slate-600 bg-slate-50 border-b border-slate-200">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-2.5 h-2.5 bg-purple-500 rounded-full"></div>
+                                  Rootly Organizations
+                                </div>
+                              </div>
+                              {rootlyIntegrations.map((integration) => (
+                                <SelectItem
+                                  key={integration.id}
+                                  value={integration.id.toString()}
+                                  className="cursor-pointer"
+                                >
+                                  <div className="flex items-center justify-between w-full gap-2">
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-2.5 h-2.5 bg-purple-500 rounded-full"></div>
+                                      <span className="font-medium">{integration.name}</span>
+                                    </div>
+                                    {selectedOrganization === integration.id.toString() && (
+                                      <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 flex-shrink-0" />
+                                    )}
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </>
+                          )}
+
+                          {/* PagerDuty Organizations */}
+                          {pagerdutyIntegrations.length > 0 && (
+                            <>
+                              {rootlyIntegrations.length > 0 && (
+                                <div className="my-1 border-t border-slate-200"></div>
+                              )}
+                              <div className="px-3 py-2 text-xs font-semibold text-slate-600 bg-slate-50 border-b border-slate-200">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-2.5 h-2.5 bg-green-500 rounded-full"></div>
+                                  PagerDuty Organizations
+                                </div>
+                              </div>
+                              {pagerdutyIntegrations.map((integration) => (
+                                <SelectItem
+                                  key={integration.id}
+                                  value={integration.id.toString()}
+                                  className="cursor-pointer"
+                                >
+                                  <div className="flex items-center justify-between w-full gap-2">
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-2.5 h-2.5 bg-green-500 rounded-full"></div>
+                                      <span className="font-medium">{integration.name}</span>
+                                    </div>
+                                    {selectedOrganization === integration.id.toString() && (
+                                      <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 flex-shrink-0" />
+                                    )}
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </>
+                          )}
+                        </>
+                      )
+                    })()}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Ready for Analysis CTA - Always visible when integrations exist */}
         {(loadingRootly || loadingPagerDuty) ? (
           <div className="bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 rounded-lg p-6 mb-8 max-w-2xl mx-auto animate-pulse">
             <div className="text-center">
@@ -1568,15 +1693,29 @@ export default function IntegrationsPage() {
                 Ready to analyze your team's burnout risk!
               </h3>
               <p className="text-slate-600 mb-4">
-                You have {integrations.length} integration{integrations.length > 1 ? 's' : ''} connected. 
+                You have {integrations.length} integration{integrations.length > 1 ? 's' : ''} connected.
                 Run your first analysis to identify burnout patterns across your team.
               </p>
-              <Link href="/dashboard">
-                <Button className="bg-purple-600 hover:bg-purple-700 text-white">
-                  <Activity className="w-4 h-4 mr-2" />
-                  Go to Dashboard
-                </Button>
-              </Link>
+              <Button
+                className="bg-purple-600 hover:bg-purple-700 text-white"
+                onClick={() => {
+                  setNavigatingToDashboard(true)
+                  router.push('/dashboard')
+                }}
+                disabled={navigatingToDashboard}
+              >
+                {navigatingToDashboard ? (
+                  <>
+                    <div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Loading Dashboard...
+                  </>
+                ) : (
+                  <>
+                    <Activity className="w-4 h-4 mr-2" />
+                    Go to Dashboard
+                  </>
+                )}
+              </Button>
             </div>
           </div>
         )}
@@ -1604,6 +1743,10 @@ export default function IntegrationsPage() {
                   setPreviewData(null)
                   setDuplicateInfo(null)
                   setTokenError(null)
+                  // Scroll to form
+                  setTimeout(() => {
+                    formSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                  }, 100)
                 }}
               >
                 {activeTab === 'rootly' && (
@@ -1655,6 +1798,10 @@ export default function IntegrationsPage() {
                 setPreviewData(null)
                 setDuplicateInfo(null)
                 setTokenError(null)
+                // Scroll to form
+                setTimeout(() => {
+                  formSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                }, 100)
               }}
             >
               {activeTab === 'pagerduty' && (
@@ -1680,126 +1827,7 @@ export default function IntegrationsPage() {
           ))}
         </div>
 
-        {/* Organization Selector */}
-        {integrations.length > 0 && (
-          <Card className="mt-8 mb-8 max-w-2xl mx-auto border-2 border-purple-200 bg-purple-50">
-            <CardHeader className="pb-4">
-              <CardTitle className="text-xl flex items-center">
-                <Settings className="w-5 h-5 mr-2 text-purple-600" />
-                Dashboard Organization
-              </CardTitle>
-              <CardDescription className="text-base">
-                Select which organization to analyze on the dashboard.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pb-6">
-              <Select
-                value={selectedOrganization}
-                onValueChange={(value) => {
-                  // Only show toast if selecting a different organization
-                  if (value !== selectedOrganization) {
-                    const selected = integrations.find(i => i.id.toString() === value)
-                    if (selected) {
-                      toast.success(`${selected.name} has been set as your default organization.`)
-                    }
-                  }
-
-                  setSelectedOrganization(value)
-                  // Save to localStorage for persistence
-                  localStorage.setItem('selected_organization', value)
-                }}
-              >
-                <SelectTrigger className="w-full h-12 text-base bg-white">
-                  <SelectValue placeholder="Choose an organization to analyze">
-                    {selectedOrganization && (() => {
-                      const selected = integrations.find(i => i.id.toString() === selectedOrganization)
-                      if (selected) {
-                        return (
-                          <div className="flex items-center justify-between w-full">
-                            <div className="flex items-center">
-                              <div className={`w-2 h-2 rounded-full mr-2 ${
-                                selected.platform === 'rootly' ? 'bg-purple-500' : 'bg-green-500'
-                              }`}></div>
-                              {selected.name}
-                            </div>
-                            <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 ml-2" />
-                          </div>
-                        )
-                      }
-                      return null
-                    })()}
-                  </SelectValue>
-                </SelectTrigger>
-              <SelectContent>
-                {/* Group integrations by platform */}
-                {(() => {
-                  const rootlyIntegrations = integrations.filter(i => i.platform === 'rootly')
-                  const pagerdutyIntegrations = integrations.filter(i => i.platform === 'pagerduty')
-                  
-                  return (
-                    <>
-                      {/* Rootly Organizations */}
-                      {rootlyIntegrations.length > 0 && (
-                        <>
-                          <div className="px-2 py-1.5 text-xs font-medium text-gray-500 bg-gray-50 border-b">
-                            <div className="flex items-center">
-                              <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
-                              Rootly Organizations
-                            </div>
-                          </div>
-                          {rootlyIntegrations.map((integration) => (
-                            <SelectItem key={integration.id} value={integration.id.toString()}>
-                              <div className="flex items-center justify-between w-full">
-                                <div className="flex items-center">
-                                  <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
-                                  {integration.name}
-                                </div>
-                                {selectedOrganization === integration.id.toString() && (
-                                  <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 ml-2" />
-                                )}
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </>
-                      )}
-                      
-                      {/* PagerDuty Organizations */}
-                      {pagerdutyIntegrations.length > 0 && (
-                        <>
-                          {rootlyIntegrations.length > 0 && (
-                            <div className="my-1 border-t border-gray-200"></div>
-                          )}
-                          <div className="px-2 py-1.5 text-xs font-medium text-gray-500 bg-gray-50 border-b">
-                            <div className="flex items-center">
-                              <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                              PagerDuty Organizations
-                            </div>
-                          </div>
-                          {pagerdutyIntegrations.map((integration) => (
-                            <SelectItem key={integration.id} value={integration.id.toString()}>
-                              <div className="flex items-center justify-between w-full">
-                                <div className="flex items-center">
-                                  <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                                  {integration.name}
-                                </div>
-                                {selectedOrganization === integration.id.toString() && (
-                                  <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 ml-2" />
-                                )}
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </>
-                      )}
-                    </>
-                  )
-                })()}
-              </SelectContent>
-              </Select>
-            </CardContent>
-          </Card>
-        )}
-
-        <div className="space-y-6">
+        <div ref={formSectionRef} className="space-y-6 scroll-mt-20">
 
             {/* Add Rootly Integration Form */}
             {addingPlatform === 'rootly' && (

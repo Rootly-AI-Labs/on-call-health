@@ -527,10 +527,18 @@ class RootlyAPIClient:
             if connection_test["status"] != "success":
                 raise Exception(f"Connection test failed: {connection_test['message']}")
 
-            # Collect users and incidents
-            users_task = self.get_users(limit=1000)
+            # Log expected data volume based on time range
+            expected_incident_multiplier = days_back / 7  # Relative to 7-day baseline
+            logger.info(f"🔍 DATA VOLUME ESTIMATE: {days_back}-day analysis expected to fetch ~{expected_incident_multiplier:.1f}x more incidents than 7-day analysis")
 
-            # Use conservative incident limits to prevent timeout
+            # Collect users and incidents in parallel (no limits for complete data collection)
+            users_start = datetime.now()
+            incidents_start = datetime.now()
+
+            logger.info(f"🔍 USER FETCH: Starting user collection for {days_back}-day analysis (limit: 10000)")
+            users_task = self.get_users(limit=10000)  # Get all users (increased from 1000)
+
+            # Use conservative incident limits to prevent timeout on longer analyses
             incident_limits_by_range = {
                 7: 1500,
                 14: 2000,
