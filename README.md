@@ -102,7 +102,7 @@ python -m pytest
 
 ## 📊 Burnout Analysis
 
-The application uses the **Copenhagen Burnout Inventory (CBI)** methodology - a scientifically validated approach to measuring burnout risk in professional settings.
+The Burnout Detector takes inspiration from the **Copenhagen Burnout Inventory (CBI)** methodology - a scientifically validated approach to measuring burnout risk in professional settings. The Burnout Detector isn’t a medical tool and doesn’t provide a diagnosis; it is designed to help identify patterns and trends that may suggest overwork.
 
 ### CBI Methodology
 Our implementation uses the two core CBI dimensions specifically validated for software engineering teams:
@@ -171,4 +171,4 @@ This project is licensed under the MIT License.
 
 ---
 
-Built with ❤️ for engineering teams everywhere.
+Built with ❤️ by the [Rootly AI Labs](https://rootly.com/ai-labs) for engineering teams everywhere.
