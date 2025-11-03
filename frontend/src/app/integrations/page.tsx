@@ -3395,7 +3395,7 @@ export default function IntegrationsPage() {
 
       {/* Team Members Drawer */}
       <Sheet open={teamMembersDrawerOpen} onOpenChange={handleDrawerClose}>
-        <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
+        <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto flex flex-col">
           <SheetHeader>
             <div className="flex items-start justify-between pr-10 gap-4">
               <div>
@@ -3428,39 +3428,6 @@ export default function IntegrationsPage() {
                     </>
                   )}
                 </Button>
-                {/* Hide save button for beta integrations, only show when there are unsaved changes */}
-                {selectedOrganization && !['beta-rootly', 'beta-pagerduty'].includes(selectedOrganization) && hasUnsavedChanges() && (
-                  <>
-                    <Button
-                      onClick={discardRecipientChanges}
-                      disabled={savingRecipients}
-                      variant="ghost"
-                      size="default"
-                    >
-                      <X className="w-4 h-4 mr-2" />
-                      Cancel
-                    </Button>
-                    <Button
-                      onClick={saveSurveyRecipients}
-                      disabled={savingRecipients}
-                      variant="default"
-                      size="default"
-                      className="bg-purple-600 hover:bg-purple-700"
-                    >
-                      {savingRecipients ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Saving...
-                        </>
-                      ) : (
-                        <>
-                          <Check className="w-4 h-4 mr-2" />
-                          Save Changes
-                        </>
-                      )}
-                    </Button>
-                  </>
-                )}
               </div>
             </div>
           </SheetHeader>
@@ -3749,6 +3716,48 @@ export default function IntegrationsPage() {
               </div>
             )}
           </div>
+
+          {/* Sticky Footer with Save/Cancel buttons */}
+          {selectedOrganization && !['beta-rootly', 'beta-pagerduty'].includes(selectedOrganization) && hasUnsavedChanges() && (
+            <div className="sticky bottom-0 left-0 right-0 border-t bg-white p-4 mt-auto">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-sm text-orange-600 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4" />
+                  <span>You have unsaved changes</span>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={discardRecipientChanges}
+                    disabled={savingRecipients}
+                    variant="outline"
+                    size="default"
+                  >
+                    <X className="w-4 h-4 mr-2" />
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={saveSurveyRecipients}
+                    disabled={savingRecipients}
+                    variant="default"
+                    size="default"
+                    className="bg-purple-600 hover:bg-purple-700"
+                  >
+                    {savingRecipients ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-4 h-4 mr-2" />
+                        Save Changes
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
         </SheetContent>
       </Sheet>
 
