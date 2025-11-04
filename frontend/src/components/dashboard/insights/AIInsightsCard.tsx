@@ -13,9 +13,9 @@ interface AIInsightsCardProps {
 export function AIInsightsCard({ currentAnalysis }: AIInsightsCardProps) {
   const router = useRouter()
 
-  // Only show if AI insights are available AND have actual content
+  // Only show if AI insights data exists (show even if unavailable/loading)
   const aiInsights = currentAnalysis?.analysis_data?.ai_team_insights;
-  if (!aiInsights?.available || !aiInsights?.insights?.llm_team_analysis) {
+  if (!aiInsights?.available) {
     return null
   }
 
