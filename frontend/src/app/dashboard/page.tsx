@@ -262,7 +262,7 @@ export default function Dashboard() {
               {!sidebarCollapsed && previousAnalyses.length > 0 && (
                 <p className="text-xs text-gray-400 uppercase tracking-wide px-2 py-1 mt-4">Recent</p>
               )}
-              <div className="max-h-96 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">
+              <div className="max-h-96 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 relative">
                 {!initialDataLoaded && previousAnalyses.length === 0 ? (
                   // Show loading state for analyses
                   <div className="flex items-center justify-center py-8">
