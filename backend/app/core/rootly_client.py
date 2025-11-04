@@ -198,9 +198,11 @@ class RootlyAPIClient:
             async with httpx.AsyncClient() as client:
                 while len(all_users) < limit:
                     # URL encode the parameters manually since httpx doesn't encode brackets properly
+                    # Include role and on_call_role to identify licensed incident responders
                     params_encoded = urlencode({
                         "page[number]": page,
-                        "page[size]": page_size
+                        "page[size]": page_size,
+                        "include": "role,on_call_role"
                     })
 
                     response = await client.get(
@@ -237,11 +239,40 @@ class RootlyAPIClient:
                     page += 1
 
                 return all_users[:limit]
-                
+
         except Exception as e:
             logger.error(f"Error fetching users: {e}")
             raise
-    
+
+    def filter_incident_responders(self, users: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Filter users to only those with on-call roles (licensed incident responders).
+
+        Args:
+            users: List of user objects from Rootly API with included relationships
+
+        Returns:
+            List of users who have an on_call_role (incident responders with seats)
+        """
+        incident_responders = []
+
+        for user in users:
+            try:
+                # Check if user has an on_call_role relationship
+                relationships = user.get('relationships', {})
+                on_call_role = relationships.get('on_call_role', {})
+
+                # If on_call_role has data, this user is a licensed incident responder
+                if on_call_role.get('data'):
+                    incident_responders.append(user)
+
+            except Exception as e:
+                logger.warning(f"Error checking on_call_role for user: {e}")
+                continue
+
+        logger.info(f"Filtered {len(users)} total users to {len(incident_responders)} incident responders with on-call roles")
+        return incident_responders
+
     async def get_on_call_shifts(self, start_date: datetime, end_date: datetime) -> List[Dict[str, Any]]:
         """
         Get on-call shifts for a specific time period from Rootly.
@@ -565,6 +596,17 @@ class RootlyAPIClient:
 
             # Collect users (required)
             users = await users_task
+
+            # Filter to only incident responders (users with on-call roles/licensed seats)
+            # This is critical for large organizations with 5k+ users but only ~100-200 responders
+            if users:
+                total_users = len(users)
+                users = self.filter_incident_responders(users)
+                logger.info(f"👥 INCIDENT_RESPONDER_FILTER: Filtered from {total_users} total users to {len(users)} licensed incident responders")
+
+                if len(users) == 0:
+                    logger.warning(f"👥 INCIDENT_RESPONDER_FILTER: No users with on_call_role found - falling back to all users")
+                    users = await users_task  # Reset to original list
 
             # Try to collect incidents but don't fail if permission denied
             incidents = []
