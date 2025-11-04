@@ -67,8 +67,8 @@ export function AIInsightsCard({ currentAnalysis }: AIInsightsCardProps) {
             return (
               <div className="text-center py-12 text-gray-500">
                 <Sparkles className="h-10 w-10 mx-auto mb-4 opacity-40" />
-                <h4 className="font-medium text-gray-700 mb-2">AI Insights Unavailable</h4>
-                <p className="text-sm">Enable AI insights when running your next analysis</p>
+                <h4 className="font-medium text-gray-700 mb-2">No AI Insights Generated</h4>
+                <p className="text-sm">Run a new analysis to generate AI insights</p>
               </div>
             )
           }
