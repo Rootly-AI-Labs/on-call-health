@@ -1325,9 +1325,9 @@ You are an expert burnout analyst reviewing a software team's health data. Gener
         
         response = requests.post(
             "https://api.anthropic.com/v1/messages",
-            headers=headers, 
+            headers=headers,
             json=data,
-            timeout=30
+            timeout=120  # Increased timeout for Claude 4.5
         )
         
         if response.status_code == 200:
