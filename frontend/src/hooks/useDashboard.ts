@@ -549,7 +549,9 @@ export default function useDashboard() {
         return false
       }
     } catch (error) {
-      // Check if this is a network connectivity issue (expected during Railway startup)
+      console.error('Unexpected error in loadPreviousAnalyses:', error)
+
+      // Check if this is a network connectivity issue
       const isNetworkError = error instanceof Error && (
         error.message.includes('fetch') ||
         error.message.includes('network') ||
@@ -557,11 +559,6 @@ export default function useDashboard() {
         error.message.includes('TypeError') ||
         error.name === 'TypeError'
       )
-
-      // Only log non-network errors
-      if (!isNetworkError) {
-        console.error('Unexpected error in loadPreviousAnalyses:', error)
-      }
 
       if (isNetworkError) {
         toast.error("Cannot connect to backend")
@@ -739,9 +736,9 @@ export default function useDashboard() {
         }
       })
 
-      // Treat both 200 and 404 as success (404 means already deleted)
-      if (response.ok || response.status === 404) {
 
+      if (response.ok) {
+        
         // Immediately remove from local state - be more explicit about ID matching
         setPreviousAnalyses(prev => {
           const filtered = prev.filter(a => {
@@ -750,22 +747,22 @@ export default function useDashboard() {
           })
           return filtered
         })
-
+        
         // If the deleted analysis was currently selected, clear it
         if (currentAnalysis?.id === analysisToDelete.id) {
           setCurrentAnalysis(null)
           updateURLWithAnalysis(null)
         }
-
+        
         toast.success("Analysis deleted")
-
+        
         // Close dialog and reset state
         setDeleteDialogOpen(false)
         setAnalysisToDelete(null)
-
+        
         // Also reload from server to ensure consistency
         setTimeout(() => loadPreviousAnalyses(), 500)
-
+        
       } else {
         const errorData = await response.json()
         throw new Error(errorData.detail || 'Failed to delete analysis')
@@ -1436,9 +1433,7 @@ export default function useDashboard() {
               }
             })
           } catch (networkError) {
-            // Network error (including CORS errors from 502) - silently retry
-            pollRetryCount++
-            return
+            throw new Error('Cannot connect to backend server during polling')
           }
 
           if (pollResponse.ok) {
@@ -1448,13 +1443,9 @@ export default function useDashboard() {
             setAnalysisRunning(false)
             setCurrentRunningAnalysisId(null)
             toast.error("Analysis was deleted or no longer exists")
-
+            
             // Try to load the most recent analysis as fallback
             await loadPreviousAnalyses()
-            return
-          } else if (pollResponse.status === 502 || pollResponse.status === 503) {
-            // Backend temporarily unavailable - silently retry
-            pollRetryCount++
             return
           } else {
             // Other HTTP errors - treat as polling failure
