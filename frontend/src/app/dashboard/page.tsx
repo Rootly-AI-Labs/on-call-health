@@ -1920,9 +1920,26 @@ export default function Dashboard() {
               
               // Only check permissions for Rootly integrations, not PagerDuty
               if (selectedIntegration?.platform === 'rootly') {
+                // Check if permissions have been loaded (undefined = not loaded yet, false/true = loaded)
+                const permissionsLoaded = selectedIntegration?.permissions !== undefined;
                 const hasUserPermission = selectedIntegration?.permissions?.users?.access;
                 const hasIncidentPermission = selectedIntegration?.permissions?.incidents?.access;
-                
+
+                // Show loader if permissions haven't been loaded yet
+                if (!permissionsLoaded || loadingIntegrations) {
+                  return (
+                    <Alert className="border-blue-200 bg-blue-50 py-2 px-3">
+                      <div className="flex items-center gap-2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                        <AlertDescription className="text-blue-800 text-sm">
+                          Checking permissions...
+                        </AlertDescription>
+                      </div>
+                    </Alert>
+                  );
+                }
+
+                // Show error only if permissions are loaded but missing
                 if (!hasUserPermission || !hasIncidentPermission) {
                   return (
                     <Alert className="border-red-200 bg-red-50 py-2 px-3">
@@ -1930,10 +1947,10 @@ export default function Dashboard() {
                       <AlertDescription className="text-red-800 text-sm">
                         <strong>Missing Required Permissions</strong>
                         <span className="block mt-1">
-                          {!hasUserPermission && !hasIncidentPermission 
-                            ? "User and incident read access required" 
-                            : !hasUserPermission 
-                            ? "User read access required" 
+                          {!hasUserPermission && !hasIncidentPermission
+                            ? "User and incident read access required"
+                            : !hasUserPermission
+                            ? "User read access required"
                             : "Incident read access required"}
                         </span>
                         <span className="text-xs opacity-75">Update API token permissions in Rootly settings</span>
