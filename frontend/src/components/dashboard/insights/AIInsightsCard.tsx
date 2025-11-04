@@ -13,8 +13,9 @@ interface AIInsightsCardProps {
 export function AIInsightsCard({ currentAnalysis }: AIInsightsCardProps) {
   const router = useRouter()
 
-  // Only show if AI insights are available
-  if (!currentAnalysis?.analysis_data?.ai_team_insights?.available) {
+  // Only show if AI insights are available AND have actual content
+  const aiInsights = currentAnalysis?.analysis_data?.ai_team_insights;
+  if (!aiInsights?.available || !aiInsights?.insights?.llm_team_analysis) {
     return null
   }
 
@@ -67,14 +68,7 @@ export function AIInsightsCard({ currentAnalysis }: AIInsightsCardProps) {
               <div className="text-center py-12 text-gray-500">
                 <Sparkles className="h-10 w-10 mx-auto mb-4 opacity-40" />
                 <h4 className="font-medium text-gray-700 mb-2">AI Insights Unavailable</h4>
-                <p className="text-sm mb-4">Configure your AI token to enable intelligent team insights</p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => router.push('/settings')}
-                >
-                  Configure AI Settings
-                </Button>
+                <p className="text-sm">Enable AI insights when running your next analysis</p>
               </div>
             )
           }
