@@ -1300,14 +1300,7 @@ class UnifiedBurnoutAnalyzer:
         # Calculate confidence intervals and data quality
         confidence = self._calculate_confidence_intervals(metrics, incidents, github_data, slack_data, user_tz)
         
-        # CBI DEBUG LOGGING - Track score calculation
-        print(f"🐛 CBI RAILWAY DEBUG - User: {user_email}")
-        print(f"🐛 CBI RAILWAY DEBUG - Personal: {dimensions['personal_burnout']}, Work: {dimensions['work_related_burnout']}, Accomplishment: {dimensions['accomplishment_burnout']}")
-        logger.info(f"🐛 CBI METRICS DEBUG - User: {user_email}")
-        logger.info(f"🐛 CBI METRICS DEBUG - Input metrics: {metrics}")
-        logger.info(f"🐛 CBI METRICS DEBUG - Personal burnout: {dimensions['personal_burnout']}")
-        logger.info(f"🐛 CBI METRICS DEBUG - Work burnout: {dimensions['work_related_burnout']}")
-        logger.info(f"🐛 CBI METRICS DEBUG - Accomplishment burnout: {dimensions['accomplishment_burnout']}")
+        # CBI DEBUG LOGGING - Removed to reduce Railway log noise
         
         # Calculate overall burnout score using three-factor methodology (equal weighting)
         burnout_score = (dimensions["personal_burnout"] * 0.333 + 
@@ -1317,8 +1310,7 @@ class UnifiedBurnoutAnalyzer:
         # Ensure overall score is never negative
         burnout_score = max(0, burnout_score)
         
-        print(f"🐛 CBI RAILWAY DEBUG - Final score: {burnout_score} (was using HARDCODED PLACEHOLDERS before!)")
-        logger.info(f"🐛 CBI METRICS DEBUG - Final burnout score: {burnout_score}")
+        # Debug logging removed to reduce noise
         
         # Determine risk level
         risk_level = self._determine_risk_level(burnout_score)
@@ -1463,18 +1455,12 @@ class UnifiedBurnoutAnalyzer:
         # Check if all CBI metrics are 0
         non_zero_metrics = {k: v for k, v in cbi_metrics.items() if v > 0}
         if not non_zero_metrics:
-            logger.warning(f"🐛 WARNING: ALL CBI metrics are 0 for {user_name} with {len(incidents)} incidents!")
-        else:
-            logger.info(f"🐛 Non-zero CBI metrics: {non_zero_metrics}")
-        
+            logger.warning(f"⚠️ ALL CBI metrics are 0 for {user_name} with {len(incidents)} incidents!")
+
         # Calculate CBI dimensions
         personal_cbi = calculate_personal_burnout(cbi_metrics)
-        work_cbi = calculate_work_related_burnout(cbi_metrics) 
+        work_cbi = calculate_work_related_burnout(cbi_metrics)
         composite_cbi = calculate_composite_cbi_score(personal_cbi['score'], work_cbi['score'])
-        
-        # CBI DEBUG - Now we have composite_cbi calculated
-        print(f"🐛 CBI RAILWAY DEBUG - CBI composite score: {round(composite_cbi['composite_score'], 2)}")
-        logger.info(f"🐛 CBI METRICS DEBUG - CBI composite score: {round(composite_cbi['composite_score'], 2)}")
         
         # Prepare enhanced metrics with research insights for CBI reasoning
         enhanced_metrics = metrics.copy()
