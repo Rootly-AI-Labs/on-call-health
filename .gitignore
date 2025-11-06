@@ -36,6 +36,7 @@ test.db
 # Environment variables
 .env
 secrets.env
+backend/.env
 
 # All markdown files except README and critical docs (internal documentation not for public release)
 *.md
