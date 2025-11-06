@@ -48,7 +48,7 @@
                 },
                 "team_health": {
                     "overall_score": 56.17,
-                    "scoring_method": "CBI",
+                    "scoring_method": "OCB",
                     "risk_distribution": {
                         "low": 4,
                         "medium": 2,
@@ -66,7 +66,7 @@
                             "user_name": "Kumbi Maposa",
                             "user_email": "kumbi@rootly.com",
                             "burnout_score": 6.63,
-                            "cbi_score": 64.46,
+                            "ocb_score": 64.46,
                             "risk_level": "high",
                             "incident_count": 48,
                             "factors": {
@@ -80,13 +80,13 @@
                                 "work_related_burnout": 6.16,
                                 "accomplishment_burnout": 6.0
                             },
-                            "cbi_breakdown": {
+                            "ocb_breakdown": {
                                 "personal": 78.42,
                                 "work_related": 50.5,
                                 "interpretation": "moderate"
                             },
-                            "cbi_reasoning": [
-                                "High burnout risk (CBI: 64/100) - monitor closely",
+                            "ocb_reasoning": [
+                                "High burnout risk (OCB: 64/100) - monitor closely",
                                 "Personal burnout factors:",
                                 "   • Critical incidents and on-call stress affecting sleep quality (37.5 points)",
                                 "   • High incident load preventing proper recovery time (22.5 points)",
@@ -258,7 +258,7 @@
                             "user_name": "JP Cheung",
                             "user_email": "jp@rootly.com",
                             "burnout_score": 6.18,
-                            "cbi_score": 69.03,
+                            "ocb_score": 69.03,
                             "risk_level": "high",
                             "incident_count": 46,
                             "factors": {
@@ -272,13 +272,13 @@
                                 "work_related_burnout": 6.1,
                                 "accomplishment_burnout": 6.0
                             },
-                            "cbi_breakdown": {
+                            "ocb_breakdown": {
                                 "personal": 77.97,
                                 "work_related": 60.1,
                                 "interpretation": "moderate"
                             },
-                            "cbi_reasoning": [
-                                "High burnout risk (CBI: 69/100) - monitor closely",
+                            "ocb_reasoning": [
+                                "High burnout risk (OCB: 69/100) - monitor closely",
                                 "Personal burnout factors:",
                                 "   • Critical incidents and on-call stress affecting sleep quality (37.5 points)",
                                 "   • High incident load preventing proper recovery time (22.5 points)",
@@ -453,7 +453,7 @@
                             "user_name": "Mark Grod",
                             "user_email": "mark@rootly.com",
                             "burnout_score": 6.1,
-                            "cbi_score": 63.53,
+                            "ocb_score": 63.53,
                             "risk_level": "high",
                             "incident_count": 38,
                             "factors": {
@@ -467,13 +467,13 @@
                                 "work_related_burnout": 5.62,
                                 "accomplishment_burnout": 5.43
                             },
-                            "cbi_breakdown": {
+                            "ocb_breakdown": {
                                 "personal": 77.45,
                                 "work_related": 49.62,
                                 "interpretation": "moderate"
                             },
-                            "cbi_reasoning": [
-                                "High burnout risk (CBI: 64/100) - monitor closely",
+                            "ocb_reasoning": [
+                                "High burnout risk (OCB: 64/100) - monitor closely",
                                 "Personal burnout factors:",
                                 "   • Critical incidents and on-call stress affecting sleep quality (37.5 points)",
                                 "   • High incident load preventing proper recovery time (22.5 points)",
@@ -640,7 +640,7 @@
                             "user_name": "Andre King",
                             "user_email": "andre@rootly.com",
                             "burnout_score": 5.97,
-                            "cbi_score": 70.58,
+                            "ocb_score": 70.58,
                             "risk_level": "high",
                             "incident_count": 36,
                             "factors": {
@@ -654,13 +654,13 @@
                                 "work_related_burnout": 5.57,
                                 "accomplishment_burnout": 5.2
                             },
-                            "cbi_breakdown": {
+                            "ocb_breakdown": {
                                 "personal": 77.5,
                                 "work_related": 63.66,
                                 "interpretation": "moderate"
                             },
-                            "cbi_reasoning": [
-                                "High burnout risk (CBI: 71/100) - monitor closely",
+                            "ocb_reasoning": [
+                                "High burnout risk (OCB: 71/100) - monitor closely",
                                 "Personal burnout factors:",
                                 "   • Critical incidents and on-call stress affecting sleep quality (37.5 points)",
                                 "   • High incident load preventing proper recovery time (22.5 points)",
@@ -836,7 +836,7 @@
                             "user_name": "Purvai Nanda",
                             "user_email": "purvai@rootly.com",
                             "burnout_score": 5.85,
-                            "cbi_score": 70.16,
+                            "ocb_score": 70.16,
                             "risk_level": "high",
                             "incident_count": 39,
                             "factors": {
@@ -850,13 +850,13 @@
                                 "work_related_burnout": 5.69,
                                 "accomplishment_burnout": 5.55
                             },
-                            "cbi_breakdown": {
+                            "ocb_breakdown": {
                                 "personal": 77.33,
                                 "work_related": 63.0,
                                 "interpretation": "moderate"
                             },
-                            "cbi_reasoning": [
-                                "High burnout risk (CBI: 70/100) - monitor closely",
+                            "ocb_reasoning": [
+                                "High burnout risk (OCB: 70/100) - monitor closely",
                                 "Personal burnout factors:",
                                 "   • Critical incidents and on-call stress affecting sleep quality (37.5 points)",
                                 "   • High incident load preventing proper recovery time (22.5 points)",
@@ -1030,7 +1030,7 @@
                             "user_name": "Jamie Baker",
                             "user_email": "jamie@rootly.com",
                             "burnout_score": 3.95,
-                            "cbi_score": 65.0,
+                            "ocb_score": 65.0,
                             "risk_level": "medium",
                             "incident_count": 32,
                             "factors": {
@@ -1044,13 +1044,13 @@
                                 "work_related_burnout": 5.28,
                                 "accomplishment_burnout": 4.73
                             },
-                            "cbi_breakdown": {
+                            "ocb_breakdown": {
                                 "personal": 76.68,
                                 "work_related": 53.33,
                                 "interpretation": "moderate"
                             },
-                            "cbi_reasoning": [
-                                "High burnout risk (CBI: 65/100) - monitor closely",
+                            "ocb_reasoning": [
+                                "High burnout risk (OCB: 65/100) - monitor closely",
                                 "Personal burnout factors:",
                                 "   • Critical incidents and on-call stress affecting sleep quality (37.5 points)",
                                 "   • High incident load preventing proper recovery time (22.5 points)",
@@ -1226,7 +1226,7 @@
                             "user_name": "JJ Tang",
                             "user_email": "jj@rootly.com",
                             "burnout_score": 4.8,
-                            "cbi_score": 56.44,
+                            "ocb_score": 56.44,
                             "risk_level": "medium",
                             "incident_count": 27,
                             "factors": {
@@ -1240,13 +1240,13 @@
                                 "work_related_burnout": 3.04,
                                 "accomplishment_burnout": 4.15
                             },
-                            "cbi_breakdown": {
+                            "ocb_breakdown": {
                                 "personal": 64.05,
                                 "work_related": 48.83,
                                 "interpretation": "moderate"
                             },
-                            "cbi_reasoning": [
-                                "High burnout risk (CBI: 56/100) - monitor closely",
+                            "ocb_reasoning": [
+                                "High burnout risk (OCB: 56/100) - monitor closely",
                                 "Personal burnout factors:",
                                 "   • Critical incidents and on-call stress affecting sleep quality (37.5 points)",
                                 "   • Excessive work hours contributing 14.9 points",
@@ -1415,7 +1415,7 @@
                             "user_name": "Alex Conrad",
                             "user_email": "alex.conrad@rootly.com",
                             "burnout_score": 2.61,
-                            "cbi_score": 51.58,
+                            "ocb_score": 51.58,
                             "risk_level": "low",
                             "incident_count": 10,
                             "factors": {
@@ -1429,13 +1429,13 @@
                                 "work_related_burnout": 2.29,
                                 "accomplishment_burnout": 2.17
                             },
-                            "cbi_breakdown": {
+                            "ocb_breakdown": {
                                 "personal": 58.34,
                                 "work_related": 44.82,
                                 "interpretation": "moderate"
                             },
-                            "cbi_reasoning": [
-                                "High burnout risk (CBI: 52/100) - monitor closely",
+                            "ocb_reasoning": [
+                                "High burnout risk (OCB: 52/100) - monitor closely",
                                 "Personal burnout factors:",
                                 "   • Critical incidents and on-call stress affecting sleep quality (37.5 points)",
                                 "   • High incident load preventing proper recovery time (12.4 points)",
@@ -1606,7 +1606,7 @@
                             "user_name": "Gideon Lapshun",
                             "user_email": "gideon@rootly.com",
                             "burnout_score": 1.98,
-                            "cbi_score": 50.33,
+                            "ocb_score": 50.33,
                             "risk_level": "low",
                             "incident_count": 10,
                             "factors": {
@@ -1620,13 +1620,13 @@
                                 "work_related_burnout": 2.15,
                                 "accomplishment_burnout": 2.17
                             },
-                            "cbi_breakdown": {
+                            "ocb_breakdown": {
                                 "personal": 57.03,
                                 "work_related": 43.62,
                                 "interpretation": "moderate"
                             },
-                            "cbi_reasoning": [
-                                "High burnout risk (CBI: 50/100) - monitor closely",
+                            "ocb_reasoning": [
+                                "High burnout risk (OCB: 50/100) - monitor closely",
                                 "Personal burnout factors:",
                                 "   • Critical incidents and on-call stress affecting sleep quality (37.5 points)",
                                 "   • High incident load preventing proper recovery time (11.1 points)",
@@ -1797,7 +1797,7 @@
                             "user_name": "Andre Yang",
                             "user_email": "andre.yang@rootly.com",
                             "burnout_score": 2.36,
-                            "cbi_score": 48.62,
+                            "ocb_score": 48.62,
                             "risk_level": "low",
                             "incident_count": 8,
                             "factors": {
@@ -1811,13 +1811,13 @@
                                 "work_related_burnout": 1.86,
                                 "accomplishment_burnout": 0.93
                             },
-                            "cbi_breakdown": {
+                            "ocb_breakdown": {
                                 "personal": 54.7,
                                 "work_related": 42.55,
                                 "interpretation": "mild"
                             },
-                            "cbi_reasoning": [
-                                "Moderate stress levels (CBI: 49/100) - manageable with care",
+                            "ocb_reasoning": [
+                                "Moderate stress levels (OCB: 49/100) - manageable with care",
                                 "Personal burnout factors:",
                                 "   • Critical incidents and on-call stress affecting sleep quality (37.5 points)",
                                 "   • High incident load preventing proper recovery time (9.8 points)",
@@ -1989,7 +1989,7 @@
                             "user_name": "Spencer Cheng",
                             "user_email": "spencer.cheng@rootly.com",
                             "burnout_score": 0.46,
-                            "cbi_score": 8.11,
+                            "ocb_score": 8.11,
                             "risk_level": "low",
                             "incident_count": 1,
                             "factors": {
@@ -2003,13 +2003,13 @@
                                 "work_related_burnout": 0.1,
                                 "accomplishment_burnout": 1.12
                             },
-                            "cbi_breakdown": {
+                            "ocb_breakdown": {
                                 "personal": 10.59,
                                 "work_related": 5.63,
                                 "interpretation": "low"
                             },
-                            "cbi_reasoning": [
-                                "Low burnout risk (CBI: 8/100) - healthy stress levels",
+                            "ocb_reasoning": [
+                                "Low burnout risk (OCB: 8/100) - healthy stress levels",
                                 "On-call baseline stress from handling 1 total incidents"
                             ],
                             "metrics": {
@@ -2170,7 +2170,7 @@
                             "user_name": "David Arias",
                             "user_email": "david.arias@rootly.com",
                             "burnout_score": 0,
-                            "cbi_score": 0.0,
+                            "ocb_score": 0.0,
                             "risk_level": "low",
                             "incident_count": 0,
                             "factors": {
@@ -2185,13 +2185,13 @@
                                 "work_related_burnout": 0,
                                 "client_related_burnout": 0
                             },
-                            "cbi_breakdown": {
+                            "ocb_breakdown": {
                                 "personal": 0.0,
                                 "work_related": 0.0,
                                 "interpretation": "low"
                             },
-                            "cbi_reasoning": [
-                                "Low burnout risk (CBI: 0/100) - healthy stress levels"
+                            "ocb_reasoning": [
+                                "Low burnout risk (OCB: 0/100) - healthy stress levels"
                             ],
                             "metrics": {
                                 "incidents_per_week": 0,
@@ -2307,7 +2307,7 @@
                             "user_name": "Maxwell Power",
                             "user_email": "max.power@rootly.com",
                             "burnout_score": 0,
-                            "cbi_score": 0.0,
+                            "ocb_score": 0.0,
                             "risk_level": "low",
                             "incident_count": 0,
                             "factors": {
@@ -2322,13 +2322,13 @@
                                 "work_related_burnout": 0,
                                 "client_related_burnout": 0
                             },
-                            "cbi_breakdown": {
+                            "ocb_breakdown": {
                                 "personal": 0.0,
                                 "work_related": 0.0,
                                 "interpretation": "low"
                             },
-                            "cbi_reasoning": [
-                                "Low burnout risk (CBI: 0/100) - healthy stress levels"
+                            "ocb_reasoning": [
+                                "Low burnout risk (OCB: 0/100) - healthy stress levels"
                             ],
                             "metrics": {
                                 "incidents_per_week": 0,
@@ -2468,7 +2468,7 @@
                             "user_name": "Nick Meisenheimer",
                             "user_email": "nicholas@rootly.com",
                             "burnout_score": 0.83,
-                            "cbi_score": 0.0,
+                            "ocb_score": 0.0,
                             "risk_level": "low",
                             "incident_count": 0,
                             "factors": {
@@ -2483,13 +2483,13 @@
                                 "work_related_burnout": 0,
                                 "client_related_burnout": 0
                             },
-                            "cbi_breakdown": {
+                            "ocb_breakdown": {
                                 "personal": 0.0,
                                 "work_related": 0.0,
                                 "interpretation": "low"
                             },
-                            "cbi_reasoning": [
-                                "Low burnout risk (CBI: 0/100) - healthy stress levels"
+                            "ocb_reasoning": [
+                                "Low burnout risk (OCB: 0/100) - healthy stress levels"
                             ],
                             "metrics": {
                                 "incidents_per_week": 0,
@@ -2629,7 +2629,7 @@
                             "user_name": "Owen Sheppard",
                             "user_email": "owen.sheppard@rootly.com",
                             "burnout_score": 0,
-                            "cbi_score": 0.0,
+                            "ocb_score": 0.0,
                             "risk_level": "low",
                             "incident_count": 0,
                             "factors": {
@@ -2644,13 +2644,13 @@
                                 "work_related_burnout": 0,
                                 "client_related_burnout": 0
                             },
-                            "cbi_breakdown": {
+                            "ocb_breakdown": {
                                 "personal": 0.0,
                                 "work_related": 0.0,
                                 "interpretation": "low"
                             },
-                            "cbi_reasoning": [
-                                "Low burnout risk (CBI: 0/100) - healthy stress levels"
+                            "ocb_reasoning": [
+                                "Low burnout risk (OCB: 0/100) - healthy stress levels"
                             ],
                             "metrics": {
                                 "incidents_per_week": 0,
@@ -2790,7 +2790,7 @@
                             "user_name": "Iain MacKenzie MacKenzie",
                             "user_email": "iain@rootly.com",
                             "burnout_score": 0,
-                            "cbi_score": 0.0,
+                            "ocb_score": 0.0,
                             "risk_level": "low",
                             "incident_count": 0,
                             "factors": {
@@ -2805,13 +2805,13 @@
                                 "work_related_burnout": 0,
                                 "client_related_burnout": 0
                             },
-                            "cbi_breakdown": {
+                            "ocb_breakdown": {
                                 "personal": 0.0,
                                 "work_related": 0.0,
                                 "interpretation": "low"
                             },
-                            "cbi_reasoning": [
-                                "Low burnout risk (CBI: 0/100) - healthy stress levels"
+                            "ocb_reasoning": [
+                                "Low burnout risk (OCB: 0/100) - healthy stress levels"
                             ],
                             "metrics": {
                                 "incidents_per_week": 0,
@@ -2951,7 +2951,7 @@
                             "user_name": "Sarah Crowe",
                             "user_email": "sarah@rootly.com",
                             "burnout_score": 0,
-                            "cbi_score": 0.0,
+                            "ocb_score": 0.0,
                             "risk_level": "low",
                             "incident_count": 0,
                             "factors": {
@@ -2966,13 +2966,13 @@
                                 "work_related_burnout": 0,
                                 "client_related_burnout": 0
                             },
-                            "cbi_breakdown": {
+                            "ocb_breakdown": {
                                 "personal": 0.0,
                                 "work_related": 0.0,
                                 "interpretation": "low"
                             },
-                            "cbi_reasoning": [
-                                "Low burnout risk (CBI: 0/100) - healthy stress levels"
+                            "ocb_reasoning": [
+                                "Low burnout risk (OCB: 0/100) - healthy stress levels"
                             ],
                             "metrics": {
                                 "incidents_per_week": 0,
@@ -3112,7 +3112,7 @@
                             "user_name": "Jeba Singh Emmanuel",
                             "user_email": "jeba.emmanuel@rootly.com",
                             "burnout_score": 0,
-                            "cbi_score": 0.0,
+                            "ocb_score": 0.0,
                             "risk_level": "low",
                             "incident_count": 0,
                             "factors": {
@@ -3127,13 +3127,13 @@
                                 "work_related_burnout": 0,
                                 "client_related_burnout": 0
                             },
-                            "cbi_breakdown": {
+                            "ocb_breakdown": {
                                 "personal": 0.0,
                                 "work_related": 0.0,
                                 "interpretation": "low"
                             },
-                            "cbi_reasoning": [
-                                "Low burnout risk (CBI: 0/100) - healthy stress levels"
+                            "ocb_reasoning": [
+                                "Low burnout risk (OCB: 0/100) - healthy stress levels"
                             ],
                             "metrics": {
                                 "incidents_per_week": 0,
@@ -3273,7 +3273,7 @@
                             "user_name": "Adam",
                             "user_email": "adam@rootly.com",
                             "burnout_score": 0,
-                            "cbi_score": 0.0,
+                            "ocb_score": 0.0,
                             "risk_level": "low",
                             "incident_count": 0,
                             "factors": {
@@ -3288,13 +3288,13 @@
                                 "work_related_burnout": 0,
                                 "client_related_burnout": 0
                             },
-                            "cbi_breakdown": {
+                            "ocb_breakdown": {
                                 "personal": 0.0,
                                 "work_related": 0.0,
                                 "interpretation": "low"
                             },
-                            "cbi_reasoning": [
-                                "Low burnout risk (CBI: 0/100) - healthy stress levels"
+                            "ocb_reasoning": [
+                                "Low burnout risk (OCB: 0/100) - healthy stress levels"
                             ],
                             "metrics": {
                                 "incidents_per_week": 0,
@@ -3410,7 +3410,7 @@
                             "user_name": "Sylvain Kalache",
                             "user_email": "sylvain@rootly.com",
                             "burnout_score": 0,
-                            "cbi_score": 0.0,
+                            "ocb_score": 0.0,
                             "risk_level": "low",
                             "incident_count": 0,
                             "factors": {
@@ -3425,13 +3425,13 @@
                                 "work_related_burnout": 0,
                                 "client_related_burnout": 0
                             },
-                            "cbi_breakdown": {
+                            "ocb_breakdown": {
                                 "personal": 0.0,
                                 "work_related": 0.0,
                                 "interpretation": "low"
                             },
-                            "cbi_reasoning": [
-                                "Low burnout risk (CBI: 0/100) - healthy stress levels"
+                            "ocb_reasoning": [
+                                "Low burnout risk (OCB: 0/100) - healthy stress levels"
                             ],
                             "metrics": {
                                 "incidents_per_week": 0,
@@ -3571,7 +3571,7 @@
                             "user_name": "Adrien Maret",
                             "user_email": "adrien@rootly.com",
                             "burnout_score": 0,
-                            "cbi_score": 0.0,
+                            "ocb_score": 0.0,
                             "risk_level": "low",
                             "incident_count": 0,
                             "factors": {
@@ -3586,13 +3586,13 @@
                                 "work_related_burnout": 0,
                                 "client_related_burnout": 0
                             },
-                            "cbi_breakdown": {
+                            "ocb_breakdown": {
                                 "personal": 0.0,
                                 "work_related": 0.0,
                                 "interpretation": "low"
                             },
-                            "cbi_reasoning": [
-                                "Low burnout risk (CBI: 0/100) - healthy stress levels"
+                            "ocb_reasoning": [
+                                "Low burnout risk (OCB: 0/100) - healthy stress levels"
                             ],
                             "metrics": {
                                 "incidents_per_week": 0,
@@ -3732,7 +3732,7 @@
                             "user_name": "Ash Dehghan",
                             "user_email": "ash@rootly.com",
                             "burnout_score": 0,
-                            "cbi_score": 0.0,
+                            "ocb_score": 0.0,
                             "risk_level": "low",
                             "incident_count": 0,
                             "factors": {
@@ -3747,13 +3747,13 @@
                                 "work_related_burnout": 0,
                                 "client_related_burnout": 0
                             },
-                            "cbi_breakdown": {
+                            "ocb_breakdown": {
                                 "personal": 0.0,
                                 "work_related": 0.0,
                                 "interpretation": "low"
                             },
-                            "cbi_reasoning": [
-                                "Low burnout risk (CBI: 0/100) - healthy stress levels"
+                            "ocb_reasoning": [
+                                "Low burnout risk (OCB: 0/100) - healthy stress levels"
                             ],
                             "metrics": {
                                 "incidents_per_week": 0,
@@ -3893,7 +3893,7 @@
                             "user_name": "Kayla Th",
                             "user_email": "kayla@rootly.com",
                             "burnout_score": 0.6,
-                            "cbi_score": 0.0,
+                            "ocb_score": 0.0,
                             "risk_level": "low",
                             "incident_count": 0,
                             "factors": {
@@ -3908,13 +3908,13 @@
                                 "work_related_burnout": 0,
                                 "client_related_burnout": 0
                             },
-                            "cbi_breakdown": {
+                            "ocb_breakdown": {
                                 "personal": 0.0,
                                 "work_related": 0.0,
                                 "interpretation": "low"
                             },
-                            "cbi_reasoning": [
-                                "Low burnout risk (CBI: 0/100) - healthy stress levels"
+                            "ocb_reasoning": [
+                                "Low burnout risk (OCB: 0/100) - healthy stress levels"
                             ],
                             "metrics": {
                                 "incidents_per_week": 0,
@@ -4054,7 +4054,7 @@
                             "user_name": "Joel Andrews",
                             "user_email": "joel@rootly.com",
                             "burnout_score": 0.6,
-                            "cbi_score": 0.0,
+                            "ocb_score": 0.0,
                             "risk_level": "low",
                             "incident_count": 0,
                             "factors": {
@@ -4069,13 +4069,13 @@
                                 "work_related_burnout": 0,
                                 "client_related_burnout": 0
                             },
-                            "cbi_breakdown": {
+                            "ocb_breakdown": {
                                 "personal": 0.0,
                                 "work_related": 0.0,
                                 "interpretation": "low"
                             },
-                            "cbi_reasoning": [
-                                "Low burnout risk (CBI: 0/100) - healthy stress levels"
+                            "ocb_reasoning": [
+                                "Low burnout risk (OCB: 0/100) - healthy stress levels"
                             ],
                             "metrics": {
                                 "incidents_per_week": 0,
@@ -4215,7 +4215,7 @@
                             "user_name": "Andre The Giant",
                             "user_email": "andre@rootly.tech",
                             "burnout_score": 0,
-                            "cbi_score": 0.0,
+                            "ocb_score": 0.0,
                             "risk_level": "low",
                             "incident_count": 0,
                             "factors": {
@@ -4230,13 +4230,13 @@
                                 "work_related_burnout": 0,
                                 "client_related_burnout": 0
                             },
-                            "cbi_breakdown": {
+                            "ocb_breakdown": {
                                 "personal": 0.0,
                                 "work_related": 0.0,
                                 "interpretation": "low"
                             },
-                            "cbi_reasoning": [
-                                "Low burnout risk (CBI: 0/100) - healthy stress levels"
+                            "ocb_reasoning": [
+                                "Low burnout risk (OCB: 0/100) - healthy stress levels"
                             ],
                             "metrics": {
                                 "incidents_per_week": 0,
@@ -4376,7 +4376,7 @@
                             "user_name": "Ibrahim El Chami",
                             "user_email": "ibrahim@rootly.com",
                             "burnout_score": 0,
-                            "cbi_score": 0.0,
+                            "ocb_score": 0.0,
                             "risk_level": "low",
                             "incident_count": 0,
                             "factors": {
@@ -4391,13 +4391,13 @@
                                 "work_related_burnout": 0,
                                 "client_related_burnout": 0
                             },
-                            "cbi_breakdown": {
+                            "ocb_breakdown": {
                                 "personal": 0.0,
                                 "work_related": 0.0,
                                 "interpretation": "low"
                             },
-                            "cbi_reasoning": [
-                                "Low burnout risk (CBI: 0/100) - healthy stress levels"
+                            "ocb_reasoning": [
+                                "Low burnout risk (OCB: 0/100) - healthy stress levels"
                             ],
                             "metrics": {
                                 "incidents_per_week": 0,
@@ -4537,7 +4537,7 @@
                             "user_name": "Angelone Tomasco",
                             "user_email": "angelo@rootly.com",
                             "burnout_score": 0,
-                            "cbi_score": 0.0,
+                            "ocb_score": 0.0,
                             "risk_level": "low",
                             "incident_count": 0,
                             "factors": {
@@ -4552,13 +4552,13 @@
                                 "work_related_burnout": 0,
                                 "client_related_burnout": 0
                             },
-                            "cbi_breakdown": {
+                            "ocb_breakdown": {
                                 "personal": 0.0,
                                 "work_related": 0.0,
                                 "interpretation": "low"
                             },
-                            "cbi_reasoning": [
-                                "Low burnout risk (CBI: 0/100) - healthy stress levels"
+                            "ocb_reasoning": [
+                                "Low burnout risk (OCB: 0/100) - healthy stress levels"
                             ],
                             "metrics": {
                                 "incidents_per_week": 0,
@@ -4698,7 +4698,7 @@
                             "user_name": "Katsiaryna Rabtsava",
                             "user_email": "kate@rootly.com",
                             "burnout_score": 0,
-                            "cbi_score": 0.0,
+                            "ocb_score": 0.0,
                             "risk_level": "low",
                             "incident_count": 0,
                             "factors": {
@@ -4713,13 +4713,13 @@
                                 "work_related_burnout": 0,
                                 "client_related_burnout": 0
                             },
-                            "cbi_breakdown": {
+                            "ocb_breakdown": {
                                 "personal": 0.0,
                                 "work_related": 0.0,
                                 "interpretation": "low"
                             },
-                            "cbi_reasoning": [
-                                "Low burnout risk (CBI: 0/100) - healthy stress levels"
+                            "ocb_reasoning": [
+                                "Low burnout risk (OCB: 0/100) - healthy stress levels"
                             ],
                             "metrics": {
                                 "incidents_per_week": 0,
@@ -4859,7 +4859,7 @@
                             "user_name": "Vishnu Mohanan",
                             "user_email": "vishnu.mohanan@bigbinary.com",
                             "burnout_score": 0,
-                            "cbi_score": 0.0,
+                            "ocb_score": 0.0,
                             "risk_level": "low",
                             "incident_count": 0,
                             "factors": {
@@ -4874,13 +4874,13 @@
                                 "work_related_burnout": 0,
                                 "client_related_burnout": 0
                             },
-                            "cbi_breakdown": {
+                            "ocb_breakdown": {
                                 "personal": 0.0,
                                 "work_related": 0.0,
                                 "interpretation": "low"
                             },
-                            "cbi_reasoning": [
-                                "Low burnout risk (CBI: 0/100) - healthy stress levels"
+                            "ocb_reasoning": [
+                                "Low burnout risk (OCB: 0/100) - healthy stress levels"
                             ],
                             "metrics": {
                                 "incidents_per_week": 0,
@@ -5020,7 +5020,7 @@
                             "user_name": "Ahammed Nafih BK",
                             "user_email": "ahammed.bk@bigbinary.com",
                             "burnout_score": 0,
-                            "cbi_score": 0.0,
+                            "ocb_score": 0.0,
                             "risk_level": "low",
                             "incident_count": 0,
                             "factors": {
@@ -5035,13 +5035,13 @@
                                 "work_related_burnout": 0,
                                 "client_related_burnout": 0
                             },
-                            "cbi_breakdown": {
+                            "ocb_breakdown": {
                                 "personal": 0.0,
                                 "work_related": 0.0,
                                 "interpretation": "low"
                             },
-                            "cbi_reasoning": [
-                                "Low burnout risk (CBI: 0/100) - healthy stress levels"
+                            "ocb_reasoning": [
+                                "Low burnout risk (OCB: 0/100) - healthy stress levels"
                             ],
                             "metrics": {
                                 "incidents_per_week": 0,
@@ -5181,7 +5181,7 @@
                             "user_name": "Alexandra Chapin",
                             "user_email": "alexandra@rootly.com",
                             "burnout_score": 0,
-                            "cbi_score": 0.0,
+                            "ocb_score": 0.0,
                             "risk_level": "low",
                             "incident_count": 0,
                             "factors": {
@@ -5196,13 +5196,13 @@
                                 "work_related_burnout": 0,
                                 "client_related_burnout": 0
                             },
-                            "cbi_breakdown": {
+                            "ocb_breakdown": {
                                 "personal": 0.0,
                                 "work_related": 0.0,
                                 "interpretation": "low"
                             },
-                            "cbi_reasoning": [
-                                "Low burnout risk (CBI: 0/100) - healthy stress levels"
+                            "ocb_reasoning": [
+                                "Low burnout risk (OCB: 0/100) - healthy stress levels"
                             ],
                             "metrics": {
                                 "incidents_per_week": 0,
@@ -5342,7 +5342,7 @@
                             "user_name": "Ed Carrel Carrel",
                             "user_email": "ed@rootly.com",
                             "burnout_score": 0,
-                            "cbi_score": 0.0,
+                            "ocb_score": 0.0,
                             "risk_level": "low",
                             "incident_count": 0,
                             "factors": {
@@ -5357,13 +5357,13 @@
                                 "work_related_burnout": 0,
                                 "client_related_burnout": 0
                             },
-                            "cbi_breakdown": {
+                            "ocb_breakdown": {
                                 "personal": 0.0,
                                 "work_related": 0.0,
                                 "interpretation": "low"
                             },
-                            "cbi_reasoning": [
-                                "Low burnout risk (CBI: 0/100) - healthy stress levels"
+                            "ocb_reasoning": [
+                                "Low burnout risk (OCB: 0/100) - healthy stress levels"
                             ],
                             "metrics": {
                                 "incidents_per_week": 0,
@@ -5503,7 +5503,7 @@
                             "user_name": "Abhishek P",
                             "user_email": "abhishek.p@bigbinary.com",
                             "burnout_score": 0,
-                            "cbi_score": 0.0,
+                            "ocb_score": 0.0,
                             "risk_level": "low",
                             "incident_count": 0,
                             "factors": {
@@ -5518,13 +5518,13 @@
                                 "work_related_burnout": 0,
                                 "client_related_burnout": 0
                             },
-                            "cbi_breakdown": {
+                            "ocb_breakdown": {
                                 "personal": 0.0,
                                 "work_related": 0.0,
                                 "interpretation": "low"
                             },
-                            "cbi_reasoning": [
-                                "Low burnout risk (CBI: 0/100) - healthy stress levels"
+                            "ocb_reasoning": [
+                                "Low burnout risk (OCB: 0/100) - healthy stress levels"
                             ],
                             "metrics": {
                                 "incidents_per_week": 0,
@@ -5664,7 +5664,7 @@
                             "user_name": "Dinesh Kumar Panda",
                             "user_email": "dinesh.panda@bigbinary.com",
                             "burnout_score": 0,
-                            "cbi_score": 0.0,
+                            "ocb_score": 0.0,
                             "risk_level": "low",
                             "incident_count": 0,
                             "factors": {
@@ -5679,13 +5679,13 @@
                                 "work_related_burnout": 0,
                                 "client_related_burnout": 0
                             },
-                            "cbi_breakdown": {
+                            "ocb_breakdown": {
                                 "personal": 0.0,
                                 "work_related": 0.0,
                                 "interpretation": "low"
                             },
-                            "cbi_reasoning": [
-                                "Low burnout risk (CBI: 0/100) - healthy stress levels"
+                            "ocb_reasoning": [
+                                "Low burnout risk (OCB: 0/100) - healthy stress levels"
                             ],
                             "metrics": {
                                 "incidents_per_week": 0,
@@ -5825,7 +5825,7 @@
                             "user_name": "Shadab Patel",
                             "user_email": "shadab@rootly.com",
                             "burnout_score": 0,
-                            "cbi_score": 0.0,
+                            "ocb_score": 0.0,
                             "risk_level": "low",
                             "incident_count": 0,
                             "factors": {
@@ -5840,13 +5840,13 @@
                                 "work_related_burnout": 0,
                                 "client_related_burnout": 0
                             },
-                            "cbi_breakdown": {
+                            "ocb_breakdown": {
                                 "personal": 0.0,
                                 "work_related": 0.0,
                                 "interpretation": "low"
                             },
-                            "cbi_reasoning": [
-                                "Low burnout risk (CBI: 0/100) - healthy stress levels"
+                            "ocb_reasoning": [
+                                "Low burnout risk (OCB: 0/100) - healthy stress levels"
                             ],
                             "metrics": {
                                 "incidents_per_week": 0,
@@ -5986,7 +5986,7 @@
                             "user_name": "Ryan McDonald",
                             "user_email": "ryan@rootly.com",
                             "burnout_score": 0,
-                            "cbi_score": 0.0,
+                            "ocb_score": 0.0,
                             "risk_level": "low",
                             "incident_count": 0,
                             "factors": {
@@ -6001,13 +6001,13 @@
                                 "work_related_burnout": 0,
                                 "client_related_burnout": 0
                             },
-                            "cbi_breakdown": {
+                            "ocb_breakdown": {
                                 "personal": 0.0,
                                 "work_related": 0.0,
                                 "interpretation": "low"
                             },
-                            "cbi_reasoning": [
-                                "Low burnout risk (CBI: 0/100) - healthy stress levels"
+                            "ocb_reasoning": [
+                                "Low burnout risk (OCB: 0/100) - healthy stress levels"
                             ],
                             "metrics": {
                                 "incidents_per_week": 0,
@@ -6147,7 +6147,7 @@
                             "user_name": "John (Ioannis) tzikas",
                             "user_email": "john@rootly.com",
                             "burnout_score": 0.83,
-                            "cbi_score": 0.0,
+                            "ocb_score": 0.0,
                             "risk_level": "low",
                             "incident_count": 0,
                             "factors": {
@@ -6162,13 +6162,13 @@
                                 "work_related_burnout": 0,
                                 "client_related_burnout": 0
                             },
-                            "cbi_breakdown": {
+                            "ocb_breakdown": {
                                 "personal": 0.0,
                                 "work_related": 0.0,
                                 "interpretation": "low"
                             },
-                            "cbi_reasoning": [
-                                "Low burnout risk (CBI: 0/100) - healthy stress levels"
+                            "ocb_reasoning": [
+                                "Low burnout risk (OCB: 0/100) - healthy stress levels"
                             ],
                             "metrics": {
                                 "incidents_per_week": 0,
@@ -6308,7 +6308,7 @@
                             "user_name": "Dan Sadler Sadler",
                             "user_email": "dan@rootly.com",
                             "burnout_score": 0,
-                            "cbi_score": 0.0,
+                            "ocb_score": 0.0,
                             "risk_level": "low",
                             "incident_count": 0,
                             "factors": {
@@ -6323,13 +6323,13 @@
                                 "work_related_burnout": 0,
                                 "client_related_burnout": 0
                             },
-                            "cbi_breakdown": {
+                            "ocb_breakdown": {
                                 "personal": 0.0,
                                 "work_related": 0.0,
                                 "interpretation": "low"
                             },
-                            "cbi_reasoning": [
-                                "Low burnout risk (CBI: 0/100) - healthy stress levels"
+                            "ocb_reasoning": [
+                                "Low burnout risk (OCB: 0/100) - healthy stress levels"
                             ],
                             "metrics": {
                                 "incidents_per_week": 0,
@@ -6469,7 +6469,7 @@
                             "user_name": "Weihan Li",
                             "user_email": "weihan@rootly.com",
                             "burnout_score": 0,
-                            "cbi_score": 0.0,
+                            "ocb_score": 0.0,
                             "risk_level": "low",
                             "incident_count": 0,
                             "factors": {
@@ -6484,13 +6484,13 @@
                                 "work_related_burnout": 0,
                                 "client_related_burnout": 0
                             },
-                            "cbi_breakdown": {
+                            "ocb_breakdown": {
                                 "personal": 0.0,
                                 "work_related": 0.0,
                                 "interpretation": "low"
                             },
-                            "cbi_reasoning": [
-                                "Low burnout risk (CBI: 0/100) - healthy stress levels"
+                            "ocb_reasoning": [
+                                "Low burnout risk (OCB: 0/100) - healthy stress levels"
                             ],
                             "metrics": {
                                 "incidents_per_week": 0,
@@ -6630,7 +6630,7 @@
                             "user_name": "Alex Mingoia",
                             "user_email": "alex.mingoia@rootly.com",
                             "burnout_score": 0,
-                            "cbi_score": 0.0,
+                            "ocb_score": 0.0,
                             "risk_level": "low",
                             "incident_count": 0,
                             "factors": {
@@ -6645,13 +6645,13 @@
                                 "work_related_burnout": 0,
                                 "client_related_burnout": 0
                             },
-                            "cbi_breakdown": {
+                            "ocb_breakdown": {
                                 "personal": 0.0,
                                 "work_related": 0.0,
                                 "interpretation": "low"
                             },
-                            "cbi_reasoning": [
-                                "Low burnout risk (CBI: 0/100) - healthy stress levels"
+                            "ocb_reasoning": [
+                                "Low burnout risk (OCB: 0/100) - healthy stress levels"
                             ],
                             "metrics": {
                                 "incidents_per_week": 0,
@@ -6791,7 +6791,7 @@
                             "user_name": "Quentin Rousseau Rousseau",
                             "user_email": "quentin@rootly.com",
                             "burnout_score": 0,
-                            "cbi_score": 0.0,
+                            "ocb_score": 0.0,
                             "risk_level": "low",
                             "incident_count": 0,
                             "factors": {
@@ -6806,13 +6806,13 @@
                                 "work_related_burnout": 0,
                                 "client_related_burnout": 0
                             },
-                            "cbi_breakdown": {
+                            "ocb_breakdown": {
                                 "personal": 0.0,
                                 "work_related": 0.0,
                                 "interpretation": "low"
                             },
-                            "cbi_reasoning": [
-                                "Low burnout risk (CBI: 0/100) - healthy stress levels"
+                            "ocb_reasoning": [
+                                "Low burnout risk (OCB: 0/100) - healthy stress levels"
                             ],
                             "metrics": {
                                 "incidents_per_week": 0,
