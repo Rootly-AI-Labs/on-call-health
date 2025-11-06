@@ -489,42 +489,79 @@ async def update_integration(
             detail=f"Failed to update integration: {str(e)}"
         )
 
+
 @router.delete("/integrations/{integration_id}")
 async def delete_integration(
-    integration_id: int,
+    integration_id: str,   
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    """Delete/revoke a Rootly integration."""
+    # Handle virtual/demo integrations gracefully
+    if integration_id in {"beta-rootly", "beta-pagerduty"}:
+        return {"status": "success", "message": "Removed demo integration from view"}
+
+    # Convert to int for real rows
+    try:
+        numeric_id = int(integration_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid integration ID")
+
     integration = db.query(RootlyIntegration).filter(
-        RootlyIntegration.id == integration_id,
+        RootlyIntegration.id == numeric_id,
         RootlyIntegration.user_id == current_user.id,
-        RootlyIntegration.platform == "rootly"
+        RootlyIntegration.platform == "rootly",
     ).first()
-    
+
     if not integration:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Integration not found"
-        )
-    
+        raise HTTPException(status_code=404, detail="Integration not found")
+
     try:
         integration_name = integration.name
-        
-        # Soft delete - mark as inactive
         integration.is_active = False
         db.commit()
-        
-        return {
-            "status": "success",
-            "message": f"Integration '{integration_name}' has been revoked"
-        }
+        return {"status": "success", "message": f"Integration '{integration_name}' has been revoked"}
     except Exception as e:
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to delete integration: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to delete integration: {str(e)}")
+
+
+
+# @router.delete("/integrations/{integration_id}")
+# async def delete_integration(
+#     integration_id: int,
+#     current_user: User = Depends(get_current_active_user),
+#     db: Session = Depends(get_db)
+# ):
+#     """Delete/revoke a Rootly integration."""
+#     integration = db.query(RootlyIntegration).filter(
+#         RootlyIntegration.id == integration_id,
+#         RootlyIntegration.user_id == current_user.id,
+#         RootlyIntegration.platform == "rootly"
+#     ).first()
+    
+#     if not integration:
+#         raise HTTPException(
+#             status_code=status.HTTP_404_NOT_FOUND,
+#             detail="Integration not found"
+#         )
+    
+#     try:
+#         integration_name = integration.name
+        
+#         # Soft delete - mark as inactive
+#         integration.is_active = False
+#         db.commit()
+        
+#         return {
+#             "status": "success",
+#             "message": f"Integration '{integration_name}' has been revoked"
+#         }
+#     except Exception as e:
+#         db.rollback()
+#         raise HTTPException(
+#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+#             detail=f"Failed to delete integration: {str(e)}"
+#         )
 
 @router.get("/token/test")
 async def test_rootly_token(
