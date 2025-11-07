@@ -144,6 +144,7 @@ export default function IntegrationsPage() {
   const [loadingGitHub, setLoadingGitHub] = useState(true)
   const [loadingSlack, setLoadingSlack] = useState(true)
   const [reloadingIntegrations, setReloadingIntegrations] = useState(false)
+  const [refreshingIntegrationId, setRefreshingIntegrationId] = useState<string | number | null>(null)
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null)
   const [activeTab, setActiveTab] = useState<"rootly" | "pagerduty" | null>(null)
   const [backUrl, setBackUrl] = useState<string>('/dashboard')
@@ -1176,6 +1177,46 @@ export default function IntegrationsPage() {
     )
   }
 
+  const refreshIntegrationPermissions = async (integration: Integration) => {
+    setRefreshingIntegrationId(integration.id)
+
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) {
+        toast.error('Authentication required')
+        return
+      }
+
+      const endpoint = integration.platform === 'rootly'
+        ? `${API_BASE}/integrations/rootly`
+        : `${API_BASE}/integrations/pagerduty`
+
+      const response = await fetch(endpoint, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`
+        }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        const updatedIntegration = data.integrations.find((i: Integration) => i.id === integration.id)
+
+        if (updatedIntegration) {
+          setIntegrations(prev => prev.map(i =>
+            i.id === integration.id ? updatedIntegration : i
+          ))
+          toast.success('Permissions refreshed')
+        }
+      } else {
+        toast.error('Failed to refresh permissions')
+      }
+    } catch (error) {
+      console.error('Error refreshing permissions:', error)
+      toast.error('Failed to refresh permissions')
+    } finally {
+      setRefreshingIntegrationId(null)
+    }
+  }
 
   const copyToClipboard = async (text: string) => {
     return Utils.copyToClipboard(text, setCopied)
@@ -2074,8 +2115,18 @@ export default function IntegrationsPage() {
                             </>
                           )}
                         </div>
-                        
-                        <div className="flex items-center">
+
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => refreshIntegrationPermissions(integration)}
+                            disabled={refreshingIntegrationId === integration.id}
+                            className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                            title="Refresh permissions"
+                          >
+                            <RefreshCw className={`w-4 h-4 ${refreshingIntegrationId === integration.id ? 'animate-spin' : ''}`} />
+                          </Button>
                           <Button
                             size="sm"
                             variant="ghost"
