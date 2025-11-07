@@ -1205,9 +1205,16 @@ export default function IntegrationsPage() {
         if (updatedIntegration) {
           console.log('Found updated integration:', updatedIntegration)
           console.log('Current integrations before update:', integrations)
+
+          // Ensure platform is preserved from original integration
+          const mergedIntegration = {
+            ...updatedIntegration,
+            platform: integration.platform // Preserve original platform
+          }
+
           setIntegrations(prev => {
             const updated = prev.map(i =>
-              i.id === integration.id ? updatedIntegration : i
+              i.id === integration.id ? mergedIntegration : i
             )
             console.log('Integrations after update:', updated)
             return updated
