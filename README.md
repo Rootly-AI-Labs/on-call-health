@@ -18,13 +18,13 @@ The On-call Burnout Detector measures and tracks signals over time that may indi
 - **🔄 Tailor to Your organization**: Ability to customize tool integration and signal weights
 
 ## 🚀 Quick Start
+### Docker Compose
+The easiest way is to get started is with our [Docker Compose file](https://github.com/Rootly-AI-Labs/On-Call-Burnout-Detector/blob/main/docker-compose.yml).
+```docker compose up -d```
+
 ### Environment Variables
-For ling purpiose, you **must** setup environement variables for either Google or GitHub OAuth.
-
-Start with creating a `.env` file.
+⚠️ For login purpose, you **must** get OAuth tokens for Google or GitHub OAuth and set then in the `.env` file. Start with:
 ```cp backend/.env.example backend/.env```
-
-In that file, you'll need to configure either the Google OAuth or GitHub OAuth:
 
 <details>
 <summary><b>Instruction to get token for Google Auth</b></summary>
@@ -50,14 +50,9 @@ In that file, you'll need to configure either the Google OAuth or GitHub OAuth:
 	* Click **Register application**
 	* You'll see your **Client ID**
 	* Click **Generate a new client secret** to get your **Client Secret**
-3. **Add to backend/.env:**
+3. **Add to `backend/.env:`**
 4. **Restart backend:**
 </details>
-
-
-### Docker Compose
-The easiest way is to get started is with our [Docker Compose file](https://github.com/Rootly-AI-Labs/On-Call-Burnout-Detector/blob/main/docker-compose.yml).
-```docker compose up -d```
 
 ### Manual setup
 <details><summary>You can also set it up manually, but this method isn't activelly supported.</summary>
