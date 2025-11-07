@@ -821,7 +821,7 @@ export default function Dashboard() {
               <Card className="mb-6">
                 <CardHeader>
                   <CardTitle>Individual Burnout Scores</CardTitle>
-                  <CardDescription>Team member CBI burnout scores (higher = more burnout risk)</CardDescription>
+                  <CardDescription>Team member OCB burnout scores (higher = more burnout risk)</CardDescription>
                 </CardHeader>
                 <CardContent>
                   {memberBarData.length > 0 ? (
@@ -948,8 +948,8 @@ export default function Dashboard() {
                           // Transform data and detect standout events (same logic as chart)
                           const chartData = dailyTrends.map((trend: any, index: number) => ({
                             date: trend.date,
-                            // Use CBI score methodology (0-100, where higher = more burnout)
-                            score: Math.round(trend.overall_score * 10), // Convert 0-10 to 0-100 CBI scale
+                            // Use OCB score methodology (0-100, where higher = more burnout)
+                            score: Math.round(trend.overall_score * 10), // Convert 0-10 to 0-100 OCB scale
                             membersAtRisk: trend.members_at_risk,
                             totalMembers: trend.total_members,
                             incidentCount: trend.incident_count || 0,
@@ -975,33 +975,33 @@ export default function Dashboard() {
                               // Detect peaks (local maxima)
                               if (prev && next && point.score > prev.score && point.score > next.score && point.score >= 75) {
                                 eventType = 'peak';
-                                // Convert health score to CBI score for display (100 - health_percentage = CBI score)
-                                const cbiScore = Math.round(100 - point.score);
-                                eventDescription = `Team wellness at peak (${cbiScore} CBI score) - ${point.incidentCount} incidents handled without stress signs`;
+                                // Convert health score to OCB score for display (100 - health_percentage = OCB score)
+                                const ocbScore = Math.round(100 - point.score);
+                                eventDescription = `Team wellness at peak (${ocbScore} OCB score) - ${point.incidentCount} incidents handled without stress signs`;
                                 significance = point.score >= 90 ? 3 : 2;
                               }
                               // Detect valleys (local minima)  
                               else if (prev && next && point.score < prev.score && point.score < next.score && point.score <= 60) {
                                 eventType = 'valley';
-                                // Convert health score to CBI score for display (100 - health_percentage = CBI score)
-                                const cbiScore = Math.round(100 - point.score);
-                                eventDescription = `Team showing signs of strain (${cbiScore} CBI score) - ${point.incidentCount} incidents, ${point.membersAtRisk} team members need support`;
+                                // Convert health score to OCB score for display (100 - health_percentage = OCB score)
+                                const ocbScore = Math.round(100 - point.score);
+                                eventDescription = `Team showing signs of strain (${ocbScore} OCB score) - ${point.incidentCount} incidents, ${point.membersAtRisk} team members need support`;
                                 significance = point.score <= 40 ? 3 : 2;
                               }
                               // Detect sharp improvements
                               else if (prevChange >= 20) {
                                 eventType = 'recovery';
-                                // For improvement, show it as CBI score reduction (health increase = CBI decrease)
-                                const cbiImprovement = Math.abs(prevChange);
-                                eventDescription = `Great turnaround! Team burnout reduced by ${cbiImprovement} CBI points - interventions working well`;
+                                // For improvement, show it as OCB score reduction (health increase = OCB decrease)
+                                const ocbImprovement = Math.abs(prevChange);
+                                eventDescription = `Great turnaround! Team burnout reduced by ${ocbImprovement} OCB points - interventions working well`;
                                 significance = prevChange >= 30 ? 3 : 2;
                               }
                               // Detect sharp declines
                               else if (prevChange <= -20) {
                                 eventType = 'decline';
-                                // For decline, show it as CBI score increase (health decrease = CBI increase)
-                                const cbiIncrease = Math.abs(prevChange);
-                                eventDescription = `Warning: Team burnout increased by ${cbiIncrease} CBI points - immediate attention recommended`;
+                                // For decline, show it as OCB score increase (health decrease = OCB increase)
+                                const ocbIncrease = Math.abs(prevChange);
+                                eventDescription = `Warning: Team burnout increased by ${ocbIncrease} OCB points - immediate attention recommended`;
                                 significance = prevChange <= -30 ? 3 : 2;
                               }
                               // Detect high incident volume days
@@ -1013,9 +1013,9 @@ export default function Dashboard() {
                               // Detect critical health days
                               else if (point.score <= 45 && point.membersAtRisk >= 3) {
                                 eventType = 'critical';
-                                // Convert health score to CBI score for display (100 - health_percentage = CBI score)
-                                const cbiScore = Math.round(100 - point.score);
-                                eventDescription = `URGENT: Team at burnout risk (${cbiScore} CBI score) - ${point.membersAtRisk} members need immediate support`;
+                                // Convert health score to OCB score for display (100 - health_percentage = OCB score)
+                                const ocbScore = Math.round(100 - point.score);
+                                eventDescription = `URGENT: Team at burnout risk (${ocbScore} OCB score) - ${point.membersAtRisk} members need immediate support`;
                                 significance = 3;
                               }
                               
@@ -1207,7 +1207,6 @@ export default function Dashboard() {
                             tick={{ fontSize: 11, fill: '#6B7280' }}
                             tickCount={6}
                             angle={90}
-                            reversed={true}
                           />
                           <Radar 
                             dataKey="value" 
@@ -1249,7 +1248,6 @@ export default function Dashboard() {
                       <CardTitle className="flex items-center space-x-2">
                         {highRiskFactors.length > 0 ? (
                           <>
-                            <AlertTriangle className="w-5 h-5 text-red-500" />
                             <span>Risk Factors</span>
                           </>
                         ) : (
@@ -1268,52 +1266,80 @@ export default function Dashboard() {
                     </CardHeader>
                     
                     <CardContent>
-                      <div className="space-y-4">
-                        {sortedBurnoutFactors.map((factor, index) => (
-                          <div key={factor.factor} className="relative">
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="flex items-center space-x-2">
-                                <span className="font-medium text-gray-900">{factor.factor}</span>
-                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                  factor.severity === 'Critical' ? 'bg-red-100 text-red-800' :
-                                  factor.severity === 'Poor' ? 'bg-orange-100 text-orange-800' :
-                                  factor.severity === 'Fair' ? 'bg-yellow-100 text-yellow-800' :
-                                  'bg-green-100 text-green-800'
-                                }`}>
-                                  {factor.severity}
-                                </span>
-                              </div>
-                              <span className="text-lg font-bold" style={{ color: factor.color }}>
-                                {factor.value}/100
-                              </span>
-                            </div>
-                            <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
-                              <div 
-                                className="h-2 rounded-full transition-all duration-500" 
-                                style={{ 
-                                  width: `${factor.value}%`,
-                                  backgroundColor: (() => {
-                                    // Standardize colors to match CBI burnout risk levels (0-100 scale)
-                                    if (factor.value < 30) return '#10B981'; // green-500 - Good
-                                    if (factor.value < 50) return '#F59E0B'; // yellow-500 - Fair
-                                    if (factor.value < 70) return '#F97316'; // orange-500 - Poor
-                                    return '#EF4444'; // red-500 - Critical
-                                  })()
-                                }}
-                              ></div>
-                            </div>
-                            <div className="text-sm text-gray-600">
-                              <div>{factor.metrics}</div>
-                              {factor.value >= 5 && (
-                                <div className="mt-1 text-blue-600">
-                                  <strong>Action:</strong> {factor.recommendation}
+                      {(() => {
+                        // One source of truth for risk colors (severity preferred; fallback to value thresholds)
+                        const getRiskHex = (severity?: string, value?: number) => {
+                          if (severity) {
+                            if (severity === 'Critical') return '#EF4444' // red-500
+                            if (severity === 'Poor')     return '#F97316' // orange-500
+                            if (severity === 'Fair')     return '#F59E0B' // yellow-500
+                            return '#10B981'                               // green-500
+                          }
+                          const v = value ?? 0
+                          if (v < 30) return '#10B981'
+                          if (v < 50) return '#F59E0B'
+                          if (v < 70) return '#F97316'
+                          return '#EF4444'
+                        }
+
+                        return (
+                          <div className="space-y-4">
+                            {sortedBurnoutFactors.map((factor) => {
+                              const color = getRiskHex(factor.severity, factor.value)
+                              return (
+                                <div key={factor.factor} className="relative">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center space-x-2">
+                                      <span className="font-medium text-gray-900">{factor.factor}</span>
+                                      <span
+                                        className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                          factor.severity === 'Critical'
+                                            ? 'bg-red-100 text-red-800'
+                                            : factor.severity === 'Poor'
+                                            ? 'bg-orange-100 text-orange-800'
+                                            : factor.severity === 'Fair'
+                                            ? 'bg-yellow-100 text-yellow-800'
+                                            : 'bg-green-100 text-green-800'
+                                        }`}
+                                      >
+                                        {factor.severity}
+                                      </span>
+                                    </div>
+
+                                    {/* Unified text color */}
+                                    <span className="text-lg font-bold" style={{ color }}>
+                                      {factor.value}/100
+                                    </span>
+                                  </div>
+
+                                  <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
+                                    {/* Unified bar color */}
+                                    <div
+                                      className="h-2 rounded-full transition-all duration-500"
+                                      style={{
+                                        width: `${factor.value}%`,
+                                        backgroundColor: color,
+                                      }}
+                                    />
+                                  </div>
+
+                                  <div className="text-sm text-gray-600">
+                                    <div>{factor.metrics}</div>
+                                    {factor.value >= 5 && (
+                                      <div className="mt-1 text-blue-600">
+                                        <strong>Action:</strong> {factor.recommendation}
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
-                              )}
-                            </div>
+                              )
+                            })}
                           </div>
-                        ))}
-                      </div>
+                        )
+                      })()}
                     </CardContent>
+
+
                   </Card>
                 )}
               </div>
@@ -1369,10 +1395,7 @@ export default function Dashboard() {
                           
                           return (
                             <>
-
-
-
-                            
+          
                               {/* Commit Activity Timeline */}
                               <GitHubCommitsTimeline
                                 analysisId={currentAnalysis?.id ? parseInt(currentAnalysis.id) : 0}
