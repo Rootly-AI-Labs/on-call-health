@@ -19,6 +19,34 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+# In-memory cache for permission checks (key: integration_id, value: {permissions, timestamp})
+_permissions_cache = {}
+PERMISSIONS_CACHE_TTL = 60  # Cache for 60 seconds
+
+def get_cached_permissions(integration_id: int) -> Dict[str, Any] | None:
+    """Get cached permissions if still valid."""
+    if integration_id not in _permissions_cache:
+        return None
+
+    cached = _permissions_cache[integration_id]
+    cache_age = (datetime.now() - cached['timestamp']).total_seconds()
+
+    if cache_age > PERMISSIONS_CACHE_TTL:
+        # Cache expired
+        del _permissions_cache[integration_id]
+        return None
+
+    logger.info(f"🔍 [CACHE] Using cached permissions for integration {integration_id} (age: {cache_age:.1f}s)")
+    return cached['permissions']
+
+def set_cached_permissions(integration_id: int, permissions: Dict[str, Any]) -> None:
+    """Cache permissions for an integration."""
+    _permissions_cache[integration_id] = {
+        'permissions': permissions,
+        'timestamp': datetime.now()
+    }
+    logger.info(f"🔍 [CACHE] Cached permissions for integration {integration_id}")
+
 class RootlyTokenUpdate(BaseModel):
     token: str
 
@@ -256,8 +284,12 @@ async def list_integrations(
         }
         result_integrations.append(integration_data)
 
-        # Queue permission check task if token exists
-        if integration.api_token:
+        # Check cache first
+        cached_permissions = get_cached_permissions(integration.id)
+        if cached_permissions:
+            integration_data["permissions"] = cached_permissions
+        elif integration.api_token:
+            # Queue permission check task if token exists and not cached
             client = RootlyAPIClient(integration.api_token)
             permission_tasks.append((idx, client.check_permissions()))
         else:
@@ -285,20 +317,26 @@ async def list_integrations(
         # Run all checks concurrently
         results = await asyncio.gather(*[check_with_timeout(idx, task) for idx, task in permission_tasks])
 
-        # Apply results
+        # Apply results and cache successful checks
         for idx, permissions, error in results:
+            integration_id = integrations[idx].id
+
             if error == "timeout":
                 result_integrations[idx]["permissions"] = {
                     "users": {"access": None, "error": "Rootly API timeout - check back later"},
                     "incidents": {"access": None, "error": "Rootly API timeout - check back later"}
                 }
+                # Don't cache timeout errors
             elif error:
                 result_integrations[idx]["permissions"] = {
                     "users": {"access": None, "error": f"Rootly API unavailable: {error}"},
                     "incidents": {"access": None, "error": f"Rootly API unavailable: {error}"}
                 }
+                # Don't cache errors
             else:
                 result_integrations[idx]["permissions"] = permissions
+                # Cache successful permission checks
+                set_cached_permissions(integration_id, permissions)
 
         logger.info(f"🔍 [ROOTLY] All permission checks completed in {time.time() - perm_start:.2f}s")
     
