@@ -1199,12 +1199,19 @@ export default function IntegrationsPage() {
 
       if (response.ok) {
         const data = await response.json()
+        console.log('Refresh response data:', data)
         const updatedIntegration = data.integrations.find((i: Integration) => i.id === integration.id)
 
         if (updatedIntegration) {
-          setIntegrations(prev => prev.map(i =>
-            i.id === integration.id ? updatedIntegration : i
-          ))
+          console.log('Found updated integration:', updatedIntegration)
+          console.log('Current integrations before update:', integrations)
+          setIntegrations(prev => {
+            const updated = prev.map(i =>
+              i.id === integration.id ? updatedIntegration : i
+            )
+            console.log('Integrations after update:', updated)
+            return updated
+          })
           toast.success('Permissions refreshed')
         } else {
           console.error('Integration not found in response:', integration.id, data)
