@@ -1188,8 +1188,8 @@ export default function IntegrationsPage() {
       }
 
       const endpoint = integration.platform === 'rootly'
-        ? `${API_BASE}/integrations/rootly`
-        : `${API_BASE}/integrations/pagerduty`
+        ? `${API_BASE}/rootly/integrations`
+        : `${API_BASE}/pagerduty/integrations`
 
       const response = await fetch(endpoint, {
         headers: {
