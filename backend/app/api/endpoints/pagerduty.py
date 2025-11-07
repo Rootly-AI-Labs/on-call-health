@@ -334,40 +334,88 @@ def update_pagerduty_integration(
         platform=integration.platform
     )
 
+
 @router.delete("/integrations/{integration_id}")
 def delete_pagerduty_integration(
-    integration_id: int,
+    integration_id: str,  # accept string to support "beta-pagerduty"
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    """Delete a PagerDuty integration."""
-    integration = db.query(RootlyIntegration).filter(
-        and_(
-            RootlyIntegration.id == integration_id,
-            RootlyIntegration.user_id == current_user.id,
-            RootlyIntegration.platform == "pagerduty"
-        )
-    ).first()
-    
-    if not integration:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Integration not found"
-        )
-    
-    # If this was default, make another one default
-    if integration.is_default:
-        other_integration = db.query(RootlyIntegration).filter(
-            and_(
-                RootlyIntegration.user_id == current_user.id,
-                RootlyIntegration.id != integration_id
-            )
-        ).first()
+    """Delete a PagerDuty integration or hide the virtual beta card."""
+    # Handle virtual/demo card
+    if integration_id == "beta-pagerduty":
+        return {"status": "success", "message": "Removed demo integration from view"}
         
-        if other_integration:
-            other_integration.is_default = True
+    # Real DB row
+    try:
+        numeric_id = int(integration_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid integration ID")
+
+    integration = db.query(RootlyIntegration).filter(
+        RootlyIntegration.id == numeric_id,
+        RootlyIntegration.user_id == current_user.id,
+        RootlyIntegration.platform == "pagerduty",
+    ).first()
+
+    if not integration:
+        raise HTTPException(status_code=404, detail="Integration not found")
+
+    try:
+        if hasattr(integration, "is_active"):
+            integration.is_active = False
+            if getattr(integration, "is_default", False):
+                other = db.query(RootlyIntegration).filter(
+                    RootlyIntegration.user_id == current_user.id,
+                    RootlyIntegration.id != numeric_id,
+                    RootlyIntegration.platform == "pagerduty",
+                    getattr(RootlyIntegration, "is_active", True) == True,
+                ).first()
+                if other and hasattr(other, "is_default"):
+                    other.is_default = True
+        else:
+            db.delete(integration)
+
+        db.commit()
+        return {"status": "success", "message": "Integration deleted successfully"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to delete integration: {e}")
+
+# @router.delete("/integrations/{integration_id}")
+# def delete_pagerduty_integration(
+#     integration_id: int,
+#     current_user: User = Depends(get_current_active_user),
+#     db: Session = Depends(get_db)
+# ):
+#     """Delete a PagerDuty integration."""
+#     integration = db.query(RootlyIntegration).filter(
+#         and_(
+#             RootlyIntegration.id == integration_id,
+#             RootlyIntegration.user_id == current_user.id,
+#             RootlyIntegration.platform == "pagerduty"
+#         )
+#     ).first()
     
-    db.delete(integration)
-    db.commit()
+#     if not integration:
+#         raise HTTPException(
+#             status_code=status.HTTP_404_NOT_FOUND,
+#             detail="Integration not found"
+#         )
     
-    return {"status": "success", "message": "Integration deleted successfully"}
+#     # If this was default, make another one default
+#     if integration.is_default:
+#         other_integration = db.query(RootlyIntegration).filter(
+#             and_(
+#                 RootlyIntegration.user_id == current_user.id,
+#                 RootlyIntegration.id != integration_id
+#             )
+#         ).first()
+        
+#         if other_integration:
+#             other_integration.is_default = True
+    
+#     db.delete(integration)
+#     db.commit()
+    
+#     return {"status": "success", "message": "Integration deleted successfully"}
