@@ -1922,7 +1922,11 @@ export default function IntegrationsPage() {
             )}
 
             {/* Existing Integrations */}
-            {(loadingRootly || loadingPagerDuty) ? (
+            {integrations.length === 0 && !loadingRootly && !loadingPagerDuty ? (
+              <div className="text-center py-8">
+                <p className="text-gray-600">No platform integrations connected yet.</p>
+              </div>
+            ) : (loadingRootly || loadingPagerDuty) ? (
               <Card className="max-w-2xl mx-auto">
                 <CardContent className="p-6 space-y-4">
                 {/* Skeleton loading cards */}
