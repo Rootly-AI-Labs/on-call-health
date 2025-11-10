@@ -21,15 +21,18 @@ docker compose up -d
 ```
 
 ### Environment Variables
-⚠️ For login purpose, you **must** configure OAuth tokens for Google OR GitHub OAuth:
-```cp backend/.env.example backend/.env```
+⚠️ For login purposes, you **must** configure OAuth tokens for Google OR GitHub OAuth:
+```
+# Create a copy of the .env file
+cp backend/.env.example backend/.env
+```
 
 <details>
 <summary><b>📝 Instructions to get token for Google Auth</b></summary>
 
 1. **Enable [Google People API](https://console.cloud.google.com/marketplace/product/google/people.googleapis.com)**
 	2. **Visit [https://console.cloud.google.com/](https://console.cloud.google.com/)**
-	* Create a new project (or select existing)
+	* Create a new project
 	* Create OAuth 2.0 credentials
 	* Callback URL**: http://localhost:8000/auth/github/callback
 	3. **Fill out the variable `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in your `backend/.env` file**
@@ -53,7 +56,7 @@ docker compose up -d
 </details>
 
 ### Manual setup
-<details><summary>You can also set it up manually, but this method isn't activelly supported.</summary>
+<details><summary>You can also set it up manually, but this method isn't actively supported.</summary>
 
 ### Prerequisites
 - Python 3.11+
@@ -108,8 +111,8 @@ Our implementation uses the two core dimensions:
 
 2. **Work-Related Burnout** 
    - Fatigue specifically tied to work processes
-   - Response time pressure and incident load
-   - Team collaboration stress and communication quality
+   - Response time, pressure, and incident load
+   - Team collaboration, stress, and communication quality
 
 ## 🔐 Security
 
@@ -128,6 +131,6 @@ Our implementation uses the two core dimensions:
 If you are interested in integrating with the On-call Burnout Detector, [get in touch](mailto:sylvain@rootly.com)!
 
 ## 🔗 About the Rootly AI Labs
-Built with ❤️ by the [Rootly AI Labs](https://rootly.com/ai-labs) for engineering teams everywhere. The Rootly AI Labs is a fellow-led community designed to redefine reliability engineering. We develop innovative prototypes, create open-source tools, and produce research that's shared to advance the standards of operational excellence. Thank you Anthropic, Google Cloud and Google Deepmind for supporting us.
+Built with ❤️ by the [Rootly AI Labs](https://rootly.com/ai-labs) for engineering teams everywhere. The Rootly AI Labs is a fellow-led community designed to redefine reliability engineering. We develop innovative prototypes, create open-source tools, and produce research that's shared to advance the standards of operational excellence. We would like to thank Anthropic, Google Cloud, and Google DeepMind for their support.
 
 This project is licensed under the Apache License 2.0.
