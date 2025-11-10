@@ -3448,7 +3448,7 @@ export default function IntegrationsPage() {
           <SheetHeader>
             <div className="flex items-start justify-between pr-10 gap-4">
               <div>
-                <SheetTitle>Team Members ({syncedUsers.length})</SheetTitle>
+                <SheetTitle>Team Members</SheetTitle>
                 <SheetDescription>
                   Sync will match {integrations.find(i => i.id.toString() === selectedOrganization)?.name || 'organization'} users with GitHub and Slack accounts
                 </SheetDescription>
@@ -3480,6 +3480,14 @@ export default function IntegrationsPage() {
               </div>
             </div>
           </SheetHeader>
+
+          {/* Member count - only show when loaded */}
+          {!loadingSyncedUsers && syncedUsers.length > 0 && (
+            <div className="mt-4 inline-flex items-center gap-2 px-3 py-1.5 bg-gray-100 rounded-full">
+              <Users className="w-4 h-4 text-gray-600" />
+              <span className="text-sm font-medium text-gray-700">{syncedUsers.length} members</span>
+            </div>
+          )}
 
           <div className="mt-6 space-y-4">
             {/* Show synced users only */}
