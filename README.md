@@ -1,33 +1,31 @@
+
 # On-call Burnout Detector
 
-An application that detects signs of overwork in incident responders by analyzing operational, behavioral signals, and self-reported data. It integrates with Rootly, PagerDuty, GitHub, and Slack to compute a per-responder risk score highlighting potential burnout trends.
-
-There are two ways to run the On-call Burnout Detector:
-* By self-hosting the app using our [quick start](#-quick-start) guide
-* By using a hosted version [www.oncallburnout.com](https://www.oncallburnout.com/)
-
-The On-call Burnout Detector measures and tracks signals over time that may indicate someone is at risk; it isn’t a medical tool and doesn’t diagnose burnout.
+Detects potential signs of overwork in incident responders which could lead to burnout. To compute a per-responder risk score, it integrates with Rootly, PagerDuty, GitHub, and Slack.
 
 ![Rootly AI Labs On-call Burnout Detector screenshot](assets/rootly-burnout-detector.png)
 
-## ✨ Features
+Two ways to get started:
+* Use our hosted version [www.oncallburnout.com](https://www.oncallburnout.com/) (contains mock data if you just want to test it out)
+* Host it [locally](#Installation)
 
-- **👥 Multi Layer Signals**: Individual and team-level insights
-- **📊 Interactive Dashboard**: Visual  and AI-powered burnout risk analysis
-- **📈 Real-time Analysis**: Progress tracking during data processing
-- **🔄 Tailor to Your organization**: Ability to customize tool integration and signal weights
+## Installation
+Use our Docker Compose file.
+```
+# Clone the repo
+git clone https://github.com/Rootly-AI-Labs/on-call-burnout-detector
+cd on-call-burnout-detector
 
-## 🚀 Quick Start
-### Docker Compose
-The easiest way is to get started is with our [Docker Compose file](https://github.com/Rootly-AI-Labs/On-Call-Burnout-Detector/blob/main/docker-compose.yml).
-```docker compose up -d```
+# Launch with Docker Compose
+docker compose up -d
+```
 
 ### Environment Variables
-⚠️ For login purpose, you **must** get OAuth tokens for Google or GitHub OAuth and set then in the `.env` file. Start with:
+⚠️ For login purpose, you **must** configure OAuth tokens for Google OR GitHub OAuth:
 ```cp backend/.env.example backend/.env```
 
 <details>
-<summary><b>Instruction to get token for Google Auth</b></summary>
+<summary><b>📝 Instructions to get token for Google Auth</b></summary>
 
 1. **Enable [Google People API](https://console.cloud.google.com/marketplace/product/google/people.googleapis.com)**
 	2. **Visit [https://console.cloud.google.com/](https://console.cloud.google.com/)**
@@ -39,7 +37,7 @@ The easiest way is to get started is with our [Docker Compose file](https://gith
 </details>
 
 <details>
-<summary><b>Instruction to get token for GitHub Auth</b></summary>
+<summary><b>📝 Instructions to get token for GitHub Auth</b></summary>
 
 1. **Visit [https://github.com/settings/developers](https://github.com/settings/developers)**
 	*  Click **OAuth Apps** → **New OAuth App**
@@ -89,12 +87,19 @@ npm run dev
 The frontend will be available at `http://localhost:3000`
 </details>
 
-## 📊 Signals Analysis
+##  Features
+
+- ** Multi Layer Signals**: Individual and team-level insights
+- ** Interactive Dashboard**: Visual  and AI-powered burnout risk analysis
+- ** Real-time Analysis**: Progress tracking during data processing
+- ** Tailor to Your organization**: Ability to customize tool integration and signal weights
+
+##  Methodology
 
 The On-call Burnout Detector (OCB) takes inspiration from the [Copenhagen Burnout Inventory](https://nfa.dk/media/hl5nbers/cbi-first-edition.pdf) (CBI), a scientifically validated approach to measuring burnout risk in professional settings. The Burnout Detector isn’t a medical tool and doesn’t provide a diagnosis; it is designed to help identify patterns and trends that may suggest overwork.
 
-### Methodology
-Our implementation uses the two core OCB dimensions:
+### Methodology breakdown
+Our implementation uses the two core dimensions:
 
 1. **Personal Burnout**
    - Physical and psychological fatigue from workload
