@@ -62,6 +62,8 @@ export function AIInsightsCard({
     if (wasConnected && wasCustom && !checked) {
       setIsSwitching(true)
       try {
+        // Add 1 second delay
+        await new Promise(resolve => setTimeout(resolve, 1000))
         await onConnect('', 'anthropic', true, false)
         setUseCustomToken(false)
         toast.success("Switched to system token")
@@ -76,18 +78,20 @@ export function AIInsightsCard({
 
     // Case 2: Switching from system to custom while connected - try to activate stored token
     if (wasConnected && !wasCustom && checked) {
-      // First, optimistically show the custom UI
-      setUseCustomToken(true)
       setIsSwitching(true)
 
       try {
+        // Add 1 second delay
+        await new Promise(resolve => setTimeout(resolve, 1000))
         // Try to switch to stored custom token
         await onConnect('', provider, false, true)
+        setUseCustomToken(true)
         toast.success("Switched to custom token")
       } catch (error: any) {
         // If no stored token exists, that's ok - just show the form
         const errorMsg = error?.message || String(error)
         if (errorMsg.includes('No custom token found') || errorMsg.includes('404')) {
+          setUseCustomToken(true)
           toast.info("Enter your custom API token below to get started")
         } else {
           // Real error - show it
@@ -184,44 +188,48 @@ export function AIInsightsCard({
             </CardDescription>
           </div>
           {/* Segmented Control for Token Selection */}
-          <div
-            role="radiogroup"
-            aria-label="Token source selection"
-            className="inline-flex rounded-md border border-slate-300 p-0.5 bg-slate-100 relative"
-          >
-            {/* System Token Button */}
-            <button
-              type="button"
-              role="radio"
-              aria-checked={!useCustomToken}
-              onClick={() => handleTokenSourceChange('system')}
-              disabled={isSwitching}
-              className={`px-3 py-1.5 rounded text-xs font-semibold transition-all duration-150 flex items-center gap-1.5 ${
-                !useCustomToken
-                  ? 'bg-white text-slate-900 shadow-md border border-slate-200'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-              } ${isSwitching ? 'opacity-50 cursor-not-allowed' : ''}`}
+          <div className="flex items-center gap-2">
+            {/* Loader to the left of toggle */}
+            {isSwitching && (
+              <Loader2 className="w-4 h-4 animate-spin text-slate-600" />
+            )}
+            <div
+              role="radiogroup"
+              aria-label="Token source selection"
+              className="inline-flex rounded-md border border-slate-300 p-0.5 bg-slate-100"
             >
-              {isSwitching && !useCustomToken && <Loader2 className="w-3 h-3 animate-spin" />}
-              System
-            </button>
+              {/* System Token Button */}
+              <button
+                type="button"
+                role="radio"
+                aria-checked={!useCustomToken}
+                onClick={() => handleTokenSourceChange('system')}
+                disabled={isSwitching}
+                className={`px-3 py-1.5 rounded text-xs font-semibold transition-all duration-150 ${
+                  !useCustomToken
+                    ? 'bg-white text-slate-900 shadow-md border border-slate-200'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                } ${isSwitching ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                System
+              </button>
 
-            {/* Custom Token Button */}
-            <button
-              type="button"
-              role="radio"
-              aria-checked={useCustomToken}
-              onClick={() => handleTokenSourceChange('custom')}
-              disabled={isSwitching}
-              className={`px-3 py-1.5 rounded text-xs font-semibold transition-all duration-150 flex items-center gap-1.5 ${
-                useCustomToken
-                  ? 'bg-white text-slate-900 shadow-md border border-slate-200'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-              } ${isSwitching ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-              {isSwitching && useCustomToken && <Loader2 className="w-3 h-3 animate-spin" />}
-              Custom
-            </button>
+              {/* Custom Token Button */}
+              <button
+                type="button"
+                role="radio"
+                aria-checked={useCustomToken}
+                onClick={() => handleTokenSourceChange('custom')}
+                disabled={isSwitching}
+                className={`px-3 py-1.5 rounded text-xs font-semibold transition-all duration-150 ${
+                  useCustomToken
+                    ? 'bg-white text-slate-900 shadow-md border border-slate-200'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                } ${isSwitching ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                Custom
+              </button>
+            </div>
           </div>
         </div>
       </CardHeader>
