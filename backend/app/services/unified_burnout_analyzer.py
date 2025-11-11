@@ -3107,15 +3107,37 @@ class UnifiedBurnoutAnalyzer:
             Enhanced analysis with AI insights
         """
         try:
-            # Get user's LLM token from context
+            # Get user's LLM token preference from context
             from .ai_burnout_analyzer import get_user_context
-            from ..api.endpoints.llm import get_user_llm_token
-            
+            from ..api.endpoints.llm import decrypt_token
+            import os
+
             current_user = get_user_context()
             user_llm_token = None
             user_llm_provider = None
-            # Use system API key for all users (Railway environment key)
-            ai_analyzer = get_ai_burnout_analyzer()
+
+            # Check user's active token preference
+            if current_user and hasattr(current_user, 'active_llm_token_source'):
+                active_source = getattr(current_user, 'active_llm_token_source', 'system')
+
+                # If user prefers custom token and has one stored, use it
+                if active_source == 'custom' and current_user.has_llm_token():
+                    try:
+                        user_llm_token = decrypt_token(current_user.llm_token)
+                        user_llm_provider = current_user.llm_provider
+                        logger.info(f"Using user's custom {user_llm_provider} token for AI analysis")
+                        ai_analyzer = get_ai_burnout_analyzer(api_key=user_llm_token, provider=user_llm_provider)
+                    except Exception as e:
+                        logger.warning(f"Failed to use custom token, falling back to system: {e}")
+                        ai_analyzer = get_ai_burnout_analyzer()
+                else:
+                    # User prefers system token or no custom token available
+                    logger.info(f"Using system token for AI analysis (user preference: {active_source})")
+                    ai_analyzer = get_ai_burnout_analyzer()
+            else:
+                # No user context or preference, use system token
+                logger.info("No user context, using system token for AI analysis")
+                ai_analyzer = get_ai_burnout_analyzer()
             
             # Enhance each member analysis with null safety
             enhanced_members = []
