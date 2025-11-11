@@ -1374,27 +1374,33 @@ _ai_analyzer_cache = {}
 def get_ai_burnout_analyzer(api_key: Optional[str] = None, provider: Optional[str] = None) -> AIBurnoutAnalyzerService:
     """
     Get AI burnout analyzer instance.
-    
-    Uses system API key for all users to provide AI insights by default.
-    
+
+    Respects user's token preference: uses custom token if provided, otherwise system token.
+
     Args:
-        api_key: Deprecated - system uses Railway environment key
-        provider: LLM provider (always 'anthropic' for system key)
-        
+        api_key: Optional custom API key (if user has configured one)
+        provider: LLM provider ('anthropic' or 'openai')
+
     Returns:
         AIBurnoutAnalyzerService instance
     """
     import os
-    
-    # Always use system API key from Railway environment
-    system_api_key = os.getenv('ANTHROPIC_API_KEY')
-    system_provider = 'anthropic'
-    
-    # Use system key for cache (single instance for all users)
     import hashlib
-    cache_key = hashlib.sha256(f"{system_api_key or ''}:{system_provider}".encode()).hexdigest()[:16]
-    
+
+    # Determine which token to use
+    if api_key and provider:
+        # User has custom token - use it
+        effective_api_key = api_key
+        effective_provider = provider
+    else:
+        # No custom token - use system token from Railway environment
+        effective_api_key = os.getenv('ANTHROPIC_API_KEY')
+        effective_provider = 'anthropic'
+
+    # Create cache key based on the actual token being used
+    cache_key = hashlib.sha256(f"{effective_api_key or ''}:{effective_provider}".encode()).hexdigest()[:16]
+
     if cache_key not in _ai_analyzer_cache:
-        _ai_analyzer_cache[cache_key] = AIBurnoutAnalyzerService(api_key=system_api_key, provider=system_provider)
-    
+        _ai_analyzer_cache[cache_key] = AIBurnoutAnalyzerService(api_key=effective_api_key, provider=effective_provider)
+
     return _ai_analyzer_cache[cache_key]

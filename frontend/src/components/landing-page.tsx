@@ -329,7 +329,7 @@ Skip the UI and pull results directly into your CLI via MCP, or fork the code to
                   Get started
                 </a>
                 <a
-                  href="https://github.com/Rootly-AI-Labs/rootly-burnout-detector-web/tree/main"
+                  href="https://github.com/Rootly-AI-Labs/On-Call-Burnout-Detector"
                   target="_blank"
                   className="w-full rounded-full sm:w-auto border-slate-300 px-8 py-4 text-lg hover:bg-slate-50 bg-transparent border border-input bg-background hover:bg-accent hover:text-accent-foreground"
                 >
