@@ -45,7 +45,7 @@ class LLMTokenResponse(BaseModel):
     has_token: bool
     provider: Optional[str] = None
     token_suffix: Optional[str] = None
-    token_source: str = 'system'  # 'system' or 'custom'
+    token_source: str = 'system'  # 'system' or 'self-provided'
     created_at: Optional[datetime] = None
 
 @router.post("/token", response_model=LLMTokenResponse)
@@ -66,7 +66,7 @@ async def store_llm_token(
                 detail="System LLM token not configured"
             )
 
-        # Clear any custom token and mark as using system token
+        # Clear any self-provided token and mark as using system token
         current_user.llm_token = None
         current_user.llm_provider = 'anthropic'  # System token is Anthropic
         current_user.updated_at = datetime.now()
@@ -154,7 +154,7 @@ async def store_llm_token(
             has_token=True,
             provider=request.provider,
             token_suffix=token_suffix,
-            token_source='custom',
+            token_source='self-provided',
             created_at=current_user.updated_at
         )
         
@@ -170,11 +170,11 @@ async def get_llm_token_info(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get information about user's LLM token (system or custom)."""
+    """Get information about user's LLM token (system or self-provided)."""
 
-    # Check if user has a custom token
+    # Check if user has a self-provided token
     if current_user.has_llm_token():
-        # User has custom token
+        # User has self-provided token
         try:
             decrypted_token = decrypt_token(current_user.llm_token)
             token_suffix = decrypted_token[-4:] if len(decrypted_token) > 4 else "****"
@@ -183,7 +183,7 @@ async def get_llm_token_info(
                 has_token=True,
                 provider=current_user.llm_provider,
                 token_suffix=token_suffix,
-                token_source='custom',
+                token_source='self-provided',
                 created_at=current_user.updated_at
             )
         except Exception as e:
@@ -194,7 +194,7 @@ async def get_llm_token_info(
     import os
     system_api_key = os.getenv('ANTHROPIC_API_KEY')
     if system_api_key:
-        # Return system token info (default for users without custom token)
+        # Return system token info (default for users without self-provided token)
         return LLMTokenResponse(
             has_token=True,
             provider='anthropic',
@@ -211,7 +211,7 @@ async def delete_llm_token(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Delete user's custom LLM token and revert to system token."""
+    """Delete user's self-provided LLM token and revert to system token."""
     
     if not current_user.has_llm_token():
         raise HTTPException(
