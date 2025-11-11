@@ -109,7 +109,7 @@ async def store_llm_token(
     try:
         if request.provider == 'anthropic':
             import anthropic
-            client = anthropic.Anthropic(api_key=request.token)
+            client = anthropic.Anthropic(api_key=request.token, timeout=30.0)
             # Test with a minimal API call
             response = client.messages.create(
                 model="claude-3-haiku-20240307",
@@ -118,18 +118,36 @@ async def store_llm_token(
             )
         elif request.provider == 'openai':
             import openai
-            client = openai.OpenAI(api_key=request.token)
+            client = openai.OpenAI(api_key=request.token, timeout=30.0)
             # Test with a minimal API call
             response = client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[{"role": "user", "content": "Hi"}],
                 max_tokens=1
             )
+    except ImportError as e:
+        logger.error(f"Missing library for {request.provider}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Server configuration error: {request.provider} library not installed"
+        )
     except Exception as e:
+        error_msg = str(e).lower()
         logger.error(f"Token verification failed for {request.provider}: {e}")
+
+        # Provide more specific error messages
+        if 'authentication' in error_msg or 'invalid' in error_msg or '401' in error_msg or 'unauthorized' in error_msg:
+            detail = f"Invalid API key. Please verify your {request.provider} token and try again."
+        elif 'timeout' in error_msg or 'timed out' in error_msg:
+            detail = f"Connection timeout while verifying token. Please try again."
+        elif 'connection' in error_msg or 'network' in error_msg:
+            detail = f"Network error while verifying token. Please check your connection and try again."
+        else:
+            detail = f"Token verification failed: {str(e)}"
+
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Token verification failed. Please check your {request.provider} API key and try again."
+            detail=detail
         )
     
     try:
