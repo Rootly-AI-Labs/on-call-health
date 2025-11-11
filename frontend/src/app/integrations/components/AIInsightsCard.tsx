@@ -46,9 +46,8 @@ export function AIInsightsCard({
     isUserInitiatedRef.current = true
     const wasConnected = llmConfig?.has_token
     const wasCustom = llmConfig?.token_source === 'custom'
-    const hasStoredCustomToken = llmConfig?.has_token && llmConfig?.token_source === 'custom'
 
-    // Switching from custom to system while connected - just switch (no deletion)
+    // Case 1: Switching from custom to system while connected
     if (wasConnected && wasCustom && !checked) {
       setIsSwitching(true)
       try {
@@ -57,27 +56,32 @@ export function AIInsightsCard({
         toast.success("Switched to system token")
       } catch (error) {
         toast.error("Failed to switch to system token")
+        setUseCustomToken(true) // Revert on error
       } finally {
         setIsSwitching(false)
       }
       return
     }
 
-    // Switching from system to custom while connected - activate stored custom token if it exists
+    // Case 2: Switching from system to custom while connected - try to activate stored token
     if (wasConnected && !wasCustom && checked) {
+      // First, optimistically show the custom UI
+      setUseCustomToken(true)
       setIsSwitching(true)
+
       try {
         // Try to switch to stored custom token
         await onConnect('', provider, false, true)
-        setUseCustomToken(true)
         toast.success("Switched to custom token")
       } catch (error: any) {
-        // If no stored token exists, show form
-        if (error?.message?.includes('No custom token found')) {
-          setUseCustomToken(checked)
-          toast.info("Enter your custom API token below to get started.")
+        // If no stored token exists, that's ok - just show the form
+        const errorMsg = error?.message || String(error)
+        if (errorMsg.includes('No custom token found') || errorMsg.includes('404')) {
+          toast.info("Enter your custom API token below to get started")
         } else {
-          toast.error("Failed to switch to custom token")
+          // Real error - show it
+          console.error('Switch error:', error)
+          toast.error("Failed to switch. Please try again.")
         }
       } finally {
         setIsSwitching(false)
@@ -85,13 +89,13 @@ export function AIInsightsCard({
       return
     }
 
-    // Not connected - just toggle and show appropriate message
+    // Case 3: Not connected - just toggle UI and show appropriate message
     setUseCustomToken(checked)
     if (!isInitialMount.current) {
       if (checked) {
-        toast.info("Switched to custom token mode. Enter your own API token below.")
+        toast.info("Enter your custom API token below")
       } else {
-        toast.info("Switched to system token mode. Use our provided Anthropic API.")
+        toast.info("Use our provided Anthropic API")
       }
     }
     isInitialMount.current = false
@@ -131,7 +135,7 @@ export function AIInsightsCard({
           <div
             role="radiogroup"
             aria-label="Token source selection"
-            className="inline-flex rounded-md border border-slate-300 p-0.5 bg-slate-100"
+            className="inline-flex rounded-md border border-slate-300 p-0.5 bg-slate-100 relative"
           >
             {/* System Token Button */}
             <button
@@ -139,12 +143,14 @@ export function AIInsightsCard({
               role="radio"
               aria-checked={!useCustomToken}
               onClick={() => handleTokenSourceChange('system')}
-              className={`px-3 py-1.5 rounded text-xs font-semibold transition-all duration-150 ${
+              disabled={isSwitching}
+              className={`px-3 py-1.5 rounded text-xs font-semibold transition-all duration-150 flex items-center gap-1.5 ${
                 !useCustomToken
                   ? 'bg-white text-slate-900 shadow-md border border-slate-200'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-              }`}
+              } ${isSwitching ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
+              {isSwitching && !useCustomToken && <Loader2 className="w-3 h-3 animate-spin" />}
               System
             </button>
 
@@ -154,12 +160,14 @@ export function AIInsightsCard({
               role="radio"
               aria-checked={useCustomToken}
               onClick={() => handleTokenSourceChange('custom')}
-              className={`px-3 py-1.5 rounded text-xs font-semibold transition-all duration-150 ${
+              disabled={isSwitching}
+              className={`px-3 py-1.5 rounded text-xs font-semibold transition-all duration-150 flex items-center gap-1.5 ${
                 useCustomToken
                   ? 'bg-white text-slate-900 shadow-md border border-slate-200'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-              }`}
+              } ${isSwitching ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
+              {isSwitching && useCustomToken && <Loader2 className="w-3 h-3 animate-spin" />}
               Custom
             </button>
           </div>
