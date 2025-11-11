@@ -217,6 +217,10 @@ class UserSyncService:
             updated = True
 
         if platform == "rootly":
+            # Store both the Rootly user ID and email
+            if user.get("id") and (not correlation.rootly_user_id or correlation.rootly_user_id != user["id"]):
+                correlation.rootly_user_id = user["id"]
+                updated = True
             if not correlation.rootly_email or correlation.rootly_email != user["email"]:
                 correlation.rootly_email = user["email"]
                 updated = True

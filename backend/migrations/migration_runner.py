@@ -468,9 +468,26 @@ class MigrationRunner:
                     """
                 ]
             },
+            {
+                "name": "015_add_rootly_user_id_to_user_correlations",
+                "description": "Add rootly_user_id field to store Rootly API user ID (needed for incident matching)",
+                "sql": [
+                    """
+                    ALTER TABLE user_correlations
+                    ADD COLUMN IF NOT EXISTS rootly_user_id VARCHAR(50)
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_user_correlations_rootly_user_id
+                    ON user_correlations(rootly_user_id)
+                    """,
+                    """
+                    COMMENT ON COLUMN user_correlations.rootly_user_id IS 'Rootly API user ID for incident matching'
+                    """
+                ]
+            },
             # Add future migrations here with incrementing numbers
             # {
-            #     "name": "014_add_user_preferences",
+            #     "name": "016_add_user_preferences",
             #     "description": "Add user preferences table",
             #     "sql": ["CREATE TABLE IF NOT EXISTS user_preferences (...)"]
             # }

@@ -2559,8 +2559,19 @@ async def run_analysis_task(
                 for corr in correlations:
                     if corr.integration_ids and integration_id_str in corr.integration_ids:
                         # Format user data for analyzer (compatible with API format)
+                        # CRITICAL: Must use the actual platform user ID for incident matching!
+                        if platform == "pagerduty":
+                            user_id = corr.pagerduty_user_id
+                        else:  # rootly
+                            user_id = corr.rootly_user_id  # Use Rootly API user ID, NOT email
+
+                        # Skip if no user ID (shouldn't happen but be safe)
+                        if not user_id:
+                            logger.warning(f"Skipping synced user {corr.email} - missing {platform} user ID")
+                            continue
+
                         user_data = {
-                            'id': corr.pagerduty_user_id if platform == "pagerduty" else corr.rootly_email or corr.email,
+                            'id': user_id,  # Must be actual platform user ID for incident matching
                             'name': corr.name,
                             'email': corr.email,
                             # Include enhanced platform mappings
