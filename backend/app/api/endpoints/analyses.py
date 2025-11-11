@@ -2538,14 +2538,58 @@ async def run_analysis_task(
             from ...services.ai_burnout_analyzer import set_user_context
             set_user_context(user)
             logger.info(f"BACKGROUND_TASK: Set user context for AI analysis (LLM provider: {user.llm_provider if user.llm_token else 'none'})")
-        
+
+        # TEAM SYNC OPTIMIZATION: Fetch synced users from UserCorrelation table
+        synced_users = None
+        if user_id and integration_id:
+            try:
+                from ...models.user_correlation import UserCorrelation
+
+                # Determine integration_id string format
+                integration_id_str = str(integration_id)
+                logger.info(f"BACKGROUND_TASK: Querying UserCorrelation for user_id={user_id}, integration_id={integration_id_str}")
+
+                # Query all correlations for this user
+                correlations = db.query(UserCorrelation).filter(
+                    UserCorrelation.user_id == user_id
+                ).all()
+
+                # Filter by integration_id (check JSON array)
+                synced_users = []
+                for corr in correlations:
+                    if corr.integration_ids and integration_id_str in corr.integration_ids:
+                        # Format user data for analyzer (compatible with API format)
+                        user_data = {
+                            'id': corr.pagerduty_user_id if platform == "pagerduty" else corr.rootly_email or corr.email,
+                            'name': corr.name,
+                            'email': corr.email,
+                            # Include enhanced platform mappings
+                            'github_username': corr.github_username,
+                            'slack_user_id': corr.slack_user_id,
+                            'synced': True  # Mark as from Team Sync
+                        }
+                        synced_users.append(user_data)
+
+                if synced_users:
+                    logger.info(f"✅ TEAM SYNC OPTIMIZATION: Found {len(synced_users)} synced users for integration {integration_id_str} - will skip user API fetch")
+                else:
+                    logger.info(f"⚠️  TEAM SYNC: No synced users found for integration {integration_id_str} - will fetch from API")
+                    synced_users = None  # Fallback to API
+
+            except Exception as e:
+                logger.warning(f"⚠️  TEAM SYNC: Failed to fetch synced users: {e} - falling back to API")
+                synced_users = None  # Fallback to API on error
+        else:
+            logger.info("BACKGROUND_TASK: Skipping Team Sync query (missing user_id or integration_id)")
+
         analyzer_service = UnifiedBurnoutAnalyzer(
             api_token=effective_api_token,
             platform=platform,
             enable_ai=use_ai_analyzer,
             github_token=github_token if include_github else None,
             slack_token=slack_token if include_slack else None,
-            organization_name=organization_name
+            organization_name=organization_name,
+            synced_users=synced_users  # Pass synced users from Team Sync
         )
         logger.info(f"BACKGROUND_TASK: UnifiedBurnoutAnalyzer initialized - Features: AI={use_ai_analyzer}, GitHub={include_github}, Slack={include_slack}")
         

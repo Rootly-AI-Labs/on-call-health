@@ -67,7 +67,8 @@ class UnifiedBurnoutAnalyzer:
         enable_ai: bool = False,
         github_token: Optional[str] = None,
         slack_token: Optional[str] = None,
-        organization_name: Optional[str] = None
+        organization_name: Optional[str] = None,
+        synced_users: Optional[List[Dict[str, Any]]] = None
     ):
         # Check for mock data mode from environment
         self.use_mock_data = os.getenv('USE_MOCK_DATA', 'false').lower() == 'true'
@@ -103,6 +104,13 @@ class UnifiedBurnoutAnalyzer:
         # Using Copenhagen Burnout Inventory (OCB) methodology
         logger.info("Unified analyzer using Copenhagen Burnout Inventory methodology")
         self.organization_name = organization_name
+
+        # Store synced users if provided (from Team Sync feature)
+        self.synced_users = synced_users
+        if synced_users:
+            logger.info(f"✅ Using {len(synced_users)} pre-synced users from Team Sync - will skip user API fetch")
+        else:
+            logger.info("⚠️  No synced users provided - will fetch users from API (slower)")
 
         # Determine which features are enabled
         if self.use_mock_data:
@@ -874,13 +882,42 @@ class UnifiedBurnoutAnalyzer:
             raise
     
     async def _fetch_analysis_data(self, days_back: int) -> Dict[str, Any]:
-        """Fetch all required data from Rootly API."""
+        """Fetch all required data from Rootly API (or use synced users if provided)."""
         fetch_start_time = datetime.now()
         logger.info(f"🔍 ANALYZER DATA FETCH: Starting data collection for {days_back}-day analysis")
-        
+
         try:
-            # Use the existing data collection method
-            logger.info(f"🔍 ANALYZER DATA FETCH: Delegating to client.collect_analysis_data for {days_back} days")
+            # If synced users provided, use them instead of fetching from API
+            if self.synced_users:
+                logger.info(f"✅ TEAM SYNC OPTIMIZATION: Using {len(self.synced_users)} pre-synced users, only fetching incidents")
+
+                # Only fetch incidents from API (much faster!)
+                incidents = await self.client.get_incidents(days_back=days_back, limit=5000)
+
+                # Build data structure with synced users
+                data = {
+                    "users": self.synced_users,
+                    "incidents": incidents,
+                    "collection_metadata": {
+                        "timestamp": datetime.now().isoformat(),
+                        "days_analyzed": days_back,
+                        "total_users": len(self.synced_users),
+                        "total_incidents": len(incidents),
+                        "used_synced_users": True,
+                        "date_range": {
+                            "start": (datetime.now() - timedelta(days=days_back)).isoformat(),
+                            "end": datetime.now().isoformat()
+                        }
+                    }
+                }
+
+                fetch_duration = (datetime.now() - fetch_start_time).total_seconds()
+                logger.info(f"✅ TEAM SYNC OPTIMIZATION: Data fetch completed in {fetch_duration:.2f}s (skipped user fetch)")
+
+                return data
+
+            # Fallback: Use the existing data collection method (backward compatibility)
+            logger.info(f"🔍 ANALYZER DATA FETCH: No synced users provided, delegating to client.collect_analysis_data for {days_back} days")
             data = await self.client.collect_analysis_data(days_back=days_back)
             
             fetch_duration = (datetime.now() - fetch_start_time).total_seconds()
