@@ -70,6 +70,7 @@ export default function Dashboard() {
   loadingIntegrations,
   initialDataLoaded,
   hasDataFromCache,
+  loadingAnalyses,
   loadingTrends,
   analysisRunning,
   analysisStage,
@@ -198,36 +199,6 @@ export default function Dashboard() {
     return <Minus className={meta.className} />
   }
 
-
-  // Show full-screen loading when loading integrations
-  if (loadingIntegrations) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <Activity className="w-8 h-8 text-purple-600 animate-pulse mx-auto mb-4" />
-          <p className="text-gray-600">Loading dashboard...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Show main page loader ONLY while initial data loads (and no cached data)
-  // Once data is loaded, show proper empty state or analysis content
-  const showLoader = !initialDataLoaded && !hasDataFromCache;
-  
-  if (showLoader) {
-    return (
-      <div className="flex h-screen bg-gray-50">
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <div className="w-8 h-8 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading dashboard...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-  
   return (
     <div className="flex flex-col h-screen bg-gray-50">
       <TopPanel />
@@ -266,7 +237,7 @@ export default function Dashboard() {
                 <p className="text-sm text-gray-400 uppercase tracking-wide px-2 py-1 mt-4">Recent</p>
               )}
               <div className="max-h-96 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 relative">
-                {!initialDataLoaded && previousAnalyses.length === 0 ? (
+                {loadingAnalyses && previousAnalyses.length === 0 ? (
                   // Show loading state for analyses
                   <div className="flex items-center justify-center py-8">
                     <div className="flex items-center space-x-2">
@@ -416,7 +387,7 @@ export default function Dashboard() {
                       disabled={loadingMoreAnalyses || analysisRunning}
                       className="w-full border-gray-500 bg-gray-800 text-gray-200 hover:bg-gray-700 hover:text-white hover:border-gray-400 text-sm"
                     >
-                      {(loadingMoreAnalyses || (!initialDataLoaded && previousAnalyses.length === 0)) ? (
+                      {(loadingMoreAnalyses || (loadingAnalyses && previousAnalyses.length === 0)) ? (
                         <>
                           <div className="w-3 h-3 border border-gray-300 border-t-transparent rounded-full animate-spin mr-2" />
                           Loading...
@@ -1729,8 +1700,8 @@ export default function Dashboard() {
           {/* Empty State or Loading State */}
           {!analysisRunning && !currentAnalysis && !searchParams.get('analysis') && (
             <>
-              {/* Show loading state if initial data hasn't loaded yet OR if we have analyses but currentAnalysis isn't set */}
-              {!initialDataLoaded || (previousAnalyses.length > 0 && !currentAnalysis) ? (
+              {/* Show loading state while analyses are loading OR if we have analyses but currentAnalysis isn't set */}
+              {loadingAnalyses || (previousAnalyses.length > 0 && !currentAnalysis) ? (
                 <Card className="text-center p-8">
                   <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                     <div className="w-8 h-8 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
