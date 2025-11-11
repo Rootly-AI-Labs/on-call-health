@@ -90,6 +90,7 @@ export function AIInsightsCard({
     }
 
     // Case 3: Not connected - toggle UI and persist preference
+    const previousState = useCustomToken
     setUseCustomToken(checked)
 
     // Persist the preference to backend
@@ -106,9 +107,17 @@ export function AIInsightsCard({
 
       if (!response.ok) {
         console.error('Failed to save token preference')
+        // Revert to previous state
+        setUseCustomToken(previousState)
+        toast.error("Failed to save preference. Please try again.")
+        return
       }
     } catch (error) {
       console.error('Error saving preference:', error)
+      // Revert to previous state
+      setUseCustomToken(previousState)
+      toast.error("Failed to save preference. Please try again.")
+      return
     }
 
     if (!isInitialMount.current) {
