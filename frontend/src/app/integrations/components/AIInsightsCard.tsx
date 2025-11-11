@@ -2,6 +2,16 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Brain, Sparkles, Trash2, Loader2, ExternalLink, CheckCircle2 } from "lucide-react"
 import { useState, useEffect, useRef } from "react"
 import { toast } from "sonner"
@@ -23,6 +33,7 @@ export function AIInsightsCard({
   const [customToken, setCustomToken] = useState('')
   const [provider, setProvider] = useState<'anthropic' | 'openai'>('anthropic')
   const [isSwitching, setIsSwitching] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
 
   // Track if toggle change is user-initiated to prevent toast spam
   const isUserInitiatedRef = useRef(false)
@@ -145,6 +156,18 @@ export function AIInsightsCard({
     }
   }
 
+  const handleDelete = async () => {
+    try {
+      await onDisconnect()
+      setShowDeleteDialog(false)
+      toast.success("Custom token deleted successfully", {
+        className: "bg-green-50 text-green-900 border-green-200"
+      })
+    } catch (error) {
+      toast.error("Failed to delete token")
+    }
+  }
+
   const isConnected = llmConfig?.has_token
 
   return (
@@ -253,7 +276,7 @@ export function AIInsightsCard({
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={onDisconnect}
+                onClick={() => setShowDeleteDialog(true)}
                 className="text-red-600 hover:text-red-700 hover:bg-red-100"
               >
                 <Trash2 className="w-4 h-4" />
@@ -376,6 +399,27 @@ export function AIInsightsCard({
         )}
       </CardContent>
 
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Custom Token?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete your custom API token? This action cannot be undone.
+              You will automatically switch back to the system-provided token.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Delete Token
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   )
 }
