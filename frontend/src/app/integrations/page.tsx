@@ -103,6 +103,7 @@ import {
   type Integration,
   type GitHubIntegration,
   type SlackIntegration,
+  type JiraIntegration,
   type PreviewData,
   type IntegrationMapping,
   type MappingStatistics,
@@ -120,6 +121,7 @@ import {
 } from "./types"
 import * as GithubHandlers from "./handlers/github-handlers"
 import * as SlackHandlers from "./handlers/slack-handlers"
+import * as JiraHandlers from "./handlers/jira-handlers"
 import * as TeamHandlers from "./handlers/team-handlers"
 import * as IntegrationHandlers from "./handlers/integration-handlers"
 import * as OrganizationHandlers from "./handlers/organization-handlers"
@@ -129,12 +131,15 @@ import * as Utils from "./utils"
 import { GitHubIntegrationCard } from "./components/GitHubIntegrationCard"
 import { AIInsightsCard } from "./components/AIInsightsCard"
 import { GitHubConnectedCard } from "./components/GitHubConnectedCard"
+import { JiraIntegrationCard } from "./components/JiraIntegrationCard"
+import { JiraConnectedCard } from "./components/JiraConnectedCard"
 import { RootlyIntegrationForm } from "./components/RootlyIntegrationForm"
 import { SurveyFeedbackSection } from "./components/SurveyFeedbackSection"
 import { PagerDutyIntegrationForm } from "./components/PagerDutyIntegrationForm"
 import { DeleteIntegrationDialog } from "./dialogs/DeleteIntegrationDialog"
 import { GitHubDisconnectDialog } from "./dialogs/GitHubDisconnectDialog"
 import { SlackDisconnectDialog } from "./dialogs/SlackDisconnectDialog"
+import { JiraDisconnectDialog } from "./dialogs/JiraDisconnectDialog"
 import { NewMappingDialog } from "./dialogs/NewMappingDialog"
 import { OrganizationManagementDialog } from "./dialogs/OrganizationManagementDialog"
 
@@ -145,6 +150,7 @@ export default function IntegrationsPage() {
   const [loadingPagerDuty, setLoadingPagerDuty] = useState(true)
   const [loadingGitHub, setLoadingGitHub] = useState(true)
   const [loadingSlack, setLoadingSlack] = useState(true)
+  const [loadingJira, setLoadingJira] = useState(true)
   const [reloadingIntegrations, setReloadingIntegrations] = useState(false)
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null)
   const [activeTab, setActiveTab] = useState<"rootly" | "pagerduty" | null>(null)
@@ -152,10 +158,11 @@ export default function IntegrationsPage() {
   const [selectedOrganization, setSelectedOrganization] = useState<string>("")
   const [navigatingToDashboard, setNavigatingToDashboard] = useState(false)
 
-  // GitHub/Slack integration state
+  // GitHub/Slack/Jira integration state
   const [githubIntegration, setGithubIntegration] = useState<GitHubIntegration | null>(null)
   const [slackIntegration, setSlackIntegration] = useState<SlackIntegration | null>(null)
-  const [activeEnhancementTab, setActiveEnhancementTab] = useState<"github" | "slack" | null>(null)
+  const [jiraIntegration, setJiraIntegration] = useState<JiraIntegration | null>(null)
+  const [activeEnhancementTab, setActiveEnhancementTab] = useState<"github" | "slack" | "jira" | null>(null)
 
   // Slack feature selection for OAuth
   const [enableSlackSurvey, setEnableSlackSurvey] = useState(true) // Default both enabled
@@ -219,14 +226,17 @@ export default function IntegrationsPage() {
   const [showSlackToken, setShowSlackToken] = useState(false)
   const [isConnectingGithub, setIsConnectingGithub] = useState(false)
   const [isConnectingSlack, setIsConnectingSlack] = useState(false)
-  
+  const [isConnectingJira, setIsConnectingJira] = useState(false)
+
   // Disconnect confirmation state
   const [githubDisconnectDialogOpen, setGithubDisconnectDialogOpen] = useState(false)
   const [slackDisconnectDialogOpen, setSlackDisconnectDialogOpen] = useState(false)
+  const [jiraDisconnectDialogOpen, setJiraDisconnectDialogOpen] = useState(false)
   const [slackSurveyDisconnectDialogOpen, setSlackSurveyDisconnectDialogOpen] = useState(false)
   const [slackSurveyConfirmDisconnectOpen, setSlackSurveyConfirmDisconnectOpen] = useState(false)
   const [isDisconnectingGithub, setIsDisconnectingGithub] = useState(false)
   const [isDisconnectingSlack, setIsDisconnectingSlack] = useState(false)
+  const [isDisconnectingJira, setIsDisconnectingJira] = useState(false)
   const [isDisconnectingSlackSurvey, setIsDisconnectingSlackSurvey] = useState(false)
   const [isConnectingSlackOAuth, setIsConnectingSlackOAuth] = useState(false)
   const [slackPermissions, setSlackPermissions] = useState<any>(null)
@@ -418,12 +428,14 @@ export default function IntegrationsPage() {
     }
   }, [showInviteModal])
 
-  // Handle Slack OAuth success redirect
+  // Handle Slack/Jira OAuth success redirect
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
     const slackConnected = urlParams.get('slack_connected')
     const workspace = urlParams.get('workspace')
     const status = urlParams.get('status')
+    const jiraConnected = urlParams.get('jira_connected')
+    const jiraError = urlParams.get('jira_error')
 
     // Check auth token after OAuth redirect
     const authToken = localStorage.getItem('auth_token')
@@ -578,6 +590,91 @@ export default function IntegrationsPage() {
       const newUrl = window.location.pathname
       window.history.replaceState({}, '', newUrl)
     }
+
+    // Handle Jira OAuth success
+    if (jiraConnected === 'true') {
+      // Show loading toast
+      const loadingToastId = toast.loading('Verifying Jira connection...', {
+        description: 'Please wait while we confirm your Jira integration.',
+      })
+
+      // Clean up URL parameters
+      const newUrl = window.location.pathname
+      window.history.replaceState({}, '', newUrl)
+
+      // Poll for connection status with retries
+      let retries = 0
+      const maxRetries = 15
+      const pollInterval = 500
+
+      const checkJiraConnection = async () => {
+        try {
+          retries++
+
+          // Check if Jira is now connected
+          const authToken = localStorage.getItem('auth_token')
+          if (!authToken) return
+
+          const response = await fetch(`${API_BASE}/integrations/jira/status`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+          })
+
+          if (response.ok) {
+            const data = await response.json()
+            if (data.connected) {
+              // Update Jira integration state
+              setJiraIntegration(data.integration)
+              // Update cache
+              localStorage.setItem('jira_integration', JSON.stringify(data))
+              localStorage.setItem('all_integrations_timestamp', Date.now().toString())
+
+              toast.dismiss(loadingToastId)
+              toast.success(`🎉 Jira integration connected!`, {
+                description: `Successfully connected to ${data.integration.jira_site_url || 'your Jira workspace'}.`,
+                duration: 5000,
+              })
+              return
+            }
+          }
+
+          // Not connected yet, retry if we haven't exceeded max retries
+          if (retries < maxRetries) {
+            setTimeout(checkJiraConnection, pollInterval)
+          } else {
+            // Max retries reached, show warning
+            toast.dismiss(loadingToastId)
+            toast.warning('Connection verification timed out', {
+              description: 'Your Jira integration was added, but verification took longer than expected. Try refreshing the page.',
+              duration: 8000,
+            })
+          }
+        } catch (error) {
+          if (retries < maxRetries) {
+            setTimeout(checkJiraConnection, pollInterval)
+          } else {
+            toast.dismiss(loadingToastId)
+            toast.error('Failed to verify connection', {
+              description: 'Please refresh the page to check your Jira connection status.',
+            })
+          }
+        }
+      }
+
+      // Start checking immediately
+      checkJiraConnection()
+    } else if (jiraError) {
+      // Show error toast
+      const errorMessage = decodeURIComponent(jiraError)
+
+      toast.error('Failed to connect Jira', {
+        description: errorMessage,
+        duration: 8000,
+      })
+
+      // Clean up URL parameters
+      const newUrl = window.location.pathname
+      window.history.replaceState({}, '', newUrl)
+    }
   }, [])
 
   // Load each provider independently for better UX
@@ -597,6 +694,10 @@ export default function IntegrationsPage() {
     return SlackHandlers.loadSlackIntegration(forceRefresh, setSlackIntegration, setLoadingSlack)
   }
 
+  const loadJiraIntegration = async (forceRefresh = false) => {
+    return JiraHandlers.loadJiraIntegration(forceRefresh, setJiraIntegration, setLoadingJira)
+  }
+
   // ✨ PHASE 1 OPTIMIZATION: Instant cache loading with background refresh
   const [refreshingInBackground, setRefreshingInBackground] = useState(false)
   
@@ -606,24 +707,30 @@ export default function IntegrationsPage() {
       const cachedIntegrations = localStorage.getItem('all_integrations')
       const cachedGithub = localStorage.getItem('github_integration')
       const cachedSlack = localStorage.getItem('slack_integration')
-      
-      
+      const cachedJira = localStorage.getItem('jira_integration')
+
+
       if (cachedIntegrations) {
         const parsedIntegrations = JSON.parse(cachedIntegrations)
         setIntegrations(parsedIntegrations)
       }
-      
+
       if (cachedGithub) {
         const githubData = JSON.parse(cachedGithub)
         setGithubIntegration(githubData.connected ? githubData.integration : null)
       }
-      
+
       if (cachedSlack) {
         const slackData = JSON.parse(cachedSlack)
         setSlackIntegration(slackData.integration)
       }
-      
-      const hasAllCache = !!(cachedIntegrations && cachedGithub && cachedSlack)
+
+      if (cachedJira) {
+        const jiraData = JSON.parse(cachedJira)
+        setJiraIntegration(jiraData.connected ? jiraData.integration : null)
+      }
+
+      const hasAllCache = !!(cachedIntegrations && cachedGithub && cachedSlack && cachedJira)
       return hasAllCache
     } catch (error) {
       return false
@@ -677,7 +784,7 @@ export default function IntegrationsPage() {
         return
       }
 
-      const [rootlyResponse, pagerdutyResponse, githubResponse, slackResponse] = await Promise.all([
+      const [rootlyResponse, pagerdutyResponse, githubResponse, slackResponse, jiraResponse] = await Promise.all([
         fetch(`${API_BASE}/rootly/integrations`, {
           headers: { 'Authorization': `Bearer ${authToken}` }
         }),
@@ -689,14 +796,18 @@ export default function IntegrationsPage() {
         }),
         fetch(`${API_BASE}/integrations/slack/status`, {
           headers: { 'Authorization': `Bearer ${authToken}` }
+        }),
+        fetch(`${API_BASE}/integrations/jira/status`, {
+          headers: { 'Authorization': `Bearer ${authToken}` }
         })
       ])
 
-      const [rootlyData, pagerdutyData, githubData, slackData] = await Promise.all([
+      const [rootlyData, pagerdutyData, githubData, slackData, jiraData] = await Promise.all([
         rootlyResponse.ok ? rootlyResponse.json() : { integrations: [] },
         pagerdutyResponse.ok ? pagerdutyResponse.json() : { integrations: [] },
         githubResponse.ok ? githubResponse.json() : { connected: false, integration: null },
-        slackResponse.ok ? slackResponse.json() : { integration: null }
+        slackResponse.ok ? slackResponse.json() : { integration: null },
+        jiraResponse.ok ? jiraResponse.json() : { connected: false, integration: null }
       ])
 
       // Update state silently
@@ -708,12 +819,14 @@ export default function IntegrationsPage() {
       setIntegrations(allIntegrations)
       setGithubIntegration(githubData.connected ? githubData.integration : null)
       setSlackIntegration(slackData.integration)
+      setJiraIntegration(jiraData.connected ? jiraData.integration : null)
 
       // Update cache with fresh data
       localStorage.setItem('all_integrations', JSON.stringify(allIntegrations))
       localStorage.setItem('all_integrations_timestamp', Date.now().toString())
       localStorage.setItem('github_integration', JSON.stringify(githubData))
       localStorage.setItem('slack_integration', JSON.stringify(slackData))
+      localStorage.setItem('jira_integration', JSON.stringify(jiraData))
 
     } catch (error) {
     }
@@ -735,6 +848,7 @@ export default function IntegrationsPage() {
         setLoadingPagerDuty(false)
         setLoadingGitHub(false)
         setLoadingSlack(false)
+        setLoadingJira(false)
         
         // Step 3: Check if cache is stale and refresh in background if needed
         const cacheIsStale = isCacheStale()
@@ -754,6 +868,7 @@ export default function IntegrationsPage() {
       setLoadingPagerDuty(false)
       setLoadingGitHub(false)
       setLoadingSlack(false)
+      setLoadingJira(false)
     }
   }
   
@@ -764,6 +879,7 @@ export default function IntegrationsPage() {
     setLoadingPagerDuty(true)
     setLoadingGitHub(true)
     setLoadingSlack(true)
+    setLoadingJira(true)
     try {
       const authToken = localStorage.getItem('auth_token')
       if (!authToken) {
@@ -771,7 +887,7 @@ export default function IntegrationsPage() {
         return
       }
 
-      const [rootlyResponse, pagerdutyResponse, githubResponse, slackResponse] = await Promise.all([
+      const [rootlyResponse, pagerdutyResponse, githubResponse, slackResponse, jiraResponse] = await Promise.all([
         fetch(`${API_BASE}/rootly/integrations`, {
           headers: { 'Authorization': `Bearer ${authToken}` }
         }),
@@ -783,6 +899,9 @@ export default function IntegrationsPage() {
         }).catch(() => ({ ok: false })),
         fetch(`${API_BASE}/integrations/slack/status`, {
           headers: { 'Authorization': `Bearer ${authToken}` }
+        }).catch(() => ({ ok: false })),
+        fetch(`${API_BASE}/integrations/jira/status`, {
+          headers: { 'Authorization': `Bearer ${authToken}` }
         }).catch(() => ({ ok: false }))
       ])
 
@@ -790,6 +909,7 @@ export default function IntegrationsPage() {
       const pagerdutyData = pagerdutyResponse.ok ? await pagerdutyResponse.json() : { integrations: [] }
       const githubData = (githubResponse as Response).ok ? await (githubResponse as Response).json() : { connected: false, integration: null }
       const slackData = (slackResponse as Response).ok ? await (slackResponse as Response).json() : { integration: null }
+      const jiraData = (jiraResponse as Response).ok ? await (jiraResponse as Response).json() : { connected: false, integration: null }
 
       const rootlyIntegrations = rootlyData.integrations.map((i: Integration) => ({ ...i, platform: 'rootly' }))
       const pagerdutyIntegrations = pagerdutyData.integrations || []
@@ -798,14 +918,16 @@ export default function IntegrationsPage() {
       setIntegrations(allIntegrations)
       setGithubIntegration(githubData.connected ? githubData.integration : null)
       setSlackIntegration(slackData.integration)
-      
+      setJiraIntegration(jiraData.connected ? jiraData.integration : null)
+
       // Cache the integrations (same as dashboard caching)
       localStorage.setItem('all_integrations', JSON.stringify(allIntegrations))
       localStorage.setItem('all_integrations_timestamp', Date.now().toString())
-      
-      // Cache GitHub and Slack integration status separately
+
+      // Cache GitHub, Slack, and Jira integration status separately
       localStorage.setItem('github_integration', JSON.stringify(githubData))
       localStorage.setItem('slack_integration', JSON.stringify(slackData))
+      localStorage.setItem('jira_integration', JSON.stringify(jiraData))
       
       // Update back URL based on integration status
       if (backUrl === '') {
@@ -824,6 +946,7 @@ export default function IntegrationsPage() {
       setLoadingPagerDuty(false)
       setLoadingGitHub(false)
       setLoadingSlack(false)
+      setLoadingJira(false)
     }
   }
 
@@ -958,6 +1081,27 @@ export default function IntegrationsPage() {
 
   const loadSlackPermissions = async () => {
     return SlackHandlers.loadSlackPermissions(slackIntegration, setIsLoadingPermissions, setSlackPermissions)
+  }
+
+  // Jira integration handlers
+  const handleJiraConnect = async () => {
+    return JiraHandlers.handleJiraConnect(
+      setIsConnectingJira,
+      setActiveEnhancementTab,
+      loadJiraIntegration
+    )
+  }
+
+  const handleJiraDisconnect = async () => {
+    return JiraHandlers.handleJiraDisconnect(
+      setIsDisconnectingJira,
+      setJiraIntegration,
+      setActiveEnhancementTab
+    )
+  }
+
+  const handleJiraTest = async () => {
+    return JiraHandlers.handleJiraTest(toast)
   }
 
   // Mapping data handlers
@@ -1867,6 +2011,54 @@ export default function IntegrationsPage() {
                   </div>
                 </Card>
             )}
+
+            {/* Jira Card */}
+            {loadingJira ? (
+              <Card className="border-2 border-gray-200 p-8 flex items-center justify-center relative h-32 animate-pulse">
+                <div className="absolute top-4 right-4 w-16 h-5 bg-gray-300 rounded"></div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-10 h-10 bg-gray-300 rounded"></div>
+                  <div className="h-8 w-20 bg-gray-300 rounded"></div>
+                </div>
+              </Card>
+            ) : (
+              <Card
+                className={`border-2 transition-all cursor-pointer hover:shadow-lg ${
+                  activeEnhancementTab === 'jira'
+                    ? 'border-blue-500 shadow-lg bg-blue-50'
+                    : 'border-gray-200 hover:border-blue-300'
+                } p-8 flex items-center justify-center relative h-32`}
+                onClick={() => {
+                  setActiveEnhancementTab(activeEnhancementTab === 'jira' ? null : 'jira')
+                }}
+              >
+                {jiraIntegration ? (
+                  <div className="absolute top-4 right-4">
+                    <Badge variant="secondary" className="bg-green-100 text-green-700">
+                      <CheckCircle className="w-3 h-3 mr-1" />
+                      Connected
+                    </Badge>
+                  </div>
+                ) : null}
+                {activeEnhancementTab === 'jira' && (
+                  <div className="absolute top-4 left-4">
+                    <CheckCircle className="w-6 h-6 text-blue-600" />
+                  </div>
+                )}
+                <div className="flex items-center space-x-2">
+                  <div className="w-10 h-10 rounded flex items-center justify-center bg-blue-600">
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="w-6 h-6 text-white"
+                      fill="currentColor"
+                    >
+                      <path d="M11.571 11.513H0a5.218 5.218 0 0 0 5.232 5.215h2.13v2.057A5.215 5.215 0 0 0 12.575 24V12.518a1.005 1.005 0 0 0-1.005-1.005zm5.723-5.756H5.736a5.215 5.215 0 0 0 5.215 5.214h2.129v2.058a5.218 5.218 0 0 0 5.215 5.232V6.758a1.001 1.001 0 0 0-1.001-1.001zM23.013 0H11.455a5.215 5.215 0 0 0 5.215 5.215h2.129v2.057A5.215 5.215 0 0 0 24 12.483V1.005A1.001 1.001 0 0 0 23.013 0Z"/>
+                    </svg>
+                  </div>
+                  <span className="text-2xl font-bold text-slate-900">Jira</span>
+                </div>
+              </Card>
+            )}
           </div>
 
           {/* Integration Forms */}
@@ -1912,6 +2104,24 @@ export default function IntegrationsPage() {
                 onViewMappings={() => openMappingDrawer('github')}
                 loadingMappings={loadingMappingData}
                 selectedMappingPlatform={selectedMappingPlatform}
+              />
+            )}
+
+            {/* Jira Integration Card - Not Connected */}
+            {activeEnhancementTab === 'jira' && !jiraIntegration && (
+              <JiraIntegrationCard
+                onConnect={handleJiraConnect}
+                isConnecting={isConnectingJira}
+              />
+            )}
+
+            {/* Jira Connected Card */}
+            {activeEnhancementTab === 'jira' && jiraIntegration && (
+              <JiraConnectedCard
+                integration={jiraIntegration}
+                onDisconnect={() => setJiraDisconnectDialogOpen(true)}
+                onTest={handleJiraTest}
+                isLoading={isDisconnectingJira}
               />
             )}
 
@@ -2756,6 +2966,17 @@ export default function IntegrationsPage() {
         onOpenChange={setSlackDisconnectDialogOpen}
         isDisconnecting={isDisconnectingSlack}
         onConfirmDisconnect={handleSlackDisconnect}
+      />
+
+      {/* Jira Disconnect Confirmation Dialog */}
+      <JiraDisconnectDialog
+        open={jiraDisconnectDialogOpen}
+        onOpenChange={setJiraDisconnectDialogOpen}
+        isDisconnecting={isDisconnectingJira}
+        onConfirmDisconnect={async () => {
+          await handleJiraDisconnect()
+          setJiraDisconnectDialogOpen(false)
+        }}
       />
 
       {/* Slack Survey Workspace Info & Disconnect Dialog */}

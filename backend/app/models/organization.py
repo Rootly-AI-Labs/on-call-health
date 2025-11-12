@@ -40,6 +40,7 @@ class Organization(Base):
     users = relationship("User", back_populates="organization")
     analyses = relationship("Analysis", back_populates="organization")
     workspace_mappings = relationship("SlackWorkspaceMapping", back_populates="organization")
+    jira_workspace_mappings = relationship("JiraWorkspaceMapping", back_populates="organization")
 
     # Constraints
     __table_args__ = (
