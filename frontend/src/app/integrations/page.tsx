@@ -1762,13 +1762,7 @@ export default function IntegrationsPage() {
             )}
 
             {/* Existing Integrations */}
-            {(activeTab === null && !selectedOrganization && integrations.length === 0) ? (
-              <div className="text-center py-12">
-                <Shield className="w-12 h-12 mx-auto text-slate-300 mb-4" />
-                <p className="text-lg font-medium mb-2 text-slate-700">Choose a platform to get started</p>
-                <p className="text-sm text-slate-500">Select Rootly or PagerDuty above to view and manage your integrations</p>
-              </div>
-            ) : (loadingRootly || loadingPagerDuty) ? (
+            {(loadingRootly || loadingPagerDuty) ? (
               <Card className="max-w-2xl mx-auto">
                 <CardContent className="p-6 space-y-4">
                 {/* Skeleton loading cards */}
