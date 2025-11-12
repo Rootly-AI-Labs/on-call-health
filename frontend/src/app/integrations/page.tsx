@@ -3298,9 +3298,10 @@ export default function IntegrationsPage() {
           <SheetHeader>
             <div className="flex items-start justify-between pr-10 gap-4">
               <div>
-                <SheetTitle>Team Members ({syncedUsers.length})</SheetTitle>
+                <SheetTitle>Team Members</SheetTitle>
                 <SheetDescription>
                   Sync will match {integrations.find(i => i.id.toString() === selectedOrganization)?.name || 'organization'} users with GitHub and Slack accounts
+                  {syncedUsers.length > 0 && ` • ${syncedUsers.length} synced`}
                 </SheetDescription>
               </div>
               <div className="flex items-center gap-3 flex-shrink-0">
