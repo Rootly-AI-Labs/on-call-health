@@ -146,11 +146,17 @@ class UserSyncService:
         """
         user_id = current_user.id
 
-        # Delete all correlations for this user and integration
-        deleted = self.db.query(UserCorrelation).filter(
-            UserCorrelation.user_id == user_id,
-            UserCorrelation.integration_id == integration_id
-        ).delete(synchronize_session=False)
+        # Get all correlations for this user that have this integration_id in their integration_ids array
+        correlations = self.db.query(UserCorrelation).filter(
+            UserCorrelation.user_id == user_id
+        ).all()
+
+        deleted = 0
+        for correlation in correlations:
+            # Check if this integration_id is in the JSON array
+            if correlation.integration_ids and integration_id in correlation.integration_ids:
+                self.db.delete(correlation)
+                deleted += 1
 
         self.db.commit()
 
