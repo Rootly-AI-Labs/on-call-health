@@ -3695,43 +3695,45 @@ export default function IntegrationsPage() {
             <AlertDialogTitle>
               {syncProgress?.isLoading ? 'Syncing Team Members...' : 'Sync Team Members?'}
             </AlertDialogTitle>
-            <div className="space-y-3 text-left text-sm text-muted-foreground">
-              {!syncProgress?.isLoading ? (
-                <>
-                  <p>This will sync your team members from {integrations.find(i => i.id.toString() === selectedOrganization)?.name || 'your integration'}.</p>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-left">
+                {!syncProgress?.isLoading ? (
+                  <>
+                    <span>This will sync your team members from {integrations.find(i => i.id.toString() === selectedOrganization)?.name || 'your integration'}.</span>
 
-                  <div className="bg-blue-50 border border-blue-200 rounded-md p-3 space-y-2">
-                    <p className="font-medium text-blue-900">What happens during sync:</p>
-                    <ul className="list-disc list-inside space-y-1 text-sm text-blue-800">
-                      <li><strong>Incident Responders Only:</strong> For Rootly, only users with Incident Response (IR) roles will be synced (admin, owner, user). Observers and users without IR access are excluded.</li>
-                      <li><strong>Clean Sync:</strong> All existing users from this integration will be removed and replaced with the fresh list.</li>
-                      <li><strong>Used in Analysis:</strong> These synced users will be used when running burnout analysis.</li>
-                      <li><strong>Cross-Platform Matching:</strong> Users will be matched across GitHub and Slack accounts when possible.</li>
-                    </ul>
-                  </div>
+                    <div className="bg-blue-50 border border-blue-200 rounded-md p-3 space-y-2">
+                      <div className="font-medium text-blue-900">What happens during sync:</div>
+                      <ul className="list-disc list-inside space-y-1 text-sm text-blue-800">
+                        <li><strong>Incident Responders Only:</strong> For Rootly, only users with Incident Response (IR) roles will be synced (admin, owner, user). Observers and users without IR access are excluded.</li>
+                        <li><strong>Clean Sync:</strong> All existing users from this integration will be removed and replaced with the fresh list.</li>
+                        <li><strong>Used in Analysis:</strong> These synced users will be used when running burnout analysis.</li>
+                        <li><strong>Cross-Platform Matching:</strong> Users will be matched across GitHub and Slack accounts when possible.</li>
+                      </ul>
+                    </div>
 
-                  <p className="text-sm text-gray-600">
-                    {syncedUsers.length > 0
-                      ? `This will replace your current ${syncedUsers.length} synced users.`
-                      : 'This is your first sync for this integration.'}
-                  </p>
-                </>
-              ) : (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <Loader2 className="w-5 h-5 animate-spin text-purple-600" />
-                    <div className="flex-1">
-                      <p className="font-medium text-gray-900">{syncProgress.stage}</p>
-                      <p className="text-sm text-gray-600">{syncProgress.details}</p>
+                    <span className="text-sm text-gray-600 block">
+                      {syncedUsers.length > 0
+                        ? `This will replace your current ${syncedUsers.length} synced users.`
+                        : 'This is your first sync for this integration.'}
+                    </span>
+                  </>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      <Loader2 className="w-5 h-5 animate-spin text-purple-600" />
+                      <div className="flex-1">
+                        <div className="font-medium text-gray-900">{syncProgress.stage}</div>
+                        <div className="text-sm text-gray-600">{syncProgress.details}</div>
+                      </div>
+                    </div>
+
+                    <div className="bg-purple-50 border border-purple-200 rounded-md p-3">
+                      <span className="text-sm text-purple-800">Please wait while we sync your team members. This may take a few moments...</span>
                     </div>
                   </div>
-
-                  <div className="bg-purple-50 border border-purple-200 rounded-md p-3">
-                    <p className="text-sm text-purple-800">Please wait while we sync your team members. This may take a few moments...</p>
-                  </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             {!syncProgress?.isLoading && (
