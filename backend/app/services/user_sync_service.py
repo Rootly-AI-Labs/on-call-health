@@ -83,13 +83,19 @@ class UserSyncService:
             raise
 
     async def _fetch_rootly_users(self, api_token: str) -> List[Dict[str, Any]]:
-        """Fetch all users from Rootly API."""
+        """Fetch incident responders from Rootly API (IR role holders only)."""
         client = RootlyAPIClient(api_token)
-        raw_users = await client.get_users(limit=10000)  # Fetch up to 1000 users
+
+        # Fetch users with IR role data
+        raw_users, included_roles = await client.get_users(limit=10000, include_role=True)
+
+        # Filter to only incident responders (exclude observers/no_access)
+        filtered_users = client.filter_incident_responders(raw_users, included_roles)
+        logger.info(f"Rootly: Filtered {len(raw_users)} total users → {len(filtered_users)} incident responders")
 
         # Extract from JSONAPI format
         users = []
-        for user in raw_users:
+        for user in filtered_users:
             attrs = user.get("attributes", {})
             users.append({
                 "id": user.get("id"),
