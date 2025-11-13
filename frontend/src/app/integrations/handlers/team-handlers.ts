@@ -185,10 +185,21 @@ export async function fetchSyncedUsers(
   showToast: boolean = true,
   autoSync: boolean = true,
   setSelectedRecipients?: (recipients: Set<number>) => void,
-  setSavedRecipients?: (recipients: Set<number>) => void
+  setSavedRecipients?: (recipients: Set<number>) => void,
+  cache?: Map<string, any[]>,
+  forceRefresh: boolean = false
 ): Promise<void> {
   if (!selectedOrganization) {
     toast.error('Please select an organization first')
+    return
+  }
+
+  // Check cache first unless force refresh is requested
+  if (!forceRefresh && cache?.has(selectedOrganization)) {
+    const cachedUsers = cache.get(selectedOrganization)!
+    setSyncedUsers(cachedUsers)
+    setShowSyncedUsers(true)
+    setTeamMembersDrawerOpen(true)
     return
   }
 
@@ -225,6 +236,11 @@ export async function fetchSyncedUsers(
       setSyncedUsers(users)
       setShowSyncedUsers(true)
       setTeamMembersDrawerOpen(true)
+
+      // Update cache
+      if (cache) {
+        cache.set(selectedOrganization, users)
+      }
 
       // Load saved recipients if provided setters exist
       if (recipientsResponse && recipientsResponse.ok && setSelectedRecipients && setSavedRecipients) {

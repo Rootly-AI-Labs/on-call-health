@@ -259,6 +259,9 @@ export default function IntegrationsPage() {
   const [showSyncedUsers, setShowSyncedUsers] = useState(false)
   const [teamMembersDrawerOpen, setTeamMembersDrawerOpen] = useState(false)
 
+  // Cache to track which integrations have already been loaded
+  const syncedUsersCache = useRef<Map<string, any[]>>(new Map())
+
   // GitHub username editing state
   const [editingUserId, setEditingUserId] = useState<number | null>(null)
   const [editingUsername, setEditingUsername] = useState<string>('')
@@ -355,26 +358,11 @@ export default function IntegrationsPage() {
           toast.success(`GitHub username updated to ${usernameToSave}`)
         }
 
-        // Refresh synced users list - simple re-fetch
+        // Clear cache and refresh synced users list
         const selectedOrg = selectedOrganization || integrations.find(i => i.is_default)?.id?.toString()
         if (selectedOrg) {
-          setLoadingSyncedUsers(true)
-          try {
-            const authToken = localStorage.getItem('auth_token')
-            const response = await fetch(`${API_BASE}/rootly/synced-users?integration_id=${selectedOrg}`, {
-              headers: {
-                'Authorization': `Bearer ${authToken}`
-              }
-            })
-            if (response.ok) {
-              const data = await response.json()
-              setSyncedUsers(data.users || [])
-            }
-          } catch (error) {
-            console.error('Error refreshing synced users:', error)
-          } finally {
-            setLoadingSyncedUsers(false)
-          }
+          syncedUsersCache.current.delete(selectedOrg)
+          await fetchSyncedUsers(false, false, true)
         }
 
         cancelEditingGitHubUsername()
@@ -1286,12 +1274,17 @@ export default function IntegrationsPage() {
 
   // Sync users to UserCorrelation table
   const syncUsersToCorrelation = async () => {
+    // Clear cache for this integration before syncing
+    if (selectedOrganization) {
+      syncedUsersCache.current.delete(selectedOrganization)
+    }
+
     return TeamHandlers.syncUsersToCorrelation(
       selectedOrganization,
       setLoadingTeamMembers,
       setTeamMembersError,
       fetchTeamMembers,
-      fetchSyncedUsers
+      () => fetchSyncedUsers(true, true, true) // Force refresh after sync
     )
   }
 
@@ -1301,7 +1294,7 @@ export default function IntegrationsPage() {
   }
 
   // Fetch synced users from database
-  const fetchSyncedUsers = async (showToast = true, autoSync = true) => {
+  const fetchSyncedUsers = async (showToast = true, autoSync = true, forceRefresh = false) => {
     return TeamHandlers.fetchSyncedUsers(
       selectedOrganization,
       setLoadingSyncedUsers,
@@ -1312,7 +1305,9 @@ export default function IntegrationsPage() {
       showToast,
       autoSync,
       setSelectedRecipients,
-      setSavedRecipients
+      setSavedRecipients,
+      syncedUsersCache.current,
+      forceRefresh
     )
   }
 
