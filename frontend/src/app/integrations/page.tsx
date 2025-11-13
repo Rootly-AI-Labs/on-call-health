@@ -3695,7 +3695,7 @@ export default function IntegrationsPage() {
             <AlertDialogTitle>
               {syncProgress?.isLoading ? 'Syncing Team Members...' : 'Sync Team Members?'}
             </AlertDialogTitle>
-            <AlertDialogDescription className="space-y-3 text-left">
+            <div className="space-y-3 text-left text-sm text-muted-foreground">
               {!syncProgress?.isLoading ? (
                 <>
                   <p>This will sync your team members from {integrations.find(i => i.id.toString() === selectedOrganization)?.name || 'your integration'}.</p>
@@ -3731,7 +3731,7 @@ export default function IntegrationsPage() {
                   </div>
                 </div>
               )}
-            </AlertDialogDescription>
+            </div>
           </AlertDialogHeader>
           <AlertDialogFooter>
             {!syncProgress?.isLoading && (
