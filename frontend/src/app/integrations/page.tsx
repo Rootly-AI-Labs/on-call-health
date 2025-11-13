@@ -17,6 +17,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
   Sheet,
   SheetContent,
   SheetDescription,
@@ -202,6 +212,9 @@ export default function IntegrationsPage() {
   const [selectedManualMappingPlatform, setSelectedManualMappingPlatform] = useState<'github' | 'slack' | null>(null)
   const [loadingManualMappings, setLoadingManualMappings] = useState(false)
   const [newMappingDialogOpen, setNewMappingDialogOpen] = useState(false)
+
+  // Sync confirmation modal state
+  const [showSyncConfirmModal, setShowSyncConfirmModal] = useState(false)
   const [editingMapping, setEditingMapping] = useState<ManualMapping | null>(null)
   const [newMappingForm, setNewMappingForm] = useState({
     source_platform: 'rootly' as string,
@@ -3306,12 +3319,7 @@ export default function IntegrationsPage() {
               </div>
               <div className="flex items-center gap-3 flex-shrink-0">
                 <Button
-                  onClick={async () => {
-                    await syncUsersToCorrelation()
-                    if (slackIntegration?.workspace_id) {
-                      await syncSlackUserIds()
-                    }
-                  }}
+                  onClick={() => setShowSyncConfirmModal(true)}
                   disabled={loadingTeamMembers}
                   className="bg-purple-600 hover:bg-purple-700 text-white"
                   size="default"
@@ -3670,6 +3678,49 @@ export default function IntegrationsPage() {
           toast.success("Survey delivery initiated successfully")
         }}
       />
+
+      {/* Sync Confirmation Modal */}
+      <AlertDialog open={showSyncConfirmModal} onOpenChange={setShowSyncConfirmModal}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Sync Team Members?</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3 text-left">
+              <p>This will sync your team members from {integrations.find(i => i.id.toString() === selectedOrganization)?.name || 'your integration'}.</p>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-md p-3 space-y-2">
+                <p className="font-medium text-blue-900">What happens during sync:</p>
+                <ul className="list-disc list-inside space-y-1 text-sm text-blue-800">
+                  <li><strong>Incident Responders Only:</strong> For Rootly, only users with Incident Response (IR) roles will be synced (admin, owner, user). Observers and users without IR access are excluded.</li>
+                  <li><strong>Clean Sync:</strong> All existing users from this integration will be removed and replaced with the fresh list.</li>
+                  <li><strong>Used in Analysis:</strong> These synced users will be used when running burnout analysis.</li>
+                  <li><strong>Cross-Platform Matching:</strong> Users will be matched across GitHub and Slack accounts when possible.</li>
+                </ul>
+              </div>
+
+              <p className="text-sm text-gray-600">
+                {syncedUsers.length > 0
+                  ? `This will replace your current ${syncedUsers.length} synced users.`
+                  : 'This is your first sync for this integration.'}
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                setShowSyncConfirmModal(false)
+                await syncUsersToCorrelation()
+                if (slackIntegration?.workspace_id) {
+                  await syncSlackUserIds()
+                }
+              }}
+              className="bg-purple-600 hover:bg-purple-700"
+            >
+              Sync Now
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
