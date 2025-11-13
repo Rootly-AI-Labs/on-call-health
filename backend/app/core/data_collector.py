@@ -25,14 +25,10 @@ class RootlyDataCollector:
     async def collect_all_data(self) -> Dict[str, Any]:
         """Collect all necessary data for burnout analysis."""
         logger.info("Starting data collection...")
-
+        
         async with self.client.connect() as session:
-            # Collect base data - fetch users with IR role filtering
-            all_users, included_roles = await self.client.get_users(limit=10000, include_role=True)
-
-            # Filter to only incident responders (exclude observers/no_access)
-            users = self.client.filter_incident_responders(all_users, included_roles)
-            logger.info(f"Filtered {len(all_users)} total users → {len(users)} incident responders")
+            # Collect base data
+            users = await self.client.get_users(limit=200)
             
             days_to_analyze = self.analysis_config.get("days_to_analyze", 30)
             incidents = await self.client.get_all_incidents(days_back=days_to_analyze)
