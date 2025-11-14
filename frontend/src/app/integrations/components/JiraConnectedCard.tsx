@@ -1,13 +1,14 @@
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { AlertCircle, CheckCircle, Calendar, Globe, Key, Trash2, TestTube, Loader2 } from "lucide-react"
+import { AlertCircle, CheckCircle, Calendar, Globe, Key, Trash2, TestTube, Loader2, ArrowLeftRight } from "lucide-react"
 import type { JiraIntegration } from "../types"
 
 interface JiraConnectedCardProps {
   integration: JiraIntegration
   onDisconnect: () => void
   onTest: () => void
+  onSwitchWorkspace?: () => void
   isLoading?: boolean
 }
 
@@ -15,6 +16,7 @@ export function JiraConnectedCard({
   integration,
   onDisconnect,
   onTest,
+  onSwitchWorkspace,
   isLoading = false
 }: JiraConnectedCardProps) {
   return (
@@ -129,7 +131,7 @@ export function JiraConnectedCard({
         )}
 
         {/* Action Buttons */}
-        <div className="flex items-center space-x-2 pt-2">
+        <div className="flex items-center flex-wrap gap-2 pt-2">
           <Button
             size="sm"
             variant="outline"
@@ -143,6 +145,17 @@ export function JiraConnectedCard({
             )}
             Test Connection
           </Button>
+          {integration.accessible_sites_count && integration.accessible_sites_count > 1 && onSwitchWorkspace && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onSwitchWorkspace}
+              disabled={isLoading}
+            >
+              <ArrowLeftRight className="w-4 h-4 mr-2" />
+              Switch Workspace
+            </Button>
+          )}
           <Button
             size="sm"
             variant="destructive"

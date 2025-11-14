@@ -1,5 +1,5 @@
 import { toast } from "sonner"
-import { type JiraIntegration, API_BASE } from "../types"
+import { type JiraIntegration, type JiraWorkspacesResponse, API_BASE } from "../types"
 
 /**
  * Load Jira integration from API with caching
@@ -168,5 +168,102 @@ export async function handleJiraTest(
   } catch (error) {
     console.error('Error testing Jira connection:', error)
     toast.error('Failed to test connection')
+  }
+}
+
+/**
+ * Check if user has access to multiple Jira workspaces
+ * Returns true if the user has more than 1 workspace
+ */
+export async function checkMultipleWorkspaces(): Promise<boolean> {
+  try {
+    const authToken = localStorage.getItem('auth_token')
+    if (!authToken) return false
+
+    const response = await fetch(`${API_BASE}/integrations/jira/workspaces`, {
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    })
+
+    if (!response.ok) return false
+
+    const data: JiraWorkspacesResponse = await response.json()
+    return (data.workspaces?.length || 0) > 1
+  } catch (error) {
+    console.error('Error checking workspaces:', error)
+    return false
+  }
+}
+
+/**
+ * Load all available Jira workspaces
+ */
+export async function loadJiraWorkspaces(): Promise<JiraWorkspacesResponse | null> {
+  try {
+    const authToken = localStorage.getItem('auth_token')
+    if (!authToken) {
+      toast.error('Authentication required')
+      return null
+    }
+
+    const response = await fetch(`${API_BASE}/integrations/jira/workspaces`, {
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    })
+
+    if (!response.ok) {
+      throw new Error('Failed to load workspaces')
+    }
+
+    return await response.json()
+  } catch (error) {
+    console.error('Error loading Jira workspaces:', error)
+    toast.error('Failed to load workspaces')
+    return null
+  }
+}
+
+/**
+ * Select a specific Jira workspace
+ */
+export async function selectJiraWorkspace(
+  cloudId: string,
+  onSuccess?: () => void
+): Promise<boolean> {
+  try {
+    const authToken = localStorage.getItem('auth_token')
+    if (!authToken) {
+      toast.error('Authentication required')
+      return false
+    }
+
+    const response = await fetch(`${API_BASE}/integrations/jira/select-workspace`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ cloud_id: cloudId })
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.detail || 'Failed to select workspace')
+    }
+
+    const data = await response.json()
+
+    // Clear cache to force reload
+    localStorage.removeItem('jira_integration')
+
+    toast.success(data.message || 'Workspace selected successfully')
+
+    if (onSuccess) {
+      onSuccess()
+    }
+
+    return true
+  } catch (error) {
+    console.error('Error selecting workspace:', error)
+    toast.error(error instanceof Error ? error.message : 'Failed to select workspace')
+    return false
   }
 }
