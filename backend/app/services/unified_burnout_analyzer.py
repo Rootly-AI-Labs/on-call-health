@@ -1277,15 +1277,22 @@ class UnifiedBurnoutAnalyzer:
             user_name = user.get("name") or user.get("summary", "Unknown")
             user_email = user.get("email")
         else:
-            # Rootly API structure
-            user_attrs = user.get("attributes", {})
+            # Rootly API structure - handle both JSONAPI format and synced user format
             # CRITICAL FIX: Use rootly_user_id for synced users
             if user.get("rootly_user_id"):
                 user_id = user.get("rootly_user_id")
             else:
                 user_id = user.get("id")
-            user_name = user_attrs.get("full_name") or user_attrs.get("name", "Unknown")
-            user_email = user_attrs.get("email")
+
+            # Check if this is JSONAPI format (from direct API) or flat format (from synced users)
+            if "attributes" in user:
+                user_attrs = user.get("attributes", {})
+                user_name = user_attrs.get("full_name") or user_attrs.get("name", "Unknown")
+                user_email = user_attrs.get("email")
+            else:
+                # Flat format from synced users
+                user_name = user.get("name", "Unknown")
+                user_email = user.get("email")
         
         # If no incidents, return minimal analysis
         if not incidents:
