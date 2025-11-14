@@ -8,7 +8,6 @@ Jira integration API endpoints for OAuth and data collection.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request, Response
-from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from typing import Dict, Any, Optional, List, Tuple
 from datetime import datetime, timedelta, timezone as dt_timezone, date
@@ -113,10 +112,10 @@ async def _process_callback(code: str, state: Optional[str], db: Session, curren
                 logger.warning("[Jira] Code already used; treating as idempotent success.")
                 existing = db.query(JiraIntegration).filter(JiraIntegration.user_id == user_id).first()
                 if existing:
-                    return RedirectResponse(
-                        url=f"{settings.FRONTEND_URL}/integrations?jira_connected=true&reuse=1",
-                        status_code=status.HTTP_302_FOUND,
-                    )
+                    return {
+                        "success": True,
+                        "redirect_url": f"{settings.FRONTEND_URL}/integrations?jira_connected=1&reuse=1"
+                    }
             raise
 
         access_token = token_data.get("access_token")
@@ -232,19 +231,21 @@ async def _process_callback(code: str, state: Optional[str], db: Session, curren
 
         db.commit()
 
-        return RedirectResponse(
-            url=f"{settings.FRONTEND_URL}/integrations?jira_connected=true",
-            status_code=status.HTTP_302_FOUND,
-        )
+        # Return JSON with redirect URL instead of HTTP redirect for frontend handling
+        return {
+            "success": True,
+            "redirect_url": f"{settings.FRONTEND_URL}/integrations?jira_connected=1"
+        }
 
     except HTTPException as he:
         logger.error("[Jira] OAuth callback HTTPException: status=%s detail=%s", he.status_code, he.detail)
         raise
     except Exception as e:
         logger.error("[Jira] OAuth callback error: %s", e, exc_info=True)
-        return RedirectResponse(
-            url=f"{settings.FRONTEND_URL}/integrations?jira_error={str(e)}",
-            status_code=status.HTTP_302_FOUND,
+        # Return JSON error response instead of redirect
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
         )
 
 
