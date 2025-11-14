@@ -132,16 +132,23 @@ class RootlyAPIClient:
                         first_user = data["data"][0]
                         if "attributes" in first_user:
                             attrs = first_user["attributes"]
+
+                            # Log what Rootly actually returns for debugging
+                            logger.info(f"🔍 Rootly API returned user attributes: full_name_with_team='{attrs.get('full_name_with_team')}', organization_name='{attrs.get('organization_name')}', company='{attrs.get('company')}'")
+
                             # Extract organization name from full_name_with_team: "[Team Name] User Name"
                             if "full_name_with_team" in attrs:
                                 full_name_with_team = attrs["full_name_with_team"]
                                 if full_name_with_team and full_name_with_team.startswith("[") and "]" in full_name_with_team:
                                     organization_name = full_name_with_team.split("]")[0][1:]  # Extract text between [ ]
+                                    logger.info(f"✅ Extracted org name from full_name_with_team: '{organization_name}'")
                             # Fallback to other fields
                             elif "organization_name" in attrs:
                                 organization_name = attrs["organization_name"]
+                                logger.info(f"✅ Using organization_name attribute: '{organization_name}'")
                             elif "company" in attrs:
                                 organization_name = attrs["company"]
+                                logger.info(f"✅ Using company attribute: '{organization_name}'")
                     
                     # Only include organization name if available
                     if organization_name:
