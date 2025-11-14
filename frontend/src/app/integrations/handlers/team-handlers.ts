@@ -187,7 +187,8 @@ export async function fetchSyncedUsers(
   setSelectedRecipients?: (recipients: Set<number>) => void,
   setSavedRecipients?: (recipients: Set<number>) => void,
   cache?: Map<string, any[]>,
-  forceRefresh: boolean = false
+  forceRefresh: boolean = false,
+  recipientsCache?: Map<string, Set<number>>
 ): Promise<void> {
   if (!selectedOrganization) {
     toast.error('Please select an organization first')
@@ -200,6 +201,13 @@ export async function fetchSyncedUsers(
     setSyncedUsers(cachedUsers)
     setShowSyncedUsers(true)
     setTeamMembersDrawerOpen(true)
+
+    // Restore cached recipients if available
+    if (recipientsCache?.has(selectedOrganization) && setSelectedRecipients && setSavedRecipients) {
+      const cachedRecipients = recipientsCache.get(selectedOrganization)!
+      setSelectedRecipients(cachedRecipients)
+      setSavedRecipients(cachedRecipients)
+    }
     return
   }
 
@@ -248,6 +256,11 @@ export async function fetchSyncedUsers(
         const savedIds = new Set<number>(recipientsData.recipient_ids || [])
         setSelectedRecipients(savedIds)
         setSavedRecipients(savedIds)
+
+        // Cache recipients
+        if (recipientsCache) {
+          recipientsCache.set(selectedOrganization, savedIds)
+        }
       }
 
       // If no users found, automatically sync them (but not for beta integrations)
