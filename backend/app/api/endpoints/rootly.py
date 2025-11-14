@@ -295,13 +295,18 @@ async def list_integrations(
                     "users": {"access": None, "error": "Rootly API timeout - check back later"},
                     "incidents": {"access": None, "error": "Rootly API timeout - check back later"}
                 }
+                logger.warning(f"⚠️ Integration '{result_integrations[idx]['name']}' (ID={result_integrations[idx]['id']}) - Permission check TIMEOUT")
             elif error:
                 result_integrations[idx]["permissions"] = {
                     "users": {"access": None, "error": f"Rootly API unavailable: {error}"},
                     "incidents": {"access": None, "error": f"Rootly API unavailable: {error}"}
                 }
+                logger.warning(f"⚠️ Integration '{result_integrations[idx]['name']}' (ID={result_integrations[idx]['id']}) - Permission check ERROR: {error}")
             else:
                 result_integrations[idx]["permissions"] = permissions
+                users_access = permissions.get('users', {}).get('access', False)
+                incidents_access = permissions.get('incidents', {}).get('access', False)
+                logger.info(f"✅ Integration '{result_integrations[idx]['name']}' (ID={result_integrations[idx]['id']}) - Permissions: users={users_access}, incidents={incidents_access}")
 
         logger.info(f"🔍 [ROOTLY] All permission checks completed in {time.time() - perm_start:.2f}s")
     

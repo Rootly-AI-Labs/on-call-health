@@ -1326,14 +1326,11 @@ export default function useDashboard() {
 
     // Set the dialog integration to the currently selected one by default
     setDialogSelectedIntegration(integrationToUse)
-
-    // Refresh integrations BEFORE opening modal to ensure permissions are up-to-date
-    // This prevents showing stale "Missing Permissions" errors for newly added integrations
-    setLoadingIntegrations(true)
-    await loadIntegrations(true)  // Force refresh to bypass cache and wait for completion
-    setLoadingIntegrations(false)
-
     setShowTimeRangeDialog(true)
+
+    // Refresh permissions in background after modal opens
+    // Modal will show loading state until permissions are loaded
+    loadIntegrations(true)  // Force refresh to get latest permissions
 
     // Load cached GitHub/Slack data immediately if we don't have it in state
     if (!githubIntegration || !slackIntegration) {
