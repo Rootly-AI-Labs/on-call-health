@@ -2133,7 +2133,7 @@ export default function IntegrationsPage() {
               Sync and manage your team members for burnout analysis
             </p>
             <p className="text-slate-500">
-              View synced users, manage GitHub mappings, and select survey recipients
+              View synced users, manage enhanced integration mappings, and select survey recipients
             </p>
           </div>
 
