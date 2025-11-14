@@ -3802,7 +3802,7 @@ export default function IntegrationsPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {syncProgress?.isLoading ? 'Syncing Team Members...' : 'Sync Team Members?'}
+              {syncProgress?.isLoading ? 'Syncing Team Members...' : 'Sync Team Members'}
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-3 text-left">
@@ -3850,13 +3850,11 @@ export default function IntegrationsPage() {
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                 <AlertDialogAction
                   onClick={async () => {
-                    setSyncProgress({ stage: 'Starting sync...', details: 'Preparing to sync users', isLoading: true })
-
                     try {
-                      setSyncProgress({ stage: 'Deleting old users...', details: 'Removing existing users from database', isLoading: true })
+                      setSyncProgress({ stage: 'Starting sync...', details: 'Preparing to sync users', isLoading: true })
+                      await new Promise(resolve => setTimeout(resolve, 300))
 
                       setSyncProgress({ stage: 'Fetching users...', details: 'Retrieving users from API with IR role filtering', isLoading: true })
-
                       await syncUsersToCorrelation()
 
                       if (slackIntegration?.workspace_id) {

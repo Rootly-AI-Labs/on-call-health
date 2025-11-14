@@ -1849,6 +1849,60 @@ export default function Dashboard() {
               </div>
             </div>
 
+            {/* Team Members Info */}
+            {dialogSelectedIntegration && (() => {
+              const selectedIntegration = integrations.find(i => i.id.toString() === dialogSelectedIntegration);
+              const syncedCount = selectedIntegration?.total_users || 0;
+
+              if (syncedCount === 0) {
+                return (
+                  <Alert className="border-amber-200 bg-amber-50 py-2 px-3">
+                    <AlertCircle className="w-4 h-4 text-amber-600" />
+                    <AlertDescription className="text-amber-800 text-sm">
+                      <strong>No team members synced</strong>
+                      <span className="block mt-1">
+                        Visit the integrations page to sync your team members for analysis.
+                      </span>
+                      <button
+                        onClick={() => {
+                          setShowTimeRangeDialog(false)
+                          router.push('/integrations')
+                        }}
+                        className="text-xs text-amber-700 hover:text-amber-900 font-medium underline mt-1 inline-block"
+                      >
+                        Go to integrations →
+                      </button>
+                    </AlertDescription>
+                  </Alert>
+                );
+              }
+
+              return (
+                <div className="p-3 bg-gray-50 rounded-md border border-gray-200">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Users className="w-4 h-4 text-gray-500" />
+                      <span className="text-sm font-medium text-gray-700">
+                        {syncedCount} team {syncedCount === 1 ? 'member' : 'members'} synced
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setShowTimeRangeDialog(false)
+                        router.push('/integrations')
+                      }}
+                      className="text-xs text-blue-600 hover:text-blue-800 hover:underline"
+                    >
+                      Manage team
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Sync team members if there are changes to your organization
+                  </p>
+                </div>
+              );
+            })()}
+
             {/* Permission Error Alert - Only for Rootly */}
             {dialogSelectedIntegration && (() => {
               const selectedIntegration = integrations.find(i => i.id.toString() === dialogSelectedIntegration);
@@ -2058,19 +2112,24 @@ export default function Dashboard() {
               <Button variant="outline" onClick={() => setShowTimeRangeDialog(false)}>
                 Cancel
               </Button>
-              <Button 
-                onClick={runAnalysisWithTimeRange} 
+              <Button
+                onClick={runAnalysisWithTimeRange}
                 className="bg-purple-600 hover:bg-purple-700"
                 disabled={!dialogSelectedIntegration || (() => {
                   const selectedIntegration = integrations.find(i => i.id.toString() === dialogSelectedIntegration);
-                  
+
+                  // Check if no team members synced
+                  if ((selectedIntegration?.total_users || 0) === 0) {
+                    return true;
+                  }
+
                   // Only check permissions for Rootly integrations, not PagerDuty
                   if (selectedIntegration?.platform === 'rootly') {
                     const hasUserPermission = selectedIntegration?.permissions?.users?.access;
                     const hasIncidentPermission = selectedIntegration?.permissions?.incidents?.access;
                     return !hasUserPermission || !hasIncidentPermission;
                   }
-                  
+
                   // For PagerDuty or other platforms, don't block based on permissions
                   return false;
                 })()}
