@@ -140,6 +140,7 @@ import { DeleteIntegrationDialog } from "./dialogs/DeleteIntegrationDialog"
 import { GitHubDisconnectDialog } from "./dialogs/GitHubDisconnectDialog"
 import { SlackDisconnectDialog } from "./dialogs/SlackDisconnectDialog"
 import { JiraDisconnectDialog } from "./dialogs/JiraDisconnectDialog"
+import { JiraWorkspaceSelector } from "./dialogs/JiraWorkspaceSelector"
 import { NewMappingDialog } from "./dialogs/NewMappingDialog"
 import { OrganizationManagementDialog } from "./dialogs/OrganizationManagementDialog"
 
@@ -227,6 +228,7 @@ export default function IntegrationsPage() {
   const [isConnectingGithub, setIsConnectingGithub] = useState(false)
   const [isConnectingSlack, setIsConnectingSlack] = useState(false)
   const [isConnectingJira, setIsConnectingJira] = useState(false)
+  const [jiraWorkspaceSelectorOpen, setJiraWorkspaceSelectorOpen] = useState(false)
 
   // Disconnect confirmation state
   const [githubDisconnectDialogOpen, setGithubDisconnectDialogOpen] = useState(false)
@@ -629,10 +631,24 @@ export default function IntegrationsPage() {
               localStorage.setItem('all_integrations_timestamp', Date.now().toString())
 
               toast.dismiss(loadingToastId)
-              toast.success(`🎉 Jira integration connected!`, {
-                description: `Successfully connected to ${data.integration.jira_site_url || 'your Jira workspace'}.`,
-                duration: 5000,
-              })
+
+              // Check if user has multiple workspaces
+              const hasMultipleWorkspaces = await JiraHandlers.checkMultipleWorkspaces()
+
+              if (hasMultipleWorkspaces) {
+                // Show workspace selector
+                toast.success(`🎉 Jira integration connected!`, {
+                  description: `Select your preferred workspace to continue.`,
+                  duration: 3000,
+                })
+                setJiraWorkspaceSelectorOpen(true)
+              } else {
+                // Single workspace, show normal success message
+                toast.success(`🎉 Jira integration connected!`, {
+                  description: `Successfully connected to ${data.integration.jira_site_url || 'your Jira workspace'}.`,
+                  duration: 5000,
+                })
+              }
               return
             }
           }
@@ -2121,6 +2137,7 @@ export default function IntegrationsPage() {
                 integration={jiraIntegration}
                 onDisconnect={() => setJiraDisconnectDialogOpen(true)}
                 onTest={handleJiraTest}
+                onSwitchWorkspace={() => setJiraWorkspaceSelectorOpen(true)}
                 isLoading={isDisconnectingJira}
               />
             )}
@@ -2976,6 +2993,16 @@ export default function IntegrationsPage() {
         onConfirmDisconnect={async () => {
           await handleJiraDisconnect()
           setJiraDisconnectDialogOpen(false)
+        }}
+      />
+
+      {/* Jira Workspace Selector Dialog */}
+      <JiraWorkspaceSelector
+        open={jiraWorkspaceSelectorOpen}
+        onClose={() => setJiraWorkspaceSelectorOpen(false)}
+        onWorkspaceSelected={async () => {
+          // Reload Jira integration after workspace selection
+          await loadJiraIntegration(true)
         }}
       />
 

@@ -154,6 +154,22 @@ export interface JiraIntegration {
   token_preview?: string
 }
 
+export interface JiraWorkspace {
+  id: string
+  name: string
+  url: string
+  scopes: string[]
+  avatarUrl?: string
+  is_selected: boolean
+}
+
+export interface JiraWorkspacesResponse {
+  workspaces: JiraWorkspace[]
+  current_workspace_id: string | null
+  total_count: number
+  message?: string
+}
+
 export interface PreviewData {
   organization_name: string
   total_users: number

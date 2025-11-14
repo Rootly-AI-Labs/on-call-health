@@ -366,6 +366,204 @@ async def get_jira_status(
     return response
 
 
+@router.get("/workspaces")
+async def list_jira_workspaces(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    List all Jira workspaces/sites that the user has access to.
+    Returns the list of accessible resources with information about which one is currently selected.
+    """
+    integration = db.query(JiraIntegration).filter(JiraIntegration.user_id == current_user.id).first()
+
+    if not integration:
+        raise HTTPException(
+            status_code=404,
+            detail="Jira integration not found. Please connect your Jira account first.",
+        )
+
+    accessible_resources = getattr(integration, "accessible_resources", []) or []
+
+    if not accessible_resources:
+        return {
+            "workspaces": [],
+            "current_workspace_id": None,
+            "message": "No Jira workspaces found. Try reconnecting your Jira account.",
+        }
+
+    # Mark the currently selected workspace
+    current_cloud_id = integration.jira_cloud_id
+
+    workspaces = []
+    for resource in accessible_resources:
+        workspaces.append({
+            "id": resource.get("id"),
+            "name": resource.get("name"),
+            "url": resource.get("url"),
+            "scopes": resource.get("scopes", []),
+            "avatarUrl": resource.get("avatarUrl"),
+            "is_selected": resource.get("id") == current_cloud_id,
+        })
+
+    return {
+        "workspaces": workspaces,
+        "current_workspace_id": current_cloud_id,
+        "total_count": len(workspaces),
+    }
+
+
+@router.post("/select-workspace")
+async def select_jira_workspace(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Select a specific Jira workspace/site to use.
+    Requires the cloud_id of the workspace to switch to.
+    """
+    integration = db.query(JiraIntegration).filter(JiraIntegration.user_id == current_user.id).first()
+
+    if not integration:
+        raise HTTPException(
+            status_code=404,
+            detail="Jira integration not found. Please connect your Jira account first.",
+        )
+
+    body = await request.json()
+    cloud_id = body.get("cloud_id")
+
+    if not cloud_id:
+        raise HTTPException(
+            status_code=400,
+            detail="cloud_id is required",
+        )
+
+    accessible_resources = getattr(integration, "accessible_resources", []) or []
+
+    # Find the selected workspace
+    selected_workspace = None
+    for resource in accessible_resources:
+        if resource.get("id") == cloud_id:
+            selected_workspace = resource
+            break
+
+    if not selected_workspace:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Workspace with cloud_id '{cloud_id}' not found in your accessible resources. "
+                   "You may need to reconnect your Jira account.",
+        )
+
+    # Update integration with selected workspace
+    integration.jira_cloud_id = cloud_id
+    integration.jira_site_url = selected_workspace.get("url", "").replace("https://", "")
+    integration.jira_site_name = selected_workspace.get("name")
+    integration.updated_at = datetime.now(dt_timezone.utc)
+
+    # Update user info for the new workspace
+    try:
+        access_token = decrypt_token(integration.access_token)
+
+        # Refresh token if needed
+        if needs_refresh(integration.token_expires_at) and integration.refresh_token:
+            logger.info("[Jira] Refreshing access token for workspace switch")
+            refresh_token = decrypt_token(integration.refresh_token)
+            token_data = await jira_integration_oauth.refresh_access_token(refresh_token)
+            new_access_token = token_data.get("access_token")
+            new_refresh_token = token_data.get("refresh_token") or refresh_token
+            expires_in = token_data.get("expires_in", 3600)
+
+            if new_access_token:
+                integration.access_token = encrypt_token(new_access_token)
+                integration.refresh_token = encrypt_token(new_refresh_token)
+                integration.token_expires_at = datetime.now(dt_timezone.utc) + timedelta(seconds=expires_in)
+                access_token = new_access_token
+
+        # Get user info for the new workspace
+        me = await jira_integration_oauth.get_user_info(access_token, cloud_id)
+        integration.jira_account_id = me.get("accountId")
+        integration.jira_display_name = me.get("displayName")
+        integration.jira_email = me.get("emailAddress")
+
+        # Update workspace mapping if organization exists
+        if current_user.organization_id:
+            mapping = db.query(JiraWorkspaceMapping).filter(
+                JiraWorkspaceMapping.jira_cloud_id == cloud_id,
+                JiraWorkspaceMapping.organization_id == current_user.organization_id,
+            ).first()
+
+            if not mapping:
+                mapping = JiraWorkspaceMapping(
+                    jira_cloud_id=cloud_id,
+                    jira_site_url=integration.jira_site_url,
+                    jira_site_name=integration.jira_site_name,
+                    owner_user_id=current_user.id,
+                    organization_id=current_user.organization_id,
+                    registered_via="workspace_switch",
+                    status="active",
+                    collection_enabled=True,
+                    workload_metrics_enabled=True,
+                )
+                db.add(mapping)
+            else:
+                mapping.status = "active"
+                mapping.jira_site_url = integration.jira_site_url
+                mapping.jira_site_name = integration.jira_site_name
+
+        # Update user correlation
+        if integration.jira_email and integration.jira_account_id and current_user.organization_id:
+            corr = db.query(UserCorrelation).filter(
+                UserCorrelation.organization_id == current_user.organization_id,
+                UserCorrelation.email == integration.jira_email,
+            ).first()
+            if corr:
+                corr.jira_account_id = integration.jira_account_id
+                corr.jira_email = integration.jira_email
+            else:
+                db.add(
+                    UserCorrelation(
+                        user_id=current_user.id,
+                        organization_id=current_user.organization_id,
+                        email=integration.jira_email,
+                        name=integration.jira_display_name,
+                        jira_account_id=integration.jira_account_id,
+                        jira_email=integration.jira_email,
+                    )
+                )
+
+        db.commit()
+
+        logger.info(
+            "[Jira] Switched workspace for user %s to %s (%s)",
+            current_user.id,
+            integration.jira_site_name,
+            cloud_id,
+        )
+
+        return {
+            "success": True,
+            "message": f"Successfully switched to workspace: {integration.jira_site_name}",
+            "workspace": {
+                "id": cloud_id,
+                "name": integration.jira_site_name,
+                "url": f"https://{integration.jira_site_url}",
+                "account_id": integration.jira_account_id,
+                "display_name": integration.jira_display_name,
+                "email": integration.jira_email,
+            },
+        }
+
+    except Exception as e:
+        db.rollback()
+        logger.error("[Jira] Failed to switch workspace: %s", e, exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to switch workspace: {str(e)}",
+        )
+
+
 def _parse_due(d: Optional[str]) -> Optional[date]:
     if not d:
         return None
