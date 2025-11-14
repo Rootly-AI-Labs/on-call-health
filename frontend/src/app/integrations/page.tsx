@@ -1173,7 +1173,9 @@ export default function IntegrationsPage() {
       setIsDeleting,
       setIntegrations,
       setDeleteDialogOpen,
-      setIntegrationToDelete
+      setIntegrationToDelete,
+      syncedUsersCache.current,
+      recipientsCache.current
     )
   }
 
@@ -1310,7 +1312,8 @@ export default function IntegrationsPage() {
       setSelectedRecipients,
       setSavedRecipients,
       syncedUsersCache.current,
-      forceRefresh
+      forceRefresh,
+      recipientsCache.current
     )
   }
 
@@ -2094,11 +2097,15 @@ export default function IntegrationsPage() {
                         setSyncedUsers(cachedUsers)
                         setShowSyncedUsers(true)
 
-                        // Also restore cached recipient selections
+                        // Also restore cached recipient selections (validate IDs still exist)
                         if (recipientsCache.current.has(selectedOrganization)) {
                           const cachedRecipients = recipientsCache.current.get(selectedOrganization)!
-                          setSelectedRecipients(cachedRecipients)
-                          setSavedRecipients(cachedRecipients)
+                          const validUserIds = new Set(cachedUsers.map(u => u.id))
+                          const validCachedRecipients = new Set(
+                            Array.from(cachedRecipients).filter(id => validUserIds.has(id))
+                          )
+                          setSelectedRecipients(validCachedRecipients)
+                          setSavedRecipients(validCachedRecipients)
                         }
                       } else {
                         // Otherwise fetch from API
@@ -3368,7 +3375,7 @@ export default function IntegrationsPage() {
               </div>
             ) : syncedUsers.length > 0 ? (
               <div>
-                {slackIntegration?.survey_enabled !== false ? (
+                {slackIntegration?.survey_enabled === true ? (
                   <>
                     <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                       <div className="flex items-center justify-between">
@@ -3441,7 +3448,7 @@ export default function IntegrationsPage() {
                 <div className="space-y-2 pb-20">
                   {syncedUsers.map((user: any) => {
                     const isSelected = selectedRecipients.has(user.id)
-                    const surveyEnabled = slackIntegration?.survey_enabled !== false
+                    const surveyEnabled = slackIntegration?.survey_enabled === true
                     return (
                       <div
                         key={user.id}

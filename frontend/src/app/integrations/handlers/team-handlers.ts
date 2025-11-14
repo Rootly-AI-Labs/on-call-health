@@ -202,11 +202,15 @@ export async function fetchSyncedUsers(
     setShowSyncedUsers(true)
     setTeamMembersDrawerOpen(true)
 
-    // Restore cached recipients if available
+    // Restore cached recipients if available (validate IDs still exist)
     if (recipientsCache?.has(selectedOrganization) && setSelectedRecipients && setSavedRecipients) {
       const cachedRecipients = recipientsCache.get(selectedOrganization)!
-      setSelectedRecipients(cachedRecipients)
-      setSavedRecipients(cachedRecipients)
+      const validUserIds = new Set(cachedUsers.map(u => u.id))
+      const validCachedRecipients = new Set(
+        Array.from(cachedRecipients).filter(id => validUserIds.has(id))
+      )
+      setSelectedRecipients(validCachedRecipients)
+      setSavedRecipients(validCachedRecipients)
     }
     return
   }

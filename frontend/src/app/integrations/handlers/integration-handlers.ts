@@ -323,7 +323,9 @@ export async function deleteIntegration(
   setIsDeleting: (loading: boolean) => void,
   setIntegrations: React.Dispatch<React.SetStateAction<Integration[]>>,
   setDeleteDialogOpen: (open: boolean) => void,
-  setIntegrationToDelete: (integration: Integration | null) => void
+  setIntegrationToDelete: (integration: Integration | null) => void,
+  syncedUsersCache?: Map<string, any[]>,
+  recipientsCache?: Map<string, Set<number>>
 ): Promise<void> {
   setIsDeleting(true)
   try {
@@ -356,9 +358,18 @@ export async function deleteIntegration(
       localStorage.removeItem(`${integrationToDelete.platform}_integrations`)
       localStorage.removeItem(`${integrationToDelete.platform}_integrations_timestamp`)
 
+      // Clear synced users and recipients cache for this integration
+      const integrationIdStr = integrationToDelete.id.toString()
+      if (syncedUsersCache?.has(integrationIdStr)) {
+        syncedUsersCache.delete(integrationIdStr)
+      }
+      if (recipientsCache?.has(integrationIdStr)) {
+        recipientsCache.delete(integrationIdStr)
+      }
+
       // If we deleted the currently selected integration, clear the selection
       const selectedOrg = localStorage.getItem('selected_organization')
-      if (selectedOrg === integrationToDelete.id.toString()) {
+      if (selectedOrg === integrationIdStr) {
         localStorage.removeItem('selected_organization')
       }
 
