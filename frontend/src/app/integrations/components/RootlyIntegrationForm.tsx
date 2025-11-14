@@ -43,7 +43,7 @@ export function RootlyIntegrationForm({
 
   // Auto-validate token when it's fully entered and valid format
   useEffect(() => {
-    if (tokenValue && isValidToken(tokenValue) && connectionStatus === 'idle') {
+    if (tokenValue && isValidToken(tokenValue)) {
       onTest('rootly', tokenValue)
     }
   }, [tokenValue])
