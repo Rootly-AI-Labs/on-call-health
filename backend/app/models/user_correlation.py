@@ -18,6 +18,8 @@ class UserCorrelation(Base):
     slack_user_id = Column(String(20), nullable=True, index=True)
     rootly_email = Column(String(255), nullable=True)
     pagerduty_user_id = Column(String(50), nullable=True)
+    jira_account_id = Column(String(100), nullable=True, index=True)  # Jira accountId (opaque UUID)
+    jira_email = Column(String(255), nullable=True)  # Jira-specific email
     integration_ids = Column(JSON, nullable=True)  # Array of integration IDs this user belongs to
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
@@ -40,6 +42,8 @@ class UserCorrelation(Base):
             platforms.append("rootly")
         if self.pagerduty_user_id:
             platforms.append("pagerduty")
+        if self.jira_account_id:
+            platforms.append("jira")
         return platforms
     
     @property
@@ -57,6 +61,8 @@ class UserCorrelation(Base):
             self.rootly_email = identifier
         elif platform == "pagerduty":
             self.pagerduty_user_id = identifier
+        elif platform == "jira":
+            self.jira_account_id = identifier
         else:
             raise ValueError(f"Unknown platform: {platform}")
     
@@ -70,6 +76,8 @@ class UserCorrelation(Base):
             return self.rootly_email
         elif platform == "pagerduty":
             return self.pagerduty_user_id
+        elif platform == "jira":
+            return self.jira_account_id
         else:
             raise ValueError(f"Unknown platform: {platform}")
     
