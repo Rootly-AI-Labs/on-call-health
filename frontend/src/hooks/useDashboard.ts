@@ -1328,6 +1328,10 @@ export default function useDashboard() {
     setDialogSelectedIntegration(integrationToUse)
     setShowTimeRangeDialog(true)
 
+    // Refresh integrations to ensure permissions are up-to-date
+    // This prevents showing stale "Missing Permissions" errors for newly added integrations
+    loadIntegrations(true)  // Force refresh to bypass cache
+
     // Load cached GitHub/Slack data immediately if we don't have it in state
     if (!githubIntegration || !slackIntegration) {
     const cachedGitHub = localStorage.getItem('github_integration');
