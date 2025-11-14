@@ -49,7 +49,9 @@ class User(Base):
     user_mappings_owned = relationship("UserMapping", foreign_keys="UserMapping.user_id", back_populates="user", cascade="all, delete-orphan")
     user_mappings_created = relationship("UserMapping", foreign_keys="UserMapping.created_by", back_populates="creator")
     owned_slack_workspaces = relationship("SlackWorkspaceMapping", back_populates="owner")
-    
+    jira_integrations = relationship("JiraIntegration", back_populates="user", cascade="all, delete-orphan")
+    owned_jira_workspaces = relationship("JiraWorkspaceMapping", back_populates="owner")
+
     def __repr__(self):
         return f"<User(id={self.id}, email='{self.email}', providers={len(self.oauth_providers)})>"
     
@@ -79,6 +81,11 @@ class User(Base):
     def slack_integration(self):
         """Get the Slack integration for this user."""
         return self.slack_integrations[0] if self.slack_integrations else None
+
+    @property
+    def jira_integration(self):
+        """Get the Jira integration for this user."""
+        return self.jira_integrations[0] if self.jira_integrations else None
     
     @property
     def primary_correlation(self):
@@ -96,7 +103,11 @@ class User(Base):
     def has_llm_token(self) -> bool:
         """Check if user has LLM token configured."""
         return self.llm_token is not None and self.llm_provider is not None
-    
+
+    def has_jira_integration(self) -> bool:
+        """Check if user has Jira integration set up."""
+        return len(self.jira_integrations) > 0
+
     @property
     def connected_platforms(self) -> list:
         """Get list of all connected platforms for this user."""

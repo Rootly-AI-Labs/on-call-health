@@ -354,8 +354,211 @@ class SlackIntegrationOAuth:
                 permissions["errors"].append(f"Users conversations test failed: {str(e)}")
         
         return permissions
+    
+class JiraIntegrationOAuth:
+    """
+    Jira OAuth provider for integration purposes (frontend redirect style).
+
+    Notes:
+    - Uses OAuth 2.0 (3LO). Ensure the Atlassian app's Redirect URL exactly matches
+      settings.FRONTEND_URL + "/setup/jira/callback".
+    - Scopes used: read:jira-work read:jira-user offline_access
+    """
+
+    def __init__(self):
+        self.client_id = settings.JIRA_CLIENT_ID
+        self.client_secret = settings.JIRA_CLIENT_SECRET
+        # The provider redirects back to FRONTEND, which then calls backend /callback
+        self.redirect_uri = f"{settings.FRONTEND_URL}/setup/jira/callback"
+        self.auth_url = "https://auth.atlassian.com/authorize"
+        self.token_url = "https://auth.atlassian.com/oauth/token"
+        self.accessible_resources_url = "https://api.atlassian.com/oauth/token/accessible-resources"
+        self.api_base = "https://api.atlassian.com/ex/jira"
+
+    def get_authorization_url(self, state: str = "") -> str:
+        from urllib.parse import urlencode
+        params = {
+            "audience": "api.atlassian.com",
+            "client_id": self.client_id,
+            "redirect_uri": self.redirect_uri,  # must match Atlassian app config
+            "scope": "read:jira-work read:jira-user offline_access",
+            "response_type": "code",
+            "prompt": "consent",
+            "state": state or "",
+        }
+        return f"{self.auth_url}?{urlencode(params)}"
+
+    async def exchange_code_for_token(self, code: str) -> Dict[str, Any]:
+        data = {
+            "grant_type": "authorization_code",
+            "client_id": self.client_id,
+            "client_secret": self.client_secret,
+            "code": code,
+            "redirect_uri": self.redirect_uri,  # must match exactly
+        }
+        headers = {"Content-Type": "application/json"}
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(self.token_url, json=data, headers=headers)
+        if resp.status_code != 200:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Failed to exchange code for token: {resp.text}",
+            )
+        return resp.json()
+
+    async def refresh_access_token(self, refresh_token: str) -> Dict[str, Any]:
+        data = {
+            "grant_type": "refresh_token",
+            "client_id": self.client_id,
+            "client_secret": self.client_secret,
+            "refresh_token": refresh_token,
+        }
+        headers = {"Content-Type": "application/json"}
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(self.token_url, json=data, headers=headers)
+        if resp.status_code != 200:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Failed to refresh access token: {resp.text}",
+            )
+        return resp.json()
+
+    async def get_accessible_resources(self, access_token: str) -> List[Dict[str, Any]]:
+        headers = {"Authorization": f"Bearer {access_token}", "Accept": "application/json"}
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(self.accessible_resources_url, headers=headers)
+        if resp.status_code != 200:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Failed to get accessible resources: {resp.text}",
+            )
+        return resp.json()
+
+    async def get_user_info(self, access_token: str, cloud_id: str) -> Dict[str, Any]:
+        headers = {"Authorization": f"Bearer {access_token}", "Accept": "application/json"}
+        url = f"{self.api_base}/{cloud_id}/rest/api/3/myself"
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(url, headers=headers)
+        if resp.status_code != 200:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Failed to get user info: {resp.text}",
+            )
+        return resp.json()
+
+    async def search_issues(
+        self,
+        access_token: str,
+        cloud_id: str,
+        jql: str,
+        *,
+        fields: Optional[List[str]] = None,
+        max_results: int = 100,
+        next_page_token: Optional[str] = None,
+        expand: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Use the enhanced JQL search API:
+          GET /rest/api/3/search/jql
+        Supports pagination via nextPageToken. Old /rest/api/3/search is being removed.
+        """
+        headers = {"Authorization": f"Bearer {access_token}", "Accept": "application/json"}
+        url = f"{self.api_base}/{cloud_id}/rest/api/3/search/jql"
+
+        params: Dict[str, Any] = {
+            "jql": jql,
+            "maxResults": max(1, min(1000, int(max_results))),
+        }
+        if fields:
+            params["fields"] = ",".join(fields)
+        if next_page_token:
+            params["nextPageToken"] = next_page_token
+        if expand:
+            params["expand"] = expand
+
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(url, headers=headers, params=params)
+
+        # Atlassian sends 410 Gone when calling old endpoints; surface error if any non-200
+        if resp.status_code != 200:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Failed to search issues: {resp.text}",
+            )
+        return resp.json()
+
+    async def test_permissions(self, access_token: str, cloud_id: str) -> Dict[str, Any]:
+        """
+        Basic permission smoke tests:
+        - /myself => user_access
+        - /project => project_access
+        - /search/jql => issue_access (try a small query)
+        - /issue/{key}/worklog => worklog_access (on first issue if exists)
+        """
+        perms = {
+            "user_access": False,
+            "project_access": False,
+            "issue_access": False,
+            "worklog_access": False,
+            "errors": [],
+        }
+        headers = {"Authorization": f"Bearer {access_token}", "Accept": "application/json"}
+
+        async with httpx.AsyncClient() as client:
+            # /myself
+            try:
+                r = await client.get(f"{self.api_base}/{cloud_id}/rest/api/3/myself", headers=headers)
+                perms["user_access"] = r.status_code == 200
+                if not perms["user_access"]:
+                    perms["errors"].append(f"myself: {r.text}")
+            except Exception as e:
+                perms["errors"].append(f"myself err: {e}")
+
+            # /project
+            try:
+                r = await client.get(
+                    f"{self.api_base}/{cloud_id}/rest/api/3/project",
+                    headers=headers,
+                    params={"maxResults": 1},
+                )
+                perms["project_access"] = r.status_code == 200
+                if not perms["project_access"]:
+                    perms["errors"].append(f"project: {r.text}")
+            except Exception as e:
+                perms["errors"].append(f"project err: {e}")
+
+        # Issue access via enhanced JQL (GET)
+        try:
+            sr = await self.search_issues(
+                access_token,
+                cloud_id,
+                jql="updated >= -7d",
+                fields=["key"],
+                max_results=1,
+            )
+            perms["issue_access"] = True
+            # Worklog access on the first returned issue (if any)
+            issues = (sr or {}).get("issues") or []
+            if issues:
+                key = issues[0].get("key")
+                if key:
+                    async with httpx.AsyncClient() as client:
+                        wr = await client.get(
+                            f"{self.api_base}/{cloud_id}/rest/api/3/issue/{key}/worklog",
+                            headers=headers,
+                        )
+                    perms["worklog_access"] = wr.status_code == 200
+                    if not perms["worklog_access"]:
+                        perms["errors"].append(f"worklog: {wr.text}")
+        except HTTPException as e:
+            perms["errors"].append(f"search/jql: {e.detail}")
+        except Exception as e:
+            perms["errors"].append(f"search/jql err: {e}")
+
+        return perms
 
 
 # Provider instances
 github_integration_oauth = GitHubIntegrationOAuth()
 slack_integration_oauth = SlackIntegrationOAuth()
+jira_integration_oauth = JiraIntegrationOAuth()

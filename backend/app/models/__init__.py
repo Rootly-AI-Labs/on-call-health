@@ -16,10 +16,12 @@ from .integration_mapping import IntegrationMapping
 from .user_mapping import UserMapping
 from .user_burnout_report import UserBurnoutReport
 from .slack_workspace_mapping import SlackWorkspaceMapping
+from .jira_integration import JiraIntegration
+from .jira_workspace_mapping import JiraWorkspaceMapping
 
 __all__ = [
     "Base", "get_db", "create_tables", "SessionLocal", "Organization", "OrganizationInvitation", "UserNotification", "User", "Analysis",
     "RootlyIntegration", "OAuthProvider", "UserEmail", "GitHubIntegration",
     "SlackIntegration", "UserCorrelation", "IntegrationMapping", "UserMapping",
-    "UserBurnoutReport", "SlackWorkspaceMapping"
+    "UserBurnoutReport", "SlackWorkspaceMapping", "JiraIntegration", "JiraWorkspaceMapping"
 ]
