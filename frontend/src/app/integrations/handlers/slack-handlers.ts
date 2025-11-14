@@ -198,7 +198,7 @@ export async function loadSlackPermissions(
       setSlackPermissions(data.permissions)
     }
   } catch (error) {
-    console.error('Error loading Slack permissions:', error)
+    // Silently handle permission loading errors
   } finally {
     setIsLoadingPermissions(false)
   }

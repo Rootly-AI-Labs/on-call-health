@@ -942,7 +942,7 @@ export default function IntegrationsPage() {
         ))
       }
     } catch (error) {
-      console.error('Failed to refresh permissions:', error)
+      // Silently handle permission refresh errors
     } finally {
       setRefreshingPermissions(null)
     }
