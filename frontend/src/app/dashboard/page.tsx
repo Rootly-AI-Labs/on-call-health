@@ -1852,9 +1852,18 @@ export default function Dashboard() {
             {/* Permission Error Alert - Only for Rootly */}
             {dialogSelectedIntegration && (() => {
               const selectedIntegration = integrations.find(i => i.id.toString() === dialogSelectedIntegration);
-              
+
               // Only check permissions for Rootly integrations, not PagerDuty
               if (selectedIntegration?.platform === 'rootly') {
+                // Debug logging to see what we're getting
+                console.log('🔍 Modal Permission Check:', {
+                  integrationName: selectedIntegration?.name,
+                  integrationId: selectedIntegration?.id,
+                  permissions: selectedIntegration?.permissions,
+                  usersAccess: selectedIntegration?.permissions?.users?.access,
+                  incidentsAccess: selectedIntegration?.permissions?.incidents?.access,
+                });
+
                 // Check if permissions have been loaded (undefined = not loaded yet, false/true = loaded)
                 const permissionsLoaded = selectedIntegration?.permissions !== undefined;
                 const hasUserPermission = selectedIntegration?.permissions?.users?.access;
