@@ -892,7 +892,13 @@ class UnifiedBurnoutAnalyzer:
                 logger.info(f"✅ TEAM SYNC OPTIMIZATION: Using {len(self.synced_users)} pre-synced users, only fetching incidents")
 
                 # Only fetch incidents from API (much faster!)
-                raw_incidents = await self.client.get_incidents(days_back=days_back, limit=5000)
+                # Different APIs use different parameters
+                if self.platform == "pagerduty":
+                    since = datetime.now() - timedelta(days=days_back)
+                    until = datetime.now()
+                    raw_incidents = await self.client.get_incidents(since=since, until=until, limit=5000)
+                else:  # rootly
+                    raw_incidents = await self.client.get_incidents(days_back=days_back, limit=5000)
 
                 # CRITICAL FIX: Normalize incidents for PagerDuty to extract assigned_to from assignments array
                 if self.platform == "pagerduty":
