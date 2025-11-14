@@ -485,9 +485,26 @@ class MigrationRunner:
                     """
                 ]
             },
+            {
+                "name": "016_add_permissions_caching",
+                "description": "Add permissions caching to rootly_integrations",
+                "sql": [
+                    """
+                    ALTER TABLE rootly_integrations
+                    ADD COLUMN IF NOT EXISTS cached_permissions JSON,
+                    ADD COLUMN IF NOT EXISTS permissions_checked_at TIMESTAMP WITH TIME ZONE
+                    """,
+                    """
+                    COMMENT ON COLUMN rootly_integrations.cached_permissions IS 'Cached permission check results to reduce API calls'
+                    """,
+                    """
+                    COMMENT ON COLUMN rootly_integrations.permissions_checked_at IS 'Timestamp when permissions were last checked'
+                    """
+                ]
+            },
             # Add future migrations here with incrementing numbers
             # {
-            #     "name": "016_add_user_preferences",
+            #     "name": "017_add_user_preferences",
             #     "description": "Add user preferences table",
             #     "sql": ["CREATE TABLE IF NOT EXISTS user_preferences (...)"]
             # }

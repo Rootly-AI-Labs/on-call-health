@@ -156,6 +156,8 @@ export default function IntegrationsPage() {
   const [loadingGitHub, setLoadingGitHub] = useState(true)
   const [loadingSlack, setLoadingSlack] = useState(true)
   const [reloadingIntegrations, setReloadingIntegrations] = useState(false)
+  const [loadingPermissions, setLoadingPermissions] = useState(false)
+  const [refreshingPermissions, setRefreshingPermissions] = useState<number | null>(null)
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null)
   const [activeTab, setActiveTab] = useState<"rootly" | "pagerduty" | null>(null)
   const [backUrl, setBackUrl] = useState<string>('/dashboard')
@@ -919,6 +921,34 @@ export default function IntegrationsPage() {
       setOrgMembers,
       setPendingInvitations
     )
+  }
+
+  // Refresh permissions for a specific integration
+  const refreshIntegrationPermissions = async (integrationId: number) => {
+    setRefreshingPermissions(integrationId)
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) return
+
+      const response = await fetch(`${API_BASE}/rootly/integrations/${integrationId}/refresh-permissions`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        // Update the integration in the list with new permissions
+        setIntegrations(prev => prev.map(int =>
+          int.id === integrationId
+            ? { ...int, permissions: data.permissions }
+            : int
+        ))
+      }
+    } catch (error) {
+      console.error('Failed to refresh permissions:', error)
+    } finally {
+      setRefreshingPermissions(null)
+    }
   }
 
   // Background API loading - does NOT change loading states (for silent refresh)
@@ -1965,36 +1995,59 @@ export default function IntegrationsPage() {
                           {/* Permissions for Rootly and PagerDuty */}
                           {integration.permissions && (
                             <>
-                              <div className="mt-3 flex items-center space-x-4 text-sm">
-                                <span className="text-gray-500">Read permissions:</span>
-                                <div className="flex items-center space-x-1">
-                                  {integration.permissions.users.access ? (
-                                    <Tooltip content="✓ User read permissions: Required to run burnout analysis and identify team members">
-                                      <CheckCircle className="w-4 h-4 text-green-500 cursor-help" />
-                                    </Tooltip>
+                              <div className="mt-3 flex items-center justify-between text-sm">
+                                <div className="flex items-center space-x-4">
+                                  <span className="text-gray-500">Read permissions:</span>
+                                  {/* Show loader when permissions are being checked */}
+                                  {(integration.permissions.users.access === null && integration.permissions.incidents.access === null) || refreshingPermissions === integration.id ? (
+                                    <div className="flex items-center space-x-2">
+                                      <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+                                      <span className="text-gray-500">Checking permissions...</span>
+                                    </div>
                                   ) : (
-                                    <Tooltip content={`✗ User read permissions required: ${integration.permissions.users.error || "Permission denied"}. Both User and Incident read permissions are required to run burnout analysis.`}>
-                                      <AlertCircle className="w-4 h-4 text-red-500 cursor-help" />
-                                    </Tooltip>
+                                    <>
+                                      <div className="flex items-center space-x-1">
+                                        {integration.permissions.users.access ? (
+                                          <Tooltip content="✓ User read permissions: Required to run burnout analysis and identify team members">
+                                            <CheckCircle className="w-4 h-4 text-green-500 cursor-help" />
+                                          </Tooltip>
+                                        ) : (
+                                          <Tooltip content={`✗ User read permissions required: ${integration.permissions.users.error || "Permission denied"}. Both User and Incident read permissions are required to run burnout analysis.`}>
+                                            <AlertCircle className="w-4 h-4 text-red-500 cursor-help" />
+                                          </Tooltip>
+                                        )}
+                                        <span>Users</span>
+                                      </div>
+                                      <div className="flex items-center space-x-1">
+                                        {integration.permissions.incidents.access ? (
+                                          <Tooltip content="✓ Incident read permissions: Required to run burnout analysis and analyze incident response patterns">
+                                            <CheckCircle className="w-4 h-4 text-green-500 cursor-help" />
+                                          </Tooltip>
+                                        ) : (
+                                          <Tooltip content={`✗ Incident read permissions required: ${integration.permissions.incidents.error || "Permission denied"}. Both User and Incident read permissions are required to run burnout analysis.`}>
+                                            <AlertCircle className="w-4 h-4 text-red-500 cursor-help" />
+                                          </Tooltip>
+                                        )}
+                                        <span>Incidents</span>
+                                      </div>
+                                    </>
                                   )}
-                                  <span>Users</span>
                                 </div>
-                                <div className="flex items-center space-x-1">
-                                  {integration.permissions.incidents.access ? (
-                                    <Tooltip content="✓ Incident read permissions: Required to run burnout analysis and analyze incident response patterns">
-                                      <CheckCircle className="w-4 h-4 text-green-500 cursor-help" />
-                                    </Tooltip>
-                                  ) : (
-                                    <Tooltip content={`✗ Incident read permissions required: ${integration.permissions.incidents.error || "Permission denied"}. Both User and Incident read permissions are required to run burnout analysis.`}>
-                                      <AlertCircle className="w-4 h-4 text-red-500 cursor-help" />
-                                    </Tooltip>
-                                  )}
-                                  <span>Incidents</span>
-                                </div>
+                                {/* Refresh button */}
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => refreshIntegrationPermissions(integration.id)}
+                                  disabled={refreshingPermissions === integration.id}
+                                  className="h-7 px-2 text-gray-500 hover:text-gray-700"
+                                >
+                                  <RefreshCw className={`w-3 h-3 ${refreshingPermissions === integration.id ? 'animate-spin' : ''}`} />
+                                </Button>
                               </div>
-                              
+
                               {/* Error message for insufficient permissions */}
-                              {(!integration.permissions.users.access || !integration.permissions.incidents.access) && (
+                              {integration.permissions.users.access !== null && integration.permissions.incidents.access !== null &&
+                               (!integration.permissions.users.access || !integration.permissions.incidents.access) && (
                                 <div className="mt-3">
                                   <Alert className="border-red-200 bg-red-50">
                                     <AlertCircle className="h-4 w-4 text-red-600" />
