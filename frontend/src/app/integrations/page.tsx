@@ -884,7 +884,11 @@ export default function IntegrationsPage() {
     try {
       await loadAllIntegrationsAPIBackground()
     } catch (error) {
-      console.error('Background refresh failed:', error)
+      // Silently fail for background refreshes - don't spam console
+      // User still has cached data, so this is non-critical
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('Background refresh failed (non-critical):', error)
+      }
     } finally {
       setRefreshingInBackground(false)
     }
@@ -968,7 +972,11 @@ export default function IntegrationsPage() {
       }
 
     } catch (error) {
-      console.error('Background refresh error:', error)
+      // Silently fail - already caught in refreshInBackground
+      // Only log if unexpected error type
+      if (!(error instanceof TypeError && error.message.includes('fetch'))) {
+        console.error('Background refresh error:', error)
+      }
     }
   }
   
