@@ -3794,17 +3794,17 @@ export default function IntegrationsPage() {
       />
 
       {/* Sync Confirmation Modal */}
-      <AlertDialog open={showSyncConfirmModal} onOpenChange={(open) => {
+      <Dialog open={showSyncConfirmModal} onOpenChange={(open) => {
         if (!syncProgress?.isLoading) {
           setShowSyncConfirmModal(open)
         }
       }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
               {syncProgress?.isLoading ? 'Syncing Team Members...' : 'Sync Team Members'}
-            </AlertDialogTitle>
-            <AlertDialogDescription asChild>
+            </DialogTitle>
+            <DialogDescription asChild>
               <div className="space-y-3 text-left">
                 {!syncProgress?.isLoading ? (
                   <>
@@ -3842,13 +3842,15 @@ export default function IntegrationsPage() {
                   </div>
                 )}
               </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
             {!syncProgress?.isLoading && (
               <>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction
+                <Button variant="outline" onClick={() => setShowSyncConfirmModal(false)}>
+                  Cancel
+                </Button>
+                <Button
                   onClick={async () => {
                     try {
                       setSyncProgress({ stage: 'Starting sync...', details: 'Preparing to sync users', isLoading: true })
@@ -3880,12 +3882,12 @@ export default function IntegrationsPage() {
                   className="bg-purple-600 hover:bg-purple-700"
                 >
                   Sync Now
-                </AlertDialogAction>
+                </Button>
               </>
             )}
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
