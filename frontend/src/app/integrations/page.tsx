@@ -622,6 +622,18 @@ export default function IntegrationsPage() {
     }
   }, [githubIntegration, teamMembersDrawerOpen, showSyncedUsers])
 
+  // Clear drawer data when organization changes to prevent showing stale data
+  useEffect(() => {
+    if (teamMembersDrawerOpen) {
+      // Close drawer when org changes to prevent showing wrong data
+      setTeamMembersDrawerOpen(false)
+      setSyncedUsers([])
+      setShowSyncedUsers(false)
+      setSelectedRecipients(new Set())
+      setSavedRecipients(new Set())
+    }
+  }, [selectedOrganization])
+
   // Load saved survey recipients when drawer opens (only if no unsaved changes)
   useEffect(() => {
     const loadSavedRecipients = async () => {
