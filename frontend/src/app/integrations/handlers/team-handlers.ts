@@ -68,7 +68,7 @@ export async function syncUsersToCorrelation(
 ): Promise<{ created: number; updated: number; github_matched?: number }> {
   if (!selectedOrganization) {
     toast.error('Please select an organization first')
-    return
+    throw new Error('No organization selected')
   }
   setLoadingTeamMembers(true)
   setTeamMembersError(null)
@@ -78,7 +78,7 @@ export async function syncUsersToCorrelation(
     const authToken = localStorage.getItem('auth_token')
     if (!authToken) {
       toast.error('Please log in to sync users')
-      return
+      throw new Error('Not authenticated')
     }
 
     onProgress?.('📡 Connecting to API...')
@@ -153,7 +153,7 @@ export async function syncSlackUserIds(
     const authToken = localStorage.getItem('auth_token')
     if (!authToken) {
       toast.error('Please log in to sync Slack user IDs')
-      return
+      throw new Error('Not authenticated')
     }
 
     const response = await fetch(`${API_BASE}/integrations/slack/sync-user-ids`, {
