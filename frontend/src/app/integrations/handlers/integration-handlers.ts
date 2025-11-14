@@ -282,6 +282,9 @@ export async function addIntegration(
       // Reload integrations to show the newly added one
       setReloadingIntegrations(true)
       try {
+        // Add delay to ensure backend has processed the new integration
+        await new Promise(resolve => setTimeout(resolve, 500))
+
         if (platform === 'rootly') {
           await loadRootlyIntegrations(true)
         } else {
