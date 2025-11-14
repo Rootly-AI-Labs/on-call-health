@@ -592,7 +592,7 @@ export default function IntegrationsPage() {
     }
 
     // Handle Jira OAuth success
-    if (jiraConnected === 'true') {
+    if (jiraConnected === '1' || jiraConnected === 'true') {
       // Show loading toast
       const loadingToastId = toast.loading('Verifying Jira connection...', {
         description: 'Please wait while we confirm your Jira integration.',
