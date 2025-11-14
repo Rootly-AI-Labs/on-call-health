@@ -892,7 +892,9 @@ class UnifiedBurnoutAnalyzer:
                 logger.info(f"✅ TEAM SYNC OPTIMIZATION: Using {len(self.synced_users)} pre-synced users, only fetching incidents")
 
                 # Only fetch incidents from API (much faster!)
-                incidents = await self.client.get_incidents(days_back=days_back, limit=5000)
+                since = datetime.now() - timedelta(days=days_back)
+                until = datetime.now()
+                incidents = await self.client.get_incidents(since=since, until=until, limit=5000)
 
                 # Build data structure with synced users
                 data = {
