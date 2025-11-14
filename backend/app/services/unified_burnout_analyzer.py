@@ -894,7 +894,21 @@ class UnifiedBurnoutAnalyzer:
                 # Only fetch incidents from API (much faster!)
                 since = datetime.now() - timedelta(days=days_back)
                 until = datetime.now()
-                incidents = await self.client.get_incidents(since=since, until=until, limit=5000)
+                raw_incidents = await self.client.get_incidents(since=since, until=until, limit=5000)
+
+                # CRITICAL FIX: Normalize incidents for PagerDuty to extract assigned_to from assignments array
+                if self.platform == "pagerduty":
+                    from app.core.pagerduty_client import PagerDutyDataCollector
+                    collector = PagerDutyDataCollector(self.client.api_token)
+                    # Use the enhanced normalization to extract assignments
+                    normalized_data = collector._normalize_with_enhanced_assignment_extraction(
+                        raw_incidents,
+                        self.synced_users
+                    )
+                    incidents = normalized_data.get("incidents", [])
+                    logger.info(f"✅ TEAM SYNC: Normalized {len(incidents)} PagerDuty incidents with assignment extraction")
+                else:
+                    incidents = raw_incidents
 
                 # Build data structure with synced users
                 data = {
