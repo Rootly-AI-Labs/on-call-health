@@ -2554,15 +2554,17 @@ async def run_analysis_task(
                     UserCorrelation.user_id == user_id
                 ).all()
 
-                # Fetch on-call status for all users
-                from ...api.endpoints.rootly import get_synced_users as _get_synced_users
-                oncall_data = await _get_synced_users(
-                    integration_id=integration_id_str,
-                    include_oncall_status=True,
-                    current_user=user,
-                    db=db
-                )
-                oncall_emails = {u["email"].lower(): u["is_oncall"] for u in oncall_data.get("users", [])}
+                # Fetch on-call status for all users (Rootly only - PagerDuty doesn't have this endpoint)
+                oncall_emails = {}
+                if platform == "rootly":
+                    from ...api.endpoints.rootly import get_synced_users as _get_synced_users
+                    oncall_data = await _get_synced_users(
+                        integration_id=integration_id_str,
+                        include_oncall_status=True,
+                        current_user=user,
+                        db=db
+                    )
+                    oncall_emails = {u["email"].lower(): u["is_oncall"] for u in oncall_data.get("users", [])}
 
                 # Filter by integration_id (check JSON array)
                 synced_users = []

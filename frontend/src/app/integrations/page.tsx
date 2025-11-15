@@ -3838,27 +3838,7 @@ export default function IntegrationsPage() {
             </DialogTitle>
             <DialogDescription asChild>
               <div className="space-y-3 text-left">
-                {!syncProgress?.isLoading ? (
-                  <>
-                    <span>This will sync your team members from {integrations.find(i => i.id.toString() === selectedOrganization)?.name || 'your integration'}.</span>
-
-                    <div className="bg-blue-50 border border-blue-200 rounded-md p-3 space-y-2">
-                      <div className="font-medium text-blue-900">What happens during sync:</div>
-                      <ul className="list-disc list-inside space-y-1 text-sm text-blue-800">
-                        <li><strong>Incident Responders Only:</strong> For Rootly, only users with Incident Response (IR) roles will be synced (admin, owner, user). Observers and users without IR access are excluded.</li>
-                        <li><strong>Clean Sync:</strong> All existing users from this integration will be removed and replaced with the fresh list.</li>
-                        <li><strong>Used in Analysis:</strong> These synced users will be used when running burnout analysis.</li>
-                        <li><strong>Cross-Platform Matching:</strong> Users will be matched across GitHub and Slack accounts when possible.</li>
-                      </ul>
-                    </div>
-
-                    <span className="text-sm text-gray-600 block">
-                      {syncedUsers.length > 0
-                        ? `This will replace your current ${syncedUsers.length} synced users.`
-                        : 'This is your first sync for this integration.'}
-                    </span>
-                  </>
-                ) : syncProgress.results ? (
+                {syncProgress?.results ? (
                   <div className="space-y-4">
                     <div className="flex items-center gap-3">
                       <CheckCircle className="w-6 h-6 text-green-600" />
@@ -3868,34 +3848,28 @@ export default function IntegrationsPage() {
                       </div>
                     </div>
 
-                    <div className="bg-green-50 border border-green-200 rounded-md p-4 space-y-3">
-                      <div className="font-semibold text-green-900 text-base">Sync Results</div>
+                    <div className="bg-gray-50 border border-gray-200 rounded-md p-4 space-y-3">
+                      <div className="font-semibold text-gray-900 text-base">Sync Results</div>
 
                       <div className="space-y-2">
-                        <div className="flex items-center justify-between py-2 border-b border-green-200">
-                          <span className="text-sm text-green-800">New users synced</span>
-                          <span className="font-semibold text-green-900">{syncProgress.results.created}</span>
+                        <div className="flex items-center justify-between py-2 border-b border-gray-200">
+                          <span className="text-sm text-gray-700">New users synced</span>
+                          <span className="font-semibold text-gray-900">{syncProgress.results.created}</span>
                         </div>
-                        <div className="flex items-center justify-between py-2 border-b border-green-200">
-                          <span className="text-sm text-green-800">Existing users updated</span>
-                          <span className="font-semibold text-green-900">{syncProgress.results.updated}</span>
+                        <div className="flex items-center justify-between py-2 border-b border-gray-200">
+                          <span className="text-sm text-gray-700">Existing users updated</span>
+                          <span className="font-semibold text-gray-900">{syncProgress.results.updated}</span>
                         </div>
-                        {syncProgress.results.github_matched !== undefined && (
-                          <div className="flex items-center justify-between py-2 border-b border-green-200">
-                            <span className="text-sm text-green-800">GitHub accounts matched</span>
-                            <span className="font-semibold text-green-900">{syncProgress.results.github_matched}</span>
+                        {syncProgress.results.github_matched !== undefined && syncProgress.results.github_matched > 0 && (
+                          <div className="flex items-center justify-between py-2 border-b border-gray-200">
+                            <span className="text-sm text-gray-700">GitHub accounts matched</span>
+                            <span className="font-semibold text-gray-900">{syncProgress.results.github_matched}</span>
                           </div>
                         )}
-                        {syncProgress.results.slack_synced !== undefined && (
-                          <div className="flex items-center justify-between py-2 border-b border-green-200">
-                            <span className="text-sm text-green-800">Slack accounts matched</span>
-                            <span className="font-semibold text-green-900">{syncProgress.results.slack_synced}</span>
-                          </div>
-                        )}
-                        {syncProgress.results.slack_skipped !== undefined && syncProgress.results.slack_skipped > 0 && (
+                        {syncProgress.results.slack_synced !== undefined && syncProgress.results.slack_synced > 0 && (
                           <div className="flex items-center justify-between py-2">
-                            <span className="text-sm text-green-800">Users without Slack match</span>
-                            <span className="font-semibold text-green-900">{syncProgress.results.slack_skipped}</span>
+                            <span className="text-sm text-gray-700">Slack accounts matched</span>
+                            <span className="font-semibold text-gray-900">{syncProgress.results.slack_synced}</span>
                           </div>
                         )}
                       </div>
@@ -3907,13 +3881,13 @@ export default function IntegrationsPage() {
                           setShowSyncConfirmModal(false)
                           setSyncProgress(null)
                         }}
-                        className="bg-green-600 hover:bg-green-700"
+                        className="bg-purple-600 hover:bg-purple-700"
                       >
                         Done
                       </Button>
                     </div>
                   </div>
-                ) : (
+                ) : syncProgress?.isLoading ? (
                   <div className="space-y-4">
                     <div className="flex items-center gap-3">
                       <Loader2 className="w-5 h-5 animate-spin text-purple-600" />
@@ -3927,12 +3901,37 @@ export default function IntegrationsPage() {
                       <span className="text-sm text-purple-800">Please wait while we sync your team members. This may take a few moments...</span>
                     </div>
                   </div>
+                ) : (
+                  <>
+                    <span>This will sync your team members from {integrations.find(i => i.id.toString() === selectedOrganization)?.name || 'your integration'}.</span>
+
+                    <div className="bg-blue-50 border border-blue-200 rounded-md p-3 space-y-2">
+                      <div className="font-medium text-blue-900">What happens during sync:</div>
+                      <ul className="list-disc list-inside space-y-1 text-sm text-blue-800">
+                        {integrations.find(i => i.id.toString() === selectedOrganization)?.platform === 'rootly' && (
+                          <li><strong>Incident Responders Only:</strong> Only users with Incident Response (IR) roles will be synced (admin, owner, user). Observers and users without IR access are excluded.</li>
+                        )}
+                        {integrations.find(i => i.id.toString() === selectedOrganization)?.platform === 'pagerduty' && (
+                          <li><strong>All Users:</strong> All users from your PagerDuty account will be synced.</li>
+                        )}
+                        <li><strong>Clean Sync:</strong> All existing users from this integration will be removed and replaced with the fresh list.</li>
+                        <li><strong>Used in Analysis:</strong> These synced users will be used when running burnout analysis.</li>
+                        <li><strong>Cross-Platform Matching:</strong> Users will be matched across GitHub and Slack accounts when possible.</li>
+                      </ul>
+                    </div>
+
+                    <span className="text-sm text-gray-600 block">
+                      {syncedUsers.length > 0
+                        ? `This will replace your current ${syncedUsers.length} synced users.`
+                        : 'This is your first sync for this integration.'}
+                    </span>
+                  </>
                 )}
               </div>
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            {!syncProgress?.isLoading && (
+            {!syncProgress?.isLoading && !syncProgress?.results && (
               <>
                 <Button variant="outline" onClick={() => setShowSyncConfirmModal(false)}>
                   Cancel
@@ -3962,6 +3961,7 @@ export default function IntegrationsPage() {
                         slackResults = await TeamHandlers.syncSlackUserIds(setLoadingTeamMembers, fetchSyncedUsers, true)
                       }
 
+                      console.log('Sync completed:', { syncResults, slackResults })
                       setSyncProgress({
                         stage: 'Sync Complete!',
                         details: 'Your team members have been successfully synced',
