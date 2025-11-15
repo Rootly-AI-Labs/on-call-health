@@ -103,7 +103,6 @@ import {
   type Integration,
   type GitHubIntegration,
   type SlackIntegration,
-  type JiraIntegration,
   type PreviewData,
   type IntegrationMapping,
   type MappingStatistics,
@@ -121,7 +120,6 @@ import {
 } from "./types"
 import * as GithubHandlers from "./handlers/github-handlers"
 import * as SlackHandlers from "./handlers/slack-handlers"
-import * as JiraHandlers from "./handlers/jira-handlers"
 import * as TeamHandlers from "./handlers/team-handlers"
 import * as IntegrationHandlers from "./handlers/integration-handlers"
 import * as OrganizationHandlers from "./handlers/organization-handlers"
@@ -131,16 +129,12 @@ import * as Utils from "./utils"
 import { GitHubIntegrationCard } from "./components/GitHubIntegrationCard"
 import { AIInsightsCard } from "./components/AIInsightsCard"
 import { GitHubConnectedCard } from "./components/GitHubConnectedCard"
-import { JiraIntegrationCard } from "./components/JiraIntegrationCard"
-import { JiraConnectedCard } from "./components/JiraConnectedCard"
 import { RootlyIntegrationForm } from "./components/RootlyIntegrationForm"
 import { SurveyFeedbackSection } from "./components/SurveyFeedbackSection"
 import { PagerDutyIntegrationForm } from "./components/PagerDutyIntegrationForm"
 import { DeleteIntegrationDialog } from "./dialogs/DeleteIntegrationDialog"
 import { GitHubDisconnectDialog } from "./dialogs/GitHubDisconnectDialog"
 import { SlackDisconnectDialog } from "./dialogs/SlackDisconnectDialog"
-import { JiraDisconnectDialog } from "./dialogs/JiraDisconnectDialog"
-import { JiraWorkspaceSelector } from "./dialogs/JiraWorkspaceSelector"
 import { NewMappingDialog } from "./dialogs/NewMappingDialog"
 import { OrganizationManagementDialog } from "./dialogs/OrganizationManagementDialog"
 
@@ -151,19 +145,19 @@ export default function IntegrationsPage() {
   const [loadingPagerDuty, setLoadingPagerDuty] = useState(true)
   const [loadingGitHub, setLoadingGitHub] = useState(true)
   const [loadingSlack, setLoadingSlack] = useState(true)
-  const [loadingJira, setLoadingJira] = useState(true)
   const [reloadingIntegrations, setReloadingIntegrations] = useState(false)
+  const [loadingPermissions, setLoadingPermissions] = useState(false)
+  const [refreshingPermissions, setRefreshingPermissions] = useState<number | null>(null)
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null)
   const [activeTab, setActiveTab] = useState<"rootly" | "pagerduty" | null>(null)
   const [backUrl, setBackUrl] = useState<string>('/dashboard')
   const [selectedOrganization, setSelectedOrganization] = useState<string>("")
   const [navigatingToDashboard, setNavigatingToDashboard] = useState(false)
 
-  // GitHub/Slack/Jira integration state
+  // GitHub/Slack integration state
   const [githubIntegration, setGithubIntegration] = useState<GitHubIntegration | null>(null)
   const [slackIntegration, setSlackIntegration] = useState<SlackIntegration | null>(null)
-  const [jiraIntegration, setJiraIntegration] = useState<JiraIntegration | null>(null)
-  const [activeEnhancementTab, setActiveEnhancementTab] = useState<"github" | "slack" | "jira" | null>(null)
+  const [activeEnhancementTab, setActiveEnhancementTab] = useState<"github" | "slack" | null>(null)
 
   // Slack feature selection for OAuth
   const [enableSlackSurvey, setEnableSlackSurvey] = useState(true) // Default both enabled
@@ -210,6 +204,21 @@ export default function IntegrationsPage() {
   const [selectedManualMappingPlatform, setSelectedManualMappingPlatform] = useState<'github' | 'slack' | null>(null)
   const [loadingManualMappings, setLoadingManualMappings] = useState(false)
   const [newMappingDialogOpen, setNewMappingDialogOpen] = useState(false)
+
+  // Sync confirmation modal state
+  const [showSyncConfirmModal, setShowSyncConfirmModal] = useState(false)
+  const [syncProgress, setSyncProgress] = useState<{
+    stage: string
+    details: string
+    isLoading: boolean
+    results?: {
+      created?: number
+      updated?: number
+      github_matched?: number
+      slack_synced?: number
+      slack_skipped?: number
+    }
+  } | null>(null)
   const [editingMapping, setEditingMapping] = useState<ManualMapping | null>(null)
   const [newMappingForm, setNewMappingForm] = useState({
     source_platform: 'rootly' as string,
@@ -227,18 +236,14 @@ export default function IntegrationsPage() {
   const [showSlackToken, setShowSlackToken] = useState(false)
   const [isConnectingGithub, setIsConnectingGithub] = useState(false)
   const [isConnectingSlack, setIsConnectingSlack] = useState(false)
-  const [isConnectingJira, setIsConnectingJira] = useState(false)
-  const [jiraWorkspaceSelectorOpen, setJiraWorkspaceSelectorOpen] = useState(false)
-
+  
   // Disconnect confirmation state
   const [githubDisconnectDialogOpen, setGithubDisconnectDialogOpen] = useState(false)
   const [slackDisconnectDialogOpen, setSlackDisconnectDialogOpen] = useState(false)
-  const [jiraDisconnectDialogOpen, setJiraDisconnectDialogOpen] = useState(false)
   const [slackSurveyDisconnectDialogOpen, setSlackSurveyDisconnectDialogOpen] = useState(false)
   const [slackSurveyConfirmDisconnectOpen, setSlackSurveyConfirmDisconnectOpen] = useState(false)
   const [isDisconnectingGithub, setIsDisconnectingGithub] = useState(false)
   const [isDisconnectingSlack, setIsDisconnectingSlack] = useState(false)
-  const [isDisconnectingJira, setIsDisconnectingJira] = useState(false)
   const [isDisconnectingSlackSurvey, setIsDisconnectingSlackSurvey] = useState(false)
   const [isConnectingSlackOAuth, setIsConnectingSlackOAuth] = useState(false)
   const [slackPermissions, setSlackPermissions] = useState<any>(null)
@@ -253,8 +258,189 @@ export default function IntegrationsPage() {
   const [showSyncedUsers, setShowSyncedUsers] = useState(false)
   const [teamMembersDrawerOpen, setTeamMembersDrawerOpen] = useState(false)
 
+  // Cache to track which integrations have already been loaded
+  const syncedUsersCache = useRef<Map<string, any[]>>(new Map())
+  const recipientsCache = useRef<Map<string, Set<number>>>(new Map())
+  const permissionsCache = useRef<{data: any, timestamp: number} | null>(null)
+  const PERMISSIONS_CACHE_TTL = 5 * 60 * 1000 // 5 minutes
+
+  // GitHub username editing state
+  const [editingUserId, setEditingUserId] = useState<number | null>(null)
+  const [editingUsername, setEditingUsername] = useState<string>('')
+  const [githubOrgMembers, setGithubOrgMembers] = useState<string[]>([])
+  const [loadingOrgMembers, setLoadingOrgMembers] = useState(false)
+  const [savingUsername, setSavingUsername] = useState(false)
+
   // Manual survey delivery modal state
   const [showManualSurveyModal, setShowManualSurveyModal] = useState(false)
+
+  // Survey recipient selection state
+  const [selectedRecipients, setSelectedRecipients] = useState<Set<number>>(new Set())
+  const [savedRecipients, setSavedRecipients] = useState<Set<number>>(new Set()) // Track what's saved in DB
+  const [savingRecipients, setSavingRecipients] = useState(false)
+
+  // Check if there are unsaved changes
+  const hasUnsavedChanges = () => {
+    if (selectedRecipients.size !== savedRecipients.size) return true
+    for (const id of Array.from(selectedRecipients)) {
+      if (!savedRecipients.has(id)) return true
+    }
+    return false
+  }
+
+  // GitHub org members handlers
+  const fetchGitHubOrgMembers = async () => {
+    if (!githubIntegration) return
+
+    setLoadingOrgMembers(true)
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) {
+        toast.error('Please log in to load GitHub members')
+        return
+      }
+
+      const response = await fetch(`${API_BASE}/integrations/github/org-members`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`
+        }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setGithubOrgMembers(data.members || [])
+      } else {
+        const error = await response.json()
+        console.error('Failed to load GitHub org members:', error)
+      }
+    } catch (error) {
+      console.error('Error fetching GitHub org members:', error)
+    } finally {
+      setLoadingOrgMembers(false)
+    }
+  }
+
+  const startEditingGitHubUsername = (userId: number, currentUsername: string | null) => {
+    setEditingUserId(userId)
+    setEditingUsername(currentUsername || '')
+  }
+
+  const cancelEditingGitHubUsername = () => {
+    setEditingUserId(null)
+    setEditingUsername('')
+  }
+
+  const saveGitHubUsername = async (userId: number) => {
+    setSavingUsername(true)
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) {
+        toast.error('Please log in to update GitHub username')
+        return
+      }
+
+      // Convert __clear__ sentinel to empty string
+      const usernameToSave = editingUsername === '__clear__' ? '' : editingUsername
+
+      const response = await fetch(
+        `${API_BASE}/rootly/user-correlation/${userId}/github-username?github_username=${encodeURIComponent(usernameToSave)}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${authToken}`
+          }
+        }
+      )
+
+      if (response.ok) {
+        const data = await response.json()
+        if (usernameToSave === '') {
+          toast.success('GitHub username mapping cleared')
+        } else {
+          toast.success(`GitHub username updated to ${usernameToSave}`)
+        }
+
+        // Clear cache and refresh synced users list
+        const selectedOrg = selectedOrganization || integrations.find(i => i.is_default)?.id?.toString()
+        if (selectedOrg) {
+          syncedUsersCache.current.delete(selectedOrg)
+          await fetchSyncedUsers(false, false, true)
+        }
+
+        cancelEditingGitHubUsername()
+      } else {
+        const error = await response.json()
+        toast.error(error.detail || 'Failed to update GitHub username')
+      }
+    } catch (error) {
+      console.error('Error updating GitHub username:', error)
+      toast.error('Failed to update GitHub username')
+    } finally {
+      setSavingUsername(false)
+    }
+  }
+
+  // Survey recipient handlers
+  const saveSurveyRecipients = async () => {
+    if (!selectedOrganization) {
+      toast.error('No organization selected')
+      return
+    }
+
+    setSavingRecipients(true)
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) {
+        toast.error('Please log in to save recipients')
+        return
+      }
+
+      const recipientIds = Array.from(selectedRecipients)
+      const response = await fetch(
+        `${API_BASE}/rootly/integrations/${selectedOrganization}/survey-recipients`,
+        {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${authToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(recipientIds)
+        }
+      )
+
+      if (response.ok) {
+        const data = await response.json()
+        // Update savedRecipients to match what was just saved
+        setSavedRecipients(new Set(selectedRecipients))
+        // Update cache
+        recipientsCache.current.set(selectedOrganization, new Set(selectedRecipients))
+        toast.success(data.message || 'Survey recipients saved successfully')
+      } else {
+        const error = await response.json()
+        toast.error(error.detail || 'Failed to save recipients')
+      }
+    } catch (error) {
+      console.error('Error saving recipients:', error)
+      toast.error('Failed to save recipients')
+    } finally {
+      setSavingRecipients(false)
+    }
+  }
+
+  // Discard changes and revert to saved state
+  const discardRecipientChanges = () => {
+    setSelectedRecipients(new Set(savedRecipients))
+    toast.info('Changes discarded')
+  }
+
+  // Handle drawer close - reset selections if there are unsaved changes
+  const handleDrawerClose = (open: boolean) => {
+    if (!open && hasUnsavedChanges()) {
+      // Reset to saved state when closing with unsaved changes
+      setSelectedRecipients(new Set(savedRecipients))
+    }
+    setTeamMembersDrawerOpen(open)
+  }
 
   // AI Integration state
   const [llmToken, setLlmToken] = useState('')
@@ -320,13 +506,13 @@ export default function IntegrationsPage() {
   useEffect(() => {
     // ✨ PHASE 1 OPTIMIZATION: Re-enabled with API endpoint fixes
     loadAllIntegrationsOptimized()
-    
+
     // 🚨 ROLLBACK: Individual loading functions (fallback disabled)
     // loadRootlyIntegrations()
-    // loadPagerDutyIntegrations() 
+    // loadPagerDutyIntegrations()
     // loadGitHubIntegration()
     // loadSlackIntegration()
-    loadLlmConfig()
+    // loadLlmConfig() // Disabled - AI is always enabled with system token
     
     // Load saved organization preference
     const savedOrg = localStorage.getItem('selected_organization')
@@ -430,14 +616,62 @@ export default function IntegrationsPage() {
     }
   }, [showInviteModal])
 
-  // Handle Slack/Jira OAuth success redirect
+  // Fetch GitHub org members when GitHub is connected
+  useEffect(() => {
+    if (githubIntegration && teamMembersDrawerOpen && showSyncedUsers) {
+      fetchGitHubOrgMembers()
+    }
+  }, [githubIntegration, teamMembersDrawerOpen, showSyncedUsers])
+
+  // Clear drawer data when organization changes to prevent showing stale data
+  useEffect(() => {
+    if (teamMembersDrawerOpen) {
+      // Close drawer when org changes to prevent showing wrong data
+      setTeamMembersDrawerOpen(false)
+      setSyncedUsers([])
+      setShowSyncedUsers(false)
+      setSelectedRecipients(new Set())
+      setSavedRecipients(new Set())
+    }
+  }, [selectedOrganization])
+
+  // Load saved survey recipients when drawer opens (only if no unsaved changes)
+  useEffect(() => {
+    const loadSavedRecipients = async () => {
+      if (!teamMembersDrawerOpen || !selectedOrganization) return
+
+      try {
+        const authToken = localStorage.getItem('auth_token')
+        if (!authToken) return
+
+        const response = await fetch(
+          `${API_BASE}/rootly/integrations/${selectedOrganization}/survey-recipients`,
+          {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+          }
+        )
+
+        if (response.ok) {
+          const data = await response.json()
+          const recipientIds = new Set<number>(data.recipient_ids || [])
+          // Update both current and saved state
+          setSelectedRecipients(recipientIds)
+          setSavedRecipients(recipientIds)
+        }
+      } catch (error) {
+        console.error('Error loading saved recipients:', error)
+      }
+    }
+
+    loadSavedRecipients()
+  }, [teamMembersDrawerOpen, selectedOrganization])
+
+  // Handle Slack OAuth success redirect
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
     const slackConnected = urlParams.get('slack_connected')
     const workspace = urlParams.get('workspace')
     const status = urlParams.get('status')
-    const jiraConnected = urlParams.get('jira_connected')
-    const jiraError = urlParams.get('jira_error')
 
     // Check auth token after OAuth redirect
     const authToken = localStorage.getItem('auth_token')
@@ -592,105 +826,6 @@ export default function IntegrationsPage() {
       const newUrl = window.location.pathname
       window.history.replaceState({}, '', newUrl)
     }
-
-    // Handle Jira OAuth success
-    if (jiraConnected === '1' || jiraConnected === 'true') {
-      // Show loading toast
-      const loadingToastId = toast.loading('Verifying Jira connection...', {
-        description: 'Please wait while we confirm your Jira integration.',
-      })
-
-      // Clean up URL parameters
-      const newUrl = window.location.pathname
-      window.history.replaceState({}, '', newUrl)
-
-      // Poll for connection status with retries
-      let retries = 0
-      const maxRetries = 15
-      const pollInterval = 500
-
-      const checkJiraConnection = async () => {
-        try {
-          retries++
-
-          // Check if Jira is now connected
-          const authToken = localStorage.getItem('auth_token')
-          if (!authToken) return
-
-          const response = await fetch(`${API_BASE}/integrations/jira/status`, {
-            headers: { 'Authorization': `Bearer ${authToken}` }
-          })
-
-          if (response.ok) {
-            const data = await response.json()
-            if (data.connected) {
-              // Update Jira integration state
-              setJiraIntegration(data.integration)
-              // Update cache
-              localStorage.setItem('jira_integration', JSON.stringify(data))
-              localStorage.setItem('all_integrations_timestamp', Date.now().toString())
-
-              toast.dismiss(loadingToastId)
-
-              // Check if user has multiple workspaces
-              const hasMultipleWorkspaces = await JiraHandlers.checkMultipleWorkspaces()
-
-              if (hasMultipleWorkspaces) {
-                // Show workspace selector
-                toast.success(`🎉 Jira integration connected!`, {
-                  description: `Select your preferred workspace to continue.`,
-                  duration: 3000,
-                })
-                setJiraWorkspaceSelectorOpen(true)
-              } else {
-                // Single workspace, show normal success message
-                toast.success(`🎉 Jira integration connected!`, {
-                  description: `Successfully connected to ${data.integration.jira_site_url || 'your Jira workspace'}.`,
-                  duration: 5000,
-                })
-              }
-              return
-            }
-          }
-
-          // Not connected yet, retry if we haven't exceeded max retries
-          if (retries < maxRetries) {
-            setTimeout(checkJiraConnection, pollInterval)
-          } else {
-            // Max retries reached, show warning
-            toast.dismiss(loadingToastId)
-            toast.warning('Connection verification timed out', {
-              description: 'Your Jira integration was added, but verification took longer than expected. Try refreshing the page.',
-              duration: 8000,
-            })
-          }
-        } catch (error) {
-          if (retries < maxRetries) {
-            setTimeout(checkJiraConnection, pollInterval)
-          } else {
-            toast.dismiss(loadingToastId)
-            toast.error('Failed to verify connection', {
-              description: 'Please refresh the page to check your Jira connection status.',
-            })
-          }
-        }
-      }
-
-      // Start checking immediately
-      checkJiraConnection()
-    } else if (jiraError) {
-      // Show error toast
-      const errorMessage = decodeURIComponent(jiraError)
-
-      toast.error('Failed to connect Jira', {
-        description: errorMessage,
-        duration: 8000,
-      })
-
-      // Clean up URL parameters
-      const newUrl = window.location.pathname
-      window.history.replaceState({}, '', newUrl)
-    }
   }, [])
 
   // Load each provider independently for better UX
@@ -710,12 +845,9 @@ export default function IntegrationsPage() {
     return SlackHandlers.loadSlackIntegration(forceRefresh, setSlackIntegration, setLoadingSlack)
   }
 
-  const loadJiraIntegration = async (forceRefresh = false) => {
-    return JiraHandlers.loadJiraIntegration(forceRefresh, setJiraIntegration, setLoadingJira)
-  }
-
   // ✨ PHASE 1 OPTIMIZATION: Instant cache loading with background refresh
   const [refreshingInBackground, setRefreshingInBackground] = useState(false)
+  const isLoadingRef = useRef(false)
   
   // Synchronous cache reading for instant display
   const loadFromCacheSync = () => {
@@ -723,30 +855,24 @@ export default function IntegrationsPage() {
       const cachedIntegrations = localStorage.getItem('all_integrations')
       const cachedGithub = localStorage.getItem('github_integration')
       const cachedSlack = localStorage.getItem('slack_integration')
-      const cachedJira = localStorage.getItem('jira_integration')
-
-
+      
+      
       if (cachedIntegrations) {
         const parsedIntegrations = JSON.parse(cachedIntegrations)
         setIntegrations(parsedIntegrations)
       }
-
+      
       if (cachedGithub) {
         const githubData = JSON.parse(cachedGithub)
         setGithubIntegration(githubData.connected ? githubData.integration : null)
       }
-
+      
       if (cachedSlack) {
         const slackData = JSON.parse(cachedSlack)
         setSlackIntegration(slackData.integration)
       }
-
-      if (cachedJira) {
-        const jiraData = JSON.parse(cachedJira)
-        setJiraIntegration(jiraData.connected ? jiraData.integration : null)
-      }
-
-      const hasAllCache = !!(cachedIntegrations && cachedGithub && cachedSlack && cachedJira)
+      
+      const hasAllCache = !!(cachedIntegrations && cachedGithub && cachedSlack)
       return hasAllCache
     } catch (error) {
       return false
@@ -759,7 +885,11 @@ export default function IntegrationsPage() {
     try {
       await loadAllIntegrationsAPIBackground()
     } catch (error) {
-      console.error('Background refresh failed:', error)
+      // Silently fail for background refreshes - don't spam console
+      // User still has cached data, so this is non-critical
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('Background refresh failed (non-critical):', error)
+      }
     } finally {
       setRefreshingInBackground(false)
     }
@@ -792,6 +922,34 @@ export default function IntegrationsPage() {
     )
   }
 
+  // Refresh permissions for a specific integration
+  const refreshIntegrationPermissions = async (integrationId: number) => {
+    setRefreshingPermissions(integrationId)
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) return
+
+      const response = await fetch(`${API_BASE}/rootly/integrations/${integrationId}/refresh-permissions`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        // Update the integration in the list with new permissions
+        setIntegrations(prev => prev.map(int =>
+          int.id === integrationId
+            ? { ...int, permissions: data.permissions }
+            : int
+        ))
+      }
+    } catch (error) {
+      // Silently handle permission refresh errors
+    } finally {
+      setRefreshingPermissions(null)
+    }
+  }
+
   // Background API loading - does NOT change loading states (for silent refresh)
   const loadAllIntegrationsAPIBackground = async () => {
     try {
@@ -800,7 +958,7 @@ export default function IntegrationsPage() {
         return
       }
 
-      const [rootlyResponse, pagerdutyResponse, githubResponse, slackResponse, jiraResponse] = await Promise.all([
+      const [rootlyResponse, pagerdutyResponse, githubResponse, slackResponse] = await Promise.all([
         fetch(`${API_BASE}/rootly/integrations`, {
           headers: { 'Authorization': `Bearer ${authToken}` }
         }),
@@ -812,39 +970,42 @@ export default function IntegrationsPage() {
         }),
         fetch(`${API_BASE}/integrations/slack/status`, {
           headers: { 'Authorization': `Bearer ${authToken}` }
-        }),
-        fetch(`${API_BASE}/integrations/jira/status`, {
-          headers: { 'Authorization': `Bearer ${authToken}` }
         })
       ])
 
-      const [rootlyData, pagerdutyData, githubData, slackData, jiraData] = await Promise.all([
+      const [rootlyData, pagerdutyData, githubData, slackData] = await Promise.all([
         rootlyResponse.ok ? rootlyResponse.json() : { integrations: [] },
         pagerdutyResponse.ok ? pagerdutyResponse.json() : { integrations: [] },
         githubResponse.ok ? githubResponse.json() : { connected: false, integration: null },
-        slackResponse.ok ? slackResponse.json() : { integration: null },
-        jiraResponse.ok ? jiraResponse.json() : { connected: false, integration: null }
+        slackResponse.ok ? slackResponse.json() : { integration: null }
       ])
 
       // Update state silently
-      const allIntegrations = [
-        ...rootlyData.integrations.map((i: any) => ({ ...i, platform: 'rootly' })),
-        ...pagerdutyData.integrations.map((i: any) => ({ ...i, platform: 'pagerduty' }))
-      ]
+      const rootlyIntegrations = (rootlyData.integrations || []).map((i: any) => ({ ...i, platform: 'rootly' }))
+      const pagerdutyIntegrations = (pagerdutyData.integrations || []).map((i: any) => ({ ...i, platform: 'pagerduty' }))
+      const allIntegrations = [...rootlyIntegrations, ...pagerdutyIntegrations]
 
-      setIntegrations(allIntegrations)
-      setGithubIntegration(githubData.connected ? githubData.integration : null)
-      setSlackIntegration(slackData.integration)
-      setJiraIntegration(jiraData.connected ? jiraData.integration : null)
+      // Only skip update if requests failed - otherwise update even if empty (which is valid)
+      if (!rootlyResponse.ok && !pagerdutyResponse.ok) {
+        // Both requests failed, keep existing data
+      } else {
+        setIntegrations(allIntegrations)
+        setGithubIntegration(githubData.connected ? githubData.integration : null)
+        setSlackIntegration(slackData.integration)
 
-      // Update cache with fresh data
-      localStorage.setItem('all_integrations', JSON.stringify(allIntegrations))
-      localStorage.setItem('all_integrations_timestamp', Date.now().toString())
-      localStorage.setItem('github_integration', JSON.stringify(githubData))
-      localStorage.setItem('slack_integration', JSON.stringify(slackData))
-      localStorage.setItem('jira_integration', JSON.stringify(jiraData))
+        // Update cache with fresh data
+        localStorage.setItem('all_integrations', JSON.stringify(allIntegrations))
+        localStorage.setItem('all_integrations_timestamp', Date.now().toString())
+        localStorage.setItem('github_integration', JSON.stringify(githubData))
+        localStorage.setItem('slack_integration', JSON.stringify(slackData))
+      }
 
     } catch (error) {
+      // Silently fail - already caught in refreshInBackground
+      // Only log if unexpected error type
+      if (!(error instanceof TypeError && error.message.includes('fetch'))) {
+        console.error('Background refresh error:', error)
+      }
     }
   }
   
@@ -864,7 +1025,6 @@ export default function IntegrationsPage() {
         setLoadingPagerDuty(false)
         setLoadingGitHub(false)
         setLoadingSlack(false)
-        setLoadingJira(false)
         
         // Step 3: Check if cache is stale and refresh in background if needed
         const cacheIsStale = isCacheStale()
@@ -884,66 +1044,100 @@ export default function IntegrationsPage() {
       setLoadingPagerDuty(false)
       setLoadingGitHub(false)
       setLoadingSlack(false)
-      setLoadingJira(false)
     }
   }
   
   // Original API loading logic (extracted for reuse)
   const loadAllIntegrationsAPI = async () => {
+    // Prevent concurrent calls using a ref (not state, since state starts as true)
+    if (isLoadingRef.current) {
+      return
+    }
+
+    isLoadingRef.current = true
+
     // Set individual loading states to true
     setLoadingRootly(true)
     setLoadingPagerDuty(true)
     setLoadingGitHub(true)
     setLoadingSlack(true)
-    setLoadingJira(true)
     try {
       const authToken = localStorage.getItem('auth_token')
       if (!authToken) {
+        isLoadingRef.current = false
         router.push('/auth/success')
         return
       }
 
-      const [rootlyResponse, pagerdutyResponse, githubResponse, slackResponse, jiraResponse] = await Promise.all([
-        fetch(`${API_BASE}/rootly/integrations`, {
+      // Add 15 second timeout to prevent hanging (increased for parallel permission checks)
+      const fetchWithTimeout = (url: string, options: any, timeout = 15000) => {
+        return Promise.race([
+          fetch(url, options),
+          new Promise<Response>((_, reject) =>
+            setTimeout(() => reject(new Error('Request timeout')), timeout)
+          )
+        ])
+      }
+
+      const [rootlyResponse, pagerdutyResponse, githubResponse, slackResponse] = await Promise.all([
+        fetchWithTimeout(`${API_BASE}/rootly/integrations`, {
           headers: { 'Authorization': `Bearer ${authToken}` }
+        }).catch((error) => {
+          console.error('Rootly API request failed:', error.message)
+          return { ok: false, error: error.message }
         }),
-        fetch(`${API_BASE}/pagerduty/integrations`, {
+        fetchWithTimeout(`${API_BASE}/pagerduty/integrations`, {
           headers: { 'Authorization': `Bearer ${authToken}` }
+        }).catch((error) => {
+          console.error('PagerDuty API request failed:', error.message)
+          return { ok: false, error: error.message }
         }),
-        fetch(`${API_BASE}/integrations/github/status`, {
+        fetchWithTimeout(`${API_BASE}/integrations/github/status`, {
           headers: { 'Authorization': `Bearer ${authToken}` }
-        }).catch(() => ({ ok: false })),
-        fetch(`${API_BASE}/integrations/slack/status`, {
+        }).catch(() => {
+          return { ok: false }
+        }),
+        fetchWithTimeout(`${API_BASE}/integrations/slack/status`, {
           headers: { 'Authorization': `Bearer ${authToken}` }
-        }).catch(() => ({ ok: false })),
-        fetch(`${API_BASE}/integrations/jira/status`, {
-          headers: { 'Authorization': `Bearer ${authToken}` }
-        }).catch(() => ({ ok: false }))
+        }).catch(() => {
+          return { ok: false }
+        })
       ])
 
-      const rootlyData = rootlyResponse.ok ? await rootlyResponse.json() : { integrations: [] }
-      const pagerdutyData = pagerdutyResponse.ok ? await pagerdutyResponse.json() : { integrations: [] }
-      const githubData = (githubResponse as Response).ok ? await (githubResponse as Response).json() : { connected: false, integration: null }
-      const slackData = (slackResponse as Response).ok ? await (slackResponse as Response).json() : { integration: null }
-      const jiraData = (jiraResponse as Response).ok ? await (jiraResponse as Response).json() : { connected: false, integration: null }
+      const rootlyData = (rootlyResponse as any).ok && (rootlyResponse as Response).json ? await (rootlyResponse as Response).json() : { integrations: [] }
+      const pagerdutyData = (pagerdutyResponse as any).ok && (pagerdutyResponse as Response).json ? await (pagerdutyResponse as Response).json() : { integrations: [] }
+      const githubData = (githubResponse as any).ok && (githubResponse as Response).json ? await (githubResponse as Response).json() : { connected: false, integration: null }
+      const slackData = (slackResponse as any).ok && (slackResponse as Response).json ? await (slackResponse as Response).json() : { integration: null }
 
-      const rootlyIntegrations = rootlyData.integrations.map((i: Integration) => ({ ...i, platform: 'rootly' }))
-      const pagerdutyIntegrations = pagerdutyData.integrations || []
+      const rootlyIntegrations = (rootlyData.integrations || []).map((i: Integration) => ({ ...i, platform: 'rootly' }))
+      const pagerdutyIntegrations = (pagerdutyData.integrations || []).map((i: Integration) => ({ ...i, platform: 'pagerduty' }))
 
       const allIntegrations = [...rootlyIntegrations, ...pagerdutyIntegrations]
+
+      // Don't overwrite existing good data with empty responses from failed requests
+      // Only update if we got successful responses OR if we currently have no data
+      const shouldUpdate = (rootlyResponse as any).ok || (pagerdutyResponse as any).ok || integrations.length === 0
+
+      if (!shouldUpdate) {
+        isLoadingRef.current = false
+        setLoadingRootly(false)
+        setLoadingPagerDuty(false)
+        setLoadingGitHub(false)
+        setLoadingSlack(false)
+        return
+      }
+
       setIntegrations(allIntegrations)
       setGithubIntegration(githubData.connected ? githubData.integration : null)
       setSlackIntegration(slackData.integration)
-      setJiraIntegration(jiraData.connected ? jiraData.integration : null)
-
+      
       // Cache the integrations (same as dashboard caching)
       localStorage.setItem('all_integrations', JSON.stringify(allIntegrations))
       localStorage.setItem('all_integrations_timestamp', Date.now().toString())
-
-      // Cache GitHub, Slack, and Jira integration status separately
+      
+      // Cache GitHub and Slack integration status separately
       localStorage.setItem('github_integration', JSON.stringify(githubData))
       localStorage.setItem('slack_integration', JSON.stringify(slackData))
-      localStorage.setItem('jira_integration', JSON.stringify(jiraData))
       
       // Update back URL based on integration status
       if (backUrl === '') {
@@ -962,7 +1156,7 @@ export default function IntegrationsPage() {
       setLoadingPagerDuty(false)
       setLoadingGitHub(false)
       setLoadingSlack(false)
-      setLoadingJira(false)
+      isLoadingRef.current = false
     }
   }
 
@@ -1028,7 +1222,9 @@ export default function IntegrationsPage() {
       setIsDeleting,
       setIntegrations,
       setDeleteDialogOpen,
-      setIntegrationToDelete
+      setIntegrationToDelete,
+      syncedUsersCache.current,
+      recipientsCache.current
     )
   }
 
@@ -1095,29 +1291,25 @@ export default function IntegrationsPage() {
     return SlackHandlers.handleSlackTest(setSlackPermissions, setSlackIntegration)
   }
 
-  const loadSlackPermissions = async () => {
-    return SlackHandlers.loadSlackPermissions(slackIntegration, setIsLoadingPermissions, setSlackPermissions)
-  }
+  const loadSlackPermissions = async (forceRefresh: boolean = false) => {
+    // Check cache first (5 minute TTL)
+    if (!forceRefresh && permissionsCache.current) {
+      const age = Date.now() - permissionsCache.current.timestamp
+      if (age < PERMISSIONS_CACHE_TTL) {
+        setSlackPermissions(permissionsCache.current.data)
+        return
+      }
+    }
 
-  // Jira integration handlers
-  const handleJiraConnect = async () => {
-    return JiraHandlers.handleJiraConnect(
-      setIsConnectingJira,
-      setActiveEnhancementTab,
-      loadJiraIntegration
-    )
-  }
-
-  const handleJiraDisconnect = async () => {
-    return JiraHandlers.handleJiraDisconnect(
-      setIsDisconnectingJira,
-      setJiraIntegration,
-      setActiveEnhancementTab
-    )
-  }
-
-  const handleJiraTest = async () => {
-    return JiraHandlers.handleJiraTest(toast)
+    // Fetch fresh permissions
+    await SlackHandlers.loadSlackPermissions(slackIntegration, setIsLoadingPermissions, (permissions) => {
+      setSlackPermissions(permissions)
+      // Update cache
+      permissionsCache.current = {
+        data: permissions,
+        timestamp: Date.now()
+      }
+    })
   }
 
   // Mapping data handlers
@@ -1141,34 +1333,42 @@ export default function IntegrationsPage() {
   }
 
   // Fetch team members from selected organization
-  const fetchTeamMembers = async () => {
+  const fetchTeamMembers = async (suppressToast?: boolean) => {
     return TeamHandlers.fetchTeamMembers(
       selectedOrganization,
       setLoadingTeamMembers,
       setTeamMembersError,
       setTeamMembers,
-      setTeamMembersDrawerOpen
+      setTeamMembersDrawerOpen,
+      suppressToast
     )
   }
 
   // Sync users to UserCorrelation table
-  const syncUsersToCorrelation = async () => {
+  const syncUsersToCorrelation = async (suppressToast?: boolean) => {
+    // Clear cache for this integration before syncing
+    if (selectedOrganization) {
+      syncedUsersCache.current.delete(selectedOrganization)
+    }
+
     return TeamHandlers.syncUsersToCorrelation(
       selectedOrganization,
       setLoadingTeamMembers,
       setTeamMembersError,
-      fetchTeamMembers,
-      fetchSyncedUsers
+      () => fetchTeamMembers(suppressToast),
+      () => fetchSyncedUsers(true, true, true), // Force refresh after sync
+      undefined,
+      suppressToast
     )
   }
 
   // Sync Slack user IDs to UserCorrelation records
-  const syncSlackUserIds = async () => {
-    return TeamHandlers.syncSlackUserIds(setLoadingTeamMembers, fetchSyncedUsers)
+  const syncSlackUserIds = async (suppressToast?: boolean) => {
+    return TeamHandlers.syncSlackUserIds(setLoadingTeamMembers, fetchSyncedUsers, suppressToast)
   }
 
   // Fetch synced users from database
-  const fetchSyncedUsers = async (showToast = true, autoSync = true) => {
+  const fetchSyncedUsers = async (showToast = true, autoSync = true, forceRefresh = false) => {
     return TeamHandlers.fetchSyncedUsers(
       selectedOrganization,
       setLoadingSyncedUsers,
@@ -1177,7 +1377,12 @@ export default function IntegrationsPage() {
       setTeamMembersDrawerOpen,
       syncUsersToCorrelation,
       showToast,
-      autoSync
+      autoSync,
+      setSelectedRecipients,
+      setSavedRecipients,
+      syncedUsersCache.current,
+      forceRefresh,
+      recipientsCache.current
     )
   }
 
@@ -1645,13 +1850,7 @@ export default function IntegrationsPage() {
             )}
 
             {/* Existing Integrations */}
-            {(activeTab === null && !selectedOrganization && integrations.length === 0) ? (
-              <div className="text-center py-12">
-                <Shield className="w-12 h-12 mx-auto text-slate-300 mb-4" />
-                <p className="text-lg font-medium mb-2 text-slate-700">Choose a platform to get started</p>
-                <p className="text-sm text-slate-500">Select Rootly or PagerDuty above to view and manage your integrations</p>
-              </div>
-            ) : (loadingRootly || loadingPagerDuty) ? (
+            {(loadingRootly || loadingPagerDuty) ? (
               <Card className="max-w-2xl mx-auto">
                 <CardContent className="p-6 space-y-4">
                 {/* Skeleton loading cards */}
@@ -1815,36 +2014,59 @@ export default function IntegrationsPage() {
                           {/* Permissions for Rootly and PagerDuty */}
                           {integration.permissions && (
                             <>
-                              <div className="mt-3 flex items-center space-x-4 text-sm">
-                                <span className="text-gray-500">Read permissions:</span>
-                                <div className="flex items-center space-x-1">
-                                  {integration.permissions.users.access ? (
-                                    <Tooltip content="✓ User read permissions: Required to run burnout analysis and identify team members">
-                                      <CheckCircle className="w-4 h-4 text-green-500 cursor-help" />
-                                    </Tooltip>
+                              <div className="mt-3 flex items-center justify-between text-sm">
+                                <div className="flex items-center space-x-4">
+                                  <span className="text-gray-500">Read permissions:</span>
+                                  {/* Show loader when permissions are being checked */}
+                                  {(integration.permissions.users.access === null && integration.permissions.incidents.access === null) || refreshingPermissions === integration.id ? (
+                                    <div className="flex items-center space-x-2">
+                                      <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+                                      <span className="text-gray-500">Checking permissions...</span>
+                                    </div>
                                   ) : (
-                                    <Tooltip content={`✗ User read permissions required: ${integration.permissions.users.error || "Permission denied"}. Both User and Incident read permissions are required to run burnout analysis.`}>
-                                      <AlertCircle className="w-4 h-4 text-red-500 cursor-help" />
-                                    </Tooltip>
+                                    <>
+                                      <div className="flex items-center space-x-1">
+                                        {integration.permissions.users.access ? (
+                                          <Tooltip content="✓ User read permissions: Required to run burnout analysis and identify team members">
+                                            <CheckCircle className="w-4 h-4 text-green-500 cursor-help" />
+                                          </Tooltip>
+                                        ) : (
+                                          <Tooltip content={`✗ User read permissions required: ${integration.permissions.users.error || "Permission denied"}. Both User and Incident read permissions are required to run burnout analysis.`}>
+                                            <AlertCircle className="w-4 h-4 text-red-500 cursor-help" />
+                                          </Tooltip>
+                                        )}
+                                        <span>Users</span>
+                                      </div>
+                                      <div className="flex items-center space-x-1">
+                                        {integration.permissions.incidents.access ? (
+                                          <Tooltip content="✓ Incident read permissions: Required to run burnout analysis and analyze incident response patterns">
+                                            <CheckCircle className="w-4 h-4 text-green-500 cursor-help" />
+                                          </Tooltip>
+                                        ) : (
+                                          <Tooltip content={`✗ Incident read permissions required: ${integration.permissions.incidents.error || "Permission denied"}. Both User and Incident read permissions are required to run burnout analysis.`}>
+                                            <AlertCircle className="w-4 h-4 text-red-500 cursor-help" />
+                                          </Tooltip>
+                                        )}
+                                        <span>Incidents</span>
+                                      </div>
+                                    </>
                                   )}
-                                  <span>Users</span>
                                 </div>
-                                <div className="flex items-center space-x-1">
-                                  {integration.permissions.incidents.access ? (
-                                    <Tooltip content="✓ Incident read permissions: Required to run burnout analysis and analyze incident response patterns">
-                                      <CheckCircle className="w-4 h-4 text-green-500 cursor-help" />
-                                    </Tooltip>
-                                  ) : (
-                                    <Tooltip content={`✗ Incident read permissions required: ${integration.permissions.incidents.error || "Permission denied"}. Both User and Incident read permissions are required to run burnout analysis.`}>
-                                      <AlertCircle className="w-4 h-4 text-red-500 cursor-help" />
-                                    </Tooltip>
-                                  )}
-                                  <span>Incidents</span>
-                                </div>
+                                {/* Refresh button */}
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => refreshIntegrationPermissions(integration.id)}
+                                  disabled={refreshingPermissions === integration.id}
+                                  className="h-7 px-2 text-gray-500 hover:text-gray-700"
+                                >
+                                  <RefreshCw className={`w-3 h-3 ${refreshingPermissions === integration.id ? 'animate-spin' : ''}`} />
+                                </Button>
                               </div>
-                              
+
                               {/* Error message for insufficient permissions */}
-                              {(!integration.permissions.users.access || !integration.permissions.incidents.access) && (
+                              {integration.permissions.users.access !== null && integration.permissions.incidents.access !== null &&
+                               (!integration.permissions.users.access || !integration.permissions.incidents.access) && (
                                 <div className="mt-3">
                                   <Alert className="border-red-200 bg-red-50">
                                     <AlertCircle className="h-4 w-4 text-red-600" />
@@ -1920,6 +2142,78 @@ export default function IntegrationsPage() {
                 </CardContent>
               </Card>
             ) : null}
+        </div>
+
+        {/* Team Management Section */}
+        <div className="mt-16 space-y-8">
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-slate-900 mb-3">Team Management</h2>
+            <p className="text-lg text-slate-600 mb-2">
+              Sync and manage your team members for burnout analysis
+            </p>
+            <p className="text-slate-500">
+              View synced users, manage enhanced integration mappings, and select survey recipients
+            </p>
+          </div>
+
+          {/* Team Members Card */}
+          <div className="max-w-2xl mx-auto">
+            <Card className={`border-2 ${selectedOrganization ? 'border-purple-200 bg-purple-50' : 'border-gray-200 bg-gray-50'}`}>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${selectedOrganization ? 'bg-purple-600' : 'bg-gray-300'}`}>
+                      <Users className={`w-6 h-6 ${selectedOrganization ? 'text-white' : 'text-gray-500'}`} />
+                    </div>
+                    <div>
+                      <h3 className={`text-lg font-semibold ${selectedOrganization ? 'text-slate-900' : 'text-gray-900'}`}>
+                        Team Members
+                      </h3>
+                      <p className={`text-sm ${selectedOrganization ? 'text-slate-600' : 'text-gray-600'}`}>
+                        {selectedOrganization ? (
+                          <>View and manage synced team members {syncedUsers.length > 0 && `(${syncedUsers.length} synced)`}</>
+                        ) : (
+                          'Select an organization above to view team members'
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    onClick={() => {
+                      // Open drawer immediately for better UX
+                      setTeamMembersDrawerOpen(true)
+
+                      // If we have cached data, show it immediately
+                      if (selectedOrganization && syncedUsersCache.current.has(selectedOrganization)) {
+                        const cachedUsers = syncedUsersCache.current.get(selectedOrganization)!
+                        setSyncedUsers(cachedUsers)
+                        setShowSyncedUsers(true)
+
+                        // Also restore cached recipient selections (validate IDs still exist)
+                        if (recipientsCache.current.has(selectedOrganization)) {
+                          const cachedRecipients = recipientsCache.current.get(selectedOrganization)!
+                          const validUserIds = new Set(cachedUsers.map(u => u.id))
+                          const validCachedRecipients = new Set(
+                            Array.from(cachedRecipients).filter(id => validUserIds.has(id))
+                          )
+                          setSelectedRecipients(validCachedRecipients)
+                          setSavedRecipients(validCachedRecipients)
+                        }
+                      } else {
+                        // Otherwise fetch from API
+                        fetchSyncedUsers(false, false)
+                      }
+                    }}
+                    disabled={!selectedOrganization}
+                    className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                  >
+                    <Users className="w-4 h-4 mr-2" />
+                    View Members
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
 
         {/* Enhanced Integrations Section */}
@@ -2027,54 +2321,6 @@ export default function IntegrationsPage() {
                   </div>
                 </Card>
             )}
-
-            {/* Jira Card */}
-            {loadingJira ? (
-              <Card className="border-2 border-gray-200 p-8 flex items-center justify-center relative h-32 animate-pulse">
-                <div className="absolute top-4 right-4 w-16 h-5 bg-gray-300 rounded"></div>
-                <div className="flex items-center space-x-2">
-                  <div className="w-10 h-10 bg-gray-300 rounded"></div>
-                  <div className="h-8 w-20 bg-gray-300 rounded"></div>
-                </div>
-              </Card>
-            ) : (
-              <Card
-                className={`border-2 transition-all cursor-pointer hover:shadow-lg ${
-                  activeEnhancementTab === 'jira'
-                    ? 'border-blue-500 shadow-lg bg-blue-50'
-                    : 'border-gray-200 hover:border-blue-300'
-                } p-8 flex items-center justify-center relative h-32`}
-                onClick={() => {
-                  setActiveEnhancementTab(activeEnhancementTab === 'jira' ? null : 'jira')
-                }}
-              >
-                {jiraIntegration ? (
-                  <div className="absolute top-4 right-4">
-                    <Badge variant="secondary" className="bg-green-100 text-green-700">
-                      <CheckCircle className="w-3 h-3 mr-1" />
-                      Connected
-                    </Badge>
-                  </div>
-                ) : null}
-                {activeEnhancementTab === 'jira' && (
-                  <div className="absolute top-4 left-4">
-                    <CheckCircle className="w-6 h-6 text-blue-600" />
-                  </div>
-                )}
-                <div className="flex items-center space-x-2">
-                  <div className="w-10 h-10 rounded flex items-center justify-center bg-blue-600">
-                    <svg
-                      viewBox="0 0 24 24"
-                      className="w-6 h-6 text-white"
-                      fill="currentColor"
-                    >
-                      <path d="M11.571 11.513H0a5.218 5.218 0 0 0 5.232 5.215h2.13v2.057A5.215 5.215 0 0 0 12.575 24V12.518a1.005 1.005 0 0 0-1.005-1.005zm5.723-5.756H5.736a5.215 5.215 0 0 0 5.215 5.214h2.129v2.058a5.218 5.218 0 0 0 5.215 5.232V6.758a1.001 1.001 0 0 0-1.001-1.001zM23.013 0H11.455a5.215 5.215 0 0 0 5.215 5.215h2.129v2.057A5.215 5.215 0 0 0 24 12.483V1.005A1.001 1.001 0 0 0 23.013 0Z"/>
-                    </svg>
-                  </div>
-                  <span className="text-2xl font-bold text-slate-900">Jira</span>
-                </div>
-              </Card>
-            )}
           </div>
 
           {/* Integration Forms */}
@@ -2120,25 +2366,6 @@ export default function IntegrationsPage() {
                 onViewMappings={() => openMappingDrawer('github')}
                 loadingMappings={loadingMappingData}
                 selectedMappingPlatform={selectedMappingPlatform}
-              />
-            )}
-
-            {/* Jira Integration Card - Not Connected */}
-            {activeEnhancementTab === 'jira' && !jiraIntegration && (
-              <JiraIntegrationCard
-                onConnect={handleJiraConnect}
-                isConnecting={isConnectingJira}
-              />
-            )}
-
-            {/* Jira Connected Card */}
-            {activeEnhancementTab === 'jira' && jiraIntegration && (
-              <JiraConnectedCard
-                integration={jiraIntegration}
-                onDisconnect={() => setJiraDisconnectDialogOpen(true)}
-                onTest={handleJiraTest}
-                onSwitchWorkspace={() => setJiraWorkspaceSelectorOpen(true)}
-                isLoading={isDisconnectingJira}
               />
             )}
 
@@ -2985,27 +3212,6 @@ export default function IntegrationsPage() {
         onConfirmDisconnect={handleSlackDisconnect}
       />
 
-      {/* Jira Disconnect Confirmation Dialog */}
-      <JiraDisconnectDialog
-        open={jiraDisconnectDialogOpen}
-        onOpenChange={setJiraDisconnectDialogOpen}
-        isDisconnecting={isDisconnectingJira}
-        onConfirmDisconnect={async () => {
-          await handleJiraDisconnect()
-          setJiraDisconnectDialogOpen(false)
-        }}
-      />
-
-      {/* Jira Workspace Selector Dialog */}
-      <JiraWorkspaceSelector
-        open={jiraWorkspaceSelectorOpen}
-        onClose={() => setJiraWorkspaceSelectorOpen(false)}
-        onWorkspaceSelected={async () => {
-          // Reload Jira integration after workspace selection
-          await loadJiraIntegration(true)
-        }}
-      />
-
       {/* Slack Survey Workspace Info & Disconnect Dialog */}
       <Dialog open={slackSurveyDisconnectDialogOpen} onOpenChange={setSlackSurveyDisconnectDialogOpen}>
         <DialogContent className="sm:max-w-md">
@@ -3231,90 +3437,329 @@ export default function IntegrationsPage() {
       </div>
 
       {/* Team Members Drawer */}
-      <Sheet open={teamMembersDrawerOpen} onOpenChange={setTeamMembersDrawerOpen}>
-        <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
+      <Sheet open={teamMembersDrawerOpen} onOpenChange={handleDrawerClose}>
+        <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto flex flex-col">
           <SheetHeader>
-            <SheetTitle>Team Members</SheetTitle>
-            <SheetDescription>
-              Users from {integrations.find(i => i.id.toString() === selectedOrganization)?.name || 'your organization'} who can submit burnout surveys
-            </SheetDescription>
+            <div className="flex items-start justify-between pr-10 gap-4">
+              <div>
+                <SheetTitle>Team Members</SheetTitle>
+                <SheetDescription>
+                  Sync will match {integrations.find(i => i.id.toString() === selectedOrganization)?.name || 'organization'} users with GitHub and Slack accounts
+                  {syncedUsers.length > 0 && ` • ${syncedUsers.length} synced`}
+                </SheetDescription>
+              </div>
+              <div className="flex items-center gap-3 flex-shrink-0">
+                <Button
+                  onClick={() => setShowSyncConfirmModal(true)}
+                  disabled={loadingTeamMembers}
+                  className="bg-purple-600 hover:bg-purple-700 text-white"
+                  size="default"
+                >
+                  {loadingTeamMembers ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Syncing...
+                    </>
+                  ) : (
+                    <>
+                      <Users className="w-4 h-4 mr-2" />
+                      Sync Members
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
           </SheetHeader>
 
           <div className="mt-6 space-y-4">
             {/* Show synced users only */}
-            {syncedUsers.length > 0 ? (
+            {loadingSyncedUsers ? (
+              <div className="flex flex-col items-center justify-center py-12 space-y-4">
+                <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
+                <p className="text-sm text-gray-600">Loading team members...</p>
+              </div>
+            ) : syncedUsers.length > 0 ? (
               <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-gray-900">
-                    Team Members ({syncedUsers.length})
-                  </h3>
-                  <div className="flex items-center gap-2">
-                    {slackIntegration?.workspace_id && (
-                      <Button
-                        onClick={syncSlackUserIds}
-                        disabled={loadingTeamMembers}
-                        size="sm"
-                        variant="outline"
-                        className="flex items-center space-x-2 border-green-300 text-green-700 hover:bg-green-50"
-                      >
-                        {loadingTeamMembers ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            <span>Syncing...</span>
-                          </>
-                        ) : (
-                          <>
-                            <MessageSquare className="w-4 h-4" />
-                            <span>Sync Slack IDs</span>
-                          </>
-                        )}
-                      </Button>
-                    )}
-                    <Badge className="text-xs bg-green-100 text-green-700 border-green-300">
-                      Can Submit Surveys
-                    </Badge>
-                  </div>
-                </div>
-                <p className="text-xs text-gray-600 mb-3">
-                  These users can submit burnout surveys via Slack /burnout-survey command
-                </p>
-                <div className="space-y-2 max-h-[600px] overflow-y-auto">
-                  {syncedUsers.map((user: any) => (
-                    <div
-                      key={user.id}
-                      className="bg-white border border-gray-200 rounded-lg p-3 hover:border-purple-300 transition-colors"
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center space-x-3">
-                          <Avatar className="h-10 w-10">
-                            <AvatarFallback className="bg-purple-100 text-purple-700 text-sm font-medium">
-                              {user.name?.substring(0, 2).toUpperCase() || user.email?.substring(0, 2).toUpperCase() || '??'}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <div className="text-sm font-medium text-gray-900">
-                              {user.name || 'Unknown'}
-                            </div>
-                            <div className="text-xs text-gray-600">
-                              {user.email}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-1">
-                          {user.platforms?.map((platform: string) => (
-                            <Badge key={platform} variant="secondary" className="text-xs">
-                              {platform}
-                            </Badge>
-                          ))}
+                {slackIntegration?.survey_enabled === true ? (
+                  <>
+                    <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs text-blue-900 font-medium">
+                          ✓ Check users to send them automated burnout survey invitations via Slack
+                        </p>
+                        <div className="text-xs font-semibold text-blue-900 bg-blue-100 px-2 py-1 rounded">
+                          {selectedRecipients.size || 0} / {syncedUsers.length} will receive surveys
                         </div>
                       </div>
-                      {user.github_username && (
-                        <div className="pl-13 text-xs text-gray-500">
-                          GitHub: <span className="font-mono">{user.github_username}</span>
-                        </div>
+                      {selectedOrganization && ['beta-rootly', 'beta-pagerduty'].includes(selectedOrganization) ? (
+                        <p className="text-xs text-amber-700 mt-2 font-medium">
+                          ℹ️ Beta integrations send surveys to all synced users. Add a personal integration to customize recipients.
+                        </p>
+                      ) : hasUnsavedChanges() && (
+                        <p className="text-xs text-orange-600 mt-2 font-medium">
+                          ⚠️ You have unsaved changes. Click "Save Changes" to apply.
+                        </p>
                       )}
                     </div>
-                  ))}
+
+                    {/* Quick filter buttons */}
+                    <div className="flex items-center gap-2 mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                      <span className="text-xs font-medium text-gray-600">Quick Actions:</span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          const oncallUserIds = syncedUsers
+                            .filter(u => u.is_oncall)
+                            .map(u => u.id)
+                          setSelectedRecipients(new Set(oncallUserIds))
+                        }}
+                        className="h-7 text-xs"
+                      >
+                        Select On-Call ({syncedUsers.filter(u => u.is_oncall).length})
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          const slackConnectedUserIds = syncedUsers
+                            .filter(u => u.platforms?.some((p: string) => p.toLowerCase() === 'slack'))
+                            .map(u => u.id)
+                          setSelectedRecipients(new Set(slackConnectedUserIds))
+                        }}
+                        className="h-7 text-xs"
+                      >
+                        Select All
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setSelectedRecipients(new Set())
+                        }}
+                        className="h-7 text-xs"
+                      >
+                        Deselect All
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="mb-3 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                    <p className="text-xs text-gray-600 font-medium">
+                      ℹ️ Survey delivery is disabled. These users are synced and available for analysis only.
+                    </p>
+                  </div>
+                )}
+                <div className="space-y-2 pb-20">
+                  {syncedUsers.map((user: any) => {
+                    const isSelected = selectedRecipients.has(user.id)
+                    const surveyEnabled = slackIntegration?.survey_enabled === true
+                    return (
+                      <div
+                        key={user.id}
+                        onClick={() => {
+                          if (!surveyEnabled) return
+                          const newSelected = new Set(selectedRecipients)
+                          if (isSelected) {
+                            newSelected.delete(user.id)
+                          } else {
+                            newSelected.add(user.id)
+                          }
+                          setSelectedRecipients(newSelected)
+                        }}
+                        className={`bg-white border rounded-lg p-3 transition-all ${
+                          surveyEnabled ? 'cursor-pointer' : ''
+                        } ${
+                          surveyEnabled && isSelected
+                            ? 'border-purple-400 bg-purple-50'
+                            : 'border-gray-200'
+                        } ${
+                          surveyEnabled && !isSelected ? 'hover:border-purple-300' : ''
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center space-x-3">
+                            {/* Checkbox - only show if surveys enabled */}
+                            {surveyEnabled && (
+                              <div className="relative">
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={() => {}} // Handled by parent div onClick
+                                  className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500 cursor-pointer"
+                                />
+                              </div>
+                            )}
+
+                            {/* Avatar with on-call indicator */}
+                            <div className="relative">
+                              <Avatar className="h-10 w-10">
+                                <AvatarFallback className="bg-purple-100 text-purple-700 text-sm font-medium">
+                                  {user.name?.substring(0, 2).toUpperCase() || user.email?.substring(0, 2).toUpperCase() || '??'}
+                                </AvatarFallback>
+                              </Avatar>
+                              {user.is_oncall && (
+                                <div
+                                  className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white"
+                                  title="Currently on-call"
+                                />
+                              )}
+                            </div>
+
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium text-gray-900">
+                                  {user.name || 'Unknown'}
+                                </span>
+                                {/* GitHub and Slack logos */}
+                                {user.platforms?.map((platform: string) => {
+                                  const platformLower = platform.toLowerCase()
+                                  const isGitHub = platformLower === 'github'
+                                  const isSlack = platformLower === 'slack'
+
+                                  if (isGitHub || isSlack) {
+                                    return (
+                                      <div
+                                        key={platform}
+                                        className="flex items-center justify-center w-4 h-4"
+                                        title={platform}
+                                      >
+                                        <Image
+                                          src={isGitHub ? '/images/github-logo.png' : '/images/slack-logo.png'}
+                                          alt={platform}
+                                          width={14}
+                                          height={14}
+                                          className="object-contain"
+                                        />
+                                      </div>
+                                    )
+                                  }
+                                  return null
+                                })}
+                                {user.is_oncall && (
+                                  <Badge className="text-xs bg-green-100 text-green-700 border-green-300">
+                                    On-Call
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="text-xs text-gray-600">
+                                {user.email}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-1">
+                            {/* Rootly and PagerDuty badges */}
+                            {user.platforms?.map((platform: string) => {
+                              const platformLower = platform.toLowerCase()
+                              const isPagerDuty = platformLower === 'pagerduty'
+                              const isRootly = platformLower === 'rootly'
+
+                              if (isPagerDuty || isRootly) {
+                                return (
+                                  <Badge
+                                    key={platform}
+                                    variant="secondary"
+                                    className={`text-xs ${
+                                      isPagerDuty ? 'bg-green-100 text-green-700 border-green-300' :
+                                      isRootly ? 'bg-purple-100 text-purple-700 border-purple-300' :
+                                      ''
+                                    }`}
+                                  >
+                                    {platform}
+                                  </Badge>
+                                )
+                              }
+                              return null
+                            })}
+                          </div>
+                        </div>
+                      {/* GitHub username section - always show, with edit capability */}
+                      <div className="pl-13 mt-2" onClick={(e) => e.stopPropagation()}>
+                        {editingUserId === user.id ? (
+                          // Edit mode
+                          <div className="flex items-center space-x-2">
+                            <Select
+                              value={editingUsername}
+                              onValueChange={setEditingUsername}
+                              disabled={savingUsername}
+                            >
+                              <SelectTrigger className="h-8 text-xs flex-1">
+                                <SelectValue placeholder="Select GitHub username..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="__clear__">
+                                  <span className="text-gray-400 italic">Clear mapping</span>
+                                </SelectItem>
+                                {githubOrgMembers.length > 0 ? (
+                                  githubOrgMembers.map(username => (
+                                    <SelectItem key={username} value={username}>
+                                      {username}
+                                    </SelectItem>
+                                  ))
+                                ) : (
+                                  <div className="text-xs text-gray-400 p-2">
+                                    {loadingOrgMembers ? 'Loading...' : 'No GitHub members found'}
+                                  </div>
+                                )}
+                              </SelectContent>
+                            </Select>
+                            <Button
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                saveGitHubUsername(user.id)
+                              }}
+                              disabled={savingUsername}
+                              className="h-8 px-2"
+                            >
+                              {savingUsername ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              ) : (
+                                <Check className="w-3 h-3" />
+                              )}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                cancelEditingGitHubUsername()
+                              }}
+                              disabled={savingUsername}
+                              className="h-8 px-2"
+                            >
+                              <X className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        ) : (
+                          // Display mode
+                          <div className="flex items-center justify-between text-xs">
+                            <div className="text-gray-500">
+                              GitHub: {user.github_username ? (
+                                <span className="font-mono text-gray-700">{user.github_username}</span>
+                              ) : (
+                                <span className="text-gray-400 italic">Not mapped</span>
+                              )}
+                            </div>
+                            {githubIntegration && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  startEditingGitHubUsername(user.id, user.github_username)
+                                }}
+                                className="h-6 px-2 text-gray-400 hover:text-gray-700"
+                              >
+                                <Edit3 className="w-3 h-3" />
+                              </Button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    )
+                  })}
                 </div>
               </div>
             ) : (
@@ -3325,6 +3770,48 @@ export default function IntegrationsPage() {
               </div>
             )}
           </div>
+
+          {/* Sticky Footer with Save/Cancel buttons */}
+          {selectedOrganization && !['beta-rootly', 'beta-pagerduty'].includes(selectedOrganization) && hasUnsavedChanges() && (
+            <div className="sticky bottom-0 left-0 right-0 border-t bg-white p-4 mt-auto">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-sm text-orange-600 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4" />
+                  <span>You have unsaved changes</span>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={discardRecipientChanges}
+                    disabled={savingRecipients}
+                    variant="outline"
+                    size="default"
+                  >
+                    <X className="w-4 h-4 mr-2" />
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={saveSurveyRecipients}
+                    disabled={savingRecipients}
+                    variant="default"
+                    size="default"
+                    className="bg-purple-600 hover:bg-purple-700"
+                  >
+                    {savingRecipients ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-4 h-4 mr-2" />
+                        Save Changes
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
         </SheetContent>
       </Sheet>
 
@@ -3337,6 +3824,173 @@ export default function IntegrationsPage() {
           toast.success("Survey delivery initiated successfully")
         }}
       />
+
+      {/* Sync Confirmation Modal */}
+      <Dialog open={showSyncConfirmModal} onOpenChange={(open) => {
+        if (!syncProgress?.isLoading) {
+          setShowSyncConfirmModal(open)
+        }
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {syncProgress?.isLoading ? 'Syncing Team Members...' : 'Sync Team Members'}
+            </DialogTitle>
+            <DialogDescription asChild>
+              <div className="space-y-3 text-left">
+                {syncProgress?.results ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      <CheckCircle className="w-6 h-6 text-green-600" />
+                      <div className="flex-1">
+                        <div className="text-lg font-semibold text-gray-900">{syncProgress.stage}</div>
+                        <div className="text-sm text-gray-600">{syncProgress.details}</div>
+                      </div>
+                    </div>
+
+                    <div className="bg-gray-50 border border-gray-200 rounded-md p-4 space-y-3">
+                      <div className="font-semibold text-gray-900 text-base">Sync Results</div>
+
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between py-2 border-b border-gray-200">
+                          <span className="text-sm text-gray-700">New users synced</span>
+                          <span className="font-semibold text-gray-900">{syncProgress.results.created}</span>
+                        </div>
+                        <div className="flex items-center justify-between py-2 border-b border-gray-200">
+                          <span className="text-sm text-gray-700">Existing users updated</span>
+                          <span className="font-semibold text-gray-900">{syncProgress.results.updated}</span>
+                        </div>
+                        {syncProgress.results.github_matched !== undefined && syncProgress.results.github_matched > 0 && (
+                          <div className="flex items-center justify-between py-2 border-b border-gray-200">
+                            <span className="text-sm text-gray-700">GitHub accounts matched</span>
+                            <span className="font-semibold text-gray-900">{syncProgress.results.github_matched}</span>
+                          </div>
+                        )}
+                        {syncProgress.results.slack_synced !== undefined && syncProgress.results.slack_synced > 0 && (
+                          <div className="flex items-center justify-between py-2">
+                            <span className="text-sm text-gray-700">Slack accounts matched</span>
+                            <span className="font-semibold text-gray-900">{syncProgress.results.slack_synced}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end">
+                      <Button
+                        onClick={() => {
+                          setShowSyncConfirmModal(false)
+                          setSyncProgress(null)
+                        }}
+                        className="bg-purple-600 hover:bg-purple-700"
+                      >
+                        Done
+                      </Button>
+                    </div>
+                  </div>
+                ) : syncProgress?.isLoading ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      <Loader2 className="w-5 h-5 animate-spin text-purple-600" />
+                      <div className="flex-1">
+                        <div className="font-medium text-gray-900">{syncProgress.stage}</div>
+                        <div className="text-sm text-gray-600">{syncProgress.details}</div>
+                      </div>
+                    </div>
+
+                    <div className="bg-purple-50 border border-purple-200 rounded-md p-3">
+                      <span className="text-sm text-purple-800">Please wait while we sync your team members. This may take a few moments...</span>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <span>This will sync your team members from {integrations.find(i => i.id.toString() === selectedOrganization)?.name || 'your integration'}.</span>
+
+                    <div className="bg-blue-50 border border-blue-200 rounded-md p-3 space-y-2">
+                      <div className="font-medium text-blue-900">What happens during sync:</div>
+                      <ul className="list-disc list-inside space-y-1 text-sm text-blue-800">
+                        {integrations.find(i => i.id.toString() === selectedOrganization)?.platform === 'rootly' && (
+                          <li><strong>Incident Responders Only:</strong> Only users with Incident Response (IR) roles will be synced (admin, owner, user). Observers and users without IR access are excluded.</li>
+                        )}
+                        {integrations.find(i => i.id.toString() === selectedOrganization)?.platform === 'pagerduty' && (
+                          <li><strong>All Users:</strong> All users from your PagerDuty account will be synced.</li>
+                        )}
+                        <li><strong>Clean Sync:</strong> All existing users from this integration will be removed and replaced with the fresh list.</li>
+                        <li><strong>Used in Analysis:</strong> These synced users will be used when running burnout analysis.</li>
+                        <li><strong>Cross-Platform Matching:</strong> Users will be matched across GitHub and Slack accounts when possible.</li>
+                      </ul>
+                    </div>
+
+                    <span className="text-sm text-gray-600 block">
+                      {syncedUsers.length > 0
+                        ? `This will replace your current ${syncedUsers.length} synced users.`
+                        : 'This is your first sync for this integration.'}
+                    </span>
+                  </>
+                )}
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            {!syncProgress?.isLoading && !syncProgress?.results && (
+              <>
+                <Button variant="outline" onClick={() => setShowSyncConfirmModal(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={async () => {
+                    try {
+                      setSyncProgress({ stage: 'Starting sync...', details: 'Preparing to sync users', isLoading: true })
+                      await new Promise(resolve => setTimeout(resolve, 300))
+
+                      setSyncProgress({ stage: 'Fetching users...', details: 'Retrieving users from API with IR role filtering', isLoading: true })
+                      const syncResults = await TeamHandlers.syncUsersToCorrelation(
+                        selectedOrganization,
+                        setLoadingTeamMembers,
+                        setTeamMembersError,
+                        fetchTeamMembers,
+                        () => fetchSyncedUsers(false, false, true),
+                        (message: string) => {
+                          setSyncProgress({ stage: 'Syncing users...', details: message, isLoading: true })
+                        },
+                        true // suppressToast
+                      )
+
+                      let slackResults
+                      if (slackIntegration?.workspace_id) {
+                        setSyncProgress({ stage: 'Syncing Slack...', details: 'Matching Slack user IDs', isLoading: true })
+                        slackResults = await TeamHandlers.syncSlackUserIds(setLoadingTeamMembers, fetchSyncedUsers, true)
+                      }
+
+                      console.log('Sync completed:', { syncResults, slackResults })
+                      setSyncProgress({
+                        stage: 'Sync Complete!',
+                        details: 'Your team members have been successfully synced',
+                        isLoading: false,
+                        results: {
+                          created: syncResults.created,
+                          updated: syncResults.updated,
+                          github_matched: syncResults.github_matched,
+                          slack_synced: slackResults?.updated,
+                          slack_skipped: slackResults?.skipped
+                        }
+                      })
+                    } catch (error) {
+                      setSyncProgress({ stage: 'Error', details: 'Failed to sync. Please try again.', isLoading: false })
+                      setTimeout(() => {
+                        setShowSyncConfirmModal(false)
+                        setSyncProgress(null)
+                      }, 2000)
+                    }
+                  }}
+                  className="bg-purple-600 hover:bg-purple-700"
+                >
+                  Sync Now
+                </Button>
+              </>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

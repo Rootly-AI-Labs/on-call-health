@@ -53,6 +53,14 @@ class UserSyncService:
             else:
                 raise ValueError(f"Unsupported platform: {integration.platform}")
 
+            # Delete existing users from this integration before syncing fresh list
+            deleted_count = self._delete_integration_users(
+                integration_id=str(integration_id),
+                current_user=current_user
+            )
+            if deleted_count > 0:
+                logger.info(f"Deleted {deleted_count} existing users from integration {integration_id} before re-sync")
+
             # Sync users to UserCorrelation
             stats = self._sync_users_to_correlation(
                 users=users,
@@ -60,6 +68,7 @@ class UserSyncService:
                 current_user=current_user,
                 integration_id=str(integration_id)  # Store which integration synced this user
             )
+            stats['deleted'] = deleted_count
 
             logger.info(
                 f"Synced {stats['created']} new users, updated {stats['updated']} existing users "
@@ -83,13 +92,19 @@ class UserSyncService:
             raise
 
     async def _fetch_rootly_users(self, api_token: str) -> List[Dict[str, Any]]:
-        """Fetch all users from Rootly API."""
+        """Fetch incident responders from Rootly API (IR role holders only)."""
         client = RootlyAPIClient(api_token)
-        raw_users = await client.get_users(limit=10000)  # Fetch up to 1000 users
+
+        # Fetch users with IR role data
+        raw_users, included_roles = await client.get_users(limit=10000, include_role=True)
+
+        # Filter to only incident responders (exclude observers/no_access)
+        filtered_users = client.filter_incident_responders(raw_users, included_roles)
+        logger.info(f"Rootly: Filtered {len(raw_users)} total users → {len(filtered_users)} incident responders")
 
         # Extract from JSONAPI format
         users = []
-        for user in raw_users:
+        for user in filtered_users:
             attrs = user.get("attributes", {})
             users.append({
                 "id": user.get("id"),
@@ -116,6 +131,36 @@ class UserSyncService:
             })
 
         return users
+
+    def _delete_integration_users(
+        self,
+        integration_id: str,
+        current_user: User
+    ) -> int:
+        """
+        Delete all users previously synced from this integration.
+        This ensures a clean slate before re-syncing with updated filtering.
+
+        Returns:
+            Number of users deleted
+        """
+        user_id = current_user.id
+
+        # Get all correlations for this user that have this integration_id in their integration_ids array
+        correlations = self.db.query(UserCorrelation).filter(
+            UserCorrelation.user_id == user_id
+        ).all()
+
+        deleted = 0
+        for correlation in correlations:
+            # Check if this integration_id is in the JSON array
+            if correlation.integration_ids and integration_id in correlation.integration_ids:
+                self.db.delete(correlation)
+                deleted += 1
+
+        self.db.commit()
+
+        return deleted
 
     def _sync_users_to_correlation(
         self,
@@ -217,6 +262,10 @@ class UserSyncService:
             updated = True
 
         if platform == "rootly":
+            # Store both the Rootly user ID and email
+            if user.get("id") and (not correlation.rootly_user_id or correlation.rootly_user_id != user["id"]):
+                correlation.rootly_user_id = user["id"]
+                updated = True
             if not correlation.rootly_email or correlation.rootly_email != user["email"]:
                 correlation.rootly_email = user["email"]
                 updated = True

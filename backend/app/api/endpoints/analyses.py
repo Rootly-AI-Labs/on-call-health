@@ -2538,14 +2538,83 @@ async def run_analysis_task(
             from ...services.ai_burnout_analyzer import set_user_context
             set_user_context(user)
             logger.info(f"BACKGROUND_TASK: Set user context for AI analysis (LLM provider: {user.llm_provider if user.llm_token else 'none'})")
-        
+
+        # TEAM SYNC OPTIMIZATION: Fetch synced users from UserCorrelation table
+        synced_users = None
+        if user_id and integration_id:
+            try:
+                from ...models.user_correlation import UserCorrelation
+
+                # Determine integration_id string format
+                integration_id_str = str(integration_id)
+                logger.info(f"BACKGROUND_TASK: Querying UserCorrelation for user_id={user_id}, integration_id={integration_id_str}")
+
+                # Query all correlations for this user
+                correlations = db.query(UserCorrelation).filter(
+                    UserCorrelation.user_id == user_id
+                ).all()
+
+                # Fetch on-call status for all users (Rootly only - PagerDuty doesn't have this endpoint)
+                oncall_emails = {}
+                if platform == "rootly":
+                    from ...api.endpoints.rootly import get_synced_users as _get_synced_users
+                    oncall_data = await _get_synced_users(
+                        integration_id=integration_id_str,
+                        include_oncall_status=True,
+                        current_user=user,
+                        db=db
+                    )
+                    oncall_emails = {u["email"].lower(): u["is_oncall"] for u in oncall_data.get("users", [])}
+
+                # Filter by integration_id (check JSON array)
+                synced_users = []
+                for corr in correlations:
+                    if corr.integration_ids and integration_id_str in corr.integration_ids:
+                        # Format user data for analyzer (compatible with API format)
+                        if platform == "pagerduty":
+                            user_id = corr.pagerduty_user_id
+                            if not user_id:
+                                logger.warning(f"Skipping PagerDuty user {corr.email} - missing pagerduty_user_id")
+                                continue
+                        else:  # rootly
+                            # Prefer rootly_user_id for accuracy, but fallback to email for backward compatibility
+                            user_id = corr.rootly_user_id or corr.email
+                            if not user_id:
+                                logger.warning(f"Skipping Rootly user - missing both rootly_user_id and email")
+                                continue
+
+                        user_data = {
+                            'id': user_id,  # Must be actual platform user ID for incident matching
+                            'name': corr.name,
+                            'email': corr.email,
+                            'is_oncall': oncall_emails.get(corr.email.lower(), False),
+                            # Include enhanced platform mappings
+                            'github_username': corr.github_username,
+                            'slack_user_id': corr.slack_user_id,
+                            'synced': True  # Mark as from Team Sync
+                        }
+                        synced_users.append(user_data)
+
+                if synced_users:
+                    logger.info(f"✅ TEAM SYNC OPTIMIZATION: Found {len(synced_users)} synced users for integration {integration_id_str} - will skip user API fetch")
+                else:
+                    logger.info(f"⚠️  TEAM SYNC: No synced users found for integration {integration_id_str} - will fetch from API")
+                    synced_users = None  # Fallback to API
+
+            except Exception as e:
+                logger.warning(f"⚠️  TEAM SYNC: Failed to fetch synced users: {e} - falling back to API")
+                synced_users = None  # Fallback to API on error
+        else:
+            logger.info("BACKGROUND_TASK: Skipping Team Sync query (missing user_id or integration_id)")
+
         analyzer_service = UnifiedBurnoutAnalyzer(
             api_token=effective_api_token,
             platform=platform,
             enable_ai=use_ai_analyzer,
             github_token=github_token if include_github else None,
             slack_token=slack_token if include_slack else None,
-            organization_name=organization_name
+            organization_name=organization_name,
+            synced_users=synced_users  # Pass synced users from Team Sync
         )
         logger.info(f"BACKGROUND_TASK: UnifiedBurnoutAnalyzer initialized - Features: AI={use_ai_analyzer}, GitHub={include_github}, Slack={include_slack}")
         

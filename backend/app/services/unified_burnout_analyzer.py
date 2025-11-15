@@ -67,7 +67,8 @@ class UnifiedBurnoutAnalyzer:
         enable_ai: bool = False,
         github_token: Optional[str] = None,
         slack_token: Optional[str] = None,
-        organization_name: Optional[str] = None
+        organization_name: Optional[str] = None,
+        synced_users: Optional[List[Dict[str, Any]]] = None
     ):
         # Check for mock data mode from environment
         self.use_mock_data = os.getenv('USE_MOCK_DATA', 'false').lower() == 'true'
@@ -103,6 +104,13 @@ class UnifiedBurnoutAnalyzer:
         # Using Copenhagen Burnout Inventory (OCB) methodology
         logger.info("Unified analyzer using Copenhagen Burnout Inventory methodology")
         self.organization_name = organization_name
+
+        # Store synced users if provided (from Team Sync feature)
+        self.synced_users = synced_users
+        if synced_users:
+            logger.info(f"✅ Using {len(synced_users)} pre-synced users from Team Sync - will skip user API fetch")
+        else:
+            logger.info("⚠️  No synced users provided - will fetch users from API (slower)")
 
         # Determine which features are enabled
         if self.use_mock_data:
@@ -348,80 +356,7 @@ class UnifiedBurnoutAnalyzer:
             
             extraction_duration = (datetime.now() - extraction_start).total_seconds()
             logger.info(f"🔍 BURNOUT ANALYSIS: Step 2 completed in {extraction_duration:.3f}s - {len(users)} users, {len(incidents)} incidents")
-            
-            # Step 2.5: Filter to only on-call users (NEW FEATURE)
-            oncall_filter_start = datetime.now()
-            logger.info(f"🔍 BURNOUT ANALYSIS: Step 2.5 - Filtering to on-call users only for {time_range_days}-day period")
-
-            # Skip on-call filtering when using mock data (no API client available)
-            if self.use_mock_data:
-                logger.info(f"🎭 MOCK MODE: Skipping on-call filtering (analyzing all mock users)")
-                oncall_filter_duration = (datetime.now() - oncall_filter_start).total_seconds()
-                logger.info(f"🔍 BURNOUT ANALYSIS: Step 2.5 completed in {oncall_filter_duration:.3f}s - Analyzing all {len(users)} users (mock mode)")
-            else:
-                try:
-                    # Get on-call schedule data for the analysis period
-                    start_date = datetime.now() - timedelta(days=time_range_days)
-                    end_date = datetime.now()
-                    logger.info(f"🗓️ ON_CALL_FILTERING: Attempting to fetch on-call shifts from {start_date.isoformat()} to {end_date.isoformat()}")
-                    logger.info(f"🗓️ ON_CALL_FILTERING: Client type: {type(self.client).__name__}, Platform: {self.platform}")
-
-                    on_call_shifts = await self.client.get_on_call_shifts(start_date, end_date)
-                    logger.info(f"🗓️ ON_CALL_FILTERING: Retrieved {len(on_call_shifts)} on-call shifts")
-
-                    on_call_user_emails = await self.client.extract_on_call_users_from_shifts(on_call_shifts)
-                    logger.info(f"🗓️ ON_CALL_FILTERING: Extracted {len(on_call_user_emails)} unique on-call user emails")
-                    logger.info(f"🗓️ ON_CALL_FILTERING: On-call emails: {list(on_call_user_emails)[:5]}{'...' if len(on_call_user_emails) > 5 else ''}")
-
-                    logger.info(f"🗓️ ON_CALL_FILTERING: Found {len(on_call_user_emails)} users who were on-call during the {time_range_days}-day period")
-                    logger.info(f"🗓️ ON_CALL_FILTERING: Total team members: {len(users)}, On-call members: {len(on_call_user_emails)}")
-
-                    if on_call_user_emails:
-                        # Filter users to only those who were on-call during the period
-                        original_user_count = len(users)
-                        filtered_users = []
-
-                        # Debug: Log all user emails for comparison
-                        all_user_emails = []
-                        for user in users:
-                            user_email = self._get_user_email_from_user(user)
-                            all_user_emails.append(user_email)
-                            if user_email and user_email.lower() in on_call_user_emails:
-                                filtered_users.append(user)
-
-                        logger.info(f"🗓️ ON_CALL_FILTERING: All user emails in team: {all_user_emails[:5]}{'...' if len(all_user_emails) > 5 else ''}")
-
-                        users = filtered_users
-                        logger.info(f"🗓️ ON_CALL_FILTERING: Filtered from {original_user_count} total users to {len(users)} on-call users")
-
-                        if len(users) == 0:
-                            logger.error(f"🗓️ ON_CALL_FILTERING: CRITICAL - No matching users found between team emails and on-call emails!")
-                            logger.error(f"🗓️ ON_CALL_FILTERING: Team emails: {all_user_emails}")
-                            logger.error(f"🗓️ ON_CALL_FILTERING: On-call emails: {list(on_call_user_emails)}")
-                            logger.error(f"🗓️ ON_CALL_FILTERING: Falling back to all users to prevent empty analysis")
-                            users = []  # Reset to original users list (will be handled below)
-                        else:
-                            # Log the on-call users for verification
-                            oncall_names = [self._get_user_name_from_user(user) for user in users]
-                            logger.info(f"🗓️ ON_CALL_FILTERING: On-call users being analyzed: {', '.join(oncall_names[:10])}{'...' if len(oncall_names) > 10 else ''}")
-                    else:
-                        logger.warning(f"🗓️ ON_CALL_FILTERING: No on-call shifts found for the period, analyzing all users as fallback")
-
-                except Exception as e:
-                    logger.error(f"🗓️ ON_CALL_FILTERING: Error fetching on-call data: {e}")
-                    logger.error(f"🗓️ ON_CALL_FILTERING: Exception type: {type(e).__name__}")
-                    logger.error(f"🗓️ ON_CALL_FILTERING: Exception details: {str(e)}")
-                    import traceback
-                    logger.error(f"🗓️ ON_CALL_FILTERING: Stack trace: {traceback.format_exc()}")
-                    logger.warning(f"🗓️ ON_CALL_FILTERING: Falling back to analyzing all users (original behavior)")
-            
-            # If filtering failed or resulted in no users, use all users as fallback
-            if len(users) == 0:
-                logger.warning(f"🗓️ ON_CALL_FILTERING: Using all users as fallback due to empty filtered list")
-                users = data.get("users", [])
-            
-            oncall_filter_duration = (datetime.now() - oncall_filter_start).total_seconds()
-            logger.info(f"🔍 BURNOUT ANALYSIS: Step 2.5 completed in {oncall_filter_duration:.3f}s - Now analyzing {len(users)} on-call users")
+            logger.info(f"🔍 BURNOUT ANALYSIS: Analyzing all {len(users)} synced users (on-call filtering disabled)")
             
             # Log potential issues based on data patterns
             if len(users) == 0:
@@ -874,13 +809,62 @@ class UnifiedBurnoutAnalyzer:
             raise
     
     async def _fetch_analysis_data(self, days_back: int) -> Dict[str, Any]:
-        """Fetch all required data from Rootly API."""
+        """Fetch all required data from Rootly API (or use synced users if provided)."""
         fetch_start_time = datetime.now()
         logger.info(f"🔍 ANALYZER DATA FETCH: Starting data collection for {days_back}-day analysis")
-        
+
         try:
-            # Use the existing data collection method
-            logger.info(f"🔍 ANALYZER DATA FETCH: Delegating to client.collect_analysis_data for {days_back} days")
+            # If synced users provided, use them instead of fetching from API
+            if self.synced_users:
+                logger.info(f"✅ TEAM SYNC OPTIMIZATION: Using {len(self.synced_users)} pre-synced users, only fetching incidents")
+
+                # Only fetch incidents from API (much faster!)
+                # Different APIs use different parameters
+                if self.platform == "pagerduty":
+                    since = datetime.now() - timedelta(days=days_back)
+                    until = datetime.now()
+                    raw_incidents = await self.client.get_incidents(since=since, until=until, limit=5000)
+                else:  # rootly
+                    raw_incidents = await self.client.get_incidents(days_back=days_back, limit=5000)
+
+                # CRITICAL FIX: Normalize incidents for PagerDuty to extract assigned_to from assignments array
+                if self.platform == "pagerduty":
+                    from app.core.pagerduty_client import PagerDutyDataCollector
+                    collector = PagerDutyDataCollector(self.client.api_token)
+                    # Use the enhanced normalization to extract assignments
+                    normalized_data = collector._normalize_with_enhanced_assignment_extraction(
+                        raw_incidents,
+                        self.synced_users
+                    )
+                    incidents = normalized_data.get("incidents", [])
+                    logger.info(f"✅ TEAM SYNC: Normalized {len(incidents)} PagerDuty incidents with assignment extraction")
+                else:
+                    incidents = raw_incidents
+
+                # Build data structure with synced users
+                data = {
+                    "users": self.synced_users,
+                    "incidents": incidents,
+                    "collection_metadata": {
+                        "timestamp": datetime.now().isoformat(),
+                        "days_analyzed": days_back,
+                        "total_users": len(self.synced_users),
+                        "total_incidents": len(incidents),
+                        "used_synced_users": True,
+                        "date_range": {
+                            "start": (datetime.now() - timedelta(days=days_back)).isoformat(),
+                            "end": datetime.now().isoformat()
+                        }
+                    }
+                }
+
+                fetch_duration = (datetime.now() - fetch_start_time).total_seconds()
+                logger.info(f"✅ TEAM SYNC OPTIMIZATION: Data fetch completed in {fetch_duration:.2f}s (skipped user fetch)")
+
+                return data
+
+            # Fallback: Use the existing data collection method (backward compatibility)
+            logger.info(f"🔍 ANALYZER DATA FETCH: No synced users provided, delegating to client.collect_analysis_data for {days_back} days")
             data = await self.client.collect_analysis_data(days_back=days_back)
             
             fetch_duration = (datetime.now() - fetch_start_time).total_seconds()
@@ -1074,7 +1058,17 @@ class UnifiedBurnoutAnalyzer:
             # Add safety check for None user
             if user is None:
                 continue
-            user_id = str(user.get("id")) if user.get("id") is not None else "unknown"
+
+            # CRITICAL FIX: Use platform-specific user ID for synced users
+            # For PagerDuty synced users, use pagerduty_user_id instead of database ID
+            # For Rootly synced users, use rootly_user_id instead of database ID
+            if self.platform == "pagerduty" and user.get("pagerduty_user_id"):
+                user_id = str(user["pagerduty_user_id"])
+            elif self.platform == "rootly" and user.get("rootly_user_id"):
+                user_id = str(user["rootly_user_id"])
+            else:
+                user_id = str(user.get("id")) if user.get("id") is not None else "unknown"
+
             # Get GitHub/Slack data for this user - handle JSONAPI format
             if isinstance(user, dict) and "attributes" in user:
                 user_email = user["attributes"].get("email")
@@ -1202,16 +1196,34 @@ class UnifiedBurnoutAnalyzer:
         # Extract user info based on platform
         if self.platform == "pagerduty":
             # PagerDuty API structure
-            user_id = user.get("id")
+            # CRITICAL FIX: Use pagerduty_user_id for synced users
+            if user.get("pagerduty_user_id"):
+                user_id = user.get("pagerduty_user_id")
+            else:
+                user_id = user.get("id")
             user_name = user.get("name") or user.get("summary", "Unknown")
             user_email = user.get("email")
         else:
-            # Rootly API structure
-            user_attrs = user.get("attributes", {})
-            user_id = user.get("id")
-            user_name = user_attrs.get("full_name") or user_attrs.get("name", "Unknown")
-            user_email = user_attrs.get("email")
-        
+            # Rootly API structure - handle both JSONAPI format and synced user format
+            # CRITICAL FIX: Use rootly_user_id for synced users
+            if user.get("rootly_user_id"):
+                user_id = user.get("rootly_user_id")
+            else:
+                user_id = user.get("id")
+
+            # Check if this is JSONAPI format (from direct API) or flat format (from synced users)
+            if "attributes" in user:
+                user_attrs = user.get("attributes", {})
+                user_name = user_attrs.get("full_name") or user_attrs.get("name", "Unknown")
+                user_email = user_attrs.get("email")
+            else:
+                # Flat format from synced users
+                user_name = user.get("name", "Unknown")
+                user_email = user.get("email")
+
+        # Get on-call status if available (from synced users)
+        is_oncall = user.get("is_oncall", False)
+
         # If no incidents, return minimal analysis
         if not incidents:
             # Calculate zero-incident OCB metrics for consistency
@@ -1243,6 +1255,7 @@ class UnifiedBurnoutAnalyzer:
                 "user_id": user_id,
                 "user_name": user_name,
                 "user_email": user_email,
+                "is_oncall": is_oncall,
                 "burnout_score": 0,
                 "ocb_score": round(min(100, composite_ocb['composite_score']), 2),  # Cap display at 100 for UI
                 "risk_level": "low",
@@ -1484,6 +1497,7 @@ class UnifiedBurnoutAnalyzer:
             "user_id": user_id,
             "user_name": user_name,
             "user_email": user_email,
+            "is_oncall": is_oncall,
             "burnout_score": round(burnout_score, 2),
             "ocb_score": round(min(100, composite_ocb['composite_score']), 2),  # Cap display at 100 for UI
             "risk_level": risk_level,
@@ -3253,7 +3267,8 @@ class UnifiedBurnoutAnalyzer:
                 if user.get('user_email') and user.get('user_id'):
                     user_key = user['user_email'].lower()
                     individual_daily_data[user_key] = {}
-                    # Create ID to email mapping for incident processing
+                    # CRITICAL FIX: Create ID to email mapping using platform-specific user ID
+                    # This ensures PagerDuty incident assignments (e.g., P3HWE4C) match user IDs
                     user_id_to_email[str(user['user_id'])] = user['user_email']
             
             logger.info(f"Created user ID mapping for {len(user_id_to_email)} users from {self.platform} team analysis")

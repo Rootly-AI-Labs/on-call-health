@@ -9,7 +9,8 @@ export async function fetchTeamMembers(
   setLoadingTeamMembers: (loading: boolean) => void,
   setTeamMembersError: (error: string | null) => void,
   setTeamMembers: (members: any[]) => void,
-  setTeamMembersDrawerOpen: (open: boolean) => void
+  setTeamMembersDrawerOpen: (open: boolean) => void,
+  suppressToast?: boolean
 ): Promise<void> {
   if (!selectedOrganization) {
     toast.error('Please select an organization first')
@@ -36,7 +37,9 @@ export async function fetchTeamMembers(
       const data = await response.json()
       setTeamMembers(data.users || [])
       setTeamMembersDrawerOpen(true)
-      toast.success(`Loaded ${data.total_users} team members from ${data.integration_name}`)
+      if (!suppressToast) {
+        toast.success(`Loaded ${data.total_users} team members from ${data.integration_name}`)
+      }
     } else {
       const errorData = await response.json()
       throw new Error(errorData.detail || 'Failed to fetch team members')
@@ -58,13 +61,14 @@ export async function syncUsersToCorrelation(
   selectedOrganization: string,
   setLoadingTeamMembers: (loading: boolean) => void,
   setTeamMembersError: (error: string | null) => void,
-  fetchTeamMembers: () => Promise<void>,
+  fetchTeamMembers: (suppressToast?: boolean) => Promise<void>,
   fetchSyncedUsers: (showToast?: boolean, autoSync?: boolean) => Promise<void>,
-  onProgress?: (message: string) => void
-): Promise<void> {
+  onProgress?: (message: string) => void,
+  suppressToast?: boolean
+): Promise<{ created: number; updated: number; github_matched?: number }> {
   if (!selectedOrganization) {
     toast.error('Please select an organization first')
-    return
+    throw new Error('No organization selected')
   }
   setLoadingTeamMembers(true)
   setTeamMembersError(null)
@@ -74,7 +78,7 @@ export async function syncUsersToCorrelation(
     const authToken = localStorage.getItem('auth_token')
     if (!authToken) {
       toast.error('Please log in to sync users')
-      return
+      throw new Error('Not authenticated')
     }
 
     onProgress?.('📡 Connecting to API...')
@@ -105,12 +109,20 @@ export async function syncUsersToCorrelation(
       }
       message += ` All team members can now submit burnout surveys via Slack!`
 
-      toast.success(message)
+      if (!suppressToast) {
+        toast.success(message)
+      }
       onProgress?.('🔄 Reloading team members...')
       // Reload the members list and fetch synced users (without showing another toast or auto-syncing again)
-      await fetchTeamMembers()
+      await fetchTeamMembers(suppressToast)
       await fetchSyncedUsers(false, false)
       onProgress?.('✅ Sync completed successfully!')
+
+      return {
+        created: stats.created,
+        updated: stats.updated,
+        github_matched: stats.github_matched
+      }
     } else {
       const errorData = await response.json()
       throw new Error(errorData.detail || 'Failed to sync users')
@@ -121,6 +133,7 @@ export async function syncUsersToCorrelation(
     const errorMsg = error instanceof Error ? error.message : 'Failed to sync users'
     setTeamMembersError(errorMsg)
     toast.error(errorMsg)
+    throw error
   } finally {
     setLoadingTeamMembers(false)
   }
@@ -131,15 +144,16 @@ export async function syncUsersToCorrelation(
  */
 export async function syncSlackUserIds(
   setLoadingTeamMembers: (loading: boolean) => void,
-  fetchSyncedUsers: (showToast?: boolean, autoSync?: boolean) => Promise<void>
-): Promise<void> {
+  fetchSyncedUsers: (showToast?: boolean, autoSync?: boolean) => Promise<void>,
+  suppressToast?: boolean
+): Promise<{ updated: number; skipped: number }> {
   setLoadingTeamMembers(true)
 
   try {
     const authToken = localStorage.getItem('auth_token')
     if (!authToken) {
       toast.error('Please log in to sync Slack user IDs')
-      return
+      throw new Error('Not authenticated')
     }
 
     const response = await fetch(`${API_BASE}/integrations/slack/sync-user-ids`, {
@@ -153,12 +167,19 @@ export async function syncSlackUserIds(
     if (response.ok) {
       const data = await response.json()
       const stats = data.stats || {}
-      toast.success(
-        `Synced Slack IDs for ${stats.updated} users! ` +
-        `${stats.skipped} users skipped (no matching Slack account).`
-      )
+      if (!suppressToast) {
+        toast.success(
+          `Synced Slack IDs for ${stats.updated} users! ` +
+          `${stats.skipped} users skipped (no matching Slack account).`
+        )
+      }
       // Refresh synced users list
       await fetchSyncedUsers(false)
+
+      return {
+        updated: stats.updated,
+        skipped: stats.skipped
+      }
     } else {
       const errorData = await response.json()
       throw new Error(errorData.detail || 'Failed to sync Slack user IDs')
@@ -167,6 +188,7 @@ export async function syncSlackUserIds(
     console.error('Error syncing Slack user IDs:', error)
     const errorMsg = error instanceof Error ? error.message : 'Failed to sync Slack user IDs'
     toast.error(errorMsg)
+    throw error
   } finally {
     setLoadingTeamMembers(false)
   }
@@ -185,10 +207,33 @@ export async function fetchSyncedUsers(
   showToast: boolean = true,
   autoSync: boolean = true,
   setSelectedRecipients?: (recipients: Set<number>) => void,
-  setSavedRecipients?: (recipients: Set<number>) => void
+  setSavedRecipients?: (recipients: Set<number>) => void,
+  cache?: Map<string, any[]>,
+  forceRefresh: boolean = false,
+  recipientsCache?: Map<string, Set<number>>
 ): Promise<void> {
   if (!selectedOrganization) {
     toast.error('Please select an organization first')
+    return
+  }
+
+  // Check cache first unless force refresh is requested
+  if (!forceRefresh && cache?.has(selectedOrganization)) {
+    const cachedUsers = cache.get(selectedOrganization)!
+    setSyncedUsers(cachedUsers)
+    setShowSyncedUsers(true)
+    setTeamMembersDrawerOpen(true)
+
+    // Restore cached recipients if available (validate IDs still exist)
+    if (recipientsCache?.has(selectedOrganization) && setSelectedRecipients && setSavedRecipients) {
+      const cachedRecipients = recipientsCache.get(selectedOrganization)!
+      const validUserIds = new Set(cachedUsers.map(u => u.id))
+      const validCachedRecipients = new Set(
+        Array.from(cachedRecipients).filter(id => validUserIds.has(id))
+      )
+      setSelectedRecipients(validCachedRecipients)
+      setSavedRecipients(validCachedRecipients)
+    }
     return
   }
 
@@ -226,12 +271,22 @@ export async function fetchSyncedUsers(
       setShowSyncedUsers(true)
       setTeamMembersDrawerOpen(true)
 
+      // Update cache
+      if (cache) {
+        cache.set(selectedOrganization, users)
+      }
+
       // Load saved recipients if provided setters exist
       if (recipientsResponse && recipientsResponse.ok && setSelectedRecipients && setSavedRecipients) {
         const recipientsData = await recipientsResponse.json()
         const savedIds = new Set<number>(recipientsData.recipient_ids || [])
         setSelectedRecipients(savedIds)
         setSavedRecipients(savedIds)
+
+        // Cache recipients
+        if (recipientsCache) {
+          recipientsCache.set(selectedOrganization, savedIds)
+        }
       }
 
       // If no users found, automatically sync them (but not for beta integrations)

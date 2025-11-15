@@ -1328,6 +1328,10 @@ export default function useDashboard() {
     setDialogSelectedIntegration(integrationToUse)
     setShowTimeRangeDialog(true)
 
+    // Refresh permissions in background after modal opens
+    // Modal will show loading state until permissions are loaded
+    loadIntegrations(true)  // Force refresh to get latest permissions
+
     // Load cached GitHub/Slack data immediately if we don't have it in state
     if (!githubIntegration || !slackIntegration) {
     const cachedGitHub = localStorage.getItem('github_integration');

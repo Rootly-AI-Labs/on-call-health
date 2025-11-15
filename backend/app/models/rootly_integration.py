@@ -19,7 +19,9 @@ class RootlyIntegration(Base):
     survey_recipients = Column(JSON, nullable=True)  # Array of UserCorrelation IDs who should receive surveys
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     last_used_at = Column(DateTime(timezone=True), nullable=True)
-    
+    cached_permissions = Column(JSON, nullable=True)  # Cached permission check results
+    permissions_checked_at = Column(DateTime(timezone=True), nullable=True)  # When permissions were last checked
+
     # Relationships
     user = relationship("User", back_populates="rootly_integrations")
     analyses = relationship("Analysis", back_populates="rootly_integration")

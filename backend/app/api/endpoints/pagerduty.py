@@ -19,6 +19,36 @@ from ...core.pagerduty_client import PagerDutyAPIClient
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+# In-memory cache for permission checks (key: integration_id, value: {permissions, timestamp})
+_permissions_cache = {}
+PERMISSIONS_CACHE_TTL = 60  # Cache for 60 seconds
+
+def get_cached_permissions(integration_id: int):
+    """Get cached permissions if still valid."""
+    if integration_id not in _permissions_cache:
+        return None
+
+    cached = _permissions_cache[integration_id]
+    from datetime import datetime
+    cache_age = (datetime.now() - cached['timestamp']).total_seconds()
+
+    if cache_age > PERMISSIONS_CACHE_TTL:
+        # Cache expired
+        del _permissions_cache[integration_id]
+        return None
+
+    logger.info(f"🔍 [CACHE] Using cached PagerDuty permissions for integration {integration_id} (age: {cache_age:.1f}s)")
+    return cached['permissions']
+
+def set_cached_permissions(integration_id: int, permissions: dict):
+    """Cache permissions for an integration."""
+    from datetime import datetime
+    _permissions_cache[integration_id] = {
+        'permissions': permissions,
+        'timestamp': datetime.now()
+    }
+    logger.info(f"🔍 [CACHE] Cached PagerDuty permissions for integration {integration_id}")
+
 class TokenTestRequest(BaseModel):
     token: str
 
@@ -118,15 +148,20 @@ async def get_pagerduty_integrations(
             "platform": i.platform
         }
         
-        # Check permissions for this integration
-        if i.api_token:
+        # Check permissions for this integration (with caching)
+        cached_permissions = get_cached_permissions(i.id)
+        if cached_permissions:
+            integration_data["permissions"] = cached_permissions
+        elif i.api_token:
             try:
                 client = PagerDutyAPIClient(i.api_token)
                 permissions = await client.check_permissions()
                 integration_data["permissions"] = permissions
+                # Cache successful permission checks
+                set_cached_permissions(i.id, permissions)
             except Exception as e:
                 logger.warning(f"Failed to check permissions for integration {i.id}: {e}")
-                # If we can't check permissions, include a note
+                # If we can't check permissions, include a note (don't cache errors)
                 integration_data["permissions"] = {
                     "users": {"access": False, "error": f"Permission check failed: {str(e)}"},
                     "incidents": {"access": False, "error": f"Permission check failed: {str(e)}"}

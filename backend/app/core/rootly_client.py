@@ -44,17 +44,23 @@ class RootlyAPIClient:
                     
                     if response.status_code == 200:
                         permissions["users"]["access"] = True
+                        logger.info(f"✅ Rootly users permission check: SUCCESS")
                     elif response.status_code == 401:
                         permissions["users"]["error"] = "Unauthorized - check API token"
+                        logger.warning(f"⚠️ Rootly users permission check: 401 Unauthorized")
                     elif response.status_code == 403:
                         permissions["users"]["error"] = "Token needs 'users:read' permission"
+                        logger.warning(f"⚠️ Rootly users permission check: 403 Forbidden")
                     elif response.status_code == 404:
                         permissions["users"]["error"] = "API token doesn't have access to user data"
+                        logger.warning(f"⚠️ Rootly users permission check: 404 Not Found")
                     else:
                         permissions["users"]["error"] = f"HTTP {response.status_code}"
-                        
+                        logger.warning(f"⚠️ Rootly users permission check: HTTP {response.status_code}")
+
                 except Exception as e:
                     permissions["users"]["error"] = f"Connection error: {str(e)}"
+                    logger.error(f"❌ Rootly users permission check: Exception - {str(e)}")
                 
                 # Test incidents endpoint
                 try:
@@ -132,16 +138,23 @@ class RootlyAPIClient:
                         first_user = data["data"][0]
                         if "attributes" in first_user:
                             attrs = first_user["attributes"]
+
+                            # Log what Rootly actually returns for debugging
+                            logger.info(f"🔍 Rootly API returned user attributes: full_name_with_team='{attrs.get('full_name_with_team')}', organization_name='{attrs.get('organization_name')}', company='{attrs.get('company')}'")
+
                             # Extract organization name from full_name_with_team: "[Team Name] User Name"
                             if "full_name_with_team" in attrs:
                                 full_name_with_team = attrs["full_name_with_team"]
                                 if full_name_with_team and full_name_with_team.startswith("[") and "]" in full_name_with_team:
                                     organization_name = full_name_with_team.split("]")[0][1:]  # Extract text between [ ]
+                                    logger.info(f"✅ Extracted org name from full_name_with_team: '{organization_name}'")
                             # Fallback to other fields
                             elif "organization_name" in attrs:
                                 organization_name = attrs["organization_name"]
+                                logger.info(f"✅ Using organization_name attribute: '{organization_name}'")
                             elif "company" in attrs:
                                 organization_name = attrs["company"]
+                                logger.info(f"✅ Using company attribute: '{organization_name}'")
                     
                     # Only include organization name if available
                     if organization_name:
@@ -188,20 +201,36 @@ class RootlyAPIClient:
                 "error_code": "UNKNOWN_ERROR"
             }
     
-    async def get_users(self, limit: int = 100) -> List[Dict[str, Any]]:
-        """Fetch users from Rootly API."""
+    async def get_users(self, limit: int = 100, include_role: bool = False):
+        """Fetch users from Rootly API.
+
+        Args:
+            limit: Maximum number of users to fetch
+            include_role: If True, includes role relationship to identify incident responders
+
+        Returns:
+            If include_role is True: Tuple of (users, included_data)
+            Otherwise: List of users
+        """
         all_users = []
+        all_included = []
         page = 1
         page_size = min(limit, 100)  # Rootly API typically limits to 100 per page
-        
+
         try:
             async with httpx.AsyncClient() as client:
                 while len(all_users) < limit:
                     # URL encode the parameters manually since httpx doesn't encode brackets properly
-                    params_encoded = urlencode({
+                    params = {
                         "page[number]": page,
                         "page[size]": page_size
-                    })
+                    }
+
+                    # Add include parameter if requested
+                    if include_role:
+                        params["include"] = "role"
+
+                    params_encoded = urlencode(params)
 
                     response = await client.get(
                         f"{self.base_url}/v1/users?{params_encoded}",
@@ -227,6 +256,11 @@ class RootlyAPIClient:
 
                     all_users.extend(users)
 
+                    # Collect included data if present (for role details)
+                    if include_role:
+                        included = data.get("included", [])
+                        all_included.extend(included)
+
                     # Check if we have more pages
                     meta = data.get("meta", {})
                     total_pages = meta.get("total_pages", 1)
@@ -236,8 +270,12 @@ class RootlyAPIClient:
 
                     page += 1
 
-                return all_users[:limit]
-                
+                # Return users and included data if role was requested
+                if include_role:
+                    return all_users[:limit], all_included
+                else:
+                    return all_users[:limit]
+
         except Exception as e:
             logger.error(f"Error fetching users: {e}")
             raise
@@ -374,7 +412,77 @@ class RootlyAPIClient:
                 logger.error(f"Error fetching on-call user details: {e}")
         
         return on_call_user_emails
-    
+
+    def filter_incident_responders(self, users: List[Dict[str, Any]], included_data: List[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+        """
+        Filter users to only those who are incident responders (have IR role).
+
+        Filters OUT observers and users without IR access.
+        Includes: admin, owner, user, and custom roles.
+
+        Args:
+            users: List of user objects from Rootly API (must include role relationship)
+            included_data: Optional included section from API response with full role details
+
+        Returns:
+            Filtered list of users who are incident responders
+        """
+        # Build a map of role_id -> role details from included data
+        role_map = {}
+        if included_data:
+            for item in included_data:
+                if item.get('type') == 'roles':
+                    role_id = item.get('id')
+                    slug = item.get('attributes', {}).get('slug')
+                    name = item.get('attributes', {}).get('name')
+                    role_map[role_id] = {
+                        'slug': slug,
+                        'name': name
+                    }
+
+        incident_responders = []
+
+        for user in users:
+            try:
+                email = user.get('attributes', {}).get('email', 'unknown')
+
+                # Check if user has role relationship (IR role)
+                relationships = user.get('relationships', {})
+                role = relationships.get('role', {})
+                role_data = role.get('data')
+
+                # No role = not an incident responder
+                if not role_data:
+                    logger.debug(f"❌ User {email} has no IR role")
+                    continue
+
+                role_id = role_data.get('id')
+
+                # If we have role details, check the slug
+                if role_id and role_id in role_map:
+                    slug = role_map[role_id]['slug']
+                    role_name = role_map[role_id]['name']
+
+                    # Exclude observers and no_access (they're not incident responders)
+                    if slug in ['observer', 'no_access']:
+                        logger.debug(f"❌ User {email} has {role_name} role (not incident responder)")
+                        continue
+
+                    # Include admin, owner, user, and custom roles
+                    incident_responders.append(user)
+                    logger.debug(f"✅ User {email} is incident responder (role: {role_name})")
+                else:
+                    # If we don't have role details, include them (fail-safe)
+                    incident_responders.append(user)
+                    logger.debug(f"✅ User {email} has IR role (no role details available)")
+
+            except Exception as e:
+                logger.warning(f"Error checking IR role for user: {e}")
+                continue
+
+        logger.info(f"📊 Filtered {len(users)} users → {len(incident_responders)} incident responders (excluded observers/no_access)")
+        return incident_responders
+
     async def get_incidents(self, days_back: int = 30, limit: int = 1000) -> List[Dict[str, Any]]:
         """Fetch incidents from Rootly API."""
         fetch_start_time = datetime.now()

@@ -328,28 +328,15 @@ export function SlackSurveyTabs({
             Send burnout surveys to your team members immediately via Slack DM.
           </p>
 
-          {(userInfo?.role === 'super_admin' || userInfo?.role === 'org_admin') ? (
-            <div className="flex justify-center">
-              <Button
-                onClick={() => setShowManualSurveyModal(true)}
-                className="flex items-center space-x-2 bg-purple-600 hover:bg-purple-700"
-              >
-                <Send className="w-4 h-4" />
-                <span>Send Survey Now</span>
-              </Button>
-            </div>
-          ) : (
-            <div className="text-center py-4">
-              <p className="text-sm text-gray-500 mb-2">
-                Only organization admins can manually send surveys.
-              </p>
-              {userInfo && (
-                <p className="text-xs text-gray-400">
-                  Current role: {userInfo.role || 'unknown'}
-                </p>
-              )}
-            </div>
-          )}
+          <div className="flex justify-center">
+            <Button
+              onClick={() => setShowManualSurveyModal(true)}
+              className="flex items-center space-x-2 bg-purple-600 hover:bg-purple-700"
+            >
+              <Send className="w-4 h-4" />
+              <span>Send Survey Now</span>
+            </Button>
+          </div>
 
           <div className="mt-6 border-t pt-4">
             <div className="flex items-center justify-between mb-4">
@@ -375,7 +362,7 @@ export function SlackSurveyTabs({
               <Switch
                 checked={scheduleEnabled}
                 onCheckedChange={setScheduleEnabled}
-                disabled={!userInfo || (userInfo.role !== 'org_admin' && userInfo.role !== 'super_admin') || savingSchedule}
+                disabled={savingSchedule}
               />
             </div>
 
@@ -493,11 +480,6 @@ export function SlackSurveyTabs({
               </div>
             )}
 
-            {!userInfo || (userInfo.role !== 'org_admin' && userInfo.role !== 'super_admin') ? (
-              <p className="text-xs text-gray-500 mt-2">
-                Only organization admins can configure automated schedules.
-              </p>
-            ) : null}
           </div>
         </div>
       </TabsContent>

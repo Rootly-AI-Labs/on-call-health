@@ -2,9 +2,11 @@
 Authentication API endpoints.
 """
 from typing import Any, Dict, Optional
+from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 from ...models import get_db, User, OAuthProvider, UserEmail
 from ...auth.oauth import google_oauth, github_oauth
@@ -16,20 +18,77 @@ from ...core.rate_limiting import auth_rate_limit
 from ...core.input_validation import BaseValidatedModel
 from pydantic import field_validator, Field
 
-# Temporary in-memory storage for auth codes (use Redis in production)
-_temp_auth_codes = {}
-
 router = APIRouter()
 
 # Allowed OAuth redirect origins
 ALLOWED_OAUTH_ORIGINS = [
     "http://localhost:3000",
-    "http://localhost:3001", 
+    "http://localhost:3001",
     "http://localhost:3002",
     settings.FRONTEND_URL,
     "https://www.oncallburnout.com",
     "https://oncallburnout.com"
 ]
+
+# Helper functions for database-backed OAuth code storage
+def store_oauth_code(db: Session, code: str, jwt_token: str, user_id: int) -> None:
+    """Store OAuth temporary code in database."""
+    try:
+        expires_at = datetime.utcnow() + timedelta(minutes=5)
+        db.execute(text("""
+            INSERT INTO oauth_temp_codes (code, jwt_token, user_id, expires_at)
+            VALUES (:code, :jwt_token, :user_id, :expires_at)
+        """), {
+            "code": code,
+            "jwt_token": jwt_token,
+            "user_id": user_id,
+            "expires_at": expires_at
+        })
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        import logging
+        logging.error(f"Failed to store OAuth code: {e}")
+        raise
+
+def get_oauth_code(db: Session, code: str) -> Optional[Dict[str, Any]]:
+    """Retrieve and delete OAuth code from database (single-use)."""
+    try:
+        # Clean up expired codes first
+        db.execute(text("""
+            DELETE FROM oauth_temp_codes
+            WHERE expires_at < :now
+        """), {"now": datetime.utcnow()})
+        db.commit()
+
+        # Get the code
+        result = db.execute(text("""
+            SELECT jwt_token, user_id, expires_at
+            FROM oauth_temp_codes
+            WHERE code = :code
+        """), {"code": code})
+
+        row = result.fetchone()
+        if not row:
+            return None
+
+        # Delete the code (single-use)
+        db.execute(text("""
+            DELETE FROM oauth_temp_codes
+            WHERE code = :code
+        """), {"code": code})
+        db.commit()
+
+        return {
+            "jwt_token": row[0],
+            "user_id": row[1],
+            "expires_at": row[2]
+        }
+    except Exception as e:
+        db.rollback()
+        import logging
+        logging.error(f"Failed to retrieve OAuth code: {e}")
+        return None
 
 # ===== VALIDATION MODELS =====
 
@@ -151,28 +210,22 @@ async def google_callback(
         is_production = not frontend_url.startswith("http://localhost")
         
         # ✅ ENTERPRISE PATTERN: 2-Step Server-Side Token Exchange
-        # 1. Create temporary auth code (not JWT) 
+        # 1. Create temporary auth code (not JWT)
         # 2. Frontend exchanges code for JWT via secure API call
         import secrets
-        import time
-        
+        import logging
+        logger = logging.getLogger(__name__)
+
         # Create temporary authorization code
         auth_code = secrets.token_urlsafe(32)
-        
-        # Store JWT temporarily (in production: use Redis/cache)
-        # Clean up expired codes first
-        current_time = time.time()
-        expired_codes = [code for code, data in _temp_auth_codes.items() if data['expires_at'] < current_time]
-        for code in expired_codes:
-            del _temp_auth_codes[code]
-        
-        # Store with 5-minute expiration
-        _temp_auth_codes[auth_code] = {
-            'jwt_token': jwt_token,
-            'expires_at': time.time() + 300,  # 5 minutes
-            'user_id': user.id
-        }
-        
+
+        logger.info(f"🔐 Storing OAuth code for user {user.id}: {auth_code[:10]}...")
+
+        # Store JWT in database (works across multiple Railway instances)
+        store_oauth_code(db, auth_code, jwt_token, user.id)
+
+        logger.info(f"✅ OAuth code stored successfully")
+
         # Redirect with secure authorization code (not JWT)
         success_url = f"{frontend_url}/auth/success?code={auth_code}"
         response = RedirectResponse(url=success_url)
@@ -271,28 +324,22 @@ async def github_callback(
         is_production = not frontend_url.startswith("http://localhost")
         
         # ✅ ENTERPRISE PATTERN: 2-Step Server-Side Token Exchange
-        # 1. Create temporary auth code (not JWT) 
+        # 1. Create temporary auth code (not JWT)
         # 2. Frontend exchanges code for JWT via secure API call
         import secrets
-        import time
-        
+        import logging
+        logger = logging.getLogger(__name__)
+
         # Create temporary authorization code
         auth_code = secrets.token_urlsafe(32)
-        
-        # Store JWT temporarily (in production: use Redis/cache)
-        # Clean up expired codes first
-        current_time = time.time()
-        expired_codes = [code for code, data in _temp_auth_codes.items() if data['expires_at'] < current_time]
-        for code in expired_codes:
-            del _temp_auth_codes[code]
-        
-        # Store with 5-minute expiration
-        _temp_auth_codes[auth_code] = {
-            'jwt_token': jwt_token,
-            'expires_at': time.time() + 300,  # 5 minutes
-            'user_id': user.id
-        }
-        
+
+        logger.info(f"🔐 Storing OAuth code for user {user.id}: {auth_code[:10]}...")
+
+        # Store JWT in database (works across multiple Railway instances)
+        store_oauth_code(db, auth_code, jwt_token, user.id)
+
+        logger.info(f"✅ OAuth code stored successfully")
+
         # Redirect with secure authorization code (not JWT)
         success_url = f"{frontend_url}/auth/success?code={auth_code}"
         response = RedirectResponse(url=success_url)
@@ -390,37 +437,44 @@ async def get_current_user_info(
 @auth_rate_limit("auth_exchange")
 async def exchange_auth_code_for_token(
     request: Request,
-    code: str = Query(..., description="Authorization code from OAuth callback")
+    code: str = Query(..., description="Authorization code from OAuth callback"),
+    db: Session = Depends(get_db)
 ):
     """
     ✅ ENTERPRISE PATTERN: Exchange temporary auth code for JWT token.
-    
+
     This implements the industry-standard 2-step OAuth token exchange:
     1. OAuth callback creates temporary auth code
     2. Frontend securely exchanges code for JWT token
     """
-    import time
-    
-    # Clean up expired codes
-    current_time = time.time()
-    expired_codes = [c for c, data in _temp_auth_codes.items() if data['expires_at'] < current_time]
-    
-    for expired_code in expired_codes:
-        del _temp_auth_codes[expired_code]
-    
-    # Check if code exists and is valid
-    if code not in _temp_auth_codes:
+    import logging
+    logger = logging.getLogger(__name__)
+
+    logger.info(f"🔍 Token exchange request for code: {code[:10]}...")
+
+    # Get code from database (single-use, auto-deleted)
+    auth_data = get_oauth_code(db, code)
+
+    if not auth_data:
+        logger.error(f"❌ OAuth code not found or expired: {code[:10]}...")
+
+        # Debug: Check if table exists and has any codes
+        try:
+            result = db.execute(text("SELECT COUNT(*) FROM oauth_temp_codes"))
+            count = result.scalar()
+            logger.error(f"📊 Total codes in database: {count}")
+        except Exception as e:
+            logger.error(f"❌ Failed to query oauth_temp_codes table: {e}")
+
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid or expired authorization code"
         )
-    
-    # Get JWT token and clean up code (single use)
-    auth_data = _temp_auth_codes.pop(code)
-    jwt_token = auth_data['jwt_token']
-    
+
+    logger.info(f"✅ OAuth code valid, returning token for user {auth_data['user_id']}")
+
     return {
-        "access_token": jwt_token,
+        "access_token": auth_data['jwt_token'],
         "token_type": "bearer",
         "expires_in": 604800,  # 7 days
         "user_id": auth_data['user_id']

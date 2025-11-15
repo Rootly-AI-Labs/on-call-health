@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
-import { CheckCircle, Loader2 } from "lucide-react"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { CheckCircle, Loader2, AlertCircle } from "lucide-react"
 import { SlackSurveyTabs } from "@/components/SlackSurveyTabs"
 
 interface UnifiedSlackCardProps {
@@ -66,6 +67,7 @@ export function UnifiedSlackCard({
 }: UnifiedSlackCardProps) {
   const [surveyEnabled, setSurveyEnabled] = useState(slackIntegration?.survey_enabled ?? true)
   const [communicationPatternsEnabled, setCommunicationPatternsEnabled] = useState(slackIntegration?.communication_patterns_enabled ?? true)
+  const [showSurveyDisableConfirm, setShowSurveyDisableConfirm] = useState(false)
 
   const isConnected = !!slackIntegration
 
@@ -165,6 +167,16 @@ export function UnifiedSlackCard({
   }
 
   const handleFeatureToggle = async (feature: 'survey' | 'communication_patterns', enabled: boolean) => {
+    // Show confirmation when disabling survey
+    if (feature === 'survey' && !enabled) {
+      setShowSurveyDisableConfirm(true)
+      return
+    }
+
+    await performFeatureToggle(feature, enabled)
+  }
+
+  const performFeatureToggle = async (feature: 'survey' | 'communication_patterns', enabled: boolean) => {
     const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL
 
     try {
@@ -287,7 +299,7 @@ export function UnifiedSlackCard({
                 <ul className="space-y-2 text-sm text-gray-600">
                   <li className="flex items-start space-x-2">
                     <span className="text-green-600 mt-0.5">✓</span>
-                    <span><strong>Survey Delivery:</strong> Let team members report burnout via /burnout-survey command and automated DMs</span>
+                    <span><strong>Slack Surveys:</strong> Collect burnout data through Slack surveys via command and automated DMs</span>
                   </li>
                   <li className="flex items-start space-x-2">
                     <span className="text-green-600 mt-0.5">✓</span>
@@ -341,10 +353,10 @@ export function UnifiedSlackCard({
                 <div className="p-4 flex items-center justify-between">
                   <div className="flex-1">
                     <Label htmlFor="survey-toggle" className="text-base font-medium text-gray-900 cursor-pointer">
-                      Survey Delivery
+                      Slack Surveys
                     </Label>
                     <p className="text-sm text-gray-600 mt-1">
-                      Let team members report burnout via /burnout-survey command
+                      Enable burnout surveys via Slack command and automated DMs
                     </p>
                   </div>
                   <Switch
@@ -416,6 +428,46 @@ export function UnifiedSlackCard({
           </>
         )}
       </CardContent>
+
+      {/* Confirmation Dialog for Disabling Surveys */}
+      <Dialog open={showSurveyDisableConfirm} onOpenChange={setShowSurveyDisableConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-orange-500" />
+              Disable Slack Surveys?
+            </DialogTitle>
+            <DialogDescription className="space-y-3 pt-2">
+              <p>This will disable all Slack survey features, including:</p>
+              <ul className="list-disc list-inside space-y-1 text-sm">
+                <li>The <code className="bg-gray-100 px-1 rounded">/burnout-survey</code> command</li>
+                <li>Automated survey delivery (scheduled surveys will stop)</li>
+                <li>Manual survey sending</li>
+              </ul>
+              <p className="text-sm font-medium text-orange-600">
+                You can re-enable surveys anytime by toggling this back on.
+              </p>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowSurveyDisableConfirm(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={async () => {
+                setShowSurveyDisableConfirm(false)
+                await performFeatureToggle('survey', false)
+              }}
+            >
+              Disable Surveys
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   )
 }

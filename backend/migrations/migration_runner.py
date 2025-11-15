@@ -541,9 +541,43 @@ class MigrationRunner:
                     """
                 ]
             },
+            {
+                "name": "015_add_rootly_user_id_to_user_correlations",
+                "description": "Add rootly_user_id field to store Rootly API user ID (needed for incident matching)",
+                "sql": [
+                    """
+                    ALTER TABLE user_correlations
+                    ADD COLUMN IF NOT EXISTS rootly_user_id VARCHAR(50)
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_user_correlations_rootly_user_id
+                    ON user_correlations(rootly_user_id)
+                    """,
+                    """
+                    COMMENT ON COLUMN user_correlations.rootly_user_id IS 'Rootly API user ID for incident matching'
+                    """
+                ]
+            },
+            {
+                "name": "016_add_permissions_caching",
+                "description": "Add permissions caching to rootly_integrations",
+                "sql": [
+                    """
+                    ALTER TABLE rootly_integrations
+                    ADD COLUMN IF NOT EXISTS cached_permissions JSON,
+                    ADD COLUMN IF NOT EXISTS permissions_checked_at TIMESTAMP WITH TIME ZONE
+                    """,
+                    """
+                    COMMENT ON COLUMN rootly_integrations.cached_permissions IS 'Cached permission check results to reduce API calls'
+                    """,
+                    """
+                    COMMENT ON COLUMN rootly_integrations.permissions_checked_at IS 'Timestamp when permissions were last checked'
+                    """
+                ]
+            },
             # Add future migrations here with incrementing numbers
             # {
-            #     "name": "011_add_user_preferences",
+            #     "name": "017_add_user_preferences",
             #     "description": "Add user preferences table",
             #     "sql": ["CREATE TABLE IF NOT EXISTS user_preferences (...)"]
             # }
