@@ -400,7 +400,102 @@ class MigrationRunner:
                 ]
             },
             {
-                "name": "011_add_survey_recipients_to_integrations",
+                "name": "011_create_jira_integration_tables",
+                "description": "Create Jira integration and workspace mapping tables",
+                "sql": [
+                    """
+                    CREATE TABLE IF NOT EXISTS jira_integrations (
+                        id SERIAL PRIMARY KEY,
+                        user_id INTEGER NOT NULL REFERENCES users(id),
+                        access_token TEXT,
+                        refresh_token TEXT,
+                        jira_cloud_id VARCHAR(100) NOT NULL,
+                        jira_site_url VARCHAR(255) NOT NULL,
+                        jira_account_id VARCHAR(100),
+                        jira_display_name VARCHAR(255),
+                        jira_email VARCHAR(255),
+                        accessible_resources JSONB DEFAULT '[]'::jsonb,
+                        token_source VARCHAR(20) DEFAULT 'oauth',
+                        token_expires_at TIMESTAMP WITH TIME ZONE,
+                        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_jira_integrations_user_id ON jira_integrations(user_id)
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_jira_integrations_cloud_id ON jira_integrations(jira_cloud_id)
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_jira_integrations_account_id ON jira_integrations(jira_account_id)
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_jira_integrations_site_url ON jira_integrations(jira_site_url)
+                    """,
+                    """
+                    DO $$
+                    BEGIN
+                        IF NOT EXISTS (
+                            SELECT 1 FROM pg_constraint WHERE conname = 'uq_jira_integrations_user_cloud'
+                        ) THEN
+                            ALTER TABLE jira_integrations
+                            ADD CONSTRAINT uq_jira_integrations_user_cloud
+                            UNIQUE (user_id, jira_cloud_id);
+                        END IF;
+                    END $$;
+                    """,
+                    """
+                    CREATE TABLE IF NOT EXISTS jira_workspace_mappings (
+                        id SERIAL PRIMARY KEY,
+                        jira_cloud_id VARCHAR(100) NOT NULL UNIQUE,
+                        jira_site_url VARCHAR(255) NOT NULL,
+                        jira_site_name VARCHAR(255),
+                        owner_user_id INTEGER NOT NULL REFERENCES users(id),
+                        organization_id INTEGER REFERENCES organizations(id),
+                        project_keys JSONB DEFAULT '[]'::jsonb,
+                        monitored_boards JSONB DEFAULT '[]'::jsonb,
+                        registered_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                        registered_via VARCHAR(20) DEFAULT 'oauth',
+                        status VARCHAR(20) DEFAULT 'active',
+                        collection_enabled BOOLEAN DEFAULT TRUE,
+                        workload_metrics_enabled BOOLEAN DEFAULT TRUE,
+                        sprint_tracking_enabled BOOLEAN DEFAULT FALSE,
+                        granted_scopes VARCHAR(500),
+                        last_collection_at TIMESTAMP WITH TIME ZONE,
+                        last_collection_status VARCHAR(50)
+                    )
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_jira_workspace_mappings_cloud_id ON jira_workspace_mappings(jira_cloud_id)
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_jira_workspace_mappings_organization_id ON jira_workspace_mappings(organization_id)
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_jira_workspace_mappings_site_url ON jira_workspace_mappings(jira_site_url)
+                    """,
+                    """
+                    ALTER TABLE user_correlations
+                    ADD COLUMN IF NOT EXISTS jira_account_id VARCHAR(100)
+                    """,
+                    """
+                    ALTER TABLE user_correlations
+                    ADD COLUMN IF NOT EXISTS jira_email VARCHAR(255)
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_user_correlations_jira_account_id
+                    ON user_correlations(jira_account_id) WHERE jira_account_id IS NOT NULL
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_user_correlations_jira_email
+                    ON user_correlations(jira_email) WHERE jira_email IS NOT NULL
+                    """
+                ]
+            },
+
+            {
+                "name": "012_add_survey_recipients_to_integrations",
                 "description": "Add survey_recipients JSON field to rootly_integrations for storing selected survey recipients",
                 "sql": [
                     """
@@ -410,7 +505,7 @@ class MigrationRunner:
                 ]
             },
             {
-                "name": "012_ensure_user_correlation_platform_fields",
+                "name": "013_ensure_user_correlation_platform_fields",
                 "description": "Ensure github_username and slack_user_id fields exist in user_correlations for analytics",
                 "sql": [
                     """
@@ -430,28 +525,6 @@ class MigrationRunner:
                     CREATE INDEX IF NOT EXISTS idx_user_correlations_slack_user_id
                     ON user_correlations(slack_user_id)
                     WHERE slack_user_id IS NOT NULL
-                    """
-                ]
-            },
-            {
-                "name": "013_create_oauth_temp_codes_table",
-                "description": "Create oauth_temp_codes table for multi-instance OAuth support",
-                "sql": [
-                    """
-                    CREATE TABLE IF NOT EXISTS oauth_temp_codes (
-                        id SERIAL PRIMARY KEY,
-                        code VARCHAR(100) UNIQUE NOT NULL,
-                        jwt_token TEXT NOT NULL,
-                        user_id INTEGER REFERENCES users(id),
-                        expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
-                        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-                    )
-                    """,
-                    """
-                    CREATE INDEX IF NOT EXISTS idx_oauth_temp_codes_code ON oauth_temp_codes(code)
-                    """,
-                    """
-                    CREATE INDEX IF NOT EXISTS idx_oauth_temp_codes_expires_at ON oauth_temp_codes(expires_at)
                     """
                 ]
             },

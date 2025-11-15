@@ -137,6 +137,39 @@ export interface SlackIntegration {
   granted_scopes?: string
 }
 
+export interface JiraIntegration {
+  id: number
+  jira_site_url: string
+  jira_site_name?: string
+  jira_cloud_id: string
+  jira_account_id: string
+  jira_display_name?: string
+  jira_email?: string
+  token_source: "oauth" | "manual"
+  is_oauth: boolean
+  supports_refresh: boolean
+  token_expires_at?: string
+  updated_at: string
+  accessible_sites_count?: number
+  token_preview?: string
+}
+
+export interface JiraWorkspace {
+  id: string
+  name: string
+  url: string
+  scopes: string[]
+  avatarUrl?: string
+  is_selected: boolean
+}
+
+export interface JiraWorkspacesResponse {
+  workspaces: JiraWorkspace[]
+  current_workspace_id: string | null
+  total_count: number
+  message?: string
+}
+
 export interface PreviewData {
   organization_name: string
   total_users: number

@@ -40,7 +40,11 @@ class Settings:
     SLACK_CLIENT_SECRET: Optional[str] = os.getenv("SLACK_CLIENT_SECRET")
     SLACK_SIGNING_SECRET: Optional[str] = os.getenv("SLACK_SIGNING_SECRET")
     SLACK_REDIRECT_URI: str = os.getenv("SLACK_REDIRECT_URI", "http://localhost:8000/auth/slack/callback")
-    
+
+    # OAuth - Jira 
+    JIRA_CLIENT_ID: Optional[str] = os.getenv("JIRA_CLIENT_ID")
+    JIRA_CLIENT_SECRET: Optional[str] = os.getenv("JIRA_CLIENT_SECRET")
+
     # Environment detection
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
 
