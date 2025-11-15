@@ -575,9 +575,34 @@ class MigrationRunner:
                     """
                 ]
             },
+            {
+                "name": "017_create_oauth_temp_codes_table",
+                "description": "Create oauth_temp_codes table for OAuth flow token exchange",
+                "sql": [
+                    """
+                    CREATE TABLE IF NOT EXISTS oauth_temp_codes (
+                        id SERIAL PRIMARY KEY,
+                        code VARCHAR(255) UNIQUE NOT NULL,
+                        jwt_token TEXT NOT NULL,
+                        user_id INTEGER NOT NULL REFERENCES users(id),
+                        expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+                        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_oauth_temp_codes_code ON oauth_temp_codes(code)
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_oauth_temp_codes_expires_at ON oauth_temp_codes(expires_at)
+                    """,
+                    """
+                    COMMENT ON TABLE oauth_temp_codes IS 'Temporary storage for OAuth authorization codes during token exchange'
+                    """
+                ]
+            },
             # Add future migrations here with incrementing numbers
             # {
-            #     "name": "017_add_user_preferences",
+            #     "name": "018_add_user_preferences",
             #     "description": "Add user preferences table",
             #     "sql": ["CREATE TABLE IF NOT EXISTS user_preferences (...)"]
             # }
