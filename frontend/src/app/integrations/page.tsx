@@ -261,6 +261,8 @@ export default function IntegrationsPage() {
   // Cache to track which integrations have already been loaded
   const syncedUsersCache = useRef<Map<string, any[]>>(new Map())
   const recipientsCache = useRef<Map<string, Set<number>>>(new Map())
+  const permissionsCache = useRef<{data: any, timestamp: number} | null>(null)
+  const PERMISSIONS_CACHE_TTL = 5 * 60 * 1000 // 5 minutes
 
   // GitHub username editing state
   const [editingUserId, setEditingUserId] = useState<number | null>(null)
@@ -1289,8 +1291,25 @@ export default function IntegrationsPage() {
     return SlackHandlers.handleSlackTest(setSlackPermissions, setSlackIntegration)
   }
 
-  const loadSlackPermissions = async () => {
-    return SlackHandlers.loadSlackPermissions(slackIntegration, setIsLoadingPermissions, setSlackPermissions)
+  const loadSlackPermissions = async (forceRefresh: boolean = false) => {
+    // Check cache first (5 minute TTL)
+    if (!forceRefresh && permissionsCache.current) {
+      const age = Date.now() - permissionsCache.current.timestamp
+      if (age < PERMISSIONS_CACHE_TTL) {
+        setSlackPermissions(permissionsCache.current.data)
+        return
+      }
+    }
+
+    // Fetch fresh permissions
+    await SlackHandlers.loadSlackPermissions(slackIntegration, setIsLoadingPermissions, (permissions) => {
+      setSlackPermissions(permissions)
+      // Update cache
+      permissionsCache.current = {
+        data: permissions,
+        timestamp: Date.now()
+      }
+    })
   }
 
   // Mapping data handlers
