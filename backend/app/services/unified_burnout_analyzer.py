@@ -1220,7 +1220,10 @@ class UnifiedBurnoutAnalyzer:
                 # Flat format from synced users
                 user_name = user.get("name", "Unknown")
                 user_email = user.get("email")
-        
+
+        # Get on-call status if available (from synced users)
+        is_oncall = user.get("is_oncall", False)
+
         # If no incidents, return minimal analysis
         if not incidents:
             # Calculate zero-incident OCB metrics for consistency
@@ -1252,6 +1255,7 @@ class UnifiedBurnoutAnalyzer:
                 "user_id": user_id,
                 "user_name": user_name,
                 "user_email": user_email,
+                "is_oncall": is_oncall,
                 "burnout_score": 0,
                 "ocb_score": round(min(100, composite_ocb['composite_score']), 2),  # Cap display at 100 for UI
                 "risk_level": "low",
@@ -1493,6 +1497,7 @@ class UnifiedBurnoutAnalyzer:
             "user_id": user_id,
             "user_name": user_name,
             "user_email": user_email,
+            "is_oncall": is_oncall,
             "burnout_score": round(burnout_score, 2),
             "ocb_score": round(min(100, composite_ocb['composite_score']), 2),  # Cap display at 100 for UI
             "risk_level": risk_level,
