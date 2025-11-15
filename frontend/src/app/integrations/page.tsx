@@ -3950,7 +3950,9 @@ export default function IntegrationsPage() {
                         setTeamMembersError,
                         fetchTeamMembers,
                         () => fetchSyncedUsers(false, false, true),
-                        undefined,
+                        (message: string) => {
+                          setSyncProgress({ stage: 'Syncing users...', details: message, isLoading: true })
+                        },
                         true // suppressToast
                       )
 

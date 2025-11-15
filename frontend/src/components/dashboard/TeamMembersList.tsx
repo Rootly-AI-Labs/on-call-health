@@ -86,6 +86,11 @@ export function TeamMembersList({
             </div>
           </div>
           <div className="flex items-center space-x-2">
+            {member.is_oncall && (
+              <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-300">
+                ON-CALL
+              </Badge>
+            )}
             {(() => {
               // Calculate risk level based on OCB score when available
               const getOCBRiskLevel = (member: any) => {
@@ -93,20 +98,20 @@ export function TeamMembersList({
                   // Use OCB scoring (0-100, higher = more burnout)
                   if (member.ocb_score < 25) return 'healthy';      // 0-24: Low/minimal burnout
                   if (member.ocb_score < 50) return 'fair';         // 25-49: Mild burnout symptoms
-                  if (member.ocb_score < 75) return 'poor';         // 50-74: Moderate burnout risk  
+                  if (member.ocb_score < 75) return 'poor';         // 50-74: Moderate burnout risk
                   return 'critical';                                // 75-100: High/severe burnout
                 }
                 // No OCB score available - default to low risk
                 return 'low';
               };
-              
+
               const riskLevel = getOCBRiskLevel(member);
               const displayLabel = riskLevel === 'healthy' ? 'HEALTHY' :
                                  riskLevel === 'fair' ? 'FAIR' :
                                  riskLevel === 'poor' ? 'POOR' :
                                  riskLevel === 'critical' ? 'CRITICAL' :
                                  riskLevel.toUpperCase();
-              
+
               return <Badge className={getRiskColor(riskLevel)}>{displayLabel}</Badge>;
             })()}
           </div>

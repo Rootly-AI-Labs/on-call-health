@@ -1909,15 +1909,6 @@ export default function Dashboard() {
 
               // Only check permissions for Rootly integrations, not PagerDuty
               if (selectedIntegration?.platform === 'rootly') {
-                // Debug logging to see what we're getting
-                console.log('🔍 Modal Permission Check:', {
-                  integrationName: selectedIntegration?.name,
-                  integrationId: selectedIntegration?.id,
-                  permissions: selectedIntegration?.permissions,
-                  usersAccess: selectedIntegration?.permissions?.users?.access,
-                  incidentsAccess: selectedIntegration?.permissions?.incidents?.access,
-                });
-
                 // Check if permissions have been loaded (undefined = not loaded yet, null = checking, false/true = loaded)
                 const permissionsLoaded = selectedIntegration?.permissions !== undefined;
                 const hasUserPermission = selectedIntegration?.permissions?.users?.access;

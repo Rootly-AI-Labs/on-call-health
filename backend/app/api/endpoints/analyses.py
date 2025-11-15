@@ -2554,15 +2554,23 @@ async def run_analysis_task(
                     UserCorrelation.user_id == user_id
                 ).all()
 
+                # Fetch on-call status for all users
+                from ...api.endpoints.rootly import get_synced_users as _get_synced_users
+                oncall_data = await _get_synced_users(
+                    integration_id=integration_id_str,
+                    include_oncall_status=True,
+                    current_user=user,
+                    db=db
+                )
+                oncall_emails = {u["email"].lower(): u["is_oncall"] for u in oncall_data.get("users", [])}
+
                 # Filter by integration_id (check JSON array)
                 synced_users = []
                 for corr in correlations:
                     if corr.integration_ids and integration_id_str in corr.integration_ids:
                         # Format user data for analyzer (compatible with API format)
-                        # CRITICAL: Must use the actual platform user ID for incident matching!
                         if platform == "pagerduty":
                             user_id = corr.pagerduty_user_id
-                            # Skip PagerDuty users without user_id (can't match)
                             if not user_id:
                                 logger.warning(f"Skipping PagerDuty user {corr.email} - missing pagerduty_user_id")
                                 continue
@@ -2577,6 +2585,7 @@ async def run_analysis_task(
                             'id': user_id,  # Must be actual platform user ID for incident matching
                             'name': corr.name,
                             'email': corr.email,
+                            'is_oncall': oncall_emails.get(corr.email.lower(), False),
                             # Include enhanced platform mappings
                             'github_username': corr.github_username,
                             'slack_user_id': corr.slack_user_id,
