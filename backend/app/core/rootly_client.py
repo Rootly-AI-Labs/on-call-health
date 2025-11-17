@@ -322,8 +322,8 @@ class RootlyAPIClient:
                         f"{self.base_url}/v1/schedules/{schedule_id}/shifts",
                         headers=self.headers,
                         params={
-                            'filter[starts_at][gte]': start_str,
-                            'filter[ends_at][lte]': end_str,
+                            'filter[starts_at][lt]': end_str,  # Shift starts before our window ends
+                            'filter[ends_at][gt]': start_str,  # Shift ends after our window starts
                             'include': 'user',
                             'page[size]': 100
                         },
