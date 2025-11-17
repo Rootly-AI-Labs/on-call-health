@@ -2361,6 +2361,7 @@ export default function IntegrationsPage() {
                 fetchSyncedUsers={fetchSyncedUsers}
                 setShowManualSurveyModal={setShowManualSurveyModal}
                 loadSlackPermissions={loadSlackPermissions}
+                loadSlackStatus={loadSlackIntegration}
                 setSlackSurveyDisconnectDialogOpen={setSlackSurveyDisconnectDialogOpen}
                 setIsConnectingSlackOAuth={setIsConnectingSlackOAuth}
                 toast={toast}
