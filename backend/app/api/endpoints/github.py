@@ -462,9 +462,12 @@ async def connect_github_with_token(
                 if orgs_response.status_code == 200:
                     orgs = orgs_response.json()
                     org_names = [org.get("login") for org in orgs if org.get("login")]
+                    logger.info(f"GitHub token has access to {len(org_names)} organizations: {org_names}")
                 else:
+                    logger.warning(f"Failed to fetch GitHub organizations. Status: {orgs_response.status_code}. Token may need 'read:org' scope.")
                     org_names = []
-            except Exception:
+            except Exception as e:
+                logger.error(f"Error fetching GitHub organizations: {e}")
                 org_names = []
             
             # Get user's emails for correlation (optional)
@@ -524,17 +527,23 @@ async def connect_github_with_token(
                 db.add(correlation)
         
         db.commit()
-        
+
+        # Build response message with org warning if needed
+        message = "GitHub integration connected successfully with personal access token"
+        if not org_names:
+            message += ". Warning: No organizations found. GitHub username matching requires 'read:org' scope and organization membership."
+
         return {
             "success": True,
-            "message": "GitHub integration connected successfully with personal access token",
+            "message": message,
             "integration": {
                 "id": integration.id,
                 "github_username": github_username,
                 "organizations": org_names,
                 "token_source": "manual",
                 "emails_connected": len(email_addresses)
-            }
+            },
+            "warning": None if org_names else "No organizations found. GitHub matching will not work without organizations. Ensure token has 'read:org' scope."
         }
         
     except HTTPException:

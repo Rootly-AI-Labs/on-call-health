@@ -25,7 +25,7 @@ interface UnifiedSlackCardProps {
   fetchSyncedUsers: () => void
   setShowManualSurveyModal: (show: boolean) => void
   loadSlackPermissions: () => void
-  loadSlackStatus?: () => void
+  loadSlackStatus?: (forceRefresh?: boolean) => void
   setSlackSurveyDisconnectDialogOpen: (open: boolean) => void
   setIsConnectingSlackOAuth: (connecting: boolean) => void
   toast: any
@@ -209,7 +209,7 @@ export function UnifiedSlackCard({
 
       // Reload Slack status to ensure UI is in sync with backend
       if (loadSlackStatus) {
-        loadSlackStatus()
+        await loadSlackStatus(true) // Force refresh to bypass cache
       }
     } catch (error) {
       console.error('Error toggling feature:', error)

@@ -647,6 +647,16 @@ export default function IntegrationsPage() {
     }
   }, [selectedOrganization])
 
+  // Auto-select first integration if none selected
+  useEffect(() => {
+    if (!selectedOrganization && integrations.length > 0) {
+      const firstIntegration = integrations[0]
+      const firstIntegrationId = firstIntegration.id.toString()
+      setSelectedOrganization(firstIntegrationId)
+      localStorage.setItem('selected_organization', firstIntegrationId)
+    }
+  }, [integrations, selectedOrganization])
+
   // Load saved survey recipients when drawer opens (only if no unsaved changes)
   useEffect(() => {
     const loadSavedRecipients = async () => {
@@ -2574,6 +2584,7 @@ export default function IntegrationsPage() {
                 fetchSyncedUsers={fetchSyncedUsers}
                 setShowManualSurveyModal={setShowManualSurveyModal}
                 loadSlackPermissions={loadSlackPermissions}
+                loadSlackStatus={loadSlackIntegration}
                 setSlackSurveyDisconnectDialogOpen={setSlackSurveyDisconnectDialogOpen}
                 setIsConnectingSlackOAuth={setIsConnectingSlackOAuth}
                 toast={toast}

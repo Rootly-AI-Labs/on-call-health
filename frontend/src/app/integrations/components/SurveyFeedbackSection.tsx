@@ -19,6 +19,7 @@ interface SurveyFeedbackSectionProps {
   fetchSyncedUsers: () => void
   setShowManualSurveyModal: (show: boolean) => void
   loadSlackPermissions: () => void
+  loadSlackStatus?: (forceRefresh?: boolean) => void
   setSlackSurveyDisconnectDialogOpen: (open: boolean) => void
   setIsConnectingSlackOAuth: (connecting: boolean) => void
   toast: any
@@ -40,6 +41,7 @@ export function SurveyFeedbackSection({
   fetchSyncedUsers,
   setShowManualSurveyModal,
   loadSlackPermissions,
+  loadSlackStatus,
   setSlackSurveyDisconnectDialogOpen,
   setIsConnectingSlackOAuth,
   toast
@@ -64,6 +66,7 @@ export function SurveyFeedbackSection({
           fetchSyncedUsers={fetchSyncedUsers}
           setShowManualSurveyModal={setShowManualSurveyModal}
           loadSlackPermissions={loadSlackPermissions}
+          loadSlackStatus={loadSlackStatus}
           setSlackSurveyDisconnectDialogOpen={setSlackSurveyDisconnectDialogOpen}
           setIsConnectingSlackOAuth={setIsConnectingSlackOAuth}
           toast={toast}
