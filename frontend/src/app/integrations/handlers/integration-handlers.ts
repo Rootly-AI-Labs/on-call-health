@@ -335,18 +335,31 @@ export async function deleteIntegration(
     const authToken = localStorage.getItem('auth_token')
     if (!authToken) return
 
-    const endpoint = integrationToDelete.platform === 'rootly'
-      ? `${API_BASE}/rootly/integrations/${integrationToDelete.id}`
-      : `${API_BASE}/pagerduty/integrations/${integrationToDelete.id}`
+    // Check if this is a legacy beta integration (stored only in localStorage)
+    const isBetaIntegration = ['beta-rootly', 'beta-pagerduty'].includes(String(integrationToDelete.id))
 
-    const response = await fetch(endpoint, {
-      method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${authToken}`
-      }
-    })
+    let success = false
 
-    if (response.ok) {
+    if (isBetaIntegration) {
+      // Beta integrations don't exist in the backend, just remove from localStorage
+      success = true
+    } else {
+      // Regular integration - make API call
+      const endpoint = integrationToDelete.platform === 'rootly'
+        ? `${API_BASE}/rootly/integrations/${integrationToDelete.id}`
+        : `${API_BASE}/pagerduty/integrations/${integrationToDelete.id}`
+
+      const response = await fetch(endpoint, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${authToken}`
+        }
+      })
+
+      success = response.ok
+    }
+
+    if (success) {
       toast.success("The integration has been removed.")
 
       // Optimized: Update local state directly instead of full reload
