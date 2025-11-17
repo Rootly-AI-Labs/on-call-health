@@ -44,7 +44,7 @@ export function AIInsightsCard({ currentAnalysis }: AIInsightsCardProps) {
 
   return (
     <>
-      <Card className="flex flex-col h-[400px]">
+      <Card className="flex flex-col h-full">
         <CardHeader>
           <div className="flex items-center space-x-2">
             <Sparkles className="w-5 h-5 text-blue-600" />

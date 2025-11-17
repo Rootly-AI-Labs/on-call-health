@@ -9,7 +9,7 @@ interface JiraIntegrationCardProps {
 
 export function JiraIntegrationCard({ onConnect, isConnecting }: JiraIntegrationCardProps) {
   return (
-    <Card className="border-2 border-blue-200">
+    <Card className="border-2 border-blue-200 max-w-2xl mx-auto">
       <CardContent className="pt-6 space-y-4">
         <div className="space-y-2">
           <h3 className="text-lg font-semibold text-slate-900">Connect Your Jira Account</h3>
