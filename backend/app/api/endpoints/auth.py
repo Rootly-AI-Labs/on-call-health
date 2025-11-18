@@ -13,6 +13,7 @@ from ...auth.oauth import google_oauth, github_oauth
 from ...auth.jwt import create_access_token
 from ...auth.dependencies import get_current_active_user
 from ...services.account_linking import AccountLinkingService
+from ...services.demo_analysis_service import create_demo_analysis_for_new_user
 from ...core.config import settings
 from ...core.rate_limiting import auth_rate_limit
 from ...core.input_validation import BaseValidatedModel
@@ -194,7 +195,17 @@ async def google_callback(
             access_token=access_token,
             refresh_token=refresh_token
         )
-        
+
+        # Create demo analysis for new users
+        if is_new_user:
+            try:
+                create_demo_analysis_for_new_user(db, user)
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Failed to create demo analysis for new user {user.id}: {e}")
+                # Don't fail the auth flow if demo creation fails
+
         # Create JWT token
         jwt_token = create_access_token(data={"sub": user.id})
         
@@ -308,7 +319,17 @@ async def github_callback(
             access_token=access_token,
             refresh_token=None  # GitHub doesn't use refresh tokens
         )
-        
+
+        # Create demo analysis for new users
+        if is_new_user:
+            try:
+                create_demo_analysis_for_new_user(db, user)
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Failed to create demo analysis for new user {user.id}: {e}")
+                # Don't fail the auth flow if demo creation fails
+
         # Create JWT token
         jwt_token = create_access_token(data={"sub": user.id})
         
