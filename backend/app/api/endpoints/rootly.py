@@ -175,14 +175,17 @@ async def add_rootly_integration(
     account_info = test_result.get("account_info", {})
     organization_name = account_info.get("organization_name")
     total_users = account_info.get("total_users", 0)
-    
+
+    # Check permissions for the token
+    permissions = await client.check_permissions()
+
     # Check if this will be the user's first Rootly integration (make it default)
     existing_integrations = db.query(RootlyIntegration).filter(
         RootlyIntegration.user_id == current_user.id,
         RootlyIntegration.platform == "rootly"
     ).count()
     is_first_integration = existing_integrations == 0
-    
+
     # Create the new integration with cached permissions
     from datetime import timezone
     new_integration = RootlyIntegration(
