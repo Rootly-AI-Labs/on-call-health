@@ -54,10 +54,10 @@ export function RootlyIntegrationForm({
   // Auto-populate name field when preview data is available
   useEffect(() => {
     if (previewData?.suggested_name && connectionStatus === 'success') {
-      const currentName = form.getValues('rootlyName')
+      const currentName = form.getValues('nickname')
       // Only auto-fill if the field is empty
       if (!currentName) {
-        form.setValue('rootlyName', previewData.suggested_name)
+        form.setValue('nickname', previewData.suggested_name)
       }
     }
   }, [previewData, connectionStatus, form])
@@ -184,8 +184,8 @@ export function RootlyIntegrationForm({
                         <span>Connected to</span>
                         {editingInline ? (
                           <Input
-                            value={form.watch('rootlyName') || previewData.organization_name}
-                            onChange={(e) => form.setValue('rootlyName', e.target.value)}
+                            value={form.watch('nickname') || previewData.organization_name}
+                            onChange={(e) => form.setValue('nickname', e.target.value)}
                             className="h-6 w-64 inline-flex"
                             autoFocus
                             onBlur={() => setEditingInline(false)}
@@ -197,7 +197,7 @@ export function RootlyIntegrationForm({
                           />
                         ) : (
                           <>
-                            <span className="font-medium">{form.watch('rootlyName') || previewData.organization_name}</span>
+                            <span className="font-medium">{form.watch('nickname') || previewData.organization_name}</span>
                             {previewData.can_add && (
                               <button
                                 type="button"
@@ -212,8 +212,8 @@ export function RootlyIntegrationForm({
                         )}
                         <span>({previewData.total_users} users)</span>
                       </div>
-                      {form.watch('rootlyName') && form.watch('rootlyName') !== previewData.organization_name && (
-                        <p className="text-xs text-green-700 mt-1">Custom name: {form.watch('rootlyName')}</p>
+                      {form.watch('nickname') && form.watch('nickname') !== previewData.organization_name && (
+                        <p className="text-xs text-green-700 mt-1">Custom name: {form.watch('nickname')}</p>
                       )}
                     </AlertDescription>
                   </Alert>
