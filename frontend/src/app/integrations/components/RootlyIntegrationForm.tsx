@@ -50,6 +50,17 @@ export function RootlyIntegrationForm({
     }
   }, [tokenValue, lastTestedToken, isValidToken, onTest])
 
+  // Auto-populate name field when preview data is available
+  useEffect(() => {
+    if (previewData?.suggested_name && connectionStatus === 'success') {
+      const currentName = form.getValues('rootlyName')
+      // Only auto-fill if the field is empty
+      if (!currentName) {
+        form.setValue('rootlyName', previewData.suggested_name)
+      }
+    }
+  }, [previewData, connectionStatus, form])
+
   return (
     <Card className="border-purple-200 max-w-2xl mx-auto">
       <CardHeader className="p-8">
@@ -164,18 +175,36 @@ export function RootlyIntegrationForm({
             {connectionStatus === 'success' && previewData && (
               <>
                 {previewData.permissions?.users?.access && previewData.permissions?.incidents?.access ? (
-                  <Alert className="border-green-200 bg-green-50">
-                    <CheckCircle className="h-4 w-4 text-green-600" />
-                    <AlertDescription className="text-green-800">
-                      <div className="space-y-2">
+                  <div className="space-y-4">
+                    <Alert className="border-green-200 bg-green-50">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      <AlertDescription className="text-green-800">
                         <p className="font-semibold">✅ Token validated! Permissions verified.</p>
-                        <div className="space-y-1 text-sm">
-                          <p><span className="font-medium">Organization:</span> {previewData.organization_name}</p>
-                          <p><span className="font-medium">Users:</span> {previewData.total_users}</p>
-                        </div>
-                      </div>
-                    </AlertDescription>
-                  </Alert>
+                        <p className="text-sm mt-1">Connected to <span className="font-medium">{previewData.organization_name}</span> ({previewData.total_users} users)</p>
+                      </AlertDescription>
+                    </Alert>
+
+                    {previewData.can_add && (
+                      <FormField
+                        control={form.control}
+                        name="rootlyName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Integration Name</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                placeholder={previewData.suggested_name || previewData.organization_name}
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              Customize the name for this integration
+                            </FormDescription>
+                          </FormItem>
+                        )}
+                      />
+                    )}
+                  </div>
                 ) : (
                   <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
@@ -194,27 +223,6 @@ export function RootlyIntegrationForm({
                       <p className="text-sm mt-2">Please create a new API token with the required permissions and try again.</p>
                     </AlertDescription>
                   </Alert>
-                )}
-
-                {previewData.can_add && previewData.permissions?.users?.access && previewData.permissions?.incidents?.access && (
-                  <FormField
-                    control={form.control}
-                    name="nickname"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Integration Name (optional)</FormLabel>
-                        <FormControl>
-                          <Input
-                            {...field}
-                            placeholder={previewData.suggested_name || previewData.organization_name}
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          Give this integration a custom name
-                        </FormDescription>
-                      </FormItem>
-                    )}
-                  />
                 )}
               </>
             )}
