@@ -2226,6 +2226,11 @@ export default function IntegrationsPage() {
                   </div>
                   <Button
                     onClick={() => {
+                      if (!selectedOrganization) {
+                        toast.error('Please select an organization first')
+                        return
+                      }
+
                       // Open drawer immediately for better UX
                       setTeamMembersDrawerOpen(true)
 
@@ -2252,6 +2257,7 @@ export default function IntegrationsPage() {
                     }}
                     disabled={!selectedOrganization}
                     className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                    title={!selectedOrganization ? 'Please select an organization first' : ''}
                   >
                     <Users className="w-4 h-4 mr-2" />
                     View Members
@@ -4022,7 +4028,6 @@ export default function IntegrationsPage() {
                         slackResults = await TeamHandlers.syncSlackUserIds(setLoadingTeamMembers, fetchSyncedUsers, true)
                       }
 
-                      console.log('Sync completed:', { syncResults, slackResults })
                       setSyncProgress({
                         stage: 'Sync Complete!',
                         details: 'Your team members have been successfully synced',
