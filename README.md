@@ -3,7 +3,7 @@
 
 Detects potential signs of overwork in incident responders, which could lead to burnout. To compute a per-responder risk score, it integrates with Rootly, PagerDuty, GitHub, and Slack.
 
-![Rootly AI Labs On-call Burnout Detector screenshot](assets/rootly-burnout-detector.png)
+![Rootly AI Labs On-call Burnout Detector screenshot](https://raw.githubusercontent.com/Rootly-AI-Labs/On-Call-Burnout-Detector/main/assets/rootly-burnout-detector.png)
 
 Two ways to get started:
 * Use our hosted version [www.oncallburnout.com](https://www.oncallburnout.com/) (contains mock data to easily test it out)
