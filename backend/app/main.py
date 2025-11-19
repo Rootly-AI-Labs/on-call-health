@@ -1,5 +1,5 @@
 """
-FastAPI main application for Rootly Burnout Detector.
+FastAPI main application for On-call Burnout Detector.
 """
 import os
 import logging
@@ -34,7 +34,7 @@ logger.info(f"Starting application with log level: {settings.LOG_LEVEL}")
 
 # Create FastAPI application
 app = FastAPI(
-    title="Rootly Burnout Detector API",
+    title="On-call Burnout Detector API",
     description="API for detecting burnout risk in engineering teams using Rootly incident data",
     version="1.0.0",
     swagger_ui_parameters={
@@ -119,7 +119,7 @@ app.add_middleware(
 @app.get("/")
 async def root():
     """Root endpoint."""
-    return {"message": "Rootly Burnout Detector API", "version": "1.0.0"}
+    return {"message": "On-call Burnout Detector API", "version": "1.0.0"}
 
 @app.get("/health")
 async def health():
