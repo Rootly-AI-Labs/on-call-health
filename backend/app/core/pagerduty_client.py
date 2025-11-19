@@ -25,10 +25,10 @@ class PagerDutyAPIClient:
         
         # 🎯 RAILWAY DEBUG: Token identification for debugging
         token_suffix = api_token[-4:] if len(api_token) > 4 else "***"
-        logger.info(f"🎯 PAGERDUTY CLIENT: Initialized with token ending in {token_suffix}")
-        logger.info(f"🎯 PAGERDUTY CLIENT: Enhanced normalization version ACTIVE - Build 875bd95")
+        logger.info(f"PAGERDUTY CLIENT: Initialized with token ending in {token_suffix}")
+        logger.info(f"PAGERDUTY CLIENT: Enhanced normalization version ACTIVE - Build 875bd95")
         import time
-        logger.info(f"🎯 PAGERDUTY CLIENT: On-call methods deployed - Build {int(time.time())}")
+        logger.info(f"PAGERDUTY CLIENT: On-call methods deployed - Build {int(time.time())}")
         
     async def test_connection(self) -> Dict[str, Any]:
         """Test the PagerDuty API connection and get account info."""
@@ -137,17 +137,14 @@ class PagerDutyAPIClient:
     
     async def get_users(self, limit: int = 100, offset: int = 0) -> List[Dict[str, Any]]:
         """Fetch users from PagerDuty."""
-        logger.info(f"🔍 PD GET_USERS: Starting user fetch (limit={limit})")
-        
         try:
             async with aiohttp.ClientSession() as session:
                 all_users = []
                 request_count = 0
-                
+
                 while True:
                     request_count += 1
-                    logger.info(f"🔍 PD GET_USERS: API Request #{request_count}, offset={offset}")
-                    
+
                     async with session.get(
                         f"{self.base_url}/users",
                         headers=self.headers,
@@ -159,70 +156,47 @@ class PagerDutyAPIClient:
                     ) as response:
                         if response.status != 200:
                             error_text = await response.text()
-                            logger.error(f"🔍 PD GET_USERS: API ERROR - HTTP {response.status}: {error_text}")
+                            logger.error(f"PD GET_USERS: API ERROR - HTTP {response.status}: {error_text}")
                             break
-                            
+
                         data = await response.json()
                         users = data.get("users", [])
                         all_users.extend(users)
-                        
-                        logger.info(f"🔍 PD GET_USERS: Fetched {len(users)} users in batch, total: {len(all_users)}")
-                        
-                        # Log first few users for analysis
-                        if request_count == 1 and users:
-                            logger.info(f"🔍 PD GET_USERS: First batch user analysis:")
-                            for i, user in enumerate(users[:3]):
-                                logger.info(f"   - User #{i+1}: {user.get('name')} (ID: {user.get('id')}, Email: {user.get('email')})")
-                        
+
                         # Check if we have more pages
                         if not data.get("more", False) or len(all_users) >= limit:
-                            logger.info(f"🔍 PD GET_USERS: No more users to fetch (more={data.get('more')}, limit_reached={len(all_users) >= limit})")
                             break
-                            
+
                         offset += len(users)
-                
+
                 final_users = all_users[:limit]
-                
-                # COMPREHENSIVE USER SUMMARY
-                logger.info(f"🔍 PD GET_USERS: FINAL SUMMARY:")
-                logger.info(f"   - Total users fetched: {len(final_users)}")
-                logger.info(f"   - API requests made: {request_count}")
-                
-                if final_users:
-                    user_ids = [user.get("id") for user in final_users]
-                    user_emails = [user.get("email") for user in final_users if user.get("email")]
-                    
-                    logger.info(f"   - Sample user IDs: {user_ids[:5]}")
-                    logger.info(f"   - Users with emails: {len(user_emails)}/{len(final_users)}")
-                    if user_emails:
-                        logger.info(f"   - Sample emails: {user_emails[:3]}")
+                user_emails = sum(1 for u in final_users if u.get("email"))
+
+                logger.info(f"PD GET_USERS: Fetched {len(final_users)} users in {request_count} requests ({user_emails} with emails)")
                 
                 return final_users
                 
         except Exception as e:
-            logger.error(f"🔍 PD GET_USERS: ERROR - {e}")
+            logger.error(f"PD GET_USERS: ERROR - {e}")
             return []
     
     async def get_incidents(
-        self, 
+        self,
         since: datetime,
         until: Optional[datetime] = None,
         limit: int = 1000
     ) -> List[Dict[str, Any]]:
         """Fetch incidents from PagerDuty within a date range."""
-        logger.info(f"🔍 PD GET_INCIDENTS: Starting incident fetch")
-        logger.info(f"🔍 PD GET_INCIDENTS: Date range: {since.isoformat()} to {until.isoformat() if until else 'now'}")
-        logger.info(f"🔍 PD GET_INCIDENTS: Requested limit: {limit}")
-        
+        days_back = (datetime.now(pytz.UTC) - since).days
+        logger.info(f"PD GET_INCIDENTS: Starting fetch for {days_back} days (limit={limit})")
+
         try:
             if until is None:
                 until = datetime.now(pytz.UTC)
-                
+
             # Convert to ISO format with timezone
             since_str = since.astimezone(pytz.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
             until_str = until.astimezone(pytz.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-            
-            logger.info(f"🔍 PD GET_INCIDENTS: API date range: {since_str} to {until_str}")
             
             async with aiohttp.ClientSession() as session:
                 all_incidents = []
@@ -231,8 +205,6 @@ class PagerDutyAPIClient:
                 request_count = 0
                 
                 while len(all_incidents) < limit and request_count < max_requests:
-                    logger.info(f"🔍 PD GET_INCIDENTS: API Request #{request_count+1}: offset={offset}, collected={len(all_incidents)}/{limit}")
-                    
                     # Add timeout to prevent hanging
                     timeout = aiohttp.ClientTimeout(total=30)  # 30 second timeout per request
                     async with session.get(
@@ -253,126 +225,49 @@ class PagerDutyAPIClient:
                         if response.status != 200:
                             error_text = await response.text()
                             token_suffix = self.api_token[-4:] if len(self.api_token) > 4 else "***"
-                            logger.error(f"🚨 PD GET_INCIDENTS: API ERROR - HTTP {response.status}")
-                            logger.error(f"🚨 PD GET_INCIDENTS: Token ending in {token_suffix}")
-                            logger.error(f"🚨 PD GET_INCIDENTS: URL: {self.base_url}/incidents")
-                            logger.error(f"🚨 PD GET_INCIDENTS: Headers: {dict(self.headers)}")
-                            logger.error(f"🚨 PD GET_INCIDENTS: Params: since={since_str}, until={until_str}")
-                            logger.error(f"🚨 PD GET_INCIDENTS: Response: {error_text}")
+                            logger.error(f"PD GET_INCIDENTS: API ERROR - HTTP {response.status}")
+                            logger.error(f"PD GET_INCIDENTS: Token ending in {token_suffix}")
+                            logger.error(f"PD GET_INCIDENTS: URL: {self.base_url}/incidents")
+                            logger.error(f"PD GET_INCIDENTS: Headers: {dict(self.headers)}")
+                            logger.error(f"PD GET_INCIDENTS: Params: since={since_str}, until={until_str}")
+                            logger.error(f"PD GET_INCIDENTS: Response: {error_text}")
                             break
                             
                         data = await response.json()
                         incidents = data.get("incidents", [])
-
-                        #test
-                        # users = await self.get_users(limit=10)
-
-                        # for u in users:
-                        #     print(f"User: {u.get('name')} ({u.get('email')}) → TZ: {u.get('time_zone')}")
-
-                        # COMPREHENSIVE LOGGING FOR FIRST BATCH
-                        if len(all_incidents) == 0 and len(incidents) > 0:
-                            logger.info(f"🔍 PD GET_INCIDENTS: First batch analysis:")
-                            logger.info(f"   - Response keys: {list(data.keys())}")
-                            logger.info(f"   - Incidents in batch: {len(incidents)}")
-                            logger.info(f"   - Has more pages: {data.get('more', False)}")
-                            
-                            # Analyze first 3 incidents in detail
-                            for i, incident in enumerate(incidents[:3]):
-                                logger.info(f"🔍 PD INCIDENT #{i+1}:")
-                                logger.info(f"   - ID: {incident.get('id')}")
-                                logger.info(f"   - Title: {incident.get('title', 'No title')[:50]}")
-                                logger.info(f"   - Status: {incident.get('status')}")
-                                logger.info(f"   - Created: {incident.get('created_at')}")
-                                logger.info(f"   - Urgency: {incident.get('urgency')}")
-                                logger.info(f"   - Priority: {incident.get('priority')}")
-                                
-                                # CHECK ALL POSSIBLE ASSIGNMENT FIELDS
-                                assignments = incident.get("assignments", [])
-                                assignees = incident.get("assignees", [])
-                                last_status_change_by = incident.get("last_status_change_by")
-                                service = incident.get("service", {})
-                                
-                                logger.info(f"   - Assignments: {assignments}")
-                                logger.info(f"   - Assignees: {assignees}")
-                                logger.info(f"   - Last status change by: {last_status_change_by}")
-                                logger.info(f"   - Service: {service.get('summary', 'Unknown') if service else 'None'}")
-                                
-                                # Check for acknowledgments
-                                acknowledgments = incident.get("acknowledgments", [])
-                                logger.info(f"   - Acknowledgments: {len(acknowledgments)} found")
-                                if acknowledgments:
-                                    for j, ack in enumerate(acknowledgments[:2]):
-                                        acknowledger = ack.get("acknowledger", {})
-                                        logger.info(f"     - Ack #{j+1}: {acknowledger.get('summary', 'Unknown')} ({acknowledger.get('id')})")
-                        
                         all_incidents.extend(incidents)
-                        
-                        logger.info(f"🔍 PD GET_INCIDENTS: Fetched {len(incidents)} incidents in batch #{request_count}, total: {len(all_incidents)}")
                         
                         # Check if we have more pages
                         if not data.get("more", False) or len(incidents) == 0:
-                            logger.info(f"🔍 PD GET_INCIDENTS: No more incidents to fetch (more={data.get('more')}, batch_size={len(incidents)})")
                             break
-                            
+
                         offset += len(incidents)
-                
+
                 if request_count >= max_requests:
-                    logger.warning(f"🔍 PD GET_INCIDENTS: Hit request limit ({max_requests}), stopping incident fetch")
-                
-                # COMPREHENSIVE FINAL ANALYSIS
-                logger.info(f"🔍 PD GET_INCIDENTS: FINAL SUMMARY:")
-                logger.info(f"   - Total incidents fetched: {len(all_incidents)}")
-                logger.info(f"   - API requests made: {request_count}")
-                logger.info(f"   - Date range: {since_str} to {until_str}")
-                
-                if all_incidents:
-                    # Analyze assignment patterns across all incidents
-                    incidents_with_assignments = 0
-                    incidents_with_acknowledgments = 0
-                    unique_assigned_user_ids = set()
-                    unique_acknowledger_ids = set()
-                    
-                    for incident in all_incidents:
-                        # Check assignments
-                        assignments = incident.get("assignments", [])
-                        if assignments:
-                            incidents_with_assignments += 1
-                            for assignment in assignments:
-                                assignee = assignment.get("assignee", {})
-                                if assignee.get("id"):
-                                    unique_assigned_user_ids.add(assignee["id"])
-                        
-                        # Check acknowledgments  
-                        acknowledgments = incident.get("acknowledgments", [])
-                        if acknowledgments:
-                            incidents_with_acknowledgments += 1
-                            for ack in acknowledgments:
-                                acknowledger = ack.get("acknowledger", {})
-                                if acknowledger.get("id"):
-                                    unique_acknowledger_ids.add(acknowledger["id"])
-                    
-                    logger.info(f"🔍 PD GET_INCIDENTS: Assignment Analysis:")
-                    logger.info(f"   - Incidents with assignments: {incidents_with_assignments}/{len(all_incidents)} ({incidents_with_assignments/len(all_incidents)*100:.1f}%)")
-                    logger.info(f"   - Incidents with acknowledgments: {incidents_with_acknowledgments}/{len(all_incidents)} ({incidents_with_acknowledgments/len(all_incidents)*100:.1f}%)")
-                    logger.info(f"   - Unique assigned users: {len(unique_assigned_user_ids)} IDs")
-                    logger.info(f"   - Unique acknowledger users: {len(unique_acknowledger_ids)} IDs")
-                    
-                    if unique_assigned_user_ids:
-                        logger.info(f"   - Sample assigned user IDs: {list(unique_assigned_user_ids)[:5]}")
-                    if unique_acknowledger_ids:
-                        logger.info(f"   - Sample acknowledger user IDs: {list(unique_acknowledger_ids)[:5]}")
-                else:
-                    logger.warning(f"🔍 PD GET_INCIDENTS: ❌ NO INCIDENTS FOUND!")
-                    logger.warning(f"   - This could indicate:")
-                    logger.warning(f"     1. No incidents in date range ({since_str} to {until_str})")
-                    logger.warning(f"     2. API token lacks incident read permissions")
-                    logger.warning(f"     3. API query parameters are incorrect")
+                    logger.warning(f"PD GET_INCIDENTS: Hit circuit breaker limit ({max_requests} requests)")
+
+                # Calculate assignment stats for final summary
+                incidents_with_assignments = sum(1 for inc in all_incidents if inc.get("assignments"))
+                unique_assigned_user_ids = {
+                    assignee["id"]
+                    for inc in all_incidents
+                    for assignment in inc.get("assignments", [])
+                    if (assignee := assignment.get("assignee", {})).get("id")
+                }
+
+                logger.info(f"PD GET_INCIDENTS: Collected {len(all_incidents)} incidents in {request_count} requests ({incidents_with_assignments} assigned to {len(unique_assigned_user_ids)} users)")
+
+                if not all_incidents:
+                    logger.warning(f"PD GET_INCIDENTS: No incidents found in date range ({since_str} to {until_str})")
                 
                 return all_incidents
                 
         except asyncio.TimeoutError:
-            logger.error(f"PagerDuty incident fetch timed out after collecting {len(all_incidents) if 'all_incidents' in locals() else 0} incidents")
+            incidents_collected = len(all_incidents) if 'all_incidents' in locals() else 0
+            logger.error(f"🕐 PAGERDUTY TIMEOUT: Incident fetch exceeded timeout")
+            logger.error(f"🕐 PAGERDUTY TIMEOUT: Collected {incidents_collected} incidents before timeout")
+            logger.error(f"🕐 PAGERDUTY TIMEOUT: Date range: {since_str} to {until_str}")
+            logger.error(f"🕐 PAGERDUTY TIMEOUT: Requests made: {request_count if 'request_count' in locals() else 'unknown'}")
             return all_incidents if 'all_incidents' in locals() else []
         except Exception as e:
             logger.error(f"Error fetching PagerDuty incidents: {e}")
@@ -643,36 +538,36 @@ class PagerDutyDataCollector:
         """Collect all necessary data for burnout analysis."""
         # 🎯 RAILWAY DEBUG: Collection start
         token_suffix = self.client.api_token[-4:] if len(self.client.api_token) > 4 else "***"
-        logger.info(f"🎯 PAGERDUTY COLLECTION: Starting {days_back}-day collection with token ending in {token_suffix}")
+        logger.info(f"PAGERDUTY COLLECTION: Starting {days_back}-day collection with token ending in {token_suffix}")
         
         # Calculate date range
         until = datetime.now(pytz.UTC)
         since = until - timedelta(days=days_back)
         
-        logger.info(f"🎯 PAGERDUTY COLLECTION: Date range {since.isoformat()} to {until.isoformat()}")
+        logger.info(f"PAGERDUTY COLLECTION: Date range {since.isoformat()} to {until.isoformat()}")
         
         # Fetch data in parallel (no limits for complete data collection)
         users_task = self.client.get_users(limit=1000)
         incidents_task = self.client.get_incidents(since=since, until=until)
         
-        logger.info(f"🎯 PAGERDUTY COLLECTION: Starting parallel API calls...")
+        logger.info(f"PAGERDUTY COLLECTION: Starting parallel API calls...")
         users, incidents = await asyncio.gather(users_task, incidents_task)
         
-        logger.info(f"🎯 PAGERDUTY COLLECTION: Collected {len(users)} users and {len(incidents)} incidents")
+        logger.info(f"PAGERDUTY COLLECTION: Collected {len(users)} users and {len(incidents)} incidents")
         
         # 🎯 RAILWAY DEBUG: Pre-normalization data check
         if users:
             sample_user = users[0]
-            logger.info(f"🎯 PAGERDUTY COLLECTION: Sample user keys: {list(sample_user.keys())}")
-            logger.info(f"🎯 PAGERDUTY COLLECTION: Sample user email: {sample_user.get('email', 'NO_EMAIL')}")
+            logger.info(f"PAGERDUTY COLLECTION: Sample user keys: {list(sample_user.keys())}")
+            logger.info(f"PAGERDUTY COLLECTION: Sample user email: {sample_user.get('email', 'NO_EMAIL')}")
         
         if incidents:
             sample_incident = incidents[0]
             assignments = sample_incident.get("assignments", [])
-            logger.info(f"🎯 PAGERDUTY COLLECTION: Sample incident has {len(assignments)} assignments")
+            logger.info(f"PAGERDUTY COLLECTION: Sample incident has {len(assignments)} assignments")
             if assignments:
                 assignee = assignments[0].get("assignee", {})
-                logger.info(f"🎯 PAGERDUTY COLLECTION: Sample assignee: {assignee.get('id', 'NO_ID')} - {assignee.get('summary', 'NO_NAME')}")
+                logger.info(f"PAGERDUTY COLLECTION: Sample assignee: {assignee.get('id', 'NO_ID')} - {assignee.get('summary', 'NO_NAME')}")
         
         # 🚀 ENHANCED NORMALIZATION
         logger.info(f"🚀 PAGERDUTY COLLECTION: Starting ENHANCED normalization process...")
@@ -707,7 +602,7 @@ class PagerDutyDataCollector:
             "incidents_with_valid_emails": incidents_with_emails
         }
         
-        logger.info(f"🎯 PAGERDUTY COLLECTION: COMPLETE - Returning enhanced data")
+        logger.info(f"PAGERDUTY COLLECTION: COMPLETE - Returning enhanced data")
         return normalized_data
     
     def _normalize_with_enhanced_assignment_extraction(
@@ -956,7 +851,7 @@ class PagerDutyDataCollector:
                 mapped_severity = "sev5"
 
             if mapped_severity:
-                logger.debug(f"🎯 SEVERITY MAPPING: Priority '{priority_name}' + Urgency '{urgency}' → {mapped_severity}")
+                logger.debug(f"SEVERITY MAPPING: Priority '{priority_name}' + Urgency '{urgency}' → {mapped_severity}")
                 return mapped_severity
 
         # Fallback to urgency mapping
@@ -965,5 +860,5 @@ class PagerDutyDataCollector:
         else:
             mapped_severity = "sev4"  # Default for low/unknown urgency
 
-        logger.debug(f"🎯 SEVERITY MAPPING (fallback): Urgency '{urgency}' → {mapped_severity}")
+        logger.debug(f"SEVERITY MAPPING (fallback): Urgency '{urgency}' → {mapped_severity}")
         return mapped_severity

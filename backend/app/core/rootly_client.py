@@ -44,23 +44,23 @@ class RootlyAPIClient:
                     
                     if response.status_code == 200:
                         permissions["users"]["access"] = True
-                        logger.info(f"✅ Rootly users permission check: SUCCESS")
+                        logger.info(f" Rootly users permission check: SUCCESS")
                     elif response.status_code == 401:
                         permissions["users"]["error"] = "Unauthorized - check API token"
-                        logger.warning(f"⚠️ Rootly users permission check: 401 Unauthorized")
+                        logger.warning(f"️ Rootly users permission check: 401 Unauthorized")
                     elif response.status_code == 403:
                         permissions["users"]["error"] = "Token needs 'users:read' permission"
-                        logger.warning(f"⚠️ Rootly users permission check: 403 Forbidden")
+                        logger.warning(f"️ Rootly users permission check: 403 Forbidden")
                     elif response.status_code == 404:
                         permissions["users"]["error"] = "API token doesn't have access to user data"
-                        logger.warning(f"⚠️ Rootly users permission check: 404 Not Found")
+                        logger.warning(f"️ Rootly users permission check: 404 Not Found")
                     else:
                         permissions["users"]["error"] = f"HTTP {response.status_code}"
-                        logger.warning(f"⚠️ Rootly users permission check: HTTP {response.status_code}")
+                        logger.warning(f"️ Rootly users permission check: HTTP {response.status_code}")
 
                 except Exception as e:
                     permissions["users"]["error"] = f"Connection error: {str(e)}"
-                    logger.error(f"❌ Rootly users permission check: Exception - {str(e)}")
+                    logger.error(f"Rootly users permission check: Exception - {str(e)}")
                 
                 # Test incidents endpoint
                 try:
@@ -140,21 +140,21 @@ class RootlyAPIClient:
                             attrs = first_user["attributes"]
 
                             # Log what Rootly actually returns for debugging
-                            logger.info(f"🔍 Rootly API returned user attributes: full_name_with_team='{attrs.get('full_name_with_team')}', organization_name='{attrs.get('organization_name')}', company='{attrs.get('company')}'")
+                            logger.info(f" Rootly API returned user attributes: full_name_with_team='{attrs.get('full_name_with_team')}', organization_name='{attrs.get('organization_name')}', company='{attrs.get('company')}'")
 
                             # Extract organization name from full_name_with_team: "[Team Name] User Name"
                             if "full_name_with_team" in attrs:
                                 full_name_with_team = attrs["full_name_with_team"]
                                 if full_name_with_team and full_name_with_team.startswith("[") and "]" in full_name_with_team:
                                     organization_name = full_name_with_team.split("]")[0][1:]  # Extract text between [ ]
-                                    logger.info(f"✅ Extracted org name from full_name_with_team: '{organization_name}'")
+                                    logger.info(f" Extracted org name from full_name_with_team: '{organization_name}'")
                             # Fallback to other fields
                             elif "organization_name" in attrs:
                                 organization_name = attrs["organization_name"]
-                                logger.info(f"✅ Using organization_name attribute: '{organization_name}'")
+                                logger.info(f" Using organization_name attribute: '{organization_name}'")
                             elif "company" in attrs:
                                 organization_name = attrs["company"]
-                                logger.info(f"✅ Using company attribute: '{organization_name}'")
+                                logger.info(f" Using company attribute: '{organization_name}'")
                     
                     # Only include organization name if available
                     if organization_name:
@@ -310,20 +310,18 @@ class RootlyAPIClient:
 
                 schedules_data = schedules_response.json()
                 schedules = schedules_data.get('data', [])
-                logger.info(f"📅 Found {len(schedules)} on-call schedules")
 
                 # Step 2: For each schedule, get shifts in the time range
                 for schedule in schedules:
                     schedule_id = schedule.get('id')
                     schedule_name = schedule.get('attributes', {}).get('name', 'Unknown')
-                    logger.info(f"📅 Checking schedule '{schedule_name}' (id: {schedule_id}) for shifts between {start_str} and {end_str}")
 
                     shifts_response = await client.get(
                         f"{self.base_url}/v1/schedules/{schedule_id}/shifts",
                         headers=self.headers,
                         params={
-                            'filter[starts_at][lt]': end_str,  # Shift starts before our window ends
-                            'filter[ends_at][gt]': start_str,  # Shift ends after our window starts
+                            'filter[starts_at][lt]': end_str,
+                            'filter[ends_at][gt]': start_str,
                             'include': 'user',
                             'page[size]': 100
                         },
@@ -333,15 +331,11 @@ class RootlyAPIClient:
                     if shifts_response.status_code == 200:
                         shifts_data = shifts_response.json()
                         shifts = shifts_data.get('data', [])
-                        logger.info(f"✅ Schedule '{schedule_name}': Found {len(shifts)} shifts")
-                        if len(shifts) > 0:
-                            # Log first shift for debugging
-                            logger.info(f"📝 Sample shift data: {shifts[0]}")
                         all_shifts.extend(shifts)
                     else:
-                        logger.warning(f"❌ Failed to fetch shifts for schedule {schedule_name}: {shifts_response.status_code}")
+                        logger.warning(f"Failed to fetch shifts for schedule {schedule_name}: {shifts_response.status_code}")
 
-                logger.info(f"📊 Total shifts found across all schedules: {len(all_shifts)}")
+                logger.info(f"Found {len(all_shifts)} shifts across {len(schedules)} schedules")
                 return all_shifts
 
         except Exception as e:
@@ -453,7 +447,7 @@ class RootlyAPIClient:
 
                 # No role = not an incident responder
                 if not role_data:
-                    logger.debug(f"❌ User {email} has no IR role")
+                    logger.debug(f"User {email} has no IR role")
                     continue
 
                 role_id = role_data.get('id')
@@ -465,22 +459,22 @@ class RootlyAPIClient:
 
                     # Exclude observers and no_access (they're not incident responders)
                     if slug in ['observer', 'no_access']:
-                        logger.debug(f"❌ User {email} has {role_name} role (not incident responder)")
+                        logger.debug(f"User {email} has {role_name} role (not incident responder)")
                         continue
 
                     # Include admin, owner, user, and custom roles
                     incident_responders.append(user)
-                    logger.debug(f"✅ User {email} is incident responder (role: {role_name})")
+                    logger.debug(f"User {email} is incident responder (role: {role_name})")
                 else:
                     # If we don't have role details, include them (fail-safe)
                     incident_responders.append(user)
-                    logger.debug(f"✅ User {email} has IR role (no role details available)")
+                    logger.debug(f"User {email} has IR role (no role details available)")
 
             except Exception as e:
                 logger.warning(f"Error checking IR role for user: {e}")
                 continue
 
-        logger.info(f"📊 Filtered {len(users)} users → {len(incident_responders)} incident responders (excluded observers/no_access)")
+        logger.info(f" Filtered {len(users)} users → {len(incident_responders)} incident responders (excluded observers/no_access)")
         return incident_responders
 
     async def get_incidents(self, days_back: int = 30, limit: int = 1000) -> List[Dict[str, Any]]:
@@ -544,7 +538,8 @@ class RootlyAPIClient:
                         # Check if we've exceeded total pagination timeout
                         pagination_elapsed = (datetime.now() - pagination_start).total_seconds()
                         if pagination_elapsed > total_pagination_timeout:
-                            logger.error(f"Pagination timeout exceeded after {len(all_incidents)} incidents")
+                            logger.error(f"🕐 PAGINATION TIMEOUT: Exceeded {total_pagination_timeout}s limit after {len(all_incidents)} incidents")
+                            logger.error(f"🕐 PAGINATION TIMEOUT: Started at {pagination_start}, elapsed {pagination_elapsed:.2f}s")
                             break
 
                         response = await client.get(
@@ -553,6 +548,21 @@ class RootlyAPIClient:
                             timeout=15.0
                         )
                         api_calls_made += 1
+                    except asyncio.TimeoutError:
+                        # Explicit timeout exception handling
+                        logger.error(f"🕐 API REQUEST TIMEOUT: Rootly incidents request exceeded 15s timeout")
+                        logger.error(f"🕐 API REQUEST TIMEOUT: Page {page}, collected {len(all_incidents)} incidents so far")
+                        consecutive_failures += 1
+
+                        if consecutive_failures >= max_consecutive_failures:
+                            if all_incidents:
+                                logger.warning(f"Stopping after {consecutive_failures} timeout failures. Returning {len(all_incidents)} incidents.")
+                                break
+                            else:
+                                raise
+                        else:
+                            await asyncio.sleep(2 ** consecutive_failures)
+                            continue
                     except Exception as request_error:
                         consecutive_failures += 1
                         logger.error(f"Incident request failed: {request_error} (failure {consecutive_failures}/{max_consecutive_failures})")
@@ -642,15 +652,9 @@ class RootlyAPIClient:
             if connection_test["status"] != "success":
                 raise Exception(f"Connection test failed: {connection_test['message']}")
 
-            # Log expected data volume based on time range
-            expected_incident_multiplier = days_back / 7  # Relative to 7-day baseline
-            logger.info(f"🔍 DATA VOLUME ESTIMATE: {days_back}-day analysis expected to fetch ~{expected_incident_multiplier:.1f}x more incidents than 7-day analysis")
-
             # Collect users and incidents in parallel (no limits for complete data collection)
             users_start = datetime.now()
             incidents_start = datetime.now()
-
-            logger.info(f"🔍 USER FETCH: Starting user collection for {days_back}-day analysis (limit: 10000)")
             users_task = self.get_users(limit=10000)  # Get all users (increased from 1000)
 
             # Use conservative incident limits to prevent timeout on longer analyses
