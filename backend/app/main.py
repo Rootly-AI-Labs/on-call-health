@@ -4,6 +4,8 @@ FastAPI main application for On-call Burnout Detector.
 import os
 import logging
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi.errors import RateLimitExceeded
 from .models import create_tables
@@ -43,8 +45,13 @@ app = FastAPI(
         "displayRequestDuration": True,
         "filter": True,
         "tryItOutEnabled": True,
-    }
+    },
+    docs_url="/docs",
+    openapi_url="/openapi.json"
 )
+
+# Mount static files for favicon
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 # Add rate limiting to the app
 app.state.limiter = limiter
@@ -125,6 +132,11 @@ async def root():
 async def health():
     """Health check endpoint."""
     return {"status": "healthy", "service": "rootly-burnout-detector"}
+
+@app.get('/favicon.ico', include_in_schema=False)
+async def favicon():
+    """Serve favicon for the API documentation."""
+    return FileResponse("app/static/favicon.png")
 
 # Initialize database tables
 @app.on_event("startup")
