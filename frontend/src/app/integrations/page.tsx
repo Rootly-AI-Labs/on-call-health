@@ -2601,48 +2601,48 @@ export default function IntegrationsPage() {
 
             {/* Jira Card */}
             {loadingJira ? (
-              <Card className="border-2 border-gray-200 p-8 flex items-center justify-center relative h-32 animate-pulse">
-                <div className="absolute top-4 right-4 w-16 h-5 bg-gray-300 rounded"></div>
+              <Card className="border-2 border-gray-200 p-4 flex items-center justify-center relative h-20 animate-pulse">
+                <div className="absolute top-2 right-2 w-16 h-5 bg-gray-300 rounded"></div>
                 <div className="flex items-center space-x-2">
-                  <div className="w-10 h-10 bg-gray-300 rounded"></div>
-                  <div className="h-8 w-20 bg-gray-300 rounded"></div>
+                  <div className="w-8 h-8 bg-gray-300 rounded"></div>
+                  <div className="h-6 w-20 bg-gray-300 rounded"></div>
                 </div>
               </Card>
             ) : (
               <Card
-                className={`border-2 transition-all cursor-pointer hover:shadow-lg ${
+                className={`border-2 transition-all cursor-pointer hover:shadow-md ${
                   activeEnhancementTab === 'jira'
-                    ? 'border-blue-500 shadow-lg bg-blue-50'
+                    ? 'border-blue-500 shadow-md bg-blue-50'
                     : 'border-gray-200 hover:border-blue-300'
-                } p-8 flex items-center justify-center relative h-32`}
+                } p-4 flex items-center justify-center relative h-20`}
                 onClick={() => {
                   setActiveEnhancementTab(activeEnhancementTab === 'jira' ? null : 'jira')
                 }}
               >
                 {jiraIntegration ? (
-                  <div className="absolute top-4 right-4">
-                    <Badge variant="secondary" className="bg-green-100 text-green-700">
+                  <div className="absolute top-2 right-2 flex flex-col items-end space-y-1">
+                    <Badge variant="secondary" className="bg-green-100 text-green-700 border-green-200 text-xs">
                       <CheckCircle className="w-3 h-3 mr-1" />
                       Connected
                     </Badge>
                   </div>
                 ) : null}
                 {activeEnhancementTab === 'jira' && (
-                  <div className="absolute top-4 left-4">
-                    <CheckCircle className="w-6 h-6 text-blue-600" />
+                  <div className="absolute top-2 left-2">
+                    <CheckCircle className="w-5 h-5 text-gray-600" />
                   </div>
                 )}
                 <div className="flex items-center space-x-2">
-                  <div className="w-10 h-10 rounded flex items-center justify-center bg-blue-600">
+                  <div className="w-8 h-8 rounded flex items-center justify-center bg-blue-600">
                     <svg
                       viewBox="0 0 24 24"
-                      className="w-6 h-6 text-white"
+                      className="w-5 h-5 text-white"
                       fill="currentColor"
                     >
                       <path d="M11.571 11.513H0a5.218 5.218 0 0 0 5.232 5.215h2.13v2.057A5.215 5.215 0 0 0 12.575 24V12.518a1.005 1.005 0 0 0-1.005-1.005zm5.723-5.756H5.736a5.215 5.215 0 0 0 5.215 5.214h2.129v2.058a5.218 5.218 0 0 0 5.215 5.232V6.758a1.001 1.001 0 0 0-1.001-1.001zM23.013 0H11.455a5.215 5.215 0 0 0 5.215 5.215h2.129v2.057A5.215 5.215 0 0 0 24 12.483V1.005A1.001 1.001 0 0 0 23.013 0Z"/>
                     </svg>
                   </div>
-                  <span className="text-2xl font-bold text-slate-900">Jira</span>
+                  <span className="text-xl font-semibold text-slate-900">Jira</span>
                 </div>
               </Card>
             )}
