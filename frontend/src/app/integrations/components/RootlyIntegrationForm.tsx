@@ -112,7 +112,7 @@ export function RootlyIntegrationForm({
               name="rootlyToken"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Rootly API Token</FormLabel>
+                  <FormLabel>Rootly API Token (Global or Team type)</FormLabel>
                   <FormControl>
                     <div className="relative">
                       <Input
