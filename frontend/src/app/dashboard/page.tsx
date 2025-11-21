@@ -292,18 +292,20 @@ export default function Dashboard() {
                       onClick={async () => {
                         const analysisKey = analysis.uuid || analysis.id.toString()
 
-                        // Check cache first - but only use if it has full analysis data
+                        // Check cache first - but only use if it has full analysis data with members
                         const cachedAnalysis = analysisCache.get(analysisKey)
-                        if (cachedAnalysis && cachedAnalysis.analysis_data && cachedAnalysis.analysis_data.team_analysis) {
-                          // Use cached analysis data (includes both sufficient and insufficient data cases)
+                        if (cachedAnalysis && cachedAnalysis.analysis_data && cachedAnalysis.analysis_data.team_analysis &&
+                            cachedAnalysis.analysis_data.team_analysis.members && cachedAnalysis.analysis_data.team_analysis.members.length > 0) {
+                          // Use cached full analysis data
                           setCurrentAnalysis(cachedAnalysis)
                           setRedirectingToSuggested(false) // Turn off redirect loader
                           updateURLWithAnalysis(cachedAnalysis.uuid || cachedAnalysis.id)
                           return
                         }
 
-                        // If analysis doesn't have full data and not in cache, fetch it
-                        if (!analysis.analysis_data || !analysis.analysis_data.team_analysis) {
+                        // If analysis doesn't have full data with members, fetch it
+                        if (!analysis.analysis_data || !analysis.analysis_data.team_analysis ||
+                            !analysis.analysis_data.team_analysis.members || analysis.analysis_data.team_analysis.members.length === 0) {
                           try {
                             const authToken = localStorage.getItem('auth_token')
                             if (!authToken) return
