@@ -307,13 +307,13 @@ export default function Dashboard() {
                           try {
                             const authToken = localStorage.getItem('auth_token')
                             if (!authToken) return
-                            
+
                             const response = await fetch(`${API_BASE}/analyses/${analysis.id}`, {
                               headers: {
                                 'Authorization': `Bearer ${authToken}`
                               }
                             })
-                            
+
                             if (response.ok) {
                               const fullAnalysis = await response.json()
                               // Cache the full analysis data (whether sufficient or insufficient)
@@ -322,14 +322,14 @@ export default function Dashboard() {
                               setRedirectingToSuggested(false) // Turn off redirect loader
                               updateURLWithAnalysis(fullAnalysis.uuid || fullAnalysis.id)
                             } else {
-                              setCurrentAnalysis(analysis)
-                              setRedirectingToSuggested(false) // Turn off redirect loader
-                              updateURLWithAnalysis(analysis.uuid || analysis.id)
+                              // Don't set incomplete analysis - keep current one or show error
+                              console.error('Failed to fetch full analysis:', response.status)
+                              setRedirectingToSuggested(false)
                             }
                           } catch (error) {
-                                                setCurrentAnalysis(analysis)
-                            setRedirectingToSuggested(false) // Turn off redirect loader
-                            updateURLWithAnalysis(analysis.uuid || analysis.id)
+                            // Don't set incomplete analysis - keep current one or show error
+                            console.error('Error fetching full analysis:', error)
+                            setRedirectingToSuggested(false)
                           }
                         } else {
                           // Analysis already has full data, cache it and use it
