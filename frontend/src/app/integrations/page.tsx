@@ -906,23 +906,11 @@ export default function IntegrationsPage() {
 
               toast.dismiss(loadingToastId)
 
-              // Check if user has multiple workspaces
-              const hasMultipleWorkspaces = await JiraHandlers.checkMultipleWorkspaces()
-
-              if (hasMultipleWorkspaces) {
-                // Show workspace selector
-                toast.success(`🎉 Jira integration connected!`, {
-                  description: `Select your preferred workspace to continue.`,
-                  duration: 3000,
-                })
-                setJiraWorkspaceSelectorOpen(true)
-              } else {
-                // Single workspace, show normal success message
-                toast.success(`🎉 Jira integration connected!`, {
-                  description: `Successfully connected to ${data.integration.jira_site_url || 'your Jira workspace'}.`,
-                  duration: 5000,
-                })
-              }
+              // Show success message
+              toast.success(`🎉 Jira integration connected!`, {
+                description: `Successfully connected to ${data.integration.jira_site_url || 'your Jira workspace'}.`,
+                duration: 5000,
+              })
               return
             }
           }
