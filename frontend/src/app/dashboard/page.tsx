@@ -296,6 +296,11 @@ export default function Dashboard() {
                         const teamAnalysis = analysis.analysis_data?.team_analysis
                         const members = Array.isArray(teamAnalysis) ? teamAnalysis : (teamAnalysis as any)?.members
 
+                        // DEBUG: Check what we have
+                        if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
+                          alert(`Analysis ${analysis.id}: members=${Array.isArray(members) ? members.length : 'not array'}`)
+                        }
+
                         // Check cache first - but only use if it has full analysis data with members
                         const cachedAnalysis = analysisCache.get(analysisKey)
                         const cachedTeamAnalysis = cachedAnalysis?.analysis_data?.team_analysis
