@@ -624,12 +624,18 @@ export default function useDashboard() {
         return
       }
 
-      // Check cache first
+      // Check cache first - only use if it has full analysis data with members
       const cachedAnalysis = analysisCache.get(analysisId)
-      if (cachedAnalysis && cachedAnalysis.analysis_data && cachedAnalysis.analysis_data.team_analysis) {
-        setCurrentAnalysis(cachedAnalysis)
-        setRedirectingToSuggested(false)
-        return
+      if (cachedAnalysis && cachedAnalysis.analysis_data) {
+        const teamAnalysis = cachedAnalysis.analysis_data.team_analysis
+        const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members
+
+        // Only use cache if it has actual member data
+        if (members && Array.isArray(members) && members.length > 0) {
+          setCurrentAnalysis(cachedAnalysis)
+          setRedirectingToSuggested(false)
+          return
+        }
       }
       // Check if analysisId is a UUID (contains hyphens) or integer ID
       const isUuid = analysisId.includes('-')
