@@ -247,6 +247,7 @@ export default function IntegrationsPage() {
   const [isConnectingGithub, setIsConnectingGithub] = useState(false)
   const [isConnectingSlack, setIsConnectingSlack] = useState(false)
   const [isConnectingJira, setIsConnectingJira] = useState(false)
+  const [isSyncingJira, setIsSyncingJira] = useState(false)
   const [jiraWorkspaceSelectorOpen, setJiraWorkspaceSelectorOpen] = useState(false)
 
   // Disconnect confirmation state
@@ -1500,6 +1501,15 @@ export default function IntegrationsPage() {
   const handleJiraTest = async () => {
     return JiraHandlers.handleJiraTest(toast)
   }
+
+  const handleJiraSyncMembers = async () => {
+    return JiraHandlers.syncJiraUsers(
+      setIsSyncingJira,
+      undefined, // No progress callback needed
+      () => fetchSyncedUsers(false, false, true) // Refresh synced users after sync
+    )
+  }
+
   // Mapping data handlers
   // Function to open the reusable MappingDrawer
   const openMappingDrawer = (platform: 'github' | 'slack') => {
@@ -2696,8 +2706,10 @@ export default function IntegrationsPage() {
                 integration={jiraIntegration}
                 onDisconnect={() => setJiraDisconnectDialogOpen(true)}
                 onTest={handleJiraTest}
+                onSyncMembers={handleJiraSyncMembers}
                 onSwitchWorkspace={() => setJiraWorkspaceSelectorOpen(true)}
                 isLoading={isDisconnectingJira}
+                isSyncing={isSyncingJira}
               />
             )}
 

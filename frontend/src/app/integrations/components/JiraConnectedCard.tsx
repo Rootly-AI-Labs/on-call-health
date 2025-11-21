@@ -1,23 +1,27 @@
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { AlertCircle, CheckCircle, Calendar, Globe, Key, Trash2, TestTube, Loader2, ArrowLeftRight } from "lucide-react"
+import { AlertCircle, CheckCircle, Calendar, Globe, Key, Trash2, TestTube, Loader2, ArrowLeftRight, Users } from "lucide-react"
 import type { JiraIntegration } from "../types"
 
 interface JiraConnectedCardProps {
   integration: JiraIntegration
   onDisconnect: () => void
   onTest: () => void
+  onSyncMembers?: () => void
   onSwitchWorkspace?: () => void
   isLoading?: boolean
+  isSyncing?: boolean
 }
 
 export function JiraConnectedCard({
   integration,
   onDisconnect,
   onTest,
+  onSyncMembers,
   onSwitchWorkspace,
-  isLoading = false
+  isLoading = false,
+  isSyncing = false
 }: JiraConnectedCardProps) {
   return (
     <Card className="border-2 border-green-200 bg-green-50/50 max-w-2xl mx-auto">
@@ -145,6 +149,21 @@ export function JiraConnectedCard({
             )}
             Test Connection
           </Button>
+          {onSyncMembers && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onSyncMembers}
+              disabled={isLoading || isSyncing}
+            >
+              {isSyncing ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Users className="w-4 h-4 mr-2" />
+              )}
+              Sync Members
+            </Button>
+          )}
           {integration.accessible_sites_count && integration.accessible_sites_count > 1 && onSwitchWorkspace && (
             <Button
               size="sm"

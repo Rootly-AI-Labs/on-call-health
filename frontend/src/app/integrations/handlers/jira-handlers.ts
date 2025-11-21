@@ -267,3 +267,75 @@ export async function selectJiraWorkspace(
     return false
   }
 }
+
+/**
+ * Sync Jira users to UserCorrelation table
+ */
+export async function syncJiraUsers(
+  setLoadingSync: (loading: boolean) => void,
+  onProgress?: (message: string) => void,
+  fetchSyncedUsers?: () => Promise<void>
+): Promise<{ matched: number; created: number; updated: number; skipped: number }> {
+  try {
+    setLoadingSync(true)
+    onProgress?.('🔄 Starting Jira user sync...')
+
+    const authToken = localStorage.getItem('auth_token')
+    if (!authToken) {
+      toast.error('Please log in to sync Jira users')
+      throw new Error('Not authenticated')
+    }
+
+    onProgress?.('📡 Fetching users from Jira workspace...')
+
+    const response = await fetch(`${API_BASE}/integrations/jira/sync-users`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.detail || 'Failed to sync Jira users')
+    }
+
+    onProgress?.('✅ Received response from server')
+    const data = await response.json()
+    const stats = data.stats || {}
+
+    onProgress?.(`📊 Matched ${stats.matched} users`)
+    onProgress?.(`🔄 Updated ${stats.updated} user records`)
+    onProgress?.(`⏭️  Skipped ${stats.skipped} users (no match found)`)
+
+    // Build success message
+    const message = `Synced ${stats.matched} Jira users to team members (${stats.updated} updated, ${stats.skipped} skipped).`
+    toast.success(message)
+
+    onProgress?.('🔄 Reloading team members...')
+
+    // Reload synced users if callback provided
+    if (fetchSyncedUsers) {
+      await fetchSyncedUsers()
+    }
+
+    onProgress?.('✅ Sync completed successfully!')
+
+    return {
+      matched: stats.matched || 0,
+      created: stats.created || 0,
+      updated: stats.updated || 0,
+      skipped: stats.skipped || 0
+    }
+
+  } catch (error) {
+    console.error('Error syncing Jira users:', error)
+    onProgress?.(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    const errorMsg = error instanceof Error ? error.message : 'Failed to sync Jira users'
+    toast.error(errorMsg)
+    throw error
+  } finally {
+    setLoadingSync(false)
+  }
+}

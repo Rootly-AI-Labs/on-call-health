@@ -740,6 +740,54 @@ async def test_jira_integration(
         return {"success": False, "message": f"Jira integration test failed: {str(e)}", "permissions": None}
 
 
+@router.post("/sync-users")
+async def sync_jira_users(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Sync all users from Jira workspace to UserCorrelation table.
+    Uses fuzzy name matching to map Jira users (displayName) to existing UserCorrelation records.
+
+    Returns:
+        Statistics about matched, created, updated, and skipped users
+    """
+    from ...services.jira_user_sync_service import JiraUserSyncService
+
+    try:
+        logger.info("[Jira] Starting user sync for user %s", current_user.id)
+
+        sync_service = JiraUserSyncService(db)
+        stats = await sync_service.sync_jira_users(current_user)
+
+        logger.info(
+            "[Jira] Sync completed: matched=%d, created=%d, updated=%d, skipped=%d",
+            stats['matched'],
+            stats['created'],
+            stats['updated'],
+            stats['skipped']
+        )
+
+        return {
+            "success": True,
+            "message": f"Synced {stats['matched']} Jira users to team members",
+            "stats": stats
+        }
+
+    except ValueError as ve:
+        logger.warning("[Jira] Sync validation error: %s", ve)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(ve)
+        )
+    except Exception as e:
+        logger.error("[Jira] Sync failed: %s", e, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to sync Jira users: {str(e)}"
+        )
+
+
 @router.delete("/disconnect")
 async def disconnect_jira(
     current_user: User = Depends(get_current_user),
