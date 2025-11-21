@@ -673,21 +673,27 @@ async def test_jira_integration(
                         "assignee_account_id": acc,
                         "assignee_name": name,
                         "count": 0,
-                        "priorities": {},  # name -> count
-                        "earliest_due": None,  # date
-                        "issue_keys": [],
+                        "priorities": {},  # name -> count (for summary)
+                        "tickets": [],  # list of all tickets with priority and duedate
                     }
                 per[acc]["count"] += 1
-                p = (f.get("priority") or {}).get("name") or "Unspecified"
-                per[acc]["priorities"][p] = per[acc]["priorities"].get(p, 0) + 1
-                due = _parse_due(f.get("duedate"))
-                if due:
-                    ed = per[acc]["earliest_due"]
-                    per[acc]["earliest_due"] = min(ed, due) if ed else due
+
+                # Get ticket details
                 k = it.get("key")
+                p = (f.get("priority") or {}).get("name") or "Unspecified"
+                due = _parse_due(f.get("duedate"))
+
+                # Add to priority summary
+                per[acc]["priorities"][p] = per[acc]["priorities"].get(p, 0) + 1
+
+                # Add complete ticket data for burnout calculation
                 if k:
-                    if len(per[acc]["issue_keys"]) < 10:  # avoid massive logs
-                        per[acc]["issue_keys"].append(k)
+                    ticket_data = {
+                        "key": k,
+                        "priority": p,
+                        "duedate": due.isoformat() if due else None,
+                    }
+                    per[acc]["tickets"].append(ticket_data)
 
             # pagination (enhanced API)
             is_last = bool(res.get("isLast"))
@@ -700,14 +706,20 @@ async def test_jira_integration(
         logger.info("[Jira/Test] Workload summary: total_issues=%d", total_issues)
         for acc, m in per.items():
             prios = " ".join([f"{k}:{v}" for k, v in sorted(m["priorities"].items(), key=lambda kv: (-kv[1], kv[0]))])
+            sample_keys = [t["key"] for t in m["tickets"][:5]]
+            earliest_due = None
+            if m["tickets"]:
+                due_dates = [t["duedate"] for t in m["tickets"] if t["duedate"]]
+                if due_dates:
+                    earliest_due = min(due_dates)
             logger.info(
                 "[Jira/Test] Responder %s (%s): tickets=%d, priorities=[%s], earliest_due=%s, samples=%s",
                 m["assignee_name"],
                 acc,
                 m["count"],
                 prios or "none",
-                m["earliest_due"].isoformat() if m["earliest_due"] else "None",
-                ",".join(m["issue_keys"]),
+                earliest_due if earliest_due else "None",
+                ",".join(sample_keys),
             )
 
         # Return a compact preview (optional, keeps frontend stable)
@@ -715,8 +727,6 @@ async def test_jira_integration(
         for row in preview:
             # make priorities stable for JSON
             row["priorities"] = dict(sorted(row["priorities"].items(), key=lambda kv: (-kv[1], kv[0])))
-            if isinstance(row.get("earliest_due"), date):
-                row["earliest_due"] = row["earliest_due"].isoformat()
 
         return {
             "success": True,

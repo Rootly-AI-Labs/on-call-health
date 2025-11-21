@@ -175,11 +175,11 @@ export default function IntegrationsPage() {
   
   // Mapping data state
   const [showMappingDialog, setShowMappingDialog] = useState(false)
-  const [selectedMappingPlatform, setSelectedMappingPlatform] = useState<'github' | 'slack' | null>(null)
+  const [selectedMappingPlatform, setSelectedMappingPlatform] = useState<'github' | 'slack' | 'jira' | null>(null)
   
   // MappingDrawer state (reusable component)
   const [mappingDrawerOpen, setMappingDrawerOpen] = useState(false)
-  const [mappingDrawerPlatform, setMappingDrawerPlatform] = useState<'github' | 'slack'>('github')
+  const [mappingDrawerPlatform, setMappingDrawerPlatform] = useState<'github' | 'slack' | 'jira'>('github')
   const [mappingData, setMappingData] = useState<IntegrationMapping[]>([])
   const [mappingStats, setMappingStats] = useState<MappingStatistics | null>(null)
   const [analysisMappingStats, setAnalysisMappingStats] = useState<AnalysisMappingStatistics | null>(null)
@@ -211,7 +211,7 @@ export default function IntegrationsPage() {
   const [showManualMappingDialog, setShowManualMappingDialog] = useState(false)
   const [manualMappings, setManualMappings] = useState<ManualMapping[]>([])
   const [manualMappingStats, setManualMappingStats] = useState<ManualMappingStatistics | null>(null)
-  const [selectedManualMappingPlatform, setSelectedManualMappingPlatform] = useState<'github' | 'slack' | null>(null)
+  const [selectedManualMappingPlatform, setSelectedManualMappingPlatform] = useState<'github' | 'slack' | 'jira' | null>(null)
   const [loadingManualMappings, setLoadingManualMappings] = useState(false)
   const [newMappingDialogOpen, setNewMappingDialogOpen] = useState(false)
 
@@ -1512,11 +1512,11 @@ export default function IntegrationsPage() {
 
   // Mapping data handlers
   // Function to open the reusable MappingDrawer
-  const openMappingDrawer = (platform: 'github' | 'slack') => {
+  const openMappingDrawer = (platform: 'github' | 'slack' | 'jira') => {
     return Utils.openMappingDrawer(platform, setMappingDrawerPlatform, setMappingDrawerOpen)
   }
 
-  const loadMappingData = async (platform: 'github' | 'slack') => {
+  const loadMappingData = async (platform: 'github' | 'slack' | 'jira') => {
     return MappingHandlers.loadMappingData(
       platform,
       showMappingDialog,
@@ -1707,7 +1707,7 @@ export default function IntegrationsPage() {
   }
 
   // Manual mapping handlers
-  const loadManualMappings = async (platform: 'github' | 'slack') => {
+  const loadManualMappings = async (platform: 'github' | 'slack' | 'jira') => {
     return MappingHandlers.loadManualMappings(
       platform,
       setLoadingManualMappings,
@@ -2706,10 +2706,10 @@ export default function IntegrationsPage() {
                 integration={jiraIntegration}
                 onDisconnect={() => setJiraDisconnectDialogOpen(true)}
                 onTest={handleJiraTest}
-                onSyncMembers={handleJiraSyncMembers}
-                onSwitchWorkspace={() => setJiraWorkspaceSelectorOpen(true)}
+                onViewMappings={() => openMappingDrawer('jira')}
                 isLoading={isDisconnectingJira}
-                isSyncing={isSyncingJira}
+                loadingMappings={loadingMappingData}
+                selectedMappingPlatform={selectedMappingPlatform}
               />
             )}
 
@@ -3806,7 +3806,7 @@ export default function IntegrationsPage() {
               <div>
                 <SheetTitle>Team Members</SheetTitle>
                 <SheetDescription>
-                  Sync will match {integrations.find(i => i.id.toString() === selectedOrganization)?.name || 'organization'} users with GitHub and Slack accounts
+                  Sync will match {integrations.find(i => i.id.toString() === selectedOrganization)?.name || 'organization'} users with Enhanced Integrations mappings.
                   {syncedUsers.length > 0 && ` • ${syncedUsers.length} synced`}
                 </SheetDescription>
               </div>

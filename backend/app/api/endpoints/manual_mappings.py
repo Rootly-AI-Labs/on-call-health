@@ -20,7 +20,7 @@ router = APIRouter()
 
 # Pydantic models for request/response
 class CreateMappingRequest(BaseModel):
-    source_platform: str = Field(..., description="Source platform (rootly, pagerduty)")
+    source_platform: str = Field(..., description="Source platform (rootly, pagerduty, jira)")
     source_identifier: str = Field(..., description="Source identifier (email, name)")
     target_platform: str = Field(..., description="Target platform (github, slack)")
     target_identifier: str = Field(..., description="Target identifier (username, user_id)")
@@ -716,9 +716,214 @@ async def run_github_mapping(
             "success_rate": mapped_count / len(results) if results else 0,
             "results": results
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error running GitHub mapping: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to run GitHub mapping: {str(e)}")
+
+@router.post("/manual-mappings/run-jira-mapping", summary="Run Jira mapping process")
+async def run_jira_mapping(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Run the Jira mapping process for all unmapped users using name-based matching."""
+    try:
+        logger.info(f"Starting Jira mapping for user {current_user.id}")
+        from ...models import JiraIntegration, RootlyIntegration
+        import asyncio
+        from difflib import SequenceMatcher
+
+        # Get Jira integration
+        jira_integration = db.query(JiraIntegration).filter(
+            JiraIntegration.user_id == current_user.id
+        ).first()
+
+        if not jira_integration or not jira_integration.access_token or not jira_integration.jira_cloud_id:
+            raise HTTPException(status_code=400, detail="Jira integration not found")
+
+        # Get unmapped Rootly users
+        service = ManualMappingService(db)
+
+        # Get all Rootly/PagerDuty users
+        rootly_integrations = db.query(RootlyIntegration).filter(
+            RootlyIntegration.user_id == current_user.id,
+            RootlyIntegration.platform.in_(["rootly", "pagerduty"])
+        ).all()
+
+        all_users = []
+        for integration in rootly_integrations:
+            if integration.platform == "rootly":
+                from ...core.rootly_client import RootlyAPIClient
+                api_token = integration.api_token.strip() if integration.api_token else None
+                if not api_token:
+                    logger.error(f"Integration {integration.id} has empty API token")
+                    continue
+
+                client = RootlyAPIClient(api_token)
+                try:
+                    users_data = await client.get_users()
+                except Exception as e:
+                    logger.error(f"Failed to fetch users from Rootly integration {integration.id}: {e}")
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Cannot fetch users from Rootly integration '{integration.name}'. The API token may be invalid or expired."
+                    )
+                for user in users_data:
+                    attributes = user.get("attributes", {})
+                    email = attributes.get("email")
+                    name = attributes.get("full_name") or attributes.get("name")
+
+                    if (email and email.strip()) or (name and name.strip()):
+                        all_users.append({
+                            "email": email.strip() if email else None,
+                            "name": name.strip() if name else None,
+                            "platform": "rootly",
+                            "integration_id": integration.id
+                        })
+                    else:
+                        logger.warning(f"Skipping user - no email or name: {user}")
+
+        # Get existing mappings
+        existing_mappings = service.get_platform_mappings(
+            user_id=current_user.id,
+            target_platform="jira"
+        )
+        mapped_identifiers = {m.source_identifier for m in existing_mappings if m.source_platform == "rootly"}
+
+        # Filter unmapped users
+        unmapped_users = []
+        for user in all_users:
+            user_email = user.get("email")
+            user_name = user.get("name")
+
+            if user_email and user_email in mapped_identifiers:
+                continue
+            if user_name and user_name in mapped_identifiers:
+                continue
+
+            if user_email or user_name:
+                unmapped_users.append(user)
+
+        # Fetch Jira users
+        try:
+            from ...services.jira_user_sync_service import JiraUserSyncService, _decrypt_token
+
+            access_token = _decrypt_token(jira_integration.access_token)
+            jira_service = JiraUserSyncService(db)
+            jira_users = await jira_service._fetch_jira_users(access_token, jira_integration.jira_cloud_id)
+            logger.info(f"🔍 Fetched {len(jira_users)} Jira users")
+        except Exception as e:
+            logger.error(f"Failed to fetch Jira users: {e}")
+            raise HTTPException(status_code=400, detail="Failed to fetch Jira users")
+
+        # Run matching process
+        results = []
+
+        def find_best_jira_match(name: str, jira_users: list, threshold: float = 0.75) -> Optional[Dict]:
+            """Find best matching Jira user by name."""
+            best_match = None
+            best_score = 0.0
+
+            name_normalized = name.lower().strip()
+
+            for jira_user in jira_users:
+                jira_name = jira_user.get("display_name", "").lower().strip()
+                if not jira_name:
+                    continue
+
+                score = SequenceMatcher(None, name_normalized, jira_name).ratio()
+
+                if score > best_score and score >= threshold:
+                    best_score = score
+                    best_match = jira_user
+
+            return best_match
+
+        for i, user in enumerate(unmapped_users[:20]):  # Limit to 20 to prevent timeouts
+            user_email = user.get("email")
+            user_name = user.get("name")
+            jira_user = None
+            match_method = None
+
+            try:
+                # Try name-based matching
+                if user_name:
+                    logger.info(f"[{i+1}/{len(unmapped_users[:20])}] Trying name-based matching for '{user_name}'")
+                    jira_user = find_best_jira_match(user_name, jira_users, threshold=0.75)
+                    if jira_user:
+                        match_method = "name"
+
+                # If no match by name, try email
+                if not jira_user and user_email:
+                    logger.info(f"[{i+1}/{len(unmapped_users[:20])}] Trying email-based matching for '{user_email}'")
+                    email_normalized = user_email.lower().strip()
+                    for ju in jira_users:
+                        jira_email = ju.get("email")
+                        if jira_email and jira_email.lower().strip() == email_normalized:
+                            jira_user = ju
+                            match_method = "email"
+                            break
+
+                if jira_user:
+                    source_identifier = user_email if user_email else user_name
+                    jira_identifier = jira_user.get("account_id") or jira_user.get("display_name")
+
+                    service.create_mapping(
+                        user_id=current_user.id,
+                        source_platform=user["platform"],
+                        source_identifier=source_identifier,
+                        target_platform="jira",
+                        target_identifier=jira_identifier,
+                        created_by=current_user.id,
+                        mapping_type="automated"
+                    )
+
+                    results.append({
+                        "email": user_email,
+                        "name": user_name,
+                        "jira_username": jira_identifier,
+                        "status": "mapped",
+                        "platform": user["platform"],
+                        "match_method": match_method
+                    })
+                else:
+                    results.append({
+                        "email": user_email,
+                        "name": user_name,
+                        "jira_username": None,
+                        "status": "not_found",
+                        "platform": user["platform"]
+                    })
+            except Exception as e:
+                identifier = user_email or user_name or "unknown user"
+                logger.error(f"Error mapping {identifier}: {e}")
+                results.append({
+                    "email": user_email,
+                    "name": user_name,
+                    "jira_username": None,
+                    "status": "error",
+                    "error": str(e),
+                    "platform": user["platform"]
+                })
+
+        # Calculate summary stats
+        mapped_count = len([r for r in results if r["status"] == "mapped"])
+        not_found_count = len([r for r in results if r["status"] == "not_found"])
+        error_count = len([r for r in results if r["status"] == "error"])
+
+        return {
+            "total_processed": len(results),
+            "mapped": mapped_count,
+            "not_found": not_found_count,
+            "errors": error_count,
+            "success_rate": mapped_count / len(results) if results else 0,
+            "results": results
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error running Jira mapping: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to run Jira mapping: {str(e)}")

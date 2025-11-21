@@ -596,7 +596,65 @@ class UnifiedBurnoutAnalyzer:
                 # GITHUB BURNOUT ADJUSTMENT: Recalculate burnout scores using GitHub data
                 logger.info(f"GITHUB BURNOUT: Recalculating scores with GitHub activity data")
                 team_analysis["members"] = self._recalculate_burnout_with_github(team_analysis["members"], metadata)
-            
+
+            """
+            1. _calculate_jira_burnout_score(tickets)
+
+            Calculates burnout based on:
+            - Ticket Volume: 1-50+ tickets = exhaustion 1.0-9.0
+            - Priority Distribution: High/Critical % contributes 0-4 points
+            - Deadline Urgency:
+                - Overdue tickets: +0.5 per ticket (max 4.0)
+                - Due within 7 days: +0.3 per ticket (max 3.0)
+            - Three Burnout Components (same as GitHub model):
+                - Emotional Exhaustion (45% weight)
+                - Depersonalization (35% weight)
+                - Reduced Personal Accomplishment (20% weight)
+
+            Result: Burnout score 0-10 based on Jira workload
+
+            2. _recalculate_burnout_with_jira(members, metadata)
+
+            Intelligently combines burnout sources:
+            - No incidents + Jira workload → Use Jira score only
+            - Incidents + Jira workload → Combine (60% incidents, 40% Jira)
+            - All three (Incidents + GitHub + Jira) → Combine (40% incidents, 30%
+            GitHub, 30% Jira)
+
+            Result: Composite burnout scores from multiple data sources
+
+            """
+
+
+
+
+            # JIRA BURNOUT ADJUSTMENT: Recalculate burnout scores using Jira ticket workload
+            try:
+                logger.info(f"JIRA BURNOUT: Fetching Jira ticket data for burnout analysis")
+                from ..models import JiraIntegration, db as db_instance
+                from ..api.endpoints.jira import decrypt_token
+                from ..auth.integration_oauth import jira_integration_oauth
+
+                # Get Jira integration (if available)
+                jira_integration = None
+                if hasattr(self, 'current_user_id'):
+                    # This will be available if current_user_id is set on the analyzer
+                    from ..models import get_db
+                    # For now, we'll skip Jira if we can't get proper DB session
+                    # This should be improved to pass DB session properly
+                    logger.info(f"JIRA BURNOUT: Skipping Jira data - DB session not available in analyzer")
+                else:
+                    logger.info(f"JIRA BURNOUT: Skipping Jira data - current_user_id not available")
+
+                # If Jira data is available, add it to team members and recalculate
+                if jira_integration:
+                    logger.info(f"JIRA BURNOUT: Recalculating scores with Jira ticket workload")
+                    team_analysis["members"] = self._recalculate_burnout_with_jira(team_analysis["members"], metadata)
+
+            except Exception as e:
+                logger.warning(f"JIRA BURNOUT: Could not integrate Jira data: {e}")
+                # Continue without Jira data - it's optional
+
             # Calculate overall team health AFTER GitHub burnout adjustment
             health_calc_start = datetime.now()
             logger.info(f"BURNOUT ANALYSIS: Step 4 - Calculating team health for {time_range_days}-day analysis")
@@ -4051,18 +4109,227 @@ class UnifiedBurnoutAnalyzer:
                 updated_members.append(updated_member)
             
             logger.info(f"GITHUB BURNOUT: Adjusted scores for {github_adjustments_made}/{len(members)} members using GitHub activity")
-            
+
             return updated_members
-            
+
         except Exception as e:
             logger.error(f"Error in _recalculate_burnout_with_github: {e}")
             return members
-    
+
+    def _recalculate_burnout_with_jira(self, members: List[Dict[str, Any]], metadata: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """
+        Recalculate burnout scores incorporating Jira ticket workload data.
+        Considers ticket count, priorities, and deadlines.
+        """
+        try:
+            updated_members = []
+            jira_adjustments_made = 0
+
+            for member in members:
+                if not isinstance(member, dict):
+                    updated_members.append(member)
+                    continue
+
+                # Get current burnout info
+                current_score = member.get("burnout_score", 0)
+                incident_count = member.get("incident_count", 0)
+                jira_tickets = member.get("jira_tickets", [])
+
+                # Calculate Jira-based burnout score
+                jira_burnout_score = 0.0
+                if jira_tickets:
+                    jira_burnout_score = self._calculate_jira_burnout_score(jira_tickets)
+
+                # Determine final burnout score based on available data
+                final_score = current_score  # Default to current score
+                score_source = member.get("github_burnout_breakdown", {}).get("score_source", "incident_based")
+
+                if incident_count == 0 and jira_burnout_score > 0:
+                    # User has no incidents but Jira workload - use Jira score
+                    final_score = jira_burnout_score
+                    score_source = "jira_based"
+                    jira_adjustments_made += 1
+                elif incident_count > 0 and jira_burnout_score > 0:
+                    # User has both incidents and Jira workload
+                    # If already using GitHub (hybrid or github_based), combine all three
+                    if "github" in score_source or score_source == "hybrid":
+                        # Combine incident (40%), GitHub (30%), Jira (30%)
+                        github_score = member.get("github_burnout_breakdown", {}).get("github_score", 0)
+                        final_score = (current_score * 0.4) + (github_score * 0.3) + (jira_burnout_score * 0.3)
+                        score_source = "hybrid_github_jira"
+                    else:
+                        # Combine incident (60%) and Jira (40%)
+                        final_score = (current_score * 0.6) + (jira_burnout_score * 0.4)
+                        score_source = "hybrid_jira"
+                    jira_adjustments_made += 1
+
+                # Update member with new score
+                updated_member = member.copy()
+                updated_member["burnout_score"] = round(final_score, 2)
+                updated_member["risk_level"] = self._determine_risk_level(final_score)
+
+                # Add Jira burnout breakdown for transparency
+                ticket_count = len(jira_tickets) if jira_tickets else 0
+                critical_count = len([t for t in (jira_tickets or []) if t.get("priority", "").lower() in ["critical", "blocker", "highest", "high"]])
+
+                updated_member["jira_burnout_breakdown"] = {
+                    "jira_score": round(jira_burnout_score, 2),
+                    "original_score": round(current_score, 2),
+                    "final_score": round(final_score, 2),
+                    "score_source": score_source,
+                    "jira_indicators": {
+                        "ticket_count": ticket_count,
+                        "critical_high_priority_count": critical_count,
+                        "high_workload": ticket_count >= 20,
+                        "critical_ratio_high": (critical_count / ticket_count * 100 if ticket_count > 0 else 0) > 30
+                    }
+                }
+
+                updated_members.append(updated_member)
+
+            logger.info(f"JIRA BURNOUT: Adjusted scores for {jira_adjustments_made}/{len(members)} members using Jira ticket workload")
+
+            return updated_members
+
+        except Exception as e:
+            logger.error(f"Error in _recalculate_burnout_with_jira: {e}")
+            return members
+
+    def _calculate_jira_burnout_score(
+        self,
+        tickets: Optional[List[Dict[str, Any]]]
+    ) -> float:
+        """
+        Calculate burnout score based on Jira ticket workload.
+        Considers:
+        - Total ticket count (higher = more overloaded)
+        - Priority levels (High/Critical = more urgent stress)
+        - Due dates (earlier deadlines = more pressure)
+
+        Returns a burnout score between 0-10.
+        """
+        try:
+            if not tickets:
+                return 0.0
+
+            ticket_count = len(tickets)
+            if ticket_count == 0:
+                return 0.0
+
+            # Emotional Exhaustion Score (0-10, based on workload)
+            exhaustion_score = 0.0
+
+            # Base score on ticket volume
+            if ticket_count >= 50:  # Extreme overload
+                exhaustion_score += 9.0
+            elif ticket_count >= 40:  # Very high
+                exhaustion_score += 7.5
+            elif ticket_count >= 30:  # High
+                exhaustion_score += 6.0
+            elif ticket_count >= 20:  # Moderately high
+                exhaustion_score += 4.0
+            elif ticket_count >= 10:  # Moderate
+                exhaustion_score += 2.5
+            elif ticket_count >= 1:  # Some workload
+                exhaustion_score += 1.0
+
+            # Calculate priority distribution
+            priority_counts = {}
+            critical_high_count = 0
+
+            for ticket in tickets:
+                priority = ticket.get("priority", "Unspecified").lower()
+                priority_counts[priority] = priority_counts.get(priority, 0) + 1
+
+                # Count high-urgency tickets
+                if priority in ["critical", "blocker", "highest", "high"]:
+                    critical_high_count += 1
+
+            # Increase exhaustion based on high-priority ticket ratio
+            if ticket_count > 0:
+                critical_ratio = critical_high_count / ticket_count
+                if critical_ratio > 0.5:  # >50% high priority
+                    exhaustion_score += 4.0
+                elif critical_ratio > 0.3:  # >30% high priority
+                    exhaustion_score += 2.5
+                elif critical_ratio > 0.15:  # >15% high priority
+                    exhaustion_score += 1.0
+
+            # Check urgency of deadlines
+            from datetime import datetime, date as date_type
+            today = date_type.today()
+            urgent_count = 0  # Due within 7 days
+            overdue_count = 0  # Past due date
+
+            for ticket in tickets:
+                duedate_str = ticket.get("duedate")
+                if duedate_str:
+                    try:
+                        if isinstance(duedate_str, str):
+                            due_date = datetime.strptime(duedate_str, "%Y-%m-%d").date()
+                        else:
+                            due_date = duedate_str
+
+                        days_until_due = (due_date - today).days
+
+                        if days_until_due < 0:  # Overdue
+                            overdue_count += 1
+                        elif days_until_due <= 7:  # Due within a week
+                            urgent_count += 1
+                    except (ValueError, TypeError):
+                        pass
+
+            # Increase exhaustion for urgent deadlines
+            if overdue_count > 0:
+                exhaustion_score += min(4.0, overdue_count * 0.5)
+            if urgent_count > 0:
+                exhaustion_score += min(3.0, urgent_count * 0.3)
+
+            exhaustion_score = min(10.0, exhaustion_score)
+
+            # Depersonalization Score (0-10, based on deadline pressure)
+            depersonalization_score = 0.0
+
+            # High priority + short deadlines can lead to cynicism/detachment
+            if critical_high_count >= 10 and urgent_count >= 5:
+                depersonalization_score = 7.0
+            elif critical_high_count >= 8 or urgent_count >= 8:
+                depersonalization_score = 5.0
+            elif critical_high_count >= 5 or (urgent_count >= 5 and ticket_count >= 20):
+                depersonalization_score = 3.0
+            elif critical_high_count > 0 or urgent_count > 0:
+                depersonalization_score = 1.5
+
+            # Personal Accomplishment Score (0-10, higher = better)
+            # High workload can make accomplishment feel meaningless
+            accomplishment_score = 7.0  # Default
+
+            if critical_ratio > 0.5:  # Mostly fighting fires
+                accomplishment_score = 3.0
+            elif critical_ratio > 0.3 or ticket_count > 30:
+                accomplishment_score = 4.0
+            elif ticket_count > 20:
+                accomplishment_score = 5.0
+
+            # Calculate final burnout score
+            burnout_score = (
+                exhaustion_score * 0.45 +
+                depersonalization_score * 0.35 +
+                (10 - accomplishment_score) * 0.20
+            )
+
+            burnout_score = max(0.0, min(10.0, burnout_score))
+            return burnout_score
+
+        except Exception as e:
+            logger.error(f"Error calculating Jira burnout score: {e}")
+            return 0.0
+
     def _calculate_github_burnout_score(
-        self, 
-        commits_count: Optional[int], 
-        commits_per_week: Optional[float], 
-        after_hours_commits: Optional[int], 
+        self,
+        commits_count: Optional[int],
+        commits_per_week: Optional[float],
+        after_hours_commits: Optional[int],
         weekend_commits: Optional[int]
     ) -> float:
         """

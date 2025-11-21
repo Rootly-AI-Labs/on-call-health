@@ -8,20 +8,20 @@ interface JiraConnectedCardProps {
   integration: JiraIntegration
   onDisconnect: () => void
   onTest: () => void
-  onSyncMembers?: () => void
-  onSwitchWorkspace?: () => void
+  onViewMappings?: () => void
   isLoading?: boolean
-  isSyncing?: boolean
+  loadingMappings?: boolean
+  selectedMappingPlatform?: string | null
 }
 
 export function JiraConnectedCard({
   integration,
   onDisconnect,
   onTest,
-  onSyncMembers,
-  onSwitchWorkspace,
+  onViewMappings,
   isLoading = false,
-  isSyncing = false
+  loadingMappings = false,
+  selectedMappingPlatform = null
 }: JiraConnectedCardProps) {
   return (
     <Card className="border-2 border-green-200 bg-green-50/50 max-w-2xl mx-auto">
@@ -149,30 +149,26 @@ export function JiraConnectedCard({
             )}
             Test Connection
           </Button>
-          {onSyncMembers && (
+          {onViewMappings && (
             <Button
               size="sm"
               variant="outline"
-              onClick={onSyncMembers}
-              disabled={isLoading || isSyncing}
+              onClick={onViewMappings}
+              disabled={loadingMappings}
+              className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 hover:text-blue-800 hover:border-blue-300"
+              title="View and manage Jira user mappings"
             >
-              {isSyncing ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              {loadingMappings && selectedMappingPlatform === 'jira' ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Loading...
+                </>
               ) : (
-                <Users className="w-4 h-4 mr-2" />
+                <>
+                  <Users className="w-4 h-4 mr-2" />
+                  View Mappings
+                </>
               )}
-              Sync Members
-            </Button>
-          )}
-          {integration.accessible_sites_count && integration.accessible_sites_count > 1 && onSwitchWorkspace && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={onSwitchWorkspace}
-              disabled={isLoading}
-            >
-              <ArrowLeftRight className="w-4 h-4 mr-2" />
-              Switch Workspace
             </Button>
           )}
           <Button
