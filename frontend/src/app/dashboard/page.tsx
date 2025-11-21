@@ -292,9 +292,9 @@ export default function Dashboard() {
                       onClick={async () => {
                         const analysisKey = analysis.uuid || analysis.id.toString()
 
-                        // Check cache first
+                        // Check cache first - but only use if it has full analysis data
                         const cachedAnalysis = analysisCache.get(analysisKey)
-                        if (cachedAnalysis) {
+                        if (cachedAnalysis && cachedAnalysis.analysis_data && cachedAnalysis.analysis_data.team_analysis) {
                           // Use cached analysis data (includes both sufficient and insufficient data cases)
                           setCurrentAnalysis(cachedAnalysis)
                           setRedirectingToSuggested(false) // Turn off redirect loader
