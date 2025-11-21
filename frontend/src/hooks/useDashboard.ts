@@ -556,7 +556,33 @@ export default function useDashboard() {
 
           if (!analysisId && data.analyses && data.analyses.length > 0 && !currentAnalysis) {
             const mostRecentAnalysis = data.analyses[0] // Analyses should be ordered by created_at desc
-            setCurrentAnalysis(mostRecentAnalysis)
+
+            // Check if the analysis has full member data
+            const teamAnalysis = mostRecentAnalysis.analysis_data?.team_analysis
+            const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members
+
+            if (members && Array.isArray(members) && members.length > 0) {
+              // Has full data, use it directly
+              setCurrentAnalysis(mostRecentAnalysis)
+            } else {
+              // Summary only, fetch the full analysis
+              const analysisKey = mostRecentAnalysis.uuid || mostRecentAnalysis.id.toString()
+              try {
+                const response = await fetch(`${API_BASE}/analyses/${mostRecentAnalysis.id}`, {
+                  headers: {
+                    'Authorization': `Bearer ${authToken}`
+                  }
+                })
+
+                if (response.ok) {
+                  const fullAnalysis = await response.json()
+                  setAnalysisCache(prev => new Map(prev.set(analysisKey, fullAnalysis)))
+                  setCurrentAnalysis(fullAnalysis)
+                }
+              } catch (error) {
+                console.error('Error fetching most recent analysis:', error)
+              }
+            }
             // Platform mappings will be fetched by the dedicated useEffect
           }
         }
