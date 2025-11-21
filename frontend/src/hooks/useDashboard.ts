@@ -160,29 +160,15 @@ export default function useDashboard() {
 
   // Helper function to determine if insufficient data card should be shown
   const shouldShowInsufficientDataCard = () => {
-    console.log('[shouldShowInsufficientDataCard] Checking...', {
-      hasAnalysis: !!currentAnalysis,
-      analysisRunning,
-      analysisId: currentAnalysis?.id,
-      status: currentAnalysis?.status
-    })
-
-    if (!currentAnalysis || analysisRunning) {
-      console.log('[shouldShowInsufficientDataCard] Returning false - no analysis or running')
-      return false
-    }
+    if (!currentAnalysis || analysisRunning) return false
 
     // Show for failed analyses
-    if (currentAnalysis.status === 'failed') {
-      console.log('[shouldShowInsufficientDataCard] Returning true - failed status')
-      return true
-    }
+    if (currentAnalysis.status === 'failed') return true
 
     // Show for completed analyses with no meaningful data
     if (currentAnalysis.status === 'completed') {
       // Check if analysis_data is completely missing
       if (!currentAnalysis.analysis_data) {
-        console.log('[shouldShowInsufficientDataCard] Returning true - no analysis_data')
         return true
       }
 
@@ -195,20 +181,10 @@ export default function useDashboard() {
         const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members
         const hasNoMembers = !members || members.length === 0
 
-        console.log('[shouldShowInsufficientDataCard] Checking members:', {
-          hasTeamHealth: !!currentAnalysis.analysis_data?.team_health,
-          hasTeamSummary: !!currentAnalysis.analysis_data?.team_summary,
-          teamAnalysisType: Array.isArray(teamAnalysis) ? 'array' : typeof teamAnalysis,
-          membersLength: Array.isArray(members) ? members.length : 'not array',
-          hasNoMembers
-        })
-
         if (hasNoMembers) {
-          console.log('[shouldShowInsufficientDataCard] Returning true - no members')
           return true // Show insufficient data card
         }
 
-        console.log('[shouldShowInsufficientDataCard] Returning false - has members')
         return false // Has meaningful data - even if 0 incidents, show normal dashboard
       }
       

@@ -296,20 +296,12 @@ export default function Dashboard() {
                         const teamAnalysis = analysis.analysis_data?.team_analysis
                         const members = Array.isArray(teamAnalysis) ? teamAnalysis : (teamAnalysis as any)?.members
 
-                        console.log('Analysis clicked:', {
-                          id: analysis.id,
-                          uuid: analysis.uuid,
-                          hasSummary: !!analysis.analysis_data,
-                          hasMembers: Array.isArray(members) ? members.length : 0
-                        })
-
                         // Check cache first - but only use if it has full analysis data with members
                         const cachedAnalysis = analysisCache.get(analysisKey)
                         const cachedTeamAnalysis = cachedAnalysis?.analysis_data?.team_analysis
                         const cachedMembers = Array.isArray(cachedTeamAnalysis) ? cachedTeamAnalysis : (cachedTeamAnalysis as any)?.members
 
                         if (cachedAnalysis && cachedAnalysis.analysis_data && cachedMembers && Array.isArray(cachedMembers) && cachedMembers.length > 0) {
-                          console.log('Using cached full analysis')
                           // Use cached full analysis data
                           setCurrentAnalysis(cachedAnalysis)
                           setRedirectingToSuggested(false) // Turn off redirect loader
@@ -319,7 +311,6 @@ export default function Dashboard() {
 
                         // If analysis doesn't have full data with members, fetch it
                         if (!analysis.analysis_data || !members || !Array.isArray(members) || members.length === 0) {
-                          console.log('Fetching full analysis from API...')
                           try {
                             const authToken = localStorage.getItem('auth_token')
                             if (!authToken) return
@@ -330,30 +321,22 @@ export default function Dashboard() {
                               }
                             })
 
-                            console.log('Fetch response status:', response.status)
-
                             if (response.ok) {
                               const fullAnalysis = await response.json()
-                              const fullTeamAnalysis = fullAnalysis.analysis_data?.team_analysis
-                              const fullMembers = Array.isArray(fullTeamAnalysis) ? fullTeamAnalysis : (fullTeamAnalysis as any)?.members
-                              console.log('Full analysis loaded, members:', Array.isArray(fullMembers) ? fullMembers.length : 0)
-                              // Cache the full analysis data (whether sufficient or insufficient)
+                              // Cache the full analysis data
                               setAnalysisCache(prev => new Map(prev.set(analysisKey, fullAnalysis)))
                               setCurrentAnalysis(fullAnalysis)
                               setRedirectingToSuggested(false) // Turn off redirect loader
                               updateURLWithAnalysis(fullAnalysis.uuid || fullAnalysis.id)
                             } else {
-                              // Don't set incomplete analysis - keep current one or show error
                               console.error('Failed to fetch full analysis:', response.status)
                               setRedirectingToSuggested(false)
                             }
                           } catch (error) {
-                            // Don't set incomplete analysis - keep current one or show error
                             console.error('Error fetching full analysis:', error)
                             setRedirectingToSuggested(false)
                           }
                         } else {
-                          console.log('Using analysis from sidebar (already has full data)')
                           // Analysis already has full data, cache it and use it
                           setAnalysisCache(prev => new Map(prev.set(analysisKey, analysis)))
                           setCurrentAnalysis(analysis)
