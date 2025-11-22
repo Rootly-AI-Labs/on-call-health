@@ -390,10 +390,7 @@ def generate_ocb_score_reasoning(
     personal_factors = []
     work_factors = []
 
-    # Collect research-based insights to avoid duplication
-    time_data = raw_metrics.get('time_impact_analysis', {}) if raw_metrics else {}
-    recovery_data = raw_metrics.get('recovery_analysis', {}) if raw_metrics else {}
-    trauma_data = raw_metrics.get('trauma_analysis', {}) if raw_metrics else {}
+    # Get severity distribution for work-related factors
     severity_dist = raw_metrics.get('severity_distribution', {}) if raw_metrics else {}
 
     # Personal burnout contributors
@@ -423,79 +420,18 @@ def generate_ocb_score_reasoning(
                     display_score = round(normalized_score, 1)
                 if factor_name == 'sleep_quality_proxy':
                     personal_factors.append(f"Sleep quality impact from critical incidents ({display_score:.1f} points)")
-                    # Add critical incident details
-                    critical_count = trauma_data.get('critical_incidents', 0) if raw_metrics else 0
-                    compound_factor = trauma_data.get('compound_factor', 1.0) if raw_metrics else 1.0
-                    if critical_count > 0:
-                        personal_factors.append(f"  • {critical_count} critical incidents (compound factor: {compound_factor:.2f}x)")
-                    if critical_count >= 5:
-                        personal_factors.append(f"  • Research insight: 5+ critical incidents create exponential psychological impact")
 
                 elif factor_name == 'vacation_usage':
                     personal_factors.append(f"Recovery time between incidents ({display_score:.1f} points)")
-                    # Add recovery pattern details
-                    recovery_violations = recovery_data.get('recovery_violations', 0) if raw_metrics else 0
-                    avg_recovery = recovery_data.get('avg_recovery_hours', 0) if raw_metrics else 0
-                    if recovery_violations > 0:
-                        personal_factors.append(f"  • Recovery periods <48 hours: {recovery_violations} occurrences")
-                    if avg_recovery > 0 and avg_recovery < 168:
-                        personal_factors.append(f"  • Average recovery time: {avg_recovery:.1f} hours")
 
                 elif factor_name == 'work_hours_trend':
                     personal_factors.append(f"Extended work hours ({display_score:.1f} points)")
-                    # Add time pattern details for extended work hours
-                    after_hours_count = time_data.get('after_hours_incidents', 0) if raw_metrics else 0
-                    if after_hours_count > 0:
-                        personal_factors.append(f"  • After-hours incidents: {after_hours_count} incidents")
 
                 elif factor_name == 'after_hours_activity':
                     personal_factors.append(f"Non-business hours incident activity ({display_score:.1f} points)")
-                    # Add time pattern details
-                    after_hours_count = time_data.get('after_hours_incidents', 0) if raw_metrics else 0
-                    overnight_count = time_data.get('overnight_incidents', 0) if raw_metrics else 0
-                    if after_hours_count > 0:
-                        personal_factors.append(f"  • After-hours incidents: {after_hours_count} incidents")
-                    if overnight_count > 0:
-                        personal_factors.append(f"  • Overnight incidents: {overnight_count} incidents")
 
                 elif factor_name == 'weekend_work':
                     personal_factors.append(f"Weekend incident activity ({display_score:.1f} points)")
-                    # Add weekend pattern details
-                    weekend_count = time_data.get('weekend_incidents', 0) if raw_metrics else 0
-                    if weekend_count > 0:
-                        personal_factors.append(f"  • Weekend incidents: {weekend_count} incidents")
-
-    # Collect time pattern and recovery data for separate display
-    time_patterns = []
-    recovery_patterns = []
-    trauma_patterns = []
-
-    if raw_metrics:
-        # Critical incidents insights
-        critical_count = trauma_data.get('critical_incidents', 0)
-        compound_factor = trauma_data.get('compound_factor', 1.0)
-        if critical_count > 0:
-            trauma_patterns.append(f"Multiple critical incidents: {critical_count} incidents (compound factor: {compound_factor:.2f}x)")
-
-        # Time impact insights
-        after_hours_count = time_data.get('after_hours_incidents', 0)
-        weekend_count = time_data.get('weekend_incidents', 0)
-        overnight_count = time_data.get('overnight_incidents', 0)
-
-        if after_hours_count > 0:
-            time_patterns.append(f"After-hours incidents: {after_hours_count} incidents")
-        if weekend_count > 0:
-            time_patterns.append(f"Weekend incidents: {weekend_count} incidents")
-        if overnight_count > 0:
-            time_patterns.append(f"Overnight incidents: {overnight_count} incidents")
-
-        # Recovery insights
-        recovery_violations = recovery_data.get('recovery_violations', 0)
-        avg_recovery = recovery_data.get('avg_recovery_hours', 0)
-        if recovery_violations > 0:
-            recovery_patterns.append(f"Recovery periods <48 hours: {recovery_violations} occurrences")
-        if avg_recovery > 0 and avg_recovery < 168:  # Less than 1 week
-            recovery_patterns.append(f"Average recovery time: {avg_recovery:.1f} hours")
     
     # Work-related burnout contributors
     # Always show work-related factors regardless of score
@@ -544,19 +480,9 @@ def generate_ocb_score_reasoning(
                             work_factors.append(f"Critical production incident frequency ({display_score:.1f} points)")
                     else:
                         work_factors.append(f"Critical production incident frequency ({display_score:.1f} points)")
-                    # Add critical incident compound factor details
-                    critical_count = trauma_data.get('critical_incidents', 0) if raw_metrics else 0
-                    compound_factor = trauma_data.get('compound_factor', 1.0) if raw_metrics else 1.0
-                    if critical_count > 0 and compound_factor > 1.0:
-                        work_factors.append(f"  • Compound trauma factor: {compound_factor:.2f}x psychological impact")
 
                 elif factor_name == 'pr_frequency':
                     work_factors.append(f"Incident severity-weighted workload ({display_score:.1f} points)")
-                    # Add severity distribution details
-                    if severity_dist:
-                        high_severity = severity_dist.get('SEV0', 0) + severity_dist.get('SEV1', 0)
-                        if high_severity > 0:
-                            work_factors.append(f"  • High-severity incidents (SEV0/SEV1): {high_severity} incidents")
 
                 elif factor_name == 'sprint_completion':
                     work_factors.append(f"Response time requirements ({display_score:.1f} points)")
@@ -567,11 +493,6 @@ def generate_ocb_score_reasoning(
                 elif factor_name == 'code_review_speed':
                     work_factors.append(f"Code review speed pressure ({display_score:.1f} points)")
 
-    # Add work-related baseline information
-    if raw_metrics:
-        total_incidents = sum(severity_dist.values()) if severity_dist else 0
-        if total_incidents > 0:
-            work_factors.append(f"Total incident volume: {total_incidents} incidents handled")
 
     # Output organized factors with clear headers
     if personal_factors:
