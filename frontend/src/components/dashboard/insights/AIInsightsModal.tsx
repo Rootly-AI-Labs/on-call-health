@@ -1,8 +1,10 @@
 "use client"
 
+import { useState } from "react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
-import { Sparkles } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Sparkles, Copy, Check } from "lucide-react"
 
 interface AIInsightsModalProps {
   isOpen: boolean
@@ -11,7 +13,33 @@ interface AIInsightsModalProps {
 }
 
 export function AIInsightsModal({ isOpen, onClose, currentAnalysis }: AIInsightsModalProps) {
+  const [copied, setCopied] = useState(false)
   const aiInsights = currentAnalysis?.analysis_data?.ai_team_insights?.insights;
+
+  const handleCopy = async () => {
+    if (!aiInsights?.llm_team_analysis) return
+
+    try {
+      // Extract plain text from markdown-like content
+      // Convert markdown formatting to plain text
+      let plainText = aiInsights.llm_team_analysis
+        // Remove markdown headers and convert to plain text with line breaks
+        .replace(/^### (.*?)$/gm, '$1\n')
+        .replace(/^## (.*?)$/gm, '$1\n\n')
+        .replace(/^# (.*?)$/gm, '$1\n\n')
+        // Remove bold markers
+        .replace(/\*\*(.*?)\*\*/g, '$1')
+        // Ensure proper line breaks
+        .replace(/\n{3,}/g, '\n\n')
+        .trim()
+      
+      await navigator.clipboard.writeText(plainText)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (err) {
+      console.error('Failed to copy text:', err)
+    }
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -20,11 +48,33 @@ export function AIInsightsModal({ isOpen, onClose, currentAnalysis }: AIInsights
         aria-describedby="ai-insights-description"
       >
         <DialogHeader>
-          <DialogTitle className="flex items-center space-x-2">
-            <Sparkles className="w-6 h-6 text-blue-600" />
-            <span>AI Team Insights</span>
-            <Badge variant="secondary" className="text-xs">AI Enhanced</Badge>
-          </DialogTitle>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Sparkles className="w-6 h-6 text-blue-600" />
+              <DialogTitle>AI Team Insights</DialogTitle>
+              <Badge variant="secondary" className="text-xs">AI Enhanced</Badge>
+            </div>
+            {aiInsights?.llm_team_analysis && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCopy}
+                className="flex items-center space-x-2"
+              >
+                {copied ? (
+                  <>
+                    <Check className="w-4 h-4" />
+                    <span>Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-4 h-4" />
+                    <span>Copy</span>
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
           <DialogDescription id="ai-insights-description">
             Analysis generated from {aiInsights?.team_size || 0} team members
           </DialogDescription>
