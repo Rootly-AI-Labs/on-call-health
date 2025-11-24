@@ -664,14 +664,15 @@ async def test_jira_integration(
 
             for it in issues:
                 f = it.get("fields") or {}
-                asg = (f.get("assignee") or {})
+                asg = (f.get("assignee") or {}) 
                 acc = asg.get("accountId") or "unknown"
                 name = asg.get("displayName") or acc
-
+                email = asg.get("emailAddress") or None
                 if acc not in per:
                     per[acc] = {
                         "assignee_account_id": acc,
                         "assignee_name": name,
+                        "assignee_email" : email,
                         "count": 0,
                         "priorities": {},  # name -> count (for summary)
                         "tickets": [],  # list of all tickets with priority and duedate
@@ -702,31 +703,60 @@ async def test_jira_integration(
                 break
             page += 1
 
-        # Log a readable summary
+        # Log a readable summary with email addresses
         logger.info("[Jira/Test] Workload summary: total_issues=%d", total_issues)
+
         for acc, m in per.items():
-            prios = " ".join([f"{k}:{v}" for k, v in sorted(m["priorities"].items(), key=lambda kv: (-kv[1], kv[0]))])
+            prios = " ".join([
+                f"{k}:{v}"
+                for k, v in sorted(m["priorities"].items(), key=lambda kv: (-kv[1], kv[0]))
+            ])
+
             sample_keys = [t["key"] for t in m["tickets"][:5]]
             earliest_due = None
             if m["tickets"]:
                 due_dates = [t["duedate"] for t in m["tickets"] if t["duedate"]]
                 if due_dates:
                     earliest_due = min(due_dates)
+
             logger.info(
-                "[Jira/Test] Responder %s (%s): tickets=%d, priorities=[%s], earliest_due=%s, samples=%s",
+                "[Jira/Test] User %s (ID: %s, Email: %s): "
+                "tickets=%d, priorities=[%s], earliest_due=%s, samples=%s",
                 m["assignee_name"],
                 acc,
+                m.get("assignee_email") or "N/A",
                 m["count"],
                 prios or "none",
                 earliest_due if earliest_due else "None",
                 ",".join(sample_keys),
             )
 
-        # Return a compact preview (optional, keeps frontend stable)
-        preview = sorted(per.values(), key=lambda m: (-m["count"], m["assignee_name"]))[:20]
-        for row in preview:
+            # Log all tickets for this user
+            logger.info("[Jira/Test] All tickets for %s:", m["assignee_name"])
+            for ticket in m["tickets"]:
+                logger.info(
+                    "[Jira/Test]   - %s | Priority: %s | Due: %s",
+                    ticket["key"],
+                    ticket["priority"],
+                    ticket["duedate"] or "No due date",
+                )
+
+        # Return complete user + ticket data instead of preview
+        all_users = sorted(per.values(), key=lambda m: (-m["count"], m["assignee_name"]))
+
+        for row in all_users:
             # make priorities stable for JSON
-            row["priorities"] = dict(sorted(row["priorities"].items(), key=lambda kv: (-kv[1], kv[0])))
+            row["priorities"] = dict(
+                sorted(row["priorities"].items(), key=lambda kv: (-kv[1], kv[0]))
+            )
+
+        # Convert all_users list to dict format for mapping recording
+        # This allows the mapping service to match by email
+        jira_workload_dict = {}
+        for user in all_users:
+            account_id = user.get("assignee_account_id")
+            if account_id:
+                jira_workload_dict[account_id] = user
 
         return {
             "success": True,
@@ -739,8 +769,9 @@ async def test_jira_integration(
             },
             "workload_preview": {
                 "total_issues": total_issues,
-                "per_responder": preview,
+                "per_responder": all_users,  # full list now
             },
+            "jira_workload_dict": jira_workload_dict,  # for auto-mapping
         }
 
     except HTTPException:
@@ -750,6 +781,147 @@ async def test_jira_integration(
         return {"success": False, "message": f"Jira integration test failed: {str(e)}", "permissions": None}
 
 
+@router.post("/auto-map")
+async def auto_map_jira_users(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Auto-map Jira users to team emails by email matching.
+
+    Records all mapping attempts to IntegrationMapping table for analysis tracking.
+    Similar to GitHub auto-mapping - uses email as primary identifier.
+
+    Accepts optional request body with:
+    - team_emails: List of source platform emails (e.g., from Rootly/PagerDuty)
+    - analysis_id: (Optional) Analysis that triggered this mapping
+    - source_platform: (Optional) Source platform name (default: "rootly")
+
+    Returns:
+        Mapping statistics including success rate and per-user results
+    """
+    from ...services.jira_mapping_service import JiraMappingService
+
+    try:
+        # Parse request body
+        body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+        team_emails = body.get("team_emails", [])
+        analysis_id = body.get("analysis_id")
+        source_platform = body.get("source_platform", "rootly")
+
+        if not team_emails:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="team_emails list is required"
+            )
+
+        logger.info("[Jira] Auto-mapping Jira users for %d team emails", len(team_emails))
+
+        # Get Jira integration and fetch workload data
+        integration = db.query(JiraIntegration).filter(JiraIntegration.user_id == current_user.id).first()
+        if not integration:
+            raise HTTPException(
+                status_code=404,
+                detail="Jira integration not found. Please connect your Jira account first.",
+            )
+
+        # Refresh token if needed
+        access_token = decrypt_token(integration.access_token)
+        if needs_refresh(integration.token_expires_at) and integration.refresh_token:
+            logger.info("[Jira] Refreshing access token for auto-mapping")
+            refresh_token = decrypt_token(integration.refresh_token)
+            token_data = await jira_integration_oauth.refresh_access_token(refresh_token)
+            new_access_token = token_data.get("access_token")
+            if new_access_token:
+                access_token = new_access_token
+                integration.access_token = encrypt_token(new_access_token)
+                new_refresh_token = token_data.get("refresh_token") or refresh_token
+                integration.refresh_token = encrypt_token(new_refresh_token)
+                expires_in = token_data.get("expires_in", 3600)
+                integration.token_expires_at = datetime.now(dt_timezone.utc) + timedelta(seconds=expires_in)
+                db.commit()
+
+        # Fetch Jira workload data (all active issues)
+        jql = "assignee is not EMPTY AND statusCategory != Done AND updated >= -30d ORDER BY priority DESC, duedate ASC"
+        fields = ["assignee", "priority", "duedate", "key"]
+
+        jira_workload = {}
+        next_token: Optional[str] = None
+        max_pages = 10
+        page = 0
+
+        while page < max_pages:
+            res = await jira_integration_oauth.search_issues(
+                access_token,
+                integration.jira_cloud_id,
+                jql=jql,
+                fields=fields,
+                max_results=100,
+                next_page_token=next_token,
+            )
+            issues = (res or {}).get("issues") or []
+
+            for it in issues:
+                f = it.get("fields") or {}
+                asg = (f.get("assignee") or {})
+                acc = asg.get("accountId")
+                if acc and acc not in jira_workload:
+                    jira_workload[acc] = {
+                        "assignee_account_id": acc,
+                        "assignee_name": asg.get("displayName"),
+                        "assignee_email": asg.get("emailAddress"),
+                        "count": 0,
+                        "priorities": {},
+                        "tickets": [],
+                    }
+
+                if acc:
+                    jira_workload[acc]["count"] += 1
+                    p = (f.get("priority") or {}).get("name") or "Unspecified"
+                    jira_workload[acc]["priorities"][p] = jira_workload[acc]["priorities"].get(p, 0) + 1
+
+            is_last = bool(res.get("isLast"))
+            next_token = res.get("nextPageToken")
+            if is_last or not next_token:
+                break
+            page += 1
+
+        logger.info("[Jira] Fetched workload for %d Jira users", len(jira_workload))
+
+        # Record mappings using JiraMappingService
+        mapping_service = JiraMappingService(db)
+        mapping_stats = mapping_service.record_jira_mappings(
+            team_emails=team_emails,
+            jira_workload_data=jira_workload,
+            user_id=current_user.id,
+            analysis_id=analysis_id,
+            source_platform=source_platform
+        )
+
+        logger.info(
+            "[Jira] Auto-mapping complete: %d mapped, %d failed",
+            mapping_stats["mapped"],
+            mapping_stats["failed"]
+        )
+
+        return {
+            "success": True,
+            "message": f"Auto-mapped {mapping_stats['mapped']} Jira users to team emails",
+            "stats": mapping_stats,
+            "jira_workload_count": len(jira_workload),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("[Jira] Auto-mapping failed: %s", e, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Jira auto-mapping failed: {str(e)}"
+        )
+
+
 @router.post("/sync-users")
 async def sync_jira_users(
     current_user: User = Depends(get_current_user),
@@ -757,7 +929,7 @@ async def sync_jira_users(
 ):
     """
     Sync all users from Jira workspace to UserCorrelation table.
-    Uses fuzzy name matching to map Jira users (displayName) to existing UserCorrelation records.
+    Uses email-based matching first, falls back to fuzzy name matching.
 
     Returns:
         Statistics about matched, created, updated, and skipped users

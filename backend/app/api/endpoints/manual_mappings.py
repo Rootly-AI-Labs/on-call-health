@@ -728,12 +728,20 @@ async def run_jira_mapping(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Run the Jira mapping process for all unmapped users using name-based matching."""
+    """
+    Run the Jira mapping process for all unmapped users using email-based matching.
+
+    Strategy:
+    1. Try exact email match first (case-insensitive)
+    2. Fall back to fuzzy name matching (>70% threshold)
+    3. Creates UserMapping records for persistent storage
+    4. Returns detailed results for frontend display
+    """
     try:
         logger.info(f"Starting Jira mapping for user {current_user.id}")
         from ...models import JiraIntegration, RootlyIntegration
-        import asyncio
-        from difflib import SequenceMatcher
+        from ...services.enhanced_jira_matcher import EnhancedJiraMatcher
+        from ...services.jira_user_sync_service import _decrypt_token
 
         # Get Jira integration
         jira_integration = db.query(JiraIntegration).filter(
@@ -806,76 +814,69 @@ async def run_jira_mapping(
             if user_email or user_name:
                 unmapped_users.append(user)
 
-        # Fetch Jira users
+        # Fetch Jira users with email support
         try:
-            from ...services.jira_user_sync_service import JiraUserSyncService, _decrypt_token
+            from ...services.jira_user_sync_service import JiraUserSyncService
 
             access_token = _decrypt_token(jira_integration.access_token)
             jira_service = JiraUserSyncService(db)
-            jira_users = await jira_service._fetch_jira_users(access_token, jira_integration.jira_cloud_id)
+            jira_users = await jira_service._fetch_jira_users(
+                access_token,
+                jira_integration.jira_cloud_id
+            )
             logger.info(f"🔍 Fetched {len(jira_users)} Jira users")
         except Exception as e:
             logger.error(f"Failed to fetch Jira users: {e}")
             raise HTTPException(status_code=400, detail="Failed to fetch Jira users")
 
-        # Run matching process
+        # Use EnhancedJiraMatcher for email-first matching
+        matcher = EnhancedJiraMatcher()
         results = []
-
-        def find_best_jira_match(name: str, jira_users: list, threshold: float = 0.75) -> Optional[Dict]:
-            """Find best matching Jira user by name."""
-            best_match = None
-            best_score = 0.0
-
-            name_normalized = name.lower().strip()
-
-            for jira_user in jira_users:
-                jira_name = jira_user.get("display_name", "").lower().strip()
-                if not jira_name:
-                    continue
-
-                score = SequenceMatcher(None, name_normalized, jira_name).ratio()
-
-                if score > best_score and score >= threshold:
-                    best_score = score
-                    best_match = jira_user
-
-            return best_match
 
         for i, user in enumerate(unmapped_users[:20]):  # Limit to 20 to prevent timeouts
             user_email = user.get("email")
             user_name = user.get("name")
-            jira_user = None
+            match_result = None
             match_method = None
 
             try:
-                # Try name-based matching
-                if user_name:
-                    logger.info(f"[{i+1}/{len(unmapped_users[:20])}] Trying name-based matching for '{user_name}'")
-                    jira_user = find_best_jira_match(user_name, jira_users, threshold=0.75)
-                    if jira_user:
+                # Try email-based matching first (new primary strategy)
+                if user_email:
+                    logger.debug(
+                        f"[{i+1}/{len(unmapped_users[:20])}] Trying email-based matching for '{user_email}'"
+                    )
+                    match_result = await matcher.match_email_to_jira(
+                        team_email=user_email,
+                        jira_users=jira_users,
+                        confidence_threshold=0.70
+                    )
+                    if match_result:
+                        match_method = "email"
+
+                # Fall back to name-based matching if email doesn't match
+                if not match_result and user_name:
+                    logger.debug(
+                        f"[{i+1}/{len(unmapped_users[:20])}] Trying name-based matching for '{user_name}'"
+                    )
+                    match_result = await matcher.match_name_to_jira(
+                        team_name=user_name,
+                        jira_users=jira_users,
+                        confidence_threshold=0.70
+                    )
+                    if match_result:
                         match_method = "name"
 
-                # If no match by name, try email
-                if not jira_user and user_email:
-                    logger.info(f"[{i+1}/{len(unmapped_users[:20])}] Trying email-based matching for '{user_email}'")
-                    email_normalized = user_email.lower().strip()
-                    for ju in jira_users:
-                        jira_email = ju.get("email")
-                        if jira_email and jira_email.lower().strip() == email_normalized:
-                            jira_user = ju
-                            match_method = "email"
-                            break
-
-                if jira_user:
+                if match_result:
+                    jira_account_id, jira_display_name, confidence_score = match_result
                     source_identifier = user_email if user_email else user_name
-                    jira_identifier = jira_user.get("account_id") or jira_user.get("display_name")
 
+                    # Create persistent UserMapping record
                     service.create_mapping(
                         user_id=current_user.id,
                         source_platform=user["platform"],
                         source_identifier=source_identifier,
                         target_platform="jira",
-                        target_identifier=jira_identifier,
+                        target_identifier=jira_account_id,
                         created_by=current_user.id,
                         mapping_type="automated"
                     )
@@ -883,11 +884,17 @@ async def run_jira_mapping(
                     results.append({
                         "email": user_email,
                         "name": user_name,
-                        "jira_username": jira_identifier,
+                        "jira_username": jira_display_name,
+                        "jira_account_id": jira_account_id,
                         "status": "mapped",
                         "platform": user["platform"],
-                        "match_method": match_method
+                        "match_method": match_method,
+                        "confidence": confidence_score
                     })
+                    logger.info(
+                        f"✅ Mapped {user_email or user_name} -> {jira_account_id} "
+                        f"via {match_method} (confidence: {confidence_score:.2f})"
+                    )
                 else:
                     results.append({
                         "email": user_email,
@@ -896,6 +903,8 @@ async def run_jira_mapping(
                         "status": "not_found",
                         "platform": user["platform"]
                     })
+                    logger.debug(f"❌ No match found for {user_email or user_name}")
+
             except Exception as e:
                 identifier = user_email or user_name or "unknown user"
                 logger.error(f"Error mapping {identifier}: {e}")
@@ -912,6 +921,11 @@ async def run_jira_mapping(
         mapped_count = len([r for r in results if r["status"] == "mapped"])
         not_found_count = len([r for r in results if r["status"] == "not_found"])
         error_count = len([r for r in results if r["status"] == "error"])
+
+        logger.info(
+            f"🎯 Jira mapping complete: {mapped_count} mapped, "
+            f"{not_found_count} not found, {error_count} errors"
+        )
 
         return {
             "total_processed": len(results),

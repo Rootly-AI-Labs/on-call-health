@@ -67,6 +67,7 @@ class UnifiedBurnoutAnalyzer:
         enable_ai: bool = False,
         github_token: Optional[str] = None,
         slack_token: Optional[str] = None,
+        jira_token: Optional[str] = None,
         organization_name: Optional[str] = None,
         synced_users: Optional[List[Dict[str, Any]]] = None
     ):
@@ -100,6 +101,7 @@ class UnifiedBurnoutAnalyzer:
         self.enable_ai = enable_ai
         self.github_token = github_token
         self.slack_token = slack_token
+        self.jira_token = jira_token
 
         # Using Copenhagen Burnout Inventory (OCB) methodology
         logger.info("Unified analyzer using Copenhagen Burnout Inventory methodology")
@@ -120,6 +122,7 @@ class UnifiedBurnoutAnalyzer:
                 'ai': enable_ai,
                 'github': True,  # Always enable for mock data
                 'slack': True,   # Always enable for mock data
+                'jira': jira_token is not None,
                 'mock': self.use_mock_data
             }
             # Set dummy tokens if not provided (mock data doesn't need real tokens)
@@ -132,6 +135,7 @@ class UnifiedBurnoutAnalyzer:
                 'ai': enable_ai,
                 'github': github_token is not None,
                 'slack': slack_token is not None,
+                'jira': jira_token is not None,
                 'mock': self.use_mock_data
             }
 
@@ -372,9 +376,10 @@ class UnifiedBurnoutAnalyzer:
                 status_breakdown = {status: incident_statuses.count(status) for status in set(incident_statuses)}
                 logger.info(f"AI Insights Data - Incident status breakdown: {status_breakdown}")
             
-            # Collect GitHub/Slack data if enabled
+            # Collect GitHub/Slack/Jira data if enabled
             github_data = {}
             slack_data = {}
+            jira_data = {}
 
             # Load mock GitHub and Slack data if mock mode is enabled
             mock_scenario = os.getenv("MOCK_SCENARIO", "high_burnout")
@@ -513,19 +518,129 @@ class UnifiedBurnoutAnalyzer:
                         #     logger.error(f"Failed to write Slack raw data to file: {e}")
                     except Exception as e:
                         logger.error(f"Slack data collection failed: {e}")
-            
+
+                if self.features['jira']:
+                    logger.info(f"UNIFIED ANALYZER: Collecting Jira data for {len(team_emails)} team members")
+                    logger.info(f"Team emails: {team_emails[:5]}...")  # Log first 5 emails
+                    try:
+                        logger.info(f"Jira config - token: {'present' if self.jira_token else 'missing'}")
+
+                        # Import Jira-related functions
+                        from ..auth.integration_oauth import jira_integration_oauth
+
+                        # Fetch Jira data using the test endpoint logic
+                        jira_data = {}
+                        if self.jira_token:
+                            # Get Jira integration to get cloud_id
+                            from ..models import JiraIntegration, SessionLocal
+                            db_session = SessionLocal()
+                            try:
+                                jira_integration = db_session.query(JiraIntegration).filter(
+                                    JiraIntegration.user_id == user_id
+                                ).first()
+
+                                if jira_integration and jira_integration.jira_cloud_id:
+                                    # Fetch Jira workload data similar to /jira/test endpoint
+                                    jql = "assignee is not EMPTY AND statusCategory != Done AND updated >= -30d ORDER BY priority DESC, duedate ASC"
+                                    fields = ["assignee", "priority", "duedate", "key"]
+
+                                    jira_workload = {}
+                                    next_token = None
+                                    max_pages = 10
+                                    page = 0
+
+                                    while page < max_pages:
+                                        try:
+                                            res = await jira_integration_oauth.search_issues(
+                                                self.jira_token,
+                                                jira_integration.jira_cloud_id,
+                                                jql=jql,
+                                                fields=fields,
+                                                max_results=100,
+                                                next_page_token=next_token,
+                                            )
+                                            issues = (res or {}).get("issues") or []
+
+                                            for it in issues:
+                                                f = it.get("fields") or {}
+                                                asg = (f.get("assignee") or {})
+                                                acc = asg.get("accountId")
+                                                if acc and acc not in jira_workload:
+                                                    jira_workload[acc] = {
+                                                        "assignee_account_id": acc,
+                                                        "assignee_name": asg.get("displayName"),
+                                                        "assignee_email": asg.get("emailAddress"),
+                                                        "count": 0,
+                                                        "priorities": {},
+                                                        "tickets": [],
+                                                    }
+
+                                                if acc:
+                                                    jira_workload[acc]["count"] += 1
+                                                    p = (f.get("priority") or {}).get("name") or "Unspecified"
+                                                    jira_workload[acc]["priorities"][p] = jira_workload[acc]["priorities"].get(p, 0) + 1
+
+                                                    # Add ticket details
+                                                    k = it.get("key")
+                                                    if k:
+                                                        jira_workload[acc]["tickets"].append({
+                                                            "key": k,
+                                                            "priority": p,
+                                                            "duedate": f.get("duedate")
+                                                        })
+
+                                            is_last = bool(res.get("isLast"))
+                                            next_token = res.get("nextPageToken")
+                                            if is_last or not next_token:
+                                                break
+                                            page += 1
+                                        except Exception as e:
+                                            logger.error(f"Failed to fetch Jira page {page}: {e}")
+                                            break
+
+                                    # Convert workload data to per-email format for consistency with GitHub/Slack
+                                    for account_id, workload in jira_workload.items():
+                                        email = workload.get("assignee_email")
+                                        if email and email.lower() in [e.lower() for e in team_emails]:
+                                            jira_data[email.lower()] = {
+                                                'jira_account_id': account_id,
+                                                'jira_display_name': workload.get("assignee_name"),
+                                                'jira_email': email,
+                                                'ticket_count': workload.get("count", 0),
+                                                'priorities': workload.get("priorities", {}),
+                                                'tickets': workload.get("tickets", []),
+                                                'metrics': {
+                                                    'total_tickets': workload.get("count", 0),
+                                                }
+                                            }
+
+                                    logger.info(f"UNIFIED ANALYZER: Collected Jira data for {len(jira_data)} users")
+                                    logger.info(f"Jira data keys: {list(jira_data.keys())[:5]}")
+                                else:
+                                    logger.warning(f"No Jira integration or cloud_id found for user {user_id}")
+                            except Exception as e:
+                                logger.error(f"Failed to fetch Jira integration: {e}")
+                            finally:
+                                db_session.close()
+
+                    except Exception as e:
+                        logger.error(f"Jira data collection failed: {e}")
+                else:
+                    logger.info(f"UNIFIED ANALYZER: Jira integration disabled - skipping")
+
             # Analyze team burnout
             try:
                 team_analysis_start = datetime.now()
                 logger.info(f"BURNOUT ANALYSIS: Step 3 - Analyzing team data for {time_range_days}-day analysis")
                 logger.info(f"BURNOUT ANALYSIS: Team analysis inputs - {len(users)} users, {len(incidents)} incidents")
                 team_analysis = self._analyze_team_data(
-                    users, 
-                    incidents, 
+                    users,
+                    incidents,
                     metadata,
                     include_weekends,
                     github_data,
-                    slack_data
+                    slack_data,
+                    jira_data
                 )
                 team_analysis_duration = (datetime.now() - team_analysis_start).total_seconds()
                 logger.info(f"BURNOUT ANALYSIS: Step 3 completed in {team_analysis_duration:.2f}s")
@@ -1093,13 +1208,14 @@ class UnifiedBurnoutAnalyzer:
 
 
     def _analyze_team_data(
-        self, 
-        users: List[Dict[str, Any]], 
+        self,
+        users: List[Dict[str, Any]],
         incidents: List[Dict[str, Any]],
         metadata: Dict[str, Any],
         include_weekends: bool,
         github_data: Dict[str, Dict] = None,
-        slack_data: Dict[str, Dict] = None
+        slack_data: Dict[str, Dict] = None,
+        jira_data: Dict[str, Dict] = None
     ) -> Dict[str, Any]:
         """Analyze burnout data for the entire team."""
         # Ensure all inputs are valid
@@ -1135,17 +1251,19 @@ class UnifiedBurnoutAnalyzer:
                 user_email = user.get("email")
                 user_name = user.get("full_name") or user.get("name")
             
-            # GitHub uses email, Slack uses name
+            # GitHub uses email, Slack uses name, Jira uses email
             user_github_data = github_data.get(user_email) if github_data and user_email else None
             user_slack_data = slack_data.get(user_name) if slack_data and user_name else None
-            
+            user_jira_data = jira_data.get(user_email.lower()) if jira_data and user_email else None
+
             user_analysis = self._analyze_member_burnout(
                 user,
                 user_incidents.get(user_id, []),
                 metadata,
                 include_weekends,
                 user_github_data,
-                user_slack_data
+                user_slack_data,
+                user_jira_data
             )
             member_analyses.append(user_analysis)
         
@@ -1248,7 +1366,8 @@ class UnifiedBurnoutAnalyzer:
         metadata: Dict[str, Any],
         include_weekends: bool,
         github_data: Dict[str, Any] = None,
-        slack_data: Dict[str, Any] = None
+        slack_data: Dict[str, Any] = None,
+        jira_data: Dict[str, Any] = None
     ) -> Dict[str, Any]:
         """Analyze burnout for a single team member."""
         # Extract user info based on platform
@@ -1355,21 +1474,25 @@ class UnifiedBurnoutAnalyzer:
             user_tz
         )
 
-        # Enhance metrics with GitHub/Slack data if available
+        # Enhance metrics with GitHub/Slack/Jira data if available
         metrics = self._enhance_metrics_with_github_data(base_metrics, github_data, user_tz)
 
         # Add Slack communication patterns
         if slack_data:
             metrics = self._enhance_metrics_with_slack_data(metrics, slack_data, user_tz)
-        
-        # Calculate burnout dimensions  
+
+        # Add Jira ticket workload patterns
+        if jira_data:
+            metrics = self._enhance_metrics_with_jira_data(metrics, jira_data, user_tz)
+
+        # Calculate burnout dimensions
         dimensions = self._calculate_burnout_dimensions(metrics)
-        
+
         # Calculate burnout factors for backward compatibility
         factors = self._calculate_burnout_factors(metrics)
 
         # Calculate confidence intervals and data quality
-        confidence = self._calculate_confidence_intervals(metrics, incidents, github_data, slack_data, user_tz)
+        confidence = self._calculate_confidence_intervals(metrics, incidents, github_data, slack_data, jira_data, user_tz)
         
         # OCB DEBUG LOGGING - Removed to reduce Railway log noise
         
@@ -2067,7 +2190,103 @@ class UnifiedBurnoutAnalyzer:
 
         return enhanced
 
-    def _calculate_confidence_intervals(self, metrics: Dict[str, Any], incidents: List[Dict], github_data: Dict = None, slack_data: Dict = None, user_tz: str = "UTC") -> Dict[str, Any]:
+    def _enhance_metrics_with_jira_data(self, base_metrics: Dict[str, Any], jira_data: Dict[str, Any], user_tz: str = "UTC") -> Dict[str, Any]:
+        """Add Jira ticket workload metrics to detect burnout through task overload indicators."""
+        if not jira_data:
+            return base_metrics
+
+        enhanced = base_metrics.copy()
+
+        # Extract Jira ticket workload patterns
+        ticket_count = jira_data.get("ticket_count", 0)
+        priorities = jira_data.get("priorities", {})
+        tickets = jira_data.get("tickets", [])
+
+        # 1. Ticket Overload Indicator
+        # Burnout risk increases significantly with high ticket counts
+        # Thresholds: <5 healthy, 5-15 moderate, 15-30 high, >30 severe
+        if ticket_count > 0:
+            if ticket_count >= 30:
+                workload_burden = 100
+            elif ticket_count >= 15:
+                workload_burden = 75
+            elif ticket_count >= 5:
+                workload_burden = 40
+            else:
+                workload_burden = 10
+
+            enhanced["jira_ticket_workload_burden"] = workload_burden
+            enhanced["jira_ticket_count"] = ticket_count
+
+            # 2. High-Priority Ticket Load
+            # High-priority tickets create context switching and stress
+            high_priority_count = sum([
+                priorities.get("Blocker", 0),
+                priorities.get("Highest", 0),
+                priorities.get("High", 0),
+                priorities.get("Critical", 0),
+                priorities.get("P0", 0),
+                priorities.get("P1", 0)
+            ])
+
+            if high_priority_count > 0:
+                high_priority_ratio = high_priority_count / ticket_count
+                enhanced["jira_high_priority_ratio"] = high_priority_ratio
+
+                # Critical burnout indicator: >50% high priority tickets
+                if high_priority_ratio > 0.5:
+                    enhanced["jira_context_switching_stress"] = 85
+                elif high_priority_ratio > 0.3:
+                    enhanced["jira_context_switching_stress"] = 60
+                elif high_priority_ratio > 0.0:
+                    enhanced["jira_context_switching_stress"] = 35
+
+            # 3. Deadline Pressure Indicator
+            # Count tickets with approaching deadlines (<7 days)
+            from datetime import datetime, timedelta
+            now = datetime.now()
+            approaching_deadline_count = 0
+
+            for ticket in tickets:
+                duedate = ticket.get("duedate")
+                if duedate:
+                    try:
+                        due_dt = datetime.fromisoformat(duedate.replace('Z', '+00:00')).astimezone()
+                        days_until_due = (due_dt - now).days
+                        if 0 <= days_until_due <= 7:
+                            approaching_deadline_count += 1
+                    except (ValueError, TypeError):
+                        pass
+
+            if approaching_deadline_count > 0:
+                deadline_pressure_ratio = approaching_deadline_count / ticket_count
+                enhanced["jira_approaching_deadlines_count"] = approaching_deadline_count
+                enhanced["jira_deadline_pressure_ratio"] = deadline_pressure_ratio
+
+                # Burnout indicator: >30% tickets with approaching deadlines
+                if deadline_pressure_ratio > 0.3:
+                    enhanced["jira_deadline_stress"] = 80
+                elif deadline_pressure_ratio > 0.15:
+                    enhanced["jira_deadline_stress"] = 60
+                elif deadline_pressure_ratio > 0.0:
+                    enhanced["jira_deadline_stress"] = 35
+
+        # 4. Summary burnout burden from Jira workload
+        # Combine all Jira-specific indicators
+        jira_burnout_indicators = 0
+        if "jira_ticket_workload_burden" in enhanced:
+            jira_burnout_indicators += enhanced.get("jira_ticket_workload_burden", 0) * 0.4
+        if "jira_context_switching_stress" in enhanced:
+            jira_burnout_indicators += enhanced.get("jira_context_switching_stress", 0) * 0.35
+        if "jira_deadline_stress" in enhanced:
+            jira_burnout_indicators += enhanced.get("jira_deadline_stress", 0) * 0.25
+
+        if jira_burnout_indicators > 0:
+            enhanced["jira_burnout_indicators"] = min(100, jira_burnout_indicators)
+
+        return enhanced
+
+    def _calculate_confidence_intervals(self, metrics: Dict[str, Any], incidents: List[Dict], github_data: Dict = None, slack_data: Dict = None, jira_data: Dict = None, user_tz: str = "UTC") -> Dict[str, Any]:
         """Calculate confidence intervals and data quality indicators for burnout metrics."""
         confidence = {}
 
@@ -2075,6 +2294,7 @@ class UnifiedBurnoutAnalyzer:
         incident_count = len(incidents) if incidents else 0
         github_commits = len(github_data.get("commits", [])) if github_data else 0
         slack_messages = len(slack_data.get("messages", [])) if slack_data else 0
+        jira_tickets = jira_data.get("ticket_count", 0) if jira_data else 0
 
         # 2. Temporal Coverage Assessment
         days_with_activity = 0

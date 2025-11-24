@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, 
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from ...models import get_db, User, Analysis, RootlyIntegration, SlackIntegration, GitHubIntegration
+from ...models import get_db, User, Analysis, RootlyIntegration, SlackIntegration, GitHubIntegration, JiraIntegration
 from ...auth.dependencies import get_current_active_user
 from ...services.unified_burnout_analyzer import UnifiedBurnoutAnalyzer
 from ...core.rate_limiting import analysis_rate_limit, general_rate_limit
@@ -165,6 +165,7 @@ async def run_burnout_analysis(
                 "include_weekends": request.include_weekends,
                 "include_github": request.include_github,
                 "include_slack": request.include_slack,
+                "include_jira": request.include_jira,
                 "permission_warnings": permission_warnings,
                 "organization_name": integration.organization_name if hasattr(integration, 'organization_name') else integration.name
             }
@@ -203,6 +204,7 @@ async def run_burnout_analysis(
                 include_weekends=request.include_weekends,
                 include_github=request.include_github,
                 include_slack=request.include_slack,
+                include_jira=request.include_jira,
                 user_id=current_user.id,
                 enable_ai=request.enable_ai
             )
@@ -2389,6 +2391,7 @@ async def run_analysis_task(
     include_weekends: bool,
     include_github: bool = False,
     include_slack: bool = False,
+    include_jira: bool = False,
     user_id: int = None,
     enable_ai: bool = False
 ):
@@ -2405,10 +2408,10 @@ async def run_analysis_task(
 
     logger = logging.getLogger(__name__)
     logger.info(f"BACKGROUND_TASK: Starting analysis {analysis_id} with timeout mechanism")
-    logger.info(f"BACKGROUND_TASK: GitHub/Slack params - include_github: {include_github}, include_slack: {include_slack}")
+    logger.info(f"BACKGROUND_TASK: GitHub/Slack/Jira params - include_github: {include_github}, include_slack: {include_slack}, include_jira: {include_jira}")
     logger.info(f"BACKGROUND_TASK: User ID received: {user_id}")
     logger.info(f"BACKGROUND_TASK: AI params - enable_ai: {enable_ai}")
-    print(f"BACKGROUND_TASK: GitHub/Slack params - include_github: {include_github}, include_slack: {include_slack}")
+    print(f"BACKGROUND_TASK: GitHub/Slack/Jira params - include_github: {include_github}, include_slack: {include_slack}, include_jira: {include_jira}")
     print(f"BACKGROUND_TASK: User ID received: {user_id}")
     print(f"BACKGROUND_TASK: AI params - enable_ai: {enable_ai}")
     
@@ -2448,12 +2451,13 @@ async def run_analysis_task(
         # Fetch user-specific integration tokens if needed
         slack_token = None
         github_token = None
-        
-        logger.info(f"BACKGROUND_TASK: Checking conditions - user_id: {user_id}, include_slack: {include_slack}, include_github: {include_github}")
-        
-        if user_id and (include_slack or include_github):
+        jira_token = None
+
+        logger.info(f"BACKGROUND_TASK: Checking conditions - user_id: {user_id}, include_slack: {include_slack}, include_github: {include_github}, include_jira: {include_jira}")
+
+        if user_id and (include_slack or include_github or include_jira):
             logger.info(f"BACKGROUND_TASK: Fetching user {user_id} integrations for analysis {analysis_id}")
-            
+
             if include_slack:
                 logger.info(f"BACKGROUND_TASK: Looking for Slack integration for user {user_id}")
                 slack_integration = db.query(SlackIntegration).filter(
@@ -2467,14 +2471,14 @@ async def run_analysis_task(
                     logger.info(f"BACKGROUND_TASK: Found Slack integration for user {user_id} with token: {slack_token[:10]}...")
                 else:
                     logger.warning(f"BACKGROUND_TASK: No Slack integration found for user {user_id}")
-            
+
             if include_github:
                 logger.info(f"BACKGROUND_TASK: Looking for GitHub integration for user {user_id}")
                 github_integration = db.query(GitHubIntegration).filter(
                     GitHubIntegration.user_id == user_id
                 ).first()
                 logger.info(f"BACKGROUND_TASK: GitHub integration query result: {github_integration}")
-                
+
                 # Try personal integration first
                 if github_integration and github_integration.github_token:
                     # Decrypt the token
@@ -2489,8 +2493,22 @@ async def run_analysis_task(
                         logger.info(f"BACKGROUND_TASK: Using beta GitHub token for user {user_id}")
                     else:
                         logger.warning(f"BACKGROUND_TASK: No GitHub integration found for user {user_id}")
+
+            if include_jira:
+                logger.info(f"BACKGROUND_TASK: Looking for Jira integration for user {user_id}")
+                jira_integration = db.query(JiraIntegration).filter(
+                    JiraIntegration.user_id == user_id
+                ).first()
+                logger.info(f"BACKGROUND_TASK: Jira integration query result: {jira_integration}")
+                if jira_integration and jira_integration.access_token:
+                    # Decrypt the token
+                    from ...api.endpoints.jira import decrypt_token as decrypt_jira_token
+                    jira_token = decrypt_jira_token(jira_integration.access_token)
+                    logger.info(f"BACKGROUND_TASK: Found Jira integration for user {user_id} with token: {jira_token[:10]}...")
+                else:
+                    logger.warning(f"BACKGROUND_TASK: No Jira integration found for user {user_id}")
         else:
-            logger.info(f"BACKGROUND_TASK: Skipping user integrations - user_id: {user_id}, include_slack: {include_slack}, include_github: {include_github}")
+            logger.info(f"BACKGROUND_TASK: Skipping user integrations - user_id: {user_id}, include_slack: {include_slack}, include_github: {include_github}, include_jira: {include_jira}")
 
         # Initialize analyzer service based on platform and AI enablement
         logger.info(f"BACKGROUND_TASK: Initializing {platform} analyzer service for analysis {analysis_id}, enable_ai: {enable_ai}")
@@ -2613,10 +2631,11 @@ async def run_analysis_task(
             enable_ai=use_ai_analyzer,
             github_token=github_token if include_github else None,
             slack_token=slack_token if include_slack else None,
+            jira_token=jira_token if include_jira else None,
             organization_name=organization_name,
             synced_users=synced_users  # Pass synced users from Team Sync
         )
-        logger.info(f"BACKGROUND_TASK: UnifiedBurnoutAnalyzer initialized - Features: AI={use_ai_analyzer}, GitHub={include_github}, Slack={include_slack}")
+        logger.info(f"BACKGROUND_TASK: UnifiedBurnoutAnalyzer initialized - Features: AI={use_ai_analyzer}, GitHub={include_github}, Slack={include_slack}, Jira={include_jira}")
         
         # Run the analysis with timeout (15 minutes max)
         logger.info(f"BACKGROUND_TASK: Starting burnout analysis with 15-minute timeout for analysis {analysis_id}")

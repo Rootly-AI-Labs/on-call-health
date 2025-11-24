@@ -1,6 +1,7 @@
 """
-Service for syncing Jira users to UserCorrelation table using name-based matching.
-Since Jira API returns displayName (not email), we use fuzzy name matching.
+Service for syncing Jira users to UserCorrelation table using email-based matching with name fallback.
+Since Jira API now returns email addresses for users, we match by email first.
+Falls back to fuzzy name matching if email is unavailable or no email match found.
 """
 import logging
 from typing import Dict, List, Any, Optional
@@ -153,12 +154,13 @@ class JiraUserSyncService:
         current_user: User
     ) -> Dict[str, int]:
         """
-        Sync Jira users to UserCorrelation using fuzzy name matching.
+        Sync Jira users to UserCorrelation using email-based matching, with fuzzy name matching fallback.
 
         Strategy:
-        1. For each Jira user (has displayName, accountId)
-        2. Find matching UserCorrelation record by name similarity
-        3. Update the record with jira_account_id and jira_email
+        1. For each Jira user (has displayName, accountId, email)
+        2. Try to find matching UserCorrelation by email (exact match)
+        3. If email not found or unavailable, fall back to fuzzy name similarity
+        4. Update the record with jira_account_id and jira_email
         """
         matched = 0
         created = 0
@@ -183,18 +185,34 @@ class JiraUserSyncService:
         for jira_user in jira_users:
             display_name = jira_user.get("display_name")
             account_id = jira_user.get("account_id")
-            email = jira_user.get("email")  # May be None
+            email = jira_user.get("email")
 
             if not display_name or not account_id:
                 skipped += 1
                 logger.warning(f"Skipping Jira user {account_id} - missing display_name or account_id")
                 continue
 
-            # Try to find matching UserCorrelation by name
-            matched_correlation = self._find_best_name_match(
-                jira_name=display_name,
-                correlations=existing_correlations
-            )
+            # Strategy: Try email first, then fall back to name matching
+            matched_correlation = None
+            match_method = None
+
+            # 1. Try email-based matching first (if email is available)
+            if email:
+                matched_correlation = next(
+                    (c for c in existing_correlations if c.email and c.email.lower() == email.lower()),
+                    None
+                )
+                if matched_correlation:
+                    match_method = "email"
+
+            # 2. Fall back to fuzzy name matching if no email match
+            if not matched_correlation:
+                matched_correlation = self._find_best_name_match(
+                    jira_name=display_name,
+                    correlations=existing_correlations
+                )
+                if matched_correlation:
+                    match_method = "name"
 
             if matched_correlation:
                 # Update existing correlation with Jira data
@@ -211,16 +229,16 @@ class JiraUserSyncService:
                 if needs_update:
                     updated += 1
                     logger.info(
-                        f"✅ Matched Jira user '{display_name}' to '{matched_correlation.name}' "
-                        f"(email: {matched_correlation.email})"
+                        f"✅ Matched Jira user '{display_name}' ({email or 'no-email'}) to '{matched_correlation.name}' "
+                        f"via {match_method} matching"
                     )
 
                 matched += 1
             else:
-                # No match found - skip (we don't create new records without email)
+                # No match found - skip
                 skipped += 1
                 logger.debug(
-                    f"❌ No match found for Jira user '{display_name}' (account_id: {account_id})"
+                    f"❌ No match found for Jira user '{display_name}' (email: {email}, account_id: {account_id})"
                 )
 
         # Commit all changes
