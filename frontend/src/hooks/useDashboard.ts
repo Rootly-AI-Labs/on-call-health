@@ -158,6 +158,16 @@ export default function useDashboard() {
     }
   }
 
+  // Helper function to check if analysis has no incidents in time period
+  const hasNoIncidentsInPeriod = () => {
+    if (!currentAnalysis || !currentAnalysis.analysis_data) return false
+
+    const metadata = currentAnalysis.analysis_data.metadata
+    const totalIncidents = metadata?.total_incidents ?? 0
+
+    return totalIncidents === 0
+  }
+
   // Helper function to determine if insufficient data card should be shown
   const shouldShowInsufficientDataCard = () => {
     if (!currentAnalysis || analysisRunning) return false
@@ -187,23 +197,23 @@ export default function useDashboard() {
 
         return false // Has meaningful data - even if 0 incidents, show normal dashboard
       }
-      
+
       // If we have partial data with incidents/users, show the partial data UI
       if (currentAnalysis.analysis_data?.partial_data) {
         return false
       }
-      
+
       // If we have team_analysis with members, we have data
       const teamAnalysis = currentAnalysis.analysis_data?.team_analysis
       const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members
       if (members && members.length > 0) {
         return false
       }
-      
+
       // Otherwise, insufficient data
       return true
     }
-    
+
     return false
   }
 
@@ -2153,6 +2163,7 @@ return {
   handleSignOut,
   exportAsJSON,
   shouldShowInsufficientDataCard,
+  hasNoIncidentsInPeriod,
   updateURLWithAnalysis,
 
   // start-analysis modal
