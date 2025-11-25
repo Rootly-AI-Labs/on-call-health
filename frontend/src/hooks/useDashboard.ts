@@ -162,8 +162,10 @@ export default function useDashboard() {
   const hasNoIncidentsInPeriod = () => {
     if (!currentAnalysis || !currentAnalysis.analysis_data) return false
 
-    const metadata = currentAnalysis.analysis_data.metadata
-    const totalIncidents = metadata?.total_incidents ?? 0
+    // Check total_incidents directly on analysis_data or in partial_data.metadata
+    const totalIncidents = currentAnalysis.analysis_data.total_incidents ??
+                          currentAnalysis.analysis_data.partial_data?.metadata?.total_incidents ??
+                          0
 
     return totalIncidents === 0
   }
