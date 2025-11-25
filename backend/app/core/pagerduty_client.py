@@ -694,9 +694,8 @@ class PagerDutyDataCollector:
             else:
                 assignment_stats["no_assignment"] += 1
 
-            # Extract priority information
-            priority_obj = incident.get("priority")
-            priority_value = self._extract_priority(priority_obj, incident.get("urgency", "low"))
+            # Extract urgency (PagerDuty's incident classification)
+            urgency = incident.get("urgency", "low")
 
             # Create normalized incident
             normalized_incident = {
@@ -704,20 +703,20 @@ class PagerDutyDataCollector:
                 "title": incident.get("title", ""),
                 "description": incident.get("description", ""),
                 "status": incident.get("status", "open"),
-                "severity": priority_value,  # Store priority (P1-P5) instead of mapping to severity
+                "severity": urgency,  # Store urgency (high/low) - PagerDuty's incident classification
                 "created_at": incident.get("created_at"),
                 "updated_at": incident.get("last_status_change_at") or incident.get("updated_at"),
                 "resolved_at": incident.get("resolved_at") if incident.get("status") == "resolved" else None,
                 "assigned_to": assigned_user_info,
                 "service": incident.get("service", {}).get("summary", ""),
-                "urgency": incident.get("urgency", "low"),
+                "urgency": urgency,
                 "source": "pagerduty",
                 "raw_data": incident,  # Keep for debugging
                 # Enhanced fields
                 "incident_number": incident.get("incident_number"),
                 "escalation_policy": incident.get("escalation_policy", {}).get("summary", ""),
                 "teams": [team.get("summary", "") for team in incident.get("teams", [])],
-                "priority_name": priority_obj.get("summary", "") if priority_obj else ""
+                "priority_name": incident.get("priority", {}).get("summary", "") if incident.get("priority") else ""
             }
 
             normalized_incidents.append(normalized_incident)

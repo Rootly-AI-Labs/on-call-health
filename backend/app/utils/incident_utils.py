@@ -269,22 +269,18 @@ def calculate_severity_breakdown(incidents: List[Dict[str, Any]]) -> Dict[str, i
         try:
             severity_name = "sev4"  # Default to lowest severity
 
-            # Check for direct severity/priority field (normalized PagerDuty or direct string)
+            # Check for direct severity/urgency field (normalized PagerDuty or Rootly)
             if "severity" in incident and isinstance(incident["severity"], str):
                 severity_value = incident["severity"]
 
-                # Check if it's a PagerDuty priority (P1-P5)
-                if severity_value.upper().startswith("P"):
-                    # Map priority to severity for consistent counting
-                    # Note: This is just for display grouping, not conflating the concepts
-                    priority_to_sev = {
-                        "P1": "sev1",
-                        "P2": "sev2",
-                        "P3": "sev3",
-                        "P4": "sev4",
-                        "P5": "sev4"
+                # Check if it's PagerDuty urgency (high/low)
+                if severity_value.lower() in ["high", "low"]:
+                    # Map PagerDuty urgency to severity buckets for display
+                    urgency_to_sev = {
+                        "high": "sev1",  # High urgency = critical
+                        "low": "sev4"    # Low urgency = routine
                     }
-                    severity_name = priority_to_sev.get(severity_value.upper(), "sev4")
+                    severity_name = urgency_to_sev.get(severity_value.lower(), "sev4")
                 else:
                     # It's already in sev format or a text severity
                     severity_name = severity_value.lower()
@@ -302,12 +298,11 @@ def calculate_severity_breakdown(incidents: List[Dict[str, Any]]) -> Dict[str, i
             # Normalize severity name if not already in sev format
             if not severity_name.startswith("sev"):
                 # Map common severity names to sev levels
+                # Note: "high" and "low" are already handled above for PagerDuty urgency
                 severity_map = {
                     "critical": "sev1",
                     "emergency": "sev0",
-                    "high": "sev2",
-                    "medium": "sev3",
-                    "low": "sev4"
+                    "medium": "sev3"
                 }
                 severity_name = severity_map.get(severity_name.lower(), "sev4")
 
