@@ -718,15 +718,10 @@ class PagerDutyDataCollector:
 
             normalized_incidents.append(normalized_incident)
 
-            # Log progress for first few incidents with severity details
-            if i < 5:
+            # Log progress for first few incidents
+            if i < 3:
                 user_email = assigned_user_info.get("email", "None") if assigned_user_info else "None"
-                severity_field = incident.get("severity")
-                priority_field = incident.get("priority")
-                logger.info(f"🚀 PD INCIDENT #{i}: '{normalized_incident['title'][:40]}' -> {user_email}")
-                logger.info(f"   Raw severity field: {severity_field}")
-                logger.info(f"   Raw priority field: {priority_field}")
-                logger.info(f"   Mapped to: {normalized_incident['severity']}")
+                logger.info(f"🚀 PD INCIDENT #{i}: '{normalized_incident['title'][:50]}' -> {user_email}")
         
         # 🎯 STEP 4: Calculate success statistics
         total_incidents = len(incidents)
