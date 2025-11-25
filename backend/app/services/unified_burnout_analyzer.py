@@ -1102,11 +1102,19 @@ class UnifiedBurnoutAnalyzer:
         
         # Sort by burnout score (highest first)
         member_analyses.sort(key=lambda x: x["burnout_score"], reverse=True)
-        
+
+        # Count only incidents that were actually assigned to team members
+        assigned_incident_ids = set()
+        for incidents_list in user_incidents.values():
+            for incident in incidents_list:
+                incident_id = incident.get("id")
+                if incident_id:
+                    assigned_incident_ids.add(incident_id)
+
         return {
             "members": member_analyses,
             "total_members": len(users),
-            "total_incidents": len(incidents)
+            "total_incidents": len(assigned_incident_ids)  # Only count assigned incidents
         }
     
     def _map_user_incidents(
