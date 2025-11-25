@@ -269,10 +269,25 @@ def calculate_severity_breakdown(incidents: List[Dict[str, Any]]) -> Dict[str, i
         try:
             severity_name = "sev4"  # Default to lowest severity
 
-            # Check for PagerDuty format first (direct severity field)
+            # Check for direct severity/priority field (normalized PagerDuty or direct string)
             if "severity" in incident and isinstance(incident["severity"], str):
-                # PagerDuty normalized format: severity is a string like "sev1", "sev2"
-                severity_name = incident["severity"].lower()
+                severity_value = incident["severity"]
+
+                # Check if it's a PagerDuty priority (P1-P5)
+                if severity_value.upper().startswith("P"):
+                    # Map priority to severity for consistent counting
+                    # Note: This is just for display grouping, not conflating the concepts
+                    priority_to_sev = {
+                        "P1": "sev1",
+                        "P2": "sev2",
+                        "P3": "sev3",
+                        "P4": "sev4",
+                        "P5": "sev4"
+                    }
+                    severity_name = priority_to_sev.get(severity_value.upper(), "sev4")
+                else:
+                    # It's already in sev format or a text severity
+                    severity_name = severity_value.lower()
             else:
                 # Rootly format: severity is nested in attributes
                 attrs = incident.get("attributes", {})

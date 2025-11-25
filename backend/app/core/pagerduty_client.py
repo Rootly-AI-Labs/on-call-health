@@ -694,13 +694,17 @@ class PagerDutyDataCollector:
             else:
                 assignment_stats["no_assignment"] += 1
 
+            # Extract priority information
+            priority_obj = incident.get("priority")
+            priority_value = self._extract_priority(priority_obj, incident.get("urgency", "low"))
+
             # Create normalized incident
             normalized_incident = {
                 "id": incident.get("id"),
                 "title": incident.get("title", ""),
                 "description": incident.get("description", ""),
                 "status": incident.get("status", "open"),
-                "severity": self._map_priority_to_severity(incident),
+                "severity": priority_value,  # Store priority (P1-P5) instead of mapping to severity
                 "created_at": incident.get("created_at"),
                 "updated_at": incident.get("last_status_change_at") or incident.get("updated_at"),
                 "resolved_at": incident.get("resolved_at") if incident.get("status") == "resolved" else None,
@@ -713,7 +717,7 @@ class PagerDutyDataCollector:
                 "incident_number": incident.get("incident_number"),
                 "escalation_policy": incident.get("escalation_policy", {}).get("summary", ""),
                 "teams": [team.get("summary", "") for team in incident.get("teams", [])],
-                "priority_name": incident.get("priority", {}).get("summary", "") if incident.get("priority") else ""
+                "priority_name": priority_obj.get("summary", "") if priority_obj else ""
             }
 
             normalized_incidents.append(normalized_incident)
@@ -836,44 +840,33 @@ class PagerDutyDataCollector:
         
         return None  # No assignment found
     
-    def _map_priority_to_severity(self, incident: Dict[str, Any]) -> str:
+    def _extract_priority(self, priority: Optional[Dict[str, Any]], urgency: str) -> str:
         """
-        Map PagerDuty priority/urgency to severity level.
+        Extract priority level from PagerDuty incident.
+        Returns P1-P5 based on priority field, or based on urgency if no priority set.
 
-        Note: PagerDuty incidents only have 'priority' and 'urgency' fields.
-        The 'severity' field only exists on alerts/events, not incidents.
+        Note: PagerDuty incidents have 'priority' (P1-P5) which is business urgency,
+        NOT severity (technical impact). These are different concepts and should not be conflated.
         """
-        urgency = incident.get("urgency", "low").lower()
-
-        # Check priority for classification
-        priority = incident.get("priority")
-        mapped_severity = None
-
         if priority and isinstance(priority, dict):
             priority_name = priority.get("summary", "").lower()
             if not priority_name:
                 priority_name = priority.get("name", "").lower()
 
+            # Extract P1-P5 from priority name
             if "p1" in priority_name or "critical" in priority_name:
-                mapped_severity = "sev1"
+                return "P1"
             elif "p2" in priority_name or "high" in priority_name:
-                mapped_severity = "sev2"
+                return "P2"
             elif "p3" in priority_name or "medium" in priority_name:
-                mapped_severity = "sev3"
+                return "P3"
             elif "p4" in priority_name or "low" in priority_name:
-                mapped_severity = "sev4"
+                return "P4"
             elif "p5" in priority_name or "info" in priority_name:
-                mapped_severity = "sev5"
+                return "P5"
 
-            if mapped_severity:
-                logger.debug(f"SEVERITY MAPPING: Priority '{priority_name}' + Urgency '{urgency}' → {mapped_severity}")
-                return mapped_severity
-
-        # Fallback to urgency mapping
-        if urgency == "high":
-            mapped_severity = "sev1"
+        # Fallback to urgency-based priority if no explicit priority set
+        if urgency and urgency.lower() == "high":
+            return "P1"  # High urgency = P1
         else:
-            mapped_severity = "sev4"  # Default for low/unknown urgency
-
-        logger.debug(f"SEVERITY MAPPING (fallback): Urgency '{urgency}' → {mapped_severity}")
-        return mapped_severity
+            return "P4"  # Low/unknown urgency = P4
