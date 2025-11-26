@@ -856,10 +856,16 @@ class UnifiedBurnoutAnalyzer:
                 }
             }
             
+            # DEBUG: Log final team_analysis members before saving
+            logger.info(f"🔍 FINAL_DATA_CHECK: About to return results with {len(team_analysis.get('members', []))} members")
+            for member in team_analysis.get('members', [])[:3]:  # Log first 3 members
+                github_activity = member.get('github_activity', {})
+                logger.info(f"🔍 FINAL_DATA_CHECK: Member {member.get('user_email')} - github_activity: commits={github_activity.get('commits_count', 0)}, prs={github_activity.get('pull_requests_count', 0)}")
+
             # Add GitHub insights if enabled
             if github_insights:
                 result["github_insights"] = github_insights
-                
+
                 # Log GitHub indicator details for transparency
                 if github_insights.get("high_risk_member_count", 0) > 0:
                     # Count risk level distribution for members with GitHub indicators
