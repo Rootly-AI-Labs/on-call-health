@@ -4582,9 +4582,10 @@ class UnifiedBurnoutAnalyzer:
 
             if members_with_jira > 0:
                 logger.info(f"✅ JIRA USERS WITH TICKETS (will contribute to burnout score):")
-                for member in members:
+                for member in updated_members:
                     if member.get("jira_tickets") and len(member.get("jira_tickets", [])) > 0:
-                        logger.info(f"   • {member.get('name')} - {len(member.get('jira_tickets'))} tickets")
+                        member_name = member.get("user_name") or member.get("name") or "Unknown"
+                        logger.info(f"   • {member_name} - {len(member.get('jira_tickets'))} tickets")
             else:
                 logger.info(f"❌ NO USERS WITH ACTIVE JIRA TICKETS - Jira will NOT contribute to burnout scores")
 
@@ -4617,11 +4618,13 @@ class UnifiedBurnoutAnalyzer:
                 current_score = member.get("burnout_score", 0)
                 incident_count = member.get("incident_count", 0)
                 jira_tickets = member.get("jira_tickets", [])
+                member_name = member.get("user_name") or member.get("name") or "Unknown"
 
                 # Calculate Jira-based burnout score
                 jira_burnout_score = 0.0
                 if jira_tickets:
                     jira_burnout_score = self._calculate_jira_burnout_score(jira_tickets)
+                    logger.info(f"🔍 DEBUG {member_name}: jira_tickets={len(jira_tickets)}, jira_burnout_score={jira_burnout_score}, current_score={current_score}, incident_count={incident_count}")
 
                 # Determine final burnout score based on available data
                 final_score = current_score  # Default to current score
@@ -4651,6 +4654,20 @@ class UnifiedBurnoutAnalyzer:
                 updated_member["burnout_score"] = round(final_score, 2)
                 updated_member["risk_level"] = self._determine_risk_level(final_score)
 
+                if jira_tickets:
+                    logger.info(f"🔍 DEBUG {member_name}: final_score={final_score}, score_source={score_source}, risk_level={updated_member['risk_level']}")
+
+                    # IMPORTANT: Recalculate OCB score to include Jira workload
+                    # If user has Jira tickets but no/low incidents, OCB should reflect Jira workload
+                    original_ocb = member.get("ocb_score", 0)
+                    jira_ocb_contribution = self._calculate_jira_ocb_contribution(jira_tickets)
+
+                    # Combine OCB scores: use max of incident-based or Jira-based OCB
+                    final_ocb = max(original_ocb, jira_ocb_contribution)
+                    updated_member["ocb_score"] = round(final_ocb, 2)
+
+                    logger.info(f"🔍 OCB UPDATE {member_name}: original_ocb={original_ocb}, jira_ocb={jira_ocb_contribution}, final_ocb={final_ocb}")
+
                 # Add Jira burnout breakdown for transparency
                 ticket_count = len(jira_tickets) if jira_tickets else 0
                 critical_count = len([t for t in (jira_tickets or []) if t.get("priority", "").lower() in ["critical", "blocker", "highest", "high"]])
@@ -4677,6 +4694,76 @@ class UnifiedBurnoutAnalyzer:
         except Exception as e:
             logger.error(f"Error in _recalculate_burnout_with_jira: {e}")
             return members
+
+    def _calculate_jira_ocb_contribution(
+        self,
+        tickets: Optional[List[Dict[str, Any]]]
+    ) -> float:
+        """
+        Calculate OCB score contribution (0-100) based on Jira ticket workload.
+        Maps Jira workload to OCB metrics similar to incident-based calculation.
+
+        Returns: OCB score 0-100
+        """
+        try:
+            if not tickets:
+                return 0.0
+
+            ticket_count = len(tickets)
+            if ticket_count == 0:
+                return 0.0
+
+            # Count high-priority tickets
+            critical_count = len([t for t in tickets if t.get("priority", "").lower() in ["critical", "blocker", "highest", "high"]])
+            critical_ratio = critical_count / ticket_count if ticket_count > 0 else 0
+
+            # Map Jira workload to OCB-like metrics (0-100 scale)
+            # These roughly correspond to workload intensity
+
+            # Personal burnout factors based on ticket volume
+            work_hours_trend = min(100, ticket_count * 3)  # 2 tickets = 6, 20 tickets = 60, etc.
+            weekend_work = critical_ratio * 50  # High-priority tickets = likely weekend work
+            after_hours_activity = critical_ratio * 40
+            vacation_usage = min(100, ticket_count * 2)  # More tickets = less vacation
+            sleep_quality_proxy = min(100, critical_count * 8)  # Critical tickets disrupt sleep
+
+            # Work-related burnout factors based on urgency
+            sprint_completion = min(100, critical_count * 10)  # Urgent tickets impact sprint goals
+            code_review_speed = min(100, ticket_count * 2)
+            pr_frequency = min(100, ticket_count * 3)
+            deployment_frequency = min(100, critical_count * 8)
+            meeting_load = min(100, ticket_count * 2)  # More tickets = more coordination
+            oncall_burden = min(100, critical_count * 10)  # Critical tickets = oncall-like stress
+
+            jira_ocb_metrics = {
+                'work_hours_trend': work_hours_trend,
+                'weekend_work': weekend_work,
+                'after_hours_activity': after_hours_activity,
+                'vacation_usage': vacation_usage,
+                'sleep_quality_proxy': sleep_quality_proxy,
+                'sprint_completion': sprint_completion,
+                'code_review_speed': code_review_speed,
+                'pr_frequency': pr_frequency,
+                'deployment_frequency': deployment_frequency,
+                'meeting_load': meeting_load,
+                'oncall_burden': oncall_burden
+            }
+
+            # Use same OCB calculation as incidents
+            from ..core.ocb_config import calculate_personal_burnout, calculate_work_related_burnout, calculate_composite_ocb_score
+
+            personal_ocb = calculate_personal_burnout(jira_ocb_metrics)
+            work_ocb = calculate_work_related_burnout(jira_ocb_metrics)
+            composite_ocb = calculate_composite_ocb_score(personal_ocb['score'], work_ocb['score'])
+
+            ocb_score = min(100, composite_ocb['composite_score'])
+
+            logger.info(f"🔍 JIRA OCB: tickets={ticket_count}, critical={critical_count}, personal={personal_ocb['score']:.1f}, work={work_ocb['score']:.1f}, composite={ocb_score:.1f}")
+            return ocb_score
+
+        except Exception as e:
+            logger.error(f"Error calculating Jira OCB contribution: {e}")
+            return 0.0
 
     def _calculate_jira_burnout_score(
         self,
@@ -4803,8 +4890,7 @@ class UnifiedBurnoutAnalyzer:
 
 
             burnout_score = max(0.0, min(10.0, burnout_score))
-            #TODO: fix burnout_score, temporarily set to 10
-            burnout_score = 10.0
+            logger.info(f"🔍 JIRA SCORE CALCULATION: ticket_count={len(tickets)}, exhaustion={exhaustion_score:.2f}, depersonalization={depersonalization_score:.2f}, accomplishment={accomplishment_score:.2f}, final_burnout={burnout_score:.2f}")
             return burnout_score
 
         except Exception as e:

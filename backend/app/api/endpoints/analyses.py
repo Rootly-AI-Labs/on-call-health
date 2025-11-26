@@ -2546,13 +2546,21 @@ async def run_analysis_task(
         
         logger.info(f"BACKGROUND_TASK: Final analyzer decision - use_ai_analyzer: {use_ai_analyzer}")
         print(f"BACKGROUND_TASK: Final analyzer decision - use_ai_analyzer: {use_ai_analyzer}")
-        
+
         # Use UnifiedBurnoutAnalyzer for all analyses
         logger.info(f"BACKGROUND_TASK: Using UnifiedBurnoutAnalyzer")
         print(f"BACKGROUND_TASK: Using UnifiedBurnoutAnalyzer")
-        
+
+        # Fetch user object if not already fetched (needed for synced users query and oncall data)
+        if user_id:
+            if 'user' not in locals():
+                user = db.query(User).filter(User.id == user_id).first()
+                logger.info(f"BACKGROUND_TASK: Fetched user object for user_id={user_id}")
+        else:
+            user = None
+
         # Set user context for AI analysis if needed
-        if use_ai_analyzer:
+        if use_ai_analyzer and user:
             from ...services.ai_burnout_analyzer import set_user_context
             set_user_context(user)
             logger.info(f"BACKGROUND_TASK: Set user context for AI analysis (LLM provider: {user.llm_provider if user.llm_token else 'none'})")
@@ -2572,9 +2580,16 @@ async def run_analysis_task(
                     UserCorrelation.user_id == user_id
                 ).all()
 
+                logger.info(f"🔍 TEAM SYNC: Found {len(correlations)} total user correlations for user_id={user_id}")
+                jira_mapped = [c for c in correlations if c.jira_account_id]
+                logger.info(f"🔍 TEAM SYNC: {len(jira_mapped)} correlations have jira_account_id")
+                if jira_mapped:
+                    for c in jira_mapped[:3]:
+                        logger.info(f"   - {c.name} → jira_account_id={c.jira_account_id}, integration_ids={c.integration_ids}")
+
                 # Fetch on-call status for all users (Rootly only - PagerDuty doesn't have this endpoint)
                 oncall_emails = {}
-                if platform == "rootly":
+                if platform == "rootly" and user:
                     from ...api.endpoints.rootly import get_synced_users as _get_synced_users
                     oncall_data = await _get_synced_users(
                         integration_id=integration_id_str,
@@ -2586,6 +2601,7 @@ async def run_analysis_task(
 
                 # Filter by integration_id (check JSON array)
                 synced_users = []
+                filtered_out_count = 0
                 for corr in correlations:
                     if corr.integration_ids and integration_id_str in corr.integration_ids:
                         # Format user data for analyzer (compatible with API format)
@@ -2614,9 +2630,19 @@ async def run_analysis_task(
                             'synced': True  # Mark as from Team Sync
                         }
                         synced_users.append(user_data)
+                    else:
+                        filtered_out_count += 1
+                        if corr.jira_account_id:
+                            logger.warning(f"⚠️  FILTERED OUT: {corr.name} has jira_account_id={corr.jira_account_id} but integration_ids={corr.integration_ids} (looking for {integration_id_str})")
 
+                logger.info(f"🔍 TEAM SYNC: {filtered_out_count} correlations filtered out due to integration_ids mismatch")
                 if synced_users:
                     logger.info(f"✅ TEAM SYNC OPTIMIZATION: Found {len(synced_users)} synced users for integration {integration_id_str} - will skip user API fetch")
+                    jira_synced = [u for u in synced_users if u.get('jira_account_id')]
+                    logger.info(f"   ✅ {len(jira_synced)} synced users have jira_account_id")
+                    if jira_synced:
+                        for u in jira_synced[:3]:
+                            logger.info(f"      - {u.get('name')} → {u.get('jira_account_id')}")
                 else:
                     logger.info(f"⚠️  TEAM SYNC: No synced users found for integration {integration_id_str} - will fetch from API")
                     synced_users = None  # Fallback to API
