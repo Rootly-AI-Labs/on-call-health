@@ -772,6 +772,12 @@ class UnifiedBurnoutAnalyzer:
                 if not self.current_user_id:
                     logger.info(f"⚠️ JIRA BURNOUT: Skipping Jira data - no current_user_id provided to analyzer")
 
+            # DEBUG: Check GitHub data AFTER Jira processing
+            logger.info(f"🔍 POST_JIRA_CHECK: Checking GitHub data after Jira processing")
+            for member in team_analysis["members"][:3]:
+                github_activity = member.get('github_activity', {})
+                logger.info(f"🔍 POST_JIRA_CHECK: Member {member.get('user_email')} - github_activity: commits={github_activity.get('commits_count', 0)}, prs={github_activity.get('pull_requests_count', 0)}")
+
             # Calculate overall team health AFTER GitHub burnout adjustment
             health_calc_start = datetime.now()
             logger.info(f"BURNOUT ANALYSIS: Step 4 - Calculating team health for {time_range_days}-day analysis")
