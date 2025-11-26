@@ -497,6 +497,15 @@ class UnifiedBurnoutAnalyzer:
                         logger.info(f"UNIFIED ANALYZER: Collected GitHub data for {len(github_data)} users")
                         logger.info(f"GitHub data keys: {list(github_data.keys())[:5]}")  # Log first 5 keys
 
+                        # Log detailed GitHub data for debugging
+                        for email, data in list(github_data.items())[:3]:  # Log first 3 users
+                            if data:
+                                commits_count = len(data.get('commits', []))
+                                prs_count = len(data.get('pull_requests', []))
+                                logger.info(f"GitHub data for {email}: {commits_count} commits, {prs_count} PRs")
+                            else:
+                                logger.info(f"GitHub data for {email}: No data")
+
                         # # Write raw GitHub data to file
                         # try:
                         #     with open('github_raw.txt', 'w', encoding='utf-8') as f:
