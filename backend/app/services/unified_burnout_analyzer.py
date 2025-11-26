@@ -4337,13 +4337,22 @@ class UnifiedBurnoutAnalyzer:
                 commits_per_week = github_activity.get("commits_per_week", 0) if github_activity else 0
                 after_hours_commits = github_activity.get("after_hours_commits", 0) if github_activity else 0
                 weekend_commits = github_activity.get("weekend_commits", 0) if github_activity else 0
-                
+
                 # Ensure None values are converted to 0 to prevent NoneType errors
                 commits_count = commits_count if commits_count is not None else 0
                 commits_per_week = commits_per_week if commits_per_week is not None else 0
                 after_hours_commits = after_hours_commits if after_hours_commits is not None else 0
                 weekend_commits = weekend_commits if weekend_commits is not None else 0
                 has_github_username = github_activity.get("username") if github_activity else None
+
+                # FALLBACK: Calculate commits_per_week from commits_count if missing
+                # This handles older analyses where commits_per_week wasn't stored
+                if commits_per_week == 0 and commits_count > 0:
+                    # Assume standard 30-day analysis period
+                    days_analyzed = metadata.get("days_analyzed", 30)
+                    weeks = days_analyzed / 7.0
+                    commits_per_week = round(commits_count / weeks, 2) if weeks > 0 else 0
+                    logger.info(f"Calculated commits_per_week for {member.get('user_email')}: {commits_per_week} ({commits_count} commits / {weeks:.1f} weeks)")
                 
                 # Calculate GitHub-based burnout score (even if 0 to determine score_source properly)
                 github_burnout_score = 0.0
