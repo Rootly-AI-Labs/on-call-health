@@ -649,6 +649,7 @@ class GitHubCollector:
                 'commits_count': total_commits,
                 'pull_requests_count': total_prs,
                 'reviews_count': total_reviews,
+                'commits_per_week': round(commits_per_week, 2),
                 'after_hours_commits': after_hours_commits,
                 'weekend_commits': weekend_commits,
                 'avg_pr_size': random.randint(50, 300),
