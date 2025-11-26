@@ -1756,11 +1756,21 @@ class UnifiedBurnoutAnalyzer:
                 "compound_factor": self._calculate_compound_trauma_factor(severity_dist.get('sev0', 0) + severity_dist.get('sev1', 0))
             }
         }
-        
+
+        # Debug: Log what github_data looks like
+        if github_data:
+            logger.info(f"Member {user_email} github_data keys: {list(github_data.keys())}")
+            logger.info(f"Member {user_email} has activity_data: {bool(github_data.get('activity_data'))}")
+            if github_data.get('activity_data'):
+                logger.info(f"Member {user_email} activity_data: commits={github_data['activity_data'].get('commits_count', 0)}, prs={github_data['activity_data'].get('pull_requests_count', 0)}")
+        else:
+            logger.info(f"Member {user_email} has NO github_data")
+
         # Add GitHub activity if available
         if github_data and github_data.get("activity_data"):
             result["github_activity"] = github_data["activity_data"]
-            
+            logger.info(f"✅ Added github_activity to {user_email} result: {result['github_activity'].get('commits_count', 0)} commits, {result['github_activity'].get('pull_requests_count', 0)} PRs")
+
             # Check if GitHub activity indicates high risk
             github_indicators = github_data.get("activity_data", {}).get("burnout_indicators", {})
             has_github_risk_indicators = any([
