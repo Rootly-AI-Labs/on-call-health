@@ -4453,13 +4453,13 @@ export default function IntegrationsPage() {
                           </div>
                         )}
                         {syncProgress.results.slack_synced !== undefined && syncProgress.results.slack_synced > 0 && (
-                          <div className="flex items-center justify-between py-2">
+                          <div className="flex items-center justify-between py-2 border-b border-gray-200">
                             <span className="text-sm text-gray-700">Slack accounts matched</span>
                             <span className="font-semibold text-gray-900">{syncProgress.results.slack_synced}</span>
                           </div>
                         )}
-                        {syncProgress.results.jira_matched !== undefined && syncProgress.results.jira_matched > 0 && (
-                          <div className="flex items-center justify-between py-2">
+                        {syncProgress.results.jira_matched !== undefined && (
+                          <div className="flex items-center justify-between py-2 border-b border-gray-200">
                             <span className="text-sm text-gray-700">Jira accounts matched</span>
                             <span className="font-semibold text-gray-900">{syncProgress.results.jira_matched}</span>
                           </div>
@@ -4562,7 +4562,7 @@ export default function IntegrationsPage() {
                           updated: syncResults.updated,
                           github_matched: syncResults.github_matched,
                           slack_synced: slackResults?.updated,
-                          slack_skipped: slackResults?.skipped
+                          slack_skipped: slackResults?.skipped,
                         }
                       })
                     } catch (error) {

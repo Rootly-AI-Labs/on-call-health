@@ -215,13 +215,13 @@ export function TeamMembersList({
             })
             
             // Separate members with incidents/burnout and those with neither
-            // Include members with incidents OR burnout score (e.g., from Jira) in main section
+            // Include members with incidents OR OCB score (e.g., from Jira) in main section
             const membersWithIncidents = validMembers.filter(member =>
-              (member.incident_count || 0) > 0 || (member.burnout_score || 0) > 0
+              (member.incident_count || 0) > 0 || (member.ocb_score || 0) > 0
             )
-            // Only hide members with BOTH zero incidents AND zero burnout
+            // Only hide members with BOTH zero incidents AND zero OCB score
             const membersWithoutIncidents = validMembers.filter(member =>
-              (member.incident_count || 0) === 0 && (member.burnout_score || 0) === 0
+              (member.incident_count || 0) === 0 && (member.ocb_score || 0) === 0
             )
 
             

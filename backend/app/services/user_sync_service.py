@@ -87,9 +87,9 @@ class UserSyncService:
 
             # After syncing Rootly/PagerDuty users, try to match Jira accounts
             jira_stats = await self._match_jira_users(current_user)
+            stats['jira_matched'] = jira_stats['matched'] if jira_stats else 0
+            stats['jira_skipped'] = jira_stats['skipped'] if jira_stats else 0
             if jira_stats:
-                stats['jira_matched'] = jira_stats['matched']
-                stats['jira_skipped'] = jira_stats['skipped']
                 logger.info(
                     f"Jira matching: {jira_stats['matched']} users matched, "
                     f"{jira_stats['skipped']} skipped"
