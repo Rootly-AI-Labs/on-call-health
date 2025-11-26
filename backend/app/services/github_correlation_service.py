@@ -88,26 +88,35 @@ class GitHubCorrelationService:
                 # Check if this member has an integration mapping
                 if member_email in email_to_github:
                     github_mapping = email_to_github[member_email]
-                    
-                    # Create comprehensive github_activity data from integration mapping
-                    github_activity = self._create_github_activity_from_integration_mapping(github_mapping)
-                    
-                    if github_activity:
-                        # Update member with GitHub data
-                        updated_member = member.copy()
-                        updated_member['github_activity'] = github_activity
-                        updated_member['github_username'] = github_mapping['username']
-                        updated_member['github_commits'] = github_activity.get('commits_count', 0)
-                        updated_member['github_commits_per_week'] = github_activity.get('commits_per_week', 0)
-                        
-                        updated_members.append(updated_member)
-                        correlations_made += 1
-                        
-                        self.logger.info(f"✅ Correlated {member_email} → {github_mapping['username']} ({github_activity.get('commits_count', 0)} commits)")
-                    else:
-                        # Mapping exists but no activity data
+
+                    # IMPORTANT: Don't overwrite existing github_activity if it already has real data
+                    existing_github_activity = member.get('github_activity', {})
+                    existing_commits = existing_github_activity.get('commits_count', 0) if existing_github_activity else 0
+
+                    if existing_commits > 0:
+                        # Member already has real GitHub data from collection phase - don't overwrite!
+                        self.logger.info(f"✅ Skipping correlation for {member_email} - already has real GitHub data ({existing_commits} commits)")
                         updated_members.append(member)
-                        self.logger.warning(f"⚠️ Integration mapping exists for {member_email} → {github_mapping['username']} but no activity data")
+                    else:
+                        # No existing data, create from integration mapping
+                        github_activity = self._create_github_activity_from_integration_mapping(github_mapping)
+
+                        if github_activity:
+                            # Update member with GitHub data
+                            updated_member = member.copy()
+                            updated_member['github_activity'] = github_activity
+                            updated_member['github_username'] = github_mapping['username']
+                            updated_member['github_commits'] = github_activity.get('commits_count', 0)
+                            updated_member['github_commits_per_week'] = github_activity.get('commits_per_week', 0)
+
+                            updated_members.append(updated_member)
+                            correlations_made += 1
+
+                            self.logger.info(f"✅ Correlated {member_email} → {github_mapping['username']} ({github_activity.get('commits_count', 0)} commits)")
+                        else:
+                            # Mapping exists but no activity data
+                            updated_members.append(member)
+                            self.logger.warning(f"⚠️ Integration mapping exists for {member_email} → {github_mapping['username']} but no activity data")
                 else:
                     # No mapping for this member
                     updated_members.append(member)
