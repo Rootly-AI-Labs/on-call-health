@@ -1273,6 +1273,12 @@ class UnifiedBurnoutAnalyzer:
             user_slack_data = slack_data.get(user_name) if slack_data and user_name else None
             user_jira_data = jira_data.get(user_email.lower()) if jira_data and user_email else None
 
+            # Debug logging for GitHub data attachment
+            if user_github_data:
+                gh_commits = len(user_github_data.get('commits', []))
+                gh_prs = len(user_github_data.get('pull_requests', []))
+                logger.info(f"Attaching GitHub data to {user_email}: {gh_commits} commits, {gh_prs} PRs")
+
             user_analysis = self._analyze_member_burnout(
                 user,
                 user_incidents.get(user_id, []),
