@@ -182,6 +182,8 @@ export default function Dashboard() {
   setSelectedTimeRange,
   dialogSelectedIntegration,
   setDialogSelectedIntegration,
+  noIntegrationsFound,
+  setNoIntegrationsFound,
 
   // delete modal
   deleteDialogOpen,
@@ -737,84 +739,91 @@ export default function Dashboard() {
               )}
 
               {/* Individual Burnout Scores and AI Insights Grid */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-                {/* Individual Burnout Scores - Takes 2/3 width on large screens */}
-                <Card className="lg:col-span-2">
-                  <CardHeader>
-                    <CardTitle>Individual Burnout Scores</CardTitle>
-                    <CardDescription>Team member OCB burnout scores (higher = more burnout risk)</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {memberBarData.length > 0 ? (
-                      <div className="h-[350px]">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={memberBarData} margin={{ top: 20, right: 30, bottom: 60, left: 20 }}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis
-                              dataKey="fullName"
-                              angle={-45}
-                              textAnchor="end"
-                              height={60}
-                              interval={0}
-                              tick={{ fontSize: 11 }}
-                            />
-                            <YAxis domain={[0, 100]} />
-                            <Tooltip
-                              formatter={(value, name, props) => {
-                                const data = props.payload;
-                                const getRiskLabel = (level: string) => {
-                                  switch(level) {
-                                    case 'low': return 'Low/Minimal Burnout';
-                                    case 'mild': return 'Mild Burnout Symptoms';
-                                    case 'moderate': return 'Moderate/Significant Burnout';
-                                    case 'high': return 'High/Severe Burnout';
-                                    default: return level;
-                                  }
-                                };
-                                return [
-                                  `${Number(value).toFixed(1)}/100`,
-                                  `${data.scoreType} Score (${getRiskLabel(data.riskLevel)})`
-                                ];
-                              }}
-                              labelFormatter={(label, payload) => {
-                                const data = payload?.[0]?.payload;
-                                return data ? `${data.fullName}` : label;
-                              }}
-                              contentStyle={{
-                                backgroundColor: 'white',
-                                border: '1px solid #e5e7eb',
-                                borderRadius: '8px',
-                                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-                              }}
-                            />
-                            <Bar
-                              dataKey="score"
-                              radius={[4, 4, 0, 0]}
-                            >
-                              {memberBarData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={entry.fill} />
-                              ))}
-                            </Bar>
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </div>
-                    ) : (
-                      <div className="h-[350px] flex items-center justify-center text-gray-500">
-                        <div className="text-center">
-                          <p className="text-lg font-medium">No incident data available</p>
-                          <p className="text-sm mt-2">Members with zero incidents are not displayed in this chart</p>
-                        </div>
+              {(() => {
+                const hasAIInsights = currentAnalysis?.analysis_data?.ai_team_insights?.available;
+                return (
+                  <div className={`grid grid-cols-1 ${hasAIInsights ? 'lg:grid-cols-3' : 'lg:grid-cols-1'} gap-6 mb-6`}>
+                    {/* Individual Burnout Scores - Takes 2/3 width on large screens, full width if no AI Insights */}
+                    <Card className={hasAIInsights ? "lg:col-span-2" : ""}>
+                      <CardHeader>
+                        <CardTitle>Individual Burnout Scores</CardTitle>
+                        <CardDescription>Team member OCB burnout scores (higher = more burnout risk)</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        {memberBarData.length > 0 ? (
+                          <div className="h-[350px]">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <BarChart data={memberBarData} margin={{ top: 20, right: 30, bottom: 60, left: 20 }}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis
+                                  dataKey="fullName"
+                                  angle={-45}
+                                  textAnchor="end"
+                                  height={60}
+                                  interval={0}
+                                  tick={{ fontSize: 11 }}
+                                />
+                                <YAxis domain={[0, 100]} />
+                                <Tooltip
+                                  formatter={(value, name, props) => {
+                                    const data = props.payload;
+                                    const getRiskLabel = (level: string) => {
+                                      switch(level) {
+                                        case 'low': return 'Low/Minimal Burnout';
+                                        case 'mild': return 'Mild Burnout Symptoms';
+                                        case 'moderate': return 'Moderate/Significant Burnout';
+                                        case 'high': return 'High/Severe Burnout';
+                                        default: return level;
+                                      }
+                                    };
+                                    return [
+                                      `${Number(value).toFixed(1)}/100`,
+                                      `${data.scoreType} Score (${getRiskLabel(data.riskLevel)})`
+                                    ];
+                                  }}
+                                  labelFormatter={(label, payload) => {
+                                    const data = payload?.[0]?.payload;
+                                    return data ? `${data.fullName}` : label;
+                                  }}
+                                  contentStyle={{
+                                    backgroundColor: 'white',
+                                    border: '1px solid #e5e7eb',
+                                    borderRadius: '8px',
+                                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                                  }}
+                                />
+                                <Bar
+                                  dataKey="score"
+                                  radius={[4, 4, 0, 0]}
+                                >
+                                  {memberBarData.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={entry.fill} />
+                                  ))}
+                                </Bar>
+                              </BarChart>
+                            </ResponsiveContainer>
+                          </div>
+                        ) : (
+                          <div className="h-[350px] flex items-center justify-center text-gray-500">
+                            <div className="text-center">
+                              <p className="text-lg font-medium">No incident data available</p>
+                              <p className="text-sm mt-2">Members with zero incidents are not displayed in this chart</p>
+                            </div>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    {/* AI Insights Card - Takes 1/3 width on large screens */}
+                    {hasAIInsights && (
+                      <div className="lg:col-span-1">
+                        <AIInsightsCard currentAnalysis={currentAnalysis} />
                       </div>
                     )}
-                  </CardContent>
-                </Card>
-
-                {/* AI Insights Card - Takes 1/3 width on large screens */}
-                <div className="lg:col-span-1">
-                  <AIInsightsCard currentAnalysis={currentAnalysis} />
-                </div>
-              </div>
-
+                  </div>
+                );
+              })()
+              }
               {/* Charts Section */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                 {/* Burnout Journey Map */}
@@ -1817,6 +1826,32 @@ export default function Dashboard() {
               Configure your burnout analysis settings and data sources
             </DialogDescription>
           </DialogHeader>
+
+          {/* No Integrations State */}
+          {noIntegrationsFound ? (
+            <div className="space-y-4">
+              <Alert className="border-red-200 bg-red-50">
+                <AlertCircle className="w-4 h-4 text-red-600" />
+                <AlertDescription className="text-red-800">
+                  <strong>No Primary Integrations Connected</strong>
+                  <span className="block mt-2">
+                    To start a burnout analysis, you need to connect at least one primary integration (Rootly or PagerDuty).
+                  </span>
+                </AlertDescription>
+              </Alert>
+
+              <button
+                onClick={() => {
+                  setShowTimeRangeDialog(false)
+                  setNoIntegrationsFound(false)
+                  router.push('/integrations')
+                }}
+                className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-colors"
+              >
+                Go to Integrations
+              </button>
+            </div>
+          ) : (
           <div className="space-y-4">
             <div>
               <label className="text-sm font-medium text-gray-700 mb-2 block">
@@ -2186,6 +2221,7 @@ export default function Dashboard() {
               </Button>
             </div>
           </div>
+          )}
         </DialogContent>
       </Dialog>
 
