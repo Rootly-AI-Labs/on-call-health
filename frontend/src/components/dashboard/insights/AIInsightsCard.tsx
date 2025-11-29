@@ -33,13 +33,17 @@ function getTextAfterSummary(html: string): string {
 export function AIInsightsCard({ currentAnalysis }: AIInsightsCardProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Only show if AI insights data exists (show even if unavailable/loading)
+  // Check if AI insights data exists
   const aiInsights = currentAnalysis?.analysis_data?.ai_team_insights;
-  if (!aiInsights?.available) {
+  const aiEnhanced = currentAnalysis?.analysis_data?.ai_enhanced;
+  const hasAIData = aiInsights?.available;
+  
+  // Show card if AI was enabled (even if it failed) or if AI insights are available
+  if (!aiEnhanced && !hasAIData) {
     return null
   }
 
-  const insightsData = currentAnalysis.analysis_data.ai_team_insights.insights;
+  const insightsData = aiInsights?.insights;
   const hasContent = insightsData?.llm_team_analysis;
 
   return (
