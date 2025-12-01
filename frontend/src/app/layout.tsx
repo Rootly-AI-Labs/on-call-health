@@ -3,8 +3,8 @@ import { Inter } from 'next/font/google'
 import Script from 'next/script'
 import './globals.css'
 import ErrorBoundary from '@/components/error-boundary'
-import { Toaster } from '@/components/ui/sonner'
 import NewRelicProvider from '@/components/NewRelicProvider'
+import ClientToaster from '@/components/ClientToaster'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -27,7 +27,7 @@ export default function RootLayout({
 
   return (
     <html lang="en">
-      <head>
+      <body className={inter.className}>
         {gaMeasurementId && (
           <>
             <Script
@@ -48,13 +48,11 @@ export default function RootLayout({
             />
           </>
         )}
-      </head>
-      <body className={inter.className}>
         <NewRelicProvider>
           <ErrorBoundary>
             {children}
           </ErrorBoundary>
-          <Toaster />
+          <ClientToaster />
         </NewRelicProvider>
       </body>
     </html>
