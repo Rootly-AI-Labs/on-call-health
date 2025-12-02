@@ -77,24 +77,43 @@ class UserSyncService:
             )
 
             # After syncing Rootly/PagerDuty users, try to match GitHub usernames
-            github_stats = await self._match_github_usernames(current_user)
-            if github_stats:
-                stats['github_matched'] = github_stats['matched']
-                stats['github_skipped'] = github_stats['skipped']
-                logger.info(
-                    f"GitHub matching: {github_stats['matched']} users matched, "
-                    f"{github_stats['skipped']} skipped"
-                )
+            # Wrap in try-except to ensure GitHub failures don't block Jira/Slack matching
+            try:
+                github_stats = await self._match_github_usernames(current_user)
+                if github_stats:
+                    stats['github_matched'] = github_stats['matched']
+                    stats['github_skipped'] = github_stats['skipped']
+                    logger.info(
+                        f"GitHub matching: {github_stats['matched']} users matched, "
+                        f"{github_stats['skipped']} skipped"
+                    )
+                else:
+                    stats['github_matched'] = 0
+                    stats['github_skipped'] = 0
+            except Exception as e:
+                error_msg = f"GitHub matching failed: {str(e)}"
+                logger.error(f"{error_msg} - continuing with other integrations")
+                stats['github_matched'] = 0
+                stats['github_skipped'] = 0
+                stats['github_error'] = error_msg
 
             # After syncing Rootly/PagerDuty users, try to match Jira accounts
-            jira_stats = await self._match_jira_users(current_user)
-            stats['jira_matched'] = jira_stats['matched'] if jira_stats else 0
-            stats['jira_skipped'] = jira_stats['skipped'] if jira_stats else 0
-            if jira_stats:
-                logger.info(
-                    f"Jira matching: {jira_stats['matched']} users matched, "
-                    f"{jira_stats['skipped']} skipped"
-                )
+            # Wrap in try-except to ensure Jira failures don't block other operations
+            try:
+                jira_stats = await self._match_jira_users(current_user)
+                stats['jira_matched'] = jira_stats['matched'] if jira_stats else 0
+                stats['jira_skipped'] = jira_stats['skipped'] if jira_stats else 0
+                if jira_stats:
+                    logger.info(
+                        f"Jira matching: {jira_stats['matched']} users matched, "
+                        f"{jira_stats['skipped']} skipped"
+                    )
+            except Exception as e:
+                error_msg = f"Jira matching failed: {str(e)}"
+                logger.error(f"{error_msg} - continuing with other operations")
+                stats['jira_matched'] = 0
+                stats['jira_skipped'] = 0
+                stats['jira_error'] = error_msg
 
             return stats
 

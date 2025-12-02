@@ -678,16 +678,27 @@ async def sync_slack_user_ids(
     """
     logger.debug(f"Sync Slack user IDs request from user {current_user.id}")
 
-    # Get the workspace mapping and bot token for this user
-    workspace_mapping = db.query(SlackWorkspaceMapping).filter(
-        SlackWorkspaceMapping.owner_user_id == current_user.id,
-        SlackWorkspaceMapping.status == 'active'
-    ).first()
+    # Get the workspace mapping for this user's organization
+    workspace_mapping = None
+
+    # Check by organization first
+    if current_user.organization_id:
+        workspace_mapping = db.query(SlackWorkspaceMapping).filter(
+            SlackWorkspaceMapping.organization_id == current_user.organization_id,
+            SlackWorkspaceMapping.status == 'active'
+        ).first()
+
+    # Fallback to owner check if no org
+    if not workspace_mapping:
+        workspace_mapping = db.query(SlackWorkspaceMapping).filter(
+            SlackWorkspaceMapping.owner_user_id == current_user.id,
+            SlackWorkspaceMapping.status == 'active'
+        ).first()
 
     if not workspace_mapping:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="No active Slack workspace connection found"
+            detail="No active Slack workspace connection found for your organization"
         )
 
     # Get the bot token from SlackIntegration
