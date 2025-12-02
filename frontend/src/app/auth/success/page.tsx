@@ -2,12 +2,11 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState, useRef, Suspense } from 'react'
-import { useSearchParams, useRouter } from 'next/navigation'
+import { useEffect, useState, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 
-function AuthSuccessContent() {
-  const searchParams = useSearchParams()
+export default function AuthSuccessPage() {
   const router = useRouter()
   const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing')
   const [error, setError] = useState<string | null>(null)
@@ -200,22 +199,5 @@ function AuthSuccessContent() {
         </p>
       </div>
     </div>
-  )
-}
-
-export default function AuthSuccessPage() {
-  return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">
-            Loading...
-          </h2>
-        </div>
-      </div>
-    }>
-      <AuthSuccessContent />
-    </Suspense>
   )
 }
