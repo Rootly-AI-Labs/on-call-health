@@ -571,11 +571,12 @@ async def toggle_slack_feature(
                 detail="No OAuth Slack workspace found for your organization"
             )
 
-        # Check permissions: must be in the same organization
+        # Check permissions: must be in the same organization OR be the owner
         # Anyone in the organization can toggle features since they're all using the same workspace
-        is_same_org = workspace_mapping.organization_id == current_user.organization_id
+        is_owner = workspace_mapping.owner_user_id == current_user.id
+        is_same_org = workspace_mapping.organization_id and workspace_mapping.organization_id == current_user.organization_id
 
-        if not is_same_org:
+        if not (is_owner or is_same_org):
             raise HTTPException(
                 status_code=403,
                 detail="You must be in the same organization as the Slack workspace to toggle features"
@@ -598,14 +599,15 @@ async def toggle_slack_feature(
 
         db.commit()
 
-        # Send notification to org admins
-        notification_service = NotificationService(db)
-        notification_service.create_slack_feature_toggle_notification(
-            toggled_by=current_user,
-            feature=request.feature,
-            enabled=request.enabled,
-            organization_id=workspace_mapping.organization_id
-        )
+        # Send notification to org admins (only if workspace has an organization)
+        if workspace_mapping.organization_id:
+            notification_service = NotificationService(db)
+            notification_service.create_slack_feature_toggle_notification(
+                toggled_by=current_user,
+                feature=request.feature,
+                enabled=request.enabled,
+                organization_id=workspace_mapping.organization_id
+            )
 
         return {
             "success": True,
