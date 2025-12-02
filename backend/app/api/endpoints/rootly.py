@@ -1134,9 +1134,30 @@ async def sync_integration_users(
                     f"{github_stats['skipped']} skipped"
                 )
 
+            # After syncing, try to match Jira accounts
+            jira_stats = await sync_service._match_jira_users(current_user)
+            if jira_stats:
+                stats['jira_matched'] = jira_stats['matched']
+                stats['jira_skipped'] = jira_stats['skipped']
+                logger.info(
+                    f"Jira matching: {jira_stats['matched']} users matched, "
+                    f"{jira_stats['skipped']} skipped"
+                )
+
+            # Build detailed message for beta integration (matching regular integration format)
+            message_parts = [f"Successfully synced {stats['total']} users from beta integration"]
+            if stats.get('github_matched'):
+                message_parts.append(f"GitHub: {stats['github_matched']} users matched")
+            if stats.get('github_skipped'):
+                message_parts.append(f"({stats['github_skipped']} skipped)")
+            if stats.get('jira_matched'):
+                message_parts.append(f"Jira: {stats['jira_matched']} users matched")
+            if stats.get('jira_skipped'):
+                message_parts.append(f"({stats['jira_skipped']} skipped)")
+
             return {
                 "success": True,
-                "message": f"Successfully synced {stats['total']} users from beta integration",
+                "message": ". ".join(message_parts),
                 "stats": stats
             }
 
@@ -1164,6 +1185,10 @@ async def sync_integration_users(
             message_parts.append(f"GitHub: {stats['github_matched']} users matched")
         if stats.get('github_skipped'):
             message_parts.append(f"({stats['github_skipped']} skipped)")
+        if stats.get('jira_matched'):
+            message_parts.append(f"Jira: {stats['jira_matched']} users matched")
+        if stats.get('jira_skipped'):
+            message_parts.append(f"({stats['jira_skipped']} skipped)")
 
         return {
             "success": True,
