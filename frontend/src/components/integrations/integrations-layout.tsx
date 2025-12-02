@@ -39,8 +39,9 @@ function IntegrationsLayoutContent() {
         console.error('Failed to load user info:', error)
       }
     }
-    
+
     loadUserInfo()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.setUserInfo])
 
   // Handle URL parameters
@@ -55,6 +56,7 @@ function IntegrationsLayoutContent() {
     if (backUrl) {
       state.setUI({ backUrl: decodeURIComponent(backUrl) })
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, state.setUI])
 
   // Optimized data loading with performance tracking
@@ -125,6 +127,7 @@ function IntegrationsLayoutContent() {
   // Load data on mount
   useEffect(() => {
     loadIntegrationsOptimized()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Performance monitoring - end page load timing
@@ -211,10 +214,10 @@ function IntegrationsLayoutContent() {
 export default function IntegrationsLayout() {
   return (
     <Suspense fallback={
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex h-screen items-center justify-center">
         <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-          <p className="text-sm text-muted-foreground">Loading integrations...</p>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading integrations...</p>
         </div>
       </div>
     }>
