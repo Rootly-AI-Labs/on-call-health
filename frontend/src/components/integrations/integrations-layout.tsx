@@ -1,8 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { toast } from "sonner"
+import { Loader2 } from "lucide-react"
 
 // Hooks
 import { usePerformanceMonitor } from "@/hooks/use-performance-monitor"
@@ -17,7 +18,7 @@ import { IntegrationsCards } from "./integrations-cards"
 import { EnhancementCards } from "./enhancement-cards"
 import { MappingDrawer } from "@/components/mapping-drawer"
 
-export default function IntegrationsLayout() {
+function IntegrationsLayoutContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { startTiming, endTiming, trackCacheHit } = usePerformanceMonitor()
@@ -38,8 +39,9 @@ export default function IntegrationsLayout() {
         console.error('Failed to load user info:', error)
       }
     }
-    
+
     loadUserInfo()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.setUserInfo])
 
   // Handle URL parameters
@@ -54,6 +56,7 @@ export default function IntegrationsLayout() {
     if (backUrl) {
       state.setUI({ backUrl: decodeURIComponent(backUrl) })
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, state.setUI])
 
   // Optimized data loading with performance tracking
@@ -124,6 +127,7 @@ export default function IntegrationsLayout() {
   // Load data on mount
   useEffect(() => {
     loadIntegrationsOptimized()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Performance monitoring - end page load timing
@@ -204,5 +208,20 @@ export default function IntegrationsLayout() {
         platform={state.dialogs.mappingDrawerPlatform}
       />
     </div>
+  )
+}
+
+export default function IntegrationsLayout() {
+  return (
+    <Suspense fallback={
+      <div className="flex h-screen items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading integrations...</p>
+        </div>
+      </div>
+    }>
+      <IntegrationsLayoutContent />
+    </Suspense>
   )
 }

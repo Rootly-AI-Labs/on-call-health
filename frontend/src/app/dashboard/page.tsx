@@ -1,4 +1,6 @@
 "use client"
+
+import { Suspense } from "react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { MappingDrawer } from "@/components/mapping-drawer"
@@ -60,7 +62,7 @@ import Image from "next/image"
 import useDashboard from "@/hooks/useDashboard"
 import { TopPanel } from "@/components/TopPanel"
 
-export default function Dashboard() {
+function DashboardContent() {
   const {
   API_BASE,
   router,
@@ -2256,5 +2258,20 @@ export default function Dashboard() {
       />
       </div>
     </div>
+  )
+}
+
+export default function Dashboard() {
+  return (
+    <Suspense fallback={
+      <div className="flex h-screen items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading dashboard...</p>
+        </div>
+      </div>
+    }>
+      <DashboardContent />
+    </Suspense>
   )
 }
