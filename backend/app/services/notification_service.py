@@ -160,6 +160,42 @@ class NotificationService:
         self.db.commit()
         return notification
 
+    def create_slack_feature_toggle_notification(self, toggled_by: User, feature: str, enabled: bool, organization_id: int) -> List[UserNotification]:
+        """Notify org admins when a Slack feature is toggled."""
+        notifications = []
+
+        # Get org admins and owner
+        org_admins = self.db.query(User).filter(
+            User.organization_id == organization_id,
+            User.role.in_(['org_admin', 'super_admin']),
+            User.id != toggled_by.id  # Don't notify the person who toggled
+        ).all()
+
+        # Build notification message
+        user_name = toggled_by.name or toggled_by.email
+        feature_name = "Slack surveys" if feature == "survey" else "Communication pattern analysis"
+        state = "enabled" if enabled else "disabled"
+
+        title = f"Slack feature {state}"
+        message = f"{user_name} {state} {feature_name} for your organization."
+
+        for admin in org_admins:
+            notification = UserNotification(
+                user_id=admin.id,
+                organization_id=organization_id,
+                type='integration',
+                title=title,
+                message=message,
+                action_url="/integrations",
+                action_text="View Settings",
+                priority='normal'
+            )
+            notifications.append(notification)
+            self.db.add(notification)
+
+        self.db.commit()
+        return notifications
+
     def create_survey_reminder_notification(self, user: User, analysis: Analysis) -> UserNotification:
         """Create reminder for pending survey."""
         notification = UserNotification(

@@ -598,6 +598,15 @@ async def toggle_slack_feature(
 
         db.commit()
 
+        # Send notification to org admins
+        notification_service = NotificationService(db)
+        notification_service.create_slack_feature_toggle_notification(
+            toggled_by=current_user,
+            feature=request.feature,
+            enabled=request.enabled,
+            organization_id=workspace_mapping.organization_id
+        )
+
         return {
             "success": True,
             "feature": request.feature,
