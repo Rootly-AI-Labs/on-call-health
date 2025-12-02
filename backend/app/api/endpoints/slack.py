@@ -543,20 +543,42 @@ async def toggle_slack_feature(
     db: Session = Depends(get_db)
 ):
     """
-    Toggle a Slack feature (survey or communication patterns analysis) for the current user's workspace.
+    Toggle a Slack feature (survey or communication patterns analysis) for the workspace.
     Only works for OAuth-based integrations.
+    Requires: workspace owner, org admin, or manager role.
     """
     try:
-        # Find the user's OAuth workspace mapping
-        workspace_mapping = db.query(SlackWorkspaceMapping).filter(
-            SlackWorkspaceMapping.owner_user_id == current_user.id,
-            SlackWorkspaceMapping.status == 'active'
-        ).first()
+        # Find workspace mapping - check by organization first, then by owner
+        workspace_mapping = None
+
+        # If user has an organization, check for org's workspace
+        if current_user.organization_id:
+            workspace_mapping = db.query(SlackWorkspaceMapping).filter(
+                SlackWorkspaceMapping.organization_id == current_user.organization_id,
+                SlackWorkspaceMapping.status == 'active'
+            ).first()
+
+        # If no org workspace, check if user is the owner
+        if not workspace_mapping:
+            workspace_mapping = db.query(SlackWorkspaceMapping).filter(
+                SlackWorkspaceMapping.owner_user_id == current_user.id,
+                SlackWorkspaceMapping.status == 'active'
+            ).first()
 
         if not workspace_mapping:
             raise HTTPException(
                 status_code=404,
-                detail="No OAuth Slack workspace found for this user"
+                detail="No OAuth Slack workspace found for your organization"
+            )
+
+        # Check permissions: must be owner, org admin, or manager
+        is_owner = workspace_mapping.owner_user_id == current_user.id
+        is_authorized = is_owner or current_user.is_manager()
+
+        if not is_authorized:
+            raise HTTPException(
+                status_code=403,
+                detail="Only workspace owners, organization admins, and managers can toggle Slack features"
             )
 
         # Validate feature name
