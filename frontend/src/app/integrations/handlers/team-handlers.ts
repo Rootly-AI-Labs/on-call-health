@@ -101,9 +101,15 @@ export async function syncUsersToCorrelation(
         onProgress?.(`🐙 Matched ${stats.github_matched} users to GitHub`)
         onProgress?.(`⏭️  Skipped ${stats.github_skipped || 0} GitHub matches`)
       }
+      if (stats.github_error) {
+        onProgress?.(`⚠️  GitHub sync failed: ${stats.github_error}`)
+      }
       if (stats.jira_matched !== undefined) {
         onProgress?.(`🔗 Matched ${stats.jira_matched} users to Jira`)
         onProgress?.(`⏭️  Skipped ${stats.jira_skipped || 0} Jira matches`)
+      }
+      if (stats.jira_error) {
+        onProgress?.(`⚠️  Jira sync failed: ${stats.jira_error}`)
       }
 
       // Build success message with GitHub and Jira matching info
@@ -111,8 +117,14 @@ export async function syncUsersToCorrelation(
       if (stats.github_matched !== undefined) {
         message += ` Matched ${stats.github_matched} users to GitHub.`
       }
+      if (stats.github_error) {
+        message += ` GitHub sync failed.`
+      }
       if (stats.jira_matched !== undefined) {
         message += ` Matched ${stats.jira_matched} users to Jira.`
+      }
+      if (stats.jira_error) {
+        message += ` Jira sync failed.`
       }
       message += ` All team members can now submit burnout surveys via Slack!`
 
