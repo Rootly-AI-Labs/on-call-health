@@ -571,14 +571,14 @@ async def toggle_slack_feature(
                 detail="No OAuth Slack workspace found for your organization"
             )
 
-        # Check permissions: must be owner, org admin, or manager
-        is_owner = workspace_mapping.owner_user_id == current_user.id
-        is_authorized = is_owner or current_user.is_manager()
+        # Check permissions: must be in the same organization
+        # Anyone in the organization can toggle features since they're all using the same workspace
+        is_same_org = workspace_mapping.organization_id == current_user.organization_id
 
-        if not is_authorized:
+        if not is_same_org:
             raise HTTPException(
                 status_code=403,
-                detail="Only workspace owners, organization admins, and managers can toggle Slack features"
+                detail="You must be in the same organization as the Slack workspace to toggle features"
             )
 
         # Validate feature name
