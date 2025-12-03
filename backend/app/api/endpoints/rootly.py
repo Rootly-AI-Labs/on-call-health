@@ -911,7 +911,8 @@ async def get_integration_users(
                         if uc.github_username
                     ]))
 
-                    # Also check user_mappings table for manual mappings
+                    # Check if this is a manual mapping
+                    github_is_manual = False
                     if not github_usernames:
                         from ...models import UserMapping
                         manual_mapping = db.query(UserMapping).filter(
@@ -921,6 +922,18 @@ async def get_integration_users(
                         ).first()
                         if manual_mapping and manual_mapping.target_identifier:
                             github_usernames = [manual_mapping.target_identifier]
+                            github_is_manual = True
+                    else:
+                        # Check if the username in user_correlations has a manual mapping
+                        from ...models import UserMapping
+                        manual_mapping = db.query(UserMapping).filter(
+                            UserMapping.user_id == current_user.id,
+                            UserMapping.source_identifier == user_email,
+                            UserMapping.target_platform == "github",
+                            UserMapping.mapping_type == "manual"
+                        ).first()
+                        if manual_mapping and manual_mapping.target_identifier:
+                            github_is_manual = True
 
                     formatted_users.append({
                         "id": user.get("id"),
@@ -929,6 +942,7 @@ async def get_integration_users(
                         "platform": "rootly",
                         "platform_user_id": user.get("id"),
                         "github_username": github_usernames[0] if github_usernames else None,
+                        "github_is_manual": github_is_manual,
                         "has_github_mapping": len(github_usernames) > 0
                     })
 
@@ -1008,7 +1022,8 @@ async def get_integration_users(
                     if uc.github_username
                 ]))
 
-                # Also check user_mappings table for manual mappings
+                # Check if this is a manual mapping
+                github_is_manual = False
                 if not github_usernames:
                     from ...models import UserMapping
                     manual_mapping = db.query(UserMapping).filter(
@@ -1018,6 +1033,18 @@ async def get_integration_users(
                     ).first()
                     if manual_mapping and manual_mapping.target_identifier:
                         github_usernames = [manual_mapping.target_identifier]
+                        github_is_manual = True
+                else:
+                    # Check if the username in user_correlations has a manual mapping
+                    from ...models import UserMapping
+                    manual_mapping = db.query(UserMapping).filter(
+                        UserMapping.user_id == current_user.id,
+                        UserMapping.source_identifier == user_email,
+                        UserMapping.target_platform == "github",
+                        UserMapping.mapping_type == "manual"
+                    ).first()
+                    if manual_mapping and manual_mapping.target_identifier:
+                        github_is_manual = True
 
                 formatted_users.append({
                     "id": user.get("id"),
@@ -1026,6 +1053,7 @@ async def get_integration_users(
                     "platform": "rootly",
                     "platform_user_id": user.get("id"),
                     "github_username": github_usernames[0] if github_usernames else None,
+                    "github_is_manual": github_is_manual,
                     "has_github_mapping": len(github_usernames) > 0
                 })
 

@@ -4256,11 +4256,16 @@ export default function IntegrationsPage() {
                         ) : (
                           // Display mode
                           <div className="flex items-center justify-between text-xs">
-                            <div className="text-gray-500">
-                              GitHub: {user.github_username ? (
+                            <div className="text-gray-500 flex items-center gap-2">
+                              <span>GitHub: {user.github_username ? (
                                 <span className="font-mono text-gray-700">{user.github_username}</span>
                               ) : (
                                 <span className="text-gray-400 italic">Not mapped</span>
+                              )}</span>
+                              {user.github_is_manual && user.github_username && (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                                  Manual
+                                </span>
                               )}
                             </div>
                             {githubIntegration && (
