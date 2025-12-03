@@ -905,11 +905,22 @@ async def get_integration_users(
                         UserCorrelation.email == user_email
                     ).all()
 
-                    # Collect unique GitHub usernames
+                    # Collect unique GitHub usernames from user_correlations
                     github_usernames = list(set([
                         uc.github_username for uc in user_correlations
                         if uc.github_username
                     ]))
+
+                    # Also check user_mappings table for manual mappings
+                    if not github_usernames:
+                        from ...models import UserMapping
+                        manual_mapping = db.query(UserMapping).filter(
+                            UserMapping.user_id == current_user.id,
+                            UserMapping.source_identifier == user_email,
+                            UserMapping.target_platform == "github"
+                        ).first()
+                        if manual_mapping and manual_mapping.target_identifier:
+                            github_usernames = [manual_mapping.target_identifier]
 
                     formatted_users.append({
                         "id": user.get("id"),
@@ -991,11 +1002,22 @@ async def get_integration_users(
                     UserCorrelation.email == user_email
                 ).all()
 
-                # Collect unique GitHub usernames
+                # Collect unique GitHub usernames from user_correlations
                 github_usernames = list(set([
                     uc.github_username for uc in user_correlations
                     if uc.github_username
                 ]))
+
+                # Also check user_mappings table for manual mappings
+                if not github_usernames:
+                    from ...models import UserMapping
+                    manual_mapping = db.query(UserMapping).filter(
+                        UserMapping.user_id == current_user.id,
+                        UserMapping.source_identifier == user_email,
+                        UserMapping.target_platform == "github"
+                    ).first()
+                    if manual_mapping and manual_mapping.target_identifier:
+                        github_usernames = [manual_mapping.target_identifier]
 
                 formatted_users.append({
                     "id": user.get("id"),
