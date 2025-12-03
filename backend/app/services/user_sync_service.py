@@ -87,9 +87,8 @@ class UserSyncService:
                         f"GitHub matching: {github_stats['matched']} users matched, "
                         f"{github_stats['skipped']} skipped"
                     )
-                else:
-                    stats['github_matched'] = 0
-                    stats['github_skipped'] = 0
+                # If None is returned (no GitHub integration), don't set stats
+                # This prevents frontend from showing "Matched 0 users to GitHub"
             except Exception as e:
                 error_msg = f"GitHub matching failed: {str(e)}"
                 logger.error(f"{error_msg} - continuing with other integrations")
@@ -101,13 +100,15 @@ class UserSyncService:
             # Wrap in try-except to ensure Jira failures don't block other operations
             try:
                 jira_stats = await self._match_jira_users(current_user)
-                stats['jira_matched'] = jira_stats['matched'] if jira_stats else 0
-                stats['jira_skipped'] = jira_stats['skipped'] if jira_stats else 0
                 if jira_stats:
+                    stats['jira_matched'] = jira_stats['matched']
+                    stats['jira_skipped'] = jira_stats['skipped']
                     logger.info(
                         f"Jira matching: {jira_stats['matched']} users matched, "
                         f"{jira_stats['skipped']} skipped"
                     )
+                # If None is returned (no Jira integration), don't set stats
+                # This prevents frontend from showing "Matched 0 users to Jira"
             except Exception as e:
                 error_msg = f"Jira matching failed: {str(e)}"
                 logger.error(f"{error_msg} - continuing with other operations")
