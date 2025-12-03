@@ -152,8 +152,9 @@ class PagerDutyAPIClient:
                         headers=self.headers,
                         params={
                             "limit": min(limit, 100),
-                            "offset": offset,
-                            "include[]": ["contact_methods", "teams"]
+                            "offset": offset
+                            # Removed include[]=contact_methods,teams - causes 40s+ response time
+                            # Only need basic user data (id, email, name) for sync
                         }
                     ) as response:
                         if response.status != 200:
