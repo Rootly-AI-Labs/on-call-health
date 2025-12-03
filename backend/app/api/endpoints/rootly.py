@@ -901,6 +901,7 @@ async def get_integration_users(
 
                     # Check for existing user correlations
                     user_correlations = db.query(UserCorrelation).filter(
+                        UserCorrelation.user_id == current_user.id,
                         UserCorrelation.email == user_email
                     ).all()
 
@@ -916,7 +917,7 @@ async def get_integration_users(
                         "name": attrs.get("name") or attrs.get("full_name"),
                         "platform": "rootly",
                         "platform_user_id": user.get("id"),
-                        "github_usernames": github_usernames,
+                        "github_username": github_usernames[0] if github_usernames else None,
                         "has_github_mapping": len(github_usernames) > 0
                     })
 
@@ -986,6 +987,7 @@ async def get_integration_users(
 
                 # Check for existing user correlations
                 user_correlations = db.query(UserCorrelation).filter(
+                    UserCorrelation.user_id == current_user.id,
                     UserCorrelation.email == user_email
                 ).all()
 
@@ -1001,7 +1003,7 @@ async def get_integration_users(
                     "name": attrs.get("name") or attrs.get("full_name"),
                     "platform": "rootly",
                     "platform_user_id": user.get("id"),
-                    "github_usernames": github_usernames,
+                    "github_username": github_usernames[0] if github_usernames else None,
                     "has_github_mapping": len(github_usernames) > 0
                 })
 

@@ -3968,7 +3968,7 @@ export default function IntegrationsPage() {
                 </Button>
                 <Button
                   onClick={() => setShowSyncConfirmModal(true)}
-                  disabled={loadingTeamMembers}
+                  disabled={loadingTeamMembers || loadingSyncedUsers}
                   className="bg-purple-600 hover:bg-purple-700 text-white"
                   size="default"
                 >
@@ -3976,6 +3976,11 @@ export default function IntegrationsPage() {
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                       Syncing...
+                    </>
+                  ) : loadingSyncedUsers ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Loading...
                     </>
                   ) : (
                     <>
@@ -4446,6 +4451,10 @@ export default function IntegrationsPage() {
       <Dialog open={showSyncConfirmModal} onOpenChange={(open) => {
         if (!syncProgress?.isLoading) {
           setShowSyncConfirmModal(open)
+          if (!open) {
+            // Reset sync progress when closing modal
+            setSyncProgress(null)
+          }
         }
       }}>
         <DialogContent className="sm:max-w-md">

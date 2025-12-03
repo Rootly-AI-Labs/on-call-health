@@ -543,20 +543,43 @@ async def toggle_slack_feature(
     db: Session = Depends(get_db)
 ):
     """
-    Toggle a Slack feature (survey or communication patterns analysis) for the current user's workspace.
+    Toggle a Slack feature (survey or communication patterns analysis) for the workspace.
     Only works for OAuth-based integrations.
+    Requires: workspace owner, org admin, or manager role.
     """
     try:
-        # Find the user's OAuth workspace mapping
-        workspace_mapping = db.query(SlackWorkspaceMapping).filter(
-            SlackWorkspaceMapping.owner_user_id == current_user.id,
-            SlackWorkspaceMapping.status == 'active'
-        ).first()
+        # Find workspace mapping - check by organization first, then by owner
+        workspace_mapping = None
+
+        # If user has an organization, check for org's workspace
+        if current_user.organization_id:
+            workspace_mapping = db.query(SlackWorkspaceMapping).filter(
+                SlackWorkspaceMapping.organization_id == current_user.organization_id,
+                SlackWorkspaceMapping.status == 'active'
+            ).first()
+
+        # If no org workspace, check if user is the owner
+        if not workspace_mapping:
+            workspace_mapping = db.query(SlackWorkspaceMapping).filter(
+                SlackWorkspaceMapping.owner_user_id == current_user.id,
+                SlackWorkspaceMapping.status == 'active'
+            ).first()
 
         if not workspace_mapping:
             raise HTTPException(
                 status_code=404,
-                detail="No OAuth Slack workspace found for this user"
+                detail="No OAuth Slack workspace found for your organization"
+            )
+
+        # Check permissions: must be in the same organization OR be the owner
+        # Anyone in the organization can toggle features since they're all using the same workspace
+        is_owner = workspace_mapping.owner_user_id == current_user.id
+        is_same_org = workspace_mapping.organization_id and workspace_mapping.organization_id == current_user.organization_id
+
+        if not (is_owner or is_same_org):
+            raise HTTPException(
+                status_code=403,
+                detail="You must be in the same organization as the Slack workspace to toggle features"
             )
 
         # Validate feature name
@@ -575,6 +598,16 @@ async def toggle_slack_feature(
             logger.info(f"User {current_user.id} toggled communication_patterns to {request.enabled} for workspace {workspace_mapping.workspace_id}")
 
         db.commit()
+
+        # Send notification to org admins (only if workspace has an organization)
+        if workspace_mapping.organization_id:
+            notification_service = NotificationService(db)
+            notification_service.create_slack_feature_toggle_notification(
+                toggled_by=current_user,
+                feature=request.feature,
+                enabled=request.enabled,
+                organization_id=workspace_mapping.organization_id
+            )
 
         return {
             "success": True,
@@ -647,16 +680,27 @@ async def sync_slack_user_ids(
     """
     logger.debug(f"Sync Slack user IDs request from user {current_user.id}")
 
-    # Get the workspace mapping and bot token for this user
-    workspace_mapping = db.query(SlackWorkspaceMapping).filter(
-        SlackWorkspaceMapping.owner_user_id == current_user.id,
-        SlackWorkspaceMapping.status == 'active'
-    ).first()
+    # Get the workspace mapping for this user's organization
+    workspace_mapping = None
+
+    # Check by organization first
+    if current_user.organization_id:
+        workspace_mapping = db.query(SlackWorkspaceMapping).filter(
+            SlackWorkspaceMapping.organization_id == current_user.organization_id,
+            SlackWorkspaceMapping.status == 'active'
+        ).first()
+
+    # Fallback to owner check if no org
+    if not workspace_mapping:
+        workspace_mapping = db.query(SlackWorkspaceMapping).filter(
+            SlackWorkspaceMapping.owner_user_id == current_user.id,
+            SlackWorkspaceMapping.status == 'active'
+        ).first()
 
     if not workspace_mapping:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="No active Slack workspace connection found"
+            detail="No active Slack workspace connection found for your organization"
         )
 
     # Get the bot token from SlackIntegration
