@@ -166,12 +166,14 @@ class GitHubCollector:
 
             # Query for synced member - match by email only (don't filter by user_id)
             # This allows synced members to be shared across the organization
+            # Only return active users (not soft-deleted/stale)
             query = """
                 SELECT github_username
                 FROM user_correlations
                 WHERE email = :email
                   AND github_username IS NOT NULL
                   AND github_username != ''
+                  AND (is_active IS NULL OR is_active = 1)
                 LIMIT 1
             """
 
