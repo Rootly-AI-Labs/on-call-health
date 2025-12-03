@@ -54,13 +54,9 @@ class UserSyncService:
             else:
                 raise ValueError(f"Unsupported platform: {integration.platform}")
 
-            # Delete existing users from this integration before syncing fresh list
-            deleted_count = self._delete_integration_users(
-                integration_id=str(integration_id),
-                current_user=current_user
-            )
-            if deleted_count > 0:
-                logger.info(f"Deleted {deleted_count} existing users from integration {integration_id} before re-sync")
+            # NOTE: We don't delete existing users anymore - we update them instead
+            # This preserves manually mapped GitHub/Jira usernames across syncs
+            # The _sync_users_to_correlation method handles both create and update
 
             # Sync users to UserCorrelation
             stats = self._sync_users_to_correlation(
