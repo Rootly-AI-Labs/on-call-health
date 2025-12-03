@@ -491,7 +491,7 @@ class UnifiedBurnoutAnalyzer:
                         
                         github_data = await collect_team_github_data_with_mapping(
                             team_emails, time_range_days, self.github_token,
-                            user_id=user_id, analysis_id=analysis_id, source_platform=self.platform,
+                            user_id=self.current_user_id, analysis_id=analysis_id, source_platform=self.platform,
                             email_to_name=email_to_name
                         )
                         logger.info(f"UNIFIED ANALYZER: Collected GitHub data for {len(github_data)} users")
