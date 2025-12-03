@@ -54,6 +54,22 @@ class UserSyncService:
             else:
                 raise ValueError(f"Unsupported platform: {integration.platform}")
 
+            # If API returned 0 users, it likely failed/timed out
+            # Don't wipe existing users - just return existing count
+            if not users or len(users) == 0:
+                logger.warning(f"API returned 0 users for {integration.platform} integration {integration_id} - preserving existing users")
+                existing_count = self.db.query(UserCorrelation).filter(
+                    UserCorrelation.user_id == current_user.id
+                ).count()
+                return {
+                    "created": 0,
+                    "updated": 0,
+                    "skipped": 0,
+                    "total": existing_count,
+                    "removed": 0,
+                    "warning": f"{integration.platform.title()} API returned 0 users (possible timeout). Existing {existing_count} users preserved."
+                }
+
             # NOTE: We don't delete existing users anymore - we update them instead
             # This preserves manually mapped GitHub/Jira usernames across syncs
             # The _sync_users_to_correlation method handles both create and update
