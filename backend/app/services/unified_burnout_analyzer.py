@@ -991,8 +991,10 @@ class UnifiedBurnoutAnalyzer:
             return result
             
         except Exception as e:
+            import traceback
             total_analysis_duration = (datetime.now() - analysis_start_time).total_seconds() if 'analysis_start_time' in locals() else 0
             logger.error(f"BURNOUT ANALYSIS FAILED: {time_range_days}-day analysis failed after {total_analysis_duration:.2f}s: {e}")
+            logger.error(f"Full traceback:\n{traceback.format_exc()}")
             raise
     
     async def _fetch_analysis_data(self, days_back: int) -> Dict[str, Any]:
