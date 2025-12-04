@@ -54,13 +54,28 @@ class UserSyncService:
             else:
                 raise ValueError(f"Unsupported platform: {integration.platform}")
 
-            # Delete existing users from this integration before syncing fresh list
-            deleted_count = self._delete_integration_users(
-                integration_id=str(integration_id),
-                current_user=current_user
-            )
-            if deleted_count > 0:
-                logger.info(f"Deleted {deleted_count} existing users from integration {integration_id} before re-sync")
+            # If API returned 0 users, it likely failed/timed out
+            # Don't wipe existing users - just return existing count
+            if not users or len(users) == 0:
+                logger.warning(f"API returned 0 users for {integration.platform} integration {integration_id} - preserving existing users")
+                existing_count = self.db.query(UserCorrelation).filter(
+                    UserCorrelation.user_id == current_user.id
+                ).count()
+                return {
+                    "created": 0,
+                    "updated": 0,
+                    "skipped": 0,
+                    "total": existing_count,
+                    "removed": 0,
+                    "warning": f"{integration.platform.title()} API returned 0 users (possible timeout). Existing {existing_count} users preserved."
+                }
+
+            # NOTE: We don't delete existing users anymore - we update them instead
+            # This preserves manually mapped GitHub/Jira usernames across syncs
+            # The _sync_users_to_correlation method handles both create and update
+
+            # Get list of emails from this sync
+            synced_emails = set(user.get("email", "").lower().strip() for user in users if user.get("email"))
 
             # Sync users to UserCorrelation
             stats = self._sync_users_to_correlation(
@@ -69,7 +84,14 @@ class UserSyncService:
                 current_user=current_user,
                 integration_id=str(integration_id)  # Store which integration synced this user
             )
-            stats['deleted'] = deleted_count
+
+            # Remove users who are no longer in Rootly/PagerDuty
+            removed_count = self._remove_missing_users(
+                integration_id=str(integration_id),
+                current_user=current_user,
+                synced_emails=synced_emails
+            )
+            stats['removed'] = removed_count
 
             logger.info(
                 f"Synced {stats['created']} new users, updated {stats['updated']} existing users "
@@ -83,9 +105,18 @@ class UserSyncService:
                 if github_stats:
                     stats['github_matched'] = github_stats['matched']
                     stats['github_skipped'] = github_stats['skipped']
+
+                    # Also count total users with GitHub usernames (for display)
+                    total_with_github = self.db.query(UserCorrelation).filter(
+                        UserCorrelation.user_id == current_user.id,
+                        UserCorrelation.github_username.isnot(None),
+                        UserCorrelation.github_username != ''
+                    ).count()
+                    stats['github_total'] = total_with_github
+
                     logger.info(
-                        f"GitHub matching: {github_stats['matched']} users matched, "
-                        f"{github_stats['skipped']} skipped"
+                        f"GitHub matching: {github_stats['matched']} new matches, "
+                        f"{github_stats['skipped']} skipped, {total_with_github} total"
                     )
                 # If None is returned (no GitHub integration), don't set stats
                 # This prevents frontend from showing "Matched 0 users to GitHub"
@@ -258,6 +289,10 @@ class UserSyncService:
             logger.error(f"Error committing user sync: {e}")
             raise
 
+        # Restore GitHub usernames from user_mappings table after sync
+        # This ensures manually set GitHub usernames persist across syncs
+        self._restore_github_usernames_from_mappings(current_user)
+
         return {
             "created": created,
             "updated": updated,
@@ -276,6 +311,7 @@ class UserSyncService:
         Update a UserCorrelation record with platform-specific data.
         Returns 1 if updated, 0 if no changes.
         """
+        from datetime import datetime
         updated = False
 
         # Update integration_ids array - add if not already present
@@ -306,6 +342,46 @@ class UserSyncService:
                 updated = True
 
         return 1 if updated else 0
+
+    def _remove_missing_users(
+        self,
+        integration_id: str,
+        current_user: User,
+        synced_emails: set
+    ) -> int:
+        """
+        Remove users who are no longer present in Rootly/PagerDuty.
+        This is a hard delete since the user is confirmed to be removed from the source.
+
+        Args:
+            integration_id: The integration ID
+            current_user: The user performing the sync
+            synced_emails: Set of email addresses that were in the sync
+
+        Returns:
+            Number of users removed
+        """
+        # Find all users from this integration
+        correlations = self.db.query(UserCorrelation).filter(
+            UserCorrelation.user_id == current_user.id
+        ).all()
+
+        removed = 0
+        for correlation in correlations:
+            # Check if this integration_id is in the array
+            if correlation.integration_ids and integration_id in correlation.integration_ids:
+                # Check if user's email was NOT in this sync
+                if correlation.email not in synced_emails:
+                    # User was removed from Rootly/PagerDuty - delete them
+                    self.db.delete(correlation)
+                    removed += 1
+                    logger.info(f"Removed user no longer in {integration_id}: {correlation.email}")
+
+        if removed > 0:
+            self.db.commit()
+            logger.info(f"Removed {removed} users no longer in integration {integration_id}")
+
+        return removed
 
     def sync_users_from_list(
         self,
@@ -520,6 +596,55 @@ class UserSyncService:
             logger.error(f"Error in GitHub matching: {e}")
             self.db.rollback()
             return None
+
+    def _restore_github_usernames_from_mappings(self, current_user: User) -> int:
+        """
+        Restore GitHub usernames from user_mappings table to user_correlations.
+        This ensures manually set GitHub usernames persist across syncs.
+
+        Returns:
+            Number of GitHub usernames restored
+        """
+        from ..models import UserMapping
+
+        try:
+            restored = 0
+
+            # Get all manual GitHub mappings for this user
+            mappings = self.db.query(UserMapping).filter(
+                UserMapping.user_id == current_user.id,
+                UserMapping.target_platform == "github",
+                UserMapping.target_identifier.isnot(None),
+                UserMapping.target_identifier != ""
+            ).all()
+
+            logger.info(f"Found {len(mappings)} GitHub mappings to restore")
+
+            for mapping in mappings:
+                # Find the corresponding user_correlation by email
+                correlation = self.db.query(UserCorrelation).filter(
+                    UserCorrelation.user_id == current_user.id,
+                    UserCorrelation.email == mapping.source_identifier
+                ).first()
+
+                if correlation:
+                    # Restore GitHub username if missing or different
+                    if not correlation.github_username or correlation.github_username != mapping.target_identifier:
+                        correlation.github_username = mapping.target_identifier
+                        restored += 1
+                        logger.debug(f"Restored GitHub username for {mapping.source_identifier}: {mapping.target_identifier}")
+
+            # Commit all restorations
+            if restored > 0:
+                self.db.commit()
+                logger.info(f"✅ Restored {restored} GitHub usernames from user_mappings")
+
+            return restored
+
+        except Exception as e:
+            logger.error(f"Error restoring GitHub usernames: {e}")
+            self.db.rollback()
+            return 0
 
     async def _match_jira_users(self, user: User) -> Optional[Dict[str, int]]:
         """

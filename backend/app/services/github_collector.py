@@ -187,6 +187,7 @@ class GitHubCollector:
                 logger.info(f"✅ Found synced GitHub member: {email} -> {username}")
                 return username
             else:
+                logger.warning(f"⚠️ No GitHub username found for: {email}")
                 return None
 
         except Exception as e:
@@ -570,7 +571,10 @@ class GitHubCollector:
         github_username = await self._correlate_email_to_github(user_email, github_token, user_id, full_name)
 
         if not github_username:
+            logger.warning(f"❌ [GITHUB_COLLECTION] No GitHub username found for {user_email}")
             return None
+
+        logger.info(f"✅ [GITHUB_COLLECTION] Matched {user_email} -> {github_username}")
 
         # Set up date range
         end_date = datetime.now()
@@ -578,11 +582,15 @@ class GitHubCollector:
 
         # Use real GitHub API if token provided
         if github_token:
+            logger.info(f"🔄 [GITHUB_COLLECTION] Fetching data from GitHub API for {github_username}")
             result = await self._fetch_real_github_data(github_username, user_email, start_date, end_date, github_token)
             if not result:
-                logger.warning(f"Failed to fetch GitHub data for {github_username}")
+                logger.error(f"❌ [GITHUB_COLLECTION] Failed to fetch GitHub data for {github_username}")
+                return None
+            logger.info(f"✅ [GITHUB_COLLECTION] Successfully fetched data for {github_username}: {result.get('metrics', {}).get('total_commits', 0)} commits, {result.get('metrics', {}).get('total_pull_requests', 0)} PRs")
             return result
         else:
+            logger.warning(f"⚠️ [GITHUB_COLLECTION] No token provided, generating mock data for {github_username}")
             return self._generate_mock_github_data(github_username, user_email, start_date, end_date)
     
     def _generate_mock_github_data(self, username: str, email: str, start_date: datetime, end_date: datetime) -> Dict:

@@ -138,7 +138,9 @@ class PagerDutyAPIClient:
     async def get_users(self, limit: int = 100, offset: int = 0) -> List[Dict[str, Any]]:
         """Fetch users from PagerDuty."""
         try:
-            async with aiohttp.ClientSession() as session:
+            # Set 30 second timeout to prevent hanging on slow API responses
+            timeout = aiohttp.ClientTimeout(total=30)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
                 all_users = []
                 request_count = 0
 
@@ -150,8 +152,9 @@ class PagerDutyAPIClient:
                         headers=self.headers,
                         params={
                             "limit": min(limit, 100),
-                            "offset": offset,
-                            "include[]": ["contact_methods", "teams"]
+                            "offset": offset
+                            # Removed include[]=contact_methods,teams - causes 40s+ response time
+                            # Only need basic user data (id, email, name) for sync
                         }
                     ) as response:
                         if response.status != 200:

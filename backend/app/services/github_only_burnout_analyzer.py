@@ -650,7 +650,7 @@ class GitHubOnlyBurnoutAnalyzer:
         if not member_analyses:
             return {
                 "overall_score": 5.0,
-                "risk_distribution": {"low": 0, "medium": 0, "high": 0},
+                "risk_distribution": {"low": 0, "medium": 0, "high": 0, "critical": 0},
                 "average_burnout_score": 0.0,
                 "health_status": "unknown",
                 "members_at_risk": 0,
@@ -663,12 +663,15 @@ class GitHubOnlyBurnoutAnalyzer:
         
         # Convert to health score (inverse of burnout)
         health_score = max(0, 10 - avg_burnout)
-        
+
         # Count risk levels
-        risk_counts = {"low": 0, "medium": 0, "high": 0}
+        risk_counts = {"low": 0, "medium": 0, "high": 0, "critical": 0}
         for member in member_analyses:
             risk_level = member.get("risk_level", "low")
-            risk_counts[risk_level] += 1
+            if risk_level in risk_counts:
+                risk_counts[risk_level] += 1
+            else:
+                risk_counts["low"] += 1
         
         # Determine health status with more realistic thresholds
         # 90%+ = Excellent, 80-89% = Good, 70-79% = Fair, 60-69% = Poor, <60% = Critical
@@ -1107,7 +1110,7 @@ class GitHubOnlyBurnoutAnalyzer:
             "error": reason,
             "team_health": {
                 "overall_score": 0.0,
-                "risk_distribution": {"low": 0, "medium": 0, "high": 0},
+                "risk_distribution": {"low": 0, "medium": 0, "high": 0, "critical": 0},
                 "health_status": "unknown",
                 "members_at_risk": 0,
                 "confidence_level": "none"

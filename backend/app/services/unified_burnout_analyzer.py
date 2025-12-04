@@ -491,7 +491,7 @@ class UnifiedBurnoutAnalyzer:
                         
                         github_data = await collect_team_github_data_with_mapping(
                             team_emails, time_range_days, self.github_token,
-                            user_id=user_id, analysis_id=analysis_id, source_platform=self.platform,
+                            user_id=self.current_user_id, analysis_id=analysis_id, source_platform=self.platform,
                             email_to_name=email_to_name
                         )
                         logger.info(f"UNIFIED ANALYZER: Collected GitHub data for {len(github_data)} users")
@@ -875,15 +875,18 @@ class UnifiedBurnoutAnalyzer:
                 # Log GitHub indicator details for transparency
                 if github_insights.get("high_risk_member_count", 0) > 0:
                     # Count risk level distribution for members with GitHub indicators
-                    github_members_by_risk = {"low": 0, "medium": 0, "high": 0}
+                    github_members_by_risk = {"low": 0, "medium": 0, "high": 0, "critical": 0}
                     github_members_details = []
-                    
+
                     for member in result.get("team_analysis", {}).get("members", []):
                         github_activity = member.get("github_activity", {})
                         github_indicators = github_activity.get("burnout_indicators", {})
                         if any(github_indicators.values()):
                             risk_level = member.get("risk_level", "low")
-                            github_members_by_risk[risk_level] += 1
+                            if risk_level in github_members_by_risk:
+                                github_members_by_risk[risk_level] += 1
+                            else:
+                                github_members_by_risk["low"] += 1
                             github_members_details.append({
                                 "email": member.get("user_email", "unknown"),
                                 "risk_level": risk_level,
@@ -991,8 +994,10 @@ class UnifiedBurnoutAnalyzer:
             return result
             
         except Exception as e:
+            import traceback
             total_analysis_duration = (datetime.now() - analysis_start_time).total_seconds() if 'analysis_start_time' in locals() else 0
             logger.error(f"BURNOUT ANALYSIS FAILED: {time_range_days}-day analysis failed after {total_analysis_duration:.2f}s: {e}")
+            logger.error(f"Full traceback:\n{traceback.format_exc()}")
             raise
     
     async def _fetch_analysis_data(self, days_back: int) -> Dict[str, Any]:
@@ -2939,7 +2944,7 @@ class UnifiedBurnoutAnalyzer:
             logger.warning(f"🏥 TEAM_HEALTH: No member analyses provided, returning neutral baseline")
             return {
                 "overall_score": 6.5,  # Neutral baseline if no data (not perfect health)
-                "risk_distribution": {"low": 0, "medium": 0, "high": 0},
+                "risk_distribution": {"low": 0, "medium": 0, "high": 0, "critical": 0},
                 "average_burnout_score": 0,
                 "health_status": "fair",
                 "members_at_risk": 0
@@ -5078,7 +5083,7 @@ class UnifiedBurnoutAnalyzer:
                 "overall_score": None,
                 "health_status": "error",
                 "members_at_risk": 0,
-                "risk_distribution": {"low": 0, "medium": 0, "high": 0},
+                "risk_distribution": {"low": 0, "medium": 0, "high": 0, "critical": 0},
                 "error": error_message
             },
             "daily_trends": [],
