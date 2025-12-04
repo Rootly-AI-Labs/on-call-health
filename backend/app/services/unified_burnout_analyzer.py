@@ -875,15 +875,18 @@ class UnifiedBurnoutAnalyzer:
                 # Log GitHub indicator details for transparency
                 if github_insights.get("high_risk_member_count", 0) > 0:
                     # Count risk level distribution for members with GitHub indicators
-                    github_members_by_risk = {"low": 0, "medium": 0, "high": 0}
+                    github_members_by_risk = {"low": 0, "medium": 0, "high": 0, "critical": 0}
                     github_members_details = []
-                    
+
                     for member in result.get("team_analysis", {}).get("members", []):
                         github_activity = member.get("github_activity", {})
                         github_indicators = github_activity.get("burnout_indicators", {})
                         if any(github_indicators.values()):
                             risk_level = member.get("risk_level", "low")
-                            github_members_by_risk[risk_level] += 1
+                            if risk_level in github_members_by_risk:
+                                github_members_by_risk[risk_level] += 1
+                            else:
+                                github_members_by_risk["low"] += 1
                             github_members_details.append({
                                 "email": member.get("user_email", "unknown"),
                                 "risk_level": risk_level,
