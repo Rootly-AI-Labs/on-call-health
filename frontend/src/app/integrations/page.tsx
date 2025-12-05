@@ -810,6 +810,19 @@ export default function IntegrationsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedOrganization])
 
+  // Track previous organization to detect changes (not initial load)
+  const prevOrgRef = useRef<string>("")
+
+  // Show sync prompt when organization changes (not on initial load)
+  useEffect(() => {
+    if (prevOrgRef.current && prevOrgRef.current !== selectedOrganization && selectedOrganization) {
+      const orgName = integrations.find(i => i.id.toString() === selectedOrganization)?.name || "organization"
+      setSyncPromptMessage(`Switched to ${orgName} - Sync team members to update your roster`)
+      setShowSyncPrompt(true)
+    }
+    prevOrgRef.current = selectedOrganization
+  }, [selectedOrganization, integrations])
+
   // Auto-select first integration if none selected
   useEffect(() => {
     if (!selectedOrganization && integrations.length > 0) {
