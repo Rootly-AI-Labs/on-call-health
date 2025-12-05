@@ -97,7 +97,7 @@ export function RootlyIntegrationForm({
                     <li><strong>2.</strong> Navigate to <code className="bg-purple-100 px-1 rounded">Settings → API Keys</code></li>
                     <li><strong>3.</strong> Click <strong>Generate New API Key</strong></li>
                     <li><strong>4.</strong> Select <strong>Global API key</strong> or <strong>Team API Key</strong></li>
-                    <li><strong>5.</strong> For <strong>Global API key</strong>, pick <strong>Observer</strong> as Role</li>
+                    <li><strong>5.</strong> For <strong>Global API key</strong>, pick <strong>Admin</strong> or <strong>Owner</strong> as Role (required to read all team members)</li>
                     <li><strong>6.</strong> Click <strong>Create</strong> and copy the generated token (starts with <strong>"rootly_"</strong>)</li>
                   </ol>
                 </AlertDescription>
