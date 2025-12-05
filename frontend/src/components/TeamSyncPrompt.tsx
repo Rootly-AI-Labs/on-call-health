@@ -52,7 +52,7 @@ export function TeamSyncPrompt({
     <div className="fixed bottom-24 right-6 z-[100]">
       <Card
         className={`
-          w-96 shadow-2xl border-blue-200 bg-white
+          w-96 shadow-xl border-0 bg-white overflow-hidden
           transform transition-all duration-300 ease-out
           ${isAnimatingOut
             ? 'translate-y-4 opacity-0 scale-95'
@@ -60,39 +60,45 @@ export function TeamSyncPrompt({
           }
         `}
       >
-        <div className="p-4">
+        {/* Gradient top border */}
+        <div className="h-1 bg-gradient-to-r from-blue-500 via-blue-600 to-purple-600" />
+
+        <div className="p-5">
           {/* Header with icon and close button */}
           <div className="flex items-start justify-between mb-3">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100">
-                <RefreshCw className="h-5 w-5 text-blue-600" />
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 ring-2 ring-blue-100 ring-offset-2">
+                <RefreshCw className="h-6 w-6 text-blue-600 animate-pulse" />
               </div>
               <div className="flex-1">
-                <h3 className="text-sm font-semibold text-gray-900">
+                <h3 className="text-base font-bold text-gray-900 mb-0.5">
                   Sync Recommended
                 </h3>
+                <p className="text-xs text-blue-600 font-medium">
+                  Keep your team up to date
+                </p>
               </div>
             </div>
             <Button
               variant="ghost"
               size="sm"
               onClick={handleDismiss}
-              className="h-6 w-6 p-0 hover:bg-gray-100 rounded-full"
+              className="h-7 w-7 p-0 hover:bg-gray-100 rounded-full -mt-1 -mr-1"
             >
-              <X className="h-4 w-4 text-gray-400" />
+              <X className="h-4 w-4 text-gray-400 hover:text-gray-600" />
             </Button>
           </div>
 
           {/* Message */}
-          <p className="text-sm text-gray-600 mb-4 ml-13">
+          <p className="text-sm text-gray-600 leading-relaxed mb-5 pl-15">
             {message}
           </p>
 
           {/* Actions */}
-          <div className="flex items-center gap-2 ml-13">
+          <div className="flex items-center gap-2 pl-15">
             <Button
               onClick={handleSync}
-              className="bg-blue-600 hover:bg-blue-700 text-white h-9 px-4 text-sm font-medium"
+              className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white h-10 px-5 text-sm font-semibold shadow-md hover:shadow-lg transition-all"
             >
               <Users className="h-4 w-4 mr-2" />
               Sync Now
@@ -100,7 +106,7 @@ export function TeamSyncPrompt({
             <Button
               variant="ghost"
               onClick={handleDismiss}
-              className="h-9 px-4 text-sm text-gray-600 hover:text-gray-900"
+              className="h-10 px-4 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-50"
             >
               Dismiss
             </Button>
