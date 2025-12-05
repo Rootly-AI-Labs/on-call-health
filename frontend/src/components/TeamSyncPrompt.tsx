@@ -40,10 +40,10 @@ export function TeamSyncPrompt({
   }
 
   const handleSync = () => {
+    // Call sync immediately, don't wait for animation
+    onSync()
+    // Then animate out
     setIsAnimatingOut(true)
-    setTimeout(() => {
-      onSync()
-    }, 200)
   }
 
   if (!show) return null
