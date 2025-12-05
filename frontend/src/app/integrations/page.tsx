@@ -1739,14 +1739,10 @@ export default function IntegrationsPage() {
 
   // Handle sync prompt actions
   const handleSyncPromptAction = async () => {
-    // Don't close prompt immediately - let animation handle it
-    // Open team members drawer first
-    await fetchSyncedUsers(false, false)
-    setTeamMembersDrawerOpen(true)
-    // Then trigger the sync
-    await syncUsersToCorrelation(false)
-    // Close prompt after drawer is open
+    // Close the prompt
     setShowSyncPrompt(false)
+    // Open the sync modal to show progress
+    setShowSyncConfirmModal(true)
   }
 
   const handleDismissSyncPrompt = () => {
