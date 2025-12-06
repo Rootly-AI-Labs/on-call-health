@@ -2,21 +2,26 @@
 
 import { useState, useEffect } from "react"
 
-export function useOnboarding() {
+export function useOnboarding(userId?: string | number) {
   const [isOpen, setIsOpen] = useState(false)
   const [currentStep, setCurrentStep] = useState(0)
   const [hasSeenOnboarding, setHasSeenOnboarding] = useState(false)
 
+  // Generate user-specific storage key
+  const storageKey = userId
+    ? `onboarding-seen-${userId}`
+    : "onboarding-seen"
+
   // Initialize from localStorage
   useEffect(() => {
-    const seen = localStorage.getItem("onboarding-seen")
+    const seen = localStorage.getItem(storageKey)
     if (!seen) {
       setIsOpen(true)
       setHasSeenOnboarding(false)
     } else {
       setHasSeenOnboarding(true)
     }
-  }, [])
+  }, [storageKey])
 
   const nextStep = () => {
     if (currentStep < 3) {
@@ -33,7 +38,7 @@ export function useOnboarding() {
   }
 
   const completeOnboarding = () => {
-    localStorage.setItem("onboarding-seen", "true")
+    localStorage.setItem(storageKey, "true")
     setIsOpen(false)
     setHasSeenOnboarding(true)
   }
@@ -57,5 +62,6 @@ export function useOnboarding() {
     completeOnboarding,
     skipOnboarding,
     restartOnboarding,
+    storageKey,
   }
 }

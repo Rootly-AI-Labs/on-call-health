@@ -13,7 +13,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { NotificationDrawer } from "@/components/notifications"
-import { LogOut, BookOpen, HelpCircle } from "lucide-react"
+import { AccountSettingsDialog } from "@/components/AccountSettingsDialog"
+import { LogOut, BookOpen, HelpCircle, Settings } from "lucide-react"
 
 interface UserInfo {
   name: string
@@ -29,6 +30,7 @@ export function TopPanel({ onGettingStarted }: TopPanelProps) {
   const router = useRouter()
   const pathname = usePathname()
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null)
+  const [showAccountSettings, setShowAccountSettings] = useState(false)
 
   useEffect(() => {
     const userName = localStorage.getItem("user_name")
@@ -37,6 +39,15 @@ export function TopPanel({ onGettingStarted }: TopPanelProps) {
   }, [])
 
   const handleSignOut = () => {
+    // Get the current user ID before clearing localStorage
+    const userId = localStorage.getItem("user_id")
+
+    // Clear the user-specific onboarding flag
+    if (userId) {
+      localStorage.removeItem(`onboarding-seen-${userId}`)
+    }
+
+    // Clear auth token and redirect
     localStorage.removeItem("auth_token")
     router.push("/")
   }
@@ -132,6 +143,13 @@ export function TopPanel({ onGettingStarted }: TopPanelProps) {
                     <BookOpen className="w-4 h-4 mr-2" />
                     Methodology
                   </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => setShowAccountSettings(true)}
+                    className="cursor-pointer"
+                  >
+                    <Settings className="w-4 h-4 mr-2" />
+                    Account Settings
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     onClick={handleSignOut}
@@ -146,6 +164,11 @@ export function TopPanel({ onGettingStarted }: TopPanelProps) {
           </div>
         </div>
       </div>
+      <AccountSettingsDialog
+        isOpen={showAccountSettings}
+        onClose={() => setShowAccountSettings(false)}
+        userEmail={userInfo?.email || ''}
+      />
     </header>
   )
 }

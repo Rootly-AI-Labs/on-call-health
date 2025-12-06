@@ -201,7 +201,9 @@ function DashboardContent() {
   setRedirectingToSuggested
   } = useDashboard()
 
-  const onboarding = useOnboarding()
+  // Get userId from localStorage for user-specific onboarding tracking
+  const userId = typeof window !== 'undefined' ? localStorage.getItem("user_id") : null
+  const onboarding = useOnboarding(userId)
 
   // Map the hook's meta to actual Lucide icons
   const renderTrendIcon = (trend?: string) => {
