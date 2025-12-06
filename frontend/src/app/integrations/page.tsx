@@ -4063,7 +4063,10 @@ export default function IntegrationsPage() {
                   )}
                 </Button>
                 <Button
-                  onClick={() => setShowSyncConfirmModal(true)}
+                  onClick={() => {
+                    setSyncProgress(null) // Clear any previous sync progress
+                    setShowSyncConfirmModal(true)
+                  }}
                   disabled={loadingTeamMembers || loadingSyncedUsers}
                   className="bg-purple-600 hover:bg-purple-700 text-white"
                   size="default"
