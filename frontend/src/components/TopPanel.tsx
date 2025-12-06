@@ -39,14 +39,6 @@ export function TopPanel({ onGettingStarted }: TopPanelProps) {
   }, [])
 
   const handleSignOut = () => {
-    // Get the current user ID before clearing localStorage
-    const userId = localStorage.getItem("user_id")
-
-    // Clear the user-specific onboarding flag
-    if (userId) {
-      localStorage.removeItem(`onboarding-seen-${userId}`)
-    }
-
     // Clear auth token and redirect
     localStorage.removeItem("auth_token")
     router.push("/")
