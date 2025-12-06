@@ -98,6 +98,7 @@ import { NotificationDrawer } from "@/components/notifications"
 import ManualSurveyDeliveryModal from "@/components/ManualSurveyDeliveryModal"
 import { SlackSurveyTabs } from "@/components/SlackSurveyTabs"
 import { TopPanel } from "@/components/TopPanel"
+import { TeamSyncPrompt } from "@/components/TeamSyncPrompt"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import {
@@ -276,6 +277,10 @@ export default function IntegrationsPage() {
   const [teamMembersDrawerOpen, setTeamMembersDrawerOpen] = useState(false)
   const [refreshingOnCall, setRefreshingOnCall] = useState(false)
   const [oncallCacheInfo, setOncallCacheInfo] = useState<any>(null)
+
+  // Team sync prompt state
+  const [showSyncPrompt, setShowSyncPrompt] = useState(false)
+  const [syncPromptMessage, setSyncPromptMessage] = useState("Team members affected - Resync recommended")
 
   // Cache to track which integrations have already been loaded
   const syncedUsersCache = useRef<Map<string, any[]>>(new Map())
@@ -804,6 +809,19 @@ export default function IntegrationsPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedOrganization])
+
+  // Track previous organization to detect changes (not initial load)
+  const prevOrgRef = useRef<string>("")
+
+  // Show sync prompt when organization changes (not on initial load)
+  useEffect(() => {
+    if (prevOrgRef.current && prevOrgRef.current !== selectedOrganization && selectedOrganization) {
+      const orgName = integrations.find(i => i.id.toString() === selectedOrganization)?.name || "organization"
+      setSyncPromptMessage(`Switched to ${orgName} - Sync team members to update your roster`)
+      setShowSyncPrompt(true)
+    }
+    prevOrgRef.current = selectedOrganization
+  }, [selectedOrganization, integrations])
 
   // Auto-select first integration if none selected
   useEffect(() => {
@@ -1563,13 +1581,16 @@ export default function IntegrationsPage() {
 
   // GitHub integration handlers
   const handleGitHubConnect = async (token: string) => {
-    return GithubHandlers.handleGitHubConnect(
+    await GithubHandlers.handleGitHubConnect(
       token,
       setIsConnectingGithub,
       setGithubToken,
       setActiveEnhancementTab,
       loadGitHubIntegration
     )
+    // Show sync prompt after successful connection
+    setSyncPromptMessage("GitHub connected! Sync team members to enable accurate burnout analysis")
+    setShowSyncPrompt(true)
   }
 
   const handleGitHubDisconnect = async () => {
@@ -1586,7 +1607,7 @@ export default function IntegrationsPage() {
 
   // Slack integration handlers
   const handleSlackConnect = async (webhookUrl: string, botToken: string) => {
-    return SlackHandlers.handleSlackConnect(
+    await SlackHandlers.handleSlackConnect(
       webhookUrl,
       botToken,
       setIsConnectingSlack,
@@ -1595,6 +1616,9 @@ export default function IntegrationsPage() {
       setActiveEnhancementTab,
       loadSlackIntegration
     )
+    // Show sync prompt after successful connection
+    setSyncPromptMessage("Slack connected! Sync team members to link Slack users with your team")
+    setShowSyncPrompt(true)
   }
 
   const handleSlackDisconnect = async () => {
@@ -1633,11 +1657,14 @@ export default function IntegrationsPage() {
 
   // Jira integration handlers
   const handleJiraConnect = async () => {
-    return JiraHandlers.handleJiraConnect(
+    await JiraHandlers.handleJiraConnect(
       setIsConnectingJira,
       setActiveEnhancementTab,
       loadJiraIntegration
     )
+    // Show sync prompt after successful connection
+    setSyncPromptMessage("Jira connected! Sync team members to track workload and incidents")
+    setShowSyncPrompt(true)
   }
 
   const handleJiraDisconnect = async () => {
@@ -1708,6 +1735,70 @@ export default function IntegrationsPage() {
       undefined,
       suppressToast
     )
+  }
+
+  // Perform full team sync with progress tracking
+  const performTeamSync = async () => {
+    try {
+      setSyncProgress({ stage: 'Starting sync...', details: 'Preparing to sync users', isLoading: true })
+      await new Promise(resolve => setTimeout(resolve, 300))
+
+      setSyncProgress({ stage: 'Fetching users...', details: 'Retrieving users from API with IR role filtering', isLoading: true })
+      const syncResults = await TeamHandlers.syncUsersToCorrelation(
+        selectedOrganization,
+        setLoadingTeamMembers,
+        setTeamMembersError,
+        fetchTeamMembers,
+        () => fetchSyncedUsers(false, false, true),
+        (message: string) => {
+          setSyncProgress({ stage: 'Syncing users...', details: message, isLoading: true })
+        },
+        true // suppressToast
+      )
+
+      let slackResults
+      if (slackIntegration?.workspace_id) {
+        setSyncProgress({ stage: 'Syncing Slack...', details: 'Matching Slack user IDs', isLoading: true })
+        slackResults = await TeamHandlers.syncSlackUserIds(setLoadingTeamMembers, fetchSyncedUsers, true)
+      }
+
+      setSyncProgress({
+        stage: 'Sync Complete!',
+        details: 'Your team members have been successfully synced',
+        isLoading: false,
+        results: {
+          created: syncResults.created,
+          updated: syncResults.updated,
+          github_matched: syncResults.github_matched,
+          jira_matched: syncResults.jira_matched,
+          slack_synced: slackResults?.updated,
+          slack_skipped: slackResults?.skipped,
+        }
+      })
+    } catch (error) {
+      setSyncProgress({ stage: 'Error', details: 'Failed to sync. Please try again.', isLoading: false })
+      setTimeout(() => {
+        setShowSyncConfirmModal(false)
+        setSyncProgress(null)
+      }, 2000)
+    }
+  }
+
+  // Handle sync prompt actions
+  const handleSyncPromptAction = async () => {
+    // Close the prompt
+    setShowSyncPrompt(false)
+    // Open team members drawer
+    await fetchSyncedUsers(false, false)
+    setTeamMembersDrawerOpen(true)
+    // Open the sync modal to show progress
+    setShowSyncConfirmModal(true)
+    // Automatically start the sync
+    await performTeamSync()
+  }
+
+  const handleDismissSyncPrompt = () => {
+    setShowSyncPrompt(false)
   }
 
   // Sync Slack user IDs to UserCorrelation records
@@ -3972,7 +4063,10 @@ export default function IntegrationsPage() {
                   )}
                 </Button>
                 <Button
-                  onClick={() => setShowSyncConfirmModal(true)}
+                  onClick={() => {
+                    setSyncProgress(null) // Clear any previous sync progress
+                    setShowSyncConfirmModal(true)
+                  }}
                   disabled={loadingTeamMembers || loadingSyncedUsers}
                   className="bg-purple-600 hover:bg-purple-700 text-white"
                   size="default"
@@ -4590,51 +4684,7 @@ export default function IntegrationsPage() {
                   Cancel
                 </Button>
                 <Button
-                  onClick={async () => {
-                    try {
-                      setSyncProgress({ stage: 'Starting sync...', details: 'Preparing to sync users', isLoading: true })
-                      await new Promise(resolve => setTimeout(resolve, 300))
-
-                      setSyncProgress({ stage: 'Fetching users...', details: 'Retrieving users from API with IR role filtering', isLoading: true })
-                      const syncResults = await TeamHandlers.syncUsersToCorrelation(
-                        selectedOrganization,
-                        setLoadingTeamMembers,
-                        setTeamMembersError,
-                        fetchTeamMembers,
-                        () => fetchSyncedUsers(false, false, true),
-                        (message: string) => {
-                          setSyncProgress({ stage: 'Syncing users...', details: message, isLoading: true })
-                        },
-                        true // suppressToast
-                      )
-
-                      let slackResults
-                      if (slackIntegration?.workspace_id) {
-                        setSyncProgress({ stage: 'Syncing Slack...', details: 'Matching Slack user IDs', isLoading: true })
-                        slackResults = await TeamHandlers.syncSlackUserIds(setLoadingTeamMembers, fetchSyncedUsers, true)
-                      }
-
-                      setSyncProgress({
-                        stage: 'Sync Complete!',
-                        details: 'Your team members have been successfully synced',
-                        isLoading: false,
-                        results: {
-                          created: syncResults.created,
-                          updated: syncResults.updated,
-                          github_matched: syncResults.github_matched,
-                          jira_matched: syncResults.jira_matched,
-                          slack_synced: slackResults?.updated,
-                          slack_skipped: slackResults?.skipped,
-                        }
-                      })
-                    } catch (error) {
-                      setSyncProgress({ stage: 'Error', details: 'Failed to sync. Please try again.', isLoading: false })
-                      setTimeout(() => {
-                        setShowSyncConfirmModal(false)
-                        setSyncProgress(null)
-                      }, 2000)
-                    }
-                  }}
+                  onClick={performTeamSync}
                   className="bg-purple-600 hover:bg-purple-700"
                 >
                   Sync Now
@@ -4644,6 +4694,14 @@ export default function IntegrationsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Team Sync Prompt - floating bottom-right */}
+      <TeamSyncPrompt
+        isVisible={showSyncPrompt}
+        message={syncPromptMessage}
+        onSync={handleSyncPromptAction}
+        onDismiss={handleDismissSyncPrompt}
+      />
     </div>
   )
 }
