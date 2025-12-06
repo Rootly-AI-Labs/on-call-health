@@ -584,10 +584,14 @@ async def delete_current_user_account(
 
     This is a permanent, irreversible action that will:
     - Delete all analyses
+    - Delete all burnout reports (self-assessments)
+    - Delete all notifications
+    - Delete all survey preferences
     - Delete all integrations (Rootly, PagerDuty, GitHub, Slack, Jira)
     - Delete OAuth providers
     - Delete email addresses
     - Delete user correlations and mappings
+    - Nullify organization invitations sent by this user
     - Delete the user account itself
 
     Requires email confirmation for safety.
@@ -633,13 +637,40 @@ async def delete_current_user_account(
         from ...models.slack_workspace_mapping import SlackWorkspaceMapping
         from ...models.jira_workspace_mapping import JiraWorkspaceMapping
         from ...models.user_mapping import UserMapping
+        from ...models.user_burnout_report import UserBurnoutReport
+        from ...models.user_notification import UserNotification
+        from ...models.survey_schedule import UserSurveyPreference
+        from ...models.organization_invitation import OrganizationInvitation
 
         # 1. Delete analyses (will cascade to integration_mappings via relationship)
         analyses_count = db.query(Analysis).filter(Analysis.user_id == current_user.id).count()
         db.query(Analysis).filter(Analysis.user_id == current_user.id).delete(synchronize_session=False)
         logger.info(f"Deleted {analyses_count} analyses for user {current_user.id}")
 
-        # 2. Delete Rootly/PagerDuty integrations
+        # 2. Delete user burnout reports (self-reported assessments)
+        burnout_reports_count = db.query(UserBurnoutReport).filter(UserBurnoutReport.user_id == current_user.id).count()
+        db.query(UserBurnoutReport).filter(UserBurnoutReport.user_id == current_user.id).delete(synchronize_session=False)
+        logger.info(f"Deleted {burnout_reports_count} burnout reports for user {current_user.id}")
+
+        # 3. Delete user notifications
+        notifications_count = db.query(UserNotification).filter(UserNotification.user_id == current_user.id).count()
+        db.query(UserNotification).filter(UserNotification.user_id == current_user.id).delete(synchronize_session=False)
+        logger.info(f"Deleted {notifications_count} notifications for user {current_user.id}")
+
+        # 4. Delete user survey preferences
+        survey_prefs_count = db.query(UserSurveyPreference).filter(UserSurveyPreference.user_id == current_user.id).count()
+        db.query(UserSurveyPreference).filter(UserSurveyPreference.user_id == current_user.id).delete(synchronize_session=False)
+        logger.info(f"Deleted {survey_prefs_count} survey preferences for user {current_user.id}")
+
+        # 5. Nullify organization invitations sent by this user
+        invitations_count = db.query(OrganizationInvitation).filter(OrganizationInvitation.invited_by == current_user.id).count()
+        db.query(OrganizationInvitation).filter(OrganizationInvitation.invited_by == current_user.id).update(
+            {"invited_by": None},
+            synchronize_session=False
+        )
+        logger.info(f"Nullified {invitations_count} organization invitations for user {current_user.id}")
+
+        # 6. Delete Rootly/PagerDuty integrations
         rootly_count = db.query(RootlyIntegration).filter(RootlyIntegration.user_id == current_user.id).count()
         db.query(RootlyIntegration).filter(RootlyIntegration.user_id == current_user.id).delete(synchronize_session=False)
         logger.info(f"Deleted {rootly_count} Rootly/PagerDuty integrations for user {current_user.id}")
