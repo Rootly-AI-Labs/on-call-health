@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
-    "@newrelic/browser-agent": "^1.303.0",
+    "@newrelic/browser-agent": "^1.304.0",
     "@radix-ui/react-alert-dialog": "^1.1.15",
     "@radix-ui/react-avatar": "^1.1.11",
     "@radix-ui/react-dialog": "^1.1.14",
@@ -33,7 +33,7 @@
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.0.0",
     "date-fns": "^4.1.0",
-    "lucide-react": "^0.555.0",
+    "lucide-react": "^0.556.0",
     "next": "^15.5.7",
     "next-themes": "^0.4.6",
     "postcss": "^8",
