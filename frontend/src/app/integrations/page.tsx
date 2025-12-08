@@ -54,6 +54,8 @@ import {
   Calendar,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   Edit3,
   Key,
@@ -313,6 +315,10 @@ export default function IntegrationsPage() {
   const [selectedRecipients, setSelectedRecipients] = useState<Set<number>>(new Set())
   const [savedRecipients, setSavedRecipients] = useState<Set<number>>(new Set()) // Track what's saved in DB
   const [savingRecipients, setSavingRecipients] = useState(false)
+
+  // Team members drawer pagination
+  const [teamMembersPage, setTeamMembersPage] = useState(1)
+  const TEAM_MEMBERS_PER_PAGE = 10
 
   // Check if there are unsaved changes
   const hasUnsavedChanges = () => {
@@ -809,6 +815,11 @@ export default function IntegrationsPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedOrganization])
+
+  // Reset pagination when drawer opens or syncedUsers changes
+  useEffect(() => {
+    setTeamMembersPage(1)
+  }, [teamMembersDrawerOpen, syncedUsers.length])
 
   // Track previous organization to detect changes (not initial load)
   const prevOrgRef = useRef<string>("")
@@ -4171,8 +4182,10 @@ export default function IntegrationsPage() {
                     </p>
                   </div>
                 )}
-                <div className="space-y-2 pb-20">
-                  {syncedUsers.map((user: any) => {
+                <div className="space-y-2">
+                  {syncedUsers
+                    .slice((teamMembersPage - 1) * TEAM_MEMBERS_PER_PAGE, teamMembersPage * TEAM_MEMBERS_PER_PAGE)
+                    .map((user: any) => {
                     const isSelected = selectedRecipients.has(user.id)
                     const surveyEnabled = slackIntegration?.survey_enabled === true
                     return (
@@ -4487,6 +4500,46 @@ export default function IntegrationsPage() {
                     )
                   })}
                 </div>
+
+                {/* Pagination Controls */}
+                {(() => {
+                  const totalPages = Math.ceil(syncedUsers.length / TEAM_MEMBERS_PER_PAGE)
+                  const startIndex = (teamMembersPage - 1) * TEAM_MEMBERS_PER_PAGE + 1
+                  const endIndex = Math.min(teamMembersPage * TEAM_MEMBERS_PER_PAGE, syncedUsers.length)
+
+                  return totalPages > 1 ? (
+                    <div className="flex items-center justify-between mt-3 pt-3 border-t">
+                      <div className="text-sm text-gray-600">
+                        Showing {startIndex}-{endIndex} of {syncedUsers.length} members
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={() => setTeamMembersPage(teamMembersPage - 1)}
+                          disabled={teamMembersPage === 1}
+                          className="bg-black text-white hover:bg-gray-800 disabled:bg-gray-300 disabled:text-gray-500"
+                        >
+                          <ChevronLeft className="w-4 h-4 mr-1" />
+                          Previous
+                        </Button>
+                        <span className="text-sm px-3">
+                          Page {teamMembersPage} of {totalPages}
+                        </span>
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={() => setTeamMembersPage(teamMembersPage + 1)}
+                          disabled={teamMembersPage === totalPages}
+                          className="bg-black text-white hover:bg-gray-800 disabled:bg-gray-300 disabled:text-gray-500"
+                        >
+                          Next
+                          <ChevronRight className="w-4 h-4 ml-1" />
+                        </Button>
+                      </div>
+                    </div>
+                  ) : null
+                })()}
               </div>
             ) : (
               <div className="text-center py-12 text-gray-500">
@@ -4503,7 +4556,7 @@ export default function IntegrationsPage() {
               <div className="flex items-center justify-between gap-3">
                 <div className="text-sm text-orange-600 flex items-center gap-2">
                   <AlertCircle className="w-4 h-4" />
-                  <span>You have unsaved changes</span>
+                  <span>You have unsaved changes ({Math.abs(selectedRecipients.size - savedRecipients.size)} member{Math.abs(selectedRecipients.size - savedRecipients.size) !== 1 ? 's' : ''} updated)</span>
                 </div>
                 <div className="flex gap-2">
                   <Button
