@@ -303,9 +303,10 @@ async def list_integrations(
     """
     List all Rootly integrations for the current user with permissions.
 
-    🚀 PHASE 2 OPTIMIZATION: Add skip_permissions parameter for faster initial page load.
-    - skip_permissions=false (default): Check permissions for all integrations (slower, complete data)
-    - skip_permissions=true: Return only cached permissions, skip fresh checks (faster, may be stale)
+    Smart permission checking:
+    - Always checks permissions for integrations that have NEVER been checked (even with skip_permissions=true)
+    - skip_permissions=false: Check permissions for all integrations with stale cache
+    - skip_permissions=true: Skip permission checks for integrations with stale cache (shows "checking" placeholder)
     """
     import time
     start_time = time.time()
@@ -346,33 +347,32 @@ async def list_integrations(
                 integration_data["permissions"] = integration.cached_permissions
                 logger.info(f"✅ Using cached permissions for '{integration.name}' (ID={integration.id}) - cached {int(cache_age.total_seconds())}s ago")
 
-        # 🚀 OPTIMIZATION: Skip fresh permission checks if skip_permissions=true
-        if skip_permissions:
-            # Use cached permissions if available, otherwise set placeholder
-            if not cache_valid and integration.api_token:
+        # 🚀 OPTIMIZATION: Smart permission checking logic
+        # Always check permissions if never checked before, even with skip_permissions=true
+        never_checked = integration.permissions_checked_at is None
+
+        if integration.api_token:
+            # If never checked OR (cache stale AND not skipping), queue permission check
+            if never_checked or (not cache_valid and not skip_permissions):
+                client = RootlyAPIClient(integration.api_token)
+                permission_tasks.append((idx, client.check_permissions(), integration.id))
+                logger.info(f"🔍 Queueing permission check for '{integration.name}' (never_checked={never_checked}, cache_valid={cache_valid}, skip_permissions={skip_permissions})")
+            elif not cache_valid and skip_permissions:
+                # Cache is stale but we're skipping fresh checks - show placeholder
                 integration_data["permissions"] = {
                     "users": {"access": None, "checking": True},
                     "incidents": {"access": None, "checking": True}
                 }
-            elif not integration.api_token:
-                integration_data["permissions"] = {
-                    "users": {"access": None, "error": "No API token configured"},
-                    "incidents": {"access": None, "error": "No API token configured"}
-                }
         else:
-            # Queue permission check task if token exists and cache is stale/missing
-            if integration.api_token and not cache_valid:
-                client = RootlyAPIClient(integration.api_token)
-                permission_tasks.append((idx, client.check_permissions(), integration.id))
-            elif not integration.api_token:
-                # No token - set immediately
-                integration_data["permissions"] = {
-                    "users": {"access": None, "error": "No API token configured"},
-                    "incidents": {"access": None, "error": "No API token configured"}
-                }
+            # No token configured
+            integration_data["permissions"] = {
+                "users": {"access": None, "error": "No API token configured"},
+                "incidents": {"access": None, "error": "No API token configured"}
+            }
 
-    # Run all permission checks in parallel with 10s timeout each (only if not skipping)
-    if permission_tasks and not skip_permissions:
+    # Run all permission checks in parallel with 10s timeout each
+    # Note: permission_tasks may include never-checked integrations even with skip_permissions=true
+    if permission_tasks:
         import asyncio
         logger.info(f"🔍 [ROOTLY] Checking permissions for {len(permission_tasks)} integrations in parallel...")
         perm_start = time.time()
