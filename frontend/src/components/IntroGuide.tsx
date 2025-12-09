@@ -20,9 +20,7 @@ function IntroGuide({ isOpen, currentStep, onNext, onPrev, onClose }: IntroGuide
       title: "Welcome to On-Call Burnout Detector",
       description: "Detects potential signs of overwork in incident responders, which could lead to burnout.",
       details:
-        "To compute a per-responder risk score, it integrates with Rootly, PagerDuty, GitHub, Slack and Pagerduty.",
-      icon: "🎯",
-    },
+        "To compute a per-responder risk score, it integrates with Rootly, PagerDuty, GitHub, Slack and Pagerduty.",    },
     {
       title: "Understanding Mock Data",
       description: (
@@ -32,7 +30,6 @@ function IntroGuide({ isOpen, currentStep, onNext, onPrev, onClose }: IntroGuide
       ),
       details:
         "The left panel shows the mock data source, while the center analysis section displays the mock analysis results. This helps you understand what real data will look like.",
-      icon: "📊",
       highlight: "mock-data-demo",
       image: "/images/mock-data-dashboard.png",
     },
@@ -46,7 +43,6 @@ function IntroGuide({ isOpen, currentStep, onNext, onPrev, onClose }: IntroGuide
           sources.
         </>
       ),
-      icon: "🔗",
       images: ["/images/integrations-page.png", "/images/team-members-modal.png"],
     },
     {
@@ -58,7 +54,6 @@ function IntroGuide({ isOpen, currentStep, onNext, onPrev, onClose }: IntroGuide
           these slides. You can also select <strong>&quot;Methodology&quot;</strong> to view detailed information about our burnout detection framework and calculations.
         </>
       ),
-      icon: "📚",
       images: ["/images/user-profile-menu.png", "/images/methodology-page.png"],
     },
   ]
@@ -76,7 +71,6 @@ function IntroGuide({ isOpen, currentStep, onNext, onPrev, onClose }: IntroGuide
           {/* Header */}
           <div className="flex items-start justify-between p-6 border-b border-slate-200 dark:border-slate-800 sticky top-0 bg-white dark:bg-slate-950 z-10">
             <div className="flex items-center gap-3">
-              <span className="text-3xl">{step.icon}</span>
               <div>
                 <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">{step.title}</h2>
                 <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">

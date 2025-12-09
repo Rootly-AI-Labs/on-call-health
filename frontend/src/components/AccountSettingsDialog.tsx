@@ -11,8 +11,7 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Separator } from "@/components/ui/separator"
-import { AlertTriangle, Loader2, Trash2 } from "lucide-react"
+import { Loader2, Trash2 } from "lucide-react"
 
 interface AccountSettingsDialogProps {
   isOpen: boolean
@@ -97,36 +96,28 @@ export function AccountSettingsDialog({
 
         {/* Future sections will go here: Change Password, Notifications, etc. */}
 
-        {/* Danger Zone Section */}
-        <div className="mt-6">
-          <Separator className="mb-6" />
+        {/* Account Deletion Section */}
+        <div className="mt-6 border-2 border-red-500 rounded-lg p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">
+            Account Deletion
+          </h3>
 
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
-                <AlertTriangle className="w-4 h-4 text-red-600" />
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900">
-                Danger Zone
-              </h3>
-            </div>
+          <p className="text-sm text-gray-600 mb-4">
+            Once you delete your account, there is no going back. This will
+            permanently delete all your data.
+          </p>
 
-            <p className="text-sm text-gray-600">
-              Once you delete your account, there is no going back. This will
-              permanently delete all your data.
-            </p>
-
-            {!showDeleteConfirmation ? (
-              <Button
-                variant="destructive"
-                onClick={() => setShowDeleteConfirmation(true)}
-                className="bg-red-600 hover:bg-red-700"
-              >
-                <Trash2 className="w-4 h-4 mr-2" />
-                Delete Account
-              </Button>
-            ) : (
-              <div className="space-y-4 p-4 border-2 border-red-200 rounded-lg bg-red-50">
+          {!showDeleteConfirmation ? (
+            <Button
+              variant="destructive"
+              onClick={() => setShowDeleteConfirmation(true)}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Delete Account
+            </Button>
+          ) : (
+            <div className="space-y-4 p-4 border-2 border-red-200 rounded-lg bg-red-50">
                 <div>
                   <p className="text-sm font-semibold text-red-900 mb-2">
                     Are you absolutely sure?
@@ -200,8 +191,7 @@ export function AccountSettingsDialog({
                   </Button>
                 </div>
               </div>
-            )}
-          </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>
