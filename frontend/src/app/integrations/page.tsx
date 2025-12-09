@@ -4250,8 +4250,9 @@ export default function IntegrationsPage() {
                                   const platformLower = platform.toLowerCase()
                                   const isGitHub = platformLower === 'github'
                                   const isSlack = platformLower === 'slack'
+                                  const isJira = platformLower === 'jira'
 
-                                  if (isGitHub || isSlack) {
+                                  if (isGitHub || isSlack || isJira) {
                                     return (
                                       <div
                                         key={platform}
@@ -4259,7 +4260,7 @@ export default function IntegrationsPage() {
                                         title={platform}
                                       >
                                         <Image
-                                          src={isGitHub ? '/images/github-logo.png' : '/images/slack-logo.png'}
+                                          src={isGitHub ? '/images/github-logo.png' : isSlack ? '/images/slack-logo.png' : '/images/jira-logo.png'}
                                           alt={platform}
                                           width={14}
                                           height={14}

@@ -61,6 +61,8 @@ import { DeleteAnalysisDialog } from "@/components/dashboard/dialogs/DeleteAnaly
 import Image from "next/image"
 import useDashboard from "@/hooks/useDashboard"
 import { TopPanel } from "@/components/TopPanel"
+import { useOnboarding } from "@/hooks/useOnboarding"
+import IntroGuide from "@/components/IntroGuide"
 
 function DashboardContent() {
   const {
@@ -199,6 +201,10 @@ function DashboardContent() {
   setRedirectingToSuggested
   } = useDashboard()
 
+  // Get userId from localStorage for user-specific onboarding tracking
+  const userId = typeof window !== 'undefined' ? localStorage.getItem("user_id") : null
+  const onboarding = useOnboarding(userId)
+
   // Map the hook's meta to actual Lucide icons
   const renderTrendIcon = (trend?: string) => {
     const meta = getTrendIcon(trend)
@@ -210,6 +216,15 @@ function DashboardContent() {
   return (
     <div className="flex flex-col h-screen bg-gray-50">
       <TopPanel />
+      {!onboarding.hasSeenOnboarding && (
+        <IntroGuide
+          isOpen={onboarding.isOpen}
+          currentStep={onboarding.currentStep}
+          onNext={onboarding.nextStep}
+          onPrev={onboarding.prevStep}
+          onClose={onboarding.skipOnboarding}
+        />
+      )}
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
         <div

@@ -556,3 +556,176 @@ async def update_user_role(
         "new_role": new_role,
         "message": f"Successfully updated {target_user.name}'s role from {old_role} to {new_role}"
     }
+
+class DeleteAccountRequest(BaseValidatedModel):
+    """Delete account request validation."""
+    email_confirmation: str = Field(..., min_length=3, max_length=255, description="Email confirmation")
+
+    @field_validator('email_confirmation')
+    @classmethod
+    def validate_email_confirmation(cls, v):
+        """Validate email format."""
+        import re
+        email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        if not re.match(email_pattern, v):
+            raise ValueError("Invalid email format")
+        return v.lower().strip()
+
+@router.delete("/users/me")
+@auth_rate_limit("account_delete")
+async def delete_current_user_account(
+    request: Request,
+    delete_request: DeleteAccountRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Delete the current user's account and all associated data.
+
+    This is a permanent, irreversible action that will:
+    - Delete all analyses
+    - Delete all burnout reports (self-assessments)
+    - Delete all notifications
+    - Delete all survey preferences
+    - Delete all integrations (Rootly, PagerDuty, GitHub, Slack, Jira)
+    - Delete OAuth providers
+    - Delete email addresses
+    - Delete user correlations and mappings
+    - Nullify organization invitations sent by this user
+    - Delete the user account itself
+
+    Requires email confirmation for safety.
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+
+    # Verify email confirmation matches
+    if delete_request.email_confirmation != current_user.email.lower():
+        logger.warning(f"Account deletion failed - email mismatch for user {current_user.id}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email confirmation does not match your account email"
+        )
+
+    # Additional safety check - prevent deletion if user is sole org admin
+    if current_user.organization_id and current_user.role == 'org_admin':
+        # Check if there are other org admins
+        other_admins = db.query(User).filter(
+            User.organization_id == current_user.organization_id,
+            User.role == 'org_admin',
+            User.id != current_user.id,
+            User.status == 'active'
+        ).count()
+
+        if other_admins == 0:
+            logger.warning(f"Account deletion blocked - user {current_user.id} is sole org admin")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot delete account: You are the only admin in your organization. Please transfer admin rights to another user first, or contact support."
+            )
+
+    try:
+        logger.info(f"Starting account deletion for user {current_user.id} ({current_user.email})")
+
+        # Start transaction - all or nothing
+        # Note: SQLAlchemy relationships with cascade="all, delete-orphan" will handle most deletions
+        # But we'll be explicit for critical data
+
+        # Import models with correct path
+        from ...models.analysis import Analysis
+        from ...models.rootly_integration import RootlyIntegration
+        from ...models.slack_workspace_mapping import SlackWorkspaceMapping
+        from ...models.jira_workspace_mapping import JiraWorkspaceMapping
+        from ...models.user_mapping import UserMapping
+        from ...models.user_burnout_report import UserBurnoutReport
+        from ...models.user_notification import UserNotification
+        from ...models.survey_schedule import UserSurveyPreference
+        from ...models.organization_invitation import OrganizationInvitation
+
+        # 1. Delete analyses (will cascade to integration_mappings via relationship)
+        analyses_count = db.query(Analysis).filter(Analysis.user_id == current_user.id).count()
+        db.query(Analysis).filter(Analysis.user_id == current_user.id).delete(synchronize_session=False)
+        logger.info(f"Deleted {analyses_count} analyses for user {current_user.id}")
+
+        # 2. Delete user burnout reports (self-reported assessments)
+        burnout_reports_count = db.query(UserBurnoutReport).filter(UserBurnoutReport.user_id == current_user.id).count()
+        db.query(UserBurnoutReport).filter(UserBurnoutReport.user_id == current_user.id).delete(synchronize_session=False)
+        logger.info(f"Deleted {burnout_reports_count} burnout reports for user {current_user.id}")
+
+        # 3. Delete user notifications
+        notifications_count = db.query(UserNotification).filter(UserNotification.user_id == current_user.id).count()
+        db.query(UserNotification).filter(UserNotification.user_id == current_user.id).delete(synchronize_session=False)
+        logger.info(f"Deleted {notifications_count} notifications for user {current_user.id}")
+
+        # 4. Delete user survey preferences
+        survey_prefs_count = db.query(UserSurveyPreference).filter(UserSurveyPreference.user_id == current_user.id).count()
+        db.query(UserSurveyPreference).filter(UserSurveyPreference.user_id == current_user.id).delete(synchronize_session=False)
+        logger.info(f"Deleted {survey_prefs_count} survey preferences for user {current_user.id}")
+
+        # 5. Nullify organization invitations sent by this user
+        invitations_count = db.query(OrganizationInvitation).filter(OrganizationInvitation.invited_by == current_user.id).count()
+        db.query(OrganizationInvitation).filter(OrganizationInvitation.invited_by == current_user.id).update(
+            {"invited_by": None},
+            synchronize_session=False
+        )
+        logger.info(f"Nullified {invitations_count} organization invitations for user {current_user.id}")
+
+        # 6. Delete Rootly/PagerDuty integrations
+        rootly_count = db.query(RootlyIntegration).filter(RootlyIntegration.user_id == current_user.id).count()
+        db.query(RootlyIntegration).filter(RootlyIntegration.user_id == current_user.id).delete(synchronize_session=False)
+        logger.info(f"Deleted {rootly_count} Rootly/PagerDuty integrations for user {current_user.id}")
+
+        # 3. Relationships with cascade="all, delete-orphan" will auto-delete when we delete the user:
+        # - oauth_providers
+        # - emails
+        # - github_integrations
+        # - slack_integrations
+        # - jira_integrations
+        # - user_correlations
+        # - integration_mappings (if not already deleted via analyses)
+        # - user_mappings_owned
+
+        # 4. Handle workspace ownerships - transfer or delete
+        # For workspaces owned by this user, set owner_user_id to NULL (allow orphaned workspaces)
+        slack_workspaces_count = db.query(SlackWorkspaceMapping).filter(
+            SlackWorkspaceMapping.owner_user_id == current_user.id
+        ).count()
+        db.query(SlackWorkspaceMapping).filter(
+            SlackWorkspaceMapping.owner_user_id == current_user.id
+        ).update({"owner_user_id": None}, synchronize_session=False)
+
+        jira_workspaces_count = db.query(JiraWorkspaceMapping).filter(
+            JiraWorkspaceMapping.owner_user_id == current_user.id
+        ).count()
+        db.query(JiraWorkspaceMapping).filter(
+            JiraWorkspaceMapping.owner_user_id == current_user.id
+        ).update({"owner_user_id": None}, synchronize_session=False)
+
+        logger.info(f"Cleared {slack_workspaces_count} Slack workspace ownerships and {jira_workspaces_count} Jira workspace ownerships for user {current_user.id}")
+
+        # 5. Handle user_mappings_created (created_by foreign key)
+        # Set created_by to NULL for mappings created by this user
+        db.query(UserMapping).filter(
+            UserMapping.created_by == current_user.id
+        ).update({"created_by": None}, synchronize_session=False)
+
+        # 6. Finally, delete the user (cascades will handle remaining relationships)
+        db.delete(current_user)
+
+        # Commit the transaction
+        db.commit()
+
+        logger.info(f"Successfully deleted account for user {current_user.id} ({current_user.email})")
+
+        return {
+            "success": True,
+            "message": "Your account has been permanently deleted"
+        }
+
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to delete account for user {current_user.id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete account. Please contact support."
+        )

@@ -19,24 +19,25 @@ RATE_LIMITS = {
     "auth_login": "10/minute",           # OAuth login attempts
     "auth_exchange": "5/minute",         # Token exchange attempts
     "auth_refresh": "20/minute",         # Token refresh attempts
-    
+    "account_delete": "3/hour",          # Account deletion attempts (very strict)
+
     # Analysis endpoints - moderate limits
     "analysis_create": "3/minute",       # Create new analysis
     "analysis_get": "100/minute",        # View analysis results
     "analysis_list": "50/minute",        # List analyses
-    
+
     # Integration endpoints - strict for setup, loose for usage
     "integration_create": "5/minute",    # Add new integrations
     "integration_update": "10/minute",   # Update integration settings
     "integration_test": "10/minute",     # Test integration connection
     "integration_get": "200/minute",     # View integrations
-    
+
     # Mapping endpoints - moderate limits
     "mapping_create": "20/minute",       # Create user mappings
     "mapping_update": "30/minute",       # Update mappings
     "mapping_delete": "15/minute",       # Delete mappings
     "mapping_validate": "5/minute",      # Validate GitHub mappings
-    
+
     # General API endpoints
     "api_general": "1000/minute",        # General API calls
     "api_heavy": "100/minute",           # Heavy operations

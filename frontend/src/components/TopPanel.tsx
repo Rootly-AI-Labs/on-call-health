@@ -13,7 +13,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { NotificationDrawer } from "@/components/notifications"
-import { LogOut, BookOpen } from "lucide-react"
+import { AccountSettingsDialog } from "@/components/AccountSettingsDialog"
+import { useGettingStarted } from "@/contexts/GettingStartedContext"
+import { LogOut, BookOpen, HelpCircle, Settings } from "lucide-react"
 
 interface UserInfo {
   name: string
@@ -24,7 +26,10 @@ interface UserInfo {
 export function TopPanel() {
   const router = useRouter()
   const pathname = usePathname()
+  const { openGettingStarted } = useGettingStarted()
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null)
+  const [showAccountSettings, setShowAccountSettings] = useState(false)
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
 
   useEffect(() => {
     const userName = localStorage.getItem("user_name")
@@ -33,6 +38,7 @@ export function TopPanel() {
   }, [])
 
   const handleSignOut = () => {
+    // Clear auth token and redirect
     localStorage.removeItem("auth_token")
     router.push("/")
   }
@@ -89,7 +95,13 @@ export function TopPanel() {
           <div className="flex items-center gap-3">
             <NotificationDrawer />
             {userInfo && (
-              <DropdownMenu>
+              <DropdownMenu open={isDropdownOpen} onOpenChange={(open) => {
+                setIsDropdownOpen(open)
+                // Close dropdown when dialog opens
+                if (showAccountSettings) {
+                  setIsDropdownOpen(false)
+                }
+              }}>
                 <DropdownMenuTrigger asChild>
                   <button className="flex items-center gap-3 px-2.5 py-1.5 rounded-full border border-gray-200 bg-white hover:bg-gray-50 hover:border-gray-300 transition-all duration-200 shadow-sm hover:shadow">
                     <Avatar className="h-8 w-8 ring-2 ring-white">
@@ -115,11 +127,31 @@ export function TopPanel() {
                   </div>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
+                    onClick={() => {
+                      openGettingStarted()
+                      setIsDropdownOpen(false)
+                    }}
+                    className="cursor-pointer"
+                  >
+                    <HelpCircle className="w-4 h-4 mr-2" />
+                    Getting Started
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
                     onClick={() => router.push("/methodology")}
                     className="cursor-pointer"
                   >
                     <BookOpen className="w-4 h-4 mr-2" />
                     Methodology
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      setShowAccountSettings(true)
+                      setIsDropdownOpen(false)
+                    }}
+                    className="cursor-pointer"
+                  >
+                    <Settings className="w-4 h-4 mr-2" />
+                    Account Settings
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
@@ -135,6 +167,11 @@ export function TopPanel() {
           </div>
         </div>
       </div>
+      <AccountSettingsDialog
+        isOpen={showAccountSettings}
+        onClose={() => setShowAccountSettings(false)}
+        userEmail={userInfo?.email || ''}
+      />
     </header>
   )
 }
