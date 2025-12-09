@@ -1275,9 +1275,9 @@ export default function IntegrationsPage() {
         return
       }
 
-      // 🚀 PHASE 2: Background refresh also uses skip_permissions for speed
+      // 🚀 PHASE 2: Backend now caches permissions for 24 hours
       const [rootlyResponse, pagerdutyResponse, githubResponse, slackResponse, jiraResponse] = await Promise.all([
-        fetch(`${API_BASE}/rootly/integrations?skip_permissions=true`, {
+        fetch(`${API_BASE}/rootly/integrations`, {
           headers: { 'Authorization': `Bearer ${authToken}` }
         }),
         fetch(`${API_BASE}/pagerduty/integrations`, {
@@ -1411,8 +1411,8 @@ export default function IntegrationsPage() {
       }
 
       // 🚀 OPTIMIZATION: Start all requests in parallel but process them as they complete
-      // 🚀 PHASE 2: Use skip_permissions=true for initial fast load (returns cached permissions only)
-      const rootlyPromise = fetchWithTimeout(`${API_BASE}/rootly/integrations?skip_permissions=true`, {
+      // 🚀 PHASE 2: Backend caches permissions for 24 hours for fast responses
+      const rootlyPromise = fetchWithTimeout(`${API_BASE}/rootly/integrations`, {
         headers: { 'Authorization': `Bearer ${authToken}` }
       }).catch((error) => {
         console.error('Rootly API request failed:', error.message)

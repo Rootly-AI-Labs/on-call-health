@@ -297,20 +297,19 @@ async def add_rootly_integration(
 @router.get("/integrations")
 async def list_integrations(
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db),
-    skip_permissions: bool = False
+    db: Session = Depends(get_db)
 ):
     """
     List all Rootly integrations for the current user with permissions.
 
-    Smart permission checking:
-    - Always checks permissions for integrations that have NEVER been checked (even with skip_permissions=true)
-    - skip_permissions=false: Check permissions for all integrations with stale cache
-    - skip_permissions=true: Skip permission checks for integrations with stale cache (shows "checking" placeholder)
+    Permission caching:
+    - Returns cached permissions if < 24 hours old (instant response)
+    - Refreshes permissions if cache is stale or missing (slower, 10s timeout per integration)
+    - Users can manually refresh via the refresh button on integrations page
     """
     import time
     start_time = time.time()
-    logger.info(f"🔍 [ROOTLY] Starting list_integrations for user {current_user.id} (skip_permissions={skip_permissions})")
+    logger.info(f"🔍 [ROOTLY] Starting list_integrations for user {current_user.id}")
 
     integrations = db.query(RootlyIntegration).filter(
         RootlyIntegration.user_id == current_user.id,
@@ -338,31 +337,23 @@ async def list_integrations(
         }
         result_integrations.append(integration_data)
 
-        # Check if we have cached permissions (cache for 1 hour)
+        # Check if we have cached permissions (cache for 24 hours)
+        # Permissions rarely change - only when token is revoked/modified
         cache_valid = False
         if integration.cached_permissions and integration.permissions_checked_at:
             cache_age = datetime.now(timezone.utc) - integration.permissions_checked_at
-            cache_valid = cache_age < timedelta(hours=1)
+            cache_valid = cache_age < timedelta(hours=24)
             if cache_valid:
                 integration_data["permissions"] = integration.cached_permissions
                 logger.info(f"✅ Using cached permissions for '{integration.name}' (ID={integration.id}) - cached {int(cache_age.total_seconds())}s ago")
 
-        # 🚀 OPTIMIZATION: Smart permission checking logic
-        # Always check permissions if never checked before, even with skip_permissions=true
-        never_checked = integration.permissions_checked_at is None
-
+        # Permission checking logic: Always refresh stale or missing cache
         if integration.api_token:
-            # If never checked OR (cache stale AND not skipping), queue permission check
-            if never_checked or (not cache_valid and not skip_permissions):
+            # Queue permission check if cache is not valid (stale or never checked)
+            if not cache_valid:
                 client = RootlyAPIClient(integration.api_token)
                 permission_tasks.append((idx, client.check_permissions(), integration.id))
-                logger.info(f"🔍 Queueing permission check for '{integration.name}' (never_checked={never_checked}, cache_valid={cache_valid}, skip_permissions={skip_permissions})")
-            elif not cache_valid and skip_permissions:
-                # Cache is stale but we're skipping fresh checks - show placeholder
-                integration_data["permissions"] = {
-                    "users": {"access": None, "checking": True},
-                    "incidents": {"access": None, "checking": True}
-                }
+                logger.info(f"🔍 Queueing permission check for '{integration.name}' (cache_valid={cache_valid})")
         else:
             # No token configured
             integration_data["permissions"] = {
