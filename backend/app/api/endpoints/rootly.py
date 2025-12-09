@@ -297,12 +297,19 @@ async def add_rootly_integration(
 @router.get("/integrations")
 async def list_integrations(
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    skip_permissions: bool = False
 ):
-    """List all Rootly integrations for the current user with permissions."""
+    """
+    List all Rootly integrations for the current user with permissions.
+
+    🚀 PHASE 2 OPTIMIZATION: Add skip_permissions parameter for faster initial page load.
+    - skip_permissions=false (default): Check permissions for all integrations (slower, complete data)
+    - skip_permissions=true: Return only cached permissions, skip fresh checks (faster, may be stale)
+    """
     import time
     start_time = time.time()
-    logger.info(f"🔍 [ROOTLY] Starting list_integrations for user {current_user.id}")
+    logger.info(f"🔍 [ROOTLY] Starting list_integrations for user {current_user.id} (skip_permissions={skip_permissions})")
 
     integrations = db.query(RootlyIntegration).filter(
         RootlyIntegration.user_id == current_user.id,
@@ -339,19 +346,33 @@ async def list_integrations(
                 integration_data["permissions"] = integration.cached_permissions
                 logger.info(f"✅ Using cached permissions for '{integration.name}' (ID={integration.id}) - cached {int(cache_age.total_seconds())}s ago")
 
-        # Queue permission check task if token exists and cache is stale/missing
-        if integration.api_token and not cache_valid:
-            client = RootlyAPIClient(integration.api_token)
-            permission_tasks.append((idx, client.check_permissions(), integration.id))
-        elif not integration.api_token:
-            # No token - set immediately
-            integration_data["permissions"] = {
-                "users": {"access": None, "error": "No API token configured"},
-                "incidents": {"access": None, "error": "No API token configured"}
-            }
+        # 🚀 OPTIMIZATION: Skip fresh permission checks if skip_permissions=true
+        if skip_permissions:
+            # Use cached permissions if available, otherwise set placeholder
+            if not cache_valid and integration.api_token:
+                integration_data["permissions"] = {
+                    "users": {"access": None, "checking": True},
+                    "incidents": {"access": None, "checking": True}
+                }
+            elif not integration.api_token:
+                integration_data["permissions"] = {
+                    "users": {"access": None, "error": "No API token configured"},
+                    "incidents": {"access": None, "error": "No API token configured"}
+                }
+        else:
+            # Queue permission check task if token exists and cache is stale/missing
+            if integration.api_token and not cache_valid:
+                client = RootlyAPIClient(integration.api_token)
+                permission_tasks.append((idx, client.check_permissions(), integration.id))
+            elif not integration.api_token:
+                # No token - set immediately
+                integration_data["permissions"] = {
+                    "users": {"access": None, "error": "No API token configured"},
+                    "incidents": {"access": None, "error": "No API token configured"}
+                }
 
-    # Run all permission checks in parallel with 10s timeout each
-    if permission_tasks:
+    # Run all permission checks in parallel with 10s timeout each (only if not skipping)
+    if permission_tasks and not skip_permissions:
         import asyncio
         logger.info(f"🔍 [ROOTLY] Checking permissions for {len(permission_tasks)} integrations in parallel...")
         perm_start = time.time()
