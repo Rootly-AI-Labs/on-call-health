@@ -107,8 +107,8 @@ function IntroGuide({ isOpen, currentStep, onNext, onPrev, onClose }: IntroGuide
                   <Image
                     src={step.image || "/placeholder.svg"}
                     alt="Dashboard with Mock Data"
-                    width={500}
-                    height={280}
+                    width={1200}
+                    height={675}
                     className="w-full h-auto"
                     priority
                     quality={100}
@@ -144,8 +144,8 @@ function IntroGuide({ isOpen, currentStep, onNext, onPrev, onClose }: IntroGuide
                     <Image
                       src={step.images[0] || "/placeholder.svg"}
                       alt="Integrations Page"
-                      width={500}
-                      height={320}
+                      width={1200}
+                      height={768}
                       className="w-full h-auto"
                       priority
                       quality={100}
@@ -164,8 +164,8 @@ function IntroGuide({ isOpen, currentStep, onNext, onPrev, onClose }: IntroGuide
                     <Image
                       src={step.images[1] || "/placeholder.svg"}
                       alt="Team Members Modal"
-                      width={350}
-                      height={320}
+                      width={840}
+                      height={768}
                       className="w-full h-auto"
                       priority
                       quality={100}
@@ -188,8 +188,8 @@ function IntroGuide({ isOpen, currentStep, onNext, onPrev, onClose }: IntroGuide
                   <Image
                     src={step.images[1] || "/placeholder.svg"}
                     alt="Methodology Page"
-                    width={350}
-                    height={230}
+                    width={840}
+                    height={552}
                     className="w-full h-auto"
                     priority
                     quality={100}
