@@ -1081,13 +1081,12 @@ async def handle_burnout_survey_command(
                 "response_type": "ephemeral"
             }
 
-        # Check for existing survey response today
+        # Check for existing survey response today (scoped by user only)
         from datetime import datetime
         today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
 
         existing_report = db.query(UserBurnoutReport).filter(
             UserBurnoutReport.user_id == user_correlation.user_id,
-            UserBurnoutReport.organization_id == organization.id,
             UserBurnoutReport.submitted_at >= today_start
         ).first()
 
