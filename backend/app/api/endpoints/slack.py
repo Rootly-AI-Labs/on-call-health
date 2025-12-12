@@ -1263,51 +1263,62 @@ async def handle_slack_interactions(
                 # Extract form values from modal
                 values = view.get("state", {}).get("values", {})
 
-                # Get burnout score (0-100 scale) - already in correct format
-                burnout_score_block = values.get("burnout_score_block") or {}
-                burnout_score_input = burnout_score_block.get("burnout_score_input") or {}
-                burnout_score_option = burnout_score_input.get("selected_option") or {}
-                self_reported_score = int(burnout_score_option.get("value", "50"))
+                # DEBUG: Log the entire values structure to see what Slack sends
+                import json as json_module
+                logging.info(f"DEBUG Survey Submission - Full values structure: {json_module.dumps(values, indent=2, default=str)}")
+                logging.info(f"DEBUG Survey Submission - View keys: {view.keys()}")
+                logging.info(f"DEBUG Survey Submission - State keys: {view.get('state', {}).keys()}")
 
-                # Get energy level (radio buttons) - convert to 1-5 integer
-                energy_level_block = values.get("energy_level_block") or {}
-                energy_level_input = energy_level_block.get("energy_level_input") or {}
-                energy_level_option = energy_level_input.get("selected_option") or {}
-                energy_level_str = energy_level_option.get("value", "moderate")
-                energy_level_map = {
-                    "very_low": 1,
-                    "low": 2,
-                    "moderate": 3,
-                    "high": 4,
-                    "very_high": 5
-                }
-                energy_level = energy_level_map.get(energy_level_str, 3)
+                try:
+                    # Get burnout score (0-100 scale) - already in correct format
+                    burnout_score_block = values.get("burnout_score_block") or {}
+                    burnout_score_input = burnout_score_block.get("burnout_score_input") or {}
+                    burnout_score_option = burnout_score_input.get("selected_option") or {}
+                    self_reported_score = int(burnout_score_option.get("value", "50"))
 
-                # Get stress factors (checkboxes)
-                stress_factors_block = values.get("stress_factors_block") or {}
-                stress_factors_input = stress_factors_block.get("stress_factors_input") or {}
-                stress_factors_options = stress_factors_input.get("selected_options", [])
-                stress_factors = [opt.get("value") for opt in (stress_factors_options or [])]
+                    # Get energy level (radio buttons) - convert to 1-5 integer
+                    energy_level_block = values.get("energy_level_block") or {}
+                    energy_level_input = energy_level_block.get("energy_level_input") or {}
+                    energy_level_option = energy_level_input.get("selected_option") or {}
+                    energy_level_str = energy_level_option.get("value", "moderate")
+                    energy_level_map = {
+                        "very_low": 1,
+                        "low": 2,
+                        "moderate": 3,
+                        "high": 4,
+                        "very_high": 5
+                    }
+                    energy_level = energy_level_map.get(energy_level_str, 3)
 
-                # Get personal circumstances (optional)
-                personal_circumstances_block = values.get("personal_circumstances_block") or {}
-                personal_circumstances_input = personal_circumstances_block.get("personal_circumstances_input") or {}
-                personal_circumstances_option = personal_circumstances_input.get("selected_option")
-                personal_circumstances = personal_circumstances_option.get("value") if personal_circumstances_option else None
+                    # Get stress factors (checkboxes)
+                    stress_factors_block = values.get("stress_factors_block") or {}
+                    stress_factors_input = stress_factors_block.get("stress_factors_input") or {}
+                    stress_factors_options = stress_factors_input.get("selected_options", [])
+                    stress_factors = [opt.get("value") for opt in (stress_factors_options or [])]
 
-                # Get optional comments
-                comments_block = values.get("comments_block") or {}
-                comments_input = comments_block.get("comments_input")
-                comments = comments_input.get("value", "") if comments_input else ""
+                    # Get personal circumstances (optional)
+                    personal_circumstances_block = values.get("personal_circumstances_block") or {}
+                    personal_circumstances_input = personal_circumstances_block.get("personal_circumstances_input") or {}
+                    personal_circumstances_option = personal_circumstances_input.get("selected_option")
+                    personal_circumstances = personal_circumstances_option.get("value") if personal_circumstances_option else None
 
-                # Extract user and organization IDs from private_metadata
-                metadata = json.loads(view.get("private_metadata", "{}"))
-                user_id = metadata.get("user_id")
-                organization_id = metadata.get("organization_id")  # Optional now
-                analysis_id = metadata.get("analysis_id")  # Optional - may be None
+                    # Get optional comments
+                    comments_block = values.get("comments_block") or {}
+                    comments_input = comments_block.get("comments_input")
+                    comments = comments_input.get("value", "") if comments_input else ""
 
-                if not user_id:
-                    return {"response_action": "errors", "errors": {"comments_block": "Invalid survey data"}}
+                    # Extract user and organization IDs from private_metadata
+                    metadata = json.loads(view.get("private_metadata", "{}"))
+                    user_id = metadata.get("user_id")
+                    organization_id = metadata.get("organization_id")  # Optional now
+                    analysis_id = metadata.get("analysis_id")  # Optional - may be None
+
+                    if not user_id:
+                        return {"response_action": "errors", "errors": {"comments_block": "Invalid survey data"}}
+                except Exception as e:
+                    logging.error(f"ERROR parsing survey values: {str(e)}", exc_info=True)
+                    logging.error(f"ERROR - values structure: {json_module.dumps(values, indent=2, default=str)}")
+                    return {"response_action": "errors", "errors": {"comments_block": f"Error parsing survey: {str(e)}"}}
 
                 # Check if user already submitted today (within last 24 hours)
                 from datetime import datetime, timedelta
