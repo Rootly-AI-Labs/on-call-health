@@ -700,9 +700,19 @@ class MigrationRunner:
                     """
                 ]
             },
+            {
+                "name": "022_make_analysis_id_nullable",
+                "description": "Make analysis_id nullable in user_burnout_reports",
+                "sql": [
+                    """
+                    -- Make analysis_id nullable since surveys can be submitted without an analysis
+                    ALTER TABLE user_burnout_reports ALTER COLUMN analysis_id DROP NOT NULL
+                    """
+                ]
+            },
             # Add future migrations here with incrementing numbers
             # {
-            #     "name": "022_add_user_preferences",
+            #     "name": "023_add_user_preferences",
             #     "description": "Add user preferences table",
             #     "sql": ["CREATE TABLE IF NOT EXISTS user_preferences (...)"]
             # }
