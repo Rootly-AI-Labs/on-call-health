@@ -1081,13 +1081,12 @@ async def handle_burnout_survey_command(
                 "response_type": "ephemeral"
             }
 
-        # Check for existing survey response today
+        # Check for existing survey response today (scoped by user only)
         from datetime import datetime
         today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
 
         existing_report = db.query(UserBurnoutReport).filter(
             UserBurnoutReport.user_id == user_correlation.user_id,
-            UserBurnoutReport.organization_id == organization.id,
             UserBurnoutReport.submitted_at >= today_start
         ).first()
 
@@ -1213,19 +1212,18 @@ async def handle_slack_interactions(
                     slack_user_id = slack_user.get("id")
                     trigger_id = data.get("trigger_id")
 
-                    # Get organization and check for existing report
+                    # Check for existing report today (scoped by user only)
                     from datetime import datetime
                     today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
 
                     existing_report = db.query(UserBurnoutReport).filter(
                         UserBurnoutReport.user_id == user_id,
-                        UserBurnoutReport.organization_id == organization_id,
                         UserBurnoutReport.submitted_at >= today_start
                     ).first()
 
-                    # Open modal
+                    # Open modal (organization_id kept for backwards compatibility with old buttons)
                     modal_view = create_burnout_survey_modal(
-                        organization_id=organization_id,
+                        organization_id=organization_id,  # Still passed but ignored in logic
                         user_id=user_id,
                         analysis_id=None,  # No specific analysis for daily check-ins
                         is_update=bool(existing_report)
@@ -1304,17 +1302,17 @@ async def handle_slack_interactions(
                 from datetime import datetime, timedelta
                 today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
 
-                # Query for existing report, handling NULL organization_id
-                query = db.query(UserBurnoutReport).filter(
+                # Get user info once for both report creation and notifications
+                user = db.query(User).filter(User.id == user_id).first()
+                if not user:
+                    return {"response_action": "errors", "errors": {"comments_block": "User not found"}}
+
+                # Check if user already submitted today (scoped by user only, not org)
+                # This allows only 1 survey per user per day, regardless of organization
+                existing_report = db.query(UserBurnoutReport).filter(
                     UserBurnoutReport.user_id == user_id,
                     UserBurnoutReport.submitted_at >= today_start
-                )
-                if organization_id:
-                    query = query.filter(UserBurnoutReport.organization_id == organization_id)
-                else:
-                    query = query.filter(UserBurnoutReport.organization_id.is_(None))
-
-                existing_report = query.order_by(UserBurnoutReport.submitted_at.desc()).first()
+                ).order_by(UserBurnoutReport.submitted_at.desc()).first()
 
                 is_update = False
                 if existing_report:
@@ -1326,14 +1324,16 @@ async def handle_slack_interactions(
                     existing_report.additional_comments = comments
                     existing_report.submitted_via = 'slack'
                     existing_report.analysis_id = analysis_id  # Update linked analysis if provided
+                    existing_report.email_domain = user.email_domain  # Refresh email_domain in case it changed
                     existing_report.updated_at = datetime.utcnow()
                     logging.info(f"Updated existing report ID {existing_report.id} for user {user_id}")
                     is_update = True
                 else:
-                    # Create new burnout report
+                    # Create new burnout report with email_domain for domain-based sharing
                     new_report = UserBurnoutReport(
                         user_id=user_id,
                         organization_id=organization_id,
+                        email_domain=user.email_domain,
                         analysis_id=analysis_id,  # Optional - may be None
                         self_reported_score=self_reported_score,
                         energy_level=energy_level,
@@ -1344,7 +1344,7 @@ async def handle_slack_interactions(
                         submitted_at=datetime.utcnow()
                     )
                     db.add(new_report)
-                    logging.info(f"Created new report for user {user_id}")
+                    logging.info(f"Created new report for user {user_id} with email_domain {user.email_domain}")
 
                 db.commit()
 
@@ -1352,9 +1352,7 @@ async def handle_slack_interactions(
                 if not is_update:
                     try:
                         notification_service = NotificationService(db)
-                        # Get user info for notification
-                        user = db.query(User).filter(User.id == user_id).first()
-                        if user and analysis_id:
+                        if analysis_id:
                             # Get analysis for notification context
                             analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
                             if analysis:
@@ -1450,9 +1448,14 @@ async def submit_slack_burnout_survey(
                 detail="Survey already submitted for this analysis"
             )
 
+        # Get user for email_domain
+        user = db.query(User).filter(User.id == user_correlation.user_id).first()
+
         # Create new burnout report
         new_report = UserBurnoutReport(
             user_id=user_correlation.user_id,
+            organization_id=None,  # No org_id for this endpoint
+            email_domain=user.email_domain if user else None,
             analysis_id=submission.analysis_id,
             self_reported_score=submission.self_reported_score,
             energy_level=submission.energy_level,

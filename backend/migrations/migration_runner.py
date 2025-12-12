@@ -641,9 +641,68 @@ class MigrationRunner:
                     """
                 ]
             },
+            {
+                "name": "020_add_email_domain_for_data_sharing",
+                "description": "Add email_domain column to users and user_correlations for domain-based data sharing",
+                "sql": [
+                    """
+                    -- Add email_domain to users table
+                    ALTER TABLE users
+                    ADD COLUMN IF NOT EXISTS email_domain VARCHAR(255)
+                    """,
+                    """
+                    -- Populate email_domain from existing emails
+                    UPDATE users
+                    SET email_domain = LOWER(SUBSTRING(email FROM POSITION('@' IN email) + 1))
+                    WHERE email_domain IS NULL AND email LIKE '%@%'
+                    """,
+                    """
+                    -- Create index on users.email_domain for performance
+                    CREATE INDEX IF NOT EXISTS idx_users_email_domain ON users(email_domain)
+                    """,
+                    """
+                    -- Add email_domain to user_correlations for faster queries
+                    ALTER TABLE user_correlations
+                    ADD COLUMN IF NOT EXISTS email_domain VARCHAR(255)
+                    """,
+                    """
+                    -- Populate user_correlations.email_domain from users
+                    UPDATE user_correlations uc
+                    SET email_domain = u.email_domain
+                    FROM users u
+                    WHERE uc.user_id = u.id AND uc.email_domain IS NULL
+                    """,
+                    """
+                    -- Create index on user_correlations.email_domain for performance
+                    CREATE INDEX IF NOT EXISTS idx_user_correlations_email_domain ON user_correlations(email_domain)
+                    """
+                ]
+            },
+            {
+                "name": "021_add_email_domain_to_surveys",
+                "description": "Add email_domain to user_burnout_reports for domain-based survey aggregation",
+                "sql": [
+                    """
+                    -- Add email_domain to user_burnout_reports
+                    ALTER TABLE user_burnout_reports
+                    ADD COLUMN IF NOT EXISTS email_domain VARCHAR(255)
+                    """,
+                    """
+                    -- Populate email_domain from users table
+                    UPDATE user_burnout_reports ubr
+                    SET email_domain = u.email_domain
+                    FROM users u
+                    WHERE ubr.user_id = u.id AND ubr.email_domain IS NULL
+                    """,
+                    """
+                    -- Create index for performance
+                    CREATE INDEX IF NOT EXISTS idx_user_burnout_reports_email_domain ON user_burnout_reports(email_domain)
+                    """
+                ]
+            },
             # Add future migrations here with incrementing numbers
             # {
-            #     "name": "020_add_user_preferences",
+            #     "name": "022_add_user_preferences",
             #     "description": "Add user preferences table",
             #     "sql": ["CREATE TABLE IF NOT EXISTS user_preferences (...)"]
             # }
