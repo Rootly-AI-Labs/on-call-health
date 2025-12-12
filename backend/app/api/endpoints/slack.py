@@ -1263,12 +1263,6 @@ async def handle_slack_interactions(
                 # Extract form values from modal
                 values = view.get("state", {}).get("values", {})
 
-                # DEBUG: Log the entire values structure to see what Slack sends
-                import json as json_module
-                logging.info(f"DEBUG Survey Submission - Full values structure: {json_module.dumps(values, indent=2, default=str)}")
-                logging.info(f"DEBUG Survey Submission - View keys: {view.keys()}")
-                logging.info(f"DEBUG Survey Submission - State keys: {view.get('state', {}).keys()}")
-
                 try:
                     # Get burnout score (0-100 scale) - already in correct format
                     burnout_score_block = values.get("burnout_score_block") or {}
@@ -1316,9 +1310,8 @@ async def handle_slack_interactions(
                     if not user_id:
                         return {"response_action": "errors", "errors": {"comments_block": "Invalid survey data"}}
                 except Exception as e:
-                    logging.error(f"ERROR parsing survey values: {str(e)}", exc_info=True)
-                    logging.error(f"ERROR - values structure: {json_module.dumps(values, indent=2, default=str)}")
-                    return {"response_action": "errors", "errors": {"comments_block": f"Error parsing survey: {str(e)}"}}
+                    logging.error(f"Error parsing survey values: {str(e)}", exc_info=True)
+                    return {"response_action": "errors", "errors": {"comments_block": "Error submitting survey. Please try again."}}
 
                 # Check if user already submitted today (within last 24 hours)
                 from datetime import datetime, timedelta
