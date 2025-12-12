@@ -1316,6 +1316,11 @@ async def handle_slack_interactions(
 
                 existing_report = query.order_by(UserBurnoutReport.submitted_at.desc()).first()
 
+                # Get user info once for both report creation and notifications
+                user = db.query(User).filter(User.id == user_id).first()
+                if not user:
+                    return {"response_action": "errors", "errors": {"comments_block": "User not found"}}
+
                 is_update = False
                 if existing_report:
                     # Update existing report
@@ -1330,15 +1335,11 @@ async def handle_slack_interactions(
                     logging.info(f"Updated existing report ID {existing_report.id} for user {user_id}")
                     is_update = True
                 else:
-                    # Get user's email_domain for domain-based sharing
-                    user = db.query(User).filter(User.id == user_id).first()
-                    email_domain = user.email_domain if user else None
-
-                    # Create new burnout report
+                    # Create new burnout report with email_domain for domain-based sharing
                     new_report = UserBurnoutReport(
                         user_id=user_id,
                         organization_id=organization_id,
-                        email_domain=email_domain,
+                        email_domain=user.email_domain,
                         analysis_id=analysis_id,  # Optional - may be None
                         self_reported_score=self_reported_score,
                         energy_level=energy_level,
@@ -1349,7 +1350,7 @@ async def handle_slack_interactions(
                         submitted_at=datetime.utcnow()
                     )
                     db.add(new_report)
-                    logging.info(f"Created new report for user {user_id} with email_domain {email_domain}")
+                    logging.info(f"Created new report for user {user_id} with email_domain {user.email_domain}")
 
                 db.commit()
 
@@ -1357,9 +1358,7 @@ async def handle_slack_interactions(
                 if not is_update:
                     try:
                         notification_service = NotificationService(db)
-                        # Get user info for notification
-                        user = db.query(User).filter(User.id == user_id).first()
-                        if user and analysis_id:
+                        if analysis_id:
                             # Get analysis for notification context
                             analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
                             if analysis:
