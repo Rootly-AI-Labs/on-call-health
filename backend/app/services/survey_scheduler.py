@@ -195,21 +195,15 @@ class SurveyScheduler:
             for user in users:
                 try:
                     # If reminder, check if user already completed survey today
+                    # Check is scoped by user only - one survey per user per day regardless of org
                     if is_reminder:
                         from datetime import datetime
                         today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
 
-                        # Handle NULL organization_id properly
-                        query = db.query(UserBurnoutReport).filter(
+                        already_completed = db.query(UserBurnoutReport).filter(
                             UserBurnoutReport.user_id == user['user_id'],
                             UserBurnoutReport.submitted_at >= today_start
-                        )
-                        if organization_id:
-                            query = query.filter(UserBurnoutReport.organization_id == organization_id)
-                        else:
-                            query = query.filter(UserBurnoutReport.organization_id.is_(None))
-
-                        already_completed = query.first()
+                        ).first()
 
                         if already_completed:
                             skipped_count += 1

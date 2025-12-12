@@ -1213,25 +1213,18 @@ async def handle_slack_interactions(
                     slack_user_id = slack_user.get("id")
                     trigger_id = data.get("trigger_id")
 
-                    # Get organization and check for existing report
+                    # Check for existing report today (scoped by user only)
                     from datetime import datetime
                     today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
 
-                    # Handle NULL organization_id properly
-                    query = db.query(UserBurnoutReport).filter(
+                    existing_report = db.query(UserBurnoutReport).filter(
                         UserBurnoutReport.user_id == user_id,
                         UserBurnoutReport.submitted_at >= today_start
-                    )
-                    if organization_id:
-                        query = query.filter(UserBurnoutReport.organization_id == organization_id)
-                    else:
-                        query = query.filter(UserBurnoutReport.organization_id.is_(None))
+                    ).first()
 
-                    existing_report = query.first()
-
-                    # Open modal
+                    # Open modal (organization_id kept for backwards compatibility with old buttons)
                     modal_view = create_burnout_survey_modal(
-                        organization_id=organization_id,
+                        organization_id=organization_id,  # Still passed but ignored in logic
                         user_id=user_id,
                         analysis_id=None,  # No specific analysis for daily check-ins
                         is_update=bool(existing_report)
@@ -1310,22 +1303,17 @@ async def handle_slack_interactions(
                 from datetime import datetime, timedelta
                 today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
 
-                # Query for existing report, handling NULL organization_id
-                query = db.query(UserBurnoutReport).filter(
-                    UserBurnoutReport.user_id == user_id,
-                    UserBurnoutReport.submitted_at >= today_start
-                )
-                if organization_id:
-                    query = query.filter(UserBurnoutReport.organization_id == organization_id)
-                else:
-                    query = query.filter(UserBurnoutReport.organization_id.is_(None))
-
-                existing_report = query.order_by(UserBurnoutReport.submitted_at.desc()).first()
-
                 # Get user info once for both report creation and notifications
                 user = db.query(User).filter(User.id == user_id).first()
                 if not user:
                     return {"response_action": "errors", "errors": {"comments_block": "User not found"}}
+
+                # Check if user already submitted today (scoped by user only, not org)
+                # This allows only 1 survey per user per day, regardless of organization
+                existing_report = db.query(UserBurnoutReport).filter(
+                    UserBurnoutReport.user_id == user_id,
+                    UserBurnoutReport.submitted_at >= today_start
+                ).order_by(UserBurnoutReport.submitted_at.desc()).first()
 
                 is_update = False
                 if existing_report:
