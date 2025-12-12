@@ -1278,15 +1278,20 @@ async def handle_slack_interactions(
                 energy_level = energy_level_map.get(energy_level_str, 3)
 
                 # Get stress factors (checkboxes)
-                stress_factors_options = values.get("stress_factors_block", {}).get("stress_factors_input", {}).get("selected_options", [])
+                stress_factors_block = values.get("stress_factors_block") or {}
+                stress_factors_input = stress_factors_block.get("stress_factors_input") or {}
+                stress_factors_options = stress_factors_input.get("selected_options", [])
                 stress_factors = [opt.get("value") for opt in (stress_factors_options or [])]
 
                 # Get personal circumstances (optional)
-                personal_circumstances_option = values.get("personal_circumstances_block", {}).get("personal_circumstances_input", {}).get("selected_option")
+                personal_circumstances_block = values.get("personal_circumstances_block") or {}
+                personal_circumstances_input = personal_circumstances_block.get("personal_circumstances_input") or {}
+                personal_circumstances_option = personal_circumstances_input.get("selected_option")
                 personal_circumstances = personal_circumstances_option.get("value") if personal_circumstances_option else None
 
                 # Get optional comments
-                comments_input = values.get("comments_block", {}).get("comments_input")
+                comments_block = values.get("comments_block") or {}
+                comments_input = comments_block.get("comments_input")
                 comments = comments_input.get("value", "") if comments_input else ""
 
                 # Extract user and organization IDs from private_metadata
