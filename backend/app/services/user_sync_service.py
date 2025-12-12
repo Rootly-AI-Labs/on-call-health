@@ -82,7 +82,8 @@ class UserSyncService:
                 users=users,
                 platform=integration.platform,
                 current_user=current_user,
-                integration_id=str(integration_id)  # Store which integration synced this user
+                integration_id=str(integration_id),  # Store which integration synced this user
+                rootly_org_id=integration.rootly_org_id  # Link to Rootly org being analyzed
             )
 
             # Remove users who are no longer in Rootly/PagerDuty
@@ -229,7 +230,8 @@ class UserSyncService:
         users: List[Dict[str, Any]],
         platform: str,
         current_user: User,
-        integration_id: str = None
+        integration_id: str = None,
+        rootly_org_id: int = None
     ) -> Dict[str, int]:
         """
         Sync users to UserCorrelation table.
@@ -267,12 +269,15 @@ class UserSyncService:
 
             if correlation:
                 # Update existing correlation
+                if rootly_org_id and not correlation.rootly_org_id:
+                    correlation.rootly_org_id = rootly_org_id  # Set if missing
                 updated += self._update_correlation(correlation, user, platform, integration_id)
             else:
                 # Create new correlation
                 correlation = UserCorrelation(
                     user_id=current_user.id,  # Keep for backwards compatibility
                     organization_id=organization_id,  # Multi-tenancy key
+                    rootly_org_id=rootly_org_id,  # Link to Rootly org being analyzed
                     email=email,
                     name=user.get("name"),  # Store user's display name
                     integration_ids=[integration_id] if integration_id else []  # Initialize array
