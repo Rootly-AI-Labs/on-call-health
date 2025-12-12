@@ -625,9 +625,153 @@ class MigrationRunner:
                     """
                 ]
             },
+            {
+                "name": "019_fix_organization_id_issues",
+                "description": "Fix organization_id issues - ensure all users and correlations use org_id=1",
+                "sql": [
+                    """
+                    -- Ensure organization 1 exists
+                    INSERT INTO organizations (id, name, domain, slug, status)
+                    VALUES (1, 'Default Organization', 'default.local', 'default', 'active')
+                    ON CONFLICT (id) DO NOTHING
+                    """,
+                    """
+                    -- Set all NULL or invalid organization_ids to 1 in users table
+                    UPDATE users
+                    SET organization_id = 1
+                    WHERE organization_id IS NULL OR organization_id NOT IN (SELECT id FROM organizations)
+                    """,
+                    """
+                    -- Set all NULL or invalid organization_ids to 1 in user_correlations table
+                    UPDATE user_correlations
+                    SET organization_id = 1
+                    WHERE organization_id IS NULL OR organization_id NOT IN (SELECT id FROM organizations)
+                    """,
+                    """
+                    -- Set all NULL or invalid organization_ids to 1 in analyses table
+                    UPDATE analyses
+                    SET organization_id = 1
+                    WHERE organization_id IS NULL OR organization_id NOT IN (SELECT id FROM organizations)
+                    """,
+                    """
+                    -- Set all NULL or invalid organization_ids to 1 in user_burnout_reports table
+                    UPDATE user_burnout_reports
+                    SET organization_id = 1
+                    WHERE organization_id IS NULL OR organization_id NOT IN (SELECT id FROM organizations)
+                    """,
+                    """
+                    -- Delete any orphaned organizations (except org 1)
+                    DELETE FROM organizations
+                    WHERE id != 1
+                    AND id NOT IN (SELECT DISTINCT organization_id FROM users WHERE organization_id IS NOT NULL)
+                    """
+                ]
+            },
+            {
+                "name": "020_create_rootly_organizations_table",
+                "description": "Create rootly_organizations table to decouple Rootly orgs from app tenant orgs",
+                "sql": [
+                    """
+                    CREATE TABLE IF NOT EXISTS rootly_organizations (
+                        id SERIAL PRIMARY KEY,
+                        name VARCHAR(255) NOT NULL,
+                        domain VARCHAR(255) UNIQUE,
+                        app_tenant_id INTEGER REFERENCES organizations(id) DEFAULT 1,
+                        created_by_user_id INTEGER REFERENCES users(id),
+                        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_rootly_organizations_domain ON rootly_organizations(domain)
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_rootly_organizations_app_tenant ON rootly_organizations(app_tenant_id)
+                    """,
+                    """
+                    -- Add rootly_org_id to rootly_integrations
+                    ALTER TABLE rootly_integrations
+                    ADD COLUMN IF NOT EXISTS rootly_org_id INTEGER REFERENCES rootly_organizations(id)
+                    """,
+                    """
+                    -- Add rootly_org_id to analyses
+                    ALTER TABLE analyses
+                    ADD COLUMN IF NOT EXISTS rootly_org_id INTEGER REFERENCES rootly_organizations(id)
+                    """,
+                    """
+                    -- Add rootly_org_id to user_correlations
+                    ALTER TABLE user_correlations
+                    ADD COLUMN IF NOT EXISTS rootly_org_id INTEGER REFERENCES rootly_organizations(id)
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_rootly_integrations_rootly_org ON rootly_integrations(rootly_org_id)
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_analyses_rootly_org ON analyses(rootly_org_id)
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_user_correlations_rootly_org ON user_correlations(rootly_org_id)
+                    """
+                ]
+            },
+            {
+                "name": "021_migrate_existing_rootly_org_data",
+                "description": "Migrate existing Rootly integration data to rootly_organizations table",
+                "sql": [
+                    """
+                    -- Create rootly_organizations from existing integrations (deduplicated by name)
+                    INSERT INTO rootly_organizations (name, domain, app_tenant_id, created_by_user_id)
+                    SELECT DISTINCT ON (organization_name)
+                        organization_name,
+                        LOWER(REPLACE(organization_name, ' ', '-')) || '.rootly.com' as domain,
+                        1 as app_tenant_id,
+                        MIN(user_id) OVER (PARTITION BY organization_name) as created_by_user_id
+                    FROM rootly_integrations
+                    WHERE organization_name IS NOT NULL
+                    AND organization_name != ''
+                    ON CONFLICT (domain) DO NOTHING
+                    """,
+                    """
+                    -- Link rootly_integrations to rootly_organizations
+                    UPDATE rootly_integrations ri
+                    SET rootly_org_id = ro.id
+                    FROM rootly_organizations ro
+                    WHERE ri.organization_name = ro.name
+                    AND ri.rootly_org_id IS NULL
+                    """,
+                    """
+                    -- Link analyses to rootly_organizations via their integration
+                    UPDATE analyses a
+                    SET rootly_org_id = ri.rootly_org_id
+                    FROM rootly_integrations ri
+                    WHERE a.rootly_integration_id = ri.id
+                    AND ri.rootly_org_id IS NOT NULL
+                    AND a.rootly_org_id IS NULL
+                    """,
+                    """
+                    -- Link user_correlations to rootly_organizations
+                    -- Use the most recent analysis for the user's organization
+                    UPDATE user_correlations uc
+                    SET rootly_org_id = (
+                        SELECT a.rootly_org_id
+                        FROM analyses a
+                        WHERE a.organization_id = uc.organization_id
+                        AND a.rootly_org_id IS NOT NULL
+                        ORDER BY a.created_at DESC
+                        LIMIT 1
+                    )
+                    WHERE uc.rootly_org_id IS NULL
+                    AND EXISTS (
+                        SELECT 1 FROM analyses a
+                        WHERE a.organization_id = uc.organization_id
+                        AND a.rootly_org_id IS NOT NULL
+                    )
+                    """
+                ]
+            },
             # Add future migrations here with incrementing numbers
             # {
-            #     "name": "019_add_user_preferences",
+            #     "name": "022_add_user_preferences",
             #     "description": "Add user preferences table",
             #     "sql": ["CREATE TABLE IF NOT EXISTS user_preferences (...)"]
             # }
