@@ -1330,10 +1330,15 @@ async def handle_slack_interactions(
                     logging.info(f"Updated existing report ID {existing_report.id} for user {user_id}")
                     is_update = True
                 else:
+                    # Get user's email_domain for domain-based sharing
+                    user = db.query(User).filter(User.id == user_id).first()
+                    email_domain = user.email_domain if user else None
+
                     # Create new burnout report
                     new_report = UserBurnoutReport(
                         user_id=user_id,
                         organization_id=organization_id,
+                        email_domain=email_domain,
                         analysis_id=analysis_id,  # Optional - may be None
                         self_reported_score=self_reported_score,
                         energy_level=energy_level,
@@ -1344,7 +1349,7 @@ async def handle_slack_interactions(
                         submitted_at=datetime.utcnow()
                     )
                     db.add(new_report)
-                    logging.info(f"Created new report for user {user_id}")
+                    logging.info(f"Created new report for user {user_id} with email_domain {email_domain}")
 
                 db.commit()
 
