@@ -84,9 +84,7 @@ async def start_analysis(
     # Create analysis record
     analysis = Analysis(
         user_id=current_user.id,
-        organization_id=current_user.organization_id,
         rootly_integration_id=integration.id,
-        rootly_org_id=integration.rootly_org_id,  # Link to Rootly org being analyzed
         status="pending",
         config={
             "days_back": request.days_back,
