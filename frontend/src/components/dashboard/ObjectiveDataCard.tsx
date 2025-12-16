@@ -50,10 +50,12 @@ export function ObjectiveDataCard({
     });
   };
 
+  // Get chart mode from backend analysis data (default to 'normal')
+  const chartMode = currentAnalysis?.analysis_data?.chart_mode || 'normal';
+
   // Get the chart data
   const getChartData = () => {
     const dailyTrends = currentAnalysis?.analysis_data?.daily_trends;
-    const chartMode = currentAnalysis?.analysis_data?.chart_mode || 'normal'; // Default to 'normal'
 
     if (!dailyTrends || !Array.isArray(dailyTrends) || dailyTrends.length === 0) {
       return [];
@@ -101,7 +103,7 @@ export function ObjectiveDataCard({
   const hasData = chartData.length > 0;
 
   return (
-    <Card className="mb-6">
+    <Card className="mb-6 flex flex-col min-h-full">
       <CardHeader>
         <CardTitle>Team Objective Data</CardTitle>
         <CardDescription>
@@ -111,8 +113,8 @@ export function ObjectiveDataCard({
           }
         </CardDescription>
       </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
+      <CardContent className="flex-1 flex flex-col pb-4">
+        <div className="space-y-3 flex-1 flex flex-col">
           {/* Chart */}
           <div className="h-[300px]">
             {loadingTrends ? (
