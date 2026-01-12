@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { ChevronDown, ChevronRight, Users, Loader2 } from "lucide-react"
 import { useState } from "react"
+import Image from "next/image"
 
 interface TeamMembersListProps {
   currentAnalysis: any
@@ -147,11 +148,8 @@ export function TeamMembersList({
 
           {/* Linear - show if user has Linear mapping */}
           {member.linear_user_id && (
-            <div className="flex items-center justify-center w-6 h-6 bg-purple-50 rounded-full border border-purple-200" title="Linear">
-              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
-                <path d="M0 0h24v24H0V0z" fill="none"/>
-                <path d="M2.5 21.5l19-19M5.5 21.5l16-16M8.5 21.5l13-13M11.5 21.5l10-10M14.5 21.5l7-7M17.5 21.5l4-4" stroke="#5E6AD2" strokeWidth="1.5" strokeLinecap="round"/>
-              </svg>
+            <div className="flex items-center justify-center w-6 h-6" title="Linear">
+              <Image src="/images/linear-logo.png" alt="Linear" width={16} height={16} />
             </div>
           )}
 

@@ -96,3 +96,26 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Custom scrollbar styles for dark backgrounds */
+.scrollbar-dark {
+  scrollbar-width: thin;
+  scrollbar-color: #6b7280 #111827;
+}
+
+.scrollbar-dark::-webkit-scrollbar {
+  width: 10px;
+}
+
+.scrollbar-dark::-webkit-scrollbar-track {
+  background-color: #1f2937;
+}
+
+.scrollbar-dark::-webkit-scrollbar-thumb {
+  background-color: #6b7280;
+  border-radius: 5px;
+}
+
+.scrollbar-dark::-webkit-scrollbar-thumb:hover {
+  background-color: #9ca3af;
+}
