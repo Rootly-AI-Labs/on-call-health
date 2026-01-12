@@ -1,15 +1,7 @@
 "use client"
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { LineChart, Line, Area, AreaChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
 import { useState, useEffect, useMemo } from "react"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { TrendsCard } from "@/components/dashboard/TrendsCard"
 
 interface UserObjectiveDataCardProps {
   memberData: any
@@ -71,6 +63,26 @@ export function UserObjectiveDataCard({
       transformer: (day: any) => Math.round(day.severity_weighted_count || 0)
     }
   };
+
+  // Metric descriptions for the info tooltip
+  const METRIC_DESCRIPTIONS: any = {
+    health_score: {
+      title: "Risk Level",
+      description: "Measures this member's on-call health based on factors such as incident frequency, after-hours work and severity. Higher scores indicate higher risk of overwork."
+    },
+    incident_load: {
+      title: "Incident Count",
+      description: "Total count of incidents handled per day. Counts all incidents regardless of severity or timing."
+    },
+    after_hours: {
+      title: "After Hours Activity",
+      description: "Incidents occurring outside business hours (before 9 AM or after 5 PM) or on weekends. Timezone-aware based on this member's local time."
+    },
+    severity_weighted: {
+      title: "Workload Intensity",
+      description: "Measures workload stress by weighting incidents based on their severity level. Higher values indicate more stressful workload."
+    }
+  }
 
   // Calculate 7-day running average
   const calculate7DayRunningAverage = (scores: number[]) => {
@@ -201,195 +213,25 @@ export function UserObjectiveDataCard({
   })();
 
   const config = METRIC_CONFIG[selectedMetric];
+  const description = hasData
+    ? `Over the last ${timeRange} days, average ${
+        config.yAxisLabel.toLowerCase()
+      } was ${Math.round(stats.mean)}${
+        selectedMetric === 'health_score' ? ' points' : ''
+      }.`
+    : "No daily trend data available for this user";
 
   return (
-    <Card className="mb-6">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div className="space-y-1.5">
-            <CardTitle>User Objective Data</CardTitle>
-            <CardDescription>
-              {hasData
-                ? `Over the last ${timeRange} days, average ${
-                    config.yAxisLabel.toLowerCase()
-                  } was ${Math.round(stats.mean)}${
-                    selectedMetric === 'health_score' ? ' points' : ''
-                  }.`
-                : "No daily trend data available for this user"
-              }
-            </CardDescription>
-          </div>
-
-          {/* Dropdown Selector */}
-          <Select value={selectedMetric} onValueChange={setSelectedMetric}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="health_score">Health Score</SelectItem>
-              <SelectItem value="incident_load">Incident Load</SelectItem>
-              <SelectItem value="after_hours">After Hours</SelectItem>
-              <SelectItem value="severity_weighted">Workload Intensity</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          {/* Chart */}
-          <div className="h-[300px]">
-            {loading ? (
-              <div className="flex items-center justify-center h-full">
-                <div className="text-center">
-                  <div className="animate-spin w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full mx-auto mb-2"></div>
-                  <p className="text-sm text-neutral-500">Loading objective data...</p>
-                </div>
-              </div>
-            ) : !hasData ? (
-              <div className="flex items-center justify-center h-full">
-                <div className="text-center">
-                  <div className="w-12 h-12 bg-neutral-200 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <svg className="w-6 h-6 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                    </svg>
-                  </div>
-                  <p className="text-sm text-neutral-500 font-medium">No User Objective Data Available</p>
-                  <p className="text-xs text-neutral-500 mt-1">This user had no incident involvement during the analysis period</p>
-                </div>
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart
-                  data={processedChartData}
-                  margin={{
-                    top: 10,
-                    right: 10,
-                    left: selectedMetric === 'health_score' ? -20 : 20,
-                    bottom: 0,
-                  }}
-                >
-                  <defs>
-                    <linearGradient id="purpleGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#7C63D6" stopOpacity={0.4} />
-                      <stop offset="100%" stopColor="#7C63D6" stopOpacity={0.01} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis
-                    dataKey="date"
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fontSize: 10, fill: '#6B7280' }}
-                    angle={-45}
-                    textAnchor="end"
-                    height={50}
-                    interval={Math.floor(processedChartData.length / 7) || 0}
-                  />
-                  <YAxis
-                    hide={selectedMetric === 'health_score'}
-                    label={
-                      selectedMetric !== 'health_score'
-                        ? {
-                            value: config.yAxisLabel,
-                            angle: -90,
-                            position: 'insideLeft',
-                            style: { textAnchor: 'middle', fontSize: '12px', fill: '#6b7280' },
-                          }
-                        : undefined
-                    }
-                  />
-                  <Tooltip
-                    content={({ payload }) => {
-                      if (!payload || payload.length === 0) return null;
-
-                      const data = payload[0]?.payload;
-                      const metricValue = data?.[config.dataKey] || 0;
-                      const meanScore = data?.meanScore || 0;
-
-                      const percentageChange = meanScore !== 0
-                        ? ((metricValue - meanScore) / meanScore) * 100
-                        : 0;
-
-                      // For health_score: higher = better (green), lower = worse (red)
-                      // For other metrics: lower = better (green), higher = worse (red)
-                      const isPositive = selectedMetric === 'health_score'
-                        ? percentageChange >= 0
-                        : percentageChange <= 0;
-
-                      return (
-                        <div className="bg-neutral-900 p-3 border border-neutral-700 rounded-lg shadow-lg">
-                          <p className="text-sm font-medium text-neutral-300 mb-2">
-                            {data?.date}
-                          </p>
-                          <p className={`text-base font-bold mb-2 ${
-                            isPositive ? 'text-green-400' : 'text-red-400'
-                          }`}>
-                            {percentageChange >= 0 ? '↑' : '↓'} {Math.abs(percentageChange).toFixed(1)}%
-                          </p>
-                          <p className="text-sm text-neutral-300">
-                            {config.label}: <span className="font-semibold">{metricValue}</span>
-                          </p>
-                          <p className="text-xs text-neutral-400 mt-1">
-                            Mean: {meanScore}
-                          </p>
-                          {data?.incidentCount > 0 && (
-                            <p className="text-xs text-neutral-400 mt-1">
-                              {data.incidentCount} incident{data.incidentCount !== 1 ? 's' : ''}
-                            </p>
-                          )}
-                        </div>
-                      );
-                    }}
-                  />
-                  {/* Dynamic Metric Area with Gradient */}
-                  <Area
-                    type="monotone"
-                    dataKey={config.dataKey}
-                    stroke={config.color}
-                    strokeWidth={2}
-                    fill="url(#purpleGradient)"
-                    dot={false}
-                    isAnimationActive={true}
-                    name={config.label}
-                    connectNulls={true}
-                  />
-                  {/* Mean Score Line */}
-                  {config.showMeanLine && (
-                    <Line
-                      type="monotone"
-                      dataKey="meanScore"
-                      stroke="#9C84E8"
-                      strokeWidth={2}
-                      strokeDasharray="5 5"
-                      dot={false}
-                      isAnimationActive={false}
-                      name={`${timeRange}-Day Mean`}
-                      connectNulls={true}
-                    />
-                  )}
-                </AreaChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-
-          {/* Legend */}
-          <div className="mt-4 flex items-center justify-start space-x-6 text-sm text-neutral-700">
-            <div className="flex items-center space-x-2">
-              <div
-                className="w-3 h-3 rounded"
-                style={{ backgroundColor: config.color }}
-              ></div>
-              <span>{config.label}</span>
-            </div>
-            {config.showMeanLine && (
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-0.5 bg-purple-500 border-dashed"></div>
-                <span>Mean</span>
-              </div>
-            )}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+    <TrendsCard
+      title="User Trends"
+      description={description}
+      chartData={processedChartData}
+      loading={loading}
+      selectedMetric={selectedMetric}
+      onMetricChange={setSelectedMetric}
+      metricConfig={METRIC_CONFIG}
+      metricDescriptions={METRIC_DESCRIPTIONS}
+      timeRange={Number(timeRange)}
+    />
   )
 }
