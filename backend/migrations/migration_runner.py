@@ -107,6 +107,39 @@ class MigrationRunner:
             self.db.rollback()
             return False
 
+    def load_sql_file(self, filename: str) -> List[str]:
+        """Load SQL commands from a .sql file in the migrations directory"""
+        import os
+        filepath = os.path.join(os.path.dirname(__file__), filename)
+        try:
+            with open(filepath, 'r') as f:
+                content = f.read()
+
+                # Remove comment lines starting with --
+                lines = []
+                for line in content.split('\n'):
+                    # Remove inline comments but preserve strings
+                    stripped = line.split('--')[0].strip() if not "'" in line else line.strip()
+                    if stripped and not line.strip().startswith('--'):
+                        lines.append(stripped)
+
+                # Join all lines and split by semicolon
+                full_content = '\n'.join(lines)
+                commands = []
+
+                for statement in full_content.split(';'):
+                    stmt = statement.strip()
+                    if stmt and stmt.upper() not in ('BEGIN', 'COMMIT', 'BEGIN;', 'COMMIT;'):
+                        commands.append(stmt + ';')
+
+                return commands
+        except FileNotFoundError:
+            logger.warning(f"⚠️  SQL file not found: {filepath}")
+            return []
+        except Exception as e:
+            logger.error(f"❌ Failed to load SQL file {filename}: {e}")
+            return []
+
     def run_all_migrations(self):
         """Run all pending migrations in order"""
         logger.info("🚀 Starting migration process...")
@@ -801,26 +834,36 @@ class MigrationRunner:
             },
             {
                 "name": "024_add_survey_frequency_options",
-                "description": "Add frequency_type and day_of_week to survey_schedules",
+                "description": "Add survey configuration columns to survey_schedules",
                 "sql": [
                     """
-                    -- Add frequency_type column to replace send_weekdays_only with more options
+                    -- Add send_reminder column if missing
                     ALTER TABLE survey_schedules
-                    ADD COLUMN IF NOT EXISTS frequency_type VARCHAR(20) DEFAULT 'weekday'
+                    ADD COLUMN IF NOT EXISTS send_reminder BOOLEAN DEFAULT TRUE
                     """,
                     """
-                    -- Add day_of_week column for weekly schedules (0=Monday, 6=Sunday)
+                    -- Add reminder_time column if missing
                     ALTER TABLE survey_schedules
-                    ADD COLUMN IF NOT EXISTS day_of_week INTEGER
+                    ADD COLUMN IF NOT EXISTS reminder_time TIME
                     """,
                     """
-                    -- Migrate existing data: convert send_weekdays_only to frequency_type
-                    UPDATE survey_schedules
-                    SET frequency_type = CASE
-                        WHEN send_weekdays_only = true THEN 'weekday'
-                        ELSE 'daily'
-                    END
-                    WHERE frequency_type = 'weekday'  -- Only update if still default
+                    -- Add reminder_hours_after column if missing
+                    ALTER TABLE survey_schedules
+                    ADD COLUMN IF NOT EXISTS reminder_hours_after INTEGER DEFAULT 5
+                    """,
+                    """
+                    -- Add CHECK constraint for frequency_type (idempotent)
+                    DO $$
+                    BEGIN
+                        IF NOT EXISTS (
+                            SELECT 1 FROM pg_constraint
+                            WHERE conname = 'check_frequency_type'
+                        ) THEN
+                            ALTER TABLE survey_schedules
+                            ADD CONSTRAINT check_frequency_type
+                            CHECK (frequency_type IN ('daily', 'weekday', 'weekly'));
+                        END IF;
+                    END $$
                     """,
                     """
                     -- Add CHECK constraint for frequency_type (idempotent)
@@ -851,8 +894,30 @@ class MigrationRunner:
                     END $$
                     """,
                     """
-                    -- Keep send_weekdays_only column for backwards compatibility (don't drop yet)
-                    -- Will be marked as deprecated in API but still functional
+                    -- Add CHECK constraint for frequency_type (with existence check)
+                    DO $$
+                    BEGIN
+                        IF NOT EXISTS (
+                            SELECT 1 FROM pg_constraint WHERE conname = 'check_frequency_type'
+                        ) THEN
+                            ALTER TABLE survey_schedules
+                            ADD CONSTRAINT check_frequency_type
+                            CHECK (frequency_type IN ('daily', 'weekday', 'weekly'));
+                        END IF;
+                    END $$;
+                    """,
+                    """
+                    -- Add CHECK constraint for day_of_week (with existence check)
+                    DO $$
+                    BEGIN
+                        IF NOT EXISTS (
+                            SELECT 1 FROM pg_constraint WHERE conname = 'check_day_of_week'
+                        ) THEN
+                            ALTER TABLE survey_schedules
+                            ADD CONSTRAINT check_day_of_week
+                            CHECK (day_of_week IS NULL OR (day_of_week >= 0 AND day_of_week <= 6));
+                        END IF;
+                    END $$;
                     """
                 ]
             },
@@ -877,11 +942,94 @@ class MigrationRunner:
                             RAISE NOTICE 'uq_github_username constraint does not exist, skipping drop';
                         END IF;
                     END $$;
+                    """
+                ]
+            },
+            {
+                "name": "026_make_user_correlations_user_id_nullable",
+                "description": "Make user_id nullable to support org-scoped team roster data",
+                "sql": [
+                    """
+                    -- Make user_id nullable for organization-scoped team roster data
+                    -- This allows storing team members from integrations (PagerDuty, Jira, Linear)
+                    -- who don't have user accounts yet (org-scoped data)
+                    ALTER TABLE user_correlations
+                    ALTER COLUMN user_id DROP NOT NULL;
                     """,
                     """
-                    -- The regular index on github_username remains (created in migration 013)
-                    -- This index provides performance benefits without enforcing uniqueness
-                    -- allowing multiple records with the same github_username (one per email)
+                    -- Drop problematic unique constraints on platform IDs (if they exist)
+                    -- These prevent multiple users from having the same platform ID
+                    DO $$
+                    BEGIN
+                        -- Drop jira_account_id unique constraint
+                        IF EXISTS (
+                            SELECT 1 FROM pg_constraint
+                            WHERE conname = 'uq_jira_account_id'
+                            AND conrelid = 'user_correlations'::regclass
+                        ) THEN
+                            ALTER TABLE user_correlations DROP CONSTRAINT uq_jira_account_id;
+                            RAISE NOTICE 'Dropped uq_jira_account_id constraint';
+                        END IF;
+
+                        -- Drop linear_user_id unique constraint
+                        IF EXISTS (
+                            SELECT 1 FROM pg_constraint
+                            WHERE conname = 'uq_linear_user_id'
+                            AND conrelid = 'user_correlations'::regclass
+                        ) THEN
+                            ALTER TABLE user_correlations DROP CONSTRAINT uq_linear_user_id;
+                            RAISE NOTICE 'Dropped uq_linear_user_id constraint';
+                        END IF;
+                    END $$;
+                    """,
+                    """
+                    -- Create unique constraint for org-scoped data (where user_id is NULL)
+                    -- Ensures one record per email per organization for team roster data
+                    CREATE UNIQUE INDEX IF NOT EXISTS uq_user_correlations_org_email_null_user
+                    ON user_correlations (organization_id, email)
+                    WHERE user_id IS NULL;
+                    """,
+                    """
+                    -- Add index for better performance on org-scoped queries
+                    CREATE INDEX IF NOT EXISTS idx_user_correlations_org_null_user
+                    ON user_correlations (organization_id)
+                    WHERE user_id IS NULL;
+                    """,
+                    """
+                    -- Add comment explaining the dual-mode system
+                    COMMENT ON COLUMN user_correlations.user_id IS 'User ID for registered users, NULL for org-scoped team roster data from integrations';
+                    """
+                ]
+            },
+            {
+                "name": "027_rename_survey_columns",
+                "description": "Rename user_burnout_reports columns from self_reported_score/energy_level to feeling_score/workload_score",
+                "sql": [
+                    """
+                    ALTER TABLE user_burnout_reports
+                    RENAME COLUMN self_reported_score TO workload_score
+                    """,
+                    """
+                    ALTER TABLE user_burnout_reports
+                    RENAME COLUMN energy_level TO feeling_score
+                    """,
+                    """
+                    ALTER TABLE user_burnout_reports
+                    DROP CONSTRAINT IF EXISTS user_burnout_reports_self_reported_score_check
+                    """,
+                    """
+                    ALTER TABLE user_burnout_reports
+                    DROP CONSTRAINT IF EXISTS user_burnout_reports_energy_level_check
+                    """,
+                    """
+                    ALTER TABLE user_burnout_reports
+                    ADD CONSTRAINT user_burnout_reports_feeling_score_check
+                    CHECK (feeling_score >= 1 AND feeling_score <= 5)
+                    """,
+                    """
+                    ALTER TABLE user_burnout_reports
+                    ADD CONSTRAINT user_burnout_reports_workload_score_check
+                    CHECK (workload_score >= 1 AND workload_score <= 5)
                     """
                 ]
             },
@@ -934,6 +1082,36 @@ class MigrationRunner:
                 ]
             },
 
+                "name": "028_simplify_roles",
+                "description": "Simplify role system from 5 roles to 3 roles",
+                "sql_file": "2025_01_17_simplify_roles.sql"
+            },
+            {
+                "name": "029_create_organizations_for_existing_users",
+                "description": "Create organizations for existing users based on email domains",
+                "sql_file": "2025_01_18_create_organizations_for_existing_users.sql"
+            },
+            {
+                "name": "030_migrate_user_role_to_member",
+                "description": "Convert legacy 'user' role to 'member'",
+                "sql_file": "2025_01_30_migrate_user_role_to_member.sql"
+            },
+            {
+                "name": "031_allow_null_user_id_in_integration_mappings",
+                "description": "Make user_id nullable in integration_mappings and add organization_id for org-scoped users",
+                "sql_file": "2026_01_02_allow_null_user_id_in_integration_mappings.sql"
+            },
+            {
+                "name": "032_remove_communication_patterns_toggle",
+                "description": "Remove communication_patterns_enabled column from slack_workspace_mappings",
+                "sql_file": "2026_01_06_remove_communication_patterns_toggle.sql"
+            },
+
+            # {
+            #     "name": "032_add_user_preferences",
+            #     "description": "Add user preferences table",
+            #     "sql": ["CREATE TABLE IF NOT EXISTS user_preferences (...)"]
+            # }
             # Add future migrations here with incrementing numbers
         ]
 
@@ -943,7 +1121,12 @@ class MigrationRunner:
         for migration in migrations:
             name = migration["name"]
             description = migration["description"]
-            sql_commands = migration["sql"]
+
+            # Handle both inline SQL and SQL files
+            if "sql_file" in migration:
+                sql_commands = self.load_sql_file(migration["sql_file"])
+            else:
+                sql_commands = migration.get("sql", [])
 
             logger.info(f"📋 Migration: {description}")
 

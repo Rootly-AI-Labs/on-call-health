@@ -10,12 +10,14 @@ interface GitHubConnectedCardProps {
   integration: GitHubIntegration
   onDisconnect: () => void
   onTest: () => void
+  isLoading?: boolean
 }
 
 export function GitHubConnectedCard({
   integration,
   onDisconnect,
-  onTest
+  onTest,
+  isLoading = false
 }: GitHubConnectedCardProps) {
   const [orgMemberCount, setOrgMemberCount] = useState<number | null>(null)
   const [loadingMembers, setLoadingMembers] = useState(false)
