@@ -866,6 +866,20 @@ class MigrationRunner:
                     END $$
                     """,
                     """
+                    -- Add CHECK constraint for frequency_type (idempotent)
+                    DO $$
+                    BEGIN
+                        IF NOT EXISTS (
+                            SELECT 1 FROM pg_constraint
+                            WHERE conname = 'check_frequency_type'
+                        ) THEN
+                            ALTER TABLE survey_schedules
+                            ADD CONSTRAINT check_frequency_type
+                            CHECK (frequency_type IN ('daily', 'weekday', 'weekly'));
+                        END IF;
+                    END $$
+                    """,
+                    """
                     -- Add CHECK constraint for day_of_week (idempotent)
                     DO $$
                     BEGIN
@@ -878,16 +892,6 @@ class MigrationRunner:
                             CHECK (day_of_week IS NULL OR (day_of_week >= 0 AND day_of_week <= 6));
                         END IF;
                     END $$
-                    """,
-                    """
-                    -- Add frequency_type column to replace send_weekdays_only with more options
-                    ALTER TABLE survey_schedules
-                    ADD COLUMN IF NOT EXISTS frequency_type VARCHAR(20) DEFAULT 'weekday'
-                    """,
-                    """
-                    -- Add day_of_week column for weekly schedules (0=Monday, 6=Sunday)
-                    ALTER TABLE survey_schedules
-                    ADD COLUMN IF NOT EXISTS day_of_week INTEGER
                     """,
                     """
                     -- Add CHECK constraint for frequency_type (with existence check)
@@ -994,6 +998,54 @@ class MigrationRunner:
                     """
                     -- Add comment explaining the dual-mode system
                     COMMENT ON COLUMN user_correlations.user_id IS 'User ID for registered users, NULL for org-scoped team roster data from integrations';
+                    """
+                ]
+            },
+            {
+                "name": "027_rename_survey_columns",
+                "description": "Rename user_burnout_reports columns from self_reported_score/energy_level to feeling_score/workload_score",
+                "sql": [
+                    """
+                    ALTER TABLE user_burnout_reports
+                    RENAME COLUMN self_reported_score TO workload_score
+                    """,
+                    """
+                    ALTER TABLE user_burnout_reports
+                    RENAME COLUMN energy_level TO feeling_score
+                    """,
+                    """
+                    ALTER TABLE user_burnout_reports
+                    DROP CONSTRAINT IF EXISTS user_burnout_reports_self_reported_score_check
+                    """,
+                    """
+                    ALTER TABLE user_burnout_reports
+                    DROP CONSTRAINT IF EXISTS user_burnout_reports_energy_level_check
+                    """,
+                    """
+                    ALTER TABLE user_burnout_reports
+                    ADD CONSTRAINT user_burnout_reports_feeling_score_check
+                    CHECK (feeling_score >= 1 AND feeling_score <= 5)
+                    """,
+                    """
+                    ALTER TABLE user_burnout_reports
+                    ADD CONSTRAINT user_burnout_reports_workload_score_check
+                    CHECK (workload_score >= 1 AND workload_score <= 5)
+                    """
+                ]
+            },
+            {
+                "name": "026_add_organization_id_to_integration_mappings",
+                "description": "Add organization_id column to integration_mappings for org-scoped mappings",
+                "sql": [
+                    """
+                    -- Add organization_id column to integration_mappings
+                    ALTER TABLE integration_mappings
+                    ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id)
+                    """,
+                    """
+                    -- Add index for faster lookups by organization
+                    CREATE INDEX IF NOT EXISTS idx_integration_mappings_org_id
+                    ON integration_mappings(organization_id)
                     """
                 ]
             },

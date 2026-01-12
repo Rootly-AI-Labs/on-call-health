@@ -213,6 +213,11 @@ class UnifiedBurnoutAnalyzer:
         # Check if using mock data (define at function scope)
         use_mock_data = os.getenv("USE_MOCK_DATA", "false").lower() == "true"
 
+        # ========== DEBUG CHECKPOINTS ==========
+        logger.error(f"🚀 CHECKPOINT 0: Analysis STARTING at {analysis_start_time.isoformat()}")
+        logger.error(f"🚀 CHECKPOINT 0: analysis_id={analysis_id}, time_range={time_range_days}d, platform={self.platform}")
+        logger.error(f"🚀 CHECKPOINT 0: features={self.features}")
+
         logger.info(f"BURNOUT ANALYSIS START: Beginning {time_range_days}-day burnout analysis at {analysis_start_time.isoformat()}")
 
         # IMMEDIATE DEBUG - This should show up in Railway logs RIGHT AWAY
@@ -238,6 +243,7 @@ class UnifiedBurnoutAnalyzer:
 
             data_fetch_duration = (datetime.now() - data_fetch_start).total_seconds()
             logger.info(f"BURNOUT ANALYSIS: Step 1 completed in {data_fetch_duration:.2f}s - Data type: {type(data)}, is_none: {data is None}")
+            logger.error(f"✅ CHECKPOINT 1: Data fetch DONE in {data_fetch_duration:.2f}s - users={len(data.get('users', []))}, incidents={len(data.get('incidents', []))}")
             
             # Check if data was successfully fetched (data should never be None due to fallbacks)
             if data is None:
@@ -490,6 +496,7 @@ class UnifiedBurnoutAnalyzer:
                     logger.warning(f"   - Check if {self.platform} data structure matches expectation")
                 
                 if self.features['github']:
+                    logger.error(f"⏳ CHECKPOINT 2a: Starting GitHub data collection for {len(team_emails)} users")
                     logger.info(f"UNIFIED ANALYZER: Collecting GitHub data for {len(team_emails)} team members")
                     logger.info(f"Team emails: {team_emails[:5]}...")  # Log first 5 emails
                     try:
@@ -520,11 +527,15 @@ class UnifiedBurnoutAnalyzer:
                         # except Exception as e:
                         #     logger.error(f"Failed to write GitHub raw data to file: {e}")
                     except Exception as e:
+                        logger.error(f"❌ CHECKPOINT 2a: GitHub data collection FAILED: {e}")
                         logger.error(f"GitHub data collection failed: {e}")
+                    logger.error(f"✅ CHECKPOINT 2a: GitHub data collection DONE - {len(github_data)} users")
                 else:
+                    logger.error(f"⏭️ CHECKPOINT 2a: GitHub SKIPPED (disabled)")
                     logger.info(f"UNIFIED ANALYZER: GitHub integration disabled - skipping")
                 
                 if self.features['slack']:
+                    logger.error(f"⏳ CHECKPOINT 2b: Starting Slack data collection for {len(team_names)} users")
                     logger.info(f"Collecting Slack data for {len(team_names)} team members using names")
                     logger.info(f"Team names: {team_names[:5]}...")  # Log first 5 names
                     try:
@@ -545,9 +556,14 @@ class UnifiedBurnoutAnalyzer:
                         # except Exception as e:
                         #     logger.error(f"Failed to write Slack raw data to file: {e}")
                     except Exception as e:
+                        logger.error(f"❌ CHECKPOINT 2b: Slack data collection FAILED: {e}")
                         logger.error(f"Slack data collection failed: {e}")
+                    logger.error(f"✅ CHECKPOINT 2b: Slack data collection DONE - {len(slack_data)} users")
+                else:
+                    logger.error(f"⏭️ CHECKPOINT 2b: Slack SKIPPED (disabled)")
 
                 if self.features['jira']:
+                    logger.error(f"⏳ CHECKPOINT 2c: Starting Jira data collection")
                     logger.info(f"UNIFIED ANALYZER: Collecting Jira data for {len(team_emails)} team members")
                     logger.info(f"Team emails: {team_emails[:5]}...")  # Log first 5 emails
                     try:
@@ -652,12 +668,18 @@ class UnifiedBurnoutAnalyzer:
                                 db_session.close()
 
                     except Exception as e:
+                        logger.error(f"❌ CHECKPOINT 2c: Jira data collection FAILED: {e}")
                         logger.error(f"Jira data collection failed: {e}")
+                    logger.error(f"✅ CHECKPOINT 2c: Jira data collection DONE - {len(jira_data)} users")
                 else:
+                    logger.error(f"⏭️ CHECKPOINT 2c: Jira SKIPPED (disabled)")
                     logger.info(f"UNIFIED ANALYZER: Jira integration disabled - skipping")
+
+            logger.error(f"✅ CHECKPOINT 2: All data collection COMPLETE")
 
             # Analyze team burnout
             try:
+                logger.error(f"⏳ CHECKPOINT 3: Starting team data analysis")
                 team_analysis_start = datetime.now()
                 logger.info(f"BURNOUT ANALYSIS: Step 3 - Analyzing team data for {time_range_days}-day analysis")
                 logger.info(f"BURNOUT ANALYSIS: Team analysis inputs - {len(users)} users, {len(incidents)} incidents")
@@ -676,6 +698,7 @@ class UnifiedBurnoutAnalyzer:
                 # Log team analysis results
                 members_analyzed = len(team_analysis.get("members", [])) if team_analysis else 0
                 logger.info(f"BURNOUT ANALYSIS: Team analysis generated results for {members_analyzed} members")
+                logger.error(f"✅ CHECKPOINT 3: Team analysis DONE in {team_analysis_duration:.2f}s - {members_analyzed} members")
                 
             except Exception as e:
                 team_analysis_duration = (datetime.now() - team_analysis_start).total_seconds() if 'team_analysis_start' in locals() else 0
@@ -820,6 +843,7 @@ class UnifiedBurnoutAnalyzer:
                 logger.info(f"🔍 POST_JIRA_CHECK: Member {member.get('user_email')} - github_activity: commits={github_activity.get('commits_count', 0)}, prs={github_activity.get('pull_requests_count', 0)}")
 
             # Calculate overall team health AFTER GitHub burnout adjustment
+            logger.error(f"⏳ CHECKPOINT 4: Starting health calculation")
             health_calc_start = datetime.now()
             logger.info(f"BURNOUT ANALYSIS: Step 4 - Calculating team health for {time_range_days}-day analysis")
             team_health = self._calculate_team_health(team_analysis["members"])
@@ -834,12 +858,18 @@ class UnifiedBurnoutAnalyzer:
                 health_calc_duration = (datetime.now() - health_calc_start).total_seconds()
                 logger.info(f"BURNOUT ANALYSIS: Step 4 completed in {health_calc_duration:.3f}s - Health score: {team_health.get('overall_score', 'N/A')}")
             
+            logger.error(f"✅ CHECKPOINT 4: Health calculation DONE - score={team_health.get('overall_score', 'N/A')}")
+
             # Generate insights and recommendations
+            logger.error(f"⏳ CHECKPOINT 5: Starting insights generation")
             insights_start = datetime.now()
             logger.info(f"BURNOUT ANALYSIS: Step 5 - Generating insights and recommendations")
             insights = self._generate_insights(team_analysis, team_health)
             insights_duration = (datetime.now() - insights_start).total_seconds()
             logger.info(f"BURNOUT ANALYSIS: Step 5 completed in {insights_duration:.3f}s - Generated {len(insights)} insights")
+            logger.error(f"✅ CHECKPOINT 5: Insights generation DONE - {len(insights)} insights")
+
+            logger.error(f"⏳ CHECKPOINT 6: Building final result object")
 
             # Calculate period summary for consistent UI display
             team_overall_score = team_health.get("overall_score", 0.0)  # This is already health scale 0-10
@@ -1036,14 +1066,17 @@ class UnifiedBurnoutAnalyzer:
                 logger.warning(f"Error logging success metrics: {metrics_error}")
             
             # Debug: Log final result structure
-                
+            total_analysis_time = (datetime.now() - analysis_start_time).total_seconds()
+            logger.error(f"🏁 CHECKPOINT 7: Analysis COMPLETE - Total time: {total_analysis_time:.2f}s")
+            logger.error(f"🏁 CHECKPOINT 7: Result has {len(result.get('team_members', []))} members, score={result.get('overall_score', 'N/A')}")
+
             return result
             
         except Exception as e:
             import traceback
             total_analysis_duration = (datetime.now() - analysis_start_time).total_seconds() if 'analysis_start_time' in locals() else 0
-            logger.error(f"BURNOUT ANALYSIS FAILED: {time_range_days}-day analysis failed after {total_analysis_duration:.2f}s: {e}")
-            logger.error(f"Full traceback:\n{traceback.format_exc()}")
+            logger.error(f"💥 CHECKPOINT FAIL: Analysis EXCEPTION after {total_analysis_duration:.2f}s: {e}")
+            logger.error(f"💥 CHECKPOINT FAIL: Full traceback:\n{traceback.format_exc()}")
             raise
     
     async def _fetch_analysis_data(self, days_back: int) -> Dict[str, Any]:
@@ -1554,9 +1587,7 @@ class UnifiedBurnoutAnalyzer:
                 "factors": {
                     "workload": 0,
                     "after_hours": 0,
-                    "weekend_work": 0,
-                    "incident_load": 0,
-                    "response_time": 0
+                    "incident_load": 0
                 },
                 "burnout_dimensions": {
                     "personal_burnout": 0,
@@ -2777,19 +2808,9 @@ class UnifiedBurnoutAnalyzer:
         after_hours_pct = float(after_hours_pct) if after_hours_pct is not None else 0.0
         after_hours = min(10, after_hours_pct * 100 * 0.1)
 
-        # Weekend work factor - ensure numeric value
-        # Convert decimal percentage (0.0-1.0) to 0-10 scale
-        weekend_pct = metrics.get("weekend_percentage", 0)
-        weekend_pct = float(weekend_pct) if weekend_pct is not None else 0.0
-        weekend_work = min(10, weekend_pct * 100 * 0.1)
-        
         # REMOVED incident_load factor - was duplicate of workload factor
         # Both were calculated from incidents_per_week, causing double-counting
-        
-        # Response time factor - based on actual response times (backward compatibility)
-        response_time_mins = metrics.get("avg_response_time_minutes", 0)
-        response_time_mins = float(response_time_mins) if response_time_mins is not None else 0.0
-        response_time = min(10, response_time_mins / 6) if response_time_mins and response_time_mins >= 0 else 0.0
+        # REMOVED weekend_work and response_time factors - after_hours already includes weekend work
 
         # Incident load factor - severity-weighted total burden
         # Uses actual severity weights: Critical=4, High=3, Medium=2, Low=1
@@ -2804,8 +2825,6 @@ class UnifiedBurnoutAnalyzer:
         factors = {
             "workload": workload,
             "after_hours": after_hours,
-            "weekend_work": weekend_work,
-            "response_time": response_time,
             "incident_load": incident_load
         }
         
@@ -5450,8 +5469,6 @@ class UnifiedBurnoutAnalyzer:
                 factors = {
                     "workload": min((incident_count or 0) / 5.0 * 10, 10),  # Scale incidents to 0-10
                     "after_hours": ((after_hours_count or 0) / max((incident_count or 1), 1)) * 10 if (incident_count or 0) > 0 else 0,
-                    "response_time": member_factors.get("response_time", 0) or 0,
-                    "weekend_work": member_factors.get("weekend_work", 0) or 0,
                     "severity_pressure": ((high_severity_count or 0) / max((incident_count or 1), 1)) * 10 if (incident_count or 0) > 0 else 0
                 }
             else:
@@ -5459,8 +5476,6 @@ class UnifiedBurnoutAnalyzer:
                 factors = {
                     "workload": min((incident_count or 0) / 3.0 * 10, 10),
                     "after_hours": ((after_hours_count or 0) / max((incident_count or 1), 1)) * 10 if (incident_count or 0) > 0 else 0,
-                    "response_time": 5.0,  # Default moderate
-                    "weekend_work": 0,     # Can't determine from daily data
                     "severity_pressure": ((high_severity_count or 0) / max((incident_count or 1), 1)) * 10 if (incident_count or 0) > 0 else 0
                 }
             

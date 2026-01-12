@@ -131,7 +131,7 @@ export default function LandingPage() {
               <Button
                 size="lg"
                 variant="outline"
-                className="w-full rounded-full sm:w-auto border-slate-300 px-8 py-4 text-lg hover:bg-slate-50 bg-transparent"
+                className="w-full rounded-full sm:w-auto border-white text-white px-8 py-4 text-lg hover:bg-white/10 bg-transparent"
                 onClick={handleGoogleLogin}
                 disabled={isLoading === 'google'}
               >
@@ -266,7 +266,7 @@ export default function LandingPage() {
             <div className="py-10">
               <h2 className="text-2xl md:text-3xl text-slate-900 mb-4">Overload signals, backed by data.</h2>
               <p className="mb-2">
-                Our analysis combines workload pressure, after-hours activity, response time patterns, and communication sentiment to give a holistic view of burnout risk. 
+                Our analysis combines workload pressure, after-hours activity, response time patterns, and communication sentiment to give a holistic view of overwork risk. 
               </p>
               <p>
                 The system adapts to the tools you connect, delivering the most accurate insights possible.
