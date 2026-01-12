@@ -824,10 +824,10 @@ export function MemberDetailModal({
                           <div className="space-y-6">
                             {/* Dimensional Breakdown */}
                             {memberData.ocb_breakdown && (
-                              <div className="space-y-4">
+                              <div className="space-y-1">
                                 {/* Personal Burnout */}
-                                <div className="rounded-lg p-4">
-                                  <div className="flex items-center justify-between mb-3">
+                                <div className="rounded-lg p-2">
+                                  <div className="flex items-center justify-between mb-1">
                                     <span></span>
                                     {(() => {
                                       const score = memberData.ocb_breakdown.personal ?? 0;
@@ -873,8 +873,8 @@ export function MemberDetailModal({
                                 </div>
 
                                 {/* Work-Related Burnout */}
-                                <div className="rounded-lg p-4">
-                                  <div className="flex items-center justify-between mb-3">
+                                <div className="rounded-lg p-2">
+                                  <div className="flex items-center justify-between mb-1">
                                     <span></span>
                                     {(() => {
                                       const score = memberData.ocb_breakdown.work_related ?? 0;
