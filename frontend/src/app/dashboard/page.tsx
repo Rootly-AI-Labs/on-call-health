@@ -59,6 +59,7 @@ import { AnalysisProgressSection } from "@/components/dashboard/AnalysisProgress
 import { TeamMembersList } from "@/components/dashboard/TeamMembersList"
 import { HealthTrendsChart } from "@/components/dashboard/HealthTrendsChart"
 import { ObjectiveDataCard } from "@/components/dashboard/ObjectiveDataCard"
+import { RiskFactorsCard } from "@/components/dashboard/RiskFactorsCard"
 import { MemberDetailModal } from "@/components/dashboard/MemberDetailModal"
 import { GitHubCommitsTimeline } from "@/components/dashboard/charts/GitHubCommitsTimeline"
 import GitHubAllMetricsPopup from "@/components/dashboard/GitHubAllMetricsPopup"
@@ -269,9 +270,9 @@ function DashboardContent() {
           className={`${sidebarCollapsed ? "w-16" : "w-60"} bg-neutral-900 text-white transition-all duration-300 flex flex-col overflow-hidden`}
         >
         {/* Navigation */}
-        <div className={`flex-1 flex flex-col ${sidebarCollapsed ? 'p-2' : 'p-4'} space-y-2`}>
+        <div className={`flex-1 flex flex-col min-h-0 ${sidebarCollapsed ? 'p-2' : 'p-4'} space-y-2`}>
           {!sidebarCollapsed ? (
-            <div className="flex-1 space-y-2">
+            <div className="flex-1 space-y-2 min-h-0 flex flex-col">
               <Button
                 onClick={startAnalysis}
                 disabled={analysisRunning}
@@ -281,11 +282,11 @@ function DashboardContent() {
                 New Analysis
               </Button>
 
-            <div className="space-y-1 flex-1 flex flex-col">
+            <div className="space-y-1 flex-1 flex flex-col min-h-0">
               {!sidebarCollapsed && previousAnalyses.length > 0 && (
                 <p className="text-sm text-neutral-500 uppercase tracking-wide px-2 py-1 mt-4">Recent</p>
               )}
-              <div className="flex-1 overflow-y-auto relative">
+              <div className={`flex-1 relative scrollbar-dark pr-1 ${previousAnalyses.length > 12 ? 'overflow-y-scroll' : 'overflow-y-auto'}`}>
                 {loadingAnalyses && previousAnalyses.length === 0 ? (
                   // Show loading state for analyses
                   <div className="flex items-center justify-center py-8">
@@ -1075,93 +1076,37 @@ function DashboardContent() {
 
               {/* Burnout Factors Section */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                {/* Radar Chart */}
-                <Card>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle>Team Risk Factors</CardTitle>
-                      {highRiskFactors.length > 0 && (
-                        <div className="flex items-center space-x-2">
-                          <AlertTriangle className="w-4 h-4 text-red-500" />
-                          <span className="text-sm font-medium text-red-600">
-                            {highRiskFactors.length} factor{highRiskFactors.length > 1 ? 's' : ''} need{highRiskFactors.length === 1 ? 's' : ''} attention
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    <CardDescription>
-                      {(() => {
-                        const hasGitHubMembers = membersWithGitHubData.length > 0;
-                        const hasIncidentMembers = membersWithIncidents.length > 0;
-                        
-                        if (hasGitHubMembers && hasIncidentMembers) {
-                          return `Holistic burnout analysis combining incident response patterns and development activity across ${allActiveMembers.length} team members`;
-                        } else if (hasGitHubMembers && !hasIncidentMembers) {
-                          return `Development-focused burnout analysis based on GitHub activity patterns from ${membersWithGitHubData.length} active developers`;
-                        } else if (!hasGitHubMembers && hasIncidentMembers) {
-                          return `Incident response analysis from ${membersWithIncidents.length} team members handling incidents`;
-                        } else {
-                          return "Team risk assessment based on available activity data";
-                        }
-                      })()}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="h-[450px] p-4">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <RadarChart data={burnoutFactors} margin={{ top: 60, right: 80, bottom: 60, left: 80 }}>
-                          <PolarGrid gridType="polygon" />
-                          <PolarAngleAxis 
-                            dataKey="factor" 
-                            tick={{ fontSize: 13, fill: '#374151', fontWeight: 500 }}
-                            className="text-sm"
-                            tickFormatter={formatRadarLabel}
-                          />
-                          <PolarRadiusAxis
-                            domain={[0, 100]}
-                            tick={false}
-                            tickCount={5}
-                            angle={90}
-                          />
-                          <Radar 
-                            dataKey="value" 
-                            stroke="#8B5CF6" 
-                            fill="#8B5CF6" 
-                            fillOpacity={0.2}
-                            strokeWidth={2}
-                            dot={{ fill: '#8B5CF6', strokeWidth: 2, r: 4 }}
-                          />
-                          <Tooltip 
-                            content={({ payload, label }) => {
-                              if (payload && payload.length > 0) {
-                                const data = payload[0].payload
-                                return (
-                                  <div className="bg-white p-3 border border-neutral-200 rounded-lg shadow-lg">
-                                    <p className="font-semibold text-neutral-900">{label}</p>
-                                    <p className="text-purple-700">Score: {Math.round(data.value)}/100</p>
-                                    <p className="text-xs text-neutral-500 mt-1">
-                                      {data.value < 30 ? 'Good' : 
-                                       data.value < 50 ? 'Fair' : 
-                                       data.value < 70 ? 'Poor' : 'Critical'}
-                                    </p>
-                                  </div>
-                                )
-                              }
-                              return null
-                            }}
-                          />
-                        </RadarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </CardContent>
-                </Card>
+                {/* Risk Factors Radar Chart */}
+                {burnoutFactors.length > 0 && (
+                  <RiskFactorsCard
+                    title="Team Risk Factors"
+                    description={(() => {
+                      const hasGitHubMembers = membersWithGitHubData.length > 0;
+                      const hasIncidentMembers = membersWithIncidents.length > 0;
+
+                      if (hasGitHubMembers && hasIncidentMembers) {
+                        return `Holistic burnout analysis combining incident response patterns and development activity across ${allActiveMembers.length} team members`;
+                      } else if (hasGitHubMembers && !hasIncidentMembers) {
+                        return `Development-focused burnout analysis based on GitHub activity patterns from ${membersWithGitHubData.length} active developers`;
+                      } else if (!hasGitHubMembers && hasIncidentMembers) {
+                        return `Incident response analysis from ${membersWithIncidents.length} team members handling incidents`;
+                      } else {
+                        return "Team risk assessment based on available activity data";
+                      }
+                    })()}
+                    factorsData={burnoutFactors}
+                    showAlert={highRiskFactors.length > 0}
+                    alertCount={highRiskFactors.length}
+                    domain={[0, 100]}
+                  />
+                )}
                 
                 {/* Risk Factors Bar Chart - Always show if we have any factors */}
                 {burnoutFactors.length > 0 && (
-                  <Card>
+                  <Card className="h-fit">
                     <CardHeader>
                       <div className="flex items-center justify-between">
-                        <div>
+                        <div className="space-y-1.5">
                           <CardTitle className="flex items-center space-x-2">
                             {highRiskFactors.length > 0 ? (
                               <>
@@ -1188,7 +1133,7 @@ function DashboardContent() {
                       </div>
                     </CardHeader>
 
-                      <CardContent className="pb-12">
+                      <CardContent className="px-4 pt-0 pb-0">
                       {(() => {
                         // One source of truth for risk colors (severity preferred; fallback to value thresholds)
                         const getRiskHex = (severity?: string, value?: number) => {
@@ -1206,7 +1151,7 @@ function DashboardContent() {
                         }
 
                         return (
-                          <div className="space-y-2">
+                          <div className="space-y-1.5 mb-8">
                             {sortedBurnoutFactors.map((factor) => {
                               const color = getRiskHex(factor.severity, factor.value)
                               return (
