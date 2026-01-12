@@ -21,6 +21,7 @@ function IntroGuide({ isOpen, currentStep, onNext, onPrev, onClose }: IntroGuide
       description: "Detect early signs of overwork in your on-call team before it leads to burnout.",
       details:
         "Connects to Rootly, PagerDuty, GitHub, Slack, Linear, and Jira to compute a risk level.",
+      image: "/images/integrations-logos.png",
     },
     {
       title: "Run an Analysis",
