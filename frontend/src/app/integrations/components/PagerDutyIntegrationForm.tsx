@@ -233,12 +233,12 @@ export function PagerDutyIntegrationForm({
                 {isAdding ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Adding Integration...
+                    Saving...
                   </>
                 ) : (
                   <>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Integration
+                    <Check className="w-4 h-4 mr-2" />
+                    Save Integration
                   </>
                 )}
               </Button>
