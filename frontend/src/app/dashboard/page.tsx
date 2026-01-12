@@ -1116,10 +1116,10 @@ function DashboardContent() {
                       })()}
                     </CardDescription>
                   </CardHeader>
-                  <CardContent>
-                    <div className="h-[450px] p-4">
+                  <CardContent className="pt-2">
+                    <div className="h-[350px]">
                       <ResponsiveContainer width="100%" height="100%">
-                        <RadarChart data={burnoutFactors} margin={{ top: 60, right: 80, bottom: 60, left: 80 }}>
+                        <RadarChart data={burnoutFactors} margin={{ top: 30, right: 50, bottom: 30, left: 50 }}>
                           <PolarGrid gridType="polygon" />
                           <PolarAngleAxis 
                             dataKey="factor" 
@@ -1850,9 +1850,6 @@ function DashboardContent() {
         <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Start New Analysis</DialogTitle>
-            <DialogDescription>
-              Configure your burnout analysis settings and data sources
-            </DialogDescription>
           </DialogHeader>
 
           {/* No Integrations State */}

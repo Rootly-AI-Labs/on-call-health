@@ -820,10 +820,10 @@ export function MemberDetailModal({
                     })()}
                     
 
-                    {/* Burnout Analysis – Deep Dive (moved to bottom) */}
+                    {/* Risk Level Breakdown – Deep Dive (moved to bottom) */}
                     <Card>
                       <CardContent className="p-4">
-                        <h4 className="font-semibold text-gray-900 mb-2">Burnout Analysis</h4>
+                        <h4 className="font-semibold text-gray-900 mb-2">Risk Level Breakdown</h4>
                         {memberData?.ocb_reasoning ? (
                           <div className="space-y-6">
                             {/* Contributing Factors */}

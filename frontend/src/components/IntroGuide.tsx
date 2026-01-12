@@ -18,43 +18,34 @@ function IntroGuide({ isOpen, currentStep, onNext, onPrev, onClose }: IntroGuide
   const steps = [
     {
       title: "Welcome to On-Call Health",
-      description: "Monitor team wellbeing and detect potential signs of overwork in incident responders.",
+      description: "Detect early signs of overwork in your on-call team before it leads to burnout.",
       details:
-        "To compute a per-responder risk score, it integrates with Rootly, PagerDuty, GitHub, Slack and Pagerduty.",    },
+        "Connects to Rootly, PagerDuty, GitHub, Slack, Linear, and Jira to compute a risk level.",
+    },
     {
-      title: "Understanding Mock Data",
-      description: (
-        <>
-          The <strong>Dashboard</strong> you see here is displaying mock data for demonstration purposes.
-        </>
-      ),
-      details:
-        "The left panel shows the mock data source, while the center analysis section displays the mock analysis results. This helps you understand what real data will look like.",
+      title: "Run an Analysis",
+      description: "Choose your data sources, team members, and time range to analyze.",
+      details: "Powered by Anthropic and OpenAI for AI-generated insights.",
       highlight: "mock-data-demo",
       image: "/images/mock-data-dashboard.png",
     },
     {
-      title: "Connect Your Integrations",
-      description: "To get real data for your team, you need to add integrations.",
-      details: (
-        <>
-          Go to the <strong>Integrations</strong> section to sync and edit your integrations. Click{" "}
-          <strong>&quot;View Members&quot;</strong> to see the mappings of your team members and manage their data
-          sources.
-        </>
-      ),
-      images: ["/images/integrations-page.png", "/images/team-members-modal.png"],
+      title: "Explore Team-Wide Metrics",
+      description: "Track risk levels, incident counts, after-hours activity, and workload trends across your team.",
+      details: "",
+      image: "/images/team-trends-dashboard.png",
     },
     {
-      title: "Learn More About Our Methodology",
-      description: "Understand how we calculate risk of overwork and our motivation behind the analysis.",
-      details: (
-        <>
-          Click your user profile in the top right corner and select <strong>&quot;Getting Started&quot;</strong> anytime to review
-          these slides. You can also select <strong>&quot;Methodology&quot;</strong> to view detailed information about our burnout detection framework and calculations.
-        </>
-      ),
-      images: ["/images/user-profile-menu.png", "/images/methodology-page.png"],
+      title: "Dive Into Responder-Specific Data",
+      description: "Drill down into individual metrics to understand who needs support and why.",
+      details: "",
+      image: "/images/responder-detail-modal.png",
+    },
+    {
+      title: "Let AI Do the Analysis Work",
+      description: "Get AI-generated summaries to quickly prep for incident reviews or spot trends you might have missed.",
+      details: "",
+      image: "/images/ai-team-insights.png",
     },
   ]
 
@@ -90,16 +81,6 @@ function IntroGuide({ isOpen, currentStep, onNext, onPrev, onClose }: IntroGuide
           <div className="p-6">
             <p className="text-lg text-slate-700 dark:text-slate-300 mb-3">{step.description}</p>
             <p className="text-base text-slate-600 dark:text-slate-400 leading-relaxed mb-4">{step.details}</p>
-
-            {/* Highlight boxes for specific steps */}
-            {currentStep === 0 && (
-              <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
-                <p className="text-sm text-blue-900 dark:text-blue-200">
-                  <strong>✨ What you'll see:</strong> Real-time burnout analysis for your on-call team members with
-                  multiple data sources.
-                </p>
-              </div>
-            )}
 
             {currentStep === 1 && step.image && (
               <div className="mt-6 rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden bg-slate-50 dark:bg-slate-900/30">
