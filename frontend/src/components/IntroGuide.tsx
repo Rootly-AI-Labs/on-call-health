@@ -80,14 +80,16 @@ function IntroGuide({ isOpen, currentStep, onNext, onPrev, onClose }: IntroGuide
           {/* Content */}
           <div className="p-6">
             <p className="text-lg text-slate-700 dark:text-slate-300 mb-3">{step.description}</p>
-            <p className="text-base text-slate-600 dark:text-slate-400 leading-relaxed mb-4">{step.details}</p>
+            {step.details && (
+              <p className="text-base text-slate-600 dark:text-slate-400 leading-relaxed mb-4">{step.details}</p>
+            )}
 
-            {currentStep === 1 && step.image && (
+            {step.image && (
               <div className="mt-6 rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden bg-slate-50 dark:bg-slate-900/30">
                 <div className="relative w-full">
                   <Image
-                    src={step.image || "/placeholder.svg"}
-                    alt="Dashboard with Mock Data"
+                    src={step.image}
+                    alt={step.title}
                     width={1200}
                     height={675}
                     className="w-full h-auto"
@@ -95,102 +97,6 @@ function IntroGuide({ isOpen, currentStep, onNext, onPrev, onClose }: IntroGuide
                     quality={100}
                   />
                 </div>
-                <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950">
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div className="flex items-start gap-2">
-                      <div>
-                        <p className="font-medium text-slate-900 dark:text-white">Left Panel</p>
-                        <p className="text-slate-600 dark:text-slate-400">
-                          Shows "Mock Data" source with 43 synced members
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <div>
-                        <p className="font-medium text-slate-900 dark:text-white">Center Section</p>
-                        <p className="text-slate-600 dark:text-slate-400">
-                          Displays risk levels, incidents, and analysis charts
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {currentStep === 2 && "images" in step && step.images && (
-              <div className="mt-6 space-y-4">
-                <div className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden bg-slate-50 dark:bg-slate-900/30">
-                  <div className="relative w-full">
-                    <Image
-                      src={step.images[0] || "/placeholder.svg"}
-                      alt="Integrations Page"
-                      width={1200}
-                      height={768}
-                      className="w-full h-auto"
-                      priority
-                      quality={100}
-                    />
-                  </div>
-                  <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950">
-                    <p className="text-sm font-medium text-slate-900 dark:text-white"> Integrations Page</p>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
-                      Navigate to the Integrations tab to view all available connections and team management options.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden bg-slate-50 dark:bg-slate-900/30">
-                  <div className="relative w-full">
-                    <Image
-                      src={step.images[1] || "/placeholder.svg"}
-                      alt="Team Members Modal"
-                      width={840}
-                      height={768}
-                      className="w-full h-auto"
-                      priority
-                      quality={100}
-                    />
-                  </div>
-                  <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950">
-                    <p className="text-sm font-medium text-slate-900 dark:text-white"> View Members</p>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
-                      Click "View Members" to see team member mappings across integrations and manage their data
-                      sources.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {currentStep === 3 && "images" in step && step.images && (
-              <div className="mt-6 rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden bg-slate-50 dark:bg-slate-900/30">
-                <div className="relative w-full max-w-2xl mx-auto">
-                  <Image
-                    src={step.images[1] || "/placeholder.svg"}
-                    alt="Methodology Page"
-                    width={840}
-                    height={552}
-                    className="w-full h-auto"
-                    priority
-                    quality={100}
-                  />
-                </div>
-                <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950">
-                  <p className="text-sm font-medium text-slate-900 dark:text-white"> Methodology Details</p>
-                  <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-                    Learn about the On-Call Health Score (OCH), our research-backed framework, and the five key
-                    health factors we analyze.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {currentStep === 3 && !("images" in step && step.images) && (
-              <div className="mt-4 p-4 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg">
-                <p className="text-sm text-green-900 dark:text-green-200">
-                  <strong>🔍 Pro tip:</strong> You can anytime click "Getting Started" in your profile menu to review these slides.
-                </p>
               </div>
             )}
           </div>
