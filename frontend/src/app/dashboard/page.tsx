@@ -1105,9 +1105,9 @@ function DashboardContent() {
                         const hasIncidentMembers = membersWithIncidents.length > 0;
                         
                         if (hasGitHubMembers && hasIncidentMembers) {
-                          return `Holistic burnout analysis combining incident response patterns and development activity across ${allActiveMembers.length} team members`;
+                          return `Holistic analysis combining incident response patterns and development activity across ${allActiveMembers.length} team members`;
                         } else if (hasGitHubMembers && !hasIncidentMembers) {
-                          return `Development-focused burnout analysis based on GitHub activity patterns from ${membersWithGitHubData.length} active developers`;
+                          return `Development-focused analysis based on GitHub activity patterns from ${membersWithGitHubData.length} active developers`;
                         } else if (!hasGitHubMembers && hasIncidentMembers) {
                           return `Incident response analysis from ${membersWithIncidents.length} team members handling incidents`;
                         } else {
@@ -1611,7 +1611,7 @@ function DashboardContent() {
               <p className="text-yellow-700 mb-4">
                 {hasNoIncidentsInPeriod()
                   ? `No incidents were found in the selected ${timeRange}-day period. Try selecting a longer time range or check if there are any incidents in your ${selectedIntegrationData?.platform || 'organization'}.`
-                  : 'This analysis has insufficient data to generate meaningful burnout insights. This could be due to lack of organization member data, incident history, or API access issues.'
+                  : 'This analysis has insufficient data to generate meaningful insights. This could be due to lack of organization member data, incident history, or API access issues.'
                 }
               </p>
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
@@ -1717,7 +1717,7 @@ function DashboardContent() {
                   </div>
                   <h3 className="text-lg font-semibold mb-2">Setup Required</h3>
                   <p className="text-gray-600 mb-4">
-                    Connect your first integration to start analyzing burnout metrics. Both Rootly and PagerDuty are supported.
+                    Connect your first integration to start analyzing metrics. Both Rootly and PagerDuty are supported.
                   </p>
                   <Button onClick={() => router.push('/integrations')} className="bg-blue-600 hover:bg-blue-700">
                     <Settings className="w-4 h-4 mr-2" />
@@ -1741,7 +1741,7 @@ function DashboardContent() {
                                   <div>
                                     <strong>Rootly Integration Available</strong>
                                     <span className="block text-sm mt-1">
-                                      Connect Rootly for comprehensive incident management and team burnout analysis.
+                                      Connect Rootly for comprehensive incident management and team analysis.
                                     </span>
                                   </div>
                                   <Button 
@@ -1768,7 +1768,7 @@ function DashboardContent() {
                     </div>
                     <h3 className="text-lg font-semibold mb-2">No Analysis Yet</h3>
                     <p className="text-gray-600 mb-4">
-                      Click "New Analysis" to start analyzing your organization's burnout metrics
+                      Click "New Analysis" to start analyzing your organization's metrics
                     </p>
                     <Button onClick={startAnalysis} className="bg-purple-600 hover:bg-purple-700">
                       <Play className="w-4 h-4 mr-2" />
@@ -1860,7 +1860,7 @@ function DashboardContent() {
                 <AlertDescription className="text-red-800">
                   <strong>No Primary Integrations Connected</strong>
                   <span className="block mt-2">
-                    To start a burnout analysis, you need to connect at least one primary integration (Rootly or PagerDuty).
+                    To start an analysis, you need to connect at least one primary integration (Rootly or PagerDuty).
                   </span>
                 </AlertDescription>
               </Alert>
