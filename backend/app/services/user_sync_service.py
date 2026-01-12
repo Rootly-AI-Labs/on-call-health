@@ -286,25 +286,28 @@ class UserSyncService:
             # This prevents one user from overwriting another user's correlations
             if email.lower() == current_user.email.lower():
                 # This is the current user's own correlation
-                # First check if we have an existing user_id correlation
-                correlation = self.db.query(UserCorrelation).filter(
-                    UserCorrelation.user_id == user_id,
+                # First, get ALL correlations for this email (personal + org-scoped)
+                all_correlations = self.db.query(UserCorrelation).filter(
+                    UserCorrelation.organization_id == organization_id,
                     UserCorrelation.email == email
-                ).first()
+                ).all()
 
-                # If not found, check if there's a NULL user_id correlation we should migrate
-                if not correlation:
-                    null_correlation = self.db.query(UserCorrelation).filter(
-                        UserCorrelation.organization_id == organization_id,
-                        UserCorrelation.email == email,
-                        UserCorrelation.user_id.is_(None)
-                    ).first()
-
-                    if null_correlation:
-                        # Migrate org-scoped correlation to personal correlation
-                        null_correlation.user_id = current_user.id
-                        correlation = null_correlation
+                # Merge duplicates if found
+                if len(all_correlations) > 1:
+                    logger.info(f"Found {len(all_correlations)} records for current user's email {email}")
+                    correlation = self._merge_duplicate_correlations(all_correlations, organization_id, email)
+                    # After merge, ensure user_id is set for the current user
+                    if correlation and not correlation.user_id:
+                        correlation.user_id = current_user.id
+                        logger.info(f"Set user_id={current_user.id} on merged correlation")
+                elif len(all_correlations) == 1:
+                    correlation = all_correlations[0]
+                    # Ensure user_id is set for the current user
+                    if correlation and not correlation.user_id:
+                        correlation.user_id = current_user.id
                         logger.info(f"Migrated org-scoped correlation {correlation.id} to user {current_user.id}")
+                else:
+                    correlation = None
             else:
                 # This is a team member - check by organization and email
                 # IMPORTANT: Check for ANY record with this org+email, regardless of user_id
