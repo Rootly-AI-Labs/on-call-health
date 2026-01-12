@@ -852,14 +852,32 @@ class MigrationRunner:
                     ADD COLUMN IF NOT EXISTS reminder_hours_after INTEGER DEFAULT 5
                     """,
                     """
-                    -- Add message_template column if missing
-                    ALTER TABLE survey_schedules
-                    ADD COLUMN IF NOT EXISTS message_template VARCHAR(500)
+                    -- Add CHECK constraint for frequency_type (idempotent)
+                    DO $$
+                    BEGIN
+                        IF NOT EXISTS (
+                            SELECT 1 FROM pg_constraint
+                            WHERE conname = 'check_frequency_type'
+                        ) THEN
+                            ALTER TABLE survey_schedules
+                            ADD CONSTRAINT check_frequency_type
+                            CHECK (frequency_type IN ('daily', 'weekday', 'weekly'));
+                        END IF;
+                    END $$
                     """,
                     """
-                    -- Add reminder_message_template column if missing
-                    ALTER TABLE survey_schedules
-                    ADD COLUMN IF NOT EXISTS reminder_message_template VARCHAR(500)
+                    -- Add CHECK constraint for day_of_week (idempotent)
+                    DO $$
+                    BEGIN
+                        IF NOT EXISTS (
+                            SELECT 1 FROM pg_constraint
+                            WHERE conname = 'check_day_of_week'
+                        ) THEN
+                            ALTER TABLE survey_schedules
+                            ADD CONSTRAINT check_day_of_week
+                            CHECK (day_of_week IS NULL OR (day_of_week >= 0 AND day_of_week <= 6));
+                        END IF;
+                    END $$
                     """,
                     """
                     -- Add frequency_type column to replace send_weekdays_only with more options
@@ -980,27 +998,59 @@ class MigrationRunner:
                 ]
             },
             {
-                "name": "027_simplify_roles",
+                "name": "027_rename_survey_columns",
+                "description": "Rename user_burnout_reports columns from self_reported_score/energy_level to feeling_score/workload_score",
+                "sql": [
+                    """
+                    ALTER TABLE user_burnout_reports
+                    RENAME COLUMN self_reported_score TO workload_score
+                    """,
+                    """
+                    ALTER TABLE user_burnout_reports
+                    RENAME COLUMN energy_level TO feeling_score
+                    """,
+                    """
+                    ALTER TABLE user_burnout_reports
+                    DROP CONSTRAINT IF EXISTS user_burnout_reports_self_reported_score_check
+                    """,
+                    """
+                    ALTER TABLE user_burnout_reports
+                    DROP CONSTRAINT IF EXISTS user_burnout_reports_energy_level_check
+                    """,
+                    """
+                    ALTER TABLE user_burnout_reports
+                    ADD CONSTRAINT user_burnout_reports_feeling_score_check
+                    CHECK (feeling_score >= 1 AND feeling_score <= 5)
+                    """,
+                    """
+                    ALTER TABLE user_burnout_reports
+                    ADD CONSTRAINT user_burnout_reports_workload_score_check
+                    CHECK (workload_score >= 1 AND workload_score <= 5)
+                    """
+                ]
+            },
+
+                "name": "028_simplify_roles",
                 "description": "Simplify role system from 5 roles to 3 roles",
                 "sql_file": "2025_01_17_simplify_roles.sql"
             },
             {
-                "name": "028_create_organizations_for_existing_users",
+                "name": "029_create_organizations_for_existing_users",
                 "description": "Create organizations for existing users based on email domains",
                 "sql_file": "2025_01_18_create_organizations_for_existing_users.sql"
             },
             {
-                "name": "029_migrate_user_role_to_member",
+                "name": "030_migrate_user_role_to_member",
                 "description": "Convert legacy 'user' role to 'member'",
                 "sql_file": "2025_01_30_migrate_user_role_to_member.sql"
             },
             {
-                "name": "030_allow_null_user_id_in_integration_mappings",
+                "name": "031_allow_null_user_id_in_integration_mappings",
                 "description": "Make user_id nullable in integration_mappings and add organization_id for org-scoped users",
                 "sql_file": "2026_01_02_allow_null_user_id_in_integration_mappings.sql"
             },
             {
-                "name": "031_remove_communication_patterns_toggle",
+                "name": "032_remove_communication_patterns_toggle",
                 "description": "Remove communication_patterns_enabled column from slack_workspace_mappings",
                 "sql_file": "2026_01_06_remove_communication_patterns_toggle.sql"
             },
