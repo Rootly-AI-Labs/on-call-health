@@ -309,10 +309,18 @@ class UserSyncService:
                 # This is a team member - check by organization and email
                 # IMPORTANT: Check for ANY record with this org+email, regardless of user_id
                 # This prevents creating duplicates when user_id gets set by other processes
-                correlation = self.db.query(UserCorrelation).filter(
+                all_correlations = self.db.query(UserCorrelation).filter(
                     UserCorrelation.organization_id == organization_id,
                     UserCorrelation.email == email
-                ).first()
+                ).all()  # Get ALL duplicates, not just one
+
+                # If duplicates exist, merge them into the best one
+                if len(all_correlations) > 1:
+                    correlation = self._merge_duplicate_correlations(all_correlations, organization_id, email)
+                elif len(all_correlations) == 1:
+                    correlation = all_correlations[0]
+                else:
+                    correlation = None
 
             if correlation:
                 # Update existing correlation
@@ -418,6 +426,123 @@ class UserSyncService:
                 updated = True
 
         return 1 if updated else 0
+
+    def _merge_duplicate_correlations(
+        self,
+        correlations: list,
+        organization_id: int,
+        email: str
+    ) -> UserCorrelation:
+        """
+        Merge duplicate UserCorrelation records into one "best" record.
+
+        Strategy:
+        1. Pick the best record (most complete data)
+        2. Merge all fields from other records into it
+        3. Delete the duplicate records
+        4. Return the merged record
+
+        Priority for "best" record:
+        1. Has github_username
+        2. Has slack_user_id
+        3. Has jira_account_id
+        4. Has most integration_ids
+        5. Most recent created_at
+        """
+        if len(correlations) <= 1:
+            return correlations[0] if correlations else None
+
+        logger.warning(
+            f"🔀 MERGING {len(correlations)} duplicate records for {email} (org {organization_id})"
+        )
+
+        # Sort by data completeness to find the "best" record
+        def score_record(r):
+            score = 0
+            if r.github_username: score += 1000
+            if r.slack_user_id: score += 100
+            if r.jira_account_id: score += 50
+            if r.linear_user_id: score += 25
+            if r.integration_ids: score += len(r.integration_ids) * 10
+            return score
+
+        sorted_correlations = sorted(correlations, key=score_record, reverse=True)
+        keep_record = sorted_correlations[0]
+        duplicate_records = sorted_correlations[1:]
+
+        logger.info(
+            f"  ✅ KEEPING: ID={keep_record.id} | "
+            f"github={keep_record.github_username} | "
+            f"slack={keep_record.slack_user_id} | "
+            f"integration_ids={keep_record.integration_ids}"
+        )
+
+        # Merge data from duplicates into keep_record
+        for dup in duplicate_records:
+            logger.info(
+                f"  🔀 MERGING: ID={dup.id} | "
+                f"github={dup.github_username} | "
+                f"slack={dup.slack_user_id} | "
+                f"integration_ids={dup.integration_ids}"
+            )
+
+            # Merge integration_ids arrays
+            if dup.integration_ids:
+                if not keep_record.integration_ids:
+                    keep_record.integration_ids = []
+                for int_id in dup.integration_ids:
+                    if int_id not in keep_record.integration_ids:
+                        keep_record.integration_ids = keep_record.integration_ids + [int_id]
+                        logger.info(f"    ➕ Added integration_id: {int_id}")
+
+            # Merge platform-specific fields (only if keep_record doesn't have them)
+            if dup.github_username and not keep_record.github_username:
+                keep_record.github_username = dup.github_username
+                logger.info(f"    ➕ Added github_username: {dup.github_username}")
+
+            if dup.slack_user_id and not keep_record.slack_user_id:
+                keep_record.slack_user_id = dup.slack_user_id
+                logger.info(f"    ➕ Added slack_user_id: {dup.slack_user_id}")
+
+            if dup.jira_account_id and not keep_record.jira_account_id:
+                keep_record.jira_account_id = dup.jira_account_id
+                keep_record.jira_email = dup.jira_email
+                logger.info(f"    ➕ Added jira_account_id: {dup.jira_account_id}")
+
+            if dup.linear_user_id and not keep_record.linear_user_id:
+                keep_record.linear_user_id = dup.linear_user_id
+                keep_record.linear_email = dup.linear_email
+                logger.info(f"    ➕ Added linear_user_id: {dup.linear_user_id}")
+
+            if dup.rootly_user_id and not keep_record.rootly_user_id:
+                keep_record.rootly_user_id = dup.rootly_user_id
+                keep_record.rootly_email = dup.rootly_email
+                logger.info(f"    ➕ Added rootly_user_id: {dup.rootly_user_id}")
+
+            if dup.pagerduty_user_id and not keep_record.pagerduty_user_id:
+                keep_record.pagerduty_user_id = dup.pagerduty_user_id
+                logger.info(f"    ➕ Added pagerduty_user_id: {dup.pagerduty_user_id}")
+
+            # Merge name if keep_record doesn't have it
+            if dup.name and not keep_record.name:
+                keep_record.name = dup.name
+                logger.info(f"    ➕ Added name: {dup.name}")
+
+            # Prefer non-NULL user_id
+            if dup.user_id and not keep_record.user_id:
+                keep_record.user_id = dup.user_id
+                logger.info(f"    ➕ Added user_id: {dup.user_id}")
+
+            # Delete the duplicate record
+            logger.info(f"    ❌ DELETING duplicate ID={dup.id}")
+            self.db.delete(dup)
+
+        logger.info(
+            f"  ✅ MERGED into ID={keep_record.id} | "
+            f"integration_ids={keep_record.integration_ids}"
+        )
+
+        return keep_record
 
     def _remove_missing_users(
         self,
