@@ -19,33 +19,28 @@ function IntroGuide({ isOpen, currentStep, onNext, onPrev, onClose }: IntroGuide
     {
       title: "Welcome to On-Call Health",
       description: "Detect early signs of overwork in your on-call team before it leads to burnout.",
-      details:
-        "Connects to Rootly, PagerDuty, GitHub, Slack, Linear, and Jira to compute a risk level.",
+      details: "Connects to Rootly, PagerDuty, GitHub, Slack, Linear, and Jira to compute a risk level.",
       image: "/images/integrations-logos.png",
     },
     {
       title: "Run an Analysis",
       description: "Choose your data sources, team members, and time range to analyze.",
       details: "Powered by Anthropic and OpenAI for AI-generated insights.",
-      highlight: "mock-data-demo",
       image: "/images/mock-data-dashboard.png",
     },
     {
       title: "Explore Team-Wide Metrics",
       description: "Track risk levels, incident counts, after-hours activity, and workload trends across your team.",
-      details: "",
       image: "/images/team-trends-dashboard.png",
     },
     {
       title: "Dive Into Responder-Specific Data",
       description: "Drill down into individual metrics to understand who needs support and why.",
-      details: "",
       image: "/images/responder-detail-modal.png",
     },
     {
       title: "Let AI Do the Analysis Work",
       description: "Get AI-generated summaries to quickly prep for incident reviews or spot trends you might have missed.",
-      details: "",
       image: "/images/ai-team-insights.png",
     },
   ]

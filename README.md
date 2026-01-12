@@ -129,6 +129,8 @@ Our implementation uses the two core dimensions:
 * [PagerDuty](https://www.pagerduty.com/): For incident management and on-call data
 * [GitHub](https://github.com/): For commit activity
 * [Slack](http://slack.com/): For communication patterns and collect self-reported data
+* [Linear](https://linear.app/): For workload tracking
+* [Jira](https://www.atlassian.com/software/jira): For workload tracking
 
 If you are interested in integrating with On-call Health, [get in touch](mailto:sylvain@rootly.com)!
 
