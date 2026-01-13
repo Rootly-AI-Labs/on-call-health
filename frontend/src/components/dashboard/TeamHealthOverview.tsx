@@ -26,6 +26,97 @@ interface TeamHealthOverviewProps {
   setExpandedDataSources: (fn: (prev: any) => any) => void
 }
 
+// Helper to get members array from team analysis
+function getTeamMembers(currentAnalysis: any): any[] {
+  const teamAnalysis = currentAnalysis?.analysis_data?.team_analysis
+  return Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members || []
+}
+
+// Helper to get on-call members (those with incidents)
+function getOnCallMembers(currentAnalysis: any): any[] {
+  return getTeamMembers(currentAnalysis).filter((m: any) => m.incident_count > 0)
+}
+
+// Calculate team OCB score from member scores
+function calculateTeamOCBScore(currentAnalysis: any): number | null {
+  const members = getTeamMembers(currentAnalysis)
+  if (!members || members.length === 0) return null
+
+  const ocbScores = members
+    .map((m: any) => m.ocb_score)
+    .filter((s: any) => s !== undefined && s !== null && s > 0)
+
+  if (ocbScores.length === 0) return null
+  return Math.round(ocbScores.reduce((a: number, b: number) => a + b, 0) / ocbScores.length)
+}
+
+// Get health percentage from on-call members or fallback sources
+function getHealthPercentage(currentAnalysis: any, historicalTrends: any): number {
+  const onCallMembers = getOnCallMembers(currentAnalysis)
+
+  if (onCallMembers.length > 0) {
+    const ocbScores = onCallMembers
+      .map((m: any) => m.ocb_score)
+      .filter((s: any) => s !== undefined && s !== null)
+
+    if (ocbScores.length > 0) {
+      return ocbScores.reduce((a: number, b: number) => a + b, 0) / ocbScores.length
+    }
+  }
+
+  // Fallback to daily trends
+  if (historicalTrends?.daily_trends?.length > 0) {
+    const latestTrend = historicalTrends.daily_trends[historicalTrends.daily_trends.length - 1]
+    return latestTrend.overall_score * 10
+  }
+  if (currentAnalysis?.analysis_data?.daily_trends?.length > 0) {
+    const latestTrend = currentAnalysis.analysis_data.daily_trends[currentAnalysis.analysis_data.daily_trends.length - 1]
+    return latestTrend.overall_score * 10
+  }
+  if (currentAnalysis?.analysis_data?.team_health) {
+    return currentAnalysis.analysis_data.team_health.overall_score * 10
+  }
+  if (currentAnalysis?.analysis_data?.team_summary) {
+    return currentAnalysis.analysis_data.team_summary.average_score * 10
+  }
+  return 0
+}
+
+// Convert OCB score to health status label
+function getHealthStatusLabel(ocbScore: number): string {
+  if (ocbScore < 25) return 'Healthy'
+  if (ocbScore < 50) return 'Fair'
+  if (ocbScore < 75) return 'Poor'
+  return 'Critical'
+}
+
+// Get health status description
+function getHealthStatusDescription(ocbScore: number): string {
+  if (ocbScore < 25) return 'Low/minimal signs of overwork, sustainable workload'
+  if (ocbScore < 50) return 'Mild signs of overwork, watch for trends'
+  if (ocbScore < 75) return 'Moderate signs of overwork, intervention recommended'
+  return 'High/severe signs of overwork, urgent action needed'
+}
+
+// Tooltip show/hide helpers
+function showTooltip(tooltipId: string, rect: DOMRect, topOffset: number, leftOffset: number): void {
+  const tooltip = document.getElementById(tooltipId)
+  if (tooltip) {
+    tooltip.style.top = `${rect.top - topOffset}px`
+    tooltip.style.left = `${rect.left - leftOffset}px`
+    tooltip.classList.remove('invisible', 'opacity-0')
+    tooltip.classList.add('visible', 'opacity-100')
+  }
+}
+
+function hideTooltip(tooltipId: string): void {
+  const tooltip = document.getElementById(tooltipId)
+  if (tooltip) {
+    tooltip.classList.add('invisible', 'opacity-0')
+    tooltip.classList.remove('visible', 'opacity-100')
+  }
+}
+
 export function TeamHealthOverview({
   currentAnalysis,
   historicalTrends,
@@ -118,94 +209,47 @@ export function TeamHealthOverview({
               <div>
                 <div className="flex items-start space-x-3">
                   <div>
-                    <div className="text-2xl font-bold text-neutral-900">{(() => {
-                      // Helper function to calculate OCH risk level from team data - FORCE FRONTEND CALCULATION
-                      const calculateOCBFromTeam = () => {
-                        const teamAnalysis = currentAnalysis?.analysis_data?.team_analysis;
-                        const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members;
-
-                        if (!members || members.length === 0) return null;
-
-                        // ALWAYS calculate from individual member OCH risk levels first
-                        const ocbScores = members
-                          .map((m: any) => m.ocb_score)
-                          .filter((s: any) => s !== undefined && s !== null && s > 0);
-
-                        if (ocbScores.length > 0) {
-                          const avgOcbScore = ocbScores.reduce((a: number, b: number) => a + b, 0) / ocbScores.length;
-                          return Math.round(avgOcbScore); // Round to whole integer
+                    <div className="text-2xl font-bold text-gray-900">
+                      {(() => {
+                        const teamOcbScore = calculateTeamOCBScore(currentAnalysis)
+                        if (teamOcbScore !== null) {
+                          return (
+                            <>
+                              <span>{teamOcbScore}</span>
+                              <span
+                                className="text-xs text-gray-500 cursor-help ml-1"
+                                onMouseEnter={(e) => showTooltip('ocb-score-tooltip', e.currentTarget.getBoundingClientRect(), 180, 120)}
+                                onMouseLeave={() => hideTooltip('ocb-score-tooltip')}
+                              >
+                                Risk Level
+                              </span>
+                            </>
+                          )
                         }
 
-                        // No OCH risk levels available - return null
-                        return null;
-                      };
-
-                      // FORCE FRONTEND OCB CALCULATION FIRST - Don't trust backend at all!
-                      const teamOcbScore = calculateOCBFromTeam();
-                      if (teamOcbScore !== null) {
-                        return (
-                          <>
-                            <span>{teamOcbScore}</span>
-                            <span
-                              className="text-xs text-neutral-500 cursor-help ml-1"
-                              onMouseEnter={(e) => {
-                                const tooltip = document.getElementById('ocb-score-tooltip')
-                                if (tooltip) {
-                                  const rect = e.currentTarget.getBoundingClientRect()
-                                  tooltip.style.top = `${rect.top - 180}px`
-                                  tooltip.style.left = `${rect.left - 120}px`
-                                  tooltip.classList.remove('invisible', 'opacity-0')
-                                  tooltip.classList.add('visible', 'opacity-100')
-                                }
-                              }}
-                              onMouseLeave={() => {
-                                const tooltip = document.getElementById('ocb-score-tooltip')
-                                if (tooltip) {
-                                  tooltip.classList.add('invisible', 'opacity-0')
-                                  tooltip.classList.remove('visible', 'opacity-100')
-                                }
-                              }}
-                            >
-                              Risk Level
-                            </span>
-                          </>
-                        );
-                      }
-
-
-                      // Use the latest point from health trends for consistency with chart
-                      if (historicalTrends?.daily_trends?.length > 0) {
-                        const latestTrend = historicalTrends.daily_trends[historicalTrends.daily_trends.length - 1];
-                        return `${Math.round(latestTrend.overall_score * 10)}%`;
-                      }
-                      // Fallback to current analysis daily trends if available
-                      if (currentAnalysis?.analysis_data?.daily_trends?.length > 0) {
-                        const latestTrend = currentAnalysis.analysis_data.daily_trends[currentAnalysis.analysis_data.daily_trends.length - 1];
-                        return `${Math.round(latestTrend.overall_score * 10)}%`;
-                      }
-
-                      // Show real data from team_health if available
-                      if (currentAnalysis?.analysis_data?.team_health) {
-                        return `${Math.round(currentAnalysis.analysis_data.team_health.overall_score * 10)}%`;
-                      }
-                      if (currentAnalysis?.analysis_data?.team_summary) {
-                        return `${Math.round(currentAnalysis.analysis_data.team_summary.average_score * 10)}%`;
-                      }
-                      // NO FALLBACK DATA - show actual system state
-                      return "No data";
-                    })()}</div>
-                    <div className="text-xs text-neutral-500">/100</div>
+                        // Fallback to daily trends
+                        if (historicalTrends?.daily_trends?.length > 0) {
+                          const latestTrend = historicalTrends.daily_trends[historicalTrends.daily_trends.length - 1]
+                          return `${Math.round(latestTrend.overall_score * 10)}%`
+                        }
+                        if (currentAnalysis?.analysis_data?.daily_trends?.length > 0) {
+                          const latestTrend = currentAnalysis.analysis_data.daily_trends[currentAnalysis.analysis_data.daily_trends.length - 1]
+                          return `${Math.round(latestTrend.overall_score * 10)}%`
+                        }
+                        if (currentAnalysis?.analysis_data?.team_health) {
+                          return `${Math.round(currentAnalysis.analysis_data.team_health.overall_score * 10)}%`
+                        }
+                        if (currentAnalysis?.analysis_data?.team_summary) {
+                          return `${Math.round(currentAnalysis.analysis_data.team_summary.average_score * 10)}%`
+                        }
+                        return "No data"
+                      })()}
+                    </div>
+                    <div className="text-xs text-gray-500">/100</div>
                   </div>
                   {(() => {
-                    // Show average if we have either historical data OR OCH risk levels (since we can compute meaningful averages from OCB)
-                    const teamAnalysis = currentAnalysis?.analysis_data?.team_analysis;
-                    const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members;
-                    const hasOCBScores = members && members.some((m: any) => m.ocb_score !== undefined && m.ocb_score !== null);
-                    const hasHistoricalData = (historicalTrends?.daily_trends?.length > 0) ||
-                      (currentAnalysis?.analysis_data?.daily_trends?.length > 0);
-
                     // Remove average section completely
-                    return false;
+                    return false
                   })() && (
                       <div className="hidden">
                         <div className="text-2xl font-bold text-neutral-900 flex items-baseline space-x-1">{(() => {
@@ -285,71 +329,14 @@ export function TeamHealthOverview({
                     )}
                 </div>
                 <div className="mt-2 flex items-center space-x-1">
-                  <div className="text-sm font-medium text-purple-600">{(() => {
-                    // Helper function to get current health percentage
-                    const getCurrentHealthPercentage = () => {
-                      const teamAnalysis = currentAnalysis?.analysis_data?.team_analysis;
-                      const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members;
-
-                      if (members && members.length > 0) {
-                        // Only include on-call members (those with incidents during the analysis period)
-                        const onCallMembers = members.filter((m: any) => m.incident_count > 0);
-                        
-                        if (onCallMembers.length > 0) {
-                          const ocbScores = onCallMembers.map((m: any) => m.ocb_score).filter((s: any) => s !== undefined && s !== null);
-                          
-                          if (ocbScores.length > 0) {
-                            const avgOcbScore = ocbScores.reduce((a: number, b: number) => a + b, 0) / ocbScores.length;
-                            return avgOcbScore;
-                          }
-                        }
-
-                        // No OCH risk levels - no health percentage available
-                      }
-
-                      // Fallback to existing daily trends logic
-                      if (historicalTrends?.daily_trends?.length > 0) {
-                        const latestTrend = historicalTrends.daily_trends[historicalTrends.daily_trends.length - 1];
-                        return latestTrend.overall_score * 10;
-                      } else if (currentAnalysis?.analysis_data?.daily_trends?.length > 0) {
-                        const latestTrend = currentAnalysis.analysis_data.daily_trends[currentAnalysis.analysis_data.daily_trends.length - 1];
-                        return latestTrend.overall_score * 10;
-                      } else if (currentAnalysis?.analysis_data?.team_health) {
-                        return currentAnalysis.analysis_data.team_health.overall_score * 10;
-                      } else if (currentAnalysis?.analysis_data?.team_summary) {
-                        return currentAnalysis.analysis_data.team_summary.average_score * 10;
-                      }
-
-                      return 0;
-                    };
-
-                    const ocbScore = getCurrentHealthPercentage();
-
-                    // Convert to health status based on raw OCH risk level
-                    // Match OCB ranges: Healthy (0-24), Fair (25-49), Poor (50-74), Critical (75-100)
-                    if (ocbScore < 25) return 'Healthy';      // OCH 0-24 - Low/minimal burnout risk
-                    if (ocbScore < 50) return 'Fair';         // OCH 25-49 - Mild burnout symptoms 
-                    if (ocbScore < 75) return 'Poor';         // OCH 50-74 - Moderate burnout risk
-                    return 'Critical';                        // OCH 75-100 - High/severe burnout risk
-                  })()}</div>
-                  <Info className="w-3 h-3 text-purple-500"
-                    onMouseEnter={(e) => {
-                      const tooltip = document.getElementById('health-rubric-tooltip')
-                      if (tooltip) {
-                        const rect = e.currentTarget.getBoundingClientRect()
-                        tooltip.style.top = `${rect.top - 220}px`
-                        tooltip.style.left = `${rect.left - 160}px`
-                        tooltip.classList.remove('invisible', 'opacity-0')
-                        tooltip.classList.add('visible', 'opacity-100')
-                      }
-                    }}
-                    onMouseLeave={() => {
-                      const tooltip = document.getElementById('health-rubric-tooltip')
-                      if (tooltip) {
-                        tooltip.classList.add('invisible', 'opacity-0')
-                        tooltip.classList.remove('visible', 'opacity-100')
-                      }
-                    }} />
+                  <div className="text-sm font-medium text-purple-600">
+                    {getHealthStatusLabel(getHealthPercentage(currentAnalysis, historicalTrends))}
+                  </div>
+                  <Info
+                    className="w-3 h-3 text-purple-500"
+                    onMouseEnter={(e) => showTooltip('health-rubric-tooltip', e.currentTarget.getBoundingClientRect(), 220, 160)}
+                    onMouseLeave={() => hideTooltip('health-rubric-tooltip')}
+                  />
                 </div>
                 <p className="text-xs text-neutral-700 mt-1">
                   {(() => {
