@@ -199,6 +199,7 @@ export default function IntegrationsPage() {
   const [tokenErrorType, setTokenErrorType] = useState<'expired' | 'permissions' | null>(null)
   const [tokenErrorIntegrationName, setTokenErrorIntegrationName] = useState('')
   const [tokenErrorMissingPermissions, setTokenErrorMissingPermissions] = useState<string[]>([])
+  const [hasTokenError, setHasTokenError] = useState(false) // Track if current org has token issues
   const [mappingData, setMappingData] = useState<IntegrationMapping[]>([])
   const [mappingStats, setMappingStats] = useState<MappingStatistics | null>(null)
   const [analysisMappingStats, setAnalysisMappingStats] = useState<AnalysisMappingStatistics | null>(null)
@@ -2538,12 +2539,17 @@ export default function IntegrationsPage() {
                               setTokenErrorIntegrationName(selected.name)
                               setTokenErrorMissingPermissions(missing)
                               setTokenErrorModalOpen(true)
+                              setHasTokenError(true)
+                            } else {
+                              // Token is valid and has permissions
+                              setHasTokenError(false)
                             }
                           } else if (response.status === 401 || response.status === 403) {
                             setTokenErrorType('expired')
                             setTokenErrorIntegrationName(selected.name)
                             setTokenErrorMissingPermissions([])
                             setTokenErrorModalOpen(true)
+                            setHasTokenError(true)
                           }
                         } catch (error) {
                           console.error('Error checking integration permissions:', error)
@@ -5388,7 +5394,7 @@ export default function IntegrationsPage() {
 
       {/* Team Sync Prompt - floating bottom-right */}
       <TeamSyncPrompt
-        isVisible={showSyncPrompt}
+        isVisible={showSyncPrompt && !hasTokenError}
         message={syncPromptMessage}
         onSync={handleSyncPromptAction}
         onDismiss={handleDismissSyncPrompt}
