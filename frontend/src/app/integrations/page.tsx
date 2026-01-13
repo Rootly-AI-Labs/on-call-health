@@ -2658,33 +2658,6 @@ export default function IntegrationsPage() {
           </div>
         )}
 
-        {/* Sentiment Analysis Coming Soon Banner */}
-        <div className="max-w-2xl mx-auto mb-6">
-          <div className="bg-gradient-to-r from-purple-50 to-blue-50 border-2 border-purple-200 rounded-lg p-5 shadow-sm">
-            <div className="flex items-start gap-4">
-              <div className="flex-shrink-0">
-                <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-blue-500 rounded-lg flex items-center justify-center">
-                  <Sparkles className="w-6 h-6 text-white" />
-                </div>
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-1">
-                  <h3 className="text-lg font-bold text-neutral-900">
-                    Sentiment Analysis
-                  </h3>
-                  <Badge className="bg-purple-100 text-purple-700 border-purple-300 text-xs font-semibold">
-                    Coming Soon
-                  </Badge>
-                </div>
-                <p className="text-sm text-neutral-600 leading-relaxed">
-                  Analyze team sentiment from Slack messages to detect early signs of burnout, stress, and communication patterns.
-                  Get insights into team morale and well-being alongside your existing incident data.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
         {/* Platform Selection Cards */}
         <div className="grid md:grid-cols-2 gap-4 mb-6 max-w-2xl mx-auto">
           {/* Rootly Card */}
