@@ -1580,9 +1580,9 @@ async def submit_slack_burnout_survey(
                 detail="Analysis not found"
             )
 
-        # Check for duplicate submission
+        # Check for duplicate submission (match by email)
         existing_report = db.query(UserBurnoutReport).filter(
-            UserBurnoutReport.user_id == user_correlation.user_id,
+            UserBurnoutReport.email == submission.user_email.lower(),
             UserBurnoutReport.analysis_id == submission.analysis_id
         ).first()
 
@@ -1598,6 +1598,7 @@ async def submit_slack_burnout_survey(
         # Create new burnout report
         new_report = UserBurnoutReport(
             user_id=user_correlation.user_id,
+            email=submission.user_email.lower(),  # Save email for team member identification
             organization_id=None,  # No org_id for this endpoint
             email_domain=user.email_domain if user else None,
             analysis_id=submission.analysis_id,

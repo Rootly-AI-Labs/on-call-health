@@ -509,12 +509,12 @@ def get_member_surveys(analysis: Analysis, db: Session) -> dict:
     member_surveys = {}
 
     for corr in correlations:
-        if not corr.user_id or not corr.email:
+        if not corr.email:
             continue
 
-        # Get surveys within analysis period for this user
+        # Get surveys within analysis period for this team member (match by email)
         surveys = db.query(UserBurnoutReport).filter(
-            UserBurnoutReport.user_id == corr.user_id,
+            UserBurnoutReport.email == corr.email,
             UserBurnoutReport.submitted_at >= analysis_start_date,
             UserBurnoutReport.submitted_at <= analysis_end_date
         ).order_by(UserBurnoutReport.submitted_at.asc()).all()
