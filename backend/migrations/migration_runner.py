@@ -1081,7 +1081,7 @@ class MigrationRunner:
                     """
                 ]
             },
-
+            {
                 "name": "028_simplify_roles",
                 "description": "Simplify role system from 5 roles to 3 roles",
                 "sql_file": "2025_01_17_simplify_roles.sql"
