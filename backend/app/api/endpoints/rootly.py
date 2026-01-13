@@ -1556,9 +1556,9 @@ async def get_synced_users(
 
         survey_counts = {}
         for corr in correlations:
-            if corr.user_id:
+            if corr.email:
                 count = db.query(func.count(UserBurnoutReport.id)).filter(
-                    UserBurnoutReport.user_id == corr.user_id
+                    UserBurnoutReport.email == corr.email
                 ).scalar() or 0
                 survey_counts[corr.id] = count
 

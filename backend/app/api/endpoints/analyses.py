@@ -495,8 +495,10 @@ def get_member_surveys(analysis: Analysis, db: Session) -> dict:
     from ...models.user_correlation import UserCorrelation
 
     # Calculate analysis date range
-    analysis_end_date = analysis.created_at
-    analysis_start_date = analysis_end_date - timedelta(days=analysis.time_range or 30)
+    # Use current time as end date for live survey data (surveys update without re-running analysis)
+    from datetime import datetime
+    analysis_end_date = datetime.utcnow()
+    analysis_start_date = analysis.created_at - timedelta(days=analysis.time_range or 30)
 
     # Get all team members for this organization
     if not analysis.organization_id:
@@ -509,12 +511,12 @@ def get_member_surveys(analysis: Analysis, db: Session) -> dict:
     member_surveys = {}
 
     for corr in correlations:
-        if not corr.user_id or not corr.email:
+        if not corr.email:
             continue
 
-        # Get surveys within analysis period for this user
+        # Get surveys within analysis period for this team member (match by email)
         surveys = db.query(UserBurnoutReport).filter(
-            UserBurnoutReport.user_id == corr.user_id,
+            UserBurnoutReport.email == corr.email,
             UserBurnoutReport.submitted_at >= analysis_start_date,
             UserBurnoutReport.submitted_at <= analysis_end_date
         ).order_by(UserBurnoutReport.submitted_at.asc()).all()
