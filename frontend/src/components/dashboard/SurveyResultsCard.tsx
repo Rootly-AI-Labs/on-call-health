@@ -168,7 +168,7 @@ export function SurveyResultsCard({ surveyData, userEmail }: SurveyResultsCardPr
                     value: `Avg Feeling: ${avgFeeling.toFixed(1)}`,
                     fontSize: 10,
                     fill: '#3b82f6',
-                    position: 'insideTopRight'
+                    position: 'insideTopLeft'
                   }}
                 />
                 <ReferenceLine
@@ -180,7 +180,7 @@ export function SurveyResultsCard({ surveyData, userEmail }: SurveyResultsCardPr
                     value: `Avg Workload: ${avgWorkload.toFixed(1)}`,
                     fontSize: 10,
                     fill: '#8b5cf6',
-                    position: 'insideBottomRight'
+                    position: 'insideBottomLeft'
                   }}
                 />
                 <Line
