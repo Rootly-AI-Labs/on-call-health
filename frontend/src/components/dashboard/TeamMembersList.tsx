@@ -64,27 +64,25 @@ export function TeamMembersList({
   const isJiraEnabled = isDataSourceEnabled('jira');
   const isLinearEnabled = isDataSourceEnabled('linear');
   
-  // Check if data is still loading
-  const isLoading = !currentAnalysis || !currentAnalysis.analysis_data;
+  const isLoading = !currentAnalysis || !currentAnalysis.analysis_data
 
+  // OCB risk level from score (0-100 scale, higher = more burnout)
+  function getOCBRiskLevel(score: number | undefined | null): string {
+    if (score === undefined || score === null) return 'low'
+    if (score < 25) return 'healthy'
+    if (score < 50) return 'fair'
+    if (score < 75) return 'poor'
+    return 'critical'
+  }
 
-  // Official OCB 4-color system for progress bars (0-100 scale, higher = more burnout)
-  const getOCBProgressColor = (score: number) => {
-    const clampedScore = Math.max(0, Math.min(100, score));
-    
-    if (clampedScore < 25) return '#10b981';      // Green - Low/minimal burnout (0-24)
-    if (clampedScore < 50) return '#eab308';      // Yellow - Mild burnout symptoms (25-49)  
-    if (clampedScore < 75) return '#f97316';      // Orange - Moderate/significant burnout (50-74)
-    return '#dc2626';                             // Red - High/severe burnout (75-100)
-  };
-
-  // Official OCB 4-color system for text/badges
-  const getOCBTextColor = (score: number) => {
-    if (score < 25) return '#10b981';       // Green - Low/minimal burnout
-    if (score < 50) return '#eab308';       // Yellow - Mild burnout symptoms
-    if (score < 75) return '#f97316';       // Orange - Moderate/significant burnout  
-    return '#dc2626';                       // Red - High/severe burnout
-  };
+  // OCB 4-color system for progress bars (0-100 scale, higher = more burnout)
+  function getOCBProgressColor(score: number): string {
+    const clampedScore = Math.max(0, Math.min(100, score))
+    if (clampedScore < 25) return '#10b981'  // Green - Low/minimal burnout (0-24)
+    if (clampedScore < 50) return '#eab308'  // Yellow - Mild burnout symptoms (25-49)
+    if (clampedScore < 75) return '#f97316'  // Orange - Moderate/significant burnout (50-74)
+    return '#dc2626'                          // Red - High/severe burnout (75-100)
+  }
 
   const renderMemberCard = (member: any) => (
     <Card

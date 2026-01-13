@@ -31,7 +31,7 @@ export function UserObjectiveDataCard({
     transformer: (day: any) => number
   }> = {
     health_score: {
-      label: "Health Score",
+      label: "Risk Level",
       color: "#7C63D6",  // Purple-700
       yAxisLabel: "Risk Level",
       dataKey: "dailyScore",
@@ -39,7 +39,7 @@ export function UserObjectiveDataCard({
       transformer: (day: any) => day.health_score || 0
     },
     incident_load: {
-      label: "Incident Load",
+      label: "Incident Count",
       color: "#7C63D6",  // Purple-700
       yAxisLabel: "Incident Count",
       dataKey: "incidentCount",
