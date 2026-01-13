@@ -131,6 +131,18 @@ export function SurveyResultsCard({ surveyData, userEmail }: SurveyResultsCardPr
         <CardDescription>
           {surveyData.survey_count_in_period} {surveyData.survey_count_in_period === 1 ? 'response' : 'responses'} in analysis period
         </CardDescription>
+        {surveyData.survey_responses.length > 2 && (
+          <div className="flex items-center gap-4 text-xs mt-2">
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+              <span className="text-neutral-600">Avg Feeling: {avgFeeling.toFixed(1)}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 rounded-full bg-purple-500"></div>
+              <span className="text-neutral-600">Avg Workload: {avgWorkload.toFixed(1)}</span>
+            </div>
+          </div>
+        )}
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Trend Chart */}
@@ -163,25 +175,13 @@ export function SurveyResultsCard({ surveyData, userEmail }: SurveyResultsCardPr
                   y={avgFeeling}
                   stroke="#3b82f6"
                   strokeDasharray="5 5"
-                  strokeOpacity={0.3}
-                  label={{
-                    value: `Avg Feeling: ${avgFeeling.toFixed(1)}`,
-                    fontSize: 10,
-                    fill: '#3b82f6',
-                    position: 'insideTopLeft'
-                  }}
+                  strokeOpacity={0.5}
                 />
                 <ReferenceLine
                   y={avgWorkload}
                   stroke="#8b5cf6"
                   strokeDasharray="5 5"
-                  strokeOpacity={0.3}
-                  label={{
-                    value: `Avg Workload: ${avgWorkload.toFixed(1)}`,
-                    fontSize: 10,
-                    fill: '#8b5cf6',
-                    position: 'insideBottomLeft'
-                  }}
+                  strokeOpacity={0.5}
                 />
                 <Line
                   type="monotone"
