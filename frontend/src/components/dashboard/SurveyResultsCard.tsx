@@ -292,25 +292,71 @@ export function SurveyResultsCard({ surveyData, userEmail }: SurveyResultsCardPr
             <Separator />
             <div>
               <div className="text-xs font-medium text-neutral-700 mb-3">Previous Check-ins</div>
-              <div className="space-y-2 max-h-64 overflow-y-auto">
+              <div className="space-y-3 max-h-96 overflow-y-auto">
                 {surveyData.survey_responses.slice().reverse().slice(1).map((response, index) => (
-                  <div key={index} className="flex items-center justify-between text-sm py-2 border-b last:border-0">
-                    <span className="text-xs text-neutral-500">
-                      {new Date(response.submitted_at).toLocaleDateString(undefined, {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: 'numeric',
-                        minute: '2-digit'
-                      })}
-                    </span>
-                    <div className="flex gap-4 text-xs">
-                      <span className={getScoreColor(response.feeling_score)}>
-                        Feeling: {response.feeling_score}/5
-                      </span>
-                      <span className={getScoreColor(response.workload_score)}>
-                        Workload: {response.workload_score}/5
+                  <div key={index} className="space-y-3 p-3 border rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-neutral-500">
+                        {new Date(response.submitted_at).toLocaleDateString(undefined, {
+                          month: 'short',
+                          day: 'numeric',
+                          hour: 'numeric',
+                          minute: '2-digit'
+                        })} via {response.submitted_via || 'web'}
                       </span>
                     </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <span className="text-xs text-neutral-500">Feeling</span>
+                        <div className="flex items-center gap-2">
+                          <Badge className={getScoreBadgeColor(response.feeling_score)}>
+                            {response.feeling_score}/5
+                          </Badge>
+                          <span className="text-xs">{getFeelingText(response.feeling_score)}</span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <span className="text-xs text-neutral-500">Workload</span>
+                        <div className="flex items-center gap-2">
+                          <Badge className={getScoreBadgeColor(response.workload_score)}>
+                            {response.workload_score}/5
+                          </Badge>
+                          <span className="text-xs">{getWorkloadText(response.workload_score)}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {response.stress_factors && response.stress_factors.length > 0 && (
+                      <div>
+                        <div className="text-xs font-medium text-neutral-700 mb-2">Stress Sources</div>
+                        <div className="flex flex-wrap gap-1">
+                          {response.stress_factors.map((factor, factorIndex) => (
+                            <Badge key={factorIndex} variant="outline" className="text-xs">
+                              {getStressSourceLabel(factor)}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {response.personal_circumstances && (
+                      <div>
+                        <div className="text-xs font-medium text-neutral-700 mb-1">Personal Circumstances Impact</div>
+                        <p className="text-xs text-neutral-700">{response.personal_circumstances}</p>
+                      </div>
+                    )}
+
+                    {response.additional_comments && (
+                      <div>
+                        <div className="flex items-center gap-1 text-xs font-medium text-neutral-700 mb-1">
+                          <MessageSquare className="w-3 h-3" />
+                          <span>Comments</span>
+                        </div>
+                        <p className="text-xs text-neutral-700">{response.additional_comments}</p>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
