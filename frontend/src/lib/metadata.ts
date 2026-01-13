@@ -11,7 +11,7 @@ export const SITE_CONFIG = {
   description: 'Catch overload before it burns out your engineers.',
   longDescription: 'An open source, research-based tool that looks for early-warning signs of burnout in your on-call engineers.',
   url: process.env.NEXT_PUBLIC_SITE_URL || 'https://www.oncallhealth.ai',
-  ogImage: '/images/landing/landing_page_preview',
+  ogImage: '/images/landing/landing_page_preview.png',
   favicon: '/images/favicon.png',
   twitterHandle: '@rootly',
 } as const
@@ -99,7 +99,7 @@ export function generatePageMetadata(
 export const landingPageMetadata = generatePageMetadata(
   'Stop on-call overload before it starts',
   'An open source, research-based tool that looks for early-warning signs of burnout in your on-call engineers.',
-  '/images/landing/landing_page_preview'
+  '/images/landing/landing_page_preview.png'
 )
 
 /**
