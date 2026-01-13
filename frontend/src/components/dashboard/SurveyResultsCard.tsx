@@ -283,15 +283,6 @@ export function SurveyResultsCard({ surveyData, userEmail }: SurveyResultsCardPr
             </div>
           )}
 
-          {latestResponse.personal_circumstances && latestResponse.personal_circumstances !== 'no' && (
-            <div>
-              <div className="text-xs font-medium text-neutral-700 mb-1">Personal Circumstances</div>
-              <Badge variant="outline" className="text-xs">
-                {getPersonalCircumstancesText(latestResponse.personal_circumstances)} impact
-              </Badge>
-            </div>
-          )}
-
           {latestResponse.additional_comments && (
             <div>
               <div className="flex items-center gap-1 text-xs font-medium text-neutral-700 mb-1">
@@ -359,15 +350,6 @@ export function SurveyResultsCard({ surveyData, userEmail }: SurveyResultsCardPr
                             </Badge>
                           ))}
                         </div>
-                      </div>
-                    )}
-
-                    {response.personal_circumstances && response.personal_circumstances !== 'no' && (
-                      <div>
-                        <div className="text-xs font-medium text-neutral-700 mb-1">Personal Circumstances</div>
-                        <Badge variant="outline" className="text-xs">
-                          {getPersonalCircumstancesText(response.personal_circumstances)} impact
-                        </Badge>
                       </div>
                     )}
 
