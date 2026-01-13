@@ -60,7 +60,7 @@ import { AnalysisProgressSection } from "@/components/dashboard/AnalysisProgress
 import { TeamMembersList } from "@/components/dashboard/TeamMembersList"
 import { HealthTrendsChart } from "@/components/dashboard/HealthTrendsChart"
 import { ObjectiveDataCard } from "@/components/dashboard/ObjectiveDataCard"
-import { RiskFactorsCard } from "@/components/dashboard/RiskFactorsCard"
+import { TeamRiskFactorsCard } from "@/components/dashboard/TeamRiskFactorsCard"
 import { MemberDetailModal } from "@/components/dashboard/MemberDetailModal"
 import { GitHubCommitsTimeline } from "@/components/dashboard/charts/GitHubCommitsTimeline"
 import GitHubAllMetricsPopup from "@/components/dashboard/GitHubAllMetricsPopup"
@@ -1079,8 +1079,9 @@ function DashboardContent() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                 {/* Risk Factors Radar Chart */}
                 {burnoutFactors.length > 0 && (
-                  <RiskFactorsCard
-                    title="Team Risk Factors"
+                  <TeamRiskFactorsCard
+                    factorsData={burnoutFactors}
+                    highRiskFactorsCount={highRiskFactors.length}
                     description={(() => {
                       const hasGitHubMembers = membersWithGitHubData.length > 0;
                       const hasIncidentMembers = membersWithIncidents.length > 0;
@@ -1095,10 +1096,8 @@ function DashboardContent() {
                         return "Team risk assessment based on available activity data";
                       }
                     })()}
-                    factorsData={burnoutFactors}
-                    showAlert={highRiskFactors.length > 0}
-                    alertCount={highRiskFactors.length}
-                    domain={[0, 100]}
+                    loadingAnalysis={loadingAnalyses}
+                    membersCount={allActiveMembers.length}
                   />
                 )}
                 

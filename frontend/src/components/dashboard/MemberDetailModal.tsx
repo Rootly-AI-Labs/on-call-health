@@ -12,7 +12,7 @@ import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadius
 import { Info, RefreshCw, BarChart3 } from "lucide-react"
 import { useState, useEffect, useRef } from "react"
 import { UserObjectiveDataCard } from "@/components/dashboard/UserObjectiveDataCard"
-import { RiskFactorsCard } from "@/components/dashboard/RiskFactorsCard"
+import { UserRiskFactorsCard } from "@/components/dashboard/UserRiskFactorsCard"
 import { SurveyResultsCard } from "@/components/dashboard/SurveyResultsCard"
 import { TicketingCard } from "@/components/dashboard/TicketingCard"
 
@@ -463,38 +463,8 @@ export function MemberDetailModal({
                   currentAnalysis={currentAnalysis}
                 />
 
-                {/* Risk Factors - Radar */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base">Risk Factors</CardTitle>
-                    <CardDescription>Key factors contributing to risk of overwork</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="h-64">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <RadarChart data={[
-                          { factor: 'Workload', value: selectedMember.factors?.workload || 0 },
-                          { factor: 'After Hours', value: selectedMember.factors?.afterHours || 0 },
-                          { factor: 'Weekend Work', value: selectedMember.factors?.weekendWork || 0 },
-                          { factor: 'Incident Load', value: selectedMember.factors?.incidentLoad || 0 },
-                          { factor: 'Response Time', value: selectedMember.factors?.responseTime || 0 }
-                        ]}>
-                          <PolarGrid />
-                          <PolarAngleAxis dataKey="factor" tick={{ fontSize: 11 }} />
-                          <PolarRadiusAxis domain={[0, 10]} tick={{ fontSize: 9 }} angle={90} />
-                          <Radar
-                            name="Risk Level"
-                            dataKey="value"
-                            stroke="#8b5cf6"
-                            fill="#8b5cf6"
-                            fillOpacity={0.3}
-                            strokeWidth={2}
-                          />
-                        </RadarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </CardContent>
-                </Card>
+                {/* User Risk Factors - Using shared component */}
+                <UserRiskFactorsCard selectedMember={selectedMember} />
 
                 {/* GitHub / Slack Tabs (conditional) */}
                 {(() => {

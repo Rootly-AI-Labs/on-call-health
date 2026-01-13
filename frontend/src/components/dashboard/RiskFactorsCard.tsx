@@ -1,3 +1,16 @@
+/**
+ * @deprecated Use BaseRiskFactorsCard with TeamRiskFactorsCard or UserRiskFactorsCard wrappers instead.
+ * This component has been replaced with a shared base component architecture for consistency.
+ *
+ * Old usage (Team Trends):
+ * - Replaced by: TeamRiskFactorsCard
+ *
+ * Old usage (User Risk Factors):
+ * - Replaced by: UserRiskFactorsCard
+ *
+ * To remove: Delete this file after confirming no other references exist.
+ */
+
 "use client"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"

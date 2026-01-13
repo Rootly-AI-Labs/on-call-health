@@ -4884,7 +4884,7 @@ class UnifiedBurnoutAnalyzer:
                     deadline_score = 0.2
 
 
-            MAX_LOAD = 15
+            MAX_LOAD = 25
             ticket_load_score = min(ticket_count / MAX_LOAD, 1.0)
 
 
@@ -4898,8 +4898,8 @@ class UnifiedBurnoutAnalyzer:
                 WEIGHT_DEADLINE * deadline_score
             )  # in [0, 1]
 
-            # Global scaling so Jira score is in ~5–30 range
-            JIRA_SCALING = 0.75
+            # Global scaling so Jira score is in ~2–12 range (reduced from 5-30)
+            JIRA_SCALING = 0.65
             jira_score = max(0.0, min(100.0, combined * 100 * JIRA_SCALING))
 
 
@@ -5254,7 +5254,7 @@ class UnifiedBurnoutAnalyzer:
                     deadline_score = 0.2
 
             # Issue load score
-            MAX_LOAD = 15
+            MAX_LOAD = 25
             issue_load_score = min(issue_count / MAX_LOAD, 1.0)
 
             # Combine scores (same weights as Jira)
@@ -5268,8 +5268,8 @@ class UnifiedBurnoutAnalyzer:
                 WEIGHT_DEADLINE * deadline_score
             )
 
-            # Global scaling (same as Jira)
-            LINEAR_SCALING = 0.75
+            # Global scaling (reduced from 0.75 to match Jira)
+            LINEAR_SCALING = 0.65
             linear_score = max(0.0, min(100.0, combined * 100 * LINEAR_SCALING))
 
             logger.info(

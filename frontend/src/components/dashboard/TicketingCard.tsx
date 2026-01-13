@@ -140,7 +140,7 @@ function JiraTicketCardContent({ memberData }: TicketingCardProps) {
   })
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 w-full overflow-hidden">
       {/* Summary Metrics */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="bg-neutral-100 p-3 rounded-md">
@@ -164,11 +164,11 @@ function JiraTicketCardContent({ memberData }: TicketingCardProps) {
       <Separator />
 
       {/* Ticket List */}
-      <div>
+      <div className="w-full overflow-hidden">
         <p className="text-xs font-semibold text-neutral-700 mb-3">Active Tickets ({sortedTickets.length})</p>
-        <div className="space-y-2 max-h-64 overflow-y-auto">
+        <div className="space-y-2 max-h-64 overflow-y-auto w-full">
           {sortedTickets.map((ticket, index) => (
-            <div key={index} className="flex items-center gap-2 p-2 bg-neutral-100 rounded-md hover:bg-neutral-200 transition">
+            <div key={index} className="flex items-center gap-2 p-2 bg-neutral-100 rounded-md hover:bg-neutral-200 transition overflow-hidden">
               <Badge
                 className="text-xs flex-shrink-0"
                 style={getPriorityColor(ticket.priority)}
@@ -176,7 +176,7 @@ function JiraTicketCardContent({ memberData }: TicketingCardProps) {
                 {ticket.priority || "N/A"}
               </Badge>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-neutral-900 truncate">
+                <p className="text-sm font-medium text-neutral-900 truncate line-clamp-1">
                   <span className="font-bold">{ticket.key}</span>
                   {ticket.summary || ticket.title ? ` - ${ticket.summary || ticket.title}` : ""}
                 </p>
@@ -342,7 +342,7 @@ function LinearIssueCardContent({ memberData }: TicketingCardProps) {
   })
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 w-full overflow-hidden">
       {/* Summary Metrics */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="bg-neutral-100 p-3 rounded-md">
@@ -473,11 +473,11 @@ function LinearIssueCard({ memberData }: TicketingCardProps) {
         <Separator />
 
         {/* Issue List */}
-        <div>
+        <div className="w-full overflow-hidden">
           <p className="text-xs font-semibold text-neutral-700 mb-3">Active Issues ({sortedIssues.length})</p>
-          <div className="space-y-2 max-h-64 overflow-y-auto">
+          <div className="space-y-2 max-h-64 overflow-y-auto w-full">
             {sortedIssues.map((issue, index) => (
-              <div key={index} className="flex items-center gap-2 p-2 bg-neutral-100 rounded-md hover:bg-neutral-200 transition">
+              <div key={index} className="flex items-center gap-2 p-2 bg-neutral-100 rounded-md hover:bg-neutral-200 transition overflow-hidden">
                 <Badge
                   className="text-xs flex-shrink-0"
                   style={getPriorityColor(issue.priority)}
@@ -485,7 +485,7 @@ function LinearIssueCard({ memberData }: TicketingCardProps) {
                   {issue.priority === 1 ? "Urgent" : issue.priority === 2 ? "High" : issue.priority === 3 ? "Med" : issue.priority === 4 ? "Low" : "None"}
                 </Badge>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-neutral-900 truncate">
+                  <p className="text-sm font-medium text-neutral-900 truncate line-clamp-1">
                     <span className="font-bold">{issue.identifier}</span>
                     {issue.title ? ` - ${issue.title}` : ""}
                   </p>
@@ -549,7 +549,7 @@ export function TicketingCard({ memberData }: TicketingCardProps) {
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="w-full overflow-hidden">
           {activeTab === "jira" ? (
             <JiraTicketCardContent memberData={memberData} />
           ) : (
