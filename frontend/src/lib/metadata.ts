@@ -97,8 +97,8 @@ export function generatePageMetadata(
  * Metadata for landing/home page
  */
 export const landingPageMetadata = generatePageMetadata(
-  'Stop on-call overload before it starts',
-  'An open source, research-based tool that looks for early-warning signs of burnout in your on-call engineers.',
+  'Catch overload before it burns out your engineers.',
+  'An open source, tool that looks for early warning signs of burnout in your on-call engineers.',
   '/images/landing/landing_page_preview.png'
 )
 
