@@ -201,6 +201,7 @@ export default function IntegrationsPage() {
   const [tokenErrorIntegrationName, setTokenErrorIntegrationName] = useState('')
   const [tokenErrorMissingPermissions, setTokenErrorMissingPermissions] = useState<string[]>([])
   const [hasTokenError, setHasTokenError] = useState(false) // Track if current org has token issues
+
   const [mappingData, setMappingData] = useState<IntegrationMapping[]>([])
   const [mappingStats, setMappingStats] = useState<MappingStatistics | null>(null)
   const [analysisMappingStats, setAnalysisMappingStats] = useState<AnalysisMappingStatistics | null>(null)

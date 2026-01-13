@@ -12,6 +12,7 @@ import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadius
 import { Info, RefreshCw, BarChart3 } from "lucide-react"
 import { useState, useEffect, useRef } from "react"
 import { UserObjectiveDataCard } from "@/components/dashboard/UserObjectiveDataCard"
+import { RiskFactorsCard } from "@/components/dashboard/RiskFactorsCard"
 import { SurveyResultsCard } from "@/components/dashboard/SurveyResultsCard"
 import { TicketingCard } from "@/components/dashboard/TicketingCard"
 
@@ -515,45 +516,35 @@ export function MemberDetailModal({
                       currentAnalysis={currentAnalysis}
                     />
 
-                    {/* Risk Factors – Radar */}
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-base">Risk Factors</CardTitle>
-                        <CardDescription>Key factors contributing to risk of overwork</CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="h-64">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <RadarChart data={[
-                              {
-                                factor: 'Workload',
-                                value: selectedMember.factors?.workload || 0
-                              },
-                              {
-                                factor: 'After Hours',
-                                value: selectedMember.factors?.afterHours || 0
-                              },
-                              {
-                                factor: 'Incident Load',
-                                value: selectedMember.factors?.incidentLoad || 0
-                              }
-                            ]}>
-                              <PolarGrid />
-                              <PolarAngleAxis dataKey="factor" tick={{ fontSize: 11 }} />
-                              <PolarRadiusAxis domain={[0, 10]} tick={{ fontSize: 9 }} angle={90} />
-                              <Radar
-                                name="Risk Level"
-                                dataKey="value"
-                                stroke="#8b5cf6"
-                                fill="#8b5cf6"
-                                fillOpacity={0.3}
-                                strokeWidth={2}
-                              />
-                            </RadarChart>
-                          </ResponsiveContainer>
-                        </div>
-                      </CardContent>
-                    </Card>
+                    {/* User Risk Factors – Radar */}
+                    {(() => {
+                      const userFactorsData = [
+                        {
+                          factor: 'Workload Intensity',
+                          value: (selectedMember.factors?.workload || 0) * 10
+                        },
+                        {
+                          factor: 'After Hours Activity',
+                          value: (selectedMember.factors?.afterHours || 0) * 10
+                        },
+                        {
+                          factor: 'Incident Load',
+                          value: (selectedMember.factors?.incidentLoad || 0) * 10
+                        }
+                      ];
+                      const highRiskUserFactors = userFactorsData.filter(f => f.value > 70);
+
+                      return (
+                        <RiskFactorsCard
+                          title="User Risk Factors"
+                          description="Key factors contributing to risk of overwork"
+                          factorsData={userFactorsData}
+                          domain={[0, 100]}
+                          showAlert={highRiskUserFactors.length > 0}
+                          alertCount={highRiskUserFactors.length}
+                        />
+                      );
+                    })()}
 
                     {/* Incident Response Metrics */}
                     {/* <Card>
@@ -806,67 +797,159 @@ export function MemberDetailModal({
 
                     {/* Burnout Analysis – Deep Dive (moved to bottom) */}
                     <Card>
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-semibold text-neutral-900">Burnout Analysis</h4>
+                          <div className="relative group">
+                            <Info className="w-4 h-4 text-neutral-400 cursor-help hover:text-neutral-600" />
+                            <div className="absolute top-full right-0 mt-2 px-3 py-2 bg-neutral-900 text-white text-xs rounded-lg w-80 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                              <div className="font-semibold mb-2">Burnout Dimensions</div>
+                              <div className="space-y-2">
+                                <div>
+                                  <div className="font-medium text-blue-300 mb-1">Personal Burnout</div>
+                                  <div className="text-xs">• Incident frequency (incidents per week)<br/>• After-hours work patterns<br/>• Weekend activity levels<br/>• Sleep disruption indicators<br/>• Overall workload intensity relative to team baseline</div>
+                                </div>
+                                <div>
+                                  <div className="font-medium text-blue-300 mb-1">Work-Related Burnout</div>
+                                  <div className="text-xs">• Incident response time patterns<br/>• Severity-weighted incident load<br/>• GitHub commit activity and timing<br/>• Slack communication patterns<br/>• Work-life boundary violations (late night/weekend work)</div>
+                                </div>
+                              </div>
+                              <div className="absolute bottom-full right-4 w-0 h-0 border-l-4 border-r-4 border-b-4 border-l-transparent border-r-transparent border-b-gray-900"></div>
+                            </div>
+                          </div>
+                        </div>
+                      </CardHeader>
                       <CardContent className="p-4">
-                        <h4 className="font-semibold text-neutral-900 mb-2">Burnout Analysis</h4>
                         {memberData?.ocb_reasoning ? (
                           <div className="space-y-6">
-                            {/* Contributing Factors */}
-                            <div className="space-y-3">
-                              <h5 className="text-sm font-semibold text-neutral-900 mb-3 pb-1 border-b border-neutral-200">
-                                Factors
-                              </h5>
-                              <div className="space-y-2">
-                                {memberData.ocb_reasoning.slice(1).map((reason: string, index: number) => {
-                                  const cleanReason = reason.replace(/^[\s]*[•·\-*]\s*/, '').trim();
-                                  const isSectionHeader = cleanReason.endsWith(':');
-                                  if (isSectionHeader) return null;
-
-                                  return (
-                                    <div key={index} className="px-3 py-2 bg-neutral-100 rounded-md border text-sm text-neutral-700">
-                                      {cleanReason}
-                                    </div>
-                                  );
-                                }).filter(Boolean)}
-                              </div>
-                            </div>
-
                             {/* Dimensional Breakdown */}
                             {memberData.ocb_breakdown && (
-                              <div className="grid grid-cols-2 gap-4">
-                                <div className="bg-green-50 rounded-lg p-3">
-                                  <div className="flex items-center space-x-1 mb-1">
-                                    <div className="text-xs font-medium text-green-600 uppercase">Personal</div>
-                                    <div className="relative group">
-                                      <Info className="w-3 h-3 text-green-500 cursor-help" />
-                                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-neutral-900 text-white text-xs rounded-lg w-72 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                                        <div className="font-semibold mb-1">Personal Burnout - What We Measure</div>
-                                        <div>• Incident frequency (incidents per week)<br/>• After-hours work patterns<br/>• Weekend activity levels<br/>• Sleep disruption indicators<br/>• Overall workload intensity relative to team baseline</div>
-                                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-900"></div>
+                              <div className="space-y-1">
+                                {/* Personal Burnout */}
+                                <div className="rounded-lg p-2">
+                                  <div className="flex items-center justify-between mb-1">
+                                    <span></span>
+                                    {(() => {
+                                      const score = memberData.ocb_breakdown.personal ?? 0;
+                                      let severity = 'Good';
+                                      let color = 'bg-green-100 text-green-800';
+                                      if (score >= 70) {
+                                        severity = 'Critical';
+                                        color = 'bg-red-100 text-red-800';
+                                      } else if (score >= 50) {
+                                        severity = 'Poor';
+                                        color = 'bg-orange-100 text-orange-800';
+                                      } else if (score >= 30) {
+                                        severity = 'Fair';
+                                        color = 'bg-yellow-100 text-yellow-800';
+                                      }
+                                      return (
+                                        <span className={`text-xs font-medium px-2 py-1 rounded-full ${color}`}>
+                                          {severity}
+                                        </span>
+                                      );
+                                    })()}
+                                  </div>
+                                  <div className="flex items-center gap-3">
+                                    <span className="w-20 text-sm font-medium text-gray-700">Personal</span>
+                                    <div className="flex-1">
+                                      <div className="w-full bg-gray-300 rounded-full h-2">
+                                        <div
+                                          className="h-2 rounded-full transition-all duration-500"
+                                          style={{
+                                            width: `${memberData.ocb_breakdown.personal ?? 0}%`,
+                                            backgroundColor: (() => {
+                                              const score = memberData.ocb_breakdown.personal ?? 0;
+                                              if (score >= 70) return '#EF4444'; // red-500
+                                              if (score >= 50) return '#F97316'; // orange-500
+                                              if (score >= 30) return '#F59E0B'; // yellow-500
+                                              return '#10B981'; // green-500
+                                            })()
+                                          }}
+                                        ></div>
                                       </div>
                                     </div>
-                                  </div>
-                                  <div className="text-lg font-bold text-green-700">
-                                    {memberData.ocb_breakdown.personal?.toFixed(0)}/100
                                   </div>
                                 </div>
-                                <div className="bg-blue-50 rounded-lg p-3">
-                                  <div className="flex items-center space-x-1 mb-1">
-                                    <div className="text-xs font-medium text-blue-600 uppercase">Work-Related</div>
-                                    <div className="relative group">
-                                      <Info className="w-3 h-3 text-blue-500 cursor-help" />
-                                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-neutral-900 text-white text-xs rounded-lg w-72 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                                        <div className="font-semibold mb-1">Work-Related Burnout - What We Measure</div>
-                                        <div>• Incident response time patterns<br/>• Severity-weighted incident load<br/>• GitHub commit activity and timing<br/>• Slack communication patterns<br/>• Work-life boundary violations (late night/weekend work)</div>
-                                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-900"></div>
+
+                                {/* Work-Related Burnout */}
+                                <div className="rounded-lg p-2">
+                                  <div className="flex items-center justify-between mb-1">
+                                    <span></span>
+                                    {(() => {
+                                      const score = memberData.ocb_breakdown.work_related ?? 0;
+                                      let severity = 'Good';
+                                      let color = 'bg-green-100 text-green-800';
+                                      if (score >= 70) {
+                                        severity = 'Critical';
+                                        color = 'bg-red-100 text-red-800';
+                                      } else if (score >= 50) {
+                                        severity = 'Poor';
+                                        color = 'bg-orange-100 text-orange-800';
+                                      } else if (score >= 30) {
+                                        severity = 'Fair';
+                                        color = 'bg-yellow-100 text-yellow-800';
+                                      }
+                                      return (
+                                        <span className={`text-xs font-medium px-2 py-1 rounded-full ${color}`}>
+                                          {severity}
+                                        </span>
+                                      );
+                                    })()}
+                                  </div>
+                                  <div className="flex items-center gap-3">
+                                    <span className="w-20 text-sm font-medium text-gray-700">Work-Related</span>
+                                    <div className="flex-1">
+                                      <div className="w-full bg-gray-300 rounded-full h-2">
+                                        <div
+                                          className="h-2 rounded-full transition-all duration-500"
+                                          style={{
+                                            width: `${memberData.ocb_breakdown.work_related ?? 0}%`,
+                                            backgroundColor: (() => {
+                                              const score = memberData.ocb_breakdown.work_related ?? 0;
+                                              if (score >= 70) return '#EF4444'; // red-500
+                                              if (score >= 50) return '#F97316'; // orange-500
+                                              if (score >= 30) return '#F59E0B'; // yellow-500
+                                              return '#10B981'; // green-500
+                                            })()
+                                          }}
+                                        ></div>
                                       </div>
                                     </div>
-                                  </div>
-                                  <div className="text-lg font-bold text-blue-700">
-                                    {memberData.ocb_breakdown.work_related?.toFixed(0)}/100
                                   </div>
                                 </div>
                               </div>
                             )}
+
+                            {/* Contributing Factors */}
+                            <div className="grid grid-cols-2 gap-y-1.5 gap-x-4 mt-2">
+                              {(() => {
+                                const filteredReasons = memberData.ocb_reasoning.slice(1).filter((reason: string) => {
+                                  const cleanReason = reason.replace(/^[\s]*[•·\-*]\s*/, '').trim();
+                                  return !cleanReason.endsWith(':');
+                                });
+
+                                return filteredReasons.map((reason: string, index: number) => {
+                                  const cleanReason = reason.replace(/^[\s]*[•·\-*]\s*/, '').trim().replace(/\s*\([^)]*\)$/, '');
+                                  const isLastItem = index === filteredReasons.length - 1;
+
+                                  if (isLastItem) {
+                                    return (
+                                      <div key={index} className="col-span-2 text-sm text-neutral-700 font-semibold mt-4 pt-3 border-t border-neutral-200">
+                                        {cleanReason}
+                                      </div>
+                                    );
+                                  }
+
+                                  return (
+                                    <div key={index} className="flex items-start gap-1.5 text-sm text-neutral-700">
+                                      <span className="text-neutral-400 flex-shrink-0 leading-relaxed">•</span>
+                                      <span className="leading-relaxed">{cleanReason}</span>
+                                    </div>
+                                  );
+                                });
+                              })()}
+                            </div>
                           </div>
                         ) : (
                           <p className="text-sm text-neutral-500 italic">
