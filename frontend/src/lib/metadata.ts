@@ -19,7 +19,7 @@ export const SITE_CONFIG = {
  * Base metadata template used as default for all pages
  */
 export const baseMetadata: Metadata = {
-  title: SITE_CONFIG.name,
+  title: SITE_CONFIG.shortName,  // "On-Call Health" for browser tab (shorter than full marketing message)
   description: SITE_CONFIG.description,
   icons: {
     icon: SITE_CONFIG.favicon,
