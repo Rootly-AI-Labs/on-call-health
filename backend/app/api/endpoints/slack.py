@@ -1229,7 +1229,7 @@ async def handle_oncall_health_command(
 
         if not slack_integration or not slack_integration.slack_token:
             # Fallback to old button-based approach if no token
-            survey_url = f"{settings.FRONTEND_URL}/survey?user={user_correlation.user_id}"
+            survey_url = f"{settings.FRONTEND_URL}/survey?email={user_correlation.email}"
             if latest_analysis:
                 survey_url += f"&analysis={latest_analysis.id}"
 
@@ -1270,7 +1270,7 @@ async def handle_oncall_health_command(
             if not result.get("ok"):
                 logging.error(f"Failed to open modal: {result.get('error')}")
                 # Fallback to button approach
-                survey_url = f"{settings.FRONTEND_URL}/survey?user={user_correlation.user_id}"
+                survey_url = f"{settings.FRONTEND_URL}/survey?email={user_correlation.email}"
                 if latest_analysis:
                     survey_url += f"&analysis={latest_analysis.id}"
 
