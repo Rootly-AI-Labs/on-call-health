@@ -13,7 +13,7 @@ const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
   title: 'On-Call Health',
-  description: 'Monitor team wellbeing and prevent burnout before it impacts your team',
+  description: 'Catch overload before it burns out your engineers.',
   icons: {
     icon: '/images/favicon.png',
     shortcut: '/images/favicon.png',
