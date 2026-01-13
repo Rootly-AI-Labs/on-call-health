@@ -7,6 +7,7 @@ import { MappingDrawer } from "@/components/mapping-drawer"
 import { Separator } from "@/components/ui/separator"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
@@ -2012,13 +2013,13 @@ function DashboardContent() {
 
                   {/* Slack Toggle Card */}
                   {true && (
-                    <div className={`border rounded-lg p-3 transition-all ${includeSlack && slackIntegration ? 'border-purple-500 bg-purple-50' : 'border-neutral-200 bg-white'}`}>
+                    <div className="border rounded-lg p-3 transition-all border-neutral-200 bg-neutral-50 opacity-60 cursor-not-allowed">
                       {/* Always show Slack content immediately, no skeleton loader */}
                       {(
                         <>
                           <div className="flex items-start justify-between mb-2">
                             <div className="flex items-center space-x-2">
-                              <div className="w-6 h-6 rounded flex items-center justify-center">
+                              <div className="w-6 h-6 rounded flex items-center justify-center opacity-50">
                                 <svg className="w-6 h-6" viewBox="0 0 124 124" fill="none">
                                   <path d="M26.3996 78.2003C26.3996 84.7003 21.2996 89.8003 14.7996 89.8003C8.29961 89.8003 3.19961 84.7003 3.19961 78.2003C3.19961 71.7003 8.29961 66.6003 14.7996 66.6003H26.3996V78.2003Z" fill="#E01E5A"/>
                                   <path d="M32.2996 78.2003C32.2996 71.7003 37.3996 66.6003 43.8996 66.6003C50.3996 66.6003 55.4996 71.7003 55.4996 78.2003V109.2C55.4996 115.7 50.3996 120.8 43.8996 120.8C37.3996 120.8 32.2996 115.7 32.2996 109.2V78.2003Z" fill="#E01E5A"/>
@@ -2031,26 +2032,18 @@ function DashboardContent() {
                                 </svg>
                               </div>
                               <div>
-                                <h3 className="text-sm font-medium text-neutral-900">Slack</h3>
+                                <h3 className="text-sm font-medium text-neutral-500">Slack</h3>
                               </div>
                             </div>
                             <Switch
-                              checked={includeSlack && !!slackIntegration}
-                              onCheckedChange={(checked) => {
-                                if (!slackIntegration) {
-                                  toast.error(
-                                    <span>
-                                      Slack not connected - please connect on <a href="/integrations" className="underline font-medium hover:text-red-800">integrations page</a>
-                                    </span>
-                                  )
-                                } else {
-                                  setIncludeSlack(checked)
-                                }
-                              }}
-                              disabled={!slackIntegration}
+                              checked={false}
+                              disabled={true}
                             />
                           </div>
-                          <p className="text-xs text-neutral-700 mb-1">Communication patterns</p>
+                          <p className="text-xs text-neutral-500 mb-1">Sentiment analysis</p>
+                          <Badge className="bg-purple-100 text-purple-700 border-purple-300 text-xs font-semibold">
+                            Coming Soon
+                          </Badge>
                         </>
                       )}
                     </div>
