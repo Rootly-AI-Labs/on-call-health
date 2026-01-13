@@ -104,24 +104,35 @@ export function SurveyResultsCard({ surveyData, userEmail }: SurveyResultsCardPr
     : null
 
   return (
-    <div className="space-y-4">
-      {/* Latest Check-in Summary */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-sm">Latest Check-in</CardTitle>
-            <div className="flex items-center gap-2">
-              {getTrendIcon(surveyData.trend)}
-              <span className="text-xs text-neutral-500 capitalize">{surveyData.trend}</span>
-            </div>
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-sm">Health Check-ins</CardTitle>
+          <div className="flex items-center gap-2">
+            {getTrendIcon(surveyData.trend)}
+            <span className="text-xs text-neutral-500 capitalize">{surveyData.trend}</span>
           </div>
-          <CardDescription>
-            {new Date(latestResponse.submitted_at).toLocaleString(undefined, {
-              timeZoneName: 'short'
-            })} via {latestResponse.submitted_via || 'web'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+        </div>
+        <CardDescription>
+          {surveyData.survey_count_in_period} {surveyData.survey_count_in_period === 1 ? 'response' : 'responses'} in analysis period
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Latest Response */}
+        <div className="space-y-4 p-3 bg-neutral-50 rounded-lg">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-neutral-700">Latest Check-in</span>
+            <span className="text-xs text-neutral-500">
+              {new Date(latestResponse.submitted_at).toLocaleString(undefined, {
+                month: 'short',
+                day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit',
+                timeZoneName: 'short'
+              })} via {latestResponse.submitted_via || 'web'}
+            </span>
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
               <span className="text-xs text-neutral-500">How they're feeling</span>
@@ -145,79 +156,68 @@ export function SurveyResultsCard({ surveyData, userEmail }: SurveyResultsCardPr
           </div>
 
           {latestResponse.stress_factors && latestResponse.stress_factors.length > 0 && (
-            <>
-              <Separator />
-              <div>
-                <div className="text-xs font-medium text-neutral-700 mb-2">Stress Sources</div>
-                <div className="flex flex-wrap gap-1">
-                  {latestResponse.stress_factors.map((factor, index) => (
-                    <Badge key={index} variant="outline" className="text-xs">
-                      {getStressSourceLabel(factor)}
-                    </Badge>
-                  ))}
-                </div>
+            <div>
+              <div className="text-xs font-medium text-neutral-700 mb-2">Stress Sources</div>
+              <div className="flex flex-wrap gap-1">
+                {latestResponse.stress_factors.map((factor, index) => (
+                  <Badge key={index} variant="outline" className="text-xs">
+                    {getStressSourceLabel(factor)}
+                  </Badge>
+                ))}
               </div>
-            </>
+            </div>
           )}
 
           {latestResponse.personal_circumstances && (
-            <>
-              <Separator />
-              <div>
-                <div className="text-xs font-medium text-neutral-700 mb-1">Personal Circumstances Impact</div>
-                <p className="text-sm text-neutral-700">{latestResponse.personal_circumstances}</p>
-              </div>
-            </>
+            <div>
+              <div className="text-xs font-medium text-neutral-700 mb-1">Personal Circumstances Impact</div>
+              <p className="text-sm text-neutral-700">{latestResponse.personal_circumstances}</p>
+            </div>
           )}
 
           {latestResponse.additional_comments && (
-            <>
-              <Separator />
-              <div>
-                <div className="flex items-center gap-1 text-xs font-medium text-neutral-700 mb-1">
-                  <MessageSquare className="w-3 h-3" />
-                  <span>Comments</span>
-                </div>
-                <p className="text-sm text-neutral-700">{latestResponse.additional_comments}</p>
+            <div>
+              <div className="flex items-center gap-1 text-xs font-medium text-neutral-700 mb-1">
+                <MessageSquare className="w-3 h-3" />
+                <span>Comments</span>
               </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Response History */}
-      {surveyData.survey_responses.length > 1 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Response History</CardTitle>
-            <CardDescription>{surveyData.survey_count_in_period} responses in analysis period</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2 max-h-80 overflow-y-auto">
-              {surveyData.survey_responses.slice().reverse().slice(1).map((response, index) => (
-                <div key={index} className="flex items-center justify-between text-sm py-2 border-b last:border-0">
-                  <span className="text-xs text-neutral-500">
-                    {new Date(response.submitted_at).toLocaleDateString(undefined, {
-                      month: 'short',
-                      day: 'numeric',
-                      hour: 'numeric',
-                      minute: '2-digit'
-                    })}
-                  </span>
-                  <div className="flex gap-4 text-xs">
-                    <span className={getScoreColor(response.feeling_score)}>
-                      Feeling: {response.feeling_score}/5
-                    </span>
-                    <span className={getScoreColor(response.workload_score)}>
-                      Workload: {response.workload_score}/5
-                    </span>
-                  </div>
-                </div>
-              ))}
+              <p className="text-sm text-neutral-700">{latestResponse.additional_comments}</p>
             </div>
-          </CardContent>
-        </Card>
-      )}
-    </div>
+          )}
+        </div>
+
+        {/* Response History */}
+        {surveyData.survey_responses.length > 1 && (
+          <>
+            <Separator />
+            <div>
+              <div className="text-xs font-medium text-neutral-700 mb-3">Previous Check-ins</div>
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {surveyData.survey_responses.slice().reverse().slice(1).map((response, index) => (
+                  <div key={index} className="flex items-center justify-between text-sm py-2 border-b last:border-0">
+                    <span className="text-xs text-neutral-500">
+                      {new Date(response.submitted_at).toLocaleDateString(undefined, {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: 'numeric',
+                        minute: '2-digit'
+                      })}
+                    </span>
+                    <div className="flex gap-4 text-xs">
+                      <span className={getScoreColor(response.feeling_score)}>
+                        Feeling: {response.feeling_score}/5
+                      </span>
+                      <span className={getScoreColor(response.workload_score)}>
+                        Workload: {response.workload_score}/5
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
   )
 }
