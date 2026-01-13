@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { TrendingUp, TrendingDown, Minus, MessageSquare } from "lucide-react"
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts"
 
 interface SurveyResponse {
   feeling_score: number
@@ -103,6 +104,20 @@ export function SurveyResultsCard({ surveyData, userEmail }: SurveyResultsCardPr
     ? surveyData.survey_responses[surveyData.survey_responses.length - 2]
     : null
 
+  // Prepare chart data
+  const chartData = surveyData.survey_responses.map((response) => ({
+    date: new Date(response.submitted_at).toLocaleDateString(undefined, {
+      month: 'short',
+      day: 'numeric'
+    }),
+    feeling: response.feeling_score,
+    workload: response.workload_score
+  }))
+
+  // Calculate baseline averages
+  const avgFeeling = surveyData.survey_responses.reduce((sum, r) => sum + r.feeling_score, 0) / surveyData.survey_responses.length
+  const avgWorkload = surveyData.survey_responses.reduce((sum, r) => sum + r.workload_score, 0) / surveyData.survey_responses.length
+
   return (
     <Card>
       <CardHeader>
@@ -118,6 +133,91 @@ export function SurveyResultsCard({ surveyData, userEmail }: SurveyResultsCardPr
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Trend Chart */}
+        {surveyData.survey_responses.length > 2 && (
+          <div className="space-y-2">
+            <div className="text-xs font-medium text-neutral-700">Score Trends</div>
+            <ResponsiveContainer width="100%" height={200}>
+              <LineChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fontSize: 11 }}
+                  stroke="#737373"
+                />
+                <YAxis
+                  domain={[0, 5]}
+                  ticks={[1, 2, 3, 4, 5]}
+                  tick={{ fontSize: 11 }}
+                  stroke="#737373"
+                />
+                <Tooltip
+                  contentStyle={{
+                    fontSize: '12px',
+                    backgroundColor: 'white',
+                    border: '1px solid #e5e5e5',
+                    borderRadius: '6px'
+                  }}
+                />
+                <ReferenceLine
+                  y={avgFeeling}
+                  stroke="#3b82f6"
+                  strokeDasharray="5 5"
+                  strokeOpacity={0.3}
+                  label={{
+                    value: `Avg Feeling: ${avgFeeling.toFixed(1)}`,
+                    fontSize: 10,
+                    fill: '#3b82f6',
+                    position: 'insideTopRight'
+                  }}
+                />
+                <ReferenceLine
+                  y={avgWorkload}
+                  stroke="#8b5cf6"
+                  strokeDasharray="5 5"
+                  strokeOpacity={0.3}
+                  label={{
+                    value: `Avg Workload: ${avgWorkload.toFixed(1)}`,
+                    fontSize: 10,
+                    fill: '#8b5cf6',
+                    position: 'insideBottomRight'
+                  }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="feeling"
+                  stroke="#3b82f6"
+                  strokeWidth={2}
+                  dot={{ fill: '#3b82f6', r: 3 }}
+                  name="Feeling"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="workload"
+                  stroke="#8b5cf6"
+                  strokeWidth={2}
+                  dot={{ fill: '#8b5cf6', r: 3 }}
+                  name="Workload"
+                />
+              </LineChart>
+            </ResponsiveContainer>
+            <div className="flex items-center justify-center gap-4 text-xs">
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                <span className="text-neutral-600">Feeling</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 rounded-full bg-purple-500"></div>
+                <span className="text-neutral-600">Workload</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-0.5 bg-neutral-400"></div>
+                <span className="text-neutral-600">Average</span>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Latest Response */}
         <div className="space-y-4 p-3 bg-neutral-50 rounded-lg">
           <div className="flex items-center justify-between">
