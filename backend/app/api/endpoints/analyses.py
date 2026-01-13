@@ -495,7 +495,7 @@ def get_member_surveys(analysis: Analysis, db: Session) -> dict:
     from ...models.user_correlation import UserCorrelation
 
     # Calculate analysis date range
-    # Use current time as end date to include surveys submitted after analysis creation
+    # Use current time as end date for live survey data (surveys update without re-running analysis)
     from datetime import datetime
     analysis_end_date = datetime.utcnow()
     analysis_start_date = analysis.created_at - timedelta(days=analysis.time_range or 30)
