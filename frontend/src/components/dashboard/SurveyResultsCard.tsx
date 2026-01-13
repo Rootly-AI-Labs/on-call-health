@@ -40,9 +40,9 @@ const getScoreColor = (score: number) => {
 
 const getScoreBadgeColor = (score: number) => {
   if (score >= 4) return 'bg-green-100 text-green-800'
-  if (score >= 3) return 'bg-orange-500 text-white'
-  if (score >= 2) return 'bg-orange-700 text-white'
-  return 'bg-orange-900 text-white'
+  if (score === 3) return 'bg-yellow-100 text-yellow-800'
+  if (score === 2) return 'bg-orange-100 text-orange-800'
+  return 'bg-red-100 text-red-800'
 }
 
 const getTrendIcon = (trend: string) => {
@@ -83,6 +83,15 @@ const getStressSourceLabel = (source: string) => {
     'unclear_expectations': 'Unclear expectations'
   }
   return labels[source] || source
+}
+
+const getPersonalCircumstancesText = (value: string) => {
+  const labels: { [key: string]: string } = {
+    'no': 'No',
+    'somewhat': 'Somewhat',
+    'significantly': 'Significantly'
+  }
+  return labels[value] || value
 }
 
 export function SurveyResultsCard({ surveyData, userEmail }: SurveyResultsCardProps) {
@@ -146,7 +155,7 @@ export function SurveyResultsCard({ surveyData, userEmail }: SurveyResultsCardPr
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Trend Chart */}
-        {surveyData.survey_responses.length > 2 && (
+        {surveyData.survey_responses.length > 2 ? (
           <div className="space-y-2">
             <div className="text-xs font-medium text-neutral-700">Score Trends</div>
             <ResponsiveContainer width="100%" height={200}>
@@ -201,22 +210,26 @@ export function SurveyResultsCard({ surveyData, userEmail }: SurveyResultsCardPr
                 />
               </LineChart>
             </ResponsiveContainer>
-            <div className="flex items-center justify-center gap-4 text-xs">
+            <div className="flex items-center justify-center gap-4 text-xs text-neutral-500">
               <div className="flex items-center gap-1">
                 <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                <span className="text-neutral-600">Feeling</span>
+                <span>Feeling</span>
               </div>
               <div className="flex items-center gap-1">
                 <div className="w-3 h-3 rounded-full bg-purple-500"></div>
-                <span className="text-neutral-600">Workload</span>
+                <span>Workload</span>
               </div>
               <div className="flex items-center gap-1">
-                <div className="w-3 h-0.5 bg-neutral-400"></div>
-                <span className="text-neutral-600">Average</span>
+                <div className="w-4 h-0.5 bg-neutral-400 opacity-50"></div>
+                <span>Baseline</span>
               </div>
             </div>
           </div>
-        )}
+        ) : surveyData.survey_responses.length > 0 ? (
+          <div className="text-xs text-neutral-500 text-center py-2 bg-neutral-50 rounded-lg">
+            Need 3+ responses to show trend chart
+          </div>
+        ) : null}
 
         {/* Latest Response */}
         <div className="space-y-4 p-3 bg-neutral-50 rounded-lg">
@@ -235,7 +248,7 @@ export function SurveyResultsCard({ surveyData, userEmail }: SurveyResultsCardPr
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
-              <span className="text-xs text-neutral-500">How they're feeling</span>
+              <span className="text-xs text-neutral-500">Feeling</span>
               <div className="flex items-center gap-2">
                 <Badge className={getScoreBadgeColor(latestResponse.feeling_score)}>
                   {latestResponse.feeling_score}/5
@@ -268,10 +281,12 @@ export function SurveyResultsCard({ surveyData, userEmail }: SurveyResultsCardPr
             </div>
           )}
 
-          {latestResponse.personal_circumstances && (
+          {latestResponse.personal_circumstances && latestResponse.personal_circumstances !== 'no' && (
             <div>
-              <div className="text-xs font-medium text-neutral-700 mb-1">Personal Circumstances Impact</div>
-              <p className="text-sm text-neutral-700">{latestResponse.personal_circumstances}</p>
+              <div className="text-xs font-medium text-neutral-700 mb-1">Personal Circumstances</div>
+              <Badge variant="outline" className="text-xs">
+                {getPersonalCircumstancesText(latestResponse.personal_circumstances)} impact
+              </Badge>
             </div>
           )}
 
@@ -291,8 +306,10 @@ export function SurveyResultsCard({ surveyData, userEmail }: SurveyResultsCardPr
           <>
             <Separator />
             <div>
-              <div className="text-xs font-medium text-neutral-700 mb-3">Previous Check-ins</div>
-              <div className="space-y-3 max-h-96 overflow-y-auto">
+              <div className="text-xs font-medium text-neutral-700 mb-3">
+                Previous Check-ins ({surveyData.survey_responses.length - 1})
+              </div>
+              <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
                 {surveyData.survey_responses.slice().reverse().slice(1).map((response, index) => (
                   <div key={index} className="space-y-3 p-3 border rounded-lg">
                     <div className="flex items-center justify-between">
@@ -341,10 +358,12 @@ export function SurveyResultsCard({ surveyData, userEmail }: SurveyResultsCardPr
                       </div>
                     )}
 
-                    {response.personal_circumstances && (
+                    {response.personal_circumstances && response.personal_circumstances !== 'no' && (
                       <div>
-                        <div className="text-xs font-medium text-neutral-700 mb-1">Personal Circumstances Impact</div>
-                        <p className="text-xs text-neutral-700">{response.personal_circumstances}</p>
+                        <div className="text-xs font-medium text-neutral-700 mb-1">Personal Circumstances</div>
+                        <Badge variant="outline" className="text-xs">
+                          {getPersonalCircumstancesText(response.personal_circumstances)} impact
+                        </Badge>
                       </div>
                     )}
 
