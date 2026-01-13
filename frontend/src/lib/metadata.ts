@@ -9,7 +9,7 @@ export const SITE_CONFIG = {
   name: 'On-Call Health',
   shortName: 'OCH',
   description: 'Catch overload before it burns out your engineers.',
-  longDescription: 'An open source, research-based tool that looks for early-warning signs of burnout in your on-call engineers.',
+  longDescription: 'An open source tool that looks for early warning signs of overload in your on-call engineers.',
   url: process.env.NEXT_PUBLIC_SITE_URL || 'https://www.oncallhealth.ai',
   ogImage: '/images/landing/landing_page_preview.png',
   favicon: '/images/favicon.png',
@@ -97,8 +97,8 @@ export function generatePageMetadata(
  * Metadata for landing/home page
  */
 export const landingPageMetadata = generatePageMetadata(
+  'On-Call Health',
   'Catch overload before it burns out your engineers.',
-  'An open source, tool that looks for early warning signs of burnout in your on-call engineers.',
   '/images/landing/landing_page_preview.png'
 )
 
