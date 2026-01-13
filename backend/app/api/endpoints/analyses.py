@@ -495,8 +495,10 @@ def get_member_surveys(analysis: Analysis, db: Session) -> dict:
     from ...models.user_correlation import UserCorrelation
 
     # Calculate analysis date range
-    analysis_end_date = analysis.created_at
-    analysis_start_date = analysis_end_date - timedelta(days=analysis.time_range or 30)
+    # Use current time as end date to include surveys submitted after analysis creation
+    from datetime import datetime
+    analysis_end_date = datetime.utcnow()
+    analysis_start_date = analysis.created_at - timedelta(days=analysis.time_range or 30)
 
     # Get all team members for this organization
     if not analysis.organization_id:
