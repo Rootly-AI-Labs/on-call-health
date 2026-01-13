@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { CheckCircle, Loader2, AlertCircle } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
 import { SlackSurveyTabs } from "@/components/SlackSurveyTabs"
 
 interface UnifiedSlackCardProps {
@@ -428,6 +429,28 @@ export function UnifiedSlackCard({
                     id="survey-toggle"
                     checked={surveyEnabled}
                     onCheckedChange={(checked) => handleFeatureToggle('survey', checked)}
+                    className="ml-4"
+                  />
+                </div>
+
+                {/* Sentiment Analysis - Coming Soon */}
+                <div className="p-4 flex items-center justify-between bg-neutral-50 opacity-60">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <Label className="text-base font-medium text-neutral-500 cursor-not-allowed">
+                        Sentiment Analysis
+                      </Label>
+                      <Badge className="bg-purple-100 text-purple-700 border-purple-300 text-xs font-semibold">
+                        Coming Soon
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-neutral-500 mt-1">
+                      Analyze team sentiment from Slack messages to detect early signs of burnout
+                    </p>
+                  </div>
+                  <Switch
+                    disabled
+                    checked={false}
                     className="ml-4"
                   />
                 </div>
