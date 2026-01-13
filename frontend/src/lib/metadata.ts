@@ -6,8 +6,8 @@ import type { Metadata } from 'next'
  */
 
 export const SITE_CONFIG = {
-  name: 'On-Call Health',
-  shortName: 'OCH',
+  name: 'Catch overload before it burns out your engineers.',
+  shortName: 'On-Call Health',
   description: 'Catch overload before it burns out your engineers.',
   longDescription: 'An open source tool that looks for early warning signs of overload in your on-call engineers.',
   url: process.env.NEXT_PUBLIC_SITE_URL || 'https://www.oncallhealth.ai',
