@@ -8,12 +8,11 @@ import type { Metadata } from 'next'
 export const SITE_CONFIG = {
   name: 'Catch overload before it burns out your engineers.',
   shortName: 'On-Call Health',
-  description: 'Catch overload before it burns out your engineers.',
-  longDescription: 'An open source tool that looks for early warning signs of overload in your on-call engineers.',
+  description: 'An open source tool that looks for early warning signs of overload in your on-call engineers.',
   url: process.env.NEXT_PUBLIC_SITE_URL || 'https://www.oncallhealth.ai',
   ogImage: '/images/landing/landing_page_preview.png',
   favicon: '/images/favicon.png',
-  twitterHandle: '@rootly',
+  twitterHandle: '@rootlyhq',
 } as const
 
 /**
