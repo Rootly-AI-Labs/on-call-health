@@ -115,13 +115,12 @@ export function TeamMembersList({
             <Avatar>
               <AvatarFallback>
                 {member.user_name
-                  .split(" ")
-                  .map((n) => n[0])
-                  .join("")}
+                  ? member.user_name.split(" ").map((n) => n[0]).join("")
+                  : member.user_email?.charAt(0).toUpperCase() || "?"}
               </AvatarFallback>
             </Avatar>
             <div>
-              <h3 className="font-medium">{member.user_name}</h3>
+              <h3 className="font-medium">{member.user_name || member.user_email}</h3>
               <p className="text-sm text-neutral-500">{member.user_email}</p>
             </div>
           </div>
