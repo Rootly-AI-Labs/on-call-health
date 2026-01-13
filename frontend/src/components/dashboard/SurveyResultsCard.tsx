@@ -270,7 +270,9 @@ export function SurveyResultsCard({ surveyData, userEmail }: SurveyResultsCardPr
 
           {latestResponse.stress_factors && latestResponse.stress_factors.length > 0 && (
             <div>
-              <div className="text-xs font-medium text-neutral-700 mb-2">Stress Sources</div>
+              <div className="text-xs font-medium text-neutral-700 mb-2">
+                {latestResponse.stress_factors.length === 1 ? 'Primary Concern' : 'Primary Concerns'}
+              </div>
               <div className="flex flex-wrap gap-1">
                 {latestResponse.stress_factors.map((factor, index) => (
                   <Badge key={index} variant="outline" className="text-xs">
@@ -347,7 +349,9 @@ export function SurveyResultsCard({ surveyData, userEmail }: SurveyResultsCardPr
 
                     {response.stress_factors && response.stress_factors.length > 0 && (
                       <div>
-                        <div className="text-xs font-medium text-neutral-700 mb-2">Stress Sources</div>
+                        <div className="text-xs font-medium text-neutral-700 mb-2">
+                          {response.stress_factors.length === 1 ? 'Primary Concern' : 'Primary Concerns'}
+                        </div>
                         <div className="flex flex-wrap gap-1">
                           {response.stress_factors.map((factor, factorIndex) => (
                             <Badge key={factorIndex} variant="outline" className="text-xs">
