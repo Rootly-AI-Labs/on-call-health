@@ -1204,12 +1204,12 @@ async def handle_oncall_health_command(
                 "response_type": "ephemeral"
             }
 
-        # Check for existing survey response today (scoped by user only)
+        # Check for existing survey response today (match by email)
         from datetime import datetime
         today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
 
         existing_report = db.query(UserBurnoutReport).filter(
-            UserBurnoutReport.user_id == user_correlation.user_id,
+            UserBurnoutReport.email == user_correlation.email,
             UserBurnoutReport.submitted_at >= today_start
         ).first()
 
@@ -1335,14 +1335,17 @@ async def handle_slack_interactions(
                     slack_user_id = slack_user.get("id")
                     trigger_id = data.get("trigger_id")
 
-                    # Check for existing report today (scoped by user only)
+                    # Check for existing report today (match by user's email)
                     from datetime import datetime
                     today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
 
-                    existing_report = db.query(UserBurnoutReport).filter(
-                        UserBurnoutReport.user_id == user_id,
-                        UserBurnoutReport.submitted_at >= today_start
-                    ).first()
+                    user = db.query(User).filter(User.id == user_id).first()
+                    existing_report = None
+                    if user:
+                        existing_report = db.query(UserBurnoutReport).filter(
+                            UserBurnoutReport.email == user.email,
+                            UserBurnoutReport.submitted_at >= today_start
+                        ).first()
 
                     # Open modal (organization_id kept for backwards compatibility with old buttons)
                     modal_view = create_burnout_survey_modal(
@@ -1451,10 +1454,10 @@ async def handle_slack_interactions(
                 if not user:
                     return {"response_action": "errors", "errors": {"comments_block": "User not found"}}
 
-                # Check if user already submitted today (scoped by user only, not org)
+                # Check if user already submitted today (match by email)
                 # This allows only 1 survey per user per day, regardless of organization
                 existing_report = db.query(UserBurnoutReport).filter(
-                    UserBurnoutReport.user_id == user_id,
+                    UserBurnoutReport.email == user.email,
                     UserBurnoutReport.submitted_at >= today_start
                 ).order_by(UserBurnoutReport.submitted_at.desc()).first()
 
@@ -1468,6 +1471,7 @@ async def handle_slack_interactions(
                     existing_report.additional_comments = comments
                     existing_report.submitted_via = 'slack'
                     existing_report.analysis_id = analysis_id  # Update linked analysis if provided
+                    existing_report.email = user.email  # Refresh email in case it changed
                     existing_report.email_domain = user.email_domain  # Refresh email_domain in case it changed
                     existing_report.updated_at = datetime.utcnow()
                     logging.info(f"Updated existing report ID {existing_report.id} for user {user_id}")
@@ -1476,6 +1480,7 @@ async def handle_slack_interactions(
                     # Create new burnout report with email_domain for domain-based sharing
                     new_report = UserBurnoutReport(
                         user_id=user_id,
+                        email=user.email,  # Save email for team member identification
                         organization_id=organization_id,
                         email_domain=user.email_domain,
                         analysis_id=analysis_id,  # Optional - may be None
@@ -1560,7 +1565,7 @@ async def submit_slack_burnout_survey(
     try:
         # Find the user by email
         user_correlation = db.query(UserCorrelation).filter(
-            UserCorrelation.user_email == submission.user_email.lower()
+            UserCorrelation.email == submission.user_email.lower()
         ).first()
 
         if not user_correlation:
@@ -1672,12 +1677,11 @@ async def get_team_survey_status(
         responses_collected = len(survey_responses)
         response_rate = (responses_collected / total_members * 100) if total_members > 0 else 0
 
-        # Identify non-responders
+        # Identify non-responders (use email from survey response directly)
         responded_emails = {
-            db.query(UserCorrelation).filter(
-                UserCorrelation.user_id == response.user_id
-            ).first().user_email.lower()
+            response.email.lower()
             for response in survey_responses
+            if response.email
         }
 
         non_responders = [email for email in team_members if email not in responded_emails]
@@ -1690,9 +1694,7 @@ async def get_team_survey_status(
             "non_responders": non_responders,
             "survey_responses": [
                 {
-                    "user_email": db.query(UserCorrelation).filter(
-                        UserCorrelation.user_id == response.user_id
-                    ).first().user_email,
+                    "user_email": response.email,
                     "feeling_score": response.feeling_score,
                     "workload_score": response.workload_score,
                     "stress_factors": response.stress_factors,
