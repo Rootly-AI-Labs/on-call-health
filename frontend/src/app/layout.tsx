@@ -1,4 +1,3 @@
-import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import Script from 'next/script'
 import './globals.css'
@@ -8,18 +7,11 @@ import ClientToaster from '@/components/ClientToaster'
 import { GettingStartedProvider } from '@/contexts/GettingStartedContext'
 import { GettingStartedDialog } from '@/components/GettingStartedDialog'
 import { ChartModeProvider } from '@/contexts/ChartModeContext'
+import { baseMetadata } from '@/lib/metadata'
 
 const inter = Inter({ subsets: ['latin'] })
 
-export const metadata: Metadata = {
-  title: 'On-Call Health',
-  description: 'Catch overload before it burns out your engineers.',
-  icons: {
-    icon: '/images/favicon.png',
-    shortcut: '/images/favicon.png',
-    apple: '/images/favicon.png',
-  },
-}
+export const metadata = baseMetadata
 
 export default function RootLayout({
   children,
