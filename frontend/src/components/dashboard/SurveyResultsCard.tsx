@@ -193,11 +193,16 @@ export function SurveyResultsCard({ surveyData, userEmail }: SurveyResultsCardPr
             <CardDescription>{surveyData.survey_count_in_period} responses in analysis period</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              {surveyData.survey_responses.slice().reverse().slice(1, 6).map((response, index) => (
+            <div className="space-y-2 max-h-80 overflow-y-auto">
+              {surveyData.survey_responses.slice().reverse().slice(1).map((response, index) => (
                 <div key={index} className="flex items-center justify-between text-sm py-2 border-b last:border-0">
                   <span className="text-xs text-neutral-500">
-                    {new Date(response.submitted_at).toLocaleDateString()}
+                    {new Date(response.submitted_at).toLocaleDateString(undefined, {
+                      month: 'short',
+                      day: 'numeric',
+                      hour: 'numeric',
+                      minute: '2-digit'
+                    })}
                   </span>
                   <div className="flex gap-4 text-xs">
                     <span className={getScoreColor(response.feeling_score)}>
