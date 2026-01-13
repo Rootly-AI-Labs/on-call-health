@@ -12,6 +12,7 @@ import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadius
 import { Info, RefreshCw, BarChart3 } from "lucide-react"
 import { useState, useEffect, useRef } from "react"
 import { UserObjectiveDataCard } from "@/components/dashboard/UserObjectiveDataCard"
+import { RiskFactorsCard } from "@/components/dashboard/RiskFactorsCard"
 import { SurveyResultsCard } from "@/components/dashboard/SurveyResultsCard"
 import { TicketingCard } from "@/components/dashboard/TicketingCard"
 
@@ -113,8 +114,8 @@ function IndividualDailyHealthChart({ memberData, analysisId, currentAnalysis }:
     return (
       <Card>
         <CardContent className="p-6 text-center">
-          <RefreshCw className="w-8 h-8 animate-spin text-gray-400 mx-auto mb-2" />
-          <p className="text-sm text-gray-600">Loading daily health data...</p>
+          <RefreshCw className="w-8 h-8 animate-spin text-neutral-500 mx-auto mb-2" />
+          <p className="text-sm text-neutral-700">Loading daily health data...</p>
         </CardContent>
       </Card>
     );
@@ -124,9 +125,9 @@ function IndividualDailyHealthChart({ memberData, analysisId, currentAnalysis }:
     return (
       <Card>
         <CardContent className="p-6 text-center">
-          <BarChart3 className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-          <p className="text-gray-500 mb-2">{error || 'No daily health data available'}</p>
-          <p className="text-sm text-gray-600">
+          <BarChart3 className="w-8 h-8 text-neutral-500 mx-auto mb-2" />
+          <p className="text-neutral-500 mb-2">{error || 'No daily health data available'}</p>
+          <p className="text-sm text-neutral-700">
             Daily health scores are calculated for days when incidents occur
           </p>
         </CardContent>
@@ -143,7 +144,7 @@ function IndividualDailyHealthChart({ memberData, analysisId, currentAnalysis }:
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="mb-4 flex flex-wrap items-center gap-4 text-xs text-gray-500">
+        <div className="mb-4 flex flex-wrap items-center gap-4 text-xs text-neutral-500">
           <div className="flex items-center space-x-1">
             <div className="w-3 h-3 bg-red-500 rounded"></div>
             <span>Critical (75-100)</span>
@@ -197,12 +198,12 @@ function IndividualDailyHealthChart({ memberData, analysisId, currentAnalysis }:
                     const data = payload[0].payload;
                     if (data.tooltip_summary) {
                       return (
-                        <div className="bg-white p-4 border border-gray-300 rounded-lg shadow-xl text-sm max-w-sm">
-                          <div className="whitespace-pre-line text-gray-900 font-medium leading-relaxed">
+                        <div className="bg-white p-4 border border-neutral-300 rounded-lg shadow-xl text-sm max-w-sm">
+                          <div className="whitespace-pre-line text-neutral-900 font-medium leading-relaxed">
                             {data.tooltip_summary}
                           </div>
-                          <div className="mt-3 pt-3 border-t border-gray-300 text-xs">
-                            <div className="flex justify-between text-gray-700 font-semibold">
+                          <div className="mt-3 pt-3 border-t border-neutral-300 text-xs">
+                            <div className="flex justify-between text-neutral-700 font-semibold">
                               <span>Health Score: {data.health_score}/100</span>
                               <span>Team Avg: {data.team_health}/100</span>
                             </div>
@@ -212,8 +213,8 @@ function IndividualDailyHealthChart({ memberData, analysisId, currentAnalysis }:
                     }
 
                     return (
-                      <div className="bg-white p-4 border border-gray-300 rounded-lg shadow-xl text-sm max-w-xs">
-                        <p className="font-bold text-gray-900 mb-3">{data.day_name}</p>
+                      <div className="bg-white p-4 border border-neutral-300 rounded-lg shadow-xl text-sm max-w-xs">
+                        <p className="font-bold text-neutral-900 mb-3">{data.day_name}</p>
                         {data.has_data ? (
                           <>
                             <p className="text-blue-700 font-semibold mb-1">Health Score: {data.health_score}/100</p>
@@ -222,8 +223,8 @@ function IndividualDailyHealthChart({ memberData, analysisId, currentAnalysis }:
                           </>
                         ) : (
                           <>
-                            <p className="text-gray-800 font-semibold">No Incidents</p>
-                            <p className="text-gray-600 text-xs font-medium mt-1">Healthy day - no incident involvement</p>
+                            <p className="text-neutral-900 font-semibold">No Incidents</p>
+                            <p className="text-neutral-700 text-xs font-medium mt-1">Healthy day - no incident involvement</p>
                           </>
                         )}
                       </div>
@@ -360,7 +361,7 @@ export function MemberDetailModal({
                     <div className="flex items-center justify-between">
                       <div>
                         <h2 className="text-xl font-semibold">{selectedMember?.name}</h2>
-                        <p className="text-gray-600">{selectedMember?.role || selectedMember?.email}</p>
+                        <p className="text-neutral-700">{selectedMember?.role || selectedMember?.email}</p>
                       </div>
                     </div>
                   </div>
@@ -557,8 +558,8 @@ export function MemberDetailModal({
                                   <CardContent>
                                     {loadingCommits ? (
                                       <div className="text-center py-8">
-                                        <RefreshCw className="w-4 h-4 animate-spin text-gray-400 mx-auto mb-2" />
-                                        <p className="text-xs text-gray-500">Loading commit data...</p>
+                                        <RefreshCw className="w-4 h-4 animate-spin text-neutral-500 mx-auto mb-2" />
+                                        <p className="text-xs text-neutral-500">Loading commit data...</p>
                                       </div>
                                     ) : dailyCommitsData && dailyCommitsData.length > 0 ? (
                                       <div className="space-y-3">
@@ -581,14 +582,14 @@ export function MemberDetailModal({
                                                   if (payload && payload.length > 0) {
                                                     const data = payload[0].payload;
                                                     return (
-                                                      <div className="bg-white p-2 border border-gray-200 rounded-lg shadow-lg">
-                                                        <p className="text-xs font-semibold text-gray-900">{label}</p>
+                                                      <div className="bg-white p-2 border border-neutral-200 rounded-lg shadow-lg">
+                                                        <p className="text-xs font-semibold text-neutral-900">{label}</p>
                                                         <p className="text-xs text-indigo-600">
                                                           {data.commits} commits
-                                                          {data.weekend_commits > 0 && <span className="text-gray-500 ml-1">(Weekend)</span>}
+                                                          {data.weekend_commits > 0 && <span className="text-neutral-500 ml-1">(Weekend)</span>}
                                                         </p>
                                                         {data.after_hours_commits > 0 && (
-                                                          <p className="text-xs text-gray-500">
+                                                          <p className="text-xs text-neutral-500">
                                                             {data.after_hours_commits} after hours
                                                           </p>
                                                         )}
@@ -620,8 +621,8 @@ export function MemberDetailModal({
                                       </div>
                                     ) : (
                                       <div className="text-center py-4">
-                                        <p className="text-xs text-gray-500">Daily commit data not available</p>
-                                        <p className="text-xs text-gray-400 mt-1">
+                                        <p className="text-xs text-neutral-500">Daily commit data not available</p>
+                                        <p className="text-xs text-neutral-500 mt-1">
                                           Total: {selectedMember.github_activity?.commits_count || 0} commits
                                         </p>
                                       </div>
@@ -649,9 +650,9 @@ export function MemberDetailModal({
                                     </div>
                                     <Separator className="my-2" />
                                     <div className="space-y-2">
-                                      <p className="text-xs font-semibold text-gray-700">Work-life Balance</p>
+                                      <p className="text-xs font-semibold text-neutral-700">Work-life Balance</p>
                                       <div className="flex items-center justify-between text-xs">
-                                        <span className="text-gray-600">After-Hours</span>
+                                        <span className="text-neutral-700">After-Hours</span>
                                         <span className="font-medium text-orange-600">
                                           {selectedMember.github_activity?.commits_count > 0
                                             ? ((selectedMember.github_activity.after_hours_commits / selectedMember.github_activity.commits_count) * 100).toFixed(1)
@@ -659,7 +660,7 @@ export function MemberDetailModal({
                                         </span>
                                       </div>
                                       <div className="flex items-center justify-between text-xs">
-                                        <span className="text-gray-600">Weekend</span>
+                                        <span className="text-neutral-700">Weekend</span>
                                         <span className="font-medium text-purple-600">
                                           {selectedMember.github_activity?.commits_count > 0
                                             ? ((selectedMember.github_activity.weekend_commits / selectedMember.github_activity.commits_count) * 100).toFixed(1)
@@ -673,7 +674,7 @@ export function MemberDetailModal({
                             ) : (
                               <Card>
                                 <CardContent className="p-6 text-center">
-                                  <p className="text-gray-500">No GitHub activity data available</p>
+                                  <p className="text-neutral-500">No GitHub activity data available</p>
                                 </CardContent>
                               </Card>
                             )}
@@ -682,7 +683,7 @@ export function MemberDetailModal({
                           <TabsContent value="communication" className="space-y-4">
                             {selectedMember.slack_activity ? (
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <Card className="border border-gray-200">
+                                <Card className="border border-neutral-200">
                                   <CardHeader>
                                     <CardTitle className="text-sm">Communication Activity</CardTitle>
                                   </CardHeader>
@@ -709,18 +710,10 @@ export function MemberDetailModal({
                             ) : (
                               <Card>
                                 <CardContent className="p-6 text-center">
-                                  <p className="text-gray-500">No Slack activity data available</p>
+                                  <p className="text-neutral-500">No Slack activity data available</p>
                                 </CardContent>
                               </Card>
                             )}
-                          </TabsContent>
-
-                          <TabsContent value="surveys" className="space-y-4">
-                            <SurveyResultsCard
-                              userId={selectedMember.user_id}
-                              userEmail={selectedMember.user_email}
-                              days={30}
-                            />
                           </TabsContent>
                         </Tabs>
                       );
@@ -729,70 +722,162 @@ export function MemberDetailModal({
 
                     {/* Risk Level Breakdown – Deep Dive (moved to bottom) */}
                     <Card>
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-semibold text-neutral-900">Burnout Analysis</h4>
+                          <div className="relative group">
+                            <Info className="w-4 h-4 text-neutral-400 cursor-help hover:text-neutral-600" />
+                            <div className="absolute top-full right-0 mt-2 px-3 py-2 bg-neutral-900 text-white text-xs rounded-lg w-80 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                              <div className="font-semibold mb-2">Burnout Dimensions</div>
+                              <div className="space-y-2">
+                                <div>
+                                  <div className="font-medium text-blue-300 mb-1">Personal Burnout</div>
+                                  <div className="text-xs">• Incident frequency (incidents per week)<br/>• After-hours work patterns<br/>• Weekend activity levels<br/>• Sleep disruption indicators<br/>• Overall workload intensity relative to team baseline</div>
+                                </div>
+                                <div>
+                                  <div className="font-medium text-blue-300 mb-1">Work-Related Burnout</div>
+                                  <div className="text-xs">• Incident response time patterns<br/>• Severity-weighted incident load<br/>• GitHub commit activity and timing<br/>• Slack communication patterns<br/>• Work-life boundary violations (late night/weekend work)</div>
+                                </div>
+                              </div>
+                              <div className="absolute bottom-full right-4 w-0 h-0 border-l-4 border-r-4 border-b-4 border-l-transparent border-r-transparent border-b-gray-900"></div>
+                            </div>
+                          </div>
+                        </div>
+                      </CardHeader>
                       <CardContent className="p-4">
-                        <h4 className="font-semibold text-gray-900 mb-2">Risk Level Breakdown</h4>
                         {memberData?.ocb_reasoning ? (
                           <div className="space-y-6">
-                            {/* Contributing Factors */}
-                            <div className="space-y-3">
-                              <h5 className="text-sm font-semibold text-gray-900 mb-3 pb-1 border-b border-gray-200">
-                                Factors
-                              </h5>
-                              <div className="space-y-2">
-                                {memberData.ocb_reasoning.slice(1).map((reason: string, index: number) => {
-                                  const cleanReason = reason.replace(/^[\s]*[•·\-*]\s*/, '').trim();
-                                  const isSectionHeader = cleanReason.endsWith(':');
-                                  if (isSectionHeader) return null;
-
-                                  return (
-                                    <div key={index} className="px-3 py-2 bg-gray-50 rounded-md border text-sm text-gray-700">
-                                      {cleanReason}
-                                    </div>
-                                  );
-                                }).filter(Boolean)}
-                              </div>
-                            </div>
-
                             {/* Dimensional Breakdown */}
                             {memberData.ocb_breakdown && (
-                              <div className="grid grid-cols-2 gap-4">
-                                <div className="bg-green-50 rounded-lg p-3">
-                                  <div className="flex items-center space-x-1 mb-1">
-                                    <div className="text-xs font-medium text-green-600 uppercase">Personal</div>
-                                    <div className="relative group">
-                                      <Info className="w-3 h-3 text-green-500 cursor-help" />
-                                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg w-72 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                                        <div className="font-semibold mb-1">Personal Burnout - What We Measure</div>
-                                        <div>• Incident frequency (incidents per week)<br/>• After-hours work patterns<br/>• Weekend activity levels<br/>• Sleep disruption indicators<br/>• Overall workload intensity relative to team baseline</div>
-                                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-900"></div>
+                              <div className="space-y-1">
+                                {/* Personal Burnout */}
+                                <div className="rounded-lg p-2">
+                                  <div className="flex items-center justify-between mb-1">
+                                    <span></span>
+                                    {(() => {
+                                      const score = memberData.ocb_breakdown.personal ?? 0;
+                                      let severity = 'Good';
+                                      let color = 'bg-green-100 text-green-800';
+                                      if (score >= 70) {
+                                        severity = 'Critical';
+                                        color = 'bg-red-100 text-red-800';
+                                      } else if (score >= 50) {
+                                        severity = 'Poor';
+                                        color = 'bg-orange-100 text-orange-800';
+                                      } else if (score >= 30) {
+                                        severity = 'Fair';
+                                        color = 'bg-yellow-100 text-yellow-800';
+                                      }
+                                      return (
+                                        <span className={`text-xs font-medium px-2 py-1 rounded-full ${color}`}>
+                                          {severity}
+                                        </span>
+                                      );
+                                    })()}
+                                  </div>
+                                  <div className="flex items-center gap-3">
+                                    <span className="w-20 text-sm font-medium text-gray-700">Personal</span>
+                                    <div className="flex-1">
+                                      <div className="w-full bg-gray-300 rounded-full h-2">
+                                        <div
+                                          className="h-2 rounded-full transition-all duration-500"
+                                          style={{
+                                            width: `${memberData.ocb_breakdown.personal ?? 0}%`,
+                                            backgroundColor: (() => {
+                                              const score = memberData.ocb_breakdown.personal ?? 0;
+                                              if (score >= 70) return '#EF4444'; // red-500
+                                              if (score >= 50) return '#F97316'; // orange-500
+                                              if (score >= 30) return '#F59E0B'; // yellow-500
+                                              return '#10B981'; // green-500
+                                            })()
+                                          }}
+                                        ></div>
                                       </div>
                                     </div>
-                                  </div>
-                                  <div className="text-lg font-bold text-green-700">
-                                    {memberData.ocb_breakdown.personal?.toFixed(0)}/100
                                   </div>
                                 </div>
-                                <div className="bg-blue-50 rounded-lg p-3">
-                                  <div className="flex items-center space-x-1 mb-1">
-                                    <div className="text-xs font-medium text-blue-600 uppercase">Work-Related</div>
-                                    <div className="relative group">
-                                      <Info className="w-3 h-3 text-blue-500 cursor-help" />
-                                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg w-72 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                                        <div className="font-semibold mb-1">Work-Related Burnout - What We Measure</div>
-                                        <div>• Incident response time patterns<br/>• Severity-weighted incident load<br/>• GitHub commit activity and timing<br/>• Slack communication patterns<br/>• Work-life boundary violations (late night/weekend work)</div>
-                                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-900"></div>
+
+                                {/* Work-Related Burnout */}
+                                <div className="rounded-lg p-2">
+                                  <div className="flex items-center justify-between mb-1">
+                                    <span></span>
+                                    {(() => {
+                                      const score = memberData.ocb_breakdown.work_related ?? 0;
+                                      let severity = 'Good';
+                                      let color = 'bg-green-100 text-green-800';
+                                      if (score >= 70) {
+                                        severity = 'Critical';
+                                        color = 'bg-red-100 text-red-800';
+                                      } else if (score >= 50) {
+                                        severity = 'Poor';
+                                        color = 'bg-orange-100 text-orange-800';
+                                      } else if (score >= 30) {
+                                        severity = 'Fair';
+                                        color = 'bg-yellow-100 text-yellow-800';
+                                      }
+                                      return (
+                                        <span className={`text-xs font-medium px-2 py-1 rounded-full ${color}`}>
+                                          {severity}
+                                        </span>
+                                      );
+                                    })()}
+                                  </div>
+                                  <div className="flex items-center gap-3">
+                                    <span className="w-20 text-sm font-medium text-gray-700">Work-Related</span>
+                                    <div className="flex-1">
+                                      <div className="w-full bg-gray-300 rounded-full h-2">
+                                        <div
+                                          className="h-2 rounded-full transition-all duration-500"
+                                          style={{
+                                            width: `${memberData.ocb_breakdown.work_related ?? 0}%`,
+                                            backgroundColor: (() => {
+                                              const score = memberData.ocb_breakdown.work_related ?? 0;
+                                              if (score >= 70) return '#EF4444'; // red-500
+                                              if (score >= 50) return '#F97316'; // orange-500
+                                              if (score >= 30) return '#F59E0B'; // yellow-500
+                                              return '#10B981'; // green-500
+                                            })()
+                                          }}
+                                        ></div>
                                       </div>
                                     </div>
-                                  </div>
-                                  <div className="text-lg font-bold text-blue-700">
-                                    {memberData.ocb_breakdown.work_related?.toFixed(0)}/100
                                   </div>
                                 </div>
                               </div>
                             )}
+
+                            {/* Contributing Factors */}
+                            <div className="grid grid-cols-2 gap-y-1.5 gap-x-4 mt-2">
+                              {(() => {
+                                const filteredReasons = memberData.ocb_reasoning.slice(1).filter((reason: string) => {
+                                  const cleanReason = reason.replace(/^[\s]*[•·\-*]\s*/, '').trim();
+                                  return !cleanReason.endsWith(':');
+                                });
+
+                                return filteredReasons.map((reason: string, index: number) => {
+                                  const cleanReason = reason.replace(/^[\s]*[•·\-*]\s*/, '').trim().replace(/\s*\([^)]*\)$/, '');
+                                  const isLastItem = index === filteredReasons.length - 1;
+
+                                  if (isLastItem) {
+                                    return (
+                                      <div key={index} className="col-span-2 text-sm text-neutral-700 font-semibold mt-4 pt-3 border-t border-neutral-200">
+                                        {cleanReason}
+                                      </div>
+                                    );
+                                  }
+
+                                  return (
+                                    <div key={index} className="flex items-start gap-1.5 text-sm text-neutral-700">
+                                      <span className="text-neutral-400 flex-shrink-0 leading-relaxed">•</span>
+                                      <span className="leading-relaxed">{cleanReason}</span>
+                                    </div>
+                                  );
+                                });
+                              })()}
+                            </div>
                           </div>
                         ) : (
-                          <p className="text-sm text-gray-500 italic">
+                          <p className="text-sm text-neutral-500 italic">
                             Risk level analysis not available. Run a new analysis to see detailed risk factors.
                           </p>
                         )}
