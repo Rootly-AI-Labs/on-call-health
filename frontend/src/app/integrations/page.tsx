@@ -90,6 +90,7 @@ import {
   Mail,
   Send,
   MessageSquare,
+  Sparkles,
 } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
@@ -101,6 +102,7 @@ import ManualSurveyDeliveryModal from "@/components/ManualSurveyDeliveryModal"
 import { SlackSurveyTabs } from "@/components/SlackSurveyTabs"
 import { TopPanel } from "@/components/TopPanel"
 import { TeamSyncPrompt } from "@/components/TeamSyncPrompt"
+import { TokenErrorModal } from "@/components/TokenErrorModal"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import {
@@ -192,6 +194,14 @@ export default function IntegrationsPage() {
   // MappingDrawer state (reusable component)
   const [mappingDrawerOpen, setMappingDrawerOpen] = useState(false)
   const [mappingDrawerPlatform, setMappingDrawerPlatform] = useState<'github' | 'slack' | 'jira'>('github')
+
+  // Token error modal state
+  const [tokenErrorModalOpen, setTokenErrorModalOpen] = useState(false)
+  const [tokenErrorType, setTokenErrorType] = useState<'expired' | 'permissions' | null>(null)
+  const [tokenErrorIntegrationName, setTokenErrorIntegrationName] = useState('')
+  const [tokenErrorMissingPermissions, setTokenErrorMissingPermissions] = useState<string[]>([])
+  const [hasTokenError, setHasTokenError] = useState(false) // Track if current org has token issues
+
   const [mappingData, setMappingData] = useState<IntegrationMapping[]>([])
   const [mappingStats, setMappingStats] = useState<MappingStatistics | null>(null)
   const [analysisMappingStats, setAnalysisMappingStats] = useState<AnalysisMappingStatistics | null>(null)
@@ -274,7 +284,6 @@ export default function IntegrationsPage() {
   const [slackSurveyDisconnectDialogOpen, setSlackSurveyDisconnectDialogOpen] = useState(false)
   const [slackSurveyConfirmDisconnectOpen, setSlackSurveyConfirmDisconnectOpen] = useState(false)
   const [isDisconnectingGithub, setIsDisconnectingGithub] = useState(false)
-  const [isTestingGithub, setIsTestingGithub] = useState(false)
   const [isDisconnectingSlack, setIsDisconnectingSlack] = useState(false)
   const [isDisconnectingJira, setIsDisconnectingJira] = useState(false)
   const [isDisconnectingLinear, setIsDisconnectingLinear] = useState(false)
@@ -2011,12 +2020,7 @@ export default function IntegrationsPage() {
   }
 
   const handleGitHubTest = async () => {
-    setIsTestingGithub(true)
-    try {
-      await GithubHandlers.handleGitHubTest()
-    } finally {
-      setIsTestingGithub(false)
-    }
+    return GithubHandlers.handleGitHubTest()
   }
 
   // Slack integration handlers
@@ -2528,17 +2532,26 @@ export default function IntegrationsPage() {
                             const data = await response.json()
 
                             if (data.has_users === false || data.has_incidents === false) {
-                              toast.warning('⚠️ Integration has insufficient permissions', {
-                                description: `Missing: ${[
-                                  !data.has_users && 'users access',
-                                  !data.has_incidents && 'incidents access'
-                                ].filter(Boolean).join(', ')}. Please refresh the token.`
-                              })
+                              const missing = [
+                                !data.has_users && 'Users access',
+                                !data.has_incidents && 'Incidents access'
+                              ].filter(Boolean) as string[]
+
+                              setTokenErrorType('permissions')
+                              setTokenErrorIntegrationName(selected.name)
+                              setTokenErrorMissingPermissions(missing)
+                              setTokenErrorModalOpen(true)
+                              setHasTokenError(true)
+                            } else {
+                              // Token is valid and has permissions
+                              setHasTokenError(false)
                             }
                           } else if (response.status === 401 || response.status === 403) {
-                            toast.error('❌ Integration token expired or invalid', {
-                              description: 'Please test and refresh your token in the integration settings.'
-                            })
+                            setTokenErrorType('expired')
+                            setTokenErrorIntegrationName(selected.name)
+                            setTokenErrorMissingPermissions([])
+                            setTokenErrorModalOpen(true)
+                            setHasTokenError(true)
                           }
                         } catch (error) {
                           console.error('Error checking integration permissions:', error)
@@ -3432,7 +3445,6 @@ export default function IntegrationsPage() {
                 integration={githubIntegration}
                 onDisconnect={() => setGithubDisconnectDialogOpen(true)}
                 onTest={handleGitHubTest}
-                isLoading={isTestingGithub}
               />
             )}
             {/* Jira Integration Card - Not Connected */}
@@ -5384,10 +5396,19 @@ export default function IntegrationsPage() {
 
       {/* Team Sync Prompt - floating bottom-right */}
       <TeamSyncPrompt
-        isVisible={showSyncPrompt}
+        isVisible={showSyncPrompt && !hasTokenError}
         message={syncPromptMessage}
         onSync={handleSyncPromptAction}
         onDismiss={handleDismissSyncPrompt}
+      />
+
+      {/* Token Error Modal */}
+      <TokenErrorModal
+        isOpen={tokenErrorModalOpen}
+        onClose={() => setTokenErrorModalOpen(false)}
+        errorType={tokenErrorType}
+        integrationName={tokenErrorIntegrationName}
+        missingPermissions={tokenErrorMissingPermissions}
       />
     </div>
   )
