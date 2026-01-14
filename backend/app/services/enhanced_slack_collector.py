@@ -57,8 +57,17 @@ async def collect_team_slack_data_with_mapping(
                 if slack_user_id:
                     # Determine mapping method
                     from .slack_collector import SlackCollector
+                    from ..models import Analysis
+
                     # Look up user_id and organization_id for this specific identifier
-                    member_user_id, org_id = recorder.get_user_and_org_for_email(identifier, analysis_id)
+                    # Skip lookup if using names (identifier is a name, not email)
+                    if use_names:
+                        # Name-based lookups can't correlate to user_correlations (which uses emails)
+                        member_user_id = None
+                        analysis = recorder.db.query(Analysis).filter(Analysis.id == analysis_id).first()
+                        org_id = analysis.organization_id if analysis else None
+                    else:
+                        member_user_id, org_id = recorder.get_user_and_org_for_email(identifier, analysis_id)
 
                     collector = SlackCollector()
                     if use_names and identifier in collector.name_to_slack_mappings:
@@ -82,7 +91,14 @@ async def collect_team_slack_data_with_mapping(
                     logger.info(f"✓ Recorded successful Slack mapping: {identifier} -> {slack_user_id} ({data_points} data points)")
                 else:
                     # Look up for data collection record
-                    member_user_id, org_id = recorder.get_user_and_org_for_email(identifier, analysis_id)
+                    # Skip lookup if using names (identifier is a name, not email)
+                    if use_names:
+                        from ..models import Analysis
+                        member_user_id = None
+                        analysis = recorder.db.query(Analysis).filter(Analysis.id == analysis_id).first()
+                        org_id = analysis.organization_id if analysis else None
+                    else:
+                        member_user_id, org_id = recorder.get_user_and_org_for_email(identifier, analysis_id)
 
                     # Data collected but no clear user ID
                     recorder.record_successful_mapping(
@@ -99,7 +115,14 @@ async def collect_team_slack_data_with_mapping(
                     logger.info(f"? Recorded Slack data collection: {identifier} -> unknown user ({data_points} data points)")
             else:
                 # Look up for failed mapping
-                member_user_id, org_id = recorder.get_user_and_org_for_email(identifier, analysis_id)
+                # Skip lookup if using names (identifier is a name, not email)
+                if use_names:
+                    from ..models import Analysis
+                    member_user_id = None
+                    analysis = recorder.db.query(Analysis).filter(Analysis.id == analysis_id).first()
+                    org_id = analysis.organization_id if analysis else None
+                else:
+                    member_user_id, org_id = recorder.get_user_and_org_for_email(identifier, analysis_id)
 
                 # Failed mapping
                 error_msg = f"No Slack data found for {'name' if use_names else 'email'}: {identifier}"
