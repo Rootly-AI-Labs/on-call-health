@@ -46,34 +46,36 @@ class GitHubCollector:
         2. Enhanced matching algorithm with multiple strategies
         3. Legacy discovered email mappings from organization members
         """
-        logger.info(f"GitHub correlation attempt for {email}, token={'present' if token else 'missing'}, user_id={user_id}")
+        logger.info(f"🔗 [CORRELATION] GitHub correlation attempt for {email}, token={'present' if token else 'missing'}, user_id={user_id}")
 
         if not token:
-            logger.warning("No GitHub token provided for correlation")
+            logger.warning("❌ [CORRELATION] No GitHub token provided for correlation")
             return None
 
         try:
             # FIRST: Check user_correlations table for synced members (from "Sync Members" feature)
+            logger.debug(f"🔍 [CORRELATION] Checking user_correlations for {email}")
             synced_username = await self._check_synced_members(email, user_id)
             if synced_username:
-                logger.info(f"Found GitHub correlation via SYNCED MEMBER: {email} -> {synced_username}")
+                logger.info(f"✅ [CORRELATION_SYNCED] {email} -> {synced_username}")
                 return synced_username
 
             # SECOND: Check manual mappings from user_mappings table (mapping drawer)
             if user_id:
+                logger.debug(f"🔍 [CORRELATION] Checking user_mappings for {email}")
                 manual_username = await self._check_manual_mappings(email, user_id)
                 if manual_username:
-                    logger.info(f"Found GitHub correlation via MANUAL mapping: {email} -> {manual_username}")
+                    logger.info(f"✅ [CORRELATION_MANUAL] {email} -> {manual_username}")
                     return manual_username
 
             # IMPORTANT: No fallback matching during analysis!
             # All GitHub username correlations should be done via "Sync Members" on integrations page.
             # This keeps analysis fast and predictable.
-            logger.info(f"⚠️ No synced GitHub username found for {email}. Use 'Sync Members' to add GitHub usernames.")
+            logger.warning(f"❌ [CORRELATION_FAILED] No synced GitHub username found for {email}. Use 'Sync Members' to add GitHub usernames.")
             return None
 
         except Exception as e:
-            logger.error(f"Error correlating email {email} to GitHub: {e}")
+            logger.error(f"❌ [CORRELATION_ERROR] Error correlating email {email} to GitHub: {e}")
             return None
     
     async def _check_manual_mappings(self, email: str, user_id: int) -> Optional[str]:
@@ -151,15 +153,18 @@ class GitHubCollector:
                 try:
                     user_id = int(user_id)
                 except (ValueError, TypeError):
-                    logger.warning(f"Invalid user_id type for synced member check: {type(user_id).__name__}: {user_id}")
+                    logger.warning(f"⚠️ [SYNCED_CHECK] Invalid user_id type: {type(user_id).__name__}: {user_id}")
                     return None
             elif not isinstance(user_id, int):
-                logger.warning(f"Invalid user_id type for synced member check: {type(user_id).__name__}: {user_id}")
+                logger.warning(f"⚠️ [SYNCED_CHECK] Invalid user_id type: {type(user_id).__name__}: {user_id}")
                 return None
 
             database_url = os.getenv('DATABASE_URL')
             if not database_url:
+                logger.warning(f"⚠️ [SYNCED_CHECK] DATABASE_URL not set")
                 return None
+
+            logger.debug(f"🔍 [SYNCED_CHECK] Querying user_correlations for email: {email}")
 
             engine = create_engine(database_url)
             conn = engine.connect()
@@ -184,14 +189,14 @@ class GitHubCollector:
 
             if row:
                 username = row[0]
-                logger.info(f"✅ Found synced GitHub member: {email} -> {username}")
+                logger.info(f"✅ [SYNCED_CHECK_SUCCESS] Found synced GitHub member: {email} -> {username}")
                 return username
             else:
-                logger.warning(f"⚠️ No GitHub username found for: {email}")
+                logger.warning(f"⚠️ [SYNCED_CHECK_MISS] No GitHub username in user_correlations for: {email}")
                 return None
 
         except Exception as e:
-            logger.error(f"❌ Error checking synced members for {email}: {e}")
+            logger.error(f"❌ [SYNCED_CHECK_ERROR] Error checking synced members for {email}: {type(e).__name__}: {e}")
             return None
 
     async def _build_email_mapping(self, token: str) -> Dict[str, str]:
@@ -299,6 +304,7 @@ class GitHubCollector:
     async def _fetch_real_github_data(self, username: str, email: str, start_date: datetime, end_date: datetime, token: str) -> Dict:
         """Fetch real GitHub data using the GitHub API with enterprise resilience."""
 
+        logger.info(f"🔍 [GITHUB_API] Starting data fetch for {username} ({email}): {start_date.date()} to {end_date.date()}")
         logger.debug(f"Fetching GitHub data for {username} ({email}): {start_date.date()} to {end_date.date()}")
 
         headers = {
@@ -352,13 +358,17 @@ class GitHubCollector:
                             raise aiohttp.ClientError(f"GitHub API error for PRs: {resp.status}")
             
             # Execute with enterprise resilience patterns
+            logger.debug(f"🌐 [GITHUB_API] Fetching commits for {username}")
             commits_data = await github_api_manager.safe_api_call(fetch_commits, max_retries=3)
             total_commits = commits_data.get('total_count', 0) if commits_data else 0
+            logger.debug(f"📊 [GITHUB_API] {username} commits result: {total_commits} commits")
 
+            logger.debug(f"🌐 [GITHUB_API] Fetching PRs for {username}")
             prs_data = await github_api_manager.safe_api_call(fetch_prs, max_retries=3)
             total_prs = prs_data.get('total_count', 0) if prs_data else 0
+            logger.debug(f"📊 [GITHUB_API] {username} PRs result: {total_prs} PRs")
 
-            logger.info(f"✅ GitHub data for {username}: {total_commits} commits, {total_prs} PRs")
+            logger.info(f"✅ [GITHUB_API_SUCCESS] {username} ({email}): {total_commits} commits, {total_prs} PRs")
             
             # For now, estimate other metrics based on commits/PRs
             # In a full implementation, we'd make additional API calls
@@ -415,7 +425,20 @@ class GitHubCollector:
             }
             
         except Exception as e:
-            logger.error(f"Error fetching real GitHub data for {username}: {e}")
+            error_type = type(e).__name__
+            error_msg = str(e)
+            logger.error(f"❌ [GITHUB_API_ERROR] {username} ({email}): {error_type}: {error_msg}")
+
+            # Log additional context for specific error types
+            if "401" in error_msg or "authentication" in error_msg.lower():
+                logger.error(f"🔐 [GITHUB_API_ERROR] Authentication failed for {username} - token may be expired or invalid")
+            elif "403" in error_msg or "forbidden" in error_msg.lower():
+                logger.error(f"🚫 [GITHUB_API_ERROR] Permission denied for {username} - token may lack 'repo' scope")
+            elif "rate limit" in error_msg.lower():
+                logger.error(f"⏱️ [GITHUB_API_ERROR] Rate limit exceeded for {username}")
+            elif "timeout" in error_msg.lower():
+                logger.error(f"⏰ [GITHUB_API_ERROR] Timeout fetching data for {username}")
+
             # Don't fall back to mock data - return None to indicate failure
             return None
         
