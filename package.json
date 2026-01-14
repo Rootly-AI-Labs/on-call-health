@@ -1,6 +1,6 @@
 {
     "dependencies": {
-      "node": "^24.9.0",
+      "node": "^25.3.0",
       "newrelic": "latest"
     }
 }

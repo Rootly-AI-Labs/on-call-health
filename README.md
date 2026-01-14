@@ -80,7 +80,7 @@ cp backend/.env.example backend/.env
 
 ### Prerequisites
 - Python 3.11+
-- Node.js 18+ (for frontend)
+- Node.js 25.3.0+ (for frontend, required for security patches)
 - Rootly or PagerDuty API token
 
 ### Backend Setup
