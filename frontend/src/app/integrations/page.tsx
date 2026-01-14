@@ -4644,118 +4644,17 @@ export default function IntegrationsPage() {
               </div>
             ) : syncedUsers.length > 0 ? (
               <div>
-                {slackIntegration?.survey_enabled === true ? (
-                  <>
-                    <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                      <div className="flex items-center justify-between">
-                        <p className="text-xs text-blue-900 font-medium">
-                          ✓ Check users to send them automated a survey invitations via Slack
-                        </p>
-                        <div className="text-xs font-semibold text-blue-900 bg-blue-100 px-2 py-1 rounded">
-                          {selectedRecipients.size || 0} / {syncedUsers.length} will receive surveys
-                        </div>
-                      </div>
-                      {selectedOrganization && ['beta-rootly', 'beta-pagerduty'].includes(selectedOrganization) ? (
-                        <p className="text-xs text-amber-700 mt-2 font-medium">
-                          ℹ️ Beta integrations send surveys to all synced users. Add a personal integration to customize recipients.
-                        </p>
-                      ) : hasUnsavedChanges() && (
-                        <p className="text-xs text-orange-600 mt-2 font-medium">
-                          ⚠️ You have unsaved changes. Click "Save Changes" to apply.
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Quick filter buttons */}
-                    <div className="flex items-center gap-2 mb-4 p-3 bg-neutral-100 rounded-lg border border-neutral-200">
-                      <span className="text-xs font-medium text-neutral-700">Quick Actions:</span>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          const oncallUserIds = syncedUsers
-                            .filter(u => u.is_oncall)
-                            .map(u => u.id)
-                          setSelectedRecipients(new Set(oncallUserIds))
-                        }}
-                        className="h-7 text-xs"
-                      >
-                        Select On-Call ({syncedUsers.filter(u => u.is_oncall).length})
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          const slackConnectedUserIds = syncedUsers
-                            .filter(u => u.platforms?.some((p: string) => p.toLowerCase() === 'slack'))
-                            .map(u => u.id)
-                          setSelectedRecipients(new Set(slackConnectedUserIds))
-                        }}
-                        className="h-7 text-xs"
-                      >
-                        Select All
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          setSelectedRecipients(new Set())
-                        }}
-                        className="h-7 text-xs"
-                      >
-                        Deselect All
-                      </Button>
-                    </div>
-                  </>
-                ) : (
-                  <div className="mb-3 p-3 bg-neutral-100 border border-neutral-200 rounded-lg">
-                    <p className="text-xs text-neutral-700 font-medium">
-                      ℹ️ Survey delivery is disabled. These users are synced and available for analysis only.
-                    </p>
-                  </div>
-                )}
                 <div className="space-y-2">
                   {syncedUsers
                     .slice((teamMembersPage - 1) * TEAM_MEMBERS_PER_PAGE, teamMembersPage * TEAM_MEMBERS_PER_PAGE)
                     .map((user: any) => {
-                    const isSelected = selectedRecipients.has(user.id)
-                    const surveyEnabled = slackIntegration?.survey_enabled === true
                     return (
                       <div
                         key={user.id}
-                        onClick={() => {
-                          if (!surveyEnabled) return
-                          const newSelected = new Set(selectedRecipients)
-                          if (isSelected) {
-                            newSelected.delete(user.id)
-                          } else {
-                            newSelected.add(user.id)
-                          }
-                          setSelectedRecipients(newSelected)
-                        }}
-                        className={`bg-white border rounded-lg p-3 transition-all ${
-                          surveyEnabled ? 'cursor-pointer' : ''
-                        } ${
-                          surveyEnabled && isSelected
-                            ? 'border-purple-400 bg-purple-200'
-                            : 'border-neutral-200'
-                        } ${
-                          surveyEnabled && !isSelected ? 'hover:border-purple-500' : ''
-                        }`}
+                        className="bg-white border border-neutral-200 rounded-lg p-3"
                       >
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center space-x-3">
-                            {/* Checkbox - only show if surveys enabled */}
-                            {surveyEnabled && (
-                              <div className="relative">
-                                <input
-                                  type="checkbox"
-                                  checked={isSelected}
-                                  onChange={() => {}} // Handled by parent div onClick
-                                  className="w-4 h-4 rounded border-neutral-300 text-purple-600 focus:ring-purple-500 cursor-pointer"
-                                />
-                              </div>
-                            )}
 
                             {/* Avatar with on-call indicator */}
                             <div className="relative">
