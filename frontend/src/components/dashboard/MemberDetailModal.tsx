@@ -698,7 +698,7 @@ export function MemberDetailModal({
                     <Card>
                       <CardHeader className="pb-3">
                         <div className="flex items-center justify-between">
-                          <h4 className="font-semibold text-neutral-900">Burnout Analysis</h4>
+                          <h4 className="font-semibold text-neutral-900">Risk Analysis</h4>
                           <div className="relative group">
                             <Info className="w-4 h-4 text-neutral-400 cursor-help hover:text-neutral-600" />
                             <div className="absolute top-full right-0 mt-2 px-3 py-2 bg-neutral-900 text-white text-xs rounded-lg w-80 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
