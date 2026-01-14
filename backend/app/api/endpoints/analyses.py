@@ -1791,8 +1791,8 @@ async def get_analysis_github_commits_timeline(
     logger.info(f"GitHub members: {[m['username'] for m in github_members]}")
     logger.info(f"Total commits in insights: {github_insights.get('total_commits', 0)}")
     
-    # Fetch daily commit data for more members (increase from 5 to 10)
-    for member in github_members[:10]:  # Increased limit to get better coverage
+    # Fetch daily commit data for ALL members with GitHub usernames
+    for member in github_members:  # Fetch for all members, not just top 10
         if member["username"]:
             task = collector.fetch_daily_commit_data(
                 username=member["username"],

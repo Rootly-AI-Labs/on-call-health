@@ -139,6 +139,16 @@ export function GitHubConnectedCard({
             </div>
           </div>
 
+          {integration.token_preview && (
+            <div className="flex items-center space-x-2">
+              <Key className="w-4 h-4 text-slate-400" />
+              <div>
+                <div className="font-medium">Token Preview</div>
+                <div className="text-slate-600 font-mono text-xs">{integration.token_preview}</div>
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center space-x-2">
             <Clock className="w-4 h-4 text-slate-400" />
             <div>
