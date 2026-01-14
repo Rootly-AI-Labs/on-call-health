@@ -22,7 +22,7 @@ interface SurveyData {
   latest_feeling_score: number
   latest_workload_score: number
   latest_combined_score: number
-  trend: 'improving' | 'stable' | 'declining'
+  trend: 'improving' | 'stable' | 'declining' | null
   survey_responses: SurveyResponse[]
 }
 
@@ -45,7 +45,8 @@ const getScoreBadgeColor = (score: number) => {
   return 'bg-red-100 text-red-800'
 }
 
-const getTrendIcon = (trend: string) => {
+const getTrendIcon = (trend: string | null) => {
+  if (!trend) return null
   if (trend === 'improving') return <TrendingUp className="w-4 h-4 text-green-500" />
   if (trend === 'declining') return <TrendingDown className="w-4 h-4 text-red-500" />
   return <Minus className="w-4 h-4 text-neutral-500" />
@@ -132,10 +133,12 @@ export function SurveyResultsCard({ surveyData, userEmail }: SurveyResultsCardPr
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm">Health Check-ins</CardTitle>
-          <div className="flex items-center gap-2">
-            {getTrendIcon(surveyData.trend)}
-            <span className="text-xs text-neutral-500 capitalize">{surveyData.trend}</span>
-          </div>
+          {surveyData.trend && (
+            <div className="flex items-center gap-2">
+              {getTrendIcon(surveyData.trend)}
+              <span className="text-xs text-neutral-500 capitalize">{surveyData.trend}</span>
+            </div>
+          )}
         </div>
         <CardDescription>
           {surveyData.survey_count_in_period} {surveyData.survey_count_in_period === 1 ? 'response' : 'responses'} in analysis period
