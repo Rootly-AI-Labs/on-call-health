@@ -210,6 +210,9 @@ class UnifiedBurnoutAnalyzer:
         """
         analysis_start_time = datetime.now()
 
+        # Store analysis_id for use in correlation service
+        self.analysis_id = analysis_id
+
         # Check if using mock data (define at function scope)
         use_mock_data = os.getenv("USE_MOCK_DATA", "false").lower() == "true"
 
@@ -738,7 +741,8 @@ class UnifiedBurnoutAnalyzer:
                 logger.info(f"GITHUB CORRELATION: Correlating GitHub data with team members")
                 # Get current user ID (assuming it's passed in somehow - for now use 1 as default)
                 current_user_id = getattr(self, 'current_user_id', 1)  # Default to user 1 (Spencer)
-                correlation_service = GitHubCorrelationService(current_user_id=current_user_id)
+                analysis_id = getattr(self, 'analysis_id', None)
+                correlation_service = GitHubCorrelationService(current_user_id=current_user_id, analysis_id=analysis_id)
                 
                 # Get original team members before correlation
                 original_members = team_analysis["members"].copy()
