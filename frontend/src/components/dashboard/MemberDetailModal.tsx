@@ -466,6 +466,12 @@ export function MemberDetailModal({
                 {/* User Risk Factors - Using shared component */}
                 <UserRiskFactorsCard selectedMember={selectedMember} />
 
+                {/* Health Check-ins (Survey Data) - Always render directly */}
+                <SurveyResultsCard
+                  surveyData={currentAnalysis?.analysis_data?.member_surveys?.[selectedMember.user_email] || null}
+                  userEmail={selectedMember.user_email}
+                />
+
                 {/* GitHub / Slack Tabs (conditional) */}
                 {(() => {
                   const hasGitHubData = selectedMember.github_activity?.commits_count > 0 ||
@@ -473,10 +479,9 @@ export function MemberDetailModal({
 
                   const hasSlackData = selectedMember.slack_activity?.messages_sent > 0 ||
                     selectedMember.slack_activity?.channels_active > 0
-                  const hasSurveyData = true
 
-                  const tabCount = [hasGitHubData, hasSlackData, hasSurveyData].filter(Boolean).length
-                  const defaultTab = hasGitHubData ? "github" : hasSurveyData ? "surveys" : "communication"
+                  const tabCount = [hasGitHubData, hasSlackData].filter(Boolean).length
+                  const defaultTab = hasGitHubData ? "github" : "communication"
 
                   if (tabCount === 0) return null
 
@@ -491,7 +496,6 @@ export function MemberDetailModal({
                       <TabsList className={`grid w-full ${getGridColsClass(tabCount)}`}>
                         {hasGitHubData && <TabsTrigger value="github">GitHub</TabsTrigger>}
                         {hasSlackData && <TabsTrigger value="communication">Communication</TabsTrigger>}
-                        {hasSurveyData && <TabsTrigger value="surveys">Health Check-ins</TabsTrigger>}
                       </TabsList>
 
                       <TabsContent value="github" className="space-y-4">
