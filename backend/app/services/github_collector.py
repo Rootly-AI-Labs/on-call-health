@@ -95,43 +95,31 @@ class GitHubCollector:
                 logger.warning(f"Invalid user_id type for manual mapping check: {type(user_id).__name__}: {user_id}")
                 return None
 
-            database_url = os.getenv('DATABASE_URL')
-            if not database_url:
-                logger.warning("DATABASE_URL not set, cannot check manual mappings")
-                return None
+            # Use SessionLocal to avoid connection pool exhaustion
+            from ..models import SessionLocal, UserMapping
 
-            engine = create_engine(database_url)
-            conn = engine.connect()
-            
-            # Query for manual mapping
-            query = """
-                SELECT target_identifier
-                FROM user_mappings
-                WHERE user_id = :user_id
-                  AND source_platform = 'rootly'
-                  AND source_identifier = :email
-                  AND target_platform = 'github'
-                  AND target_identifier IS NOT NULL
-                  AND target_identifier != ''
-                ORDER BY created_at DESC
-                LIMIT 1
-            """
-            
-            result = conn.execute(
-                text(query),
-                {'user_id': user_id, 'email': email}
-            )
-            row = result.fetchone()
-            conn.close()
-            
-            if row:
-                username = row[0]
-                logger.info(f"Found manual GitHub mapping: {email} -> {username}")
-                return username
-            else:
-                logger.debug(f"No manual GitHub mapping found for {email}")
-                return None
-                
+            db = SessionLocal()
+            try:
+                # Query for manual mapping
+                user_mapping = db.query(UserMapping).filter(
+                    UserMapping.user_id == user_id,
+                    UserMapping.source_platform == 'rootly',
+                    UserMapping.source_identifier == email,
+                    UserMapping.target_platform == 'github',
+                    UserMapping.target_identifier.isnot(None),
+                    UserMapping.target_identifier != ''
+                ).order_by(UserMapping.created_at.desc()).first()
+
+                if user_mapping and user_mapping.target_identifier:
+                    username = user_mapping.target_identifier
+                    logger.info(f"Found manual GitHub mapping: {email} -> {username}")
+                    return username
+                else:
+                    logger.debug(f"No manual GitHub mapping found for {email}")
+                    return None
+            finally:
+                db.close()
+
         except Exception as e:
             logger.error(f"Error checking manual mappings: {e}")
             return None
@@ -159,41 +147,31 @@ class GitHubCollector:
                 logger.warning(f"⚠️ [SYNCED_CHECK] Invalid user_id type: {type(user_id).__name__}: {user_id}")
                 return None
 
-            database_url = os.getenv('DATABASE_URL')
-            if not database_url:
-                logger.warning(f"⚠️ [SYNCED_CHECK] DATABASE_URL not set")
-                return None
-
             logger.debug(f"🔍 [SYNCED_CHECK] Querying user_correlations for email: {email}")
 
-            engine = create_engine(database_url)
-            conn = engine.connect()
+            # Use SessionLocal instead of creating new engine/connection for each query
+            # This prevents "too many clients" error when processing large teams
+            from ..models import SessionLocal, UserCorrelation
 
-            # Query for synced member - match by email only (don't filter by user_id)
-            # This allows synced members to be shared across the organization
-            query = """
-                SELECT github_username
-                FROM user_correlations
-                WHERE email = :email
-                  AND github_username IS NOT NULL
-                  AND github_username != ''
-                LIMIT 1
-            """
+            db = SessionLocal()
+            try:
+                # Query for synced member - match by email only (don't filter by user_id)
+                # This allows synced members to be shared across the organization
+                user_correlation = db.query(UserCorrelation).filter(
+                    UserCorrelation.email == email,
+                    UserCorrelation.github_username.isnot(None),
+                    UserCorrelation.github_username != ''
+                ).first()
 
-            result = conn.execute(
-                text(query),
-                {'email': email}
-            )
-            row = result.fetchone()
-            conn.close()
-
-            if row:
-                username = row[0]
-                logger.info(f"✅ [SYNCED_CHECK_SUCCESS] Found synced GitHub member: {email} -> {username}")
-                return username
-            else:
-                logger.warning(f"⚠️ [SYNCED_CHECK_MISS] No GitHub username in user_correlations for: {email}")
-                return None
+                if user_correlation and user_correlation.github_username:
+                    username = user_correlation.github_username
+                    logger.info(f"✅ [SYNCED_CHECK_SUCCESS] Found synced GitHub member: {email} -> {username}")
+                    return username
+                else:
+                    logger.warning(f"⚠️ [SYNCED_CHECK_MISS] No GitHub username in user_correlations for: {email}")
+                    return None
+            finally:
+                db.close()
 
         except Exception as e:
             logger.error(f"❌ [SYNCED_CHECK_ERROR] Error checking synced members for {email}: {type(e).__name__}: {e}")
