@@ -2008,9 +2008,9 @@ function DashboardContent() {
                   )}
 
                   {/* Slack Toggle Card */}
+                  {/* Commented out - not ready for release yet
                   {true && (
                     <div className="border rounded-lg p-3 transition-all border-neutral-200 bg-neutral-50 opacity-60 cursor-not-allowed">
-                      {/* Always show Slack content immediately, no skeleton loader */}
                       {(
                         <>
                           <div className="flex items-start justify-between mb-2">
@@ -2044,6 +2044,7 @@ function DashboardContent() {
                       )}
                     </div>
                   )}
+                  */}
 
                   {/* Jira Toggle Card */}
                   {true && (
