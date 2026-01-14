@@ -14,8 +14,9 @@ class UserBurnoutReport(Base):
     __tablename__ = "user_burnout_reports"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # NULL for team members without accounts
     organization_id = Column(Integer, nullable=True)  # Nullable - FK removed in migration 019
+    email = Column(String(255), nullable=False, index=True)  # Team member email for identification (required)
     email_domain = Column(String(255), nullable=True, index=True)  # Domain-based grouping for aggregation
     analysis_id = Column(Integer, ForeignKey("analyses.id"), nullable=True)  # Optional - for linking to specific analysis
 
@@ -48,6 +49,7 @@ class UserBurnoutReport(Base):
         return {
             'id': self.id,
             'user_id': self.user_id,
+            'email': self.email,
             'analysis_id': self.analysis_id,
             'feeling_score': self.feeling_score,
             'workload_score': self.workload_score,
