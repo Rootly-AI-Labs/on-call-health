@@ -1567,19 +1567,26 @@ async def get_user_github_daily_commits(
             "data": None
         }
     
+    # Get GitHub username from analysis results
+    github_username = None
+    if analysis.results and isinstance(analysis.results, dict):
+        team_analysis = analysis.results.get("team_analysis", {})
+        members = team_analysis.get("members", [])
+        for member in members:
+            if member.get("user_email") == user_email:
+                github_username = member.get("github_activity", {}).get("username")
+                break
+
+    if not github_username:
+        return {
+            "status": "error",
+            "message": "No GitHub username found for this user in analysis",
+            "data": None
+        }
+
     # Initialize GitHub collector
     from ...services.github_collector import GitHubCollector
     collector = GitHubCollector()
-    
-    # Get GitHub username from email
-    github_username = await collector._correlate_email_to_github(user_email, github_token)
-    
-    if not github_username:
-        return {
-            "status": "error", 
-            "message": "No GitHub username found for this email",
-            "data": None
-        }
     
     # Determine date range from analysis
     from datetime import datetime, timedelta
