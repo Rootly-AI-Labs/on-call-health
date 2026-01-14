@@ -9,9 +9,11 @@ interface UserRiskFactorsCardProps {
     user_name?: string
     factors?: {
       workload?: number
-      afterHours?: number
+      after_hours?: number      // Backend returns snake_case
+      afterHours?: number       // Frontend may use camelCase
       weekendWork?: number
-      incidentLoad?: number
+      incident_load?: number    // Backend returns snake_case
+      incidentLoad?: number     // Frontend may use camelCase
       responseTime?: number
     }
   }
@@ -30,18 +32,23 @@ export function UserRiskFactorsCard({
     }
 
     const factorData = selectedMember.factors
+    // Handle both snake_case (from backend) and camelCase field names
+    const workload = (factorData.workload || 0)
+    const afterHours = (factorData.after_hours || factorData.afterHours || 0)
+    const incidentLoad = (factorData.incident_load || factorData.incidentLoad || 0)
+
     return [
       {
         factor: 'Workload Intensity',
-        value: (factorData.workload || 0) * 10  // Normalize from [0, 10] to [0, 100]
+        value: workload * 10  // Normalize from [0, 10] to [0, 100]
       },
       {
         factor: 'After Hours Activity',
-        value: (factorData.afterHours || 0) * 10
+        value: afterHours * 10
       },
       {
         factor: 'Incident Load',
-        value: (factorData.incidentLoad || 0) * 10
+        value: incidentLoad * 10
       }
     ]  // Always show these 3 factors, even when value is 0
   }, [selectedMember])
