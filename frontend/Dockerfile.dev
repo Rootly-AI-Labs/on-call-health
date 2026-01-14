@@ -1,15 +1,15 @@
 # Development Dockerfile
-FROM node:25.3.0-alpine
+FROM oven/bun:1-alpine
 
 WORKDIR /app
 
 # Copy package files
-COPY package.json package-lock.json* ./
-RUN npm install
+COPY package.json bun.lockb* ./
+RUN bun install
 
 # Copy source (will be overridden by volume mount)
 COPY . .
 
 EXPOSE 3000
 
-CMD ["npm", "run", "dev"]
+CMD ["bun", "run", "dev"]
