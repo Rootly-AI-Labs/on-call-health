@@ -2007,8 +2007,7 @@ function DashboardContent() {
                     </div>
                   )}
 
-                  {/* Slack Toggle Card */}
-                  {/* Commented out - not ready for release yet
+                  {/* Slack Toggle Card - Commented out until ready for release
                   {true && (
                     <div className="border rounded-lg p-3 transition-all border-neutral-200 bg-neutral-50 opacity-60 cursor-not-allowed">
                       {(
