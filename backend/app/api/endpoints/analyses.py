@@ -545,8 +545,9 @@ def get_member_surveys(analysis: Analysis, db: Session) -> dict:
             })
 
         # Calculate trend (first half vs second half)
-        trend = 'stable'
-        if len(combined_scores) >= 2:
+        # Require at least 4 responses for meaningful trend analysis
+        trend = None
+        if len(combined_scores) >= 4:
             mid = len(combined_scores) // 2
             first_half_avg = sum(combined_scores[:mid]) / mid
             second_half_avg = sum(combined_scores[mid:]) / (len(combined_scores) - mid)
@@ -556,6 +557,8 @@ def get_member_surveys(analysis: Analysis, db: Session) -> dict:
                 trend = 'improving'
             elif second_half_avg < first_half_avg - 0.3:
                 trend = 'declining'
+            else:
+                trend = 'stable'
 
         # Get latest scores
         latest = surveys[-1]
