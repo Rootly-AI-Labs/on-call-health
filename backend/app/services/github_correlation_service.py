@@ -98,6 +98,7 @@ class GitHubCorrelationService:
                         updated_members.append(member)
                     else:
                         # No existing data, create from integration mapping
+                        self.logger.info(f"🔄 [CORRELATION] Creating activity for {member_email} from mapping with data_points={github_mapping.get('data_points', 0)}")
                         github_activity = self._create_github_activity_from_integration_mapping(github_mapping)
 
                         if github_activity:
@@ -111,7 +112,7 @@ class GitHubCorrelationService:
                             updated_members.append(updated_member)
                             correlations_made += 1
 
-                            self.logger.info(f"✅ Correlated {member_email} → {github_mapping['username']} ({github_activity.get('commits_count', 0)} commits)")
+                            self.logger.info(f"✅ [CORRELATION_SUCCESS] {member_email} → {github_mapping['username']}: commits={github_activity.get('commits_count', 0)}, data_points={github_activity.get('data_points_available', 0)}")
                         else:
                             # Mapping exists but no activity data
                             updated_members.append(member)
@@ -140,6 +141,9 @@ class GitHubCorrelationService:
             try:
                 mappings = []
 
+                # Log the analysis_id being used for filtering
+                self.logger.info(f"📋 [FETCH_MAPPINGS] Fetching integration_mappings for analysis_id={self.analysis_id}")
+
                 # First, get mappings from integration_mappings table (auto-detected)
                 query = db.query(IntegrationMapping).filter(
                     IntegrationMapping.target_platform == 'github',
@@ -150,8 +154,12 @@ class GitHubCorrelationService:
 
                 if self.analysis_id:
                     query = query.filter(IntegrationMapping.analysis_id == self.analysis_id)
+                    self.logger.info(f"📋 [FETCH_MAPPINGS] Applied analysis_id filter: {self.analysis_id}")
+                else:
+                    self.logger.warning(f"⚠️ [FETCH_MAPPINGS] No analysis_id provided - fetching ALL mappings!")
 
                 auto_mappings = query.order_by(IntegrationMapping.created_at.desc()).all()
+                self.logger.info(f"📋 [FETCH_MAPPINGS] Found {len(auto_mappings)} auto-detected mappings")
             
                 # Process auto-detected mappings
                 seen_emails = set()
