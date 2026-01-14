@@ -74,7 +74,7 @@ export function GitHubCommitsTimeline({ analysisId, totalCommits, weekendPercent
     }
 
     fetchTimelineData()
-  }, [analysisId, cache, setCache])
+  }, [analysisId])
 
   if (loading) {
     return (
