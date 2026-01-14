@@ -1863,16 +1863,16 @@ async def update_user_correlation_github_username(
     """
     try:
         from sqlalchemy import func, cast, String
-        # Fetch the correlation - ensure it belongs to current user
+        # Fetch the correlation - ensure it belongs to current user's organization
         correlation = db.query(UserCorrelation).filter(
             UserCorrelation.id == correlation_id,
-            UserCorrelation.user_id == current_user.id
+            UserCorrelation.organization_id == current_user.organization_id
         ).first()
 
         if not correlation:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="User correlation not found or doesn't belong to you"
+                detail="User correlation not found or doesn't belong to your organization"
             )
 
         # Validate and process GitHub username
