@@ -204,19 +204,28 @@ class GitHubCorrelationService:
             for row in manual_mappings:
                 email, username, created_at = row
                 email_lower = email.lower()
-                
+
+                # Check if there's an existing auto-detected mapping with data_points
+                existing_data_points = 0
+                for m in mappings:
+                    if m['email'].lower() == email_lower:
+                        existing_data_points = m.get('data_points', 0)
+                        break
+
                 # Remove any existing auto-detected mapping for this email
                 mappings = [m for m in mappings if m['email'].lower() != email_lower]
-                
-                # Add the manual mapping
+
+                # Add the manual mapping, preserving data_points from auto-detected mapping
                 mappings.append({
                     'email': email,
                     'username': username,
-                    'data_points': 0,  # Will be fetched when collecting data
+                    'data_points': existing_data_points,  # Preserve data from auto-detected mapping
                     'mapping_successful': True,
                     'created_at': created_at,
                     'source': 'manual'
                 })
+
+                self.logger.info(f"📝 [MANUAL_MAPPING] {email} → {username}: preserved data_points={existing_data_points}")
                 seen_emails.add(email_lower)
             
             conn.close()
