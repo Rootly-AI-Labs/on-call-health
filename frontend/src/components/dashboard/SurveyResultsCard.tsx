@@ -143,7 +143,7 @@ export function SurveyResultsCard({ surveyData, userEmail }: SurveyResultsCardPr
         <CardDescription>
           {surveyData.survey_count_in_period} {surveyData.survey_count_in_period === 1 ? 'response' : 'responses'} in analysis period
         </CardDescription>
-        {surveyData.survey_responses.length > 2 && (
+        {surveyData.survey_responses.length >= 4 && (
           <div className="flex items-center gap-4 text-xs mt-2">
             <div className="flex items-center gap-1">
               <div className="w-2 h-2 rounded-full bg-blue-500"></div>
@@ -158,7 +158,7 @@ export function SurveyResultsCard({ surveyData, userEmail }: SurveyResultsCardPr
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Trend Chart */}
-        {surveyData.survey_responses.length > 2 ? (
+        {surveyData.survey_responses.length >= 4 ? (
           <div className="space-y-2">
             <div className="text-xs font-medium text-neutral-700">Score Trends</div>
             <ResponsiveContainer width="100%" height={200}>
