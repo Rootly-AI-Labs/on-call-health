@@ -10,9 +10,6 @@ from typing import Dict, List, Optional
 import requests
 import asyncio
 import os
-from sqlalchemy import create_engine, text
-# from sqlalchemy.orm import Session
-# from ..models import GitHubIntegration
 
 logger = logging.getLogger(__name__)
 
