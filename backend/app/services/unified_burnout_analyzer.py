@@ -4899,7 +4899,7 @@ class UnifiedBurnoutAnalyzer:
             )  # in [0, 1]
 
             # Global scaling so Jira score is in ~2–12 range (reduced from 5-30)
-            JIRA_SCALING = 0.65
+            JIRA_SCALING = 0.5
             jira_score = max(0.0, min(100.0, combined * 100 * JIRA_SCALING))
 
 
@@ -5269,7 +5269,7 @@ class UnifiedBurnoutAnalyzer:
             )
 
             # Global scaling (reduced from 0.75 to match Jira)
-            LINEAR_SCALING = 0.65
+            LINEAR_SCALING = 0.5
             linear_score = max(0.0, min(100.0, combined * 100 * LINEAR_SCALING))
 
             logger.info(

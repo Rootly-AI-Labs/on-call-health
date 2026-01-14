@@ -40,18 +40,10 @@ export function UserRiskFactorsCard({
         value: (factorData.afterHours || 0) * 10
       },
       {
-        factor: 'Weekend Work',
-        value: (factorData.weekendWork || 0) * 10
-      },
-      {
         factor: 'Incident Load',
         value: (factorData.incidentLoad || 0) * 10
-      },
-      {
-        factor: 'Response Time',
-        value: (factorData.responseTime || 0) * 10
       }
-    ].filter(f => f.value > 0)  // Only show factors with data
+    ]  // Always show these 3 factors, even when value is 0
   }, [selectedMember])
 
   const memberName = selectedMember?.user_name || 'Team Member'
