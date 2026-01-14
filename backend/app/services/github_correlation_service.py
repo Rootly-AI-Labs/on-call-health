@@ -17,9 +17,10 @@ class GitHubCorrelationService:
     This gives us ALL successful GitHub mappings, not just the top 5 contributors
     """
     
-    def __init__(self, current_user_id: Optional[int] = None):
+    def __init__(self, current_user_id: Optional[int] = None, analysis_id: Optional[int] = None):
         self.logger = logger
         self.current_user_id = current_user_id
+        self.analysis_id = analysis_id
         
     def correlate_github_data(
         self, 
@@ -39,7 +40,7 @@ class GitHubCorrelationService:
         """
         try:
             # Try integration_mappings-driven correlation first (preferred method)
-            if self.current_user_id:
+            if self.analysis_id:
                 return self._correlate_with_integration_mappings(team_members, github_insights)
             
             # Fallback to top_contributors correlation (original method)
@@ -157,10 +158,10 @@ class GitHubCorrelationService:
             """
             
             params = {}
-            if self.current_user_id:
-                query1 += " AND user_id = :user_id"
-                params['user_id'] = self.current_user_id
-            
+            if self.analysis_id:
+                query1 += " AND analysis_id = :analysis_id"
+                params['analysis_id'] = self.analysis_id
+
             query1 += " ORDER BY created_at DESC"
             
             result1 = conn.execute(text(query1), params)
@@ -183,6 +184,7 @@ class GitHubCorrelationService:
                     seen_emails.add(email_lower)
             
             # Second, get manual mappings from user_mappings table
+            # Manual mappings are user-specific, so we filter by current_user_id
             query2 = """
                 SELECT source_identifier, target_identifier, created_at
                 FROM user_mappings
@@ -191,13 +193,15 @@ class GitHubCorrelationService:
                   AND target_identifier IS NOT NULL
                   AND target_identifier != ''
             """
-            
+
+            params2 = {}
             if self.current_user_id:
                 query2 += " AND user_id = :user_id"
-            
+                params2['user_id'] = self.current_user_id
+
             query2 += " ORDER BY created_at DESC"
-            
-            result2 = conn.execute(text(query2), params)
+
+            result2 = conn.execute(text(query2), params2)
             manual_mappings = result2.fetchall()
             
             # Process manual mappings, preferring them over auto-detected
