@@ -294,7 +294,7 @@ export function MemberDetailModal({
       setLoadingCommits(true);
       try {
         const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-        const url = `${API_BASE}/users/${encodeURIComponent(selectedMember.email)}/github-daily-commits?analysis_id=${analysisId}`;
+        const url = `${API_BASE}/analyses/users/${encodeURIComponent(selectedMember.email)}/github-daily-commits?analysis_id=${analysisId}`;
 
         const response = await fetch(url, {
           headers: {
