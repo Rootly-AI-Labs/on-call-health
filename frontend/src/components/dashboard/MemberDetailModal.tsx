@@ -463,14 +463,14 @@ export function MemberDetailModal({
                   currentAnalysis={currentAnalysis}
                 />
 
-                {/* User Risk Factors - Using shared component */}
-                <UserRiskFactorsCard selectedMember={selectedMember} />
-
                 {/* Health Check-ins (Survey Data) - Always render directly */}
                 <SurveyResultsCard
-                  surveyData={currentAnalysis?.analysis_data?.member_surveys?.[selectedMember.user_email] || null}
-                  userEmail={selectedMember.user_email}
+                  surveyData={currentAnalysis?.analysis_data?.member_surveys?.[selectedMember.user_email || selectedMember.email] || null}
+                  userEmail={selectedMember.user_email || selectedMember.email}
                 />
+
+                {/* User Risk Factors - Using shared component */}
+                <UserRiskFactorsCard selectedMember={selectedMember} />
 
                 {/* GitHub / Slack Tabs (conditional) */}
                 {(() => {

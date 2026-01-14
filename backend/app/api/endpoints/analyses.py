@@ -545,9 +545,9 @@ def get_member_surveys(analysis: Analysis, db: Session) -> dict:
             })
 
         # Calculate trend (first half vs second half)
-        # Require at least 4 responses for meaningful trend analysis
+        # Require at least 3 responses for meaningful trend analysis
         trend = None
-        if len(combined_scores) >= 4:
+        if len(combined_scores) >= 3:
             mid = len(combined_scores) // 2
             first_half_avg = sum(combined_scores[:mid]) / mid
             second_half_avg = sum(combined_scores[mid:]) / (len(combined_scores) - mid)
