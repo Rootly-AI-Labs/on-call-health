@@ -22,6 +22,30 @@ export default function RootLayout({
 
   return (
     <html lang="en">
+      <head>
+        <style dangerouslySetInnerHTML={{__html: `
+          *::selection,
+          button::selection,
+          [role="tab"]::selection,
+          .text-white::selection,
+          [data-state="active"]::selection,
+          [data-state="checked"]::selection {
+            background-color: #BFDBFE !important;
+            color: #1E1E26 !important;
+            -webkit-text-fill-color: #1E1E26 !important;
+            --tw-text-opacity: 1 !important;
+          }
+          *::-moz-selection,
+          button::-moz-selection,
+          [role="tab"]::-moz-selection,
+          .text-white::-moz-selection,
+          [data-state="active"]::-moz-selection,
+          [data-state="checked"]::-moz-selection {
+            background-color: #BFDBFE !important;
+            color: #1E1E26 !important;
+          }
+        `}} />
+      </head>
       <body className={inter.className}>
         {gaMeasurementId && (
           <>
