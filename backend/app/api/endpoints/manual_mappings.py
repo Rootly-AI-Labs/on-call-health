@@ -18,6 +18,11 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+# Configuration: Maximum users to process in a single auto-mapping batch
+# Increased from 20 to 100 to support larger teams while still preventing timeouts
+# TODO: Implement pagination/background jobs for teams >100 members
+MAX_AUTO_MAPPING_BATCH_SIZE = 100
+
 # Pydantic models for request/response
 class CreateMappingRequest(BaseModel):
     source_platform: str = Field(..., description="Source platform (rootly, pagerduty, jira)")
@@ -672,10 +677,14 @@ async def run_github_mapping(
             matcher = EnhancedGitHubMatcher(github_token, github_orgs)
             results = []
             
-            # Limit to first 20 users to prevent timeouts
-            limited_users = unmapped_users[:20]
-            if len(unmapped_users) > 20:
-                logger.info(f"⏱️ Processing first 20 users out of {len(unmapped_users)} to prevent timeouts")
+            # Limit batch size to prevent timeouts
+            limited_users = unmapped_users[:MAX_AUTO_MAPPING_BATCH_SIZE]
+            if len(unmapped_users) > MAX_AUTO_MAPPING_BATCH_SIZE:
+                logger.warning(
+                    f"⏱️ Team has {len(unmapped_users)} unmapped users. "
+                    f"Processing first {MAX_AUTO_MAPPING_BATCH_SIZE} to prevent timeouts. "
+                    f"Remaining {len(unmapped_users) - MAX_AUTO_MAPPING_BATCH_SIZE} users will need manual mapping."
+                )
             
             for i, user in enumerate(limited_users):
                 user_email = user.get("email")
@@ -889,8 +898,16 @@ async def run_jira_mapping(
         # Use EnhancedJiraMatcher for email-first matching
         matcher = EnhancedJiraMatcher()
         results = []
+        limited_users = unmapped_users[:MAX_AUTO_MAPPING_BATCH_SIZE]
 
-        for i, user in enumerate(unmapped_users[:20]):  # Limit to 20 to prevent timeouts
+        if len(unmapped_users) > MAX_AUTO_MAPPING_BATCH_SIZE:
+            logger.warning(
+                f"⏱️ Team has {len(unmapped_users)} unmapped Jira users. "
+                f"Processing first {MAX_AUTO_MAPPING_BATCH_SIZE} to prevent timeouts. "
+                f"Remaining {len(unmapped_users) - MAX_AUTO_MAPPING_BATCH_SIZE} users will need manual mapping."
+            )
+
+        for i, user in enumerate(limited_users):
             user_email = user.get("email")
             user_name = user.get("name")
             match_result = None
@@ -900,7 +917,7 @@ async def run_jira_mapping(
                 # Try email-based matching first (new primary strategy)
                 if user_email:
                     logger.debug(
-                        f"[{i+1}/{len(unmapped_users[:20])}] Trying email-based matching for '{user_email}'"
+                        f"[{i+1}/{len(limited_users)}] Trying email-based matching for '{user_email}'"
                     )
                     match_result = await matcher.match_email_to_jira(
                         team_email=user_email,
@@ -913,7 +930,7 @@ async def run_jira_mapping(
                 # Fall back to name-based matching if email doesn't match
                 if not match_result and user_name:
                     logger.debug(
-                        f"[{i+1}/{len(unmapped_users[:20])}] Trying name-based matching for '{user_name}'"
+                        f"[{i+1}/{len(limited_users)}] Trying name-based matching for '{user_name}'"
                     )
                     match_result = await matcher.match_name_to_jira(
                         team_name=user_name,
@@ -1137,8 +1154,16 @@ async def run_linear_mapping(
         # Use EnhancedLinearMatcher for email-first matching
         matcher = EnhancedLinearMatcher()
         results = []
+        limited_users = unmapped_users[:MAX_AUTO_MAPPING_BATCH_SIZE]
 
-        for i, user in enumerate(unmapped_users[:20]):  # Limit to 20 to prevent timeouts
+        if len(unmapped_users) > MAX_AUTO_MAPPING_BATCH_SIZE:
+            logger.warning(
+                f"⏱️ Team has {len(unmapped_users)} unmapped Linear users. "
+                f"Processing first {MAX_AUTO_MAPPING_BATCH_SIZE} to prevent timeouts. "
+                f"Remaining {len(unmapped_users) - MAX_AUTO_MAPPING_BATCH_SIZE} users will need manual mapping."
+            )
+
+        for i, user in enumerate(limited_users):
             user_email = user.get("email")
             user_name = user.get("name")
             match_result = None
@@ -1148,7 +1173,7 @@ async def run_linear_mapping(
                 # Try email-based matching first (new primary strategy)
                 if user_email:
                     logger.debug(
-                        f"[{i+1}/{len(unmapped_users[:20])}] Trying email-based matching for '{user_email}'"
+                        f"[{i+1}/{len(limited_users)}] Trying email-based matching for '{user_email}'"
                     )
                     match_result = await matcher.match_email_to_linear(
                         team_email=user_email,
@@ -1161,7 +1186,7 @@ async def run_linear_mapping(
                 # Fall back to name-based matching if email doesn't match
                 if not match_result and user_name:
                     logger.debug(
-                        f"[{i+1}/{len(unmapped_users[:20])}] Trying name-based matching for '{user_name}'"
+                        f"[{i+1}/{len(limited_users)}] Trying name-based matching for '{user_name}'"
                     )
                     match_result = await matcher.match_name_to_linear(
                         team_name=user_name,
