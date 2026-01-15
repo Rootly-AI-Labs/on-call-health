@@ -355,7 +355,10 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
 
 
       if (!response.ok) {
-        const error = await response.json().catch(() => ({}))
+        const error = await response.json().catch((err) => {
+        console.error('Failed to parse error response:', err)
+        return {}
+      })
 
         if (error.detail === 'GitHub integration not found' || error.detail === 'Jira integration not found' || error.detail === 'Linear integration not found') {
           toast.error(`Please connect a ${platformTitle} integration first before running auto-mapping`)
@@ -506,7 +509,10 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
         await loadMappingData()
         onRefresh?.()
       } else {
-        const errorData = await response.json().catch(() => ({}))
+        const errorData = await response.json().catch((err) => {
+        console.error('Failed to parse error response:', err)
+        return {}
+      })
         
         // Handle different error response formats
         let errorMessage = 'Failed to remove mapping'
@@ -587,7 +593,10 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
         await loadMappingData()
         onRefresh?.()
       } else {
-        const errorData = await response.json().catch(() => ({}))
+        const errorData = await response.json().catch((err) => {
+        console.error('Failed to parse error response:', err)
+        return {}
+      })
         toast.error(errorData.detail || 'Failed to save mapping')
       }
     } catch (error) {

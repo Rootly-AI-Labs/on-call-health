@@ -200,11 +200,13 @@ export function useNotifications() {
 
   // Auto-refresh notifications every 30 seconds
   useEffect(() => {
-    fetchNotifications()
+    // Initial fetch
+    fetchNotifications(false)
 
-    const interval = setInterval(fetchNotifications, 30000)
+    // Set up interval for auto-refresh (always fetch fresh data, never append)
+    const interval = setInterval(() => fetchNotifications(false), 30000)
     return () => clearInterval(interval)
-  }, [fetchNotifications])
+  }, []) // Empty dependency array to avoid race conditions
 
   return {
     notifications,
