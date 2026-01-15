@@ -596,6 +596,14 @@ export default function useDashboard() {
           if (!analysisId && data.analyses && data.analyses.length > 0) {
             const mostRecentAnalysis = data.analyses[0] // Analyses should be ordered by created_at desc
 
+            // Validate the analysis has required data
+            if (!mostRecentAnalysis.analysis_data) {
+              console.error('Most recent analysis is missing analysis_data')
+              toast.error('Latest analysis data is incomplete. Please run a new analysis.')
+              setLoadingAnalyses(false)
+              return false
+            }
+
             // Check if the analysis has full member data
             const teamAnalysis = mostRecentAnalysis.analysis_data?.team_analysis
             const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members
@@ -617,9 +625,15 @@ export default function useDashboard() {
                   const fullAnalysis = await response.json()
                   setAnalysisCache(prev => new Map(prev.set(analysisKey, fullAnalysis)))
                   setCurrentAnalysis(fullAnalysis)
+                } else {
+                  // API error - show error to user
+                  const errorText = await response.text().catch(() => 'Unknown error')
+                  console.error(`Failed to load most recent analysis (${response.status}):`, errorText)
+                  toast.error(`Failed to load analysis: ${response.status === 404 ? 'Analysis not found' : 'Server error'}`)
                 }
               } catch (error) {
                 console.error('Error fetching most recent analysis:', error)
+                toast.error('Failed to load most recent analysis. Please try refreshing the page.')
               }
             }
             // Platform mappings will be fetched by the dedicated useEffect
