@@ -82,13 +82,13 @@ function IntroGuide({ isOpen, currentStep, onNext, onPrev, onClose }: IntroGuide
 
             {step.image && (
               <div className="mt-6 rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden bg-slate-50 dark:bg-slate-900/30">
-                <div className="relative w-full">
+                <div className="relative w-full flex items-center justify-center" style={{ maxHeight: '320px' }}>
                   <Image
                     src={step.image}
                     alt={step.title}
                     width={1200}
                     height={675}
-                    className="w-full h-auto"
+                    className="w-full h-auto max-h-[320px] object-contain"
                     priority
                     quality={100}
                   />
