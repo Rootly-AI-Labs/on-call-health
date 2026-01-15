@@ -119,3 +119,40 @@
 .scrollbar-dark::-webkit-scrollbar-thumb:hover {
   background-color: #9ca3af;
 }
+
+/* Global text selection styling - FORCE dark text on light background */
+*::selection {
+  background-color: rgb(191, 219, 254) !important;
+  color: rgb(30, 30, 38) !important;
+  -webkit-text-fill-color: rgb(30, 30, 38) !important;
+}
+
+*::-moz-selection {
+  background-color: rgb(191, 219, 254) !important;
+  color: rgb(30, 30, 38) !important;
+}
+
+/* Force selection on buttons and tab triggers with webkit override */
+button::selection,
+[role="tab"]::selection,
+.text-white::selection,
+[data-state="active"]::selection,
+[data-state="checked"]::selection,
+[data-selected-single="true"]::selection,
+[data-range-start="true"]::selection {
+  background-color: rgb(191, 219, 254) !important;
+  color: rgb(30, 30, 38) !important;
+  -webkit-text-fill-color: rgb(30, 30, 38) !important;
+  --tw-text-opacity: 1 !important;
+}
+
+button::-moz-selection,
+[role="tab"]::-moz-selection,
+.text-white::-moz-selection,
+[data-state="active"]::-moz-selection,
+[data-state="checked"]::-moz-selection,
+[data-selected-single="true"]::-moz-selection,
+[data-range-start="true"]::-moz-selection {
+  background-color: rgb(191, 219, 254) !important;
+  color: rgb(30, 30, 38) !important;
+}
