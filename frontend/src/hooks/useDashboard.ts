@@ -592,7 +592,8 @@ export default function useDashboard() {
           const urlParams = new URLSearchParams(window.location.search)
           const analysisId = urlParams.get('analysis')
 
-          if (!analysisId && data.analyses && data.analyses.length > 0 && !currentAnalysis) {
+          // Always load the most recent analysis if no analysis is specified in URL
+          if (!analysisId && data.analyses && data.analyses.length > 0) {
             const mostRecentAnalysis = data.analyses[0] // Analyses should be ordered by created_at desc
 
             // Check if the analysis has full member data
