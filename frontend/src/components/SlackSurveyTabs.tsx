@@ -383,12 +383,22 @@ export function SlackSurveyTabs({
           <div className={!slackIntegration ? "" : "border-t pt-4"}>
             <h4 className="font-medium text-neutral-900 mb-3">How it works:</h4>
             <div className="space-y-3">
+              <style dangerouslySetInnerHTML={{__html: `
+                .selection-fix::selection {
+                  background-color: #DBEAFE !important;
+                  color: #1E1E26 !important;
+                }
+                .selection-fix *::selection {
+                  background-color: #DBEAFE !important;
+                  color: #1E1E26 !important;
+                }
+              `}} />
               <div className="flex items-start space-x-3">
                 <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
                   <span className="text-green-600 text-xs font-bold">1</span>
                 </div>
                 <div>
-                  <p className="text-sm text-neutral-700 select-text"><strong className="text-neutral-900">Authorize the app</strong> to deliver 3-question burnout surveys via Slack</p>
+                  <p className="text-sm text-neutral-700 selection-fix"><strong className="text-neutral-900">Authorize the app</strong> to deliver 3-question burnout surveys via Slack</p>
                 </div>
               </div>
 
@@ -397,7 +407,7 @@ export function SlackSurveyTabs({
                   <span className="text-green-600 text-xs font-bold">2</span>
                 </div>
                 <div>
-                  <p className="text-sm text-neutral-700 select-text"><strong className="text-neutral-900">Team members receive surveys</strong> via automated DMs or by typing <code className="bg-neutral-200 px-1 rounded text-xs text-neutral-900">/oncall-health</code></p>
+                  <p className="text-sm text-neutral-700 selection-fix"><strong className="text-neutral-900">Team members receive surveys</strong> via automated DMs or by typing <code className="bg-neutral-200 px-1 rounded text-xs text-neutral-900">/oncall-health</code></p>
                   <div className="bg-slate-800 rounded p-3 font-mono text-sm text-green-400 mt-2">
                     <div>/oncall-health</div>
                     <div className="text-slate-400 mt-1">→ Opens interactive modal with 3 scored questions + optional text</div>
@@ -410,7 +420,7 @@ export function SlackSurveyTabs({
                   <span className="text-green-600 text-xs font-bold">3</span>
                 </div>
                 <div>
-                  <p className="text-sm text-neutral-700 select-text"><strong className="text-neutral-900">Survey data automatically integrates</strong> with your burnout analysis to validate automated detection patterns</p>
+                  <p className="text-sm text-neutral-700 selection-fix"><strong className="text-neutral-900">Survey data automatically integrates</strong> with your burnout analysis to validate automated detection patterns</p>
                 </div>
               </div>
             </div>
