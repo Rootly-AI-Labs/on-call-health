@@ -1369,8 +1369,10 @@ function DashboardContent() {
                     }}
                   />
 
-                  {/* Slack Metrics Card */}
-                  {currentAnalysis?.analysis_data?.slack_insights && (
+                  {/* Slack Metrics Card - DISABLED: Feature not ready for production
+                      To re-enable: Uncomment the code below and set slack_data: true in backend
+                  */}
+                  {false && currentAnalysis?.analysis_data?.slack_insights && (
                     <Card className="border border-neutral-300 bg-white shadow-lg">
                       <CardHeader className="pb-3">
                         <div className="flex items-center justify-between">
@@ -1394,19 +1396,21 @@ function DashboardContent() {
                       <CardContent className="space-y-4">
                         {(() => {
                           const slack = currentAnalysis.analysis_data.slack_insights
-                          
+
                           // Check if this analysis actually has valid Slack data
                           const teamAnalysis = currentAnalysis.analysis_data.team_analysis
-                          const teamMembers = Array.isArray(teamAnalysis) ? teamAnalysis : (teamAnalysis?.members || [])
-                          const hasRealSlackData = teamMembers.some(member => 
-                            member.slack_activity && 
+                          const teamMembers = Array.isArray(teamAnalysis)
+                            ? teamAnalysis
+                            : (teamAnalysis as any)?.members || []
+                          const hasRealSlackData = teamMembers.some((member: any) =>
+                            member.slack_activity &&
                             (member.slack_activity.messages_sent > 0 || member.slack_activity.channels_active > 0)
                           )
-                          
+
                           // Check for API errors
                           const hasRateLimitErrors = (slack as any)?.errors?.rate_limited_channels?.length > 0
                           const hasOtherErrors = (slack as any)?.errors?.other_errors?.length > 0
-                          
+
                           // If no real Slack data, show empty state
                           if (!hasRealSlackData && !hasRateLimitErrors && !hasOtherErrors) {
                             return (
@@ -1433,7 +1437,7 @@ function DashboardContent() {
                               </div>
                             )
                           }
-                          
+
                           return (
                             <>
                               {/* Error Messages */}
@@ -1446,9 +1450,9 @@ function DashboardContent() {
                                     <span className="text-sm font-medium text-yellow-800">Rate Limited</span>
                                   </div>
                                   <p className="text-xs text-yellow-700 mt-1">
-                                    Some channels were rate limited: {(slack as any).errors.rate_limited_channels.join(", ")}. 
-                                    Data may be incomplete. <button 
-                                      onClick={() => window.location.reload()} 
+                                    Some channels were rate limited: {(slack as any).errors.rate_limited_channels.join(", ")}.
+                                    Data may be incomplete. <button
+                                      onClick={() => window.location.reload()}
                                       className="text-yellow-800 underline hover:text-yellow-900"
                                     >
                                       Refresh to retry
@@ -1456,7 +1460,7 @@ function DashboardContent() {
                                   </p>
                                 </div>
                               )}
-                              
+
                               {hasOtherErrors && (
                                 <div className="bg-red-50 border border-red-200 rounded-lg p-3">
                                   <div className="flex items-center space-x-2">
@@ -1471,7 +1475,7 @@ function DashboardContent() {
                                   </p>
                                 </div>
                               )}
-                              
+
                               {/* Only show metrics if we have real data */}
                               {hasRealSlackData && (
                                 <>
@@ -1503,7 +1507,7 @@ function DashboardContent() {
                                     </div>
                                     <div className="bg-purple-50 rounded-lg p-3">
                                       <p className="text-xs text-purple-700 font-medium">Weekend Messages</p>
-                                      {(slack?.weekend_activity_percentage !== undefined && slack.weekend_activity_percentage !== null) || 
+                                      {(slack?.weekend_activity_percentage !== undefined && slack.weekend_activity_percentage !== null) ||
                                        (slack?.weekend_percentage !== undefined && slack.weekend_percentage !== null) ? (
                                         <p className="text-lg font-bold text-purple-900">{(slack.weekend_activity_percentage || slack.weekend_percentage || 0).toFixed(1)}%</p>
                                       ) : (
