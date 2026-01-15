@@ -42,7 +42,7 @@ cp backend/.env.example backend/.env
 ```
 
 <details>
-<summary><b>📝 Instructions to get token for Google Auth</b></summary>
+<summary><b><img src="frontend/public/images/google-logo.png" width="16" height="16" alt="Google"> Instructions to get token for Google Auth</b></summary>
 
 1. **Enable [Google People API](https://console.cloud.google.com/marketplace/product/google/people.googleapis.com)**
 2. **Get your tokens**
@@ -57,7 +57,7 @@ cp backend/.env.example backend/.env
 </details>
 
 <details>
-<summary><b>📝 Instructions to get token for GitHub Auth</b></summary>
+<summary><b><img src="frontend/public/images/github-logo.png" width="16" height="16" alt="GitHub"> Instructions to get token for GitHub Auth</b></summary>
 
 1. **Visit [https://github.com/settings/developers](https://github.com/settings/developers)**
 	*  Click **OAuth Apps** → **New OAuth App**
