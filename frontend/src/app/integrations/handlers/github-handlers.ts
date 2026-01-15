@@ -179,7 +179,10 @@ export async function handleGitHubTest(): Promise<void> {
         }
       }
     } else {
-      const errorData = await response.json().catch(() => ({}))
+      const errorData = await response.json().catch((err) => {
+        console.error('Failed to parse error response:', err)
+        return {}
+      })
       throw new Error(errorData.detail || 'Connection test failed')
     }
   } catch (error) {
