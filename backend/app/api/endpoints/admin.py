@@ -10,7 +10,7 @@ from ...models import Analysis
 from ...models.slack_workspace_mapping import SlackWorkspaceMapping
 from ...models.slack_integration import SlackIntegration
 from ...models.user import User
-from ..dependencies import get_current_active_user
+from ...auth.dependencies import get_current_active_user
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
