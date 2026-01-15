@@ -401,21 +401,29 @@ async def get_analysis_by_uuid(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=error_detail
         )
-    
+
+    # Fetch survey data for team members within analysis timeline
+    member_surveys = get_member_surveys(analysis, db)
+
+    # Add survey data to analysis results
+    analysis_data = analysis.results or {}
+    if member_surveys:
+        analysis_data['member_surveys'] = member_surveys
+
     return AnalysisResponse(
         id=analysis.id,
         uuid=getattr(analysis, 'uuid', None),
         integration_id=analysis.rootly_integration_id,
-        
+
         # Include new integration fields
         integration_name=analysis.integration_name,
         platform=analysis.platform,
-        
+
         status=analysis.status,
         created_at=analysis.created_at,
         completed_at=analysis.completed_at,
         time_range=analysis.time_range or 30,
-        analysis_data=analysis.results,
+        analysis_data=analysis_data,
         config=analysis.config
     )
 
@@ -450,23 +458,121 @@ async def get_analysis(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=error_detail
         )
-    
+
+    # Fetch survey data for team members within analysis timeline
+    member_surveys = get_member_surveys(analysis, db)
+
+    # Add survey data to analysis results
+    analysis_data = analysis.results or {}
+    if member_surveys:
+        analysis_data['member_surveys'] = member_surveys
+
     return AnalysisResponse(
         id=analysis.id,
         uuid=getattr(analysis, 'uuid', None),
         integration_id=analysis.rootly_integration_id,
-        
+
         # Include new integration fields
         integration_name=analysis.integration_name,
         platform=analysis.platform,
-        
+
         status=analysis.status,
         created_at=analysis.created_at,
         completed_at=analysis.completed_at,
         time_range=analysis.time_range or 30,
-        analysis_data=analysis.results,
+        analysis_data=analysis_data,
         config=analysis.config
     )
+
+
+def get_member_surveys(analysis: Analysis, db: Session) -> dict:
+    """
+    Fetch survey responses for all team members within the analysis timeline.
+    Returns a dict keyed by user email with survey data.
+    """
+    from datetime import timedelta
+    from ...models.user_burnout_report import UserBurnoutReport
+    from ...models.user_correlation import UserCorrelation
+
+    # Calculate analysis date range
+    # Use current time as end date for live survey data (surveys update without re-running analysis)
+    from datetime import datetime
+    analysis_end_date = datetime.utcnow()
+    analysis_start_date = analysis.created_at - timedelta(days=analysis.time_range or 30)
+
+    # Get all team members for this organization
+    if not analysis.organization_id:
+        return {}
+
+    correlations = db.query(UserCorrelation).filter(
+        UserCorrelation.organization_id == analysis.organization_id
+    ).all()
+
+    member_surveys = {}
+
+    for corr in correlations:
+        if not corr.email:
+            continue
+
+        # Get surveys within analysis period for this team member (match by email)
+        surveys = db.query(UserBurnoutReport).filter(
+            UserBurnoutReport.email == corr.email,
+            UserBurnoutReport.submitted_at >= analysis_start_date,
+            UserBurnoutReport.submitted_at <= analysis_end_date
+        ).order_by(UserBurnoutReport.submitted_at.asc()).all()
+
+        if not surveys:
+            continue
+
+        # Build survey responses
+        survey_responses = []
+        combined_scores = []
+
+        for survey in surveys:
+            # Combined score: average of feeling and workload (1-5 scale, higher = better)
+            combined = (survey.feeling_score + survey.workload_score) / 2.0
+            combined_scores.append(combined)
+
+            survey_responses.append({
+                'feeling_score': survey.feeling_score,
+                'workload_score': survey.workload_score,
+                'combined_score': round(combined, 1),
+                'submitted_at': survey.submitted_at.isoformat(),
+                'stress_factors': survey.stress_factors,
+                'personal_circumstances': survey.personal_circumstances,
+                'additional_comments': survey.additional_comments,
+                'submitted_via': survey.submitted_via
+            })
+
+        # Calculate trend (first half vs second half)
+        # Require at least 3 responses for meaningful trend analysis
+        trend = None
+        if len(combined_scores) >= 3:
+            mid = len(combined_scores) // 2
+            first_half_avg = sum(combined_scores[:mid]) / mid
+            second_half_avg = sum(combined_scores[mid:]) / (len(combined_scores) - mid)
+
+            # Higher score = better (less burnout), so improving means score went up
+            if second_half_avg > first_half_avg + 0.3:
+                trend = 'improving'
+            elif second_half_avg < first_half_avg - 0.3:
+                trend = 'declining'
+            else:
+                trend = 'stable'
+
+        # Get latest scores
+        latest = surveys[-1]
+
+        member_surveys[corr.email] = {
+            'survey_count_in_period': len(surveys),
+            'latest_feeling_score': latest.feeling_score,
+            'latest_workload_score': latest.workload_score,
+            'latest_combined_score': round((latest.feeling_score + latest.workload_score) / 2.0, 1),
+            'trend': trend,
+            'survey_responses': survey_responses
+        }
+
+    return member_surveys
 
 
 def is_uuid(value: str) -> bool:
@@ -533,21 +639,29 @@ async def get_analysis_by_identifier(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=error_detail
         )
-    
+
+    # Fetch survey data for team members within analysis timeline
+    member_surveys = get_member_surveys(analysis, db)
+
+    # Add survey data to analysis results
+    analysis_data = analysis.results or {}
+    if member_surveys:
+        analysis_data['member_surveys'] = member_surveys
+
     return AnalysisResponse(
         id=analysis.id,
         uuid=getattr(analysis, 'uuid', None),
         integration_id=analysis.rootly_integration_id,
-        
+
         # Include new integration fields
         integration_name=analysis.integration_name,
         platform=analysis.platform,
-        
+
         status=analysis.status,
         created_at=analysis.created_at,
         completed_at=analysis.completed_at,
         time_range=analysis.time_range or 30,
-        analysis_data=analysis.results,
+        analysis_data=analysis_data,
         config=analysis.config
     )
 
@@ -1453,19 +1567,26 @@ async def get_user_github_daily_commits(
             "data": None
         }
     
+    # Get GitHub username from analysis results
+    github_username = None
+    if analysis.results and isinstance(analysis.results, dict):
+        team_analysis = analysis.results.get("team_analysis", {})
+        members = team_analysis.get("members", [])
+        for member in members:
+            if member.get("user_email") == user_email:
+                github_username = member.get("github_activity", {}).get("username")
+                break
+
+    if not github_username:
+        return {
+            "status": "error",
+            "message": "No GitHub username found for this user in analysis",
+            "data": None
+        }
+
     # Initialize GitHub collector
     from ...services.github_collector import GitHubCollector
     collector = GitHubCollector()
-    
-    # Get GitHub username from email
-    github_username = await collector._correlate_email_to_github(user_email, github_token)
-    
-    if not github_username:
-        return {
-            "status": "error", 
-            "message": "No GitHub username found for this email",
-            "data": None
-        }
     
     # Determine date range from analysis
     from datetime import datetime, timedelta
@@ -1677,8 +1798,8 @@ async def get_analysis_github_commits_timeline(
     logger.info(f"GitHub members: {[m['username'] for m in github_members]}")
     logger.info(f"Total commits in insights: {github_insights.get('total_commits', 0)}")
     
-    # Fetch daily commit data for more members (increase from 5 to 10)
-    for member in github_members[:10]:  # Increased limit to get better coverage
+    # Fetch daily commit data for ALL members with GitHub usernames
+    for member in github_members:  # Fetch for all members, not just top 10
         if member["username"]:
             task = collector.fetch_daily_commit_data(
                 username=member["username"],

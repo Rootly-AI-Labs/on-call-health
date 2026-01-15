@@ -99,14 +99,14 @@ export function LinearConnectedCard({
 
         {/* Token Expiry */}
         {integration.token_expires_at && (
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-            <div className="flex items-start space-x-2 text-xs text-gray-700">
+          <div className="bg-neutral-100 border border-neutral-200 rounded-lg p-3">
+            <div className="flex items-start space-x-2 text-xs text-neutral-700">
               <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
               <div>
                 <div className="font-medium">Token Expiry</div>
                 <div>{new Date(integration.token_expires_at).toLocaleString()}</div>
                 {integration.supports_refresh && (
-                  <div className="text-gray-600 mt-1">Auto-refresh is enabled</div>
+                  <div className="text-neutral-700 mt-1">Auto-refresh is enabled</div>
                 )}
               </div>
             </div>
@@ -144,7 +144,7 @@ export function LinearConnectedCard({
         <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs text-slate-600">
           <div className="font-medium mb-1">Data Collection</div>
           <div>
-            We collect issue assignments, priorities, due dates, and team membership data to analyze workload patterns and identify burnout risk.
+            We collect issue assignments, priorities, due dates, and team membership data to analyze workload patterns and identify risk of overwork.
           </div>
         </div>
       </CardContent>

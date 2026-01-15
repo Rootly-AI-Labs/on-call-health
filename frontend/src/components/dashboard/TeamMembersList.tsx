@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { ChevronDown, ChevronRight, Users, Loader2 } from "lucide-react"
 import { useState } from "react"
+import Image from "next/image"
 
 interface TeamMembersListProps {
   currentAnalysis: any
@@ -63,27 +64,25 @@ export function TeamMembersList({
   const isJiraEnabled = isDataSourceEnabled('jira');
   const isLinearEnabled = isDataSourceEnabled('linear');
   
-  // Check if data is still loading
-  const isLoading = !currentAnalysis || !currentAnalysis.analysis_data;
+  const isLoading = !currentAnalysis || !currentAnalysis.analysis_data
 
+  // OCB risk level from score (0-100 scale, higher = more burnout)
+  function getOCBRiskLevel(score: number | undefined | null): string {
+    if (score === undefined || score === null) return 'low'
+    if (score < 25) return 'healthy'
+    if (score < 50) return 'fair'
+    if (score < 75) return 'poor'
+    return 'critical'
+  }
 
-  // Official OCB 4-color system for progress bars (0-100 scale, higher = more burnout)
-  const getOCBProgressColor = (score: number) => {
-    const clampedScore = Math.max(0, Math.min(100, score));
-    
-    if (clampedScore < 25) return '#10b981';      // Green - Low/minimal burnout (0-24)
-    if (clampedScore < 50) return '#eab308';      // Yellow - Mild burnout symptoms (25-49)  
-    if (clampedScore < 75) return '#f97316';      // Orange - Moderate/significant burnout (50-74)
-    return '#dc2626';                             // Red - High/severe burnout (75-100)
-  };
-
-  // Official OCB 4-color system for text/badges
-  const getOCBTextColor = (score: number) => {
-    if (score < 25) return '#10b981';       // Green - Low/minimal burnout
-    if (score < 50) return '#eab308';       // Yellow - Mild burnout symptoms
-    if (score < 75) return '#f97316';       // Orange - Moderate/significant burnout  
-    return '#dc2626';                       // Red - High/severe burnout
-  };
+  // OCB 4-color system for progress bars (0-100 scale, higher = more burnout)
+  function getOCBProgressColor(score: number): string {
+    const clampedScore = Math.max(0, Math.min(100, score))
+    if (clampedScore < 25) return '#10b981'  // Green - Low/minimal burnout (0-24)
+    if (clampedScore < 50) return '#eab308'  // Yellow - Mild burnout symptoms (25-49)
+    if (clampedScore < 75) return '#f97316'  // Orange - Moderate/significant burnout (50-74)
+    return '#dc2626'                          // Red - High/severe burnout (75-100)
+  }
 
   const renderMemberCard = (member: any) => (
     <Card
@@ -93,7 +92,7 @@ export function TeamMembersList({
         id: member.user_id || '',
         name: member.user_name || 'Unknown',
         email: member.user_email || '',
-        burnoutScore: member.ocb_score || 0, // Use OCB score directly
+        burnoutScore: member.ocb_score || 0, // Use OCH risk level directly
         riskLevel: (member.risk_level || 'low') as 'high' | 'medium' | 'low',
         trend: 'stable' as const,
         incidentsHandled: member.incident_count || 0,
@@ -101,9 +100,7 @@ export function TeamMembersList({
         factors: {
           workload: Math.round(((member.factors?.workload || (member as any).key_metrics?.incidents_per_week || 0)) * 10) / 10,
           afterHours: Math.round(((member.factors?.after_hours || (member as any).key_metrics?.after_hours_percentage || 0)) * 10) / 10,
-          weekendWork: Math.round(((member.factors?.weekend_work || 0)) * 10) / 10,
           incidentLoad: Math.round(((member.factors?.incident_load || (member as any).key_metrics?.incidents_per_week || 0)) * 10) / 10,
-          responseTime: Math.round(((member.factors?.response_time || (member as any).key_metrics?.avg_resolution_hours || 0)) * 10) / 10,
         },
         metrics: member.metrics || {},
         github_activity: member.github_activity || null,
@@ -116,42 +113,33 @@ export function TeamMembersList({
             <Avatar>
               <AvatarFallback>
                 {member.user_name
-                  .split(" ")
-                  .map((n) => n[0])
-                  .join("")}
+                  ? member.user_name.split(" ").map((n) => n[0]).join("")
+                  : member.user_email?.charAt(0).toUpperCase() || "?"}
               </AvatarFallback>
             </Avatar>
             <div>
-              <h3 className="font-medium">{member.user_name}</h3>
-              <p className="text-sm text-gray-500">{member.user_email}</p>
+              <h3 className="font-medium">{member.user_name || member.user_email}</h3>
             </div>
           </div>
           <div className="flex items-center space-x-2">
             {member.is_oncall && (
-              <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-300">
+              <Badge className="bg-purple-50 text-purple-700">
                 ON-CALL
               </Badge>
             )}
-            {(() => {
-              // Calculate risk level based on OCB score when available
-              const getOCBRiskLevel = (member: any) => {
-                if (member.ocb_score !== undefined && member.ocb_score !== null) {
-                  // Use OCB scoring (0-100, higher = more burnout)
-                  if (member.ocb_score < 25) return 'healthy';      // 0-24: Low/minimal burnout
-                  if (member.ocb_score < 50) return 'fair';         // 25-49: Mild burnout symptoms
-                  if (member.ocb_score < 75) return 'poor';         // 50-74: Moderate burnout risk
-                  return 'critical';                                // 75-100: High/severe burnout
-                }
-                // No OCB score available - default to low risk
-                return 'low';
+            {member?.ocb_score !== undefined && (() => {
+              const getOCBRiskLevel = (ocb_score: number): string => {
+                if (ocb_score < 25) return 'healthy';
+                if (ocb_score < 50) return 'fair';
+                if (ocb_score < 75) return 'poor';
+                return 'critical';
               };
 
-              const riskLevel = getOCBRiskLevel(member);
+              const riskLevel = getOCBRiskLevel(member.ocb_score);
               const displayLabel = riskLevel === 'healthy' ? 'HEALTHY' :
                                  riskLevel === 'fair' ? 'FAIR' :
                                  riskLevel === 'poor' ? 'POOR' :
-                                 riskLevel === 'critical' ? 'CRITICAL' :
-                                 riskLevel.toUpperCase();
+                                 'CRITICAL';
 
               return <Badge className={getRiskColor(riskLevel)}>{displayLabel}</Badge>;
             })()}
@@ -161,17 +149,17 @@ export function TeamMembersList({
         {/* Integration icons - show when mapping exists and data source enabled */}
         <div className="flex flex-wrap gap-2 mb-3">
           {/* GitHub - show if user has GitHub mapping */}
-          {isGithubEnabled && member.github_username && (
-            <div className="flex items-center justify-center w-6 h-6 bg-gray-100 rounded-full border border-gray-200" title="GitHub">
-              <svg className="w-3.5 h-3.5 text-gray-700" fill="currentColor" viewBox="0 0 24 24">
+          {member.github_username && (
+            <div className="flex items-center justify-center w-6 h-6 bg-neutral-200 rounded-full border border-neutral-200" title="GitHub">
+              <svg className="w-3.5 h-3.5 text-neutral-700" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/>
               </svg>
             </div>
           )}
 
           {/* Slack - show if user has Slack mapping */}
-          {isSlackEnabled && member.slack_user_id && (
-            <div className="flex items-center justify-center w-6 h-6 bg-white rounded-full border border-gray-200" title="Slack">
+          {member.slack_user_id && (
+            <div className="flex items-center justify-center w-6 h-6 bg-white rounded-full border border-neutral-200" title="Slack">
               <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
                 {/* Official Slack logo pattern */}
                 <path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52z" fill="#E01E5A"/>
@@ -196,30 +184,33 @@ export function TeamMembersList({
           )}
 
           {/* Linear - show if user has Linear mapping */}
-          {isLinearEnabled && member.linear_user_id && (
-            <div className="flex items-center justify-center w-6 h-6 bg-purple-50 rounded-full border border-purple-200" title="Linear">
-              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
-                <path d="M0 0h24v24H0V0z" fill="none"/>
-                <path d="M2.5 21.5l19-19M5.5 21.5l16-16M8.5 21.5l13-13M11.5 21.5l10-10M14.5 21.5l7-7M17.5 21.5l4-4" stroke="#5E6AD2" strokeWidth="1.5" strokeLinecap="round"/>
+          {member.linear_user_id && (
+            <div className="flex items-center justify-center w-6 h-6" title="Linear">
+              <Image src="/images/linear-logo.png" alt="Linear" width={16} height={16} />
+            </div>
+          )}
+
+          {/* Survey - show if user has survey data */}
+          {currentAnalysis?.analysis_data?.member_surveys?.[member.user_email] && (
+            <div className="flex items-center justify-center w-6 h-6 bg-blue-50 rounded-full border border-blue-200" title="Survey Data Available">
+              <svg className="w-3.5 h-3.5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
             </div>
           )}
         </div>
+
         <div className="space-y-2">
           {member?.ocb_score !== undefined ? (
-            <div className="flex justify-between text-sm">
-              <span>Burnout Score</span>
-              <span className="font-bold text-black">
-                {member.ocb_score.toFixed(1)}/100
-              </span>
+            <div className="text-sm">
+              <span>Risk Level</span>
             </div>
           ) : (
-            <div className="flex justify-between text-sm">
-              <span>No OCB Score Available</span>
-              <span className="font-medium text-gray-500">-</span>
+            <div className="text-sm">
+              <span>No Risk Level Available</span>
             </div>
           )}
-          <div className="relative h-2 w-full overflow-hidden rounded-full bg-gray-200">
+          <div className="relative h-2 w-full overflow-hidden rounded-full bg-neutral-300">
             <div 
               className="h-full transition-all"
               style={{ 
@@ -230,18 +221,8 @@ export function TeamMembersList({
               }}
             />
           </div>
-          <div className="flex justify-between text-xs text-gray-500">
+          <div className="flex justify-between text-xs text-neutral-500">
             <span>{member.incident_count} incidents</span>
-            <span>
-              {member.github_activity?.commits_count ? (
-                <>
-                  {member.github_activity.commits_count} commits
-                  {member.github_activity.commits_per_week && ` (${member.github_activity.commits_per_week.toFixed(1)}/week)`}
-                </>
-              ) : (
-                'No GitHub data'
-              )}
-            </span>
           </div>
         </div>
       </CardContent>
@@ -253,7 +234,7 @@ export function TeamMembersList({
       {/* Organization Members Grid */}
       <Card>
         <CardHeader>
-          <CardTitle>Team Overview</CardTitle>
+          <CardTitle>Team Member Risk Levels</CardTitle>
           <CardDescription>Click on a member to view detailed analysis</CardDescription>
         </CardHeader>
         <CardContent>
@@ -263,7 +244,7 @@ export function TeamMembersList({
             
             if (!allMembers || allMembers.length === 0) {
               return (
-                <div className="text-center text-gray-500 py-8">
+                <div className="text-center text-neutral-500 py-8">
                   No organization member data available yet
                 </div>
               )
@@ -275,11 +256,11 @@ export function TeamMembersList({
             })
             
             // Separate members with incidents/burnout and those with neither
-            // Include members with incidents OR OCB score (e.g., from Jira) in main section
+            // Include members with incidents OR OCH risk level (e.g., from Jira) in main section
             const membersWithIncidents = validMembers.filter(member =>
               (member.incident_count || 0) > 0 || (member.ocb_score || 0) > 0
             )
-            // Only hide members with BOTH zero incidents AND zero OCB score
+            // Only hide members with BOTH zero incidents AND zero OCH risk level
             const membersWithoutIncidents = validMembers.filter(member =>
               (member.incident_count || 0) === 0 && (member.ocb_score || 0) === 0
             )
@@ -287,7 +268,7 @@ export function TeamMembersList({
             
             // Sort members by score (highest risk first)
             const sortMembers = (members: any[]) => members.sort((a, b) => {
-              // Sort by OCB score only (higher score = higher risk)
+              // Sort by OCH risk level only (higher score = higher risk)
               return (b.ocb_score || 0) - (a.ocb_score || 0);
             })
 
@@ -306,7 +287,7 @@ export function TeamMembersList({
                     <Button
                       variant="outline" 
                       onClick={() => setShowMembersWithoutIncidents(!showMembersWithoutIncidents)}
-                      className="w-full mb-4 text-gray-600 border-gray-300 hover:bg-gray-50"
+                      className="w-full mb-4 text-neutral-700 border-neutral-300 hover:bg-neutral-100"
                       disabled={isLoading}
                     >
                       <div className="flex items-center justify-center space-x-2">
@@ -322,7 +303,7 @@ export function TeamMembersList({
                           ) : (
                             <>
                               {showMembersWithoutIncidents ? 'Hide' : 'Show'} team members with no activity
-                              <span className="ml-1 text-xs bg-gray-200 px-2 py-1 rounded">
+                              <span className="ml-1 text-xs bg-neutral-300 px-2 py-1 rounded">
                                 {membersWithoutIncidents.length}
                               </span>
                             </>
@@ -341,7 +322,7 @@ export function TeamMembersList({
 
                 {/* No members case */}
                 {membersWithIncidents.length === 0 && membersWithoutIncidents.length === 0 && (
-                  <div className="text-center text-gray-500 py-8">
+                  <div className="text-center text-neutral-500 py-8">
                     No team members with valid burnout data found
                   </div>
                 )}

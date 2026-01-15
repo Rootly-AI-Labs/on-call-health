@@ -748,7 +748,7 @@ async def disconnect_slack(
         workspace_mapping.status = 'inactive'
 
         # Disable survey schedule for this organization
-        from ..models.survey_schedule import SurveySchedule
+        from ...models.survey_schedule import SurveySchedule
         if organization_id:
             survey_schedule = db.query(SurveySchedule).filter(
                 SurveySchedule.organization_id == organization_id
@@ -939,8 +939,8 @@ class SlackSurveySubmission(BaseModel):
     """Model for Slack burnout survey submissions."""
     analysis_id: int
     user_email: str
-    self_reported_score: int  # 0-100 scale
-    energy_level: int  # 1-5 scale
+    feeling_score: int  # 1-5 scale: How user is feeling (1=struggling, 5=very good)
+    workload_score: int  # 1-5 scale: How manageable workload feels (1=overwhelming, 5=very manageable)
     stress_factors: list[str]  # Array of stress factors
     personal_circumstances: str = None  # 'significantly', 'somewhat', 'no', 'prefer_not_say'
     additional_comments: str = ""
@@ -1204,12 +1204,12 @@ async def handle_oncall_health_command(
                 "response_type": "ephemeral"
             }
 
-        # Check for existing survey response today (scoped by user only)
+        # Check for existing survey response today (match by email)
         from datetime import datetime
         today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
 
         existing_report = db.query(UserBurnoutReport).filter(
-            UserBurnoutReport.user_id == user_correlation.user_id,
+            UserBurnoutReport.email == user_correlation.email,
             UserBurnoutReport.submitted_at >= today_start
         ).first()
 
@@ -1229,7 +1229,7 @@ async def handle_oncall_health_command(
 
         if not slack_integration or not slack_integration.slack_token:
             # Fallback to old button-based approach if no token
-            survey_url = f"{settings.FRONTEND_URL}/survey?user={user_correlation.user_id}"
+            survey_url = f"{settings.FRONTEND_URL}/survey?email={user_correlation.email}"
             if latest_analysis:
                 survey_url += f"&analysis={latest_analysis.id}"
 
@@ -1270,7 +1270,7 @@ async def handle_oncall_health_command(
             if not result.get("ok"):
                 logging.error(f"Failed to open modal: {result.get('error')}")
                 # Fallback to button approach
-                survey_url = f"{settings.FRONTEND_URL}/survey?user={user_correlation.user_id}"
+                survey_url = f"{settings.FRONTEND_URL}/survey?email={user_correlation.email}"
                 if latest_analysis:
                     survey_url += f"&analysis={latest_analysis.id}"
 
@@ -1335,14 +1335,17 @@ async def handle_slack_interactions(
                     slack_user_id = slack_user.get("id")
                     trigger_id = data.get("trigger_id")
 
-                    # Check for existing report today (scoped by user only)
+                    # Check for existing report today (match by user's email)
                     from datetime import datetime
                     today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
 
-                    existing_report = db.query(UserBurnoutReport).filter(
-                        UserBurnoutReport.user_id == user_id,
-                        UserBurnoutReport.submitted_at >= today_start
-                    ).first()
+                    user = db.query(User).filter(User.id == user_id).first()
+                    existing_report = None
+                    if user:
+                        existing_report = db.query(UserBurnoutReport).filter(
+                            UserBurnoutReport.email == user.email,
+                            UserBurnoutReport.submitted_at >= today_start
+                        ).first()
 
                     # Open modal (organization_id kept for backwards compatibility with old buttons)
                     modal_view = create_burnout_survey_modal(
@@ -1399,21 +1402,31 @@ async def handle_slack_interactions(
                     # Store feeling as feeling_score (1-5 scale: higher = feeling better)
                     feeling_score = feeling_map.get(feeling_str, 3)
 
-                    # Question 2: How manageable does your workload feel? (1-5 scale)
-                    workload_str = values.get("workload_block", {}).get("workload_input", {}).get("selected_option", {}).get("value", "somewhat_manageable")
-                    workload_map = {
-                        "very_manageable": 5,
-                        "manageable": 4,
-                        "somewhat_manageable": 3,
-                        "barely_manageable": 2,
-                        "overwhelming": 1
-                    }
-                    # Store workload as workload_score (1-5 scale: higher = more manageable)
-                    workload_score = workload_map.get(workload_str, 3)
+                    # Question 2: What's having the biggest impact? (single-select)
+                    stress_sources_block = values.get("stress_sources_block", {})
+                    stress_sources_input = stress_sources_block.get("stress_sources_input", {})
+                    selected_option = stress_sources_input.get("selected_option", {})
+                    selected_value = selected_option.get("value") if selected_option else None
 
-                    # No longer collecting stress factors or personal circumstances
-                    stress_factors = []
-                    personal_circumstances = None
+                    # Store as array for consistency with database schema
+                    stress_factors = [selected_value] if selected_value else []
+
+                    # Derive workload_score based on selected stress source
+                    # Map stress sources to workload intensity (inverse relationship)
+                    stress_intensity_map = {
+                        'oncall_frequency': 2,      # High impact
+                        'after_hours': 2,           # High impact
+                        'incident_complexity': 3,   # Moderate impact
+                        'time_pressure': 3,         # Moderate impact
+                        'team_support': 2,          # High impact (lack of support)
+                        'work_life_balance': 2,     # High impact
+                        'personal': 4,              # Lower work impact (external)
+                        'other': 3                  # Moderate impact (unknown)
+                    }
+                    workload_score = stress_intensity_map.get(selected_value, 5) if selected_value else 5
+
+                    # Check if personal circumstances was selected
+                    personal_circumstances = 'yes' if selected_value == 'personal' else None
 
                     # Get optional comments
                     comments_block = values.get("comments_block") or {}
@@ -1441,10 +1454,10 @@ async def handle_slack_interactions(
                 if not user:
                     return {"response_action": "errors", "errors": {"comments_block": "User not found"}}
 
-                # Check if user already submitted today (scoped by user only, not org)
+                # Check if user already submitted today (match by email)
                 # This allows only 1 survey per user per day, regardless of organization
                 existing_report = db.query(UserBurnoutReport).filter(
-                    UserBurnoutReport.user_id == user_id,
+                    UserBurnoutReport.email == user.email,
                     UserBurnoutReport.submitted_at >= today_start
                 ).order_by(UserBurnoutReport.submitted_at.desc()).first()
 
@@ -1458,6 +1471,7 @@ async def handle_slack_interactions(
                     existing_report.additional_comments = comments
                     existing_report.submitted_via = 'slack'
                     existing_report.analysis_id = analysis_id  # Update linked analysis if provided
+                    existing_report.email = user.email  # Refresh email in case it changed
                     existing_report.email_domain = user.email_domain  # Refresh email_domain in case it changed
                     existing_report.updated_at = datetime.utcnow()
                     logging.info(f"Updated existing report ID {existing_report.id} for user {user_id}")
@@ -1466,6 +1480,7 @@ async def handle_slack_interactions(
                     # Create new burnout report with email_domain for domain-based sharing
                     new_report = UserBurnoutReport(
                         user_id=user_id,
+                        email=user.email,  # Save email for team member identification
                         organization_id=organization_id,
                         email_domain=user.email_domain,
                         analysis_id=analysis_id,  # Optional - may be None
@@ -1550,7 +1565,7 @@ async def submit_slack_burnout_survey(
     try:
         # Find the user by email
         user_correlation = db.query(UserCorrelation).filter(
-            UserCorrelation.user_email == submission.user_email.lower()
+            UserCorrelation.email == submission.user_email.lower()
         ).first()
 
         if not user_correlation:
@@ -1570,9 +1585,9 @@ async def submit_slack_burnout_survey(
                 detail="Analysis not found"
             )
 
-        # Check for duplicate submission
+        # Check for duplicate submission (match by email)
         existing_report = db.query(UserBurnoutReport).filter(
-            UserBurnoutReport.user_id == user_correlation.user_id,
+            UserBurnoutReport.email == submission.user_email.lower(),
             UserBurnoutReport.analysis_id == submission.analysis_id
         ).first()
 
@@ -1588,11 +1603,12 @@ async def submit_slack_burnout_survey(
         # Create new burnout report
         new_report = UserBurnoutReport(
             user_id=user_correlation.user_id,
+            email=submission.user_email.lower(),  # Save email for team member identification
             organization_id=None,  # No org_id for this endpoint
             email_domain=user.email_domain if user else None,
             analysis_id=submission.analysis_id,
-            self_reported_score=submission.self_reported_score,
-            energy_level=submission.energy_level,
+            feeling_score=submission.feeling_score,
+            workload_score=submission.workload_score,
             stress_factors=submission.stress_factors,
             personal_circumstances=submission.personal_circumstances,
             additional_comments=submission.additional_comments,
@@ -1661,12 +1677,11 @@ async def get_team_survey_status(
         responses_collected = len(survey_responses)
         response_rate = (responses_collected / total_members * 100) if total_members > 0 else 0
 
-        # Identify non-responders
+        # Identify non-responders (use email from survey response directly)
         responded_emails = {
-            db.query(UserCorrelation).filter(
-                UserCorrelation.user_id == response.user_id
-            ).first().user_email.lower()
+            response.email.lower()
             for response in survey_responses
+            if response.email
         }
 
         non_responders = [email for email in team_members if email not in responded_emails]
@@ -1679,11 +1694,9 @@ async def get_team_survey_status(
             "non_responders": non_responders,
             "survey_responses": [
                 {
-                    "user_email": db.query(UserCorrelation).filter(
-                        UserCorrelation.user_id == response.user_id
-                    ).first().user_email,
-                    "self_reported_score": response.self_reported_score,
-                    "energy_level": response.energy_level,
+                    "user_email": response.email,
+                    "feeling_score": response.feeling_score,
+                    "workload_score": response.workload_score,
                     "stress_factors": response.stress_factors,
                     "submitted_at": response.submitted_at.isoformat(),
                     "submitted_via": response.submitted_via,
@@ -1780,26 +1793,30 @@ def create_burnout_survey_modal(organization_id: int, user_id: int, analysis_id:
             },
             {
                 "type": "input",
-                "block_id": "workload_block",
+                "block_id": "stress_sources_block",
                 "element": {
                     "type": "static_select",
-                    "action_id": "workload_input",
+                    "action_id": "stress_sources_input",
                     "placeholder": {
                         "type": "plain_text",
-                        "text": "Select workload level"
+                        "text": "Select one"
                     },
                     "options": [
-                        {"text": {"type": "plain_text", "text": "Very manageable"}, "value": "very_manageable"},
-                        {"text": {"type": "plain_text", "text": "Manageable"}, "value": "manageable"},
-                        {"text": {"type": "plain_text", "text": "Somewhat manageable"}, "value": "somewhat_manageable"},
-                        {"text": {"type": "plain_text", "text": "Barely manageable"}, "value": "barely_manageable"},
-                        {"text": {"type": "plain_text", "text": "Overwhelming"}, "value": "overwhelming"}
+                        {"text": {"type": "plain_text", "text": "On-call frequency"}, "value": "oncall_frequency"},
+                        {"text": {"type": "plain_text", "text": "After-hours incidents"}, "value": "after_hours"},
+                        {"text": {"type": "plain_text", "text": "Incident complexity"}, "value": "incident_complexity"},
+                        {"text": {"type": "plain_text", "text": "Time pressure"}, "value": "time_pressure"},
+                        {"text": {"type": "plain_text", "text": "Team support"}, "value": "team_support"},
+                        {"text": {"type": "plain_text", "text": "Work-life balance"}, "value": "work_life_balance"},
+                        {"text": {"type": "plain_text", "text": "Personal"}, "value": "personal"},
+                        {"text": {"type": "plain_text", "text": "Other"}, "value": "other"}
                     ]
                 },
                 "label": {
                     "type": "plain_text",
-                    "text": "How manageable does your workload feel?"
-                }
+                    "text": "What's having the biggest impact on you right now?"
+                },
+                "optional": True
             },
             {
                 "type": "input",

@@ -26,6 +26,97 @@ interface TeamHealthOverviewProps {
   setExpandedDataSources: (fn: (prev: any) => any) => void
 }
 
+// Helper to get members array from team analysis
+function getTeamMembers(currentAnalysis: any): any[] {
+  const teamAnalysis = currentAnalysis?.analysis_data?.team_analysis
+  return Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members || []
+}
+
+// Helper to get on-call members (those with incidents)
+function getOnCallMembers(currentAnalysis: any): any[] {
+  return getTeamMembers(currentAnalysis).filter((m: any) => m.incident_count > 0)
+}
+
+// Calculate team OCB score from member scores
+function calculateTeamOCBScore(currentAnalysis: any): number | null {
+  const members = getTeamMembers(currentAnalysis)
+  if (!members || members.length === 0) return null
+
+  const ocbScores = members
+    .map((m: any) => m.ocb_score)
+    .filter((s: any) => s !== undefined && s !== null && s > 0)
+
+  if (ocbScores.length === 0) return null
+  return Math.round(ocbScores.reduce((a: number, b: number) => a + b, 0) / ocbScores.length)
+}
+
+// Get health percentage from on-call members or fallback sources
+function getHealthPercentage(currentAnalysis: any, historicalTrends: any): number {
+  const onCallMembers = getOnCallMembers(currentAnalysis)
+
+  if (onCallMembers.length > 0) {
+    const ocbScores = onCallMembers
+      .map((m: any) => m.ocb_score)
+      .filter((s: any) => s !== undefined && s !== null)
+
+    if (ocbScores.length > 0) {
+      return ocbScores.reduce((a: number, b: number) => a + b, 0) / ocbScores.length
+    }
+  }
+
+  // Fallback to daily trends
+  if (historicalTrends?.daily_trends?.length > 0) {
+    const latestTrend = historicalTrends.daily_trends[historicalTrends.daily_trends.length - 1]
+    return latestTrend.overall_score * 10
+  }
+  if (currentAnalysis?.analysis_data?.daily_trends?.length > 0) {
+    const latestTrend = currentAnalysis.analysis_data.daily_trends[currentAnalysis.analysis_data.daily_trends.length - 1]
+    return latestTrend.overall_score * 10
+  }
+  if (currentAnalysis?.analysis_data?.team_health) {
+    return currentAnalysis.analysis_data.team_health.overall_score * 10
+  }
+  if (currentAnalysis?.analysis_data?.team_summary) {
+    return currentAnalysis.analysis_data.team_summary.average_score * 10
+  }
+  return 0
+}
+
+// Convert OCB score to health status label
+function getHealthStatusLabel(ocbScore: number): string {
+  if (ocbScore < 25) return 'Healthy'
+  if (ocbScore < 50) return 'Fair'
+  if (ocbScore < 75) return 'Poor'
+  return 'Critical'
+}
+
+// Get health status description
+function getHealthStatusDescription(ocbScore: number): string {
+  if (ocbScore < 25) return 'Low/minimal signs of overwork, sustainable workload'
+  if (ocbScore < 50) return 'Mild signs of overwork, watch for trends'
+  if (ocbScore < 75) return 'Moderate signs of overwork, intervention recommended'
+  return 'High/severe signs of overwork, urgent action needed'
+}
+
+// Tooltip show/hide helpers
+function showTooltip(tooltipId: string, rect: DOMRect, topOffset: number, leftOffset: number): void {
+  const tooltip = document.getElementById(tooltipId)
+  if (tooltip) {
+    tooltip.style.top = `${rect.top - topOffset}px`
+    tooltip.style.left = `${rect.left - leftOffset}px`
+    tooltip.classList.remove('invisible', 'opacity-0')
+    tooltip.classList.add('visible', 'opacity-100')
+  }
+}
+
+function hideTooltip(tooltipId: string): void {
+  const tooltip = document.getElementById(tooltipId)
+  if (tooltip) {
+    tooltip.classList.add('invisible', 'opacity-0')
+    tooltip.classList.remove('visible', 'opacity-100')
+  }
+}
+
 export function TeamHealthOverview({
   currentAnalysis,
   historicalTrends,
@@ -34,28 +125,25 @@ export function TeamHealthOverview({
 }: TeamHealthOverviewProps) {
   return (
     <>
-      {/* OCB Score Tooltip Portal */}
-      <div className="fixed z-[99999] invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gray-900 text-white text-xs rounded-lg p-3 w-72 shadow-lg pointer-events-none"
+      {/* OCH Risk Level Tooltip Portal */}
+      <div className="fixed z-[99999] invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-neutral-900 text-white text-xs rounded-lg p-3 w-72 shadow-lg pointer-events-none"
         id="ocb-score-tooltip"
         style={{ top: '-200px', left: '-200px' }}>
         <div className="space-y-2">
-          <div className="text-purple-300 font-semibold mb-2">On-Call Health (OCH)</div>
-          <div className="text-gray-300 text-sm">
-            OCH scores range from <strong>0 to 100</strong>, where higher scores indicate more burnout risk.
-          </div>
-          <div className="text-gray-300 text-xs mt-2 pt-2 border-t border-gray-600">
-            Scientifically validated burnout assessment methodology
+          <div className="text-purple-300 font-semibold mb-2">On-Call Health Risk Level</div>
+          <div className="text-neutral-500 text-sm">
+            On-Call Health risk levels range from <strong>0 to 100</strong>, where higher scores indicate a higher risk of overwork.
           </div>
         </div>
         <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-900"></div>
       </div>
 
       {/* Info Icon Rubric Tooltip Portal */}
-      <div className="fixed z-[99999] invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gray-900 text-white text-xs rounded-lg p-4 w-80 shadow-lg pointer-events-none"
+      <div className="fixed z-[99999] invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-neutral-900 text-white text-xs rounded-lg p-4 w-80 shadow-lg pointer-events-none"
         id="health-rubric-tooltip"
         style={{ top: '-200px', left: '-200px' }}>
         <div className="space-y-3">
-          <div className="text-purple-300 font-semibold text-sm mb-3">OCB Risk Level Scale</div>
+          <div className="text-purple-300 font-semibold text-sm mb-3">On-Call Health Risk Level Scale</div>
 
           <div className="space-y-3">
             <div>
@@ -64,9 +152,9 @@ export function TeamHealthOverview({
                   <div className="w-3 h-3 bg-green-500 rounded-full"></div>
                   <span className="text-green-300 font-medium">Healthy</span>
                 </div>
-                <span className="text-gray-300">0-24</span>
+                <span className="text-neutral-500">0-24</span>
               </div>
-              <div className="text-gray-400 text-xs pl-5">No significant burnout symptoms</div>
+              <div className="text-neutral-500 text-xs pl-5">No significant signs of overwork</div>
             </div>
 
             <div>
@@ -75,9 +163,9 @@ export function TeamHealthOverview({
                   <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
                   <span className="text-yellow-300 font-medium">Fair</span>
                 </div>
-                <span className="text-gray-300">25-49</span>
+                <span className="text-neutral-500">25-49</span>
               </div>
-              <div className="text-gray-400 text-xs pl-5">Mild burnout symptoms, monitor trends</div>
+              <div className="text-neutral-500 text-xs pl-5">Mild signs of overwork, monitor trends</div>
             </div>
 
             <div>
@@ -86,9 +174,9 @@ export function TeamHealthOverview({
                   <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
                   <span className="text-orange-300 font-medium">Poor</span>
                 </div>
-                <span className="text-gray-300">50-74</span>
+                <span className="text-neutral-500">50-74</span>
               </div>
-              <div className="text-gray-400 text-xs pl-5">Moderate burnout, intervention recommended</div>
+              <div className="text-neutral-500 text-xs pl-5">Moderate signs of overwork, intervention recommended</div>
             </div>
 
             <div>
@@ -97,22 +185,19 @@ export function TeamHealthOverview({
                   <div className="w-3 h-3 bg-red-500 rounded-full"></div>
                   <span className="text-red-300 font-medium">Critical</span>
                 </div>
-                <span className="text-gray-300">75-100</span>
+                <span className="text-neutral-500">75-100</span>
               </div>
-              <div className="text-gray-400 text-xs pl-5">Severe burnout risk, immediate action needed</div>
+              <div className="text-neutral-500 text-xs pl-5">Severe signs of overwork, immediate action needed</div>
             </div>
           </div>
 
-          <div className="text-gray-400 text-xs pt-2 border-t border-gray-700">
-            Higher scores indicate greater burnout risk
-          </div>
         </div>
         <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-900"></div>
       </div>
 
       {/* Overview Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6 overflow-visible">
-        <Card className="border-2 border-purple-200 bg-white/70 backdrop-blur-sm shadow-lg overflow-visible min-h-[200px]">
+        <Card className="border border-neutral-300 overflow-visible min-h-[200px]">
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-medium text-purple-700 flex items-center space-x-2">
               <Heart className="w-4 h-4" />
@@ -124,98 +209,51 @@ export function TeamHealthOverview({
               <div>
                 <div className="flex items-start space-x-3">
                   <div>
-                    <div className="text-2xl font-bold text-gray-900">{(() => {
-                      // Helper function to calculate OCB score from team data - FORCE FRONTEND CALCULATION
-                      const calculateOCBFromTeam = () => {
-                        const teamAnalysis = currentAnalysis?.analysis_data?.team_analysis;
-                        const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members;
-
-                        if (!members || members.length === 0) return null;
-
-                        // ALWAYS calculate from individual member OCB scores first
-                        const ocbScores = members
-                          .map((m: any) => m.ocb_score)
-                          .filter((s: any) => s !== undefined && s !== null && s > 0);
-
-                        if (ocbScores.length > 0) {
-                          const avgOcbScore = ocbScores.reduce((a: number, b: number) => a + b, 0) / ocbScores.length;
-                          return Math.round(avgOcbScore); // Round to whole integer
+                    <div className="text-2xl font-bold text-gray-900">
+                      {(() => {
+                        const teamOcbScore = calculateTeamOCBScore(currentAnalysis)
+                        if (teamOcbScore !== null) {
+                          return (
+                            <>
+                              <span>{teamOcbScore}</span>
+                              <span
+                                className="text-xs text-gray-500 cursor-help ml-1"
+                                onMouseEnter={(e) => showTooltip('ocb-score-tooltip', e.currentTarget.getBoundingClientRect(), 180, 120)}
+                                onMouseLeave={() => hideTooltip('ocb-score-tooltip')}
+                              >
+                                Risk Level
+                              </span>
+                            </>
+                          )
                         }
 
-                        // No OCB scores available - return null
-                        return null;
-                      };
-
-                      // FORCE FRONTEND OCB CALCULATION FIRST - Don't trust backend at all!
-                      const teamOcbScore = calculateOCBFromTeam();
-                      if (teamOcbScore !== null) {
-                        return (
-                          <>
-                            <span>{teamOcbScore}</span>
-                            <span
-                              className="text-xs text-gray-500 cursor-help ml-1"
-                              onMouseEnter={(e) => {
-                                const tooltip = document.getElementById('ocb-score-tooltip')
-                                if (tooltip) {
-                                  const rect = e.currentTarget.getBoundingClientRect()
-                                  tooltip.style.top = `${rect.top - 180}px`
-                                  tooltip.style.left = `${rect.left - 120}px`
-                                  tooltip.classList.remove('invisible', 'opacity-0')
-                                  tooltip.classList.add('visible', 'opacity-100')
-                                }
-                              }}
-                              onMouseLeave={() => {
-                                const tooltip = document.getElementById('ocb-score-tooltip')
-                                if (tooltip) {
-                                  tooltip.classList.add('invisible', 'opacity-0')
-                                  tooltip.classList.remove('visible', 'opacity-100')
-                                }
-                              }}
-                            >
-                              OCB
-                            </span>
-                          </>
-                        );
-                      }
-
-
-                      // Use the latest point from health trends for consistency with chart
-                      if (historicalTrends?.daily_trends?.length > 0) {
-                        const latestTrend = historicalTrends.daily_trends[historicalTrends.daily_trends.length - 1];
-                        return `${Math.round(latestTrend.overall_score * 10)}%`;
-                      }
-                      // Fallback to current analysis daily trends if available
-                      if (currentAnalysis?.analysis_data?.daily_trends?.length > 0) {
-                        const latestTrend = currentAnalysis.analysis_data.daily_trends[currentAnalysis.analysis_data.daily_trends.length - 1];
-                        return `${Math.round(latestTrend.overall_score * 10)}%`;
-                      }
-
-                      // Show real data from team_health if available
-                      if (currentAnalysis?.analysis_data?.team_health) {
-                        return `${Math.round(currentAnalysis.analysis_data.team_health.overall_score * 10)}%`;
-                      }
-                      if (currentAnalysis?.analysis_data?.team_summary) {
-                        return `${Math.round(currentAnalysis.analysis_data.team_summary.average_score * 10)}%`;
-                      }
-                      // NO FALLBACK DATA - show actual system state
-                      return "No data";
-                    })()}</div>
-                    <div className="text-xs text-gray-500">Current</div>
+                        // Fallback to daily trends
+                        if (historicalTrends?.daily_trends?.length > 0) {
+                          const latestTrend = historicalTrends.daily_trends[historicalTrends.daily_trends.length - 1]
+                          return `${Math.round(latestTrend.overall_score * 10)}%`
+                        }
+                        if (currentAnalysis?.analysis_data?.daily_trends?.length > 0) {
+                          const latestTrend = currentAnalysis.analysis_data.daily_trends[currentAnalysis.analysis_data.daily_trends.length - 1]
+                          return `${Math.round(latestTrend.overall_score * 10)}%`
+                        }
+                        if (currentAnalysis?.analysis_data?.team_health) {
+                          return `${Math.round(currentAnalysis.analysis_data.team_health.overall_score * 10)}%`
+                        }
+                        if (currentAnalysis?.analysis_data?.team_summary) {
+                          return `${Math.round(currentAnalysis.analysis_data.team_summary.average_score * 10)}%`
+                        }
+                        return "No data"
+                      })()}
+                    </div>
+                    <div className="text-xs text-gray-500">/100</div>
                   </div>
                   {(() => {
-                    // Show average if we have either historical data OR OCB scores (since we can compute meaningful averages from OCB)
-                    const teamAnalysis = currentAnalysis?.analysis_data?.team_analysis;
-                    const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members;
-                    const hasOCBScores = members && members.some((m: any) => m.ocb_score !== undefined && m.ocb_score !== null);
-                    const hasHistoricalData = (historicalTrends?.daily_trends?.length > 0) ||
-                      (currentAnalysis?.analysis_data?.daily_trends?.length > 0);
-
                     // Remove average section completely
-                    return false;
+                    return false
                   })() && (
                       <div className="hidden">
-                        <div className="text-2xl font-bold text-gray-900 flex items-baseline space-x-1">{(() => {
-                          // PRIORITY 1: Use OCB scores for meaningful 30-day average (same as current calculation)
+                        <div className="text-2xl font-bold text-neutral-900 flex items-baseline space-x-1">{(() => {
+                          // PRIORITY 1: Use OCH risk levels for meaningful 30-day average (same as current calculation)
                           const teamAnalysis = currentAnalysis?.analysis_data?.team_analysis;
                           const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members;
 
@@ -235,7 +273,7 @@ export function TeamHealthOverview({
                                 <>
                                   <span>{roundedScore}</span>
                                   <span
-                                    className="text-xs text-gray-500 cursor-help ml-1"
+                                    className="text-xs text-neutral-500 cursor-help ml-1"
                                     onMouseEnter={(e) => {
                                       const tooltip = document.getElementById('ocb-score-tooltip')
                                       if (tooltip) {
@@ -254,14 +292,14 @@ export function TeamHealthOverview({
                                       }
                                     }}
                                   >
-                                    OCB
+                                    Risk Level
                                   </span>
                                 </>
                               );
                             }
                           }
 
-                          // PRIORITY 2: Fallback to backend historical data if no OCB scores
+                          // PRIORITY 2: Fallback to backend historical data if no OCH risk levels
 
                           // Calculate average from Health Trends chart data (legacy method)
                           if (historicalTrends?.daily_trends?.length > 0) {
@@ -286,79 +324,21 @@ export function TeamHealthOverview({
                           }
                           return "No data";
                         })()}</div>
-                        <div className="text-xs text-gray-500">{currentAnalysis?.time_range || 30}-day avg</div>
+                        <div className="text-xs text-neutral-500">{currentAnalysis?.time_range || 30}-day avg</div>
                       </div>
                     )}
                 </div>
                 <div className="mt-2 flex items-center space-x-1">
-                  <div className="text-sm font-medium text-purple-600">{(() => {
-                    // Helper function to get current health percentage
-                    const getCurrentHealthPercentage = () => {
-                      const teamAnalysis = currentAnalysis?.analysis_data?.team_analysis;
-                      const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members;
-
-                      if (members && members.length > 0) {
-                        // Only include on-call members (those with incidents during the analysis period)
-                        const onCallMembers = members.filter((m: any) => m.incident_count > 0);
-                        
-                        if (onCallMembers.length > 0) {
-                          const ocbScores = onCallMembers.map((m: any) => m.ocb_score).filter((s: any) => s !== undefined && s !== null);
-                          
-                          if (ocbScores.length > 0) {
-                            const avgOcbScore = ocbScores.reduce((a: number, b: number) => a + b, 0) / ocbScores.length;
-                            // OCB: Return raw OCB score (0-100 where higher = more burnout)
-                            return avgOcbScore;
-                          }
-                        }
-
-                        // No OCB scores - no health percentage available
-                      }
-
-                      // Fallback to existing daily trends logic
-                      if (historicalTrends?.daily_trends?.length > 0) {
-                        const latestTrend = historicalTrends.daily_trends[historicalTrends.daily_trends.length - 1];
-                        return latestTrend.overall_score * 10;
-                      } else if (currentAnalysis?.analysis_data?.daily_trends?.length > 0) {
-                        const latestTrend = currentAnalysis.analysis_data.daily_trends[currentAnalysis.analysis_data.daily_trends.length - 1];
-                        return latestTrend.overall_score * 10;
-                      } else if (currentAnalysis?.analysis_data?.team_health) {
-                        return currentAnalysis.analysis_data.team_health.overall_score * 10;
-                      } else if (currentAnalysis?.analysis_data?.team_summary) {
-                        return currentAnalysis.analysis_data.team_summary.average_score * 10;
-                      }
-
-                      return 0;
-                    };
-
-                    const ocbScore = getCurrentHealthPercentage();
-
-                    // Convert to health status based on raw OCB score (0-100, higher=worse burnout)
-                    // Match OCB ranges: Healthy (0-24), Fair (25-49), Poor (50-74), Critical (75-100)
-                    if (ocbScore < 25) return 'Healthy';      // OCB 0-24 - Low/minimal burnout risk
-                    if (ocbScore < 50) return 'Fair';         // OCB 25-49 - Mild burnout symptoms 
-                    if (ocbScore < 75) return 'Poor';         // OCB 50-74 - Moderate burnout risk
-                    return 'Critical';                        // OCB 75-100 - High/severe burnout risk
-                  })()}</div>
-                  <Info className="w-3 h-3 text-purple-500"
-                    onMouseEnter={(e) => {
-                      const tooltip = document.getElementById('health-rubric-tooltip')
-                      if (tooltip) {
-                        const rect = e.currentTarget.getBoundingClientRect()
-                        tooltip.style.top = `${rect.top - 220}px`
-                        tooltip.style.left = `${rect.left - 160}px`
-                        tooltip.classList.remove('invisible', 'opacity-0')
-                        tooltip.classList.add('visible', 'opacity-100')
-                      }
-                    }}
-                    onMouseLeave={() => {
-                      const tooltip = document.getElementById('health-rubric-tooltip')
-                      if (tooltip) {
-                        tooltip.classList.add('invisible', 'opacity-0')
-                        tooltip.classList.remove('visible', 'opacity-100')
-                      }
-                    }} />
+                  <div className="text-sm font-medium text-purple-600">
+                    {getHealthStatusLabel(getHealthPercentage(currentAnalysis, historicalTrends))}
+                  </div>
+                  <Info
+                    className="w-3 h-3 text-purple-500"
+                    onMouseEnter={(e) => showTooltip('health-rubric-tooltip', e.currentTarget.getBoundingClientRect(), 220, 160)}
+                    onMouseLeave={() => hideTooltip('health-rubric-tooltip')}
+                  />
                 </div>
-                <p className="text-xs text-gray-600 mt-1">
+                <p className="text-xs text-neutral-700 mt-1">
                   {(() => {
                     // Use the same health calculation logic for consistency 
                     const getCurrentHealthPercentage = () => {
@@ -374,11 +354,11 @@ export function TeamHealthOverview({
                           
                           if (ocbScores.length > 0) {
                             const avgOcbScore = ocbScores.reduce((a: number, b: number) => a + b, 0) / ocbScores.length;
-                            return avgOcbScore; // Return raw OCB score
+                            return avgOcbScore; // Return raw OCH risk level
                           }
                         }
 
-                        // No OCB scores - return null
+                        // No OCH risk levels - return null
                       }
 
                       // Fallback to legacy daily trends logic
@@ -395,28 +375,28 @@ export function TeamHealthOverview({
 
                     const ocbScore = getCurrentHealthPercentage();
 
-                    // Match OCB score ranges and descriptions (0-100, higher = more burnout)
+                    // Match OCH risk level ranges and descriptions (0-100, higher = more overwork)
                     if (ocbScore < 25) {
-                      return 'Low/minimal burnout risk, sustainable workload'  // Healthy
+                      return 'Low/minimal signs of overwork, sustainable workload'  // Healthy
                     } else if (ocbScore < 50) {
-                      return 'Mild burnout symptoms, watch for trends'         // Fair
+                      return 'Mild signs of overwork, watch for trends'             // Fair
                     } else if (ocbScore < 75) {
-                      return 'Moderate burnout risk, intervention recommended' // Poor
+                      return 'Moderate signs of overwork, intervention recommended' // Poor
                     } else {
-                      return 'High/severe burnout risk, urgent action needed'  // Critical
+                      return 'High/severe signs of overwork, urgent action needed'  // Critical
                     }
                   })()}
                 </p>
               </div>
             ) : (
-              <div className="text-gray-500">
+              <div className="text-neutral-500">
                 {currentAnalysis?.status === 'failed' ? 'Analysis failed' : 'Analysis in progress...'}
               </div>
             )}
           </CardContent>
         </Card>
 
-        <Card className="border-2 border-purple-200 bg-white/70 backdrop-blur-sm shadow-lg min-h-[200px]">
+        <Card className="border border-neutral-300 min-h-[200px]">
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-medium text-purple-700 flex items-center space-x-2">
               <Shield className="w-4 h-4" />
@@ -446,7 +426,7 @@ export function TeamHealthOverview({
                           else if (member.ocb_score >= 25) riskCounts.medium++;
                           else riskCounts.low++;
                         }
-                        // No fallback - only count members with OCB scores
+                        // No fallback - only count members with OCH risk levels
                       });
 
                       return (
@@ -454,33 +434,33 @@ export function TeamHealthOverview({
                           {riskCounts.critical > 0 && (
                             <div className="flex items-center space-x-2">
                               <div className="text-2xl font-bold text-red-800">{riskCounts.critical}</div>
-                              <span className="text-sm text-gray-600">Critical (OCB 75-100)</span>
+                              <span className="text-sm text-neutral-700">Critical (risk level 75-100)</span>
                             </div>
                           )}
                           {riskCounts.high > 0 && (
                             <div className="flex items-center space-x-2">
                               <div className="text-2xl font-bold text-red-600">{riskCounts.high}</div>
-                              <span className="text-sm text-gray-600">High (OCB 50-74)</span>
+                              <span className="text-sm text-neutral-700">High (risk level 50-74)</span>
                             </div>
                           )}
                           {riskCounts.medium > 0 && (
                             <div className="flex items-center space-x-2">
                               <div className="text-2xl font-bold text-orange-600">{riskCounts.medium}</div>
-                              <span className="text-sm text-gray-600">Medium (OCB 25-49)</span>
+                              <span className="text-sm text-neutral-700">Medium (risk level 25-49)</span>
                             </div>
                           )}
                           {/* Only show low risk count if it's the majority or no other risks */}
                           {(riskCounts.low > 0 && (riskCounts.critical + riskCounts.high + riskCounts.medium === 0)) && (
                             <div className="flex items-center space-x-2">
                               <div className="text-2xl font-bold text-green-600">{riskCounts.low}</div>
-                              <span className="text-sm text-gray-600">Low (OCB 0-24)</span>
+                              <span className="text-sm text-neutral-700">Low (risk level 0-24)</span>
                             </div>
                           )}
                           {/* Show "Everyone healthy" message if all low risk */}
                           {(riskCounts.critical + riskCounts.high + riskCounts.medium === 0) && (
                             <div className="text-center py-2">
-                              <div className="text-sm text-green-700 font-medium">🎉 Team shows healthy burnout levels</div>
-                              <div className="text-xs text-green-600">{riskCounts.low} member{riskCounts.low !== 1 ? 's' : ''} with low burnout risk</div>
+                              <div className="text-sm text-green-700 font-medium">🎉 Team shows healthy levels</div>
+                              <div className="text-xs text-green-600">{riskCounts.low} member{riskCounts.low !== 1 ? 's' : ''} with low risk of overwork</div>
                             </div>
                           )}
                         </>
@@ -493,34 +473,34 @@ export function TeamHealthOverview({
                         {(currentAnalysis.analysis_data.team_health?.risk_distribution?.critical > 0 || currentAnalysis.analysis_data.team_summary?.risk_distribution?.critical > 0) && (
                           <div className="flex items-center space-x-2">
                             <div className="text-2xl font-bold text-red-800">{currentAnalysis.analysis_data.team_health?.risk_distribution?.critical || currentAnalysis.analysis_data.team_summary?.risk_distribution?.critical || 0}</div>
-                            <span className="text-sm text-gray-600">Critical risk</span>
+                            <span className="text-sm text-neutral-700">Critical risk</span>
                           </div>
                         )}
                         <div className="flex items-center space-x-2">
                           <div className="text-2xl font-bold text-red-600">{currentAnalysis.analysis_data.team_health?.risk_distribution?.high || currentAnalysis.analysis_data.team_summary?.risk_distribution?.high || 0}</div>
-                          <span className="text-sm text-gray-600">High risk</span>
+                          <span className="text-sm text-neutral-700">High risk</span>
                         </div>
                         <div className="flex items-center space-x-2">
                           <div className="text-2xl font-bold text-orange-600">{currentAnalysis.analysis_data.team_health?.risk_distribution?.medium || currentAnalysis.analysis_data.team_summary?.risk_distribution?.medium || 0}</div>
-                          <span className="text-sm text-gray-600">Medium risk</span>
+                          <span className="text-sm text-neutral-700">Medium risk</span>
                         </div>
                       </>
                     );
                   })()}
                 </div>
-                <p className="text-xs text-gray-600 mt-2">
+                <p className="text-xs text-neutral-700 mt-2">
                   Out of {Array.isArray(currentAnalysis.analysis_data.team_analysis) ? currentAnalysis.analysis_data.team_analysis.length : (currentAnalysis.analysis_data.team_analysis?.members?.length || 0)} members
                 </p>
               </div>
             ) : (
-              <div className="text-gray-500">
+              <div className="text-neutral-500">
                 {currentAnalysis?.status === 'failed' ? 'Analysis failed' : 'Analysis in progress...'}
               </div>
             )}
           </CardContent>
         </Card>
 
-        <Card className="border-2 border-purple-200 bg-white/70 backdrop-blur-sm shadow-lg min-h-[200px]">
+        <Card className="border border-neutral-300 min-h-[200px]">
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-medium text-purple-700 flex items-center space-x-2">
               <BarChart3 className="w-4 h-4" />
@@ -528,14 +508,14 @@ export function TeamHealthOverview({
             </CardTitle>
           </CardHeader>
           <CardContent className="pb-0">
-            <div className="text-2xl font-bold text-gray-900">
+            <div className="text-2xl font-bold text-neutral-900">
               {(currentAnalysis.analysis_data as any)?.metadata?.total_incidents !== undefined
                 ? (currentAnalysis.analysis_data as any).metadata.total_incidents
                 : (currentAnalysis.analysis_data as any)?.team_analysis?.total_incidents !== undefined
                   ? (currentAnalysis.analysis_data as any).team_analysis.total_incidents
                   : currentAnalysis.analysis_data?.partial_data?.incidents?.length || 0}
             </div>
-            <p className="text-xs text-gray-600 mt-1">
+            <p className="text-xs text-neutral-700 mt-1">
               In the last {currentAnalysis.time_range || 30} days
             </p>
             {(() => {
@@ -608,32 +588,32 @@ export function TeamHealthOverview({
                   <div className={`mt-4 grid ${severityBreakdown.sev0_count > 0 ? 'grid-cols-5' : 'grid-cols-4'} gap-2`}>
                     {severityBreakdown.sev0_count > 0 && (
                       <div className="bg-purple-50 rounded-lg p-2 text-center">
-                        <div className="text-xs font-semibold text-purple-700">SEV0</div>
+                        <div className="text-xs font-semibold text-purple-600">SEV0</div>
                         <div className="text-lg font-bold text-purple-600">
                           {severityBreakdown.sev0_count}
                         </div>
                       </div>
                     )}
                     <div className="bg-red-50 rounded-lg p-2 text-center">
-                      <div className="text-xs font-semibold text-red-700">SEV1</div>
+                      <div className="text-xs font-semibold text-red-600">SEV1</div>
                       <div className="text-lg font-bold text-red-600">
                         {severityBreakdown.sev1_count}
                       </div>
                     </div>
                     <div className="bg-orange-50 rounded-lg p-2 text-center">
-                      <div className="text-xs font-semibold text-orange-700">SEV2</div>
+                      <div className="text-xs font-semibold text-orange-600">SEV2</div>
                       <div className="text-lg font-bold text-orange-600">
                         {severityBreakdown.sev2_count}
                       </div>
                     </div>
                     <div className="bg-yellow-50 rounded-lg p-2 text-center">
-                      <div className="text-xs font-semibold text-yellow-700">SEV3</div>
+                      <div className="text-xs font-semibold text-yellow-600">SEV3</div>
                       <div className="text-lg font-bold text-yellow-600">
                         {severityBreakdown.sev3_count}
                       </div>
                     </div>
                     <div className="bg-green-50 rounded-lg p-2 text-center">
-                      <div className="text-xs font-semibold text-green-700">SEV4</div>
+                      <div className="text-xs font-semibold text-green-600">SEV4</div>
                       <div className="text-lg font-bold text-green-600">
                         {severityBreakdown.sev4_count}
                       </div>
@@ -643,7 +623,7 @@ export function TeamHealthOverview({
               );
             })()}
             {currentAnalysis.analysis_data?.session_hours !== undefined && (
-              <p className="text-xs text-gray-600 mt-1">
+              <p className="text-xs text-neutral-700 mt-1">
                 {currentAnalysis.analysis_data.session_hours?.toFixed(1) || '0.0'} total hours
               </p>
             )}
@@ -652,7 +632,7 @@ export function TeamHealthOverview({
 
         {/* Data Sources Card - COMMENTED OUT */}
         {false && (
-        <Card className="border-2 border-blue-200 bg-white/70 backdrop-blur-sm shadow-lg">
+        <Card className="border border-neutral-300">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-blue-700 flex items-center space-x-2">
               <Database className="w-4 h-4" />
@@ -664,19 +644,19 @@ export function TeamHealthOverview({
               {/* Incident Data */}
               <div className="space-y-2">
                 <div
-                  className="flex items-center cursor-pointer hover:bg-gray-50 rounded px-1 py-0.5 transition-colors"
+                  className="flex items-center cursor-pointer hover:bg-neutral-100 rounded px-1 py-0.5 transition-colors"
                   onClick={() => setExpandedDataSources(prev => ({ ...prev, incident: !prev.incident }))}
                 >
                   {expandedDataSources.incident ?
-                    <ChevronDown className="w-3 h-3 mr-1 text-gray-500" /> :
-                    <ChevronRight className="w-3 h-3 mr-1 text-gray-500" />
+                    <ChevronDown className="w-3 h-3 mr-1 text-neutral-500" /> :
+                    <ChevronRight className="w-3 h-3 mr-1 text-neutral-500" />
                   }
                   <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
                   <span className="text-xs font-medium text-slate-700 flex-1">Incident Management</span>
                   <CheckCircle className="w-3 h-3 text-green-600 ml-2" />
                 </div>
                 {expandedDataSources.incident && (
-                  <div className="ml-7 text-xs text-gray-600 space-y-1">
+                  <div className="ml-7 text-xs text-neutral-700 space-y-1">
                     <div>• {(currentAnalysis?.analysis_data as any)?.metadata?.total_incidents || 0} incidents</div>
                     <div>• {(currentAnalysis?.analysis_data as any)?.team_analysis?.members?.length || 0} users</div>
                   </div>
@@ -686,75 +666,73 @@ export function TeamHealthOverview({
               {/* GitHub Data */}
               <div className="space-y-2">
                 <div
-                  className="flex items-center cursor-pointer hover:bg-gray-50 rounded px-1 py-0.5 transition-colors"
+                  className="flex items-center cursor-pointer hover:bg-neutral-100 rounded px-1 py-0.5 transition-colors"
                   onClick={() => setExpandedDataSources(prev => ({ ...prev, github: !prev.github }))}
                 >
                   {expandedDataSources.github ?
-                    <ChevronDown className="w-3 h-3 mr-1 text-gray-500" /> :
-                    <ChevronRight className="w-3 h-3 mr-1 text-gray-500" />
+                    <ChevronDown className="w-3 h-3 mr-1 text-neutral-500" /> :
+                    <ChevronRight className="w-3 h-3 mr-1 text-neutral-500" />
                   }
-                  <div className="w-2 h-2 bg-gray-900 rounded-full mr-2"></div>
+                  <div className="w-2 h-2 bg-neutral-900 rounded-full mr-2"></div>
                   <span className="text-xs font-medium text-slate-700 flex-1">GitHub Activity</span>
                   {currentAnalysis?.analysis_data?.data_sources?.github_data ? (
                     <CheckCircle className="w-3 h-3 text-green-600 ml-2" />
                   ) : (
-                    <Minus className="w-3 h-3 text-gray-400 ml-2" />
+                    <Minus className="w-3 h-3 text-neutral-500 ml-2" />
                   )}
                 </div>
                 {expandedDataSources.github && currentAnalysis?.analysis_data?.data_sources?.github_data && (
-                  <div className="ml-7 text-xs text-gray-600 space-y-1">
+                  <div className="ml-7 text-xs text-neutral-700 space-y-1">
                     <div>• {currentAnalysis?.analysis_data?.github_insights?.total_commits?.toLocaleString() || '0'} commits</div>
                     <div>• {currentAnalysis?.analysis_data?.github_insights?.total_pull_requests?.toLocaleString() || '0'} PRs</div>
                   </div>
                 )}
               </div>
 
-              {/* Slack Data */}
-              <div className="space-y-2">
-                <div
-                  className="flex items-center cursor-pointer hover:bg-gray-50 rounded px-1 py-0.5 transition-colors"
-                  onClick={() => setExpandedDataSources(prev => ({ ...prev, slack: !prev.slack }))}
-                >
-                  {expandedDataSources.slack ?
-                    <ChevronDown className="w-3 h-3 mr-1 text-gray-500" /> :
-                    <ChevronRight className="w-3 h-3 mr-1 text-gray-500" />
-                  }
-                  <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
-                  <span className="text-xs font-medium text-slate-700 flex-1">Slack Communications</span>
-                  {currentAnalysis?.analysis_data?.data_sources?.slack_data ? (
+              {/* Slack Data - DISABLED: Feature not ready for production */}
+              {/* {currentAnalysis?.analysis_data?.data_sources?.slack_data && (
+                <div className="space-y-2">
+                  <div
+                    className="flex items-center cursor-pointer hover:bg-neutral-100 rounded px-1 py-0.5 transition-colors"
+                    onClick={() => setExpandedDataSources(prev => ({ ...prev, slack: !prev.slack }))}
+                  >
+                    {expandedDataSources.slack ?
+                      <ChevronDown className="w-3 h-3 mr-1 text-neutral-500" /> :
+                      <ChevronRight className="w-3 h-3 mr-1 text-neutral-500" />
+                    }
+                    <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
+                    <span className="text-xs font-medium text-slate-700 flex-1">Slack Communications</span>
                     <CheckCircle className="w-3 h-3 text-green-600 ml-2" />
-                  ) : (
-                    <Minus className="w-3 h-3 text-gray-400 ml-2" />
+                  </div>
+                  {expandedDataSources.slack && (
+                    <div className="ml-7 text-xs text-neutral-700 space-y-1">
+                      <div>• {currentAnalysis?.analysis_data?.slack_insights?.total_messages?.toLocaleString() || '0'} messages</div>
+                      <div>• {currentAnalysis?.analysis_data?.slack_insights?.active_channels?.toLocaleString() || '0'} channels</div>
+                    </div>
                   )}
                 </div>
-                {expandedDataSources.slack && currentAnalysis?.analysis_data?.data_sources?.slack_data && (
-                  <div className="ml-7 text-xs text-gray-600 space-y-1">
-                    <div>• {currentAnalysis?.analysis_data?.slack_insights?.total_messages?.toLocaleString() || '0'} messages</div>
-                    <div>• {currentAnalysis?.analysis_data?.slack_insights?.active_channels?.toLocaleString() || '0'} channels</div>
-                  </div>
-                )}
-              </div>
+              )} */}
 
               {/* Jira Data */}
               <div className="space-y-2">
                 <div
-                  className="flex items-center cursor-pointer hover:bg-gray-50 rounded px-1 py-0.5 transition-colors"
+                  className="flex items-center cursor-pointer hover:bg-neutral-100 rounded px-1 py-0.5 transition-colors"
                   onClick={() => setExpandedDataSources(prev => ({ ...prev, jira: !prev.jira }))}
                 >
                   {expandedDataSources.jira ?
-                    <ChevronDown className="w-3 h-3 mr-1 text-gray-500" /> :
-                    <ChevronRight className="w-3 h-3 mr-1 text-gray-500" />
+                    <ChevronDown className="w-3 h-3 mr-1 text-neutral-500" /> :
+                    <ChevronRight className="w-3 h-3 mr-1 text-neutral-500" />
                   }
                   <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
                   <span className="text-xs font-medium text-slate-700 flex-1">Jira Issues</span>
                   {currentAnalysis?.analysis_data?.data_sources?.jira_data ? (
                     <CheckCircle className="w-3 h-3 text-green-600 ml-2" />
                   ) : (
-                    <Minus className="w-3 h-3 text-gray-400 ml-2" />
+                    <Minus className="w-3 h-3 text-neutral-500 ml-2" />
                   )}
                 </div>
                 {expandedDataSources.jira && currentAnalysis?.analysis_data?.data_sources?.jira_data && (
-                  <div className="ml-7 text-xs text-gray-600 space-y-1">
+                  <div className="ml-7 text-xs text-neutral-700 space-y-1">
                     <div>• {currentAnalysis?.analysis_data?.jira_insights?.total_issues?.toLocaleString() || '0'} issues</div>
                     <div>• {currentAnalysis?.analysis_data?.jira_insights?.active_projects?.toLocaleString() || '0'} projects</div>
                   </div>

@@ -10,29 +10,22 @@ jobs:
   build-frontend:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Build frontend Docker image
         run: docker build -t frontend-test ./frontend -f ./frontend/Dockerfile.dev
 
-      - name: Verify Node version meets Next.js requirements
+      - name: Verify Bun version
         run: |
-          docker run --rm frontend-test node -e "
-            const version = process.versions.node.split('.')[0];
-            if (version < 20) {
-              console.error('Node.js version ' + process.versions.node + ' is below required 20.x');
-              process.exit(1);
-            }
-            console.log('Node.js version ' + process.versions.node + ' OK');
-          "
+          docker run --rm frontend-test bun --version
 
       - name: Test Next.js build
-        run: docker run --rm frontend-test npm run build
+        run: docker run --rm frontend-test bun run build
 
   build-backend:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Build backend Docker image
         run: docker build -t backend-test ./backend
@@ -40,7 +33,7 @@ jobs:
   docker-compose:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Start services
         run: docker compose up -d --build

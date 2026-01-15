@@ -416,7 +416,7 @@ async def get_github_status(
         try:
             if integration.github_token:
                 decrypted_token = decrypt_token(integration.github_token)
-                token_preview = f"...{decrypted_token[-4:]}" if decrypted_token else None
+                token_preview = f"...{decrypted_token[-6:]}" if decrypted_token else None
         except Exception:
             pass  # Token preview is optional
         

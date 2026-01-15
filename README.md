@@ -1,9 +1,23 @@
 
 # On-call Health
 
-Detects potential signs of overwork in incident responders, which could lead to burnout. To compute a per-responder risk score, it integrates with Rootly, PagerDuty, GitHub, and Slack.
+![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)
+![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)
+![Rootly](https://img.shields.io/badge/Rootly-8e6fde?logoColor=white)
+![PagerDuty](https://img.shields.io/badge/PagerDuty-06AC38?logo=pagerduty&logoColor=white)
+![GitHub](https://img.shields.io/badge/GitHub-181717?logo=github&logoColor=white)
+![Slack](https://img.shields.io/badge/Slack-4A154B?logo=slack&logoColor=white)
+![Jira](https://img.shields.io/badge/Jira-0052CC?logo=jira&logoColor=white)
+![Linear](https://img.shields.io/badge/Linear-5E6AD2?logo=linear&logoColor=white)
+![OpenAI](https://img.shields.io/badge/OpenAI-412991?logo=openai&logoColor=white)
+![Anthropic](https://img.shields.io/badge/Anthropic-D4A27F?logo=anthropic&logoColor=white)
 
-![Rootly AI Labs On-call Health screenshot](https://raw.githubusercontent.com/Rootly-AI-Labs/On-Call-Health/main/assets/rootly-burnout-detector.png)
+Catch overload before it burns out your engineers.
+
+On-Call Health integrates with Rootly, PagerDuty, GitHub, Slack, Linear, and Jira to collect obective and self-reported data to look for sign of overload in on-call engineers. Free and open-source.
+
+![Rootly AI Labs On-call Health screenshot](https://github.com/user-attachments/assets/037358d8-1b9b-43f8-ae89-183d04e48bca)
+
 
 Two ways to get started:
 * Use our hosted version [www.oncallhealth.ai](https://www.oncallhealth.ai/) (contains mock data to easily test it out)
@@ -96,22 +110,22 @@ The frontend will be available at `http://localhost:3000`
 ##  Features
 
 - **Multi Layer Signals**: Individual and team-level insights
-- **Interactive Dashboard**: Visual and AI-powered risk analysis for incident reponders at the team and individual level
+- **Interactive Dashboard**: Visual and AI-powered risk analysis for incident responders at the team and individual level
 - **Tailor to Your organization**: Customize tool integration and signal weights
 
 ##  Methodology
 
-On-call Health takes inspiration from the [Copenhagen Burnout Inventory](https://nfa.dk/media/hl5nbers/cbi-first-edition.pdf) (CBI), a scientifically validated approach to measuring burnout risk in professional settings. The Burnout Detector isn’t a medical tool and doesn’t provide a diagnosis; it is designed to help identify patterns and trends that may suggest overwork.
+On-call Health takes inspiration from the [Copenhagen Burnout Inventory](https://nfa.dk/media/hl5nbers/cbi-first-edition.pdf) (CBI), a scientifically validated approach to measuring overwork risk in professional settings. On-call Health isn't a medical tool and doesn't provide a diagnosis; it is designed to help identify patterns and trends that may suggest overwork.
 
 ### Methodology breakdown
 Our implementation uses the two core dimensions:
 
-1. **Personal Burnout**
+1. **Personal Overwork Risk**
    - Physical and psychological fatigue from workload
    - Work-life boundary violations (after-hours/weekend work)
    - Temporal stress patterns and recovery time deficits
 
-2. **Work-Related Burnout** 
+2. **Work-Related Overwork Risk**
    - Fatigue specifically tied to work processes
    - Response time, pressure, and incident load
    - Team collaboration, stress, and communication quality
@@ -128,7 +142,9 @@ Our implementation uses the two core dimensions:
 * [Rootly](https://rootly.com/): For incident management and on-call data
 * [PagerDuty](https://www.pagerduty.com/): For incident management and on-call data
 * [GitHub](https://github.com/): For commit activity
-* [Slack](http://slack.com/): For communication patterns and collect self-reported data
+* [Slack](http://slack.com/): For communication patterns and collecting self-reported data
+* [Linear](https://linear.app/): For workload tracking
+* [Jira](https://www.atlassian.com/software/jira): For workload tracking
 
 If you are interested in integrating with On-call Health, [get in touch](mailto:sylvain@rootly.com)!
 

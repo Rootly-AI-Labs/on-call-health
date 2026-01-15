@@ -2,7 +2,6 @@
 
 import React from 'react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Badge } from '@/components/ui/badge'
 import {
   Dialog,
   DialogContent,
@@ -14,8 +13,7 @@ import {
   getAllMetricsAffectedMembers,
   getVulnerabilityTags,
   getRemainingTagCount,
-  getTagColorClasses,
-  getOCBBadgeColorClasses
+  getTagColorClasses
 } from '@/lib/githubMetricUtils'
 
 interface GitHubAllMetricsPopupProps {
@@ -47,9 +45,7 @@ export default function GitHubAllMetricsPopup({
       factors: {
         workload: Math.round(((member.factors?.workload || 0)) * 10) / 10,
         afterHours: Math.round(((member.factors?.after_hours || 0)) * 10) / 10,
-        weekendWork: Math.round(((member.factors?.weekend_work || 0)) * 10) / 10,
         incidentLoad: Math.round(((member.factors?.incident_load || 0)) * 10) / 10,
-        responseTime: Math.round(((member.factors?.response_time || 0)) * 10) / 10,
       },
       metrics: member.metrics || {},
       github_activity: member.github_activity || null,
@@ -61,7 +57,7 @@ export default function GitHubAllMetricsPopup({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto bg-neutral-100">
         <DialogHeader>
           <DialogTitle className="text-2xl">Team Members at Risk - GitHub Activity</DialogTitle>
           <DialogDescription className="text-sm">
@@ -74,13 +70,13 @@ export default function GitHubAllMetricsPopup({
             const isEmpty = metric.members.length === 0
 
             return (
-              <div key={metric.metricType} className="space-y-2">
+              <div key={metric.metricType} className="space-y-2 bg-white p-4 rounded-lg">
                 {/* Metric Section Header */}
-                <div className="border-b border-gray-200 pb-2">
-                  <h3 className="text-base font-semibold text-gray-900">
+                <div className="pb-2">
+                  <h3 className="text-base font-semibold text-neutral-900">
                     {metric.label}
                   </h3>
-                  <p className="text-xs text-gray-500 mt-0.5">
+                  <p className="text-xs text-neutral-500 mt-0.5">
                     {isEmpty
                       ? `All team members are below the threshold for ${metric.label}`
                       : `${metric.members.length} member${metric.members.length !== 1 ? 's' : ''} at risk`}
@@ -90,7 +86,7 @@ export default function GitHubAllMetricsPopup({
                 {/* Member Cards or Empty State */}
                 {isEmpty ? (
                   <div className="text-center py-4">
-                    <p className="text-xs text-gray-500 italic">
+                    <p className="text-xs text-neutral-500 italic">
                       No team members currently at risk for this metric
                     </p>
                   </div>
@@ -101,63 +97,51 @@ export default function GitHubAllMetricsPopup({
                       // Filter out OCB tag
                       const tags = allTags.filter(tag => !tag.label.startsWith('OCB:'))
                       const remainingTags = getRemainingTagCount(member, metric.metricType) - (allTags.length - tags.length)
-                      const ocbScore = member.ocb_score || 0
 
                       return (
                         <div
                           key={member.user_id}
-                          className="flex items-start space-x-3 p-3 border border-gray-100 rounded-md hover:bg-gray-50 hover:border-gray-200 cursor-pointer transition-colors"
+                          className="flex items-center space-x-3 p-3 border border-neutral-200 rounded-md bg-neutral-50 hover:bg-neutral-100 hover:border-neutral-300 cursor-pointer transition-colors"
                           onClick={() => handleMemberClick(member)}
                         >
                           {/* Avatar */}
-                          <Avatar className="flex-shrink-0 mt-0.5 h-10 w-10">
+                          <Avatar className="flex-shrink-0 h-10 w-10">
                             <AvatarFallback className="text-xs font-medium">
                               {member.user_name
-                                .split(' ')
-                                .map((n: string) => n[0])
-                                .join('')}
+                                ? member.user_name.split(' ')
+                                    .map((n: string) => n[0])
+                                    .join('')
+                                : '?'}
                             </AvatarFallback>
                           </Avatar>
 
                           {/* Member Info */}
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-start justify-between gap-2">
-                              <div>
-                                <h4 className="font-semibold text-gray-900 truncate text-sm">
-                                  {member.user_name}
-                                </h4>
-                                <p className="text-xs text-gray-500 truncate">
-                                  {member.user_email}
-                                </p>
-                              </div>
+                            <div className="flex items-center justify-between gap-2">
+                              <h4 className="font-semibold text-neutral-900 truncate text-sm">
+                                {member.user_name}
+                              </h4>
 
-                              {/* OCB Badge on the right */}
-                              <Badge
-                                variant="outline"
-                                className={`flex-shrink-0 ${getOCBBadgeColorClasses(ocbScore)} text-xs py-1 px-2`}
-                              >
-                                {ocbScore.toFixed(1)}/100
-                              </Badge>
+                              {/* Tags on the right */}
+                              {tags.length > 0 && (
+                                <div className="flex-shrink-0 flex items-center flex-wrap gap-1 justify-end">
+                                  {tags.map((tag, idx) => {
+                                    // Extract color class without border
+                                    const colorClass = getTagColorClasses(tag.color)
+                                    // Remove 'border' classes from the color class
+                                    const noBorderClass = colorClass.replace(/border[\w-]*/g, '').trim()
+                                    return (
+                                      <span
+                                        key={idx}
+                                        className={`inline-flex items-center text-xs px-2 py-0.5 rounded-full ${noBorderClass}`}
+                                      >
+                                        {tag.label}
+                                      </span>
+                                    )
+                                  })}
+                                </div>
+                              )}
                             </div>
-
-                            {/* Tags */}
-                            {tags.length > 0 && (
-                              <div className="mt-2 flex items-center flex-wrap gap-1">
-                                {tags.map((tag, idx) => (
-                                  <span
-                                    key={idx}
-                                    className={`inline-flex items-center text-xs px-2 py-0.5 rounded-full border ${getTagColorClasses(tag.color)}`}
-                                  >
-                                    {tag.label}
-                                  </span>
-                                ))}
-                                {remainingTags > 0 && (
-                                  <span className="inline-flex items-center text-xs px-2 py-0.5 rounded-full border bg-gray-100 text-gray-700 border-gray-300">
-                                    +{remainingTags} more
-                                  </span>
-                                )}
-                              </div>
-                            )}
                           </div>
                         </div>
                       )

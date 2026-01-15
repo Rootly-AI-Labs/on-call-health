@@ -145,10 +145,10 @@ def export_analysis(analysis_id: int, output_file: str = "mock_analysis_data.jso
         print("[*] Database connection closed")
 
 if __name__ == "__main__":
-    # Export analysis ID 12 - could be different depending on local data data base - used table plus to view analysis and ids
+    # Export analysis ID 3 - could be different depending on local data data base - used table plus to view analysis and ids
     success = export_analysis(
-        analysis_id=12,
-        output_file="mock_analysis_data.json"
+        analysis_id=8,
+        output_file="mock_analysis_data2.json"
     )
 
     if success:

@@ -47,6 +47,8 @@ services:
       - PAGERDUTY_API_KEY=${PAGERDUTY_API_KEY:-}
       - GITHUB_TOKEN=${GITHUB_TOKEN:-}
       - SLACK_TOKEN=${SLACK_TOKEN:-}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -72,7 +74,7 @@ services:
       - ./frontend:/app
       - frontend_node_modules:/app/node_modules
       - /app/.next
-    command: sh -c "npm install && npm run dev"
+    command: sh -c "bun install && bun run dev"
 
 volumes:
   postgres_data:

@@ -19,7 +19,7 @@ import type {
 
 
 export default function useDashboard() {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true)
   const [integrations, setIntegrations] = useState<Integration[]>([])
   const [selectedIntegration, setSelectedIntegration] = useState<string>("")
   const [loadingIntegrations, setLoadingIntegrations] = useState(false)
@@ -41,6 +41,7 @@ export default function useDashboard() {
   const [analysisToDelete, setAnalysisToDelete] = useState<AnalysisResult | null>(null)
   const [deletingAnalysis, setDeletingAnalysis] = useState(false)
   const [debugSectionOpen, setDebugSectionOpen] = useState(false)
+  const [loadingAnalysisId, setLoadingAnalysisId] = useState<string | null>(null)
   // Removed member view mode - only showing radar chart now
   const [historicalTrends, setHistoricalTrends] = useState<any>(null)
   const [loadingTrends, setLoadingTrends] = useState(false)
@@ -592,8 +593,17 @@ export default function useDashboard() {
           const urlParams = new URLSearchParams(window.location.search)
           const analysisId = urlParams.get('analysis')
 
-          if (!analysisId && data.analyses && data.analyses.length > 0 && !currentAnalysis) {
+          // Always load the most recent analysis if no analysis is specified in URL
+          if (!analysisId && data.analyses && data.analyses.length > 0) {
             const mostRecentAnalysis = data.analyses[0] // Analyses should be ordered by created_at desc
+
+            // Validate the analysis has required data
+            if (!mostRecentAnalysis.analysis_data) {
+              console.error('Most recent analysis is missing analysis_data')
+              toast.error('Latest analysis data is incomplete. Please run a new analysis.')
+              setLoadingAnalyses(false)
+              return false
+            }
 
             // Check if the analysis has full member data
             const teamAnalysis = mostRecentAnalysis.analysis_data?.team_analysis
@@ -616,9 +626,15 @@ export default function useDashboard() {
                   const fullAnalysis = await response.json()
                   setAnalysisCache(prev => new Map(prev.set(analysisKey, fullAnalysis)))
                   setCurrentAnalysis(fullAnalysis)
+                } else {
+                  // API error - show error to user
+                  const errorText = await response.text().catch(() => 'Unknown error')
+                  console.error(`Failed to load most recent analysis (${response.status}):`, errorText)
+                  toast.error(`Failed to load analysis: ${response.status === 404 ? 'Analysis not found' : 'Server error'}`)
                 }
               } catch (error) {
                 console.error('Error fetching most recent analysis:', error)
+                toast.error('Failed to load most recent analysis. Please try refreshing the page.')
               }
             }
             // Platform mappings will be fetched by the dedicated useEffect
@@ -1246,7 +1262,7 @@ export default function useDashboard() {
     stages.push({
       key: "calculating_health",
       label: "Calculating Team Health",
-      detail: "Computing burnout scores and risk levels", 
+      detail: "Computing risk levels", 
       progress: currentProgress + 10
     })
     currentProgress += 10
@@ -1842,25 +1858,25 @@ export default function useDashboard() {
 
   const getRiskColor = (riskLevel: string) => {
     switch (riskLevel) {
-      // OCB 4-tier system
+      // OCH 4-tier system
       case "critical":
-        return "text-red-800 bg-red-100 border-red-300"    // Critical (75-100): Dark red
-      case "poor": 
-        return "text-red-600 bg-red-50 border-red-200"     // Poor (50-74): Red
+        return "text-red-800 bg-red-100"    // Critical (75-100): Dark red
+      case "poor":
+        return "text-orange-800 bg-orange-100"     // Poor (50-74): Orange
       case "fair":
-        return "text-yellow-600 bg-yellow-50 border-yellow-200" // Fair (25-49): Yellow  
+        return "text-yellow-800 bg-yellow-100" // Fair (25-49): Yellow
       case "healthy":
-        return "text-green-600 bg-green-50 border-green-200"    // Healthy (0-24): Green
-      
+        return "text-green-800 bg-green-100"    // Healthy (0-24): Green
+
       // Legacy 3-tier system fallback
       case "high":
-        return "text-red-600 bg-red-50 border-red-200"
+        return "text-orange-800 bg-orange-100"
       case "medium":
-        return "text-yellow-600 bg-yellow-50 border-yellow-200"
+        return "text-yellow-800 bg-yellow-100"
       case "low":
-        return "text-green-600 bg-green-50 border-green-200"
+        return "text-green-800 bg-green-100"
       default:
-        return "text-gray-600 bg-gray-50 border-gray-200"
+        return "text-gray-800 bg-gray-100"
     }
   }
 
@@ -1952,7 +1968,7 @@ export default function useDashboard() {
     const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members
     return members
       ?.filter((member) => {
-        // Only include members with OCB scores
+        // Only include members with OCH risk levels
         const memberWithOcb = member as any;
         return memberWithOcb.ocb_score !== undefined && memberWithOcb.ocb_score !== null && memberWithOcb.ocb_score > 0
       })
@@ -2020,7 +2036,7 @@ export default function useDashboard() {
   // NO FALLBACK DATA: Only show burnout factors if we have REAL API data
   // Include ALL members with burnout scores, not just those with incidents
   // Members with high GitHub activity but no incidents should still be included
-  // Filter members with OCB scores only
+  // Filter members with OCH risk levels only
   const membersWithOcbScores = useMemo(() => members.filter((m: any) =>
     m?.ocb_score !== undefined && m?.ocb_score !== null && m?.ocb_score > 0
   ), [members]);
@@ -2090,50 +2106,6 @@ export default function useDashboard() {
       })()
     },
     {
-      factor: "Weekend Work",
-      value: (() => {
-        if (allActiveMembers.length === 0) return null;
-
-        // Use backend-calculated weekend_work factors
-        const weekendScores = allActiveMembers
-          .map((m: any) => m?.factors?.weekend_work ?? 0)
-          .filter(score => score > 0);
-
-        if (weekendScores.length === 0) return 0;
-
-        const sum = weekendScores.reduce((total, score) => total + score, 0);
-        const average = sum / weekendScores.length;
-        // Convert 0-10 scale to OCB 0-100 scale (whole integer)
-        return Math.round(average * 10);
-      })(),
-      metrics: (() => {
-        const affectedCount = allActiveMembers.filter(m => (m?.factors?.weekend_work ?? 0) >= 5).length
-        return `${affectedCount} of ${allActiveMembers.length} members at medium/high risk`
-      })()
-    },
-    {
-      factor: "Response Time",
-      value: (() => {
-        if (allActiveMembers.length === 0) return null;
-
-        // Use backend-calculated response_time factors
-        const responseScores = allActiveMembers
-          .map((m: any) => m?.factors?.response_time ?? 0)
-          .filter(score => score > 0);
-
-        if (responseScores.length === 0) return 0;
-
-        const sum = responseScores.reduce((total, score) => total + score, 0);
-        const average = sum / responseScores.length;
-        // Convert 0-10 scale to OCB 0-100 scale (whole integer)
-        return Math.round(average * 10);
-      })(),
-      metrics: (() => {
-        const affectedCount = allActiveMembers.filter(m => (m?.factors?.response_time ?? 0) >= 5).length
-        return `${affectedCount} of ${allActiveMembers.length} members at medium/high risk`
-      })()
-    },
-    {
       factor: "Incident Load",
       value: (() => {
         if (allActiveMembers.length === 0) return null;
@@ -2194,6 +2166,8 @@ return {
   hasMoreAnalyses,
   loadingMoreAnalyses,
   dropdownLoading,
+  loadingAnalysisId,
+  setLoadingAnalysisId,
 
   // ui states
   sidebarCollapsed,

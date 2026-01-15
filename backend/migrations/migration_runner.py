@@ -852,24 +852,46 @@ class MigrationRunner:
                     ADD COLUMN IF NOT EXISTS reminder_hours_after INTEGER DEFAULT 5
                     """,
                     """
-                    -- Add message_template column if missing
-                    ALTER TABLE survey_schedules
-                    ADD COLUMN IF NOT EXISTS message_template VARCHAR(500)
+                    -- Add CHECK constraint for frequency_type (idempotent)
+                    DO $$
+                    BEGIN
+                        IF NOT EXISTS (
+                            SELECT 1 FROM pg_constraint
+                            WHERE conname = 'check_frequency_type'
+                        ) THEN
+                            ALTER TABLE survey_schedules
+                            ADD CONSTRAINT check_frequency_type
+                            CHECK (frequency_type IN ('daily', 'weekday', 'weekly'));
+                        END IF;
+                    END $$
                     """,
                     """
-                    -- Add reminder_message_template column if missing
-                    ALTER TABLE survey_schedules
-                    ADD COLUMN IF NOT EXISTS reminder_message_template VARCHAR(500)
+                    -- Add CHECK constraint for frequency_type (idempotent)
+                    DO $$
+                    BEGIN
+                        IF NOT EXISTS (
+                            SELECT 1 FROM pg_constraint
+                            WHERE conname = 'check_frequency_type'
+                        ) THEN
+                            ALTER TABLE survey_schedules
+                            ADD CONSTRAINT check_frequency_type
+                            CHECK (frequency_type IN ('daily', 'weekday', 'weekly'));
+                        END IF;
+                    END $$
                     """,
                     """
-                    -- Add frequency_type column to replace send_weekdays_only with more options
-                    ALTER TABLE survey_schedules
-                    ADD COLUMN IF NOT EXISTS frequency_type VARCHAR(20) DEFAULT 'weekday'
-                    """,
-                    """
-                    -- Add day_of_week column for weekly schedules (0=Monday, 6=Sunday)
-                    ALTER TABLE survey_schedules
-                    ADD COLUMN IF NOT EXISTS day_of_week INTEGER
+                    -- Add CHECK constraint for day_of_week (idempotent)
+                    DO $$
+                    BEGIN
+                        IF NOT EXISTS (
+                            SELECT 1 FROM pg_constraint
+                            WHERE conname = 'check_day_of_week'
+                        ) THEN
+                            ALTER TABLE survey_schedules
+                            ADD CONSTRAINT check_day_of_week
+                            CHECK (day_of_week IS NULL OR (day_of_week >= 0 AND day_of_week <= 6));
+                        END IF;
+                    END $$
                     """,
                     """
                     -- Add CHECK constraint for frequency_type (with existence check)
@@ -980,33 +1002,128 @@ class MigrationRunner:
                 ]
             },
             {
-                "name": "027_simplify_roles",
+                "name": "027_rename_survey_columns",
+                "description": "Rename user_burnout_reports columns from self_reported_score/energy_level to feeling_score/workload_score",
+                "sql": [
+                    """
+                    ALTER TABLE user_burnout_reports
+                    RENAME COLUMN self_reported_score TO workload_score
+                    """,
+                    """
+                    ALTER TABLE user_burnout_reports
+                    RENAME COLUMN energy_level TO feeling_score
+                    """,
+                    """
+                    ALTER TABLE user_burnout_reports
+                    DROP CONSTRAINT IF EXISTS user_burnout_reports_self_reported_score_check
+                    """,
+                    """
+                    ALTER TABLE user_burnout_reports
+                    DROP CONSTRAINT IF EXISTS user_burnout_reports_energy_level_check
+                    """,
+                    """
+                    ALTER TABLE user_burnout_reports
+                    ADD CONSTRAINT user_burnout_reports_feeling_score_check
+                    CHECK (feeling_score >= 1 AND feeling_score <= 5)
+                    """,
+                    """
+                    ALTER TABLE user_burnout_reports
+                    ADD CONSTRAINT user_burnout_reports_workload_score_check
+                    CHECK (workload_score >= 1 AND workload_score <= 5)
+                    """
+                ]
+            },
+            {
+                "name": "026_add_organization_id_to_integration_mappings",
+                "description": "Add organization_id column to integration_mappings for org-scoped mappings",
+                "sql": [
+                    """
+                    -- Add organization_id column to integration_mappings
+                    ALTER TABLE integration_mappings
+                    ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id)
+                    """,
+                    """
+                    -- Add index for faster lookups by organization
+                    CREATE INDEX IF NOT EXISTS idx_integration_mappings_org_id
+                    ON integration_mappings(organization_id)
+                    """
+                ]
+            },
+            {
+                "name": "027_rename_survey_columns",
+                "description": "Rename user_burnout_reports columns from self_reported_score/energy_level to feeling_score/workload_score",
+                "sql": [
+                    """
+                    ALTER TABLE user_burnout_reports
+                    RENAME COLUMN self_reported_score TO workload_score
+                    """,
+                    """
+                    ALTER TABLE user_burnout_reports
+                    RENAME COLUMN energy_level TO feeling_score
+                    """,
+                    """
+                    ALTER TABLE user_burnout_reports
+                    DROP CONSTRAINT IF EXISTS user_burnout_reports_self_reported_score_check
+                    """,
+                    """
+                    ALTER TABLE user_burnout_reports
+                    DROP CONSTRAINT IF EXISTS user_burnout_reports_energy_level_check
+                    """,
+                    """
+                    ALTER TABLE user_burnout_reports
+                    ADD CONSTRAINT user_burnout_reports_feeling_score_check
+                    CHECK (feeling_score >= 1 AND feeling_score <= 5)
+                    """,
+                    """
+                    ALTER TABLE user_burnout_reports
+                    ADD CONSTRAINT user_burnout_reports_workload_score_check
+                    CHECK (workload_score >= 1 AND workload_score <= 5)
+                    """
+                ]
+            },
+            {
+                "name": "028_simplify_roles",
                 "description": "Simplify role system from 5 roles to 3 roles",
                 "sql_file": "2025_01_17_simplify_roles.sql"
             },
             {
-                "name": "028_create_organizations_for_existing_users",
+                "name": "029_create_organizations_for_existing_users",
                 "description": "Create organizations for existing users based on email domains",
                 "sql_file": "2025_01_18_create_organizations_for_existing_users.sql"
             },
             {
-                "name": "029_migrate_user_role_to_member",
+                "name": "030_migrate_user_role_to_member",
                 "description": "Convert legacy 'user' role to 'member'",
                 "sql_file": "2025_01_30_migrate_user_role_to_member.sql"
             },
             {
-                "name": "030_allow_null_user_id_in_integration_mappings",
+                "name": "031_allow_null_user_id_in_integration_mappings",
                 "description": "Make user_id nullable in integration_mappings and add organization_id for org-scoped users",
                 "sql_file": "2026_01_02_allow_null_user_id_in_integration_mappings.sql"
             },
             {
-                "name": "031_remove_communication_patterns_toggle",
+                "name": "032_remove_communication_patterns_toggle",
                 "description": "Remove communication_patterns_enabled column from slack_workspace_mappings",
                 "sql_file": "2026_01_06_remove_communication_patterns_toggle.sql"
             },
+            {
+                "name": "033_add_email_to_user_burnout_reports",
+                "description": "Add email column to user_burnout_reports and backfill from users table",
+                "sql_file": "2026_01_12_add_email_to_user_burnout_reports.sql"
+            },
+            {
+                "name": "034_allow_null_user_id_in_user_burnout_reports",
+                "description": "Allow NULL user_id in user_burnout_reports for email-based matching",
+                "sql_file": "2026_01_12_allow_null_user_id_in_user_burnout_reports.sql"
+            },
+            {
+                "name": "035_make_email_required_in_user_burnout_reports",
+                "description": "Make email column required in user_burnout_reports",
+                "sql_file": "2026_01_12_make_email_required_in_user_burnout_reports.sql"
+            },
 
             # {
-            #     "name": "032_add_user_preferences",
+            #     "name": "036_add_user_preferences",
             #     "description": "Add user preferences table",
             #     "sql": ["CREATE TABLE IF NOT EXISTS user_preferences (...)"]
             # }
