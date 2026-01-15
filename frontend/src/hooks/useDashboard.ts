@@ -318,8 +318,11 @@ export default function useDashboard() {
             }
           }
         } catch (e) {
-          }
-        
+          console.error('Failed to parse cached integrations:', e)
+          localStorage.removeItem('all_integrations')
+          localStorage.removeItem('all_integrations_timestamp')
+        }
+
         // Set loading to false when using cache
         setLoadingIntegrations(false)
         setHasDataFromCache(true)
@@ -398,6 +401,13 @@ export default function useDashboard() {
             setSlackIntegration(slackData.integration)
           }
         } catch (e) {
+          console.error('Failed to parse cached integration data:', e)
+          localStorage.removeItem('rootly_integration')
+          localStorage.removeItem('rootly_integration_timestamp')
+          localStorage.removeItem('github_integration')
+          localStorage.removeItem('github_integration_timestamp')
+          localStorage.removeItem('slack_integration')
+          localStorage.removeItem('slack_integration_timestamp')
         }
       }
 
