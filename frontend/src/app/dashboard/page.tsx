@@ -54,6 +54,7 @@ import {
   BarChart3,
   CalendarIcon,
   ArrowRight,
+  RefreshCw,
 } from "lucide-react"
 import { TeamHealthOverview } from "@/components/dashboard/TeamHealthOverview"
 import { AnalysisProgressSection } from "@/components/dashboard/AnalysisProgressSection"
@@ -95,6 +96,8 @@ function DashboardContent() {
   hasMoreAnalyses,
   loadingMoreAnalyses,
   dropdownLoading,
+  loadingAnalysisId,
+  setLoadingAnalysisId,
 
   // ui states
   sidebarCollapsed,
@@ -338,9 +341,12 @@ function DashboardContent() {
                   <div key={analysis.id} className={`relative group ${isSelected ? 'bg-neutral-800' : ''} rounded`}>
                     <Button
                       variant="ghost"
-                      disabled={analysisRunning}
-                      className={`w-full justify-start text-neutral-500 hover:text-white hover:bg-neutral-800 py-2 h-auto ${isSelected ? 'bg-neutral-800 text-white' : ''} ${analysisRunning ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      disabled={analysisRunning || loadingAnalysisId !== null}
+                      className={`w-full justify-start text-neutral-500 hover:text-white hover:bg-neutral-800 py-2 h-auto ${isSelected ? 'bg-neutral-800 text-white' : ''} ${loadingAnalysisId === analysis.id ? 'bg-neutral-700 text-white' : ''} ${analysisRunning ? 'opacity-50 cursor-not-allowed' : ''}`}
                       onClick={async () => {
+                        // Set immediate loading state for visual feedback
+                        setLoadingAnalysisId(analysis.id)
+
                         const analysisKey = analysis.uuid || analysis.id.toString()
 
                         // Get members array - handle both object and array formats
@@ -357,6 +363,7 @@ function DashboardContent() {
                           setCurrentAnalysis(cachedAnalysis)
                           setRedirectingToSuggested(false) // Turn off redirect loader
                           updateURLWithAnalysis(cachedAnalysis.uuid || cachedAnalysis.id)
+                          setLoadingAnalysisId(null) // Clear loading state
                           return
                         }
 
@@ -364,7 +371,10 @@ function DashboardContent() {
                         if (!analysis.analysis_data || !members || !Array.isArray(members) || members.length === 0) {
                           try {
                             const authToken = localStorage.getItem('auth_token')
-                            if (!authToken) return
+                            if (!authToken) {
+                              setLoadingAnalysisId(null)
+                              return
+                            }
 
                             const response = await fetch(`${API_BASE}/analyses/${analysis.id}`, {
                               headers: {
@@ -386,6 +396,8 @@ function DashboardContent() {
                           } catch (error) {
                             console.error('Error fetching full analysis:', error)
                             setRedirectingToSuggested(false)
+                          } finally {
+                            setLoadingAnalysisId(null) // Clear loading state
                           }
                         } else {
                           // Analysis already has full data, cache it and use it
@@ -393,6 +405,7 @@ function DashboardContent() {
                           setCurrentAnalysis(analysis)
                           setRedirectingToSuggested(false) // Turn off redirect loader
                           updateURLWithAnalysis(analysis.uuid || analysis.id)
+                          setLoadingAnalysisId(null) // Clear loading state
                         }
                       }}
                     >
@@ -474,7 +487,16 @@ function DashboardContent() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-auto bg-neutral-200">
+      <div className="flex-1 overflow-auto bg-neutral-200 relative">
+        {/* Loading overlay when switching analyses */}
+        {loadingAnalysisId !== null && (
+          <div className="absolute inset-0 bg-neutral-900/50 z-50 flex items-center justify-center">
+            <div className="bg-neutral-800 rounded-lg p-6 flex flex-col items-center gap-3 shadow-xl">
+              <RefreshCw className="w-8 h-8 animate-spin text-white" />
+              <p className="text-white font-medium">Loading analysis...</p>
+            </div>
+          </div>
+        )}
         <div className="p-6">
 
           {/* Debug Section - Only show in development */}

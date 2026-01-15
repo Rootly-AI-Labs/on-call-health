@@ -41,6 +41,7 @@ export default function useDashboard() {
   const [analysisToDelete, setAnalysisToDelete] = useState<AnalysisResult | null>(null)
   const [deletingAnalysis, setDeletingAnalysis] = useState(false)
   const [debugSectionOpen, setDebugSectionOpen] = useState(false)
+  const [loadingAnalysisId, setLoadingAnalysisId] = useState<string | null>(null)
   // Removed member view mode - only showing radar chart now
   const [historicalTrends, setHistoricalTrends] = useState<any>(null)
   const [loadingTrends, setLoadingTrends] = useState(false)
@@ -2165,6 +2166,8 @@ return {
   hasMoreAnalyses,
   loadingMoreAnalyses,
   dropdownLoading,
+  loadingAnalysisId,
+  setLoadingAnalysisId,
 
   // ui states
   sidebarCollapsed,
