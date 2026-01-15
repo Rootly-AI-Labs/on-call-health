@@ -54,6 +54,7 @@ import {
   BarChart3,
   CalendarIcon,
   ArrowRight,
+  RefreshCw,
 } from "lucide-react"
 import { TeamHealthOverview } from "@/components/dashboard/TeamHealthOverview"
 import { AnalysisProgressSection } from "@/components/dashboard/AnalysisProgressSection"
@@ -95,6 +96,8 @@ function DashboardContent() {
   hasMoreAnalyses,
   loadingMoreAnalyses,
   dropdownLoading,
+  loadingAnalysisId,
+  setLoadingAnalysisId,
 
   // ui states
   sidebarCollapsed,
@@ -338,9 +341,12 @@ function DashboardContent() {
                   <div key={analysis.id} className={`relative group ${isSelected ? 'bg-neutral-800' : ''} rounded`}>
                     <Button
                       variant="ghost"
-                      disabled={analysisRunning}
-                      className={`w-full justify-start text-neutral-500 hover:text-white hover:bg-neutral-800 py-2 h-auto ${isSelected ? 'bg-neutral-800 text-white' : ''} ${analysisRunning ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      disabled={analysisRunning || loadingAnalysisId !== null}
+                      className={`w-full justify-start text-neutral-500 hover:text-white hover:bg-neutral-800 py-2 h-auto ${isSelected ? 'bg-neutral-800 text-white' : ''} ${loadingAnalysisId === analysis.id ? 'bg-neutral-700 text-white' : ''} ${analysisRunning ? 'opacity-50 cursor-not-allowed' : ''}`}
                       onClick={async () => {
+                        // Set immediate loading state for visual feedback
+                        setLoadingAnalysisId(analysis.id)
+
                         const analysisKey = analysis.uuid || analysis.id.toString()
 
                         // Get members array - handle both object and array formats
@@ -357,6 +363,7 @@ function DashboardContent() {
                           setCurrentAnalysis(cachedAnalysis)
                           setRedirectingToSuggested(false) // Turn off redirect loader
                           updateURLWithAnalysis(cachedAnalysis.uuid || cachedAnalysis.id)
+                          setLoadingAnalysisId(null) // Clear loading state
                           return
                         }
 
@@ -364,7 +371,10 @@ function DashboardContent() {
                         if (!analysis.analysis_data || !members || !Array.isArray(members) || members.length === 0) {
                           try {
                             const authToken = localStorage.getItem('auth_token')
-                            if (!authToken) return
+                            if (!authToken) {
+                              setLoadingAnalysisId(null)
+                              return
+                            }
 
                             const response = await fetch(`${API_BASE}/analyses/${analysis.id}`, {
                               headers: {
@@ -386,6 +396,8 @@ function DashboardContent() {
                           } catch (error) {
                             console.error('Error fetching full analysis:', error)
                             setRedirectingToSuggested(false)
+                          } finally {
+                            setLoadingAnalysisId(null) // Clear loading state
                           }
                         } else {
                           // Analysis already has full data, cache it and use it
@@ -393,6 +405,7 @@ function DashboardContent() {
                           setCurrentAnalysis(analysis)
                           setRedirectingToSuggested(false) // Turn off redirect loader
                           updateURLWithAnalysis(analysis.uuid || analysis.id)
+                          setLoadingAnalysisId(null) // Clear loading state
                         }
                       }}
                     >
@@ -474,7 +487,16 @@ function DashboardContent() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-auto bg-neutral-200">
+      <div className="flex-1 overflow-auto bg-neutral-200 relative">
+        {/* Loading overlay when switching analyses */}
+        {loadingAnalysisId !== null && (
+          <div className="absolute inset-0 bg-neutral-900/50 z-50 flex items-center justify-center">
+            <div className="bg-neutral-800 rounded-lg p-6 flex flex-col items-center gap-3 shadow-xl">
+              <RefreshCw className="w-8 h-8 animate-spin text-white" />
+              <p className="text-white font-medium">Loading analysis...</p>
+            </div>
+          </div>
+        )}
         <div className="p-6">
 
           {/* Debug Section - Only show in development */}
@@ -1347,8 +1369,10 @@ function DashboardContent() {
                     }}
                   />
 
-                  {/* Slack Metrics Card */}
-                  {currentAnalysis?.analysis_data?.slack_insights && (
+                  {/* Slack Metrics Card - DISABLED: Feature not ready for production
+                      To re-enable: Uncomment the code below and set slack_data: true in backend
+                  */}
+                  {false && currentAnalysis?.analysis_data?.slack_insights && (
                     <Card className="border border-neutral-300 bg-white shadow-lg">
                       <CardHeader className="pb-3">
                         <div className="flex items-center justify-between">
@@ -1372,19 +1396,21 @@ function DashboardContent() {
                       <CardContent className="space-y-4">
                         {(() => {
                           const slack = currentAnalysis.analysis_data.slack_insights
-                          
+
                           // Check if this analysis actually has valid Slack data
                           const teamAnalysis = currentAnalysis.analysis_data.team_analysis
-                          const teamMembers = Array.isArray(teamAnalysis) ? teamAnalysis : (teamAnalysis?.members || [])
-                          const hasRealSlackData = teamMembers.some(member => 
-                            member.slack_activity && 
+                          const teamMembers = Array.isArray(teamAnalysis)
+                            ? teamAnalysis
+                            : (teamAnalysis as any)?.members || []
+                          const hasRealSlackData = teamMembers.some((member: any) =>
+                            member.slack_activity &&
                             (member.slack_activity.messages_sent > 0 || member.slack_activity.channels_active > 0)
                           )
-                          
+
                           // Check for API errors
                           const hasRateLimitErrors = (slack as any)?.errors?.rate_limited_channels?.length > 0
                           const hasOtherErrors = (slack as any)?.errors?.other_errors?.length > 0
-                          
+
                           // If no real Slack data, show empty state
                           if (!hasRealSlackData && !hasRateLimitErrors && !hasOtherErrors) {
                             return (
@@ -1411,7 +1437,7 @@ function DashboardContent() {
                               </div>
                             )
                           }
-                          
+
                           return (
                             <>
                               {/* Error Messages */}
@@ -1424,9 +1450,9 @@ function DashboardContent() {
                                     <span className="text-sm font-medium text-yellow-800">Rate Limited</span>
                                   </div>
                                   <p className="text-xs text-yellow-700 mt-1">
-                                    Some channels were rate limited: {(slack as any).errors.rate_limited_channels.join(", ")}. 
-                                    Data may be incomplete. <button 
-                                      onClick={() => window.location.reload()} 
+                                    Some channels were rate limited: {(slack as any).errors.rate_limited_channels.join(", ")}.
+                                    Data may be incomplete. <button
+                                      onClick={() => window.location.reload()}
                                       className="text-yellow-800 underline hover:text-yellow-900"
                                     >
                                       Refresh to retry
@@ -1434,7 +1460,7 @@ function DashboardContent() {
                                   </p>
                                 </div>
                               )}
-                              
+
                               {hasOtherErrors && (
                                 <div className="bg-red-50 border border-red-200 rounded-lg p-3">
                                   <div className="flex items-center space-x-2">
@@ -1449,7 +1475,7 @@ function DashboardContent() {
                                   </p>
                                 </div>
                               )}
-                              
+
                               {/* Only show metrics if we have real data */}
                               {hasRealSlackData && (
                                 <>
@@ -1481,7 +1507,7 @@ function DashboardContent() {
                                     </div>
                                     <div className="bg-purple-50 rounded-lg p-3">
                                       <p className="text-xs text-purple-700 font-medium">Weekend Messages</p>
-                                      {(slack?.weekend_activity_percentage !== undefined && slack.weekend_activity_percentage !== null) || 
+                                      {(slack?.weekend_activity_percentage !== undefined && slack.weekend_activity_percentage !== null) ||
                                        (slack?.weekend_percentage !== undefined && slack.weekend_percentage !== null) ? (
                                         <p className="text-lg font-bold text-purple-900">{(slack.weekend_activity_percentage || slack.weekend_percentage || 0).toFixed(1)}%</p>
                                       ) : (
