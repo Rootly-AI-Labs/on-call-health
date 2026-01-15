@@ -199,7 +199,7 @@ function JiraTicketCard({ memberData }: TicketingCardProps) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2">
             <span className="text-blue-600">●</span> Jira Workload
           </CardTitle>
         </CardHeader>
@@ -247,7 +247,7 @@ function JiraTicketCard({ memberData }: TicketingCardProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm flex items-center gap-2">
+        <CardTitle className="flex items-center gap-2">
           <span className="text-blue-600">●</span> Jira Workload
         </CardTitle>
       </CardHeader>
@@ -401,8 +401,8 @@ function LinearIssueCard({ memberData }: TicketingCardProps) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm flex items-center gap-2">
-            <span className="text-purple-600">●</span> Linear Workload
+          <CardTitle className="flex items-center gap-2">
+            Linear Workload
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -445,8 +445,8 @@ function LinearIssueCard({ memberData }: TicketingCardProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm flex items-center gap-2">
-          <span className="text-purple-600">●</span> Linear Workload
+        <CardTitle className="flex items-center gap-2">
+          Linear Workload
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -522,7 +522,7 @@ export function TicketingCard({ memberData }: TicketingCardProps) {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle className="text-sm">
+            <CardTitle>
               {activeTab === "jira" ? "Jira Workload" : "Linear Workload"}
             </CardTitle>
             <div className="flex gap-2">
