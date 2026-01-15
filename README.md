@@ -16,7 +16,8 @@ Catch overload before it burns out your engineers.
 
 On-Call Health integrates with Rootly, PagerDuty, GitHub, Slack, Linear, and Jira to collect obective and self-reported data to look for sign of overload in on-call engineers. Free and open-source.
 
-![Rootly AI Labs On-call Health screenshot](https://raw.githubusercontent.com/Rootly-AI-Labs/On-Call-Health/main/frontend/public/images/team-trends-dashboard.png)
+![Rootly AI Labs On-call Health screenshot](https://github.com/user-attachments/assets/037358d8-1b9b-43f8-ae89-183d04e48bca)
+
 
 Two ways to get started:
 * Use our hosted version [www.oncallhealth.ai](https://www.oncallhealth.ai/) (contains mock data to easily test it out)
@@ -46,9 +47,9 @@ cp backend/.env.example backend/.env
 1. **Enable [Google People API](https://console.cloud.google.com/marketplace/product/google/people.googleapis.com)**
 2. **Get your tokens**
 	* Create a [new project](https://console.cloud.google.com/projectcreate)
- 	* In the ** Overview ** tab, click on ** Get started ** button and fill out info
+ 	* In the ** Overview ** tab, click on ** Get started ** button and fill out info	
  	* Go to the ** Clients ** tab and click on ** + Create client ** button
-  	* Set **Application type** to **Web application**
+  	* Set ** Appliecation type ** to ** Web application **
 	* Set ** Authorized redirect URIs ** to ** http://localhost:8000/auth/google/callback **
 	* Keep the pop-up that contains your ** Client ID ** and ** Client secret ** open
 3. **Fill out the variable `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in your `backend/.env` file**
@@ -67,12 +68,8 @@ cp backend/.env.example backend/.env
 	* Click **Register application**
 	* You'll see your **Client ID**
 	* Click **Generate a new client secret** to get your **Client Secret**
-3. **Add to `backend/.env`:**
-   ```
-   GITHUB_CLIENT_ID=your_client_id
-   GITHUB_CLIENT_SECRET=your_client_secret
-   ```
-4. **Restart backend:** `docker compose restart backend`
+3. **Add to `backend/.env:`**
+4. **Restart backend:**
 </details>
 
 ### Manual setup
@@ -80,7 +77,7 @@ cp backend/.env.example backend/.env
 
 ### Prerequisites
 - Python 3.11+
-- Node.js 25.3.0+ (for frontend, required for security patches)
+- Node.js 18+ (for frontend)
 - Rootly or PagerDuty API token
 
 ### Backend Setup

@@ -100,7 +100,7 @@ export function SurveyResultsCard({ surveyData, userEmail }: SurveyResultsCardPr
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm">Health Check-ins</CardTitle>
+          <CardTitle>Health Check-ins</CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-neutral-500">No survey responses in this analysis period</p>
@@ -132,7 +132,7 @@ export function SurveyResultsCard({ surveyData, userEmail }: SurveyResultsCardPr
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle className="text-sm">Health Check-ins</CardTitle>
+          <CardTitle>Health Check-ins</CardTitle>
           {surveyData.trend && (
             <div className="flex items-center gap-2">
               {getTrendIcon(surveyData.trend)}

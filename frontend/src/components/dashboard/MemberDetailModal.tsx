@@ -409,12 +409,8 @@ export function MemberDetailModal({
 
                       <div className="mt-3 pt-3 border-t border-gray-200 space-y-2">
                         <div className="flex justify-between text-sm">
-                          <span className="text-gray-600">After Hours Work</span>
-                          <span className="font-medium">{(memberData?.metrics?.after_hours_percentage || 0).toFixed(1)}%</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-600">Weekend Work</span>
-                          <span className="font-medium">{(memberData?.metrics?.weekend_percentage || 0).toFixed(1)}%</span>
+                          <span className="text-gray-600">After Hours Incidents</span>
+                          <span className="font-medium">{((memberData?.metrics?.after_hours_percentage || 0) * 100).toFixed(0)}%</span>
                         </div>
                       </div>
                     </CardContent>
@@ -698,7 +694,7 @@ export function MemberDetailModal({
                     <Card>
                       <CardHeader className="pb-3">
                         <div className="flex items-center justify-between">
-                          <h4 className="font-semibold text-neutral-900">Risk Analysis</h4>
+                          <CardTitle>Risk Analysis</CardTitle>
                           <div className="relative group">
                             <Info className="w-4 h-4 text-neutral-400 cursor-help hover:text-neutral-600" />
                             <div className="absolute top-full right-0 mt-2 px-3 py-2 bg-neutral-900 text-white text-xs rounded-lg w-80 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
