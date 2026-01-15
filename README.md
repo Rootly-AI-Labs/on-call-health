@@ -16,7 +16,8 @@ Catch overload before it burns out your engineers.
 
 On-Call Health integrates with Rootly, PagerDuty, GitHub, Slack, Linear, and Jira to collect obective and self-reported data to look for sign of overload in on-call engineers. Free and open-source.
 
-![Rootly AI Labs On-call Health screenshot](https://raw.githubusercontent.com/Rootly-AI-Labs/On-Call-Health/main/frontend/public/images/team-trends-dashboard.png)
+![Rootly AI Labs On-call Health screenshot](https://github.com/user-attachments/assets/037358d8-1b9b-43f8-ae89-183d04e48bca)
+
 
 Two ways to get started:
 * Use our hosted version [www.oncallhealth.ai](https://www.oncallhealth.ai/) (contains mock data to easily test it out)
