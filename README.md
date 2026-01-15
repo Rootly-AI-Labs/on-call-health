@@ -20,25 +20,49 @@ On-Call Health integrates with Rootly, PagerDuty, GitHub, Slack, Linear, and Jir
 
 Two ways to get started:
 * Use our hosted version [www.oncallhealth.ai](https://www.oncallhealth.ai/) (contains mock data to easily test it out)
-* Host it [locally](#Installation)
+* Host it locally by 1) Docker Setup or 2) Manual Setup
 
-## Installation
-Use our Docker Compose file.
+# 1) Docker Setup
+This project uses **Docker Compose** for local development.
+
+
+## Prerequisites
+```
+# Verify docker installation 
+docker version
+```
+## Setup
 ```
 # Clone the repo
 git clone https://github.com/Rootly-AI-Labs/on-call-health
 cd on-call-health
 
-# Launch with Docker Compose
-docker compose up -d
+# Create .env file in the root of the repo
+# For login purposes, you must configure OAuth tokens
+# for Google OR GitHub authentication
+cp backend/.env.example .env
+
+
+# Pull required images (e.g. postgres, redis)
+docker compose pull
+
+# Builds images if needed and starts services in the background
+docker compose up -d --build
+
+# Access the On-Call Health at http://localhost:3000
+# Optional: Show running services and their status. 
+docker compose ps
+```
+## Stop Services
+```
+# Stops and removes all containers (keeps volumes/data)
+docker compose down
+
+# OR stop + delete volumes (wipes DB data, fresh start):
+docker compose down -v
 ```
 
-### Environment Variables
-⚠️ For login purposes, you **must** configure OAuth tokens for Google OR GitHub OAuth:
-```
-# Create a copy of the .env file
-cp backend/.env.example backend/.env
-```
+### Configure OAuth tokens
 
 <details>
 <summary><b>📝 Instructions to get token for Google Auth</b></summary>
@@ -75,7 +99,9 @@ cp backend/.env.example backend/.env
 4. **Restart backend:** `docker compose restart backend`
 </details>
 
-### Manual setup
+
+
+# 2) Manual setup
 <details><summary>You can also set it up manually, but this method isn't actively supported.</summary>
 
 ### Prerequisites
