@@ -62,7 +62,7 @@ export function GitHubCommitsTimeline({ analysisId, totalCommits, weekendPercent
           setCache(prev => new Map(prev.set(cacheKey, result.data.daily_commits)))
           setTimelineData(result.data.daily_commits)
         } else if (result.status === 'error') {
-          // GitHub integration not configured is an expected state, not an error
+          console.error('GitHub timeline server error', result.message)
           setError(result.message || 'Failed to fetch timeline data')
         }
       } catch (err) {
