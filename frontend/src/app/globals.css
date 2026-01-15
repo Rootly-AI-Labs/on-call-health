@@ -120,13 +120,9 @@
   background-color: #9ca3af;
 }
 
-/* Fix text selection visibility globally */
-::selection {
-  background-color: #DBEAFE !important;
-  color: #1E1E26 !important;
-}
-
-::-moz-selection {
-  background-color: #DBEAFE !important;
-  color: #1E1E26 !important;
+/* Global text selection styling */
+@layer base {
+  * {
+    @apply selection:bg-blue-200 selection:text-neutral-900;
+  }
 }
