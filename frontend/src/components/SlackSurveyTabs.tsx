@@ -388,7 +388,7 @@ export function SlackSurveyTabs({
                   <span className="text-green-600 text-xs font-bold">1</span>
                 </div>
                 <div>
-                  <p className="text-sm text-neutral-700"><strong>Authorize the app</strong> to deliver 3-question burnout surveys via Slack</p>
+                  <p className="text-sm text-neutral-700 select-text"><strong className="text-neutral-900">Authorize the app</strong> to deliver 3-question burnout surveys via Slack</p>
                 </div>
               </div>
 
@@ -397,7 +397,7 @@ export function SlackSurveyTabs({
                   <span className="text-green-600 text-xs font-bold">2</span>
                 </div>
                 <div>
-                  <p className="text-sm text-neutral-700"><strong>Team members receive surveys</strong> via automated DMs or by typing <code className="bg-neutral-200 px-1 rounded text-xs">/oncall-health</code></p>
+                  <p className="text-sm text-neutral-700 select-text"><strong className="text-neutral-900">Team members receive surveys</strong> via automated DMs or by typing <code className="bg-neutral-200 px-1 rounded text-xs text-neutral-900">/oncall-health</code></p>
                   <div className="bg-slate-800 rounded p-3 font-mono text-sm text-green-400 mt-2">
                     <div>/oncall-health</div>
                     <div className="text-slate-400 mt-1">→ Opens interactive modal with 3 scored questions + optional text</div>
@@ -410,7 +410,7 @@ export function SlackSurveyTabs({
                   <span className="text-green-600 text-xs font-bold">3</span>
                 </div>
                 <div>
-                  <p className="text-sm text-neutral-700"><strong>Survey data automatically integrates</strong> with your burnout analysis to validate automated detection patterns</p>
+                  <p className="text-sm text-neutral-700 select-text"><strong className="text-neutral-900">Survey data automatically integrates</strong> with your burnout analysis to validate automated detection patterns</p>
                 </div>
               </div>
             </div>
