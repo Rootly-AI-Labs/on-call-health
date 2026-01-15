@@ -112,8 +112,8 @@ export function TeamMembersList({
           <div className="flex items-center space-x-3">
             <Avatar>
               <AvatarFallback>
-                {member.user_name?.trim()
-                  ? member.user_name.trim().split(" ").filter(n => n).map((n) => n[0]).join("").toUpperCase().slice(0, 2)
+                {member.user_name
+                  ? member.user_name.split(" ").map((n) => n[0]).join("")
                   : member.user_email?.charAt(0).toUpperCase() || "?"}
               </AvatarFallback>
             </Avatar>

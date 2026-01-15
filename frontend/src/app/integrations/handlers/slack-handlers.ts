@@ -122,10 +122,7 @@ export async function handleSlackDisconnect(
       loadSlackIntegration(true) // Force refresh after changes
     } else {
       // Handle error responses
-      const errorData = await response.json().catch((err) => {
-      console.error('Failed to parse error response:', err)
-      return {}
-    })
+      const errorData = await response.json().catch(() => ({}))
       const errorMessage = errorData.detail || `Failed to disconnect: ${response.statusText}`
       toast.error(errorMessage)
       // Still close the dialog since the UI shows it's disconnected in the background
@@ -180,10 +177,7 @@ export async function handleSlackTest(
 
       toast.success(`✅ Slack test successful! Connected as ${userName} in ${workspaceName}. Permissions updated.`)
     } else {
-      const errorData = await response.json().catch((err) => {
-      console.error('Failed to parse error response:', err)
-      return {}
-    })
+      const errorData = await response.json().catch(() => ({}))
       throw new Error(errorData.detail || 'Connection test failed')
     }
   } catch (error) {

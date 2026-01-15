@@ -251,16 +251,10 @@ export default function useDashboard() {
     
     if (cachedIntegrations && cacheTimestamp) {
       // Check if cache is less than 5 minutes old for more frequent updates
-      const parsedTimestamp = parseInt(cacheTimestamp)
-      if (isNaN(parsedTimestamp)) {
-        // Invalid timestamp - clear cache
-        localStorage.removeItem('all_integrations')
-        localStorage.removeItem('all_integrations_timestamp')
-      } else {
-        const cacheAge = Date.now() - parsedTimestamp
-        const fiveMinutes = 5 * 60 * 1000
-
-      if (cacheAge < fiveMinutes && cacheAge >= 0) {
+      const cacheAge = Date.now() - parseInt(cacheTimestamp)
+      const fiveMinutes = 5 * 60 * 1000
+      
+      if (cacheAge < fiveMinutes) {
         try {
           const parsed = JSON.parse(cachedIntegrations)
           setIntegrations(parsed)
@@ -324,18 +318,14 @@ export default function useDashboard() {
             }
           }
         } catch (e) {
-          console.error('Failed to parse cached integrations:', e)
-          localStorage.removeItem('all_integrations')
-          localStorage.removeItem('all_integrations_timestamp')
-        }
-
+          }
+        
         // Set loading to false when using cache
         setLoadingIntegrations(false)
         setHasDataFromCache(true)
         setInitialDataLoaded(true) // Mark as loaded since we have cached data
 
         // Don't return yet - we still need to set up event listeners and load analyses
-      }
       }
     }
 
@@ -408,13 +398,6 @@ export default function useDashboard() {
             setSlackIntegration(slackData.integration)
           }
         } catch (e) {
-          console.error('Failed to parse cached integration data:', e)
-          localStorage.removeItem('rootly_integration')
-          localStorage.removeItem('rootly_integration_timestamp')
-          localStorage.removeItem('github_integration')
-          localStorage.removeItem('github_integration_timestamp')
-          localStorage.removeItem('slack_integration')
-          localStorage.removeItem('slack_integration_timestamp')
         }
       }
 
@@ -1005,16 +988,10 @@ export default function useDashboard() {
       const cacheTimestamp = localStorage.getItem('all_integrations_timestamp')
       
       if (cachedIntegrations && cacheTimestamp) {
-        const parsedTimestamp = parseInt(cacheTimestamp)
-        if (isNaN(parsedTimestamp)) {
-          // Invalid timestamp - clear cache
-          localStorage.removeItem('all_integrations')
-          localStorage.removeItem('all_integrations_timestamp')
-        } else {
-          const cacheAge = Date.now() - parsedTimestamp
-          const fiveMinutes = 5 * 60 * 1000
-
-        if (cacheAge < fiveMinutes && cacheAge >= 0) {
+        const cacheAge = Date.now() - parseInt(cacheTimestamp)
+        const fiveMinutes = 5 * 60 * 1000
+        
+        if (cacheAge < fiveMinutes) {
           try {
             const cached = JSON.parse(cachedIntegrations)
             setIntegrations(cached)
@@ -1068,7 +1045,6 @@ export default function useDashboard() {
           } catch (error) {
               // Continue to fetch fresh data
           }
-        }
         }
       }
     }
@@ -1409,10 +1385,8 @@ export default function useDashboard() {
       const cacheTimestamp = localStorage.getItem('all_integrations_timestamp')
       
       if (cachedIntegrations && cacheTimestamp) {
-        const parsedTimestamp = parseInt(cacheTimestamp)
-        if (!isNaN(parsedTimestamp)) {
-          const cacheAge = Date.now() - parsedTimestamp
-        if (cacheAge < 5 * 60 * 1000 && cacheAge >= 0) { // 5 minutes
+        const cacheAge = Date.now() - parseInt(cacheTimestamp)
+        if (cacheAge < 5 * 60 * 1000) { // 5 minutes
           // Load from cache without API call
           const cached = JSON.parse(cachedIntegrations)
           // Cache is stored as a flat array of integrations
@@ -1437,7 +1411,6 @@ export default function useDashboard() {
           }
 
           currentIntegrations = loadedIntegrations
-        }
         } else {
           // Cache is stale, need to load fresh data
           await loadIntegrations(true, false) // Force refresh but don't show global loading
