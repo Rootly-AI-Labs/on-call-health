@@ -9,6 +9,8 @@ from ...models import get_db
 from ...models import Analysis
 from ...models.slack_workspace_mapping import SlackWorkspaceMapping
 from ...models.slack_integration import SlackIntegration
+from ...models.user import User
+from ..dependencies import get_current_active_user
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -18,15 +20,23 @@ router = APIRouter(
 )
 
 @router.post("/fix-null-organizations")
-async def fix_null_organizations(db: Session = Depends(get_db)) -> Dict[str, Any]:
+async def fix_null_organizations(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
     """
     Fix historical analyses that have null organization names.
     This is a one-time maintenance endpoint.
     """
-    
-    # Find and fix analyses with null organization names
+
+    # Security check: Only admins can run this
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    # SECURITY: Filter by organization to prevent cross-org data modification
     analyses = db.query(Analysis).filter(
-        Analysis.results.isnot(None)
+        Analysis.results.isnot(None),
+        Analysis.organization_id == current_user.organization_id
     ).all()
     
     updated_count = 0
@@ -81,11 +91,18 @@ async def fix_null_organizations(db: Session = Depends(get_db)) -> Dict[str, Any
     }
 
 @router.post("/migrate-slack-workspace-mappings")
-async def migrate_slack_workspace_mappings(db: Session = Depends(get_db)) -> Dict[str, Any]:
+async def migrate_slack_workspace_mappings(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
     """
     Create slack_workspace_mappings table and migrate existing Slack integrations.
     This is a one-time migration endpoint for multi-org Slack support.
     """
+
+    # Security check: Only admins can run migrations
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
 
     create_table_sql = """
     CREATE TABLE IF NOT EXISTS slack_workspace_mappings (
@@ -207,11 +224,18 @@ async def migrate_slack_workspace_mappings(db: Session = Depends(get_db)) -> Dic
         raise HTTPException(status_code=500, detail=f"Migration failed: {str(e)}")
 
 @router.post("/migrate-organizations")
-async def migrate_organizations(db: Session = Depends(get_db)) -> Dict[str, Any]:
+async def migrate_organizations(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
     """
     Run the complete organizations migration - creates organizations, invitations, and notifications tables.
     This is a one-time migration for multi-org support.
     """
+
+    # Security check: Only admins can run migrations
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
     try:
         # Import and run the migration
         import sys
@@ -274,11 +298,18 @@ async def migrate_organizations(db: Session = Depends(get_db)) -> Dict[str, Any]
         }
 
 @router.post("/add-missing-user-columns")
-async def add_missing_user_columns(db: Session = Depends(get_db)) -> Dict[str, Any]:
+async def add_missing_user_columns(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
     """
     Add missing user columns that were not included in the original migration.
     Fixes: column users.joined_org_at does not exist
     """
+
+    # Security check: Only admins can run migrations
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
     try:
         from sqlalchemy import text
 
