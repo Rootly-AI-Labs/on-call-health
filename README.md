@@ -21,49 +21,25 @@ On-Call Health integrates with Rootly, PagerDuty, GitHub, Slack, Linear, and Jir
 
 Two ways to get started:
 * Use our hosted version [www.oncallhealth.ai](https://www.oncallhealth.ai/) (contains mock data to easily test it out)
-* Host it locally by 1) Docker Setup or 2) Manual Setup
+* Host it [locally](#Installation)
 
-# 1) Docker Setup
-This project uses **Docker Compose** for local development.
-
-
-## Prerequisites
-```
-# Verify docker installation 
-docker version
-```
-## Setup
+## Installation
+Use our Docker Compose file.
 ```
 # Clone the repo
 git clone https://github.com/Rootly-AI-Labs/on-call-health
 cd on-call-health
 
-# Create .env file in the root of the repo
-# For login purposes, you must configure OAuth tokens
-# for Google OR GitHub authentication
-cp backend/.env.example .env
-
-
-# Pull required images (e.g. postgres, redis)
-docker compose pull
-
-# Builds images if needed and starts services in the background
-docker compose up -d --build
-
-# Access the On-Call Health at http://localhost:3000
-# Optional: Show running services and their status. 
-docker compose ps
-```
-## Stop Services
-```
-# Stops and removes all containers (keeps volumes/data)
-docker compose down
-
-# OR stop + delete volumes (wipes DB data, fresh start):
-docker compose down -v
+# Launch with Docker Compose
+docker compose up -d
 ```
 
-### Configure OAuth tokens
+### Environment Variables
+⚠️ For login purposes, you **must** configure OAuth tokens for Google OR GitHub OAuth:
+```
+# Create a copy of the .env file
+cp backend/.env.example backend/.env
+```
 
 <details>
 <summary><b>📝 Instructions to get token for Google Auth</b></summary>
@@ -71,9 +47,9 @@ docker compose down -v
 1. **Enable [Google People API](https://console.cloud.google.com/marketplace/product/google/people.googleapis.com)**
 2. **Get your tokens**
 	* Create a [new project](https://console.cloud.google.com/projectcreate)
- 	* In the ** Overview ** tab, click on ** Get started ** button and fill out info
+ 	* In the ** Overview ** tab, click on ** Get started ** button and fill out info	
  	* Go to the ** Clients ** tab and click on ** + Create client ** button
-  	* Set **Application type** to **Web application**
+  	* Set ** Appliecation type ** to ** Web application **
 	* Set ** Authorized redirect URIs ** to ** http://localhost:8000/auth/google/callback **
 	* Keep the pop-up that contains your ** Client ID ** and ** Client secret ** open
 3. **Fill out the variable `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in your `backend/.env` file**
@@ -92,22 +68,16 @@ docker compose down -v
 	* Click **Register application**
 	* You'll see your **Client ID**
 	* Click **Generate a new client secret** to get your **Client Secret**
-3. **Add to `backend/.env`:**
-   ```
-   GITHUB_CLIENT_ID=your_client_id
-   GITHUB_CLIENT_SECRET=your_client_secret
-   ```
-4. **Restart backend:** `docker compose restart backend`
+3. **Add to `backend/.env:`**
+4. **Restart backend:**
 </details>
 
-
-
-# 2) Manual setup
+### Manual setup
 <details><summary>You can also set it up manually, but this method isn't actively supported.</summary>
 
 ### Prerequisites
 - Python 3.11+
-- Node.js 25.3.0+ (for frontend, required for security patches)
+- Node.js 18+ (for frontend)
 - Rootly or PagerDuty API token
 
 ### Backend Setup
@@ -136,7 +106,6 @@ npm run dev
 
 The frontend will be available at `http://localhost:3000`
 </details>
-
 ##  Features
 
 - **Multi Layer Signals**: Individual and team-level insights
