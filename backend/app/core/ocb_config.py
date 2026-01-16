@@ -37,19 +37,19 @@ class OCBConfig:
     # Maps current metrics to OCB Personal Burnout items (0-100 scale)
     PERSONAL_BURNOUT_FACTORS = {
         'work_hours_trend': {
-            'weight': 0.20,
+            'weight': 0.15,
             'description': 'Physical fatigue from excessive work hours',
             'calculation': 'hours_over_45_per_week',
             'scale_max': 100
         },
         'after_hours_activity': {
-            'weight': 0.40,
+            'weight': 0.50,  # INCREASED: Off-hours work is a critical burnout indicator
             'description': 'Recovery time interference and work-life boundary erosion (includes weekend work)',
-            'calculation': 'after_hours_percentage',
-            'scale_max': 40  # >40% after hours = 100 burnout
+            'calculation': 'after_hours_percentage_with_time_multiplier',
+            'scale_max': 30  # LOWERED: >30% after hours (with multiplier) = 100 burnout - more sensitive threshold
         },
         'vacation_usage': {
-            'weight': 0.15,
+            'weight': 0.10,
             'description': 'Recovery opportunity utilization (inverted)',
             'calculation': 'unused_pto_percentage',
             'scale_max': 80  # 80%+ unused PTO = 100 burnout

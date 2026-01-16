@@ -1793,12 +1793,19 @@ class UnifiedBurnoutAnalyzer:
         logger.info(f"SEVERITY_WEIGHTED: User has {severity_weighted_total:.1f} severity-weighted incidents total ({severity_weighted_per_week:.1f}/week)")
         
         # Apply Rootly's tiered scaling to all OCB metrics
+        # CRITICAL: after_hours_pct is a decimal (0.0-1.0), must convert to percentage (0-100) for OCB scale_max
+        after_hours_percentage = after_hours_pct * 100  # Convert 0.25 → 25%
+
+        # Apply time-based multipliers to increase impact of off-hours incidents
+        # Research shows off-hours incidents have 1.4-1.8x psychological impact
+        time_weighted_after_hours = after_hours_percentage * time_impacts.get('after_hours_multiplier', 1.4)
+
         ocb_metrics = {
             # Personal burnout factors - using Rootly's tiered approach
             'work_hours_trend': apply_incident_tiers(incidents_per_week) * 10,      # Scale to 0-100
-            'weekend_work': after_hours_pct * 2,                                           # NO CAP: Extreme after-hours can exceed 100%
-            'after_hours_activity': after_hours_pct,                                       # Direct mapping
-            'vacation_usage': (severity_weighted_per_week / 20) * 100,                     # NO CAP: Extreme SEV1s prevent recovery completely
+            'weekend_work': after_hours_percentage * 2,                             # NO CAP: Extreme after-hours can exceed 100%
+            'after_hours_activity': time_weighted_after_hours,                      # Time-multiplied for research-based impact
+            'vacation_usage': (severity_weighted_per_week / 20) * 100,              # NO CAP: Extreme SEV1s prevent recovery completely
             'sleep_quality_proxy': apply_rootly_incident_tiers(severity_weighted_per_week) * 8,  # NO CAP: SEV1s can destroy sleep
             
             # Work-related burnout factors - using Rootly's response time tiers  
