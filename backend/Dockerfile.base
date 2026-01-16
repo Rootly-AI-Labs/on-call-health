@@ -1,0 +1,42 @@
+# Base image with Python dependencies pre-installed
+# Build: docker build -f Dockerfile.base -t rootlyio/on-call-health:backend-base .
+# Push:  docker push rootlyio/on-call-health:backend-base
+
+# Stage 1: Build stage with compilation tools
+FROM python:3.12-slim-bookworm AS builder
+
+WORKDIR /app
+
+# Install build dependencies (only needed for compilation)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    gcc \
+    g++ \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create virtual environment for cleaner copying
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Stage 2: Runtime stage (minimal, no build tools)
+FROM python:3.12-slim-bookworm AS runtime
+
+WORKDIR /app
+
+# Install only runtime dependencies (no build tools)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    postgresql-client \
+    libpq5 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy virtual environment from builder
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Set Python to run unbuffered
+ENV PYTHONUNBUFFERED=1

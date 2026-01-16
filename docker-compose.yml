@@ -35,6 +35,8 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      args:
+        BASE_IMAGE: rootlyio/on-call-health:backend-base
     ports:
       - "8000:8000"
     environment:
@@ -63,6 +65,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile.dev
+      args:
+        BASE_IMAGE: rootlyio/on-call-health:frontend-base
     ports:
       - "3000:3000"
     environment:
@@ -74,7 +78,7 @@ services:
       - ./frontend:/app
       - frontend_node_modules:/app/node_modules
       - /app/.next
-    command: sh -c "bun install && bun run dev"
+    command: bun run dev
 
 volumes:
   postgres_data:

@@ -36,6 +36,7 @@ export function GitHubCommitsTimeline({ analysisId, totalCommits, weekendPercent
         setLoading(false)
         return
       }
+
       setLoading(true)
       setError(null)
 
@@ -74,7 +75,7 @@ export function GitHubCommitsTimeline({ analysisId, totalCommits, weekendPercent
     }
 
     fetchTimelineData()
-  }, [analysisId])
+  }, [analysisId, setCache])
 
   if (loading) {
     return (
