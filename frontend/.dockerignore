@@ -1,6 +1,7 @@
-# Ignore local environment files
-.env.local
-.env*.local
+# Ignore environment files (may contain secrets)
+.env
+.env.*
+*.local
 
 # Ignore node_modules (already copied from deps stage)
 node_modules
