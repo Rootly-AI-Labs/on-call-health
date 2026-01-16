@@ -166,10 +166,12 @@ async def test_pagerduty_token(
         ).all()
     ]
 
-    suggested_name = org_name
+    # Format: "PagerDuty - Organization Name"
+    base_name = f"PagerDuty - {org_name}"
+    suggested_name = base_name
     counter = 2
     while suggested_name in existing_names:
-        suggested_name = f"{org_name} #{counter}"
+        suggested_name = f"{base_name} #{counter}"
         counter += 1
 
     # Add can_add flag and suggested_name

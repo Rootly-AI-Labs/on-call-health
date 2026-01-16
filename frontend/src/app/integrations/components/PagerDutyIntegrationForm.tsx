@@ -182,7 +182,7 @@ export function PagerDutyIntegrationForm({
                         <FormControl>
                           <Input
                             {...field}
-                            placeholder="PagerDuty"
+                            placeholder="PagerDuty - Your Organization"
                           />
                         </FormControl>
                         <FormDescription>
