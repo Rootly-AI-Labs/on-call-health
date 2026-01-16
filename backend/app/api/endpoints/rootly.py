@@ -1467,7 +1467,7 @@ async def get_synced_users(
                     filtered_correlations.append(corr)
             correlations = filtered_correlations
 
-        # Fetch on-call emails if requested
+        # Fetch on-call emails if requested (always fetch fresh - no caching)
         oncall_emails = set()
         oncall_cache_info = None
         if include_oncall_status and integration_id:
@@ -1475,74 +1475,56 @@ async def get_synced_users(
                 from datetime import datetime, timedelta
                 from app.core.rootly_client import RootlyAPIClient
                 from app.core.pagerduty_client import PagerDutyAPIClient
-                from app.core.oncall_cache import (
-                    get_cached_oncall_emails,
-                    set_cached_oncall_emails,
-                    get_cache_info
-                )
 
-                # Try to get from cache first
-                cached_emails = get_cached_oncall_emails(str(integration_id))
-                if cached_emails is not None:
-                    oncall_emails = cached_emails
-                    oncall_cache_info = get_cache_info(str(integration_id))
-                    logger.info(f"✅ Using cached on-call data: {len(oncall_emails)} users")
-                else:
-                    logger.info(f"🔄 Cache miss, fetching fresh on-call data...")
+                logger.info(f"🔄 Fetching fresh on-call data for integration {integration_id}")
 
                 client = None
 
-                # Only fetch if cache miss
-                if cached_emails is None:
-                    # Get the integration to determine platform
-                    if integration_id in ["beta-rootly", "beta-pagerduty"]:
-                        logger.info(f"📞 Fetching on-call status for beta integration: {integration_id}")
-                        if integration_id == "beta-rootly":
-                            beta_token = os.getenv('ROOTLY_API_TOKEN')
-                            if beta_token:
-                                client = RootlyAPIClient(beta_token)
-                                logger.info("✅ Created Rootly client for beta integration")
+                # Get the integration to determine platform
+                if integration_id in ["beta-rootly", "beta-pagerduty"]:
+                    logger.info(f"📞 Fetching on-call status for beta integration: {integration_id}")
+                    if integration_id == "beta-rootly":
+                        beta_token = os.getenv('ROOTLY_API_TOKEN')
+                        if beta_token:
+                            client = RootlyAPIClient(beta_token)
+                            logger.info("✅ Created Rootly client for beta integration")
+                    else:
+                        beta_token = os.getenv('PAGERDUTY_API_TOKEN')
+                        if beta_token:
+                            client = PagerDutyAPIClient(beta_token)
+                            logger.info("✅ Created PagerDuty client for beta integration")
+                else:
+                    try:
+                        numeric_id = int(integration_id)
+                        logger.info(f"📞 Fetching on-call status for integration_id: {numeric_id}")
+                        integration = db.query(RootlyIntegration).filter(
+                            RootlyIntegration.id == numeric_id,
+                            RootlyIntegration.user_id == current_user.id
+                        ).first()
+
+                        if integration:
+                            logger.info(f"✅ Found integration: {integration.name} (platform: {integration.platform})")
+                            if integration.platform == "rootly":
+                                client = RootlyAPIClient(integration.api_token)
+                                logger.info("✅ Created Rootly API client")
+                            elif integration.platform == "pagerduty":
+                                client = PagerDutyAPIClient(integration.api_token)
+                                logger.info("✅ Created PagerDuty API client")
                         else:
-                            beta_token = os.getenv('PAGERDUTY_API_TOKEN')
-                            if beta_token:
-                                client = PagerDutyAPIClient(beta_token)
-                                logger.info("✅ Created PagerDuty client for beta integration")
-                    else:
-                        try:
-                            numeric_id = int(integration_id)
-                            logger.info(f"📞 Fetching on-call status for integration_id: {numeric_id}")
-                            integration = db.query(RootlyIntegration).filter(
-                                RootlyIntegration.id == numeric_id,
-                                RootlyIntegration.user_id == current_user.id
-                            ).first()
+                            logger.warning(f"⚠️  No integration found with id {numeric_id} for user {current_user.id}")
+                    except ValueError:
+                        logger.warning(f"⚠️  Invalid integration_id format: {integration_id}")
 
-                            if integration:
-                                logger.info(f"✅ Found integration: {integration.name} (platform: {integration.platform})")
-                                if integration.platform == "rootly":
-                                    client = RootlyAPIClient(integration.api_token)
-                                    logger.info("✅ Created Rootly API client")
-                                elif integration.platform == "pagerduty":
-                                    client = PagerDutyAPIClient(integration.api_token)
-                                    logger.info("✅ Created PagerDuty API client")
-                            else:
-                                logger.warning(f"⚠️  No integration found with id {numeric_id} for user {current_user.id}")
-                        except ValueError:
-                            logger.warning(f"⚠️  Invalid integration_id format: {integration_id}")
-
-                    # Fetch on-call shifts
-                    if client:
-                        logger.info("🔍 Fetching on-call shifts...")
-                        end_date = datetime.now() + timedelta(hours=1)
-                        start_date = datetime.now() - timedelta(hours=24)
-                        on_call_shifts = await client.get_on_call_shifts(start_date, end_date)
-                        oncall_emails = await client.extract_on_call_users_from_shifts(on_call_shifts)
-                        logger.info(f"✅ Found {len(oncall_emails)} on-call users: {list(oncall_emails)}")
-
-                        # Cache the results
-                        set_cached_oncall_emails(str(integration_id), oncall_emails)
-                        oncall_cache_info = get_cache_info(str(integration_id))
-                    else:
-                        logger.warning("⚠️  No client created, skipping on-call status fetch")
+                # Fetch on-call shifts (always fresh)
+                if client:
+                    logger.info("🔍 Fetching on-call shifts...")
+                    end_date = datetime.now() + timedelta(hours=1)
+                    start_date = datetime.now() - timedelta(hours=24)
+                    on_call_shifts = await client.get_on_call_shifts(start_date, end_date)
+                    oncall_emails = await client.extract_on_call_users_from_shifts(on_call_shifts)
+                    logger.info(f"✅ Found {len(oncall_emails)} on-call users: {list(oncall_emails)}")
+                else:
+                    logger.warning("⚠️  No client created, skipping on-call status fetch")
             except Exception as e:
                 logger.error(f"❌ Failed to fetch on-call status: {str(e)}")
                 import traceback
