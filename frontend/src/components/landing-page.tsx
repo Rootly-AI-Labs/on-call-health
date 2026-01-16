@@ -152,41 +152,44 @@ export default function LandingPage() {
             </p>
 
             {/* OAuth Login Buttons */}
-            <div id="login" className="mt-6 flex flex-col sm:flex-row gap-4 items-center mb-6 relative top-2">
-              <Button
-                size="lg"
-                className="w-full rounded-3xl sm:w-auto bg-[#E4E5EB] hover:bg-[#d7d8de] text-[color:var(--color-blue-15,_#1E1A33)] px-8 py-7 text-lg font-display font-bold"
-                onClick={handleGoogleLogin}
-                disabled={isLoading === 'google'}
-              >
-                {isLoading === 'google' ? (
+            <div id="login" className="mt-6 flex flex-col sm:flex-row gap-4 items-center mb-6">
+            <Button
+              size="lg"
+              className="w-full rounded-3xl sm:w-auto bg-[#E4E5EB] hover:bg-[#d7d8de] text-[color:var(--color-blue-15,_#1E1A33)] px-8 py-7 text-lg font-display font-bold flex items-center justify-center"
+              onClick={handleGoogleLogin}
+              disabled={isLoading === "google"}
+            >
+              <span className="flex items-center justify-center gap-3 translate-y-[1.5px]">
+                {isLoading === "google" ? (
                   <>
-                    <Loader2 className="w-5 h-5 mr-3 animate-spin" />
+                    <Loader2 className="w-5 h-5 animate-spin" />
                     Connecting to Google...
                   </>
                 ) : (
-                  <>
-                    Start with Google
-                  </>
+                  <>Start with Google</>
                 )}
-              </Button>
-              <Button
-                size="lg"
-                className="w-full rounded-3xl sm:w-auto bg-[#100F12] hover:bg-[#1b1a1e] text-[color:var(--text-text-contrast,_#FFFFFF)] px-8 py-7 text-lg font-display font-bold"
-                onClick={handleGitHubLogin}
-                disabled={isLoading === 'github'}
-              >
-                {isLoading === 'github' ? (
+              </span>
+            </Button>
+
+            <Button
+              size="lg"
+              className="w-full rounded-3xl sm:w-auto bg-[#100F12] hover:bg-[#1b1a1e] text-[color:var(--text-text-contrast,_#FFFFFF)] px-8 py-7 text-lg font-display font-bold flex items-center justify-center"
+              onClick={handleGitHubLogin}
+              disabled={isLoading === "github"}
+            >
+              <span className="flex items-center justify-center gap-3 translate-y-[1.5px]">
+                {isLoading === "github" ? (
                   <>
-                    <Loader2 className="w-5 h-5 mr-3 animate-spin" />
+                    <Loader2 className="w-5 h-5 animate-spin" />
                     Connecting to GitHub...
                   </>
                 ) : (
-                  <>
-                    Start with GitHub
-                  </>
+                  <>Start with GitHub</>
                 )}
-              </Button>
+              </span>
+            </Button>
+
+
             </div>
           </main>
           <aside className="w-full lg:w-[40%] lg:pl-20">
