@@ -5,6 +5,10 @@ FROM ${BASE_IMAGE}
 
 WORKDIR /app
 
+# Copy package files and install/update dependencies
+COPY package.json bun.lock ./
+RUN bun install
+
 # Copy source (will be overridden by volume mount)
 COPY . .
 
