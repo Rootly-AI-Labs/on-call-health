@@ -12,16 +12,13 @@ from typing import Dict, List, Any, Optional
 from collections import defaultdict
 
 from ..core.rootly_client import RootlyAPIClient
-from ..core.pagerduty_client import PagerDutyAPIClient
+from ..core.pagerduty_client import PagerDutyAPIClient, PagerDutyDataCollector
 from ..core.ocb_config import calculate_composite_ocb_score, calculate_personal_burnout, calculate_work_related_burnout, generate_ocb_score_reasoning
 from .ai_burnout_analyzer import get_ai_burnout_analyzer
 from .github_correlation_service import GitHubCorrelationService
-from ..utils.incident_utils import slim_incidents
+from ..utils.incident_utils import slim_incidents, calculate_severity_breakdown
 
 import pytz
-from collections import defaultdict
-
-from datetime import datetime
 
 # Import mock data loader for testing
 MOCK_DATA_AVAILABLE = False
@@ -44,13 +41,20 @@ except ImportError as e:
 
 logger = logging.getLogger(__name__)
 
+# Import settings for configurable business hours
+from ..core.config import settings
 
-# === BUSINESS HOURS CONSTANTS ===
-# Standardized definitions for after-hours and late-night detection
-BUSINESS_HOURS_START = 9   # 9 AM - standard knowledge worker start time
-BUSINESS_HOURS_END = 18    # 6 PM - standard knowledge worker end time
-LATE_NIGHT_START = 22      # 10 PM - when sleep preparation should begin
-LATE_NIGHT_END = 6         # 6 AM - early morning threshold
+# === BUSINESS HOURS CONFIGURATION ===
+# These values are configurable via environment variables:
+# - BUSINESS_HOURS_START: Hour when business day starts (default: 9 = 9 AM)
+# - BUSINESS_HOURS_END: Hour when business day ends (default: 17 = 5 PM)
+# - LATE_NIGHT_START: Hour when late night begins (default: 22 = 10 PM)
+# - LATE_NIGHT_END: Hour when late night ends (default: 6 = 6 AM)
+# Times are applied in each user's local timezone (fetched from Rootly/PagerDuty)
+BUSINESS_HOURS_START = settings.BUSINESS_HOURS_START
+BUSINESS_HOURS_END = settings.BUSINESS_HOURS_END
+LATE_NIGHT_START = settings.LATE_NIGHT_START
+LATE_NIGHT_END = settings.LATE_NIGHT_END
 
 
 class UnifiedBurnoutAnalyzer:
@@ -1091,9 +1095,9 @@ class UnifiedBurnoutAnalyzer:
         logger.info(f"ANALYZER DATA FETCH: Starting data collection for {days_back}-day analysis")
 
         try:
-            # If synced users provided, use them instead of fetching from API
+            # If synced users provided, use them for user list but fetch fresh data for timezones
             if self.synced_users:
-                logger.info(f"TEAM SYNC OPTIMIZATION: Using {len(self.synced_users)} pre-synced users, only fetching incidents")
+                logger.info(f"TEAM SYNC OPTIMIZATION: Using {len(self.synced_users)} pre-synced users, fetching incidents + fresh timezones")
 
                 # DEBUG: Check if jira_account_id is present in synced users
                 users_with_jira = [u for u in self.synced_users if u.get('jira_account_id')]
@@ -1104,19 +1108,27 @@ class UnifiedBurnoutAnalyzer:
                 else:
                     logger.warning(f"⚠️ NO JIRA MAPPINGS in synced_users! Sample user keys: {list(self.synced_users[0].keys()) if self.synced_users else 'empty'}")
 
-                # Only fetch incidents from API (much faster!)
-                # Different APIs use different parameters
+                # Always fetch fresh users from API to get current timezone settings
+                # Timezone is the source of truth from Rootly/PagerDuty
                 if self.platform == "pagerduty":
-                    import pytz
+                    api_users = await self.client.get_users(limit=10000)
+                else:  # rootly
+                    api_users, _ = await self.client.get_users(limit=10000)
+
+                # Store API users for timezone map (will be used by _build_user_tz_map)
+                self._api_users_for_timezone = api_users
+                logger.info(f"Fetched {len(api_users)} users from API for fresh timezone data")
+
+                # Fetch incidents from API
+                if self.platform == "pagerduty":
                     since = datetime.now(pytz.UTC) - timedelta(days=days_back)
                     until = datetime.now(pytz.UTC)
                     raw_incidents = await self.client.get_incidents(since=since, until=until, limit=5000)
                 else:  # rootly
                     raw_incidents = await self.client.get_incidents(days_back=days_back, limit=5000)
 
-                # CRITICAL FIX: Normalize incidents for PagerDuty to extract assigned_to from assignments array
+                # Normalize incidents for PagerDuty to extract assigned_to from assignments array
                 if self.platform == "pagerduty":
-                    from app.core.pagerduty_client import PagerDutyDataCollector
                     collector = PagerDutyDataCollector(self.client.api_token)
                     # Use the enhanced normalization to extract assignments
                     normalized_data = collector._normalize_with_enhanced_assignment_extraction(
@@ -1128,8 +1140,7 @@ class UnifiedBurnoutAnalyzer:
                 else:
                     incidents = raw_incidents
 
-                # Calculate severity breakdown using shared utility
-                from app.utils.incident_utils import calculate_severity_breakdown
+                # Calculate severity breakdown
                 severity_counts = calculate_severity_breakdown(incidents)
 
                 # Build data structure with synced users
@@ -1305,23 +1316,33 @@ class UnifiedBurnoutAnalyzer:
                 }
             }
 
-    # helper for building  timezone map
     def _build_user_tz_map(self, users):
+        """Build user ID to timezone map.
+
+        Timezone source of truth is always Rootly/PagerDuty API.
+        Uses fresh API data when available to capture any timezone changes.
+        """
+        # Prefer fresh API data if we fetched it (for synced_users case)
+        api_users = getattr(self, '_api_users_for_timezone', None) or users
+
         tz_by_id = {}
-        if not users:
+        if not api_users:
             return tz_by_id
-        for user in users:
-            uid = user.get("id")        
+
+        for user in api_users:
+            uid = user.get("id")
             if not uid:
                 continue
-            if self.platform == "pagerduty":
-                tz = user.get("timezone") 
-                # print(f"User: {user.get('name')} ({user.get('email')}) → TZ: {user.get('timezone')}")
-            else:  
-                attrs = user.get("attributes", {}) or {}
-                # print(f"User: {user.get('name')} ({user.get('email')}) → TZ: {user.get('timezone')}")
 
-                tz = attrs.get("time_zone") or attrs.get("timezone")
+            # Extract timezone from API response format
+            if self.platform == "pagerduty":
+                # PagerDuty: flat format {"time_zone": "America/New_York"}
+                tz = user.get("time_zone")
+            else:
+                # Rootly: JSONAPI format {"attributes": {"time_zone": "America/New_York"}}
+                attrs = user.get("attributes") or {}
+                tz = attrs.get("time_zone")
+
             tz_by_id[str(uid)] = tz
         return tz_by_id
 

@@ -192,6 +192,7 @@ class UserSyncService:
                 "id": user.get("id"),
                 "email": attrs.get("email"),
                 "name": attrs.get("name") or attrs.get("full_name"),
+                "timezone": attrs.get("time_zone"),  # User's configured timezone
                 "platform": "rootly"
             })
 
@@ -209,6 +210,7 @@ class UserSyncService:
                 "id": user.get("id"),
                 "email": user.get("email"),
                 "name": user.get("name"),
+                "timezone": user.get("time_zone"),  # User's configured timezone
                 "platform": "pagerduty"
             })
 
@@ -372,6 +374,7 @@ class UserSyncService:
                         email_domain=email_domain,  # User's actual domain for data sharing
                         email=email,
                         name=user.get("name"),  # Store user's display name
+                        timezone=user.get("timezone"),  # User's timezone from Rootly/PagerDuty
                         integration_ids=[integration_id] if integration_id else []  # Initialize array
                     )
                     self._update_correlation(correlation, user, platform, integration_id)
@@ -423,6 +426,11 @@ class UserSyncService:
         # Update name if available and different
         if user.get("name") and correlation.name != user["name"]:
             correlation.name = user["name"]
+            updated = True
+
+        # Update timezone if available and different
+        if user.get("timezone") and correlation.timezone != user["timezone"]:
+            correlation.timezone = user["timezone"]
             updated = True
 
         if platform == "rootly":

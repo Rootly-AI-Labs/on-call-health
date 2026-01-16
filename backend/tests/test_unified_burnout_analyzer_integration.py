@@ -477,8 +477,8 @@ class TestTimezoneHandling:
         analyzer = UnifiedBurnoutAnalyzer(api_token="test_token", platform="pagerduty")
 
         users = [
-            {"id": "P1", "timezone": "America/Los_Angeles"},
-            {"id": "P2", "timezone": "Asia/Tokyo"}
+            {"id": "P1", "time_zone": "America/Los_Angeles"},
+            {"id": "P2", "time_zone": "Asia/Tokyo"}
         ]
 
         result = analyzer._build_user_tz_map(users)
