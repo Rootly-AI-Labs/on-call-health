@@ -6,6 +6,7 @@ import { X, Users, Send, AlertTriangle, ArrowUpDown } from 'lucide-react';
 interface Recipient {
   name: string;
   email: string;
+  is_on_call?: boolean;
 }
 
 interface PreviewResponse {
@@ -123,6 +124,17 @@ export default function ManualSurveyDeliveryModal({
 
   const deselectAll = () => {
     setSelectedRecipients(new Set());
+  };
+
+  const selectOnCallOnly = () => {
+    if (previewData) {
+      const onCallEmails = new Set(
+        previewData.recipients
+          .filter(r => r.is_on_call)
+          .map(r => r.email)
+      );
+      setSelectedRecipients(onCallEmails);
+    }
   };
 
   const toggleSort = () => {
@@ -259,6 +271,13 @@ export default function ManualSurveyDeliveryModal({
                       className="text-sm text-purple-600 hover:text-purple-700 font-medium"
                     >
                       Select All
+                    </button>
+                    <span className="text-neutral-500">|</span>
+                    <button
+                      onClick={selectOnCallOnly}
+                      className="text-sm text-purple-600 hover:text-purple-700 font-medium"
+                    >
+                      On-Call Only
                     </button>
                     <span className="text-neutral-500">|</span>
                     <button

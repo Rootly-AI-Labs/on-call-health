@@ -397,7 +397,8 @@ class SurveyScheduler:
                 'user_id': user.id if user else None,
                 'slack_user_id': correlation.slack_user_id,
                 'email': correlation.email,
-                'name': (user.name if user else None) or correlation.name
+                'name': (user.name if user else None) or correlation.name,
+                'is_on_call': bool(correlation.is_on_call) if hasattr(correlation, 'is_on_call') else False
             }
 
         return list(recipients_dict.values())
