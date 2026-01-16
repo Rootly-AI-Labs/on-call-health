@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from 'react';
-import { X, Users, Send, AlertTriangle } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { X, Users, Send, AlertTriangle, ArrowUpDown } from 'lucide-react';
 
 interface Recipient {
   name: string;
@@ -55,6 +55,17 @@ export default function ManualSurveyDeliveryModal({
   const [successData, setSuccessData] = useState<SuccessResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedRecipients, setSelectedRecipients] = useState<Set<string>>(new Set());
+  const [sortAlphabetically, setSortAlphabetically] = useState(true);
+
+  // Sort recipients alphabetically by name
+  const sortedRecipients = useMemo(() => {
+    if (!previewData?.recipients) return [];
+    const recipients = [...previewData.recipients];
+    if (sortAlphabetically) {
+      recipients.sort((a, b) => a.name.localeCompare(b.name));
+    }
+    return recipients;
+  }, [previewData?.recipients, sortAlphabetically]);
 
   const fetchPreview = async () => {
     setLoading(true);
@@ -112,6 +123,10 @@ export default function ManualSurveyDeliveryModal({
 
   const deselectAll = () => {
     setSelectedRecipients(new Set());
+  };
+
+  const toggleSort = () => {
+    setSortAlphabetically(prev => !prev);
   };
 
   const confirmDelivery = async () => {
@@ -231,6 +246,15 @@ export default function ManualSurveyDeliveryModal({
                   </h3>
                   <div className="flex items-center space-x-2">
                     <button
+                      onClick={toggleSort}
+                      className="text-sm text-purple-600 hover:text-purple-700 font-medium flex items-center space-x-1"
+                      title={sortAlphabetically ? "Click to show original order" : "Click to sort A-Z"}
+                    >
+                      <ArrowUpDown className="w-3 h-3" />
+                      <span>{sortAlphabetically ? 'A-Z' : 'Sort'}</span>
+                    </button>
+                    <span className="text-neutral-500">|</span>
+                    <button
                       onClick={selectAll}
                       className="text-sm text-purple-600 hover:text-purple-700 font-medium"
                     >
@@ -247,7 +271,7 @@ export default function ManualSurveyDeliveryModal({
                 </div>
                 <div className="bg-neutral-100 rounded-lg p-4 max-h-64 overflow-y-auto">
                   <ul className="space-y-2">
-                    {previewData.recipients.map((recipient, index) => (
+                    {sortedRecipients.map((recipient, index) => (
                       <li key={index} className="flex items-center space-x-3 text-sm">
                         <input
                           type="checkbox"
