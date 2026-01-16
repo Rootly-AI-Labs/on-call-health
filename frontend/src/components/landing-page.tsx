@@ -357,13 +357,15 @@ export default function LandingPage() {
         <div className="container mx-auto px-4">
           <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-8">
             <div>
-              <Image
-                src="/images/rootly-ai-logo-white.png"
-                alt="Rootly AI"
-                width={820}
-                height={328}
-                className="w-[420px] lg:w-[600px] brightness-0 invert"
-              />
+              <a href="https://rootly.com" target="_blank" rel="noreferrer">
+                <Image
+                  src="/images/rootly-ai-logo-white.png"
+                  alt="Rootly AI"
+                  width={820}
+                  height={328}
+                  className="w-[420px] lg:w-[600px] brightness-0 invert"
+                />
+              </a>
               <div className="mt-0 text-3xl lg:text-4xl font-medium">On-Call Health</div>
               <div className="mt-8 text-sm text-slate-300">
                 © Rootly {new Date().getFullYear()}. All rights reserved. Privacy policy · Terms of use · Cookie Settings
