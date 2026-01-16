@@ -57,12 +57,16 @@ jobs:
 
       - name: Check backend API is responding
         run: |
-          timeout 30 bash -c 'until curl -s http://localhost:8000/health > /dev/null; do sleep 2; done'
+          timeout 90 bash -c 'until curl -s http://localhost:8000/health > /dev/null 2>&1; do echo "Waiting for backend..."; sleep 3; done'
 
       - name: Verify backend health endpoint
         run: |
           curl -f http://localhost:8000/health || exit 1
 
+      - name: Show container status
+        if: failure()
+        run: docker compose ps -a
+
       - name: Show logs on failure
         if: failure()
-        run: docker compose logs
+        run: docker compose logs --tail=100
