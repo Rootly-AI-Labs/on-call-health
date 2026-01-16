@@ -3135,81 +3135,6 @@ export default function IntegrationsPage() {
             ) : null}
         </div>
 
-        {/* Team Management Section */}
-        <div className="mt-16 space-y-8">
-          <div className="text-center">
-            <h2 className="text-2xl font-bold text-neutral-900 mb-3">Team Management</h2>
-            <p className="text-lg text-neutral-600 mb-2">
-              Sync and manage your team members for an analysis
-            </p>
-          </div>
-
-          {/* Team Members Card */}
-          <div className="max-w-2xl mx-auto">
-            <Card className={`border-2 ${selectedOrganization ? 'border-purple-300 bg-white' : 'border-neutral-300 bg-white'}`}>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                    <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${selectedOrganization ? 'bg-purple-700' : 'bg-neutral-300'}`}>
-                      <Users className={`w-6 h-6 ${selectedOrganization ? 'text-white' : 'text-neutral-500'}`} />
-                    </div>
-                    <div>
-                      <h3 className={`text-lg font-semibold ${selectedOrganization ? 'text-neutral-900' : 'text-neutral-900'}`}>
-                        Team Member Sync
-                      </h3>
-                      <p className={`text-sm ${selectedOrganization ? 'text-neutral-600' : 'text-neutral-700'}`}>
-                        {selectedOrganization ? (
-                          <>Sync team members from connected integrations {syncedUsers.length > 0 && `(${syncedUsers.length} synced)`}</>
-                        ) : (
-                          'Select an organization above to sync team members'
-                        )}
-                      </p>
-                    </div>
-                  </div>
-                  <Button
-                    onClick={() => {
-                      if (!selectedOrganization) {
-                        toast.error('Please select an organization first')
-                        return
-                      }
-
-                      // Open drawer immediately for better UX
-                      setTeamMembersDrawerOpen(true)
-
-                      // If we have cached data, show it immediately
-                      if (selectedOrganization && syncedUsersCache.current.has(selectedOrganization)) {
-                        const cachedUsers = syncedUsersCache.current.get(selectedOrganization)!
-                        setSyncedUsers(cachedUsers)
-                        setShowSyncedUsers(true)
-
-                        // Also restore cached recipient selections (validate IDs still exist)
-                        if (recipientsCache.current.has(selectedOrganization)) {
-                          const cachedRecipients = recipientsCache.current.get(selectedOrganization)!
-                          const validUserIds = new Set(cachedUsers.map(u => u.id))
-                          const validCachedRecipients = new Set(
-                            Array.from(cachedRecipients).filter(id => validUserIds.has(id))
-                          )
-                          setSelectedRecipients(validCachedRecipients)
-                          setSavedRecipients(validCachedRecipients)
-                        }
-                      } else {
-                        // Otherwise fetch from API
-                        fetchSyncedUsers(false, false)
-                      }
-                    }}
-                    disabled={!selectedOrganization}
-                    className="bg-purple-700 hover:bg-purple-800 disabled:bg-neutral-300 disabled:cursor-not-allowed"
-                    title={!selectedOrganization ? 'Please select an organization first' : ''}
-                  >
-                    <Users className="w-4 h-4 mr-2" />
-                    Sync Members
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-
         {/* Enhanced Integrations Section */}
         <div className="mt-16 space-y-8">
           <div className="text-center">
@@ -3677,6 +3602,81 @@ export default function IntegrationsPage() {
             </div>
           </div>
         )}
+
+        {/* Team Management Section */}
+        <div className="mt-16 space-y-8">
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-neutral-900 mb-3">Team Management</h2>
+            <p className="text-lg text-neutral-600 mb-2">
+              Sync and manage your team members for an analysis
+            </p>
+          </div>
+
+          {/* Team Members Card */}
+          <div className="max-w-2xl mx-auto">
+            <Card className={`border-2 ${selectedOrganization ? 'border-purple-300 bg-white' : 'border-neutral-300 bg-white'}`}>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${selectedOrganization ? 'bg-purple-700' : 'bg-neutral-300'}`}>
+                      <Users className={`w-6 h-6 ${selectedOrganization ? 'text-white' : 'text-neutral-500'}`} />
+                    </div>
+                    <div>
+                      <h3 className={`text-lg font-semibold ${selectedOrganization ? 'text-neutral-900' : 'text-neutral-900'}`}>
+                        Team Member Sync
+                      </h3>
+                      <p className={`text-sm ${selectedOrganization ? 'text-neutral-600' : 'text-neutral-700'}`}>
+                        {selectedOrganization ? (
+                          <>Sync team members from connected integrations {syncedUsers.length > 0 && `(${syncedUsers.length} synced)`}</>
+                        ) : (
+                          'Select an organization above to sync team members'
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    onClick={() => {
+                      if (!selectedOrganization) {
+                        toast.error('Please select an organization first')
+                        return
+                      }
+
+                      // Open drawer immediately for better UX
+                      setTeamMembersDrawerOpen(true)
+
+                      // If we have cached data, show it immediately
+                      if (selectedOrganization && syncedUsersCache.current.has(selectedOrganization)) {
+                        const cachedUsers = syncedUsersCache.current.get(selectedOrganization)!
+                        setSyncedUsers(cachedUsers)
+                        setShowSyncedUsers(true)
+
+                        // Also restore cached recipient selections (validate IDs still exist)
+                        if (recipientsCache.current.has(selectedOrganization)) {
+                          const cachedRecipients = recipientsCache.current.get(selectedOrganization)!
+                          const validUserIds = new Set(cachedUsers.map(u => u.id))
+                          const validCachedRecipients = new Set(
+                            Array.from(cachedRecipients).filter(id => validUserIds.has(id))
+                          )
+                          setSelectedRecipients(validCachedRecipients)
+                          setSavedRecipients(validCachedRecipients)
+                        }
+                      } else {
+                        // Otherwise fetch from API
+                        fetchSyncedUsers(false, false)
+                      }
+                    }}
+                    disabled={!selectedOrganization}
+                    className="bg-purple-700 hover:bg-purple-800 disabled:bg-neutral-300 disabled:cursor-not-allowed"
+                    title={!selectedOrganization ? 'Please select an organization first' : ''}
+                  >
+                    <Users className="w-4 h-4 mr-2" />
+                    Sync Members
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </main>
 
       {/* Data Mapping Drawer */}
