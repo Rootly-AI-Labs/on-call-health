@@ -21,6 +21,20 @@ if [[ "$1" == "--push" ]]; then
     PUSH=true
 fi
 
+# Check Docker Hub login status and login if needed
+check_docker_login() {
+    if ! docker info 2>/dev/null | grep -q "Username:"; then
+        echo "Not logged into Docker Hub. Logging in..."
+        docker login
+        if [[ $? -ne 0 ]]; then
+            echo "Error: Docker login failed. Cannot push images."
+            exit 1
+        fi
+    else
+        echo "Already logged into Docker Hub."
+    fi
+}
+
 # Ensure buildx builder exists for multi-platform builds
 setup_buildx() {
     if ! docker buildx inspect multiplatform-builder &>/dev/null; then
@@ -34,6 +48,7 @@ setup_buildx() {
 echo "Building base Docker images..."
 
 if [[ "$PUSH" == true ]]; then
+    check_docker_login
     setup_buildx
 
     # Build and push backend base image (multi-platform)
