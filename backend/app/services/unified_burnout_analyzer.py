@@ -13,7 +13,7 @@ from collections import defaultdict
 
 from ..core.rootly_client import RootlyAPIClient
 from ..core.pagerduty_client import PagerDutyAPIClient
-from ..core.ocb_config import calculate_composite_ocb_score, calculate_personal_burnout, calculate_work_related_burnout, generate_ocb_score_reasoning
+from ..core.ocb_config import calculate_composite_ocb_score, calculate_personal_burnout, calculate_work_related_burnout, generate_ocb_score_reasoning, get_structured_ocb_factors
 from .ai_burnout_analyzer import get_ai_burnout_analyzer
 from .github_correlation_service import GitHubCorrelationService
 from ..utils.incident_utils import slim_incidents
@@ -1600,6 +1600,7 @@ class UnifiedBurnoutAnalyzer:
                     "interpretation": composite_ocb['interpretation']
                 },
                 "ocb_reasoning": ocb_reasoning,  # ✅ Add explanations
+                "ocb_factors": get_structured_ocb_factors(personal_ocb, work_ocb, composite_ocb['composite_score']),
                 "metrics": {
                     "incidents_per_week": 0,
                     "after_hours_percentage": 0,
@@ -1840,6 +1841,7 @@ class UnifiedBurnoutAnalyzer:
                 "interpretation": composite_ocb['interpretation']
             },
             "ocb_reasoning": ocb_reasoning,  # Add explanations for the score
+            "ocb_factors": get_structured_ocb_factors(personal_ocb, work_ocb, composite_ocb['composite_score']),
             "metrics": metrics,
             "confidence": confidence,  # Add confidence intervals and data quality
             # Research-based insights

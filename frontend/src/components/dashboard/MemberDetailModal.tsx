@@ -846,35 +846,72 @@ export function MemberDetailModal({
                               </div>
                             )}
 
-                            {/* Contributing Factors */}
-                            <div className="grid grid-cols-2 gap-y-1.5 gap-x-4 mt-2">
-                              {(() => {
-                                const filteredReasons = memberData.ocb_reasoning.slice(1).filter((reason: string) => {
-                                  const cleanReason = reason.replace(/^[\s]*[•·\-*]\s*/, '').trim();
-                                  return !cleanReason.endsWith(':');
-                                });
+                            {/* Contributing Factors - Ranked by Percentage */}
+                            {memberData.ocb_factors?.all && memberData.ocb_factors.all.length > 0 ? (
+                              <div className="space-y-2 mt-3">
+                                <div className="text-xs font-medium text-neutral-500 uppercase tracking-wide mb-2">
+                                  Contributing Factors
+                                </div>
+                                {memberData.ocb_factors.all.map((factor: { key: string; name: string; percentage: number; dimension: string }, index: number) => (
+                                  <div key={factor.key} className="flex items-center gap-3">
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center justify-between mb-1">
+                                        <span className="text-sm text-neutral-700 truncate">{factor.name}</span>
+                                        <span className="text-sm font-semibold text-neutral-900 ml-2">{factor.percentage}%</span>
+                                      </div>
+                                      <div className="w-full bg-gray-200 rounded-full h-1.5">
+                                        <div
+                                          className="h-1.5 rounded-full transition-all duration-500"
+                                          style={{
+                                            width: `${Math.min(factor.percentage * 2, 100)}%`,
+                                            backgroundColor: factor.dimension === 'personal' ? '#6366F1' : '#8B5CF6'
+                                          }}
+                                        />
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                                <div className="flex items-center gap-4 mt-3 pt-2 border-t border-neutral-100">
+                                  <div className="flex items-center gap-1.5">
+                                    <div className="w-2.5 h-2.5 rounded-full bg-indigo-500" />
+                                    <span className="text-xs text-neutral-500">Personal</span>
+                                  </div>
+                                  <div className="flex items-center gap-1.5">
+                                    <div className="w-2.5 h-2.5 rounded-full bg-violet-500" />
+                                    <span className="text-xs text-neutral-500">Work-Related</span>
+                                  </div>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="grid grid-cols-2 gap-y-1.5 gap-x-4 mt-2">
+                                {(() => {
+                                  const filteredReasons = memberData.ocb_reasoning?.slice(1).filter((reason: string) => {
+                                    const cleanReason = reason.replace(/^[\s]*[•·\-*]\s*/, '').trim();
+                                    return !cleanReason.endsWith(':');
+                                  }) || [];
 
-                                return filteredReasons.map((reason: string, index: number) => {
-                                  const cleanReason = reason.replace(/^[\s]*[•·\-*]\s*/, '').trim().replace(/\s*\([^)]*\)$/, '');
-                                  const isLastItem = index === filteredReasons.length - 1;
+                                  return filteredReasons.map((reason: string, index: number) => {
+                                    const cleanReason = reason.replace(/^[\s]*[•·\-*]\s*/, '').trim().replace(/\s*\([^)]*\)$/, '');
+                                    const isLastItem = index === filteredReasons.length - 1;
 
-                                  if (isLastItem) {
+                                    if (isLastItem) {
+                                      return (
+                                        <div key={index} className="col-span-2 text-sm text-neutral-700 font-semibold mt-4 pt-3 border-t border-neutral-200">
+                                          {cleanReason}
+                                        </div>
+                                      );
+                                    }
+
                                     return (
-                                      <div key={index} className="col-span-2 text-sm text-neutral-700 font-semibold mt-4 pt-3 border-t border-neutral-200">
-                                        {cleanReason}
+                                      <div key={index} className="flex items-start gap-1.5 text-sm text-neutral-700">
+                                        <span className="text-neutral-400 flex-shrink-0 leading-relaxed">•</span>
+                                        <span className="leading-relaxed">{cleanReason}</span>
                                       </div>
                                     );
-                                  }
-
-                                  return (
-                                    <div key={index} className="flex items-start gap-1.5 text-sm text-neutral-700">
-                                      <span className="text-neutral-400 flex-shrink-0 leading-relaxed">•</span>
-                                      <span className="leading-relaxed">{cleanReason}</span>
-                                    </div>
-                                  );
-                                });
-                              })()}
-                            </div>
+                                  });
+                                })()}
+                              </div>
+                            )}
                           </div>
                         ) : (
                           <p className="text-sm text-neutral-500 italic">

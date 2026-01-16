@@ -507,6 +507,82 @@ def generate_ocb_score_reasoning(
     return reasons
 
 
+def get_structured_ocb_factors(
+    personal_result: Dict[str, Any],
+    work_result: Dict[str, Any],
+    composite_score: float
+) -> Dict[str, List[Dict[str, Any]]]:
+    """
+    Generate structured factor data with percentages for frontend display.
+
+    Args:
+        personal_result: Personal burnout calculation result
+        work_result: Work-related burnout calculation result
+        composite_score: Total OCB composite score
+
+    Returns:
+        Dict with 'personal' and 'work_related' lists of factor objects
+    """
+    # Human-readable names for factors
+    factor_display_names = {
+        'sleep_quality_proxy': 'Sleep quality impact',
+        'vacation_usage': 'Recovery time',
+        'work_hours_trend': 'Extended work hours',
+        'after_hours_activity': 'After-hours activity',
+        'oncall_burden': 'On-call load',
+        'deployment_frequency': 'Incident frequency',
+        'pr_frequency': 'Severity-weighted workload',
+        'sprint_completion': 'Response time pressure',
+        'meeting_load': 'Meeting load',
+        'code_review_speed': 'Review speed pressure'
+    }
+
+    def extract_factors(result: Dict[str, Any], dimension: str) -> List[Dict[str, Any]]:
+        """Extract and format factors from a dimension result."""
+        factors = []
+        components = result.get('components', {})
+        total_weight = result.get('data_completeness', 0)
+
+        if total_weight == 0:
+            total_weight = sum(c.get('weight', 0) for c in components.values())
+
+        for factor_name, factor_data in components.items():
+            weighted_score = factor_data.get('weighted_score', 0)
+            if weighted_score > 0:
+                # Calculate contribution to the dimension score
+                contribution = weighted_score / total_weight if total_weight > 0 else 0
+
+                # Calculate percentage of total OCB score
+                # Composite score is average of personal and work scores (50/50 weight)
+                # So each dimension contributes 50% to the total
+                percentage = (contribution / composite_score * 100 * 0.5) if composite_score > 0 else 0
+
+                factors.append({
+                    'key': factor_name,
+                    'name': factor_display_names.get(factor_name, factor_name),
+                    'points': round(contribution, 1),
+                    'percentage': round(percentage, 1),
+                    'dimension': dimension
+                })
+
+        # Sort by percentage contribution (highest first)
+        factors.sort(key=lambda x: x['percentage'], reverse=True)
+        return factors
+
+    personal_factors = extract_factors(personal_result, 'personal')
+    work_factors = extract_factors(work_result, 'work_related')
+
+    # Also create a combined list sorted by percentage
+    all_factors = personal_factors + work_factors
+    all_factors.sort(key=lambda x: x['percentage'], reverse=True)
+
+    return {
+        'personal': personal_factors,
+        'work_related': work_factors,
+        'all': all_factors
+    }
+
+
 def validate_factor_consistency(personal_result: Dict, work_result: Dict, raw_metrics: Dict) -> Dict[str, Any]:
     """
     Validate that OCB factors don't double count underlying data sources.
