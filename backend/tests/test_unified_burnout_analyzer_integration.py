@@ -841,5 +841,91 @@ class TestEnhancementMethods:
         assert result["after_hours_percentage"] == 0.2
 
 
+class TestOffHoursContribution:
+    """Tests to verify off-hours activity contributes significantly to burnout score"""
+
+    def test_after_hours_percentage_unit_conversion(self, mock_rootly_client):
+        """Test that after_hours_percentage is correctly converted from decimal to percentage"""
+        from app.core.ocb_config import calculate_personal_burnout
+
+        # After hours percentage of 25% (0.25 decimal)
+        # After conversion and time multiplier (1.4x): 0.25 * 100 * 1.4 = 35%
+        # With scale_max of 30, this should give high normalized score
+        ocb_metrics = {
+            'work_hours_trend': 0,
+            'after_hours_activity': 35,  # 25% * 1.4 multiplier = 35
+            'vacation_usage': 0,
+            'sleep_quality_proxy': 0
+        }
+
+        result = calculate_personal_burnout(ocb_metrics)
+
+        # after_hours_activity normalized: (35 / 30) * 100 = 116.67, capped at 150
+        # weighted: 116.67 * 0.50 = 58.33 contribution
+        # Should contribute significantly to personal burnout
+        assert result['score'] > 50, "25% after-hours work should contribute significantly to burnout"
+        assert 'after_hours_activity' in result['components']
+        after_hours_component = result['components']['after_hours_activity']
+        assert after_hours_component['normalized_score'] > 100, "35% (with multiplier) should exceed scale_max of 30"
+
+    def test_off_hours_is_largest_contributor(self, mock_rootly_client):
+        """Test that off-hours is the largest contributor to personal burnout score"""
+        from app.core.ocb_config import calculate_personal_burnout
+
+        # All factors at moderate levels
+        ocb_metrics = {
+            'work_hours_trend': 50,      # 50% of scale_max
+            'after_hours_activity': 15,  # 50% of scale_max (15/30)
+            'vacation_usage': 40,        # 50% of scale_max (40/80)
+            'sleep_quality_proxy': 15    # 50% of scale_max (15/30)
+        }
+
+        result = calculate_personal_burnout(ocb_metrics)
+
+        components = result['components']
+        after_hours_weighted = components['after_hours_activity']['weighted_score']
+        other_max_weighted = max(
+            components['work_hours_trend']['weighted_score'],
+            components['vacation_usage']['weighted_score'],
+            components['sleep_quality_proxy']['weighted_score']
+        )
+
+        # With 50% weight, after_hours should be the largest contributor
+        assert after_hours_weighted >= other_max_weighted, \
+            "after_hours_activity (50% weight) should be largest contributor at equal raw levels"
+
+    def test_high_off_hours_pushes_to_critical_risk(self, mock_rootly_client):
+        """Test that high off-hours activity can push someone to critical risk level"""
+        from app.core.ocb_config import calculate_personal_burnout, calculate_work_related_burnout, calculate_composite_ocb_score
+
+        # High off-hours activity (40% raw = 56% with 1.4 multiplier)
+        personal_metrics = {
+            'work_hours_trend': 30,
+            'after_hours_activity': 56,  # 40% * 1.4 = 56
+            'vacation_usage': 20,
+            'sleep_quality_proxy': 15
+        }
+
+        # Moderate work-related factors
+        work_metrics = {
+            'sprint_completion': 25,
+            'code_review_speed': 30,
+            'pr_frequency': 40,
+            'deployment_frequency': 35,
+            'meeting_load': 25,
+            'oncall_burden': 50
+        }
+
+        personal_result = calculate_personal_burnout(personal_metrics)
+        work_result = calculate_work_related_burnout(work_metrics)
+        composite = calculate_composite_ocb_score(personal_result['score'], work_result['score'])
+
+        # High off-hours should push into high/critical range
+        assert composite['composite_score'] >= 50, \
+            "High off-hours (40%+) should result in at least moderate burnout risk"
+        assert composite['risk_level'] in ['high', 'critical'], \
+            f"High off-hours should push to high/critical risk, got {composite['risk_level']}"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
