@@ -129,7 +129,7 @@ export default function LandingPage() {
               href="https://github.com/Rootly-AI-Labs/On-Call-Health"
               target="_blank"
               rel="noreferrer"
-              className="rounded-2xl bg-[#7b6db1] px-5 py-2 text-sm font-semibold font-display text-[color:var(--text-text-primary,_#100F12)] hover:bg-[#6f62a5]"
+              className="rounded-2xl bg-[#7b6db1] px-5 py-2 text-sm font-semibold font-display text-[color:var(--text-text-primary,_#100F12)] hover:bg-[#6f62a5] -translate-x-6"
             >
               GitHub
             </a>
