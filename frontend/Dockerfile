@@ -1,25 +1,18 @@
 # Frontend Dockerfile
-FROM oven/bun:1-alpine AS base
-
-# Install dependencies only when needed
-FROM base AS deps
-WORKDIR /app
-
-# Copy package files
-COPY package.json bun.lock* ./
-RUN bun install --frozen-lockfile
+# Use pre-built base image with dependencies from Docker Hub
+ARG BASE_IMAGE=rootlyio/on-call-health:frontend-base
+FROM ${BASE_IMAGE} AS deps
 
 # Rebuild the source code only when needed
-FROM base AS builder
+FROM deps AS builder
 WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # Build the application
 RUN bun run build
 
 # Production image, copy all the files and run next
-FROM base AS runner
+FROM oven/bun:1.2-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV production
