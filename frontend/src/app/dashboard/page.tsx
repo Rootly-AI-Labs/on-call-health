@@ -1097,13 +1097,13 @@ function DashboardContent() {
                       const hasIncidentMembers = membersWithIncidents.length > 0;
 
                       if (hasGitHubMembers && hasIncidentMembers) {
-                        return `Holistic burnout analysis combining incident response patterns and development activity across ${allActiveMembers.length} team members`;
+                        return `Incidents + GitHub activity for ${allActiveMembers.length} members`;
                       } else if (hasGitHubMembers && !hasIncidentMembers) {
-                        return `Development-focused burnout analysis based on GitHub activity patterns from ${membersWithGitHubData.length} active developers`;
+                        return `GitHub activity for ${membersWithGitHubData.length} developers`;
                       } else if (!hasGitHubMembers && hasIncidentMembers) {
-                        return `Incident response analysis from ${membersWithIncidents.length} team members handling incidents`;
+                        return `Incident data for ${membersWithIncidents.length} responders`;
                       } else {
-                        return "Team risk assessment based on available activity data";
+                        return "Based on available activity data";
                       }
                     })()}
                     loadingAnalysis={loadingAnalyses}
@@ -1214,8 +1214,8 @@ function DashboardContent() {
               {/* GitHub and Slack Metrics Section */}
               {(currentAnalysis?.analysis_data?.github_insights || currentAnalysis?.analysis_data?.slack_insights) && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                  {/* GitHub Metrics Card */}
-                  {currentAnalysis?.analysis_data?.github_insights && (
+                  {/* GitHub Metrics Card - DISABLED: Feature temporarily hidden from home page */}
+                  {false && currentAnalysis?.analysis_data?.github_insights && (
                     <Card className="border border-neutral-300 bg-white">
                       <CardHeader className="pb-3">
                         <div className="flex items-center justify-between">
