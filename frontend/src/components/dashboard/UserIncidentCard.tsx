@@ -1,11 +1,45 @@
 "use client"
 
+import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { AlertTriangle, Loader2 } from "lucide-react"
+import { AlertTriangle, Loader2, ChevronDown, ChevronUp } from "lucide-react"
+
+interface IncidentUser {
+  id?: string
+  email?: string
+  name?: string
+}
+
+interface Incident {
+  id?: string
+  attributes?: {
+    title?: string
+    summary?: string
+    severity?: string
+    created_at?: string
+    status?: string
+    user?: IncidentUser
+    started_by?: IncidentUser
+    resolved_by?: IncidentUser
+    mitigated_by?: IncidentUser
+  }
+  // PagerDuty normalized format (flat structure)
+  title?: string
+  severity?: string
+  created_at?: string
+  status?: string
+  user?: IncidentUser
+  started_by?: IncidentUser
+  resolved_by?: IncidentUser
+  mitigated_by?: IncidentUser
+}
 
 interface UserIncidentCardProps {
   memberData: {
+    user_id?: string
     user_name?: string
+    user_email?: string
+    email?: string
     incident_count?: number
     metrics?: {
       severity_distribution?: Record<string, number>
@@ -15,17 +49,40 @@ interface UserIncidentCardProps {
   timeRange?: number
   platform?: string
   loading?: boolean
+  incidents?: Incident[]
 }
 
 export function UserIncidentCard({
   memberData,
   timeRange = 30,
   platform = "rootly",
-  loading = false
+  loading = false,
+  incidents = []
 }: UserIncidentCardProps) {
+  const [isExpanded, setIsExpanded] = useState(false)
+
   const memberName = memberData?.user_name || 'Team Member'
   const incidentCount = memberData?.incident_count || 0
   const severityDist = memberData?.metrics?.severity_distribution || {}
+
+  // Filter incidents for this user
+  const userId = memberData?.user_id
+  const userEmail = memberData?.user_email || memberData?.email
+
+  const userIncidents = incidents.filter(incident => {
+    const attrs = incident.attributes || incident
+    const involvedUsers = [
+      attrs.user,
+      attrs.started_by,
+      attrs.resolved_by,
+      attrs.mitigated_by
+    ].filter(Boolean)
+
+    return involvedUsers.some(u =>
+      (userId && u?.id === userId) ||
+      (userEmail && u?.email?.toLowerCase() === userEmail?.toLowerCase())
+    )
+  })
 
   if (loading) {
     return (
@@ -75,7 +132,7 @@ export function UserIncidentCard({
           </div>
         </div>
       </CardHeader>
-      <CardContent className="pb-6">
+      <CardContent className="pt-0 pb-6">
         {/* Total incidents */}
         <div className="text-center mb-4">
           <div className="text-3xl font-bold text-neutral-900">{incidentCount}</div>
@@ -127,6 +184,77 @@ export function UserIncidentCard({
         {(!hasSeverityData || incidentCount === 0) && (
           <div className="text-center text-sm text-neutral-500 py-2">
             No severity breakdown available
+          </div>
+        )}
+
+        {/* Collapsible incident list */}
+        {userIncidents.length > 0 && (
+          <div className="mt-4 border-t border-neutral-200 pt-4">
+            <button
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="w-full flex items-center justify-between text-sm font-medium text-neutral-700 hover:text-neutral-900 transition-colors"
+            >
+              <span>View incidents ({userIncidents.length})</span>
+              {isExpanded ? (
+                <ChevronUp className="w-4 h-4" />
+              ) : (
+                <ChevronDown className="w-4 h-4" />
+              )}
+            </button>
+
+            {isExpanded && (
+              <div className="mt-3 space-y-2 max-h-64 overflow-y-auto">
+                {userIncidents.map((incident, index) => {
+                  const attrs = incident.attributes || incident
+                  const title = attrs.title || 'Untitled Incident'
+                  const severity = (attrs.severity || 'unknown').toUpperCase()
+                  const status = attrs.status || 'unknown'
+                  const createdAt = attrs.created_at
+                    ? new Date(attrs.created_at).toLocaleDateString()
+                    : ''
+
+                  // Get severity color
+                  const getSeverityColor = (sev: string) => {
+                    const s = sev.toLowerCase()
+                    if (s.includes('sev0') || s.includes('critical') || s.includes('emergency')) return 'bg-purple-100 text-purple-700'
+                    if (s.includes('sev1') || s.includes('high')) return 'bg-red-100 text-red-700'
+                    if (s.includes('sev2') || s.includes('medium')) return 'bg-orange-100 text-orange-700'
+                    if (s.includes('sev3')) return 'bg-yellow-100 text-yellow-700'
+                    return 'bg-green-100 text-green-700'
+                  }
+
+                  // Get status color
+                  const getStatusColor = (st: string) => {
+                    const s = st.toLowerCase()
+                    if (s.includes('resolved') || s.includes('closed')) return 'text-green-600'
+                    if (s.includes('mitigated')) return 'text-blue-600'
+                    if (s.includes('active') || s.includes('triggered') || s.includes('open')) return 'text-red-600'
+                    if (s.includes('acknowledged')) return 'text-orange-600'
+                    return 'text-neutral-500'
+                  }
+
+                  return (
+                    <div
+                      key={incident.id || index}
+                      className="flex items-start gap-2 p-2 rounded-lg bg-neutral-50 hover:bg-neutral-100 transition-colors"
+                    >
+                      <span className={`px-2 py-0.5 text-xs font-semibold rounded ${getSeverityColor(severity)}`}>
+                        {severity}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-neutral-800 truncate">{title}</p>
+                        {createdAt && (
+                          <p className="text-xs text-neutral-500">{createdAt}</p>
+                        )}
+                      </div>
+                      <span className={`text-xs font-medium capitalize flex-shrink-0 ${getStatusColor(status)}`}>
+                        {status}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
         )}
       </CardContent>

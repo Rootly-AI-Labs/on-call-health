@@ -92,10 +92,10 @@ function getHealthStatusLabel(ocbScore: number): string {
 
 // Get health status description
 function getHealthStatusDescription(ocbScore: number): string {
-  if (ocbScore < 25) return 'Low/minimal signs of overwork, sustainable workload'
-  if (ocbScore < 50) return 'Mild signs of overwork, watch for trends'
-  if (ocbScore < 75) return 'Moderate signs of overwork, intervention recommended'
-  return 'High/severe signs of overwork, urgent action needed'
+  if (ocbScore < 25) return 'Sustainable workload'
+  if (ocbScore < 50) return 'Monitor for trends'
+  if (ocbScore < 75) return 'Consider intervention'
+  return 'Action needed'
 }
 
 // Tooltip show/hide helpers
@@ -154,7 +154,7 @@ export function TeamHealthOverview({
                 </div>
                 <span className="text-neutral-500">0-24</span>
               </div>
-              <div className="text-neutral-500 text-xs pl-5">No significant signs of overwork</div>
+              <div className="text-neutral-500 text-xs pl-5">Sustainable workload</div>
             </div>
 
             <div>
@@ -165,7 +165,7 @@ export function TeamHealthOverview({
                 </div>
                 <span className="text-neutral-500">25-49</span>
               </div>
-              <div className="text-neutral-500 text-xs pl-5">Mild signs of overwork, monitor trends</div>
+              <div className="text-neutral-500 text-xs pl-5">Monitor for trends</div>
             </div>
 
             <div>
@@ -176,7 +176,7 @@ export function TeamHealthOverview({
                 </div>
                 <span className="text-neutral-500">50-74</span>
               </div>
-              <div className="text-neutral-500 text-xs pl-5">Moderate signs of overwork, intervention recommended</div>
+              <div className="text-neutral-500 text-xs pl-5">Consider intervention</div>
             </div>
 
             <div>
@@ -187,7 +187,7 @@ export function TeamHealthOverview({
                 </div>
                 <span className="text-neutral-500">75-100</span>
               </div>
-              <div className="text-neutral-500 text-xs pl-5">Severe signs of overwork, immediate action needed</div>
+              <div className="text-neutral-500 text-xs pl-5">Immediate action needed</div>
             </div>
           </div>
 
@@ -377,13 +377,13 @@ export function TeamHealthOverview({
 
                     // Match OCH risk level ranges and descriptions (0-100, higher = more overwork)
                     if (ocbScore < 25) {
-                      return 'Low/minimal signs of overwork, sustainable workload'  // Healthy
+                      return 'Sustainable workload'  // Healthy
                     } else if (ocbScore < 50) {
-                      return 'Mild signs of overwork, watch for trends'             // Fair
+                      return 'Monitor for trends'    // Fair
                     } else if (ocbScore < 75) {
-                      return 'Moderate signs of overwork, intervention recommended' // Poor
+                      return 'Consider intervention' // Poor
                     } else {
-                      return 'High/severe signs of overwork, urgent action needed'  // Critical
+                      return 'Action needed'         // Critical
                     }
                   })()}
                 </p>
