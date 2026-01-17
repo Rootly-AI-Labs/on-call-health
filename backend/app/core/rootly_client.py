@@ -403,7 +403,7 @@ class RootlyAPIClient:
                                         on_call_user_emails.add(email.lower().strip())
 
                         except Exception as e:
-                            logger.warning(f"Error fetching user {user_id}: {e}")
+                            logger.warning(f"Error fetching user {user_id}: {str(e) if str(e) else repr(e)}", exc_info=True)
                             continue
                             
             except Exception as e:

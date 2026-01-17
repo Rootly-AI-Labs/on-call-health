@@ -1074,7 +1074,7 @@ class UnifiedBurnoutAnalyzer:
             # Debug: Log final result structure
             total_analysis_time = (datetime.now() - analysis_start_time).total_seconds()
             logger.error(f"🏁 CHECKPOINT 7: Analysis COMPLETE - Total time: {total_analysis_time:.2f}s")
-            logger.error(f"🏁 CHECKPOINT 7: Result has {len(result.get('team_members', []))} members, score={result.get('overall_score', 'N/A')}")
+            logger.error(f"🏁 CHECKPOINT 7: Result has {len(result.get('team_analysis', {}).get('members', []))} members, score={result.get('team_health', {}).get('overall_score', 'N/A')}")
 
             return result
             
