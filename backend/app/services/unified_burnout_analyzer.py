@@ -1113,7 +1113,7 @@ class UnifiedBurnoutAnalyzer:
                 if self.platform == "pagerduty":
                     api_users = await self.client.get_users(limit=10000)
                 else:  # rootly
-                    api_users, _ = await self.client.get_users(limit=10000)
+                    api_users = await self.client.get_users(limit=10000)
 
                 # Store API users for timezone map (will be used by _build_user_tz_map)
                 self._api_users_for_timezone = api_users
