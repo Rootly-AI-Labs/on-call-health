@@ -25,6 +25,7 @@ class UserCorrelation(Base):
     linear_user_id = Column(String(100), nullable=True, index=True)  # Linear user UUID
     linear_email = Column(String(255), nullable=True)  # Linear-specific email
     timezone = Column(String(50), nullable=True)  # User's timezone from Rootly/PagerDuty (e.g., "America/New_York")
+    avatar_url = Column(String(512), nullable=True)  # Profile image URL from PagerDuty/Rootly
     integration_ids = Column(JSON, nullable=True)  # Array of integration IDs this user belongs to
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     last_synced_at = Column(DateTime(timezone=True), nullable=True)  # Last time this user was seen in a sync
