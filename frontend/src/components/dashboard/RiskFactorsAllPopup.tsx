@@ -15,7 +15,8 @@ import {
   getVulnerabilityTags,
   getRemainingTagCount,
   getTagColorClasses,
-  getOCBBadgeColorClasses
+  calculateRiskScore,
+  getRiskLevel
 } from '@/lib/riskFactorUtils'
 
 interface RiskFactorsAllPopupProps {
@@ -45,13 +46,30 @@ export default function RiskFactorsAllPopup({
     onClose()
   }
 
+  const getFactorColor = (score: number): string => {
+    const riskLevel = getRiskLevel(score)
+    if (riskLevel === 'high') return 'red'
+    if (riskLevel === 'medium') return 'orange'
+    return 'yellow'
+  }
+
+  const getFactorTagColor = (score: number): string => {
+    const riskLevel = getRiskLevel(score)
+    if (riskLevel === 'high') {
+      return 'bg-red-100 text-red-700'
+    } else if (riskLevel === 'medium') {
+      return 'bg-orange-100 text-orange-700'
+    }
+    return 'bg-yellow-100 text-yellow-700'
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto bg-neutral-100">
         <DialogHeader>
           <DialogTitle className="text-2xl">Team Members at Risk - Burnout Factors</DialogTitle>
           <DialogDescription className="text-sm">
-            Showing all team members with medium to high risk across burnout factors
+            Showing all team members with medium to high risk and their corresponding burnout factor scores
           </DialogDescription>
         </DialogHeader>
 
@@ -60,9 +78,9 @@ export default function RiskFactorsAllPopup({
             const isEmpty = factor.members.length === 0
 
             return (
-              <div key={factor.factorType} className="space-y-2">
+              <div key={factor.factorType} className="space-y-2 bg-white p-4 rounded-lg">
                 {/* Factor Section Header */}
-                <div className="border-b border-neutral-200 pb-2">
+                <div className="pb-2">
                   <h3 className="text-base font-semibold text-neutral-900">
                     {factor.label}
                   </h3>
@@ -83,20 +101,20 @@ export default function RiskFactorsAllPopup({
                 ) : (
                   <div className="space-y-2">
                     {factor.members.map((member) => {
-                      const allTags = getVulnerabilityTags(member, factor.factorType)
-                      // Filter out OCB tag and Risk level tags
-                      const tags = allTags.filter(tag => !tag.label.startsWith('OCB:') && !tag.label.includes('Risk'))
-                      const remainingTags = getRemainingTagCount(allTags) - (allTags.length - tags.length)
-                      const ocbScore = member.ocb_score || 0
+                      // Calculate risk score for the current factor section
+                      const relevantScore = calculateRiskScore(member, factor.factorType)
+
+                      // Display only the score
+                      const getTagLabel = () => `${relevantScore}/100`
 
                       return (
                         <div
                           key={member.user_id}
-                          className="flex items-start space-x-3 p-3 border border-neutral-100 rounded-md hover:bg-neutral-100 hover:border-neutral-200 cursor-pointer transition-colors"
+                          className="flex items-center space-x-3 p-3 border border-neutral-200 rounded-md bg-neutral-50 hover:bg-neutral-100 hover:border-neutral-300 cursor-pointer transition-colors"
                           onClick={() => handleMemberClick(member)}
                         >
                           {/* Avatar */}
-                          <Avatar className="flex-shrink-0 mt-0.5 h-10 w-10">
+                          <Avatar className="flex-shrink-0 h-10 w-10">
                             <AvatarFallback className="text-xs font-medium">
                               {member.user_name
                                 .split(' ')
@@ -107,43 +125,16 @@ export default function RiskFactorsAllPopup({
 
                           {/* Member Info */}
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-start justify-between gap-2">
-                              <div>
-                                <h4 className="font-semibold text-neutral-900 truncate text-sm">
-                                  {member.user_name}
-                                </h4>
-                                <p className="text-xs text-neutral-500 truncate">
-                                  {member.user_email}
-                                </p>
-                              </div>
+                            <div className="flex items-center justify-between gap-2">
+                              <h4 className="font-semibold text-neutral-900 truncate text-sm">
+                                {member.user_name}
+                              </h4>
 
-                              {/* OCB Badge on the right */}
-                              <Badge
-                                variant="outline"
-                                className={`flex-shrink-0 ${getOCBBadgeColorClasses(ocbScore)} text-xs py-1 px-2`}
-                              >
-                                {ocbScore.toFixed(1)}/100
-                              </Badge>
+                              {/* Factor Tag on the right - only for current section */}
+                              <span className={`flex-shrink-0 text-xs font-semibold px-3 py-1 rounded-full ${getFactorTagColor(relevantScore)} whitespace-nowrap`}>
+                                {getTagLabel()}
+                              </span>
                             </div>
-
-                            {/* Tags */}
-                            {tags.length > 0 && (
-                              <div className="mt-2 flex items-center flex-wrap gap-1">
-                                {tags.map((tag, idx) => (
-                                  <span
-                                    key={idx}
-                                    className={`inline-flex items-center text-xs px-2 py-0.5 rounded-full border ${getTagColorClasses(tag.color)}`}
-                                  >
-                                    {tag.label}
-                                  </span>
-                                ))}
-                                {remainingTags > 0 && (
-                                  <span className="inline-flex items-center text-xs px-2 py-0.5 rounded-full border bg-neutral-200 text-neutral-700 border-neutral-300">
-                                    +{remainingTags} more
-                                  </span>
-                                )}
-                              </div>
-                            )}
                           </div>
                         </div>
                       )

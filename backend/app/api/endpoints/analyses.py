@@ -495,8 +495,10 @@ def get_member_surveys(analysis: Analysis, db: Session) -> dict:
     from ...models.user_correlation import UserCorrelation
 
     # Calculate analysis date range
-    analysis_end_date = analysis.created_at
-    analysis_start_date = analysis_end_date - timedelta(days=analysis.time_range or 30)
+    # Use current time as end date for live survey data (surveys update without re-running analysis)
+    from datetime import datetime
+    analysis_end_date = datetime.utcnow()
+    analysis_start_date = analysis.created_at - timedelta(days=analysis.time_range or 30)
 
     # Get all team members for this organization
     if not analysis.organization_id:
@@ -509,12 +511,12 @@ def get_member_surveys(analysis: Analysis, db: Session) -> dict:
     member_surveys = {}
 
     for corr in correlations:
-        if not corr.user_id or not corr.email:
+        if not corr.email:
             continue
 
-        # Get surveys within analysis period for this user
+        # Get surveys within analysis period for this team member (match by email)
         surveys = db.query(UserBurnoutReport).filter(
-            UserBurnoutReport.user_id == corr.user_id,
+            UserBurnoutReport.email == corr.email,
             UserBurnoutReport.submitted_at >= analysis_start_date,
             UserBurnoutReport.submitted_at <= analysis_end_date
         ).order_by(UserBurnoutReport.submitted_at.asc()).all()
@@ -543,8 +545,9 @@ def get_member_surveys(analysis: Analysis, db: Session) -> dict:
             })
 
         # Calculate trend (first half vs second half)
-        trend = 'stable'
-        if len(combined_scores) >= 2:
+        # Require at least 3 responses for meaningful trend analysis
+        trend = None
+        if len(combined_scores) >= 3:
             mid = len(combined_scores) // 2
             first_half_avg = sum(combined_scores[:mid]) / mid
             second_half_avg = sum(combined_scores[mid:]) / (len(combined_scores) - mid)
@@ -554,6 +557,8 @@ def get_member_surveys(analysis: Analysis, db: Session) -> dict:
                 trend = 'improving'
             elif second_half_avg < first_half_avg - 0.3:
                 trend = 'declining'
+            else:
+                trend = 'stable'
 
         # Get latest scores
         latest = surveys[-1]
@@ -1562,19 +1567,26 @@ async def get_user_github_daily_commits(
             "data": None
         }
     
+    # Get GitHub username from analysis results
+    github_username = None
+    if analysis.results and isinstance(analysis.results, dict):
+        team_analysis = analysis.results.get("team_analysis", {})
+        members = team_analysis.get("members", [])
+        for member in members:
+            if member.get("user_email") == user_email:
+                github_username = member.get("github_activity", {}).get("username")
+                break
+
+    if not github_username:
+        return {
+            "status": "error",
+            "message": "No GitHub username found for this user in analysis",
+            "data": None
+        }
+
     # Initialize GitHub collector
     from ...services.github_collector import GitHubCollector
     collector = GitHubCollector()
-    
-    # Get GitHub username from email
-    github_username = await collector._correlate_email_to_github(user_email, github_token)
-    
-    if not github_username:
-        return {
-            "status": "error", 
-            "message": "No GitHub username found for this email",
-            "data": None
-        }
     
     # Determine date range from analysis
     from datetime import datetime, timedelta
@@ -1786,8 +1798,8 @@ async def get_analysis_github_commits_timeline(
     logger.info(f"GitHub members: {[m['username'] for m in github_members]}")
     logger.info(f"Total commits in insights: {github_insights.get('total_commits', 0)}")
     
-    # Fetch daily commit data for more members (increase from 5 to 10)
-    for member in github_members[:10]:  # Increased limit to get better coverage
+    # Fetch daily commit data for ALL members with GitHub usernames
+    for member in github_members:  # Fetch for all members, not just top 10
         if member["username"]:
             task = collector.fetch_daily_commit_data(
                 username=member["username"],

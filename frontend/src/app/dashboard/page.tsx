@@ -54,13 +54,14 @@ import {
   BarChart3,
   CalendarIcon,
   ArrowRight,
+  RefreshCw,
 } from "lucide-react"
 import { TeamHealthOverview } from "@/components/dashboard/TeamHealthOverview"
 import { AnalysisProgressSection } from "@/components/dashboard/AnalysisProgressSection"
 import { TeamMembersList } from "@/components/dashboard/TeamMembersList"
 import { HealthTrendsChart } from "@/components/dashboard/HealthTrendsChart"
 import { ObjectiveDataCard } from "@/components/dashboard/ObjectiveDataCard"
-import { RiskFactorsCard } from "@/components/dashboard/RiskFactorsCard"
+import { TeamRiskFactorsCard } from "@/components/dashboard/TeamRiskFactorsCard"
 import { MemberDetailModal } from "@/components/dashboard/MemberDetailModal"
 import { GitHubCommitsTimeline } from "@/components/dashboard/charts/GitHubCommitsTimeline"
 import GitHubAllMetricsPopup from "@/components/dashboard/GitHubAllMetricsPopup"
@@ -95,6 +96,8 @@ function DashboardContent() {
   hasMoreAnalyses,
   loadingMoreAnalyses,
   dropdownLoading,
+  loadingAnalysisId,
+  setLoadingAnalysisId,
 
   // ui states
   sidebarCollapsed,
@@ -338,9 +341,12 @@ function DashboardContent() {
                   <div key={analysis.id} className={`relative group ${isSelected ? 'bg-neutral-800' : ''} rounded`}>
                     <Button
                       variant="ghost"
-                      disabled={analysisRunning}
-                      className={`w-full justify-start text-neutral-500 hover:text-white hover:bg-neutral-800 py-2 h-auto ${isSelected ? 'bg-neutral-800 text-white' : ''} ${analysisRunning ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      disabled={analysisRunning || loadingAnalysisId !== null}
+                      className={`w-full justify-start text-neutral-500 hover:text-white hover:bg-neutral-800 py-2 h-auto ${isSelected ? 'bg-neutral-800 text-white' : ''} ${loadingAnalysisId === analysis.id ? 'bg-neutral-700 text-white' : ''} ${analysisRunning ? 'opacity-50 cursor-not-allowed' : ''}`}
                       onClick={async () => {
+                        // Set immediate loading state for visual feedback
+                        setLoadingAnalysisId(analysis.id)
+
                         const analysisKey = analysis.uuid || analysis.id.toString()
 
                         // Get members array - handle both object and array formats
@@ -357,6 +363,7 @@ function DashboardContent() {
                           setCurrentAnalysis(cachedAnalysis)
                           setRedirectingToSuggested(false) // Turn off redirect loader
                           updateURLWithAnalysis(cachedAnalysis.uuid || cachedAnalysis.id)
+                          setLoadingAnalysisId(null) // Clear loading state
                           return
                         }
 
@@ -364,7 +371,10 @@ function DashboardContent() {
                         if (!analysis.analysis_data || !members || !Array.isArray(members) || members.length === 0) {
                           try {
                             const authToken = localStorage.getItem('auth_token')
-                            if (!authToken) return
+                            if (!authToken) {
+                              setLoadingAnalysisId(null)
+                              return
+                            }
 
                             const response = await fetch(`${API_BASE}/analyses/${analysis.id}`, {
                               headers: {
@@ -386,6 +396,8 @@ function DashboardContent() {
                           } catch (error) {
                             console.error('Error fetching full analysis:', error)
                             setRedirectingToSuggested(false)
+                          } finally {
+                            setLoadingAnalysisId(null) // Clear loading state
                           }
                         } else {
                           // Analysis already has full data, cache it and use it
@@ -393,6 +405,7 @@ function DashboardContent() {
                           setCurrentAnalysis(analysis)
                           setRedirectingToSuggested(false) // Turn off redirect loader
                           updateURLWithAnalysis(analysis.uuid || analysis.id)
+                          setLoadingAnalysisId(null) // Clear loading state
                         }
                       }}
                     >
@@ -474,7 +487,16 @@ function DashboardContent() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-auto bg-neutral-200">
+      <div className="flex-1 overflow-auto bg-neutral-200 relative">
+        {/* Loading overlay when switching analyses */}
+        {loadingAnalysisId !== null && (
+          <div className="absolute inset-0 bg-neutral-900/50 z-50 flex items-center justify-center">
+            <div className="bg-neutral-800 rounded-lg p-6 flex flex-col items-center gap-3 shadow-xl">
+              <RefreshCw className="w-8 h-8 animate-spin text-white" />
+              <p className="text-white font-medium">Loading analysis...</p>
+            </div>
+          </div>
+        )}
         <div className="p-6">
 
           {/* Debug Section - Only show in development */}
@@ -1079,8 +1101,9 @@ function DashboardContent() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                 {/* Risk Factors Radar Chart */}
                 {burnoutFactors.length > 0 && (
-                  <RiskFactorsCard
-                    title="Team Risk Factors"
+                  <TeamRiskFactorsCard
+                    factorsData={burnoutFactors}
+                    highRiskFactorsCount={highRiskFactors.length}
                     description={(() => {
                       const hasGitHubMembers = membersWithGitHubData.length > 0;
                       const hasIncidentMembers = membersWithIncidents.length > 0;
@@ -1095,10 +1118,8 @@ function DashboardContent() {
                         return "Team risk assessment based on available activity data";
                       }
                     })()}
-                    factorsData={burnoutFactors}
-                    showAlert={highRiskFactors.length > 0}
-                    alertCount={highRiskFactors.length}
-                    domain={[0, 100]}
+                    loadingAnalysis={loadingAnalyses}
+                    membersCount={allActiveMembers.length}
                   />
                 )}
                 
@@ -1348,8 +1369,10 @@ function DashboardContent() {
                     }}
                   />
 
-                  {/* Slack Metrics Card */}
-                  {currentAnalysis?.analysis_data?.slack_insights && (
+                  {/* Slack Metrics Card - DISABLED: Feature not ready for production
+                      To re-enable: Uncomment the code below and set slack_data: true in backend
+                  */}
+                  {false && currentAnalysis?.analysis_data?.slack_insights && (
                     <Card className="border border-neutral-300 bg-white shadow-lg">
                       <CardHeader className="pb-3">
                         <div className="flex items-center justify-between">
@@ -1373,19 +1396,21 @@ function DashboardContent() {
                       <CardContent className="space-y-4">
                         {(() => {
                           const slack = currentAnalysis.analysis_data.slack_insights
-                          
+
                           // Check if this analysis actually has valid Slack data
                           const teamAnalysis = currentAnalysis.analysis_data.team_analysis
-                          const teamMembers = Array.isArray(teamAnalysis) ? teamAnalysis : (teamAnalysis?.members || [])
-                          const hasRealSlackData = teamMembers.some(member => 
-                            member.slack_activity && 
+                          const teamMembers = Array.isArray(teamAnalysis)
+                            ? teamAnalysis
+                            : (teamAnalysis as any)?.members || []
+                          const hasRealSlackData = teamMembers.some((member: any) =>
+                            member.slack_activity &&
                             (member.slack_activity.messages_sent > 0 || member.slack_activity.channels_active > 0)
                           )
-                          
+
                           // Check for API errors
                           const hasRateLimitErrors = (slack as any)?.errors?.rate_limited_channels?.length > 0
                           const hasOtherErrors = (slack as any)?.errors?.other_errors?.length > 0
-                          
+
                           // If no real Slack data, show empty state
                           if (!hasRealSlackData && !hasRateLimitErrors && !hasOtherErrors) {
                             return (
@@ -1412,7 +1437,7 @@ function DashboardContent() {
                               </div>
                             )
                           }
-                          
+
                           return (
                             <>
                               {/* Error Messages */}
@@ -1425,9 +1450,9 @@ function DashboardContent() {
                                     <span className="text-sm font-medium text-yellow-800">Rate Limited</span>
                                   </div>
                                   <p className="text-xs text-yellow-700 mt-1">
-                                    Some channels were rate limited: {(slack as any).errors.rate_limited_channels.join(", ")}. 
-                                    Data may be incomplete. <button 
-                                      onClick={() => window.location.reload()} 
+                                    Some channels were rate limited: {(slack as any).errors.rate_limited_channels.join(", ")}.
+                                    Data may be incomplete. <button
+                                      onClick={() => window.location.reload()}
                                       className="text-yellow-800 underline hover:text-yellow-900"
                                     >
                                       Refresh to retry
@@ -1435,7 +1460,7 @@ function DashboardContent() {
                                   </p>
                                 </div>
                               )}
-                              
+
                               {hasOtherErrors && (
                                 <div className="bg-red-50 border border-red-200 rounded-lg p-3">
                                   <div className="flex items-center space-x-2">
@@ -1450,7 +1475,7 @@ function DashboardContent() {
                                   </p>
                                 </div>
                               )}
-                              
+
                               {/* Only show metrics if we have real data */}
                               {hasRealSlackData && (
                                 <>
@@ -1482,7 +1507,7 @@ function DashboardContent() {
                                     </div>
                                     <div className="bg-purple-50 rounded-lg p-3">
                                       <p className="text-xs text-purple-700 font-medium">Weekend Messages</p>
-                                      {(slack?.weekend_activity_percentage !== undefined && slack.weekend_activity_percentage !== null) || 
+                                      {(slack?.weekend_activity_percentage !== undefined && slack.weekend_activity_percentage !== null) ||
                                        (slack?.weekend_percentage !== undefined && slack.weekend_percentage !== null) ? (
                                         <p className="text-lg font-bold text-purple-900">{(slack.weekend_activity_percentage || slack.weekend_percentage || 0).toFixed(1)}%</p>
                                       ) : (
@@ -2011,38 +2036,35 @@ function DashboardContent() {
                   {/* Slack Toggle Card */}
                   {true && (
                     <div className="border rounded-lg p-3 transition-all border-neutral-200 bg-neutral-50 opacity-60 cursor-not-allowed">
-                      {/* Always show Slack content immediately, no skeleton loader */}
-                      {(
-                        <>
-                          <div className="flex items-start justify-between mb-2">
-                            <div className="flex items-center space-x-2">
-                              <div className="w-6 h-6 rounded flex items-center justify-center opacity-50">
-                                <svg className="w-6 h-6" viewBox="0 0 124 124" fill="none">
-                                  <path d="M26.3996 78.2003C26.3996 84.7003 21.2996 89.8003 14.7996 89.8003C8.29961 89.8003 3.19961 84.7003 3.19961 78.2003C3.19961 71.7003 8.29961 66.6003 14.7996 66.6003H26.3996V78.2003Z" fill="#E01E5A"/>
-                                  <path d="M32.2996 78.2003C32.2996 71.7003 37.3996 66.6003 43.8996 66.6003C50.3996 66.6003 55.4996 71.7003 55.4996 78.2003V109.2C55.4996 115.7 50.3996 120.8 43.8996 120.8C37.3996 120.8 32.2996 115.7 32.2996 109.2V78.2003Z" fill="#E01E5A"/>
-                                  <path d="M43.8996 26.4003C37.3996 26.4003 32.2996 21.3003 32.2996 14.8003C32.2996 8.30026 37.3996 3.20026 43.8996 3.20026C50.3996 3.20026 55.4996 8.30026 55.4996 14.8003V26.4003H43.8996Z" fill="#36C5F0"/>
-                                  <path d="M43.8996 32.3003C50.3996 32.3003 55.4996 37.4003 55.4996 43.9003C55.4996 50.4003 50.3996 55.5003 43.8996 55.5003H12.8996C6.39961 55.5003 1.29961 50.4003 1.29961 43.9003C1.29961 37.4003 6.39961 32.3003 12.8996 32.3003H43.8996Z" fill="#36C5F0"/>
-                                  <path d="M95.5996 43.9003C95.5996 37.4003 100.7 32.3003 107.2 32.3003C113.7 32.3003 118.8 37.4003 118.8 43.9003C118.8 50.4003 113.7 55.5003 107.2 55.5003H95.5996V43.9003Z" fill="#2EB67D"/>
-                                  <path d="M89.6996 43.9003C89.6996 50.4003 84.5996 55.5003 78.0996 55.5003C71.5996 55.5003 66.4996 50.4003 66.4996 43.9003V12.9003C66.4996 6.40026 71.5996 1.30026 78.0996 1.30026C84.5996 1.30026 89.6996 6.40026 89.6996 12.9003V43.9003Z" fill="#2EB67D"/>
-                                  <path d="M78.0996 95.6003C84.5996 95.6003 89.6996 100.7 89.6996 107.2C89.6996 113.7 84.5996 118.8 78.0996 118.8C71.5996 118.8 66.4996 113.7 66.4996 107.2V95.6003H78.0996Z" fill="#ECB22E"/>
-                                  <path d="M78.0996 89.7003C71.5996 89.7003 66.4996 84.6003 66.4996 78.1003C66.4996 71.6003 71.5996 66.5003 78.0996 66.5003H109.1C115.6 66.5003 120.7 71.6003 120.7 78.1003C120.7 84.6003 115.6 89.7003 109.1 89.7003H78.0996Z" fill="#ECB22E"/>
-                                </svg>
-                              </div>
-                              <div>
-                                <h3 className="text-sm font-medium text-neutral-500">Slack</h3>
-                              </div>
+                      <>
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex items-center space-x-2">
+                            <div className="w-6 h-6 rounded flex items-center justify-center opacity-50">
+                              <svg className="w-6 h-6" viewBox="0 0 124 124" fill="none">
+                                <path d="M26.3996 78.2003C26.3996 84.7003 21.2996 89.8003 14.7996 89.8003C8.29961 89.8003 3.19961 84.7003 3.19961 78.2003C3.19961 71.7003 8.29961 66.6003 14.7996 66.6003H26.3996V78.2003Z" fill="#E01E5A"/>
+                                <path d="M32.2996 78.2003C32.2996 71.7003 37.3996 66.6003 43.8996 66.6003C50.3996 66.6003 55.4996 71.7003 55.4996 78.2003V109.2C55.4996 115.7 50.3996 120.8 43.8996 120.8C37.3996 120.8 32.2996 115.7 32.2996 109.2V78.2003Z" fill="#E01E5A"/>
+                                <path d="M43.8996 26.4003C37.3996 26.4003 32.2996 21.3003 32.2996 14.8003C32.2996 8.30026 37.3996 3.20026 43.8996 3.20026C50.3996 3.20026 55.4996 8.30026 55.4996 14.8003V26.4003H43.8996Z" fill="#36C5F0"/>
+                                <path d="M43.8996 32.3003C50.3996 32.3003 55.4996 37.4003 55.4996 43.9003C55.4996 50.4003 50.3996 55.5003 43.8996 55.5003H12.8996C6.39961 55.5003 1.29961 50.4003 1.29961 43.9003C1.29961 37.4003 6.39961 32.3003 12.8996 32.3003H43.8996Z" fill="#36C5F0"/>
+                                <path d="M95.5996 43.9003C95.5996 37.4003 100.7 32.3003 107.2 32.3003C113.7 32.3003 118.8 37.4003 118.8 43.9003C118.8 50.4003 113.7 55.5003 107.2 55.5003H95.5996V43.9003Z" fill="#2EB67D"/>
+                                <path d="M89.6996 43.9003C89.6996 50.4003 84.5996 55.5003 78.0996 55.5003C71.5996 55.5003 66.4996 50.4003 66.4996 43.9003V12.9003C66.4996 6.40026 71.5996 1.30026 78.0996 1.30026C84.5996 1.30026 89.6996 6.40026 89.6996 12.9003V43.9003Z" fill="#2EB67D"/>
+                                <path d="M78.0996 95.6003C84.5996 95.6003 89.6996 100.7 89.6996 107.2C89.6996 113.7 84.5996 118.8 78.0996 118.8C71.5996 118.8 66.4996 113.7 66.4996 107.2V95.6003H78.0996Z" fill="#ECB22E"/>
+                                <path d="M78.0996 89.7003C71.5996 89.7003 66.4996 84.6003 66.4996 78.1003C66.4996 71.6003 71.5996 66.5003 78.0996 66.5003H109.1C115.6 66.5003 120.7 71.6003 120.7 78.1003C120.7 84.6003 115.6 89.7003 109.1 89.7003H78.0996Z" fill="#ECB22E"/>
+                              </svg>
                             </div>
-                            <Switch
-                              checked={false}
-                              disabled={true}
-                            />
+                            <div>
+                              <h3 className="text-sm font-medium text-neutral-500">Slack</h3>
+                            </div>
                           </div>
-                          <p className="text-xs text-neutral-500 mb-1">Sentiment analysis</p>
-                          <Badge className="bg-purple-100 text-purple-700 border-purple-300 text-xs font-semibold">
-                            Coming Soon
-                          </Badge>
-                        </>
-                      )}
+                          <Switch
+                            checked={false}
+                            disabled={true}
+                          />
+                        </div>
+                        <p className="text-xs text-neutral-500 mb-1">Sentiment analysis</p>
+                        <Badge className="bg-purple-100 text-purple-700 border-purple-300 text-xs font-semibold">
+                          Coming Soon
+                        </Badge>
+                      </>
                     </div>
                   )}
 

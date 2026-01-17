@@ -97,6 +97,12 @@
   }
 }
 
+@layer utilities {
+  .font-display {
+    font-family: var(--font-display);
+  }
+}
+
 /* Custom scrollbar styles for dark backgrounds */
 .scrollbar-dark {
   scrollbar-width: thin;

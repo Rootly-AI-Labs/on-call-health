@@ -113,14 +113,12 @@ export function TeamMembersList({
             <Avatar>
               <AvatarFallback>
                 {member.user_name
-                  .split(" ")
-                  .map((n) => n[0])
-                  .join("")}
+                  ? member.user_name.split(" ").map((n) => n[0]).join("")
+                  : member.user_email?.charAt(0).toUpperCase() || "?"}
               </AvatarFallback>
             </Avatar>
             <div>
-              <h3 className="font-medium">{member.user_name}</h3>
-              <p className="text-sm text-neutral-500">{member.user_email}</p>
+              <h3 className="font-medium">{member.user_name || member.user_email}</h3>
             </div>
           </div>
           <div className="flex items-center space-x-2">
@@ -225,16 +223,6 @@ export function TeamMembersList({
           </div>
           <div className="flex justify-between text-xs text-neutral-500">
             <span>{member.incident_count} incidents</span>
-            <span>
-              {member.github_activity?.commits_count ? (
-                <>
-                  {member.github_activity.commits_count} commits
-                  {member.github_activity.commits_per_week && ` (${member.github_activity.commits_per_week.toFixed(1)}/week)`}
-                </>
-              ) : (
-                'No GitHub data'
-              )}
-            </span>
           </div>
         </div>
       </CardContent>
@@ -246,7 +234,7 @@ export function TeamMembersList({
       {/* Organization Members Grid */}
       <Card>
         <CardHeader>
-          <CardTitle>Team Overview</CardTitle>
+          <CardTitle>Team Member Risk Levels</CardTitle>
           <CardDescription>Click on a member to view detailed analysis</CardDescription>
         </CardHeader>
         <CardContent>

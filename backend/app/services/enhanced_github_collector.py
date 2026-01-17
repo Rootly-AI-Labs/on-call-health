@@ -97,20 +97,35 @@ async def collect_team_github_data_with_mapping(
     from .github_collector import GitHubCollector
     collector = GitHubCollector()
     github_data = {}
-    
+
+    logger.info(f"💻 [GITHUB_COLLECTION] Starting collection for {len(team_emails)} team members")
+
+    success_count = 0
+    failure_count = 0
+    correlation_failures = 0
+    api_failures = 0
+
     for email in team_emails:
         try:
             # Get full name for this email if available
             full_name = email_to_name.get(email) if email_to_name else None
-            
+
             # Collect data with full name for better matching
             user_data = await collector.collect_github_data_for_user(
                 email, days, github_token, user_id, full_name=full_name
             )
             if user_data:
                 github_data[email] = user_data
+                success_count += 1
+            else:
+                failure_count += 1
+                # Check if it was a correlation failure or API failure by looking at logs
+                # Since we don't have the failure reason here, we'll just count total failures
         except Exception as e:
-            logger.error(f"Failed to collect GitHub data for {email}: {e}")
+            logger.error(f"❌ [GITHUB_COLLECTION_ERROR] Failed to collect GitHub data for {email}: {e}")
+            failure_count += 1
+
+    logger.info(f"📊 [GITHUB_COLLECTION_SUMMARY] Processed {len(team_emails)} members: {success_count} succeeded, {failure_count} failed")
     
     # Record mapping attempts if we have user context
     if recorder and user_id:

@@ -689,31 +689,29 @@ export function TeamHealthOverview({
                 )}
               </div>
 
-              {/* Slack Data */}
-              <div className="space-y-2">
-                <div
-                  className="flex items-center cursor-pointer hover:bg-neutral-100 rounded px-1 py-0.5 transition-colors"
-                  onClick={() => setExpandedDataSources(prev => ({ ...prev, slack: !prev.slack }))}
-                >
-                  {expandedDataSources.slack ?
-                    <ChevronDown className="w-3 h-3 mr-1 text-neutral-500" /> :
-                    <ChevronRight className="w-3 h-3 mr-1 text-neutral-500" />
-                  }
-                  <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
-                  <span className="text-xs font-medium text-slate-700 flex-1">Slack Communications</span>
-                  {currentAnalysis?.analysis_data?.data_sources?.slack_data ? (
+              {/* Slack Data - DISABLED: Feature not ready for production */}
+              {/* {currentAnalysis?.analysis_data?.data_sources?.slack_data && (
+                <div className="space-y-2">
+                  <div
+                    className="flex items-center cursor-pointer hover:bg-neutral-100 rounded px-1 py-0.5 transition-colors"
+                    onClick={() => setExpandedDataSources(prev => ({ ...prev, slack: !prev.slack }))}
+                  >
+                    {expandedDataSources.slack ?
+                      <ChevronDown className="w-3 h-3 mr-1 text-neutral-500" /> :
+                      <ChevronRight className="w-3 h-3 mr-1 text-neutral-500" />
+                    }
+                    <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
+                    <span className="text-xs font-medium text-slate-700 flex-1">Slack Communications</span>
                     <CheckCircle className="w-3 h-3 text-green-600 ml-2" />
-                  ) : (
-                    <Minus className="w-3 h-3 text-neutral-500 ml-2" />
+                  </div>
+                  {expandedDataSources.slack && (
+                    <div className="ml-7 text-xs text-neutral-700 space-y-1">
+                      <div>• {currentAnalysis?.analysis_data?.slack_insights?.total_messages?.toLocaleString() || '0'} messages</div>
+                      <div>• {currentAnalysis?.analysis_data?.slack_insights?.active_channels?.toLocaleString() || '0'} channels</div>
+                    </div>
                   )}
                 </div>
-                {expandedDataSources.slack && currentAnalysis?.analysis_data?.data_sources?.slack_data && (
-                  <div className="ml-7 text-xs text-neutral-700 space-y-1">
-                    <div>• {currentAnalysis?.analysis_data?.slack_insights?.total_messages?.toLocaleString() || '0'} messages</div>
-                    <div>• {currentAnalysis?.analysis_data?.slack_insights?.active_channels?.toLocaleString() || '0'} channels</div>
-                  </div>
-                )}
-              </div>
+              )} */}
 
               {/* Jira Data */}
               <div className="space-y-2">
