@@ -130,6 +130,10 @@ export interface AnalysisResult {
   status: string
   time_range: number
   error_message?: string
+  config?: {
+    is_demo?: boolean
+    [key: string]: unknown
+  }
   organizationName?: string // For display purposes
   timeRange?: string // For display purposes
   overallScore?: number // For display purposes
