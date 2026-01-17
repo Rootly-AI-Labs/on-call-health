@@ -3000,10 +3000,10 @@ async def run_analysis_task(
                 
         except asyncio.TimeoutError:
             # Handle timeout
-            logger.error(f"BACKGROUND_TASK: Analysis {analysis_id} timed out after 8 minutes")
+            logger.error(f"BACKGROUND_TASK: Analysis {analysis_id} timed out after 15 minutes")
             logger.error(f"BACKGROUND_TASK: Timeout occurred at {datetime.now()}")
-            logger.error(f"BACKGROUND_TASK: Analysis was stuck - likely during incident data collection phase (causing 85% progress hang)")
-            logger.error(f"BACKGROUND_TASK: This typically happens when Rootly API pagination takes too long")
+            logger.error(f"BACKGROUND_TASK: Analysis was stuck - likely during incident data collection phase")
+            logger.error(f"BACKGROUND_TASK: This typically happens when Rootly API is slow or experiencing connectivity issues")
 
             analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
             if not analysis:
@@ -3011,7 +3011,7 @@ async def run_analysis_task(
                 return
 
             analysis.status = "failed"
-            analysis.error_message = "Analysis timed out after 8 minutes - likely stuck during incident data collection (85% progress hang). Try with a shorter time range or check Rootly API connectivity."
+            analysis.error_message = "Analysis timed out after 15 minutes. This may be due to network connectivity issues or API slowness. Please try again."
             analysis.completed_at = datetime.now()
             db.commit()
             logger.info(f"BACKGROUND_TASK: Updated analysis {analysis_id} status to failed due to timeout")

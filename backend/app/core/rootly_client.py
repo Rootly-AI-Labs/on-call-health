@@ -5,12 +5,25 @@ import asyncio
 import httpx
 import logging
 from datetime import datetime, timedelta
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Callable
 from urllib.parse import urlencode
 
 from .config import settings
 
 logger = logging.getLogger(__name__)
+
+# Retryable exceptions for network errors
+RETRYABLE_EXCEPTIONS = (
+    httpx.ConnectError,
+    httpx.ReadError,
+    httpx.WriteError,
+    httpx.ConnectTimeout,
+    httpx.ReadTimeout,
+    ConnectionResetError,
+    ConnectionError,
+    OSError,
+)
+
 
 class RootlyAPIClient:
     """Direct HTTP client for Rootly API."""
@@ -23,7 +36,69 @@ class RootlyAPIClient:
             "Content-Type": "application/vnd.api+json",
             "Accept": "application/vnd.api+json"
         }
-    
+
+    async def _request_with_retry(
+        self,
+        client: httpx.AsyncClient,
+        method: str,
+        url: str,
+        max_retries: int = 3,
+        base_delay: float = 1.0,
+        **kwargs
+    ) -> httpx.Response:
+        """
+        Make an HTTP request with retry logic for transient network errors.
+
+        Args:
+            client: The httpx AsyncClient to use
+            method: HTTP method (GET, POST, etc.)
+            url: The URL to request
+            max_retries: Maximum number of retry attempts
+            base_delay: Base delay between retries (exponential backoff)
+            **kwargs: Additional arguments to pass to the request
+
+        Returns:
+            httpx.Response object
+
+        Raises:
+            The last exception if all retries fail
+        """
+        last_exception = None
+
+        for attempt in range(max_retries + 1):
+            try:
+                if method.upper() == "GET":
+                    response = await client.get(url, **kwargs)
+                elif method.upper() == "POST":
+                    response = await client.post(url, **kwargs)
+                else:
+                    response = await client.request(method, url, **kwargs)
+                return response
+
+            except RETRYABLE_EXCEPTIONS as e:
+                last_exception = e
+                if attempt < max_retries:
+                    delay = base_delay * (2 ** attempt)  # Exponential backoff
+                    logger.warning(
+                        f"Rootly API request failed (attempt {attempt + 1}/{max_retries + 1}): "
+                        f"{type(e).__name__}: {e}. Retrying in {delay:.1f}s..."
+                    )
+                    await asyncio.sleep(delay)
+                else:
+                    logger.error(
+                        f"Rootly API request failed after {max_retries + 1} attempts: "
+                        f"{type(e).__name__}: {e}"
+                    )
+                    raise
+            except Exception as e:
+                # Non-retryable exception, raise immediately
+                logger.error(f"Rootly API request failed with non-retryable error: {type(e).__name__}: {e}")
+                raise
+
+        # This should not be reached, but just in case
+        if last_exception:
+            raise last_exception
+
     async def check_permissions(self) -> Dict[str, Any]:
         """Check permissions for specific API endpoints."""
         permissions = {
@@ -291,6 +366,8 @@ class RootlyAPIClient:
         Rootly API structure:
         1. First get all schedules via /v1/schedules
         2. For each schedule, get shifts via /v1/schedules/{id}/shifts with date filters
+
+        Uses retry logic for transient network errors (ConnectionResetError, etc.)
         """
         try:
             # Format dates for API (Rootly expects ISO format)
@@ -299,9 +376,11 @@ class RootlyAPIClient:
 
             all_shifts = []
 
-            async with httpx.AsyncClient() as client:
-                # Step 1: Get all schedules
-                schedules_response = await client.get(
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                # Step 1: Get all schedules (with retry)
+                schedules_response = await self._request_with_retry(
+                    client,
+                    "GET",
                     f"{self.base_url}/v1/schedules",
                     headers=self.headers,
                     params={"page[size]": 100},
@@ -314,30 +393,43 @@ class RootlyAPIClient:
 
                 schedules_data = schedules_response.json()
                 schedules = schedules_data.get('data', [])
+                logger.info(f"Fetching shifts for {len(schedules)} schedules...")
 
-                # Step 2: For each schedule, get shifts in the time range
-                for schedule in schedules:
+                # Step 2: For each schedule, get shifts in the time range (with retry)
+                for i, schedule in enumerate(schedules):
                     schedule_id = schedule.get('id')
                     schedule_name = schedule.get('attributes', {}).get('name', 'Unknown')
 
-                    shifts_response = await client.get(
-                        f"{self.base_url}/v1/schedules/{schedule_id}/shifts",
-                        headers=self.headers,
-                        params={
-                            'filter[starts_at][lt]': end_str,
-                            'filter[ends_at][gt]': start_str,
-                            'include': 'user',
-                            'page[size]': 100
-                        },
-                        timeout=30.0
-                    )
+                    try:
+                        shifts_response = await self._request_with_retry(
+                            client,
+                            "GET",
+                            f"{self.base_url}/v1/schedules/{schedule_id}/shifts",
+                            headers=self.headers,
+                            params={
+                                'filter[starts_at][lt]': end_str,
+                                'filter[ends_at][gt]': start_str,
+                                'include': 'user',
+                                'page[size]': 100
+                            },
+                            timeout=30.0
+                        )
 
-                    if shifts_response.status_code == 200:
-                        shifts_data = shifts_response.json()
-                        shifts = shifts_data.get('data', [])
-                        all_shifts.extend(shifts)
-                    else:
-                        logger.warning(f"Failed to fetch shifts for schedule {schedule_name}: {shifts_response.status_code}")
+                        if shifts_response.status_code == 200:
+                            shifts_data = shifts_response.json()
+                            shifts = shifts_data.get('data', [])
+                            all_shifts.extend(shifts)
+                        else:
+                            logger.warning(f"Failed to fetch shifts for schedule {schedule_name}: {shifts_response.status_code}")
+
+                    except RETRYABLE_EXCEPTIONS as e:
+                        # Log but continue with other schedules if one fails after retries
+                        logger.error(f"Failed to fetch shifts for schedule {schedule_name} after retries: {e}")
+                        continue
+
+                    # Log progress every 10 schedules
+                    if (i + 1) % 10 == 0:
+                        logger.info(f"Processed {i + 1}/{len(schedules)} schedules...")
 
                 logger.info(f"Found {len(all_shifts)} shifts across {len(schedules)} schedules")
                 return all_shifts
