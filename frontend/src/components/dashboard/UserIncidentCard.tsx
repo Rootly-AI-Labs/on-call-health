@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { AlertTriangle, Loader2, ChevronDown, ChevronUp } from "lucide-react"
+import { AlertTriangle, Loader2, ChevronDown, ChevronUp, ExternalLink } from "lucide-react"
 
 interface IncidentUser {
   id?: string
@@ -18,6 +18,7 @@ interface Incident {
     severity?: string
     created_at?: string
     status?: string
+    slug?: string
     user?: IncidentUser
     started_by?: IncidentUser
     resolved_by?: IncidentUser
@@ -28,6 +29,7 @@ interface Incident {
   severity?: string
   created_at?: string
   status?: string
+  html_url?: string
   user?: IncidentUser
   started_by?: IncidentUser
   resolved_by?: IncidentUser
@@ -50,6 +52,34 @@ interface UserIncidentCardProps {
   platform?: string
   loading?: boolean
   incidents?: Incident[]
+}
+
+function getIncidentUrl(incident: Incident, platform: string): string | null {
+  // For PagerDuty, use html_url if available
+  if (platform === "pagerduty") {
+    if (incident.html_url) {
+      return incident.html_url
+    }
+    // Construct URL if we have an ID (format: https://{subdomain}.pagerduty.com/incidents/{id})
+    if (incident.id) {
+      return `https://app.pagerduty.com/incidents/${incident.id}`
+    }
+    return null
+  }
+
+  // For Rootly, construct URL using the incident ID
+  // Rootly URL format: https://app.rootly.com/incidents/{id}
+  if (incident.id) {
+    return `https://app.rootly.com/incidents/${incident.id}`
+  }
+
+  // Try attributes.slug if available
+  const slug = incident.attributes?.slug
+  if (slug) {
+    return `https://app.rootly.com/incidents/${slug}`
+  }
+
+  return null
 }
 
 export function UserIncidentCard({
@@ -233,11 +263,10 @@ export function UserIncidentCard({
                     return 'text-neutral-500'
                   }
 
-                  return (
-                    <div
-                      key={incident.id || index}
-                      className="flex items-start gap-2 p-2 rounded-lg bg-neutral-50 hover:bg-neutral-100 transition-colors"
-                    >
+                  const incidentUrl = getIncidentUrl(incident, platform)
+
+                  const incidentContent = (
+                    <>
                       <span className={`px-2 py-0.5 text-xs font-semibold rounded ${getSeverityColor(severity)}`}>
                         {severity}
                       </span>
@@ -250,6 +279,28 @@ export function UserIncidentCard({
                       <span className={`text-xs font-medium capitalize flex-shrink-0 ${getStatusColor(status)}`}>
                         {status}
                       </span>
+                      {incidentUrl && (
+                        <ExternalLink className="w-3.5 h-3.5 text-neutral-400 flex-shrink-0" />
+                      )}
+                    </>
+                  )
+
+                  return incidentUrl ? (
+                    <a
+                      key={incident.id || index}
+                      href={incidentUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-start gap-2 p-2 rounded-lg bg-neutral-50 hover:bg-purple-50 hover:border-purple-200 border border-transparent transition-colors cursor-pointer"
+                    >
+                      {incidentContent}
+                    </a>
+                  ) : (
+                    <div
+                      key={incident.id || index}
+                      className="flex items-start gap-2 p-2 rounded-lg bg-neutral-50"
+                    >
+                      {incidentContent}
                     </div>
                   )
                 })}
