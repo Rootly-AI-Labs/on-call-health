@@ -166,7 +166,10 @@ export default function LandingPage() {
                     Connecting to Google...
                   </>
                 ) : (
-                  <>Start with Google</>
+                  <>
+                    <Chrome className="h-7 w-7 -translate-y-0.5" aria-hidden="true" />
+                    Start with Google
+                  </>
                 )}
               </span>
             </Button>
@@ -184,7 +187,10 @@ export default function LandingPage() {
                     Connecting to GitHub...
                   </>
                 ) : (
-                  <>Start with GitHub</>
+                  <>
+                    <Github className="h-7 w-7 -translate-y-0.5" aria-hidden="true" />
+                    Start with GitHub
+                  </>
                 )}
               </span>
             </Button>
