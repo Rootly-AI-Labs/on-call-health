@@ -2573,7 +2573,7 @@ export default function IntegrationsPage() {
                                 }`}></div>
                                 <span className="font-medium text-base">{selected.name}</span>
                               </div>
-                              <Star className="w-5 h-5 text-yellow-500 fill-yellow-500 flex-shrink-0" />
+                              <Star className="w-5 h-5 text-yellow-500 fill-yellow-500 flex-shrink-0 ml-2" />
                             </div>
                           )
                         }
@@ -2602,7 +2602,7 @@ export default function IntegrationsPage() {
                                   <span className="font-medium text-base">{integration.name}</span>
                                 </div>
                                 {selectedOrganization === integration.id.toString() && (
-                                  <Star className="w-5 h-5 text-yellow-500 fill-yellow-500 flex-shrink-0" />
+                                  <Star className="w-5 h-5 text-yellow-500 fill-yellow-500 flex-shrink-0 ml-2" />
                                 )}
                               </div>
                             </SelectItem>
@@ -2626,7 +2626,7 @@ export default function IntegrationsPage() {
                                   <span className="font-medium text-base">{integration.name}</span>
                                 </div>
                                 {selectedOrganization === integration.id.toString() && (
-                                  <Star className="w-5 h-5 text-yellow-500 fill-yellow-500 flex-shrink-0" />
+                                  <Star className="w-5 h-5 text-yellow-500 fill-yellow-500 flex-shrink-0 ml-2" />
                                 )}
                               </div>
                             </SelectItem>
