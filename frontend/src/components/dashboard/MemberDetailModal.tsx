@@ -2,17 +2,16 @@
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Progress } from "@/components/ui/progress"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, Cell } from "recharts"
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, BarChart, Bar, Cell } from "recharts"
 import { Info, RefreshCw, BarChart3 } from "lucide-react"
 import { useState, useEffect, useRef } from "react"
 import { UserObjectiveDataCard } from "@/components/dashboard/UserObjectiveDataCard"
 import { UserRiskFactorsCard } from "@/components/dashboard/UserRiskFactorsCard"
+import { UserIncidentCard } from "@/components/dashboard/UserIncidentCard"
 import { SurveyResultsCard } from "@/components/dashboard/SurveyResultsCard"
 import { TicketingCard } from "@/components/dashboard/TicketingCard"
 
@@ -399,22 +398,6 @@ export function MemberDetailModal({
                     </CardContent>
                   </Card>
 
-                  <Card>
-                    <CardContent className="p-4 text-center">
-                      <p className="text-sm text-gray-600 mb-2">Incidents Handled</p>
-                      <div className="text-2xl font-bold text-blue-600">
-                        {memberData?.incident_count || 0}
-                      </div>
-                      <p className="text-xs text-gray-500">Past {timeRange || 30} days</p>
-
-                      <div className="mt-3 pt-3 border-t border-gray-200 space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-600">After Hours Incidents</span>
-                          <span className="font-medium">{((memberData?.metrics?.after_hours_percentage || 0) * 100).toFixed(0)}%</span>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
                 </div>
 
                 {/* OCH Risk Levels */}
@@ -459,14 +442,21 @@ export function MemberDetailModal({
                   currentAnalysis={currentAnalysis}
                 />
 
+                {/* User Risk Factors - Using shared component with percentage display */}
+                <UserRiskFactorsCard selectedMember={memberData || selectedMember} />
+
+                {/* User Incidents Card */}
+                <UserIncidentCard
+                  memberData={memberData || selectedMember}
+                  timeRange={typeof timeRange === 'string' ? parseInt(timeRange) : timeRange}
+                  platform={currentAnalysis?.platform}
+                />
+
                 {/* Health Check-ins (Survey Data) - Always render directly */}
                 <SurveyResultsCard
                   surveyData={currentAnalysis?.analysis_data?.member_surveys?.[selectedMember.user_email || selectedMember.email] || null}
                   userEmail={selectedMember.user_email || selectedMember.email}
                 />
-
-                {/* User Risk Factors - Using shared component with percentage display */}
-                <UserRiskFactorsCard selectedMember={memberData || selectedMember} />
 
                 {/* GitHub / Slack Tabs (conditional) */}
                 {(() => {

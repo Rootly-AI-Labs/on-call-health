@@ -19,11 +19,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import {
   Bar,
   BarChart,
-  Radar,
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
   ResponsiveContainer,
   XAxis,
   YAxis,
@@ -33,8 +28,6 @@ import {
 } from "recharts"
 import {
   Activity,
-  ChevronLeft,
-  ChevronRight,
   Play,
   Clock,
   FileText,
@@ -46,8 +39,6 @@ import {
   Download,
   AlertCircle,
   Trash2,
-  LogOut,
-  BookOpen,
   Users,
   Star,
   Info,
@@ -59,14 +50,12 @@ import {
 import { TeamHealthOverview } from "@/components/dashboard/TeamHealthOverview"
 import { AnalysisProgressSection } from "@/components/dashboard/AnalysisProgressSection"
 import { TeamMembersList } from "@/components/dashboard/TeamMembersList"
-import { HealthTrendsChart } from "@/components/dashboard/HealthTrendsChart"
 import { ObjectiveDataCard } from "@/components/dashboard/ObjectiveDataCard"
 import { TeamRiskFactorsCard } from "@/components/dashboard/TeamRiskFactorsCard"
 import { MemberDetailModal } from "@/components/dashboard/MemberDetailModal"
 import { GitHubCommitsTimeline } from "@/components/dashboard/charts/GitHubCommitsTimeline"
 import GitHubAllMetricsPopup from "@/components/dashboard/GitHubAllMetricsPopup"
 import RiskFactorsAllPopup from "@/components/dashboard/RiskFactorsAllPopup"
-import { AIInsightsCard } from "@/components/dashboard/insights/AIInsightsCard"
 import { DeleteAnalysisDialog } from "@/components/dashboard/dialogs/DeleteAnalysisDialog"
 import Image from "next/image"
 import { format } from "date-fns"
@@ -172,7 +161,6 @@ function DashboardContent() {
   getTrendIcon,
   getRiskColor,
   getProgressColor,
-  formatRadarLabel,
   getAnalysisStages,
   getAnalysisDescription,
 
@@ -2149,11 +2137,11 @@ function DashboardContent() {
               <label className="text-sm font-medium text-neutral-700 mb-2 block">
                 AI Insights
               </label>
-              <div className={`border rounded-lg p-4 transition-all ${enableAI ? 'border-blue-500 bg-blue-50' : 'border-neutral-200 bg-white'}`}>
+              <div className={`border rounded-lg p-4 transition-all ${enableAI ? 'border-blue-500 bg-blue-50' : 'border-neutral-200 bg-white'} ${!llmConfig?.has_token ? 'opacity-60' : ''}`}>
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
-                      <div className="w-5 h-5 text-blue-600">🤖</div>
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${llmConfig?.has_token ? 'bg-blue-100' : 'bg-neutral-100'}`}>
+                      <div className={`w-5 h-5 ${llmConfig?.has_token ? 'text-blue-600' : 'text-neutral-400'}`}>🤖</div>
                     </div>
                     <div>
                       <h3 className="text-sm font-medium text-neutral-900">Executive Summary</h3>
@@ -2163,16 +2151,26 @@ function DashboardContent() {
                   <Switch
                     checked={enableAI}
                     onCheckedChange={setEnableAI}
+                    disabled={!llmConfig?.has_token}
                   />
                 </div>
-                
+
                 <div className="space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span className="text-xs font-medium text-green-700">
-                      Anthropic Claude Connected (Railway)
-                    </span>
-                  </div>
+                  {llmConfig?.has_token ? (
+                    <div className="flex items-center space-x-2">
+                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                      <span className="text-xs font-medium text-green-700">
+                        Anthropic Claude Connected
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center space-x-2">
+                      <div className="w-2 h-2 bg-neutral-400 rounded-full"></div>
+                      <span className="text-xs font-medium text-neutral-500">
+                        Enable AI Insights in Integrations first
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

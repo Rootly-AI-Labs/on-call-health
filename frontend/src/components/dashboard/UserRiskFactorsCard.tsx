@@ -32,7 +32,7 @@ export function UserRiskFactorsCard({
       <Card>
         <CardHeader>
           <CardTitle>Risk Factors</CardTitle>
-          <CardDescription>Key factors contributing to risk for {memberName}</CardDescription>
+          <CardDescription>Top 5 risk factors for {memberName}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="h-64 flex items-center justify-center">
@@ -51,7 +51,7 @@ export function UserRiskFactorsCard({
       <Card>
         <CardHeader>
           <CardTitle>Risk Factors</CardTitle>
-          <CardDescription>Key factors contributing to risk for {memberName}</CardDescription>
+          <CardDescription>Top 5 risk factors for {memberName}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="h-64 flex items-center justify-center">
@@ -68,7 +68,7 @@ export function UserRiskFactorsCard({
         <div className="flex items-center justify-between">
           <div className="flex-1 space-y-1.5">
             <CardTitle>Risk Factors</CardTitle>
-            <CardDescription>Key factors contributing to risk for {memberName}</CardDescription>
+            <CardDescription>Top 5 risk factors for {memberName}</CardDescription>
           </div>
           <div className="relative group ml-4">
             <Info className="w-4 h-4 text-neutral-500 cursor-help hover:text-neutral-700 transition-colors" />
@@ -80,12 +80,9 @@ export function UserRiskFactorsCard({
           </div>
         </div>
       </CardHeader>
-      <CardContent className="p-4">
+      <CardContent className="p-4 pb-6">
         <div className="space-y-2">
-          <div className="text-xs font-medium text-neutral-500 uppercase tracking-wide mb-2">
-            Contributing Factors
-          </div>
-          {factors.map((factor: OCBFactor) => (
+          {factors.slice(0, 5).map((factor: OCBFactor) => (
             <div key={factor.key} className="flex items-center gap-3">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between mb-1">

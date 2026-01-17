@@ -151,7 +151,6 @@ export default function useDashboard() {
       // Reset all analysis state
       setAnalysisRunning(false)
       setCurrentRunningAnalysisId(null)
-      setCurrentRunningAnalysisId(null)
       setAnalysisProgress(0)
       setAnalysisStage("loading")
       setCurrentStageIndex(0)
@@ -1351,6 +1350,15 @@ export default function useDashboard() {
   const [enableAI, setEnableAI] = useState(false)
   const [llmConfig, setLlmConfig] = useState<{has_token: boolean, provider?: string} | null>(null)
   const [isLoadingGitHubSlack, setIsLoadingGitHubSlack] = useState(false)
+
+  // Sync enableAI with llmConfig - only enable if AI is configured in integrations
+  useEffect(() => {
+    if (llmConfig) {
+      // If AI is enabled in integrations, enable it for analysis
+      // If AI is not enabled in integrations, disable it (can't be toggled on)
+      setEnableAI(llmConfig.has_token)
+    }
+  }, [llmConfig])
 
   // Load LLM configuration
   const loadLlmConfig = async () => {
