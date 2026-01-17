@@ -58,4 +58,12 @@ class Settings:
     # Rootly API
     ROOTLY_API_BASE_URL: str = os.getenv("ROOTLY_API_BASE_URL", "https://api.rootly.com")
 
+    # Working Hours Configuration
+    # These define what is considered "business hours" for burnout analysis
+    # Hours are in 24-hour format (0-23) and applied in each user's local timezone
+    BUSINESS_HOURS_START: int = int(os.getenv("BUSINESS_HOURS_START", "9"))
+    BUSINESS_HOURS_END: int = int(os.getenv("BUSINESS_HOURS_END", "17"))
+    LATE_NIGHT_START: int = int(os.getenv("LATE_NIGHT_START", "22"))
+    LATE_NIGHT_END: int = int(os.getenv("LATE_NIGHT_END", "6"))
+
 settings = Settings()
