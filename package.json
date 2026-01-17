@@ -1,6 +1,5 @@
 {
     "dependencies": {
-      "node": "^24.9.0",
       "newrelic": "latest"
     }
 }

@@ -15,19 +15,12 @@ jobs:
       - name: Build frontend Docker image
         run: docker build -t frontend-test ./frontend -f ./frontend/Dockerfile.dev
 
-      - name: Verify Node version meets Next.js requirements
+      - name: Verify Bun version
         run: |
-          docker run --rm frontend-test node -e "
-            const version = process.versions.node.split('.')[0];
-            if (version < 20) {
-              console.error('Node.js version ' + process.versions.node + ' is below required 20.x');
-              process.exit(1);
-            }
-            console.log('Node.js version ' + process.versions.node + ' OK');
-          "
+          docker run --rm frontend-test bun --version
 
       - name: Test Next.js build
-        run: docker run --rm frontend-test npm run build
+        run: docker run --rm frontend-test bun run build
 
   build-backend:
     runs-on: ubuntu-latest
@@ -36,6 +29,15 @@ jobs:
 
       - name: Build backend Docker image
         run: docker build -t backend-test ./backend
+
+      - name: Verify Python version
+        run: docker run --rm backend-test python --version
+
+      - name: Verify dependencies installed
+        run: docker run --rm backend-test pip check
+
+      - name: Test FastAPI app imports
+        run: docker run --rm -e DATABASE_URL=postgresql://test:test@localhost/test backend-test python -c "from app.main import app; print('FastAPI app loaded successfully')"
 
   docker-compose:
     runs-on: ubuntu-latest
@@ -53,6 +55,18 @@ jobs:
         run: |
           timeout 30 bash -c 'until curl -s http://localhost:3000 > /dev/null; do sleep 2; done'
 
+      - name: Check backend API is responding
+        run: |
+          timeout 90 bash -c 'until curl -s http://localhost:8000/health > /dev/null 2>&1; do echo "Waiting for backend..."; sleep 3; done'
+
+      - name: Verify backend health endpoint
+        run: |
+          curl -f http://localhost:8000/health || exit 1
+
+      - name: Show container status
+        if: failure()
+        run: docker compose ps -a
+
       - name: Show logs on failure
         if: failure()
-        run: docker compose logs
+        run: docker compose logs --tail=100

@@ -123,8 +123,8 @@ class PatternAnalyzerTool(BaseTool):
         hour_counts = Counter(event['hour'] for event in events)
         weekend_count = sum(1 for event in events if event['is_weekend'])
         
-        # After-hours work (6 PM to 8 AM)
-        after_hours_count = sum(1 for event in events if event['hour'] >= 18 or event['hour'] <= 8)
+        # After-hours work (before 9 AM or after 5 PM)
+        after_hours_count = sum(1 for event in events if event['hour'] < 9 or event['hour'] >= 17)
         after_hours_rate = after_hours_count / len(events) if events else 0
         
         if after_hours_rate > 0.3:
@@ -247,8 +247,8 @@ class PatternAnalyzerTool(BaseTool):
         hour_counts = Counter(event['hour'] for event in events)
         weekend_count = sum(1 for event in events if event['is_weekend'])
         
-        # After-hours messaging
-        after_hours_count = sum(1 for event in events if event['hour'] >= 18 or event['hour'] <= 8)
+        # After-hours messaging (before 9 AM or after 5 PM)
+        after_hours_count = sum(1 for event in events if event['hour'] < 9 or event['hour'] >= 17)
         after_hours_rate = after_hours_count / len(events) if events else 0
         
         if after_hours_rate > 0.25:

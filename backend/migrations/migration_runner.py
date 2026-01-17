@@ -1106,9 +1106,24 @@ class MigrationRunner:
                 "description": "Remove communication_patterns_enabled column from slack_workspace_mappings",
                 "sql_file": "2026_01_06_remove_communication_patterns_toggle.sql"
             },
+            {
+                "name": "033_add_email_to_user_burnout_reports",
+                "description": "Add email column to user_burnout_reports and backfill from users table",
+                "sql_file": "2026_01_12_add_email_to_user_burnout_reports.sql"
+            },
+            {
+                "name": "034_allow_null_user_id_in_user_burnout_reports",
+                "description": "Allow NULL user_id in user_burnout_reports for email-based matching",
+                "sql_file": "2026_01_12_allow_null_user_id_in_user_burnout_reports.sql"
+            },
+            {
+                "name": "035_make_email_required_in_user_burnout_reports",
+                "description": "Make email column required in user_burnout_reports",
+                "sql_file": "2026_01_12_make_email_required_in_user_burnout_reports.sql"
+            },
 
             # {
-            #     "name": "032_add_user_preferences",
+            #     "name": "036_add_user_preferences",
             #     "description": "Add user preferences table",
             #     "sql": ["CREATE TABLE IF NOT EXISTS user_preferences (...)"]
             # }

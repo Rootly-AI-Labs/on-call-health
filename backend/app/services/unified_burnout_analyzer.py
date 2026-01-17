@@ -210,6 +210,9 @@ class UnifiedBurnoutAnalyzer:
         """
         analysis_start_time = datetime.now()
 
+        # Store analysis_id for use in correlation service
+        self.analysis_id = analysis_id
+
         # Check if using mock data (define at function scope)
         use_mock_data = os.getenv("USE_MOCK_DATA", "false").lower() == "true"
 
@@ -534,33 +537,35 @@ class UnifiedBurnoutAnalyzer:
                     logger.error(f"⏭️ CHECKPOINT 2a: GitHub SKIPPED (disabled)")
                     logger.info(f"UNIFIED ANALYZER: GitHub integration disabled - skipping")
                 
-                if self.features['slack']:
-                    logger.error(f"⏳ CHECKPOINT 2b: Starting Slack data collection for {len(team_names)} users")
-                    logger.info(f"Collecting Slack data for {len(team_names)} team members using names")
-                    logger.info(f"Team names: {team_names[:5]}...")  # Log first 5 names
-                    try:
-                        logger.info(f"Slack config - token: {'present' if self.slack_token else 'missing'}")
-                        
-                        # Use names for Slack correlation instead of emails
-                        slack_data = await collect_team_slack_data_with_mapping(
-                            team_names, time_range_days, self.slack_token, use_names=True,
-                            user_id=user_id, analysis_id=analysis_id, source_platform=self.platform
-                        )
-                        logger.info(f"Collected Slack data for {len(slack_data)} users")
-
-                        # # Write raw Slack data to file
-                        # try:
-                        #     with open('slack_raw.txt', 'w', encoding='utf-8') as f:
-                        #         f.write(json.dumps(slack_data, indent=2, default=str))
-                        #     logger.info(f"Written raw Slack data to slack_raw.txt")
-                        # except Exception as e:
-                        #     logger.error(f"Failed to write Slack raw data to file: {e}")
-                    except Exception as e:
-                        logger.error(f"❌ CHECKPOINT 2b: Slack data collection FAILED: {e}")
-                        logger.error(f"Slack data collection failed: {e}")
-                    logger.error(f"✅ CHECKPOINT 2b: Slack data collection DONE - {len(slack_data)} users")
-                else:
-                    logger.error(f"⏭️ CHECKPOINT 2b: Slack SKIPPED (disabled)")
+                # DISABLED: Slack data collection temporarily disabled until feature is fully enabled
+                # if self.features['slack']:
+                #     logger.error(f"⏳ CHECKPOINT 2b: Starting Slack data collection for {len(team_names)} users")
+                #     logger.info(f"Collecting Slack data for {len(team_names)} team members using names")
+                #     logger.info(f"Team names: {team_names[:5]}...")  # Log first 5 names
+                #     try:
+                #         logger.info(f"Slack config - token: {'present' if self.slack_token else 'missing'}")
+                #
+                #         # Use names for Slack correlation instead of emails
+                #         slack_data = await collect_team_slack_data_with_mapping(
+                #             team_names, time_range_days, self.slack_token, use_names=True,
+                #             user_id=user_id, analysis_id=analysis_id, source_platform=self.platform
+                #         )
+                #         logger.info(f"Collected Slack data for {len(slack_data)} users")
+                #
+                #         # # Write raw Slack data to file
+                #         # try:
+                #         #     with open('slack_raw.txt', 'w', encoding='utf-8') as f:
+                #         #         f.write(json.dumps(slack_data, indent=2, default=str))
+                #         #     logger.info(f"Written raw Slack data to slack_raw.txt")
+                #         # except Exception as e:
+                #         #     logger.error(f"Failed to write Slack raw data to file: {e}")
+                #     except Exception as e:
+                #         logger.error(f"❌ CHECKPOINT 2b: Slack data collection FAILED: {e}")
+                #         logger.error(f"Slack data collection failed: {e}")
+                #     logger.error(f"✅ CHECKPOINT 2b: Slack data collection DONE - {len(slack_data)} users")
+                # else:
+                #     logger.error(f"⏭️ CHECKPOINT 2b: Slack SKIPPED (disabled)")
+                logger.info(f"⏭️ CHECKPOINT 2b: Slack data collection DISABLED - feature not ready for production")
 
                 if self.features['jira']:
                     logger.error(f"⏳ CHECKPOINT 2c: Starting Jira data collection")
@@ -716,7 +721,7 @@ class UnifiedBurnoutAnalyzer:
             data_sources = {
                 "incident_data": True,
                 "github_data": self.features['github'],
-                "slack_data": self.features['slack'],
+                "slack_data": False,  # DISABLED: Slack feature not ready for production
                 "jira_data": self.features['jira'],
                 "linear_data": self.features['linear']
             }
@@ -738,7 +743,8 @@ class UnifiedBurnoutAnalyzer:
                 logger.info(f"GITHUB CORRELATION: Correlating GitHub data with team members")
                 # Get current user ID (assuming it's passed in somehow - for now use 1 as default)
                 current_user_id = getattr(self, 'current_user_id', 1)  # Default to user 1 (Spencer)
-                correlation_service = GitHubCorrelationService(current_user_id=current_user_id)
+                analysis_id = getattr(self, 'analysis_id', None)
+                correlation_service = GitHubCorrelationService(current_user_id=current_user_id, analysis_id=analysis_id)
                 
                 # Get original team members before correlation
                 original_members = team_analysis["members"].copy()
@@ -2339,15 +2345,16 @@ class UnifiedBurnoutAnalyzer:
 
         enhanced["slack_burnout_indicators"] = min(100, slack_burnout_score)
 
-        # 5. Sentiment Analysis (if available)
-        sentiment_scores = slack_data.get("sentiment_scores", [])
-        if sentiment_scores:
-            avg_sentiment = sum(sentiment_scores) / len(sentiment_scores)
-            enhanced["slack_avg_sentiment"] = avg_sentiment
-
-            # Negative sentiment trend (burnout indicator)
-            if avg_sentiment < -0.2:  # Negative sentiment
-                enhanced["slack_burnout_indicators"] = min(100, enhanced.get("slack_burnout_indicators", 0) + 15)
+        # DISABLED: Sentiment Analysis is disabled until Slack sentiment feature is enabled
+        # # 5. Sentiment Analysis (if available)
+        # sentiment_scores = slack_data.get("sentiment_scores", [])
+        # if sentiment_scores:
+        #     avg_sentiment = sum(sentiment_scores) / len(sentiment_scores)
+        #     enhanced["slack_avg_sentiment"] = avg_sentiment
+        #
+        #     # Negative sentiment trend (burnout indicator)
+        #     if avg_sentiment < -0.2:  # Negative sentiment
+        #         enhanced["slack_burnout_indicators"] = min(100, enhanced.get("slack_burnout_indicators", 0) + 15)
 
         return enhanced
 
@@ -3478,11 +3485,14 @@ class UnifiedBurnoutAnalyzer:
         # Calculate after-hours and weekend rates
         after_hours_rates = [m.get("after_hours_percentage", 0) for m in all_metrics]
         weekend_rates = [m.get("weekend_percentage", 0) for m in all_metrics]
-        sentiment_scores = [m.get("avg_sentiment", 0) for m in all_metrics]
-        
+        # DISABLED: Sentiment analysis is disabled until Slack sentiment feature is enabled
+        # sentiment_scores = [m.get("avg_sentiment", 0) for m in all_metrics]
+
         avg_after_hours_rate = sum(after_hours_rates) / len(after_hours_rates) if after_hours_rates and len(after_hours_rates) > 0 else 0
         avg_weekend_rate = sum(weekend_rates) / len(weekend_rates) if weekend_rates and len(weekend_rates) > 0 else 0
-        avg_sentiment = sum(sentiment_scores) / len(sentiment_scores) if sentiment_scores and len(sentiment_scores) > 0 else 0
+        # DISABLED: Sentiment analysis is disabled until Slack sentiment feature is enabled
+        # avg_sentiment = sum(sentiment_scores) / len(sentiment_scores) if sentiment_scores and len(sentiment_scores) > 0 else 0
+        avg_sentiment = 0  # Disabled - no sentiment analysis
         
         # Count unique channels
         all_channels = set()
@@ -3519,17 +3529,19 @@ class UnifiedBurnoutAnalyzer:
             "after_hours_messaging_rate": round(avg_after_hours_rate, 3),
             "after_hours_activity_percentage": round(avg_after_hours_rate * 100, 1),  # Frontend expects percentage
             "weekend_messaging_rate": round(avg_weekend_rate, 3),
-            "avg_sentiment_score": round(avg_sentiment, 3),
+            "avg_sentiment_score": 0,  # DISABLED: Sentiment analysis disabled
             "channels_analyzed": len(all_channels),
-            "sentiment_analysis": {
-                "overall_sentiment": "positive" if avg_sentiment > 0.1 else "neutral" if avg_sentiment > -0.1 else "negative",
-                "sentiment_score": round(avg_sentiment, 3),
-                "positive_ratio": round(sum(m.get("positive_sentiment_ratio", 0) for m in all_metrics) / users_with_data, 3) if users_with_data and users_with_data > 0 else 0,
-                "negative_ratio": round(sum(m.get("negative_sentiment_ratio", 0) for m in all_metrics) / users_with_data, 3) if users_with_data and users_with_data > 0 else 0
-            },
+            # DISABLED: Sentiment analysis is disabled until Slack sentiment feature is enabled
+            # "sentiment_analysis": {
+            #     "overall_sentiment": "positive" if avg_sentiment > 0.1 else "neutral" if avg_sentiment > -0.1 else "negative",
+            #     "sentiment_score": round(avg_sentiment, 3),
+            #     "positive_ratio": round(sum(m.get("positive_sentiment_ratio", 0) for m in all_metrics) / users_with_data, 3) if users_with_data and users_with_data > 0 else 0,
+            #     "negative_ratio": round(sum(m.get("negative_sentiment_ratio", 0) for m in all_metrics) / users_with_data, 3) if users_with_data and users_with_data > 0 else 0
+            # },
+            "sentiment_analysis": None,  # DISABLED: Feature not enabled
             "burnout_indicators": {
                 "excessive_messaging": burnout_counts.get("excessive_messaging", 0),
-                "poor_sentiment": burnout_counts.get("poor_sentiment", 0),
+                "poor_sentiment": 0,  # DISABLED: Sentiment analysis disabled
                 "late_responses": burnout_counts.get("late_responses", 0),
                 "after_hours_activity": burnout_counts.get("after_hours_activity", 0)
             }
@@ -4886,7 +4898,7 @@ class UnifiedBurnoutAnalyzer:
                     deadline_score = 0.2
 
 
-            MAX_LOAD = 15
+            MAX_LOAD = 25
             ticket_load_score = min(ticket_count / MAX_LOAD, 1.0)
 
 
@@ -4900,8 +4912,8 @@ class UnifiedBurnoutAnalyzer:
                 WEIGHT_DEADLINE * deadline_score
             )  # in [0, 1]
 
-            # Global scaling so Jira score is in ~5–30 range
-            JIRA_SCALING = 0.75
+            # Global scaling so Jira score is in ~2–12 range (reduced from 5-30)
+            JIRA_SCALING = 0.5
             jira_score = max(0.0, min(100.0, combined * 100 * JIRA_SCALING))
 
 
@@ -5256,7 +5268,7 @@ class UnifiedBurnoutAnalyzer:
                     deadline_score = 0.2
 
             # Issue load score
-            MAX_LOAD = 15
+            MAX_LOAD = 25
             issue_load_score = min(issue_count / MAX_LOAD, 1.0)
 
             # Combine scores (same weights as Jira)
@@ -5270,8 +5282,8 @@ class UnifiedBurnoutAnalyzer:
                 WEIGHT_DEADLINE * deadline_score
             )
 
-            # Global scaling (same as Jira)
-            LINEAR_SCALING = 0.75
+            # Global scaling (reduced from 0.75 to match Jira)
+            LINEAR_SCALING = 0.5
             linear_score = max(0.0, min(100.0, combined * 100 * LINEAR_SCALING))
 
             logger.info(

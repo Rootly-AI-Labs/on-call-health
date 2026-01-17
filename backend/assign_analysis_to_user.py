@@ -3,8 +3,8 @@ Script to assign an existing analysis to a user.
 Takes an analysis ID and user ID, and creates a copy of that analysis for the user.
 
 Usage:
-    python assign_analysis_to_user.py --analysis-id 12 --user-id 5 --dry-run     # Preview changes
-    python assign_analysis_to_user.py --analysis-id 12 --user-id 5 --apply      # Apply changes
+    python assign_analysis_to_user.py --analysis-id 738 --user-id 43 --dry-run     # Preview changes
+    python assign_analysis_to_user.py --analysis-id 738 --user-id 43 --apply      # Apply changes
 """
 import sys
 import os

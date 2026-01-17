@@ -153,7 +153,7 @@ export function TrendsCard({
                         : percentageChange <= 0;
 
                       return (
-                        <div className="bg-neutral-900 p-3 border border-neutral-700 rounded-lg shadow-lg">
+                        <div className="bg-neutral-900/95 p-3 border border-neutral-700 rounded-lg shadow-lg backdrop-blur-sm">
                           <p className="text-sm font-medium text-neutral-300 mb-2">
                             {data?.date}
                           </p>
@@ -162,12 +162,21 @@ export function TrendsCard({
                           }`}>
                             {percentageChange >= 0 ? '↑' : '↓'} {Math.abs(percentageChange).toFixed(1)}%
                           </p>
-                          <p className="text-sm text-neutral-300">
-                            {config.label}: <span className="font-semibold">{metricValue}</span>
-                          </p>
-                          <p className="text-xs text-neutral-400 mt-1">
-                            Mean: {meanScore}
-                          </p>
+                          {selectedMetric === 'risk_level' ? (
+                            <>
+                              <p className="text-sm text-neutral-300 font-semibold">{metricValue}</p>
+                              <p className="text-xs text-neutral-400 mt-1">{meanScore}</p>
+                            </>
+                          ) : (
+                            <>
+                              <p className="text-sm text-neutral-300">
+                                {config.label}: <span className="font-semibold">{metricValue}</span>
+                              </p>
+                              <p className="text-xs text-neutral-400 mt-1">
+                                Mean: {meanScore}
+                              </p>
+                            </>
+                          )}
                         </div>
                       );
                     }}

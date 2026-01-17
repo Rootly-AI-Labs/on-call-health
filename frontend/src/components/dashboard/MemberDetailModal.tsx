@@ -12,7 +12,7 @@ import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadius
 import { Info, RefreshCw, BarChart3 } from "lucide-react"
 import { useState, useEffect, useRef } from "react"
 import { UserObjectiveDataCard } from "@/components/dashboard/UserObjectiveDataCard"
-import { RiskFactorsCard } from "@/components/dashboard/RiskFactorsCard"
+import { UserRiskFactorsCard } from "@/components/dashboard/UserRiskFactorsCard"
 import { SurveyResultsCard } from "@/components/dashboard/SurveyResultsCard"
 import { TicketingCard } from "@/components/dashboard/TicketingCard"
 
@@ -294,7 +294,7 @@ export function MemberDetailModal({
       setLoadingCommits(true);
       try {
         const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-        const url = `${API_BASE}/users/${encodeURIComponent(selectedMember.email)}/github-daily-commits?analysis_id=${analysisId}`;
+        const url = `${API_BASE}/analyses/users/${encodeURIComponent(selectedMember.email)}/github-daily-commits?analysis_id=${analysisId}`;
 
         const response = await fetch(url, {
           headers: {
@@ -409,12 +409,8 @@ export function MemberDetailModal({
 
                       <div className="mt-3 pt-3 border-t border-gray-200 space-y-2">
                         <div className="flex justify-between text-sm">
-                          <span className="text-gray-600">After Hours Work</span>
-                          <span className="font-medium">{(memberData?.metrics?.after_hours_percentage || 0).toFixed(1)}%</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-600">Weekend Work</span>
-                          <span className="font-medium">{(memberData?.metrics?.weekend_percentage || 0).toFixed(1)}%</span>
+                          <span className="text-gray-600">After Hours Incidents</span>
+                          <span className="font-medium">{((memberData?.metrics?.after_hours_percentage || 0) * 100).toFixed(0)}%</span>
                         </div>
                       </div>
                     </CardContent>
@@ -463,107 +459,14 @@ export function MemberDetailModal({
                   currentAnalysis={currentAnalysis}
                 />
 
-                {/* Risk Level Breakdown – Deep Dive */}
-                <Card>
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                      <CardTitle>Risk Factors</CardTitle>
-                      <div className="relative group">
-                        <Info className="w-4 h-4 text-neutral-400 cursor-help hover:text-neutral-600" />
-                        <div className="absolute top-full right-0 mt-2 px-3 py-2 bg-neutral-900 text-white text-xs rounded-lg w-80 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                          <div className="font-semibold mb-2">Burnout Dimensions</div>
-                          <div className="space-y-2">
-                            <div>
-                              <div className="font-medium text-blue-300 mb-1">Personal Burnout</div>
-                              <div className="text-xs">• Incident frequency (incidents per week)<br/>• After-hours work patterns<br/>• Weekend activity levels<br/>• Sleep disruption indicators<br/>• Overall workload intensity relative to team baseline</div>
-                            </div>
-                            <div>
-                              <div className="font-medium text-blue-300 mb-1">Work-Related Burnout</div>
-                              <div className="text-xs">• Incident response time patterns<br/>• Severity-weighted incident load<br/>• GitHub commit activity and timing<br/>• Slack communication patterns<br/>• Work-life boundary violations (late night/weekend work)</div>
-                            </div>
-                          </div>
-                          <div className="absolute bottom-full right-4 w-0 h-0 border-l-4 border-r-4 border-b-4 border-l-transparent border-r-transparent border-b-gray-900"></div>
-                        </div>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="p-4">
-                    {memberData?.ocb_reasoning ? (
-                      <div className="space-y-6">
-                        {/* Contributing Factors - Ranked by Percentage */}
-                        {memberData.ocb_factors?.all && memberData.ocb_factors.all.length > 0 ? (
-                          <div className="space-y-2 mt-3">
-                            <div className="text-xs font-medium text-neutral-500 uppercase tracking-wide mb-2">
-                              Contributing Factors
-                            </div>
-                            {memberData.ocb_factors.all.map((factor: { key: string; name: string; percentage: number; dimension: string }, index: number) => (
-                              <div key={factor.key} className="flex items-center gap-3">
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center justify-between mb-1">
-                                    <span className="text-sm text-neutral-700 truncate">{factor.name}</span>
-                                    <span className="text-sm font-semibold text-neutral-900 ml-2">{factor.percentage}%</span>
-                                  </div>
-                                  <div className="w-full bg-gray-200 rounded-full h-1.5">
-                                    <div
-                                      className="h-1.5 rounded-full transition-all duration-500"
-                                      style={{
-                                        width: `${Math.min(factor.percentage * 2, 100)}%`,
-                                        backgroundColor: factor.dimension === 'personal' ? '#6366F1' : '#8B5CF6'
-                                      }}
-                                    />
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                            <div className="flex items-center gap-4 mt-3 pt-2 border-t border-neutral-100">
-                              <div className="flex items-center gap-1.5">
-                                <div className="w-2.5 h-2.5 rounded-full bg-indigo-500" />
-                                <span className="text-xs text-neutral-500">Personal</span>
-                              </div>
-                              <div className="flex items-center gap-1.5">
-                                <div className="w-2.5 h-2.5 rounded-full bg-violet-500" />
-                                <span className="text-xs text-neutral-500">Work-Related</span>
-                              </div>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="grid grid-cols-2 gap-y-1.5 gap-x-4 mt-2">
-                            {(() => {
-                              const filteredReasons = memberData.ocb_reasoning?.slice(1).filter((reason: string) => {
-                                const cleanReason = reason.replace(/^[\s]*[•·\-*]\s*/, '').trim();
-                                return !cleanReason.endsWith(':');
-                              }) || [];
+                {/* Health Check-ins (Survey Data) - Always render directly */}
+                <SurveyResultsCard
+                  surveyData={currentAnalysis?.analysis_data?.member_surveys?.[selectedMember.user_email || selectedMember.email] || null}
+                  userEmail={selectedMember.user_email || selectedMember.email}
+                />
 
-                              return filteredReasons.map((reason: string, index: number) => {
-                                const cleanReason = reason.replace(/^[\s]*[•·\-*]\s*/, '').trim().replace(/\s*\([^)]*\)$/, '');
-                                const isLastItem = index === filteredReasons.length - 1;
-
-                                if (isLastItem) {
-                                  return (
-                                    <div key={index} className="col-span-2 text-sm text-neutral-700 font-semibold mt-4 pt-3 border-t border-neutral-200">
-                                      {cleanReason}
-                                    </div>
-                                  );
-                                }
-
-                                return (
-                                  <div key={index} className="flex items-start gap-1.5 text-sm text-neutral-700">
-                                    <span className="text-neutral-400 flex-shrink-0 leading-relaxed">•</span>
-                                    <span className="leading-relaxed">{cleanReason}</span>
-                                  </div>
-                                );
-                              });
-                            })()}
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-neutral-500 italic">
-                        Risk level analysis not available. Run a new analysis to see detailed risk factors.
-                      </p>
-                    )}
-                  </CardContent>
-                </Card>
+                {/* User Risk Factors - Using shared component with percentage display */}
+                <UserRiskFactorsCard selectedMember={memberData || selectedMember} />
 
                 {/* GitHub / Slack Tabs (conditional) */}
                 {(() => {
@@ -572,10 +475,9 @@ export function MemberDetailModal({
 
                   const hasSlackData = selectedMember.slack_activity?.messages_sent > 0 ||
                     selectedMember.slack_activity?.channels_active > 0
-                  const hasSurveyData = true
 
-                  const tabCount = [hasGitHubData, hasSlackData, hasSurveyData].filter(Boolean).length
-                  const defaultTab = hasGitHubData ? "github" : hasSurveyData ? "surveys" : "communication"
+                  const tabCount = [hasGitHubData, hasSlackData].filter(Boolean).length
+                  const defaultTab = hasGitHubData ? "github" : "communication"
 
                   if (tabCount === 0) return null
 
@@ -590,7 +492,6 @@ export function MemberDetailModal({
                       <TabsList className={`grid w-full ${getGridColsClass(tabCount)}`}>
                         {hasGitHubData && <TabsTrigger value="github">GitHub</TabsTrigger>}
                         {hasSlackData && <TabsTrigger value="communication">Communication</TabsTrigger>}
-                        {hasSurveyData && <TabsTrigger value="surveys">Health Check-ins</TabsTrigger>}
                       </TabsList>
 
                       <TabsContent value="github" className="space-y-4">

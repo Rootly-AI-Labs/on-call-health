@@ -155,9 +155,8 @@ export function UserObjectiveDataCard({
       };
     });
 
-    // Calculate mean for the selected metric
+    // Calculate mean for the selected metric (across all days, not just days with incidents)
     const values = chartData
-      .filter((d: any) => d.hasData)
       .map((d: any) => d[config.dataKey]);
 
     const mean = values.length > 0

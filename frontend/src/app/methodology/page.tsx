@@ -1,482 +1,543 @@
 "use client"
 
-import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
-import { ArrowLeft, TrendingUp, Clock, AlertTriangle, Activity, Timer } from "lucide-react"
-import { useRouter } from "next/navigation"
+import {
+  TrendingUp,
+  Clock,
+  AlertTriangle,
+  Activity,
+  Timer,
+  Target,
+  Eye,
+  MessageSquareHeart,
+  GitCompare,
+  Scale,
+  Database,
+  Heart
+} from "lucide-react"
 import Image from "next/image"
 import { TopPanel } from "@/components/TopPanel"
 
-export default function MethodologyPage() {
-  const router = useRouter()
+// ============================================================================
+// EDITABLE CONTENT - Modify text here without touching the component structure
+// ============================================================================
 
+const content = {
+  // Page header
+  header: {
+    title: "On-Call Health Methodology",
+    subtitle: "Research-enhanced Copenhagen Burnout Inventory with compound trauma, time impact, and recovery analysis",
+  },
+
+  // Goal and Role section - redesigned with cards
+  goalAndRole: {
+    title: "Goal and Role",
+    description: "Understanding what On-Call Health does and how it works",
+
+    // Main purpose card
+    purpose: {
+      icon: "Target",
+      iconColor: "text-blue-600",
+      title: "What On-Call Health Is For",
+      description: `The goal of On-Call Health is to help incident management organizations maintain a healthy and sustainable on-call and workload balance for incident responders. Instead of reacting once people are already exhausted, the tool is designed to surface early signs that teams or individuals may be drifting into overload.`,
+      callout: `On-Call Health is not a medical device and does not diagnose burnout or mental health conditions. Its role is to provide visibility into workload patterns and trends, so teams can notice issues sooner, ask better questions, and take corrective action before problems escalate.`,
+      calloutColor: "blue",
+    },
+
+    // Two data types section
+    dataTypes: {
+      title: "Two Complementary Types of Data",
+      description: "On-Call Health combines two categories of signals that serve different but complementary purposes.",
+      types: [
+        {
+          icon: "Eye",
+          iconColor: "text-blue-600",
+          bgColor: "bg-blue-50",
+          borderColor: "border-blue-200",
+          title: "Observed (Objective) Data",
+          description: `We integrate with tools incident responders already use, such as incident management platforms, paging systems, and engineering workflows. Depending on the integrations enabled, this can include systems like Rootly, PagerDuty, Slack, GitHub, Linear, and Jira.`,
+          question: "What is the current operational load on responders?",
+          bullets: [
+            "Number and severity of incidents handled",
+            "Work occurring outside normal business hours",
+            "Task volume and priority",
+            "Sustained periods of elevated operational activity",
+          ],
+          footer: `These signals provide a concrete view of interruptions, pressure, and workload, but they are inherently incomplete on their own.`,
+        },
+        {
+          icon: "MessageSquareHeart",
+          iconColor: "text-green-600",
+          bgColor: "bg-green-50",
+          borderColor: "border-green-200",
+          title: "Self-Reported Data",
+          description: `Observed data cannot capture how someone is actually experiencing their workload. For that reason, On-Call Health also includes lightweight self-reported check-ins where responders can share how they're feeling.`,
+          question: "How is the responder experiencing their current workload and stress level?",
+          bullets: [
+            "Regular wellness check-ins",
+            "Subjective stress indicators",
+            "Personal capacity feedback",
+          ],
+          footer: `This approach is inspired by simple practices used in healthcare, where subjective input is a critical signal. Even a short, regular check-in can add essential context to operational metrics and help distinguish between "busy but fine" and "busy and struggling."`,
+        },
+      ],
+    },
+
+    // Baselines card
+    baselines: {
+      icon: "GitCompare",
+      iconColor: "text-orange-600",
+      title: "Baselines and Trends, Not Absolutes",
+      description: `A core design principle of On-Call Health is focusing on baselines and trends rather than absolute thresholds. This is intentional for several reasons:`,
+      reasons: [
+        { label: "Companies are different", detail: "Teams organize on-call, incident response, and workload in very different ways." },
+        { label: "People are different", detail: "Some responders enjoy high-severity incidents or nighttime work; others find the same patterns draining." },
+        { label: "Baseline mood varies", detail: "Some people naturally report feeling better or worse on an average day, independent of workload." },
+        { label: "Change matters more than level", detail: "A negative trend relative to someone's own baseline is often a stronger signal that something may be wrong than any fixed number." },
+        { label: "The goal is not comparison", detail: "On-Call Health is not designed to benchmark individuals or teams against each other." },
+      ],
+      footer: `By anchoring analysis to each team's and individual's historical baseline, the tool highlights meaningful deviations over time, rather than enforcing one-size-fits-all definitions of "too much."`,
+    },
+
+    // Absolute load note
+    absoluteLoad: {
+      icon: "Scale",
+      iconColor: "text-neutral-600",
+      title: "A Note on Absolute Load",
+      paragraphs: [
+        `In some cases, a team or individual's baseline may already be high when the tool is first introduced. For this reason, On-Call Health still provides ways to understand absolute workload and activity levels.`,
+        `However, absolute load is not the primary focus. The main value of the tool lies in detecting trend drift—when something that used to be normal starts moving in an unhealthy direction.`,
+      ],
+    },
+  },
+
+  // Method overview section
+  overview: {
+    title: "The Method Behind <em>Risk Level</em>",
+    description: "A baseline-driven overload signal inspired by established research",
+    paragraphs: [
+      `On-Call Health computes a composite signal called <strong>Risk Level</strong>, derived from multiple <strong>Risk Signals</strong> and designed for engineering on-call and incident response work. The scoring approach is informed by established workload and burnout research, including the Copenhagen Burnout Inventory (CBI), but it is adapted to operational telemetry rather than survey-only measurement. Risk Level is not a medical tool and should not be used for diagnosis—its purpose is to surface <strong>trend drift</strong> that may indicate unsustainable on-call load.`,
+      `The composite signal incorporates factors such as incident volume and severity, after-hours and weekend interruptions, and sustained periods of elevated operational activity. These inputs are evaluated over time and interpreted relative to individual and team baselines, because what is "normal" varies significantly across organizations and responders.`,
+    ],
+    callout: `<strong>Multi-Source Analysis:</strong> On-Call Health can ingest signals from tools like Rootly and PagerDuty as primary sources, with additional context from GitHub, Slack, Linear, and Jira when available. The model adapts to whichever integrations you enable, providing visibility into workload patterns without requiring a single "perfect" data source.`,
+  },
+
+  // Key Workload Signals section
+  factors: {
+    title: "Risk Signals",
+    intro: `On-Call Health analyzes a set of <strong>operational workload signals</strong> that commonly contribute to on-call overload. They are tracked over time and interpreted relative to <strong>individual and team baselines</strong> to surface meaningful changes.`,
+    subintro: `Rather than assigning universal scores or "healthy" thresholds, the system focuses on <strong>trend drift</strong>—how patterns evolve compared to what is normal for a given team or responder.`,
+    items: [
+      {
+        icon: "Activity",
+        iconColor: "text-blue-500",
+        title: "Incident Volume",
+        description: `Tracks the frequency of incidents handled over time. Sustained increases in incident volume often indicate rising operational load and reduced opportunity for recovery, especially when combined with other signals.`,
+        question: `Is the number of interruptions increasing relative to what's normal for this team or individual?`,
+      },
+      {
+        icon: "Clock",
+        iconColor: "text-orange-500",
+        title: "Off-Hours Activity",
+        description: `Captures work performed outside normal working hours, including evenings, nights, and weekends. This includes incident responses as well as related operational activity. Persistent off-hours work can reduce recovery time and contribute to cumulative fatigue, especially when it becomes a consistent pattern rather than an exception.`,
+        question: `Is off-hours work increasing or becoming more frequent compared to the historical baseline?`,
+      },
+      {
+        icon: "Timer",
+        iconColor: "text-red-500",
+        title: "Response-Time Pressure",
+        description: `Reflects the urgency and frequency of rapid responses required during incidents. While fast response is often necessary, sustained pressure to respond immediately can increase stress and cognitive load.`,
+        detail: `Rather than enforcing a fixed response-time threshold, On-Call Health looks at how response patterns change over time for a given responder or team.`,
+        question: `Is the pressure to respond quickly increasing or becoming more sustained over time?`,
+      },
+      {
+        icon: "TrendingUp",
+        iconColor: "text-purple-500",
+        title: "Severity-Weighted Incident Load",
+        description: `Accounts for the fact that not all incidents carry the same operational and cognitive burden. Higher-severity incidents generally demand more attention, longer focus, and greater emotional investment than lower-severity events.`,
+        question: `Is the proportion of high-severity incidents increasing relative to normal patterns?`,
+      },
+    ],
+    conclusion: {
+      title: "How These Signals Are Used",
+      description: `These signals are combined into a <strong>composite workload view</strong> and evaluated relative to historical baselines. The goal is to reduce noise and highlight changes that may warrant attention, not to label or rank individuals.`,
+      callout: `A sustained negative trend across one or more signals—especially when combined with changes in self-reported check-ins—can indicate that on-call load is becoming unsustainable and may require investigation or adjustment.`,
+    },
+  },
+
+  // Research enhancements section
+  enhancements: {
+    title: "Risk Level Formula",
+    intro: `The Risk Level is a metric specific to On-Call Health—it is not a clinically validated health metric or diagnostic tool. We took inspiration from research-led frameworks (including the Copenhagen Burnout Inventory and first responder stress studies) and adapted them to the specific needs of incident responders. We share this methodology so you have full clarity on how scores are calculated. Since On-Call Health is open source, you're free to adjust the weights and thresholds to fit your team's needs.`,
+    items: [
+      {
+        icon: "AlertTriangle",
+        iconColor: "text-red-600",
+        title: "Compound Trauma Factor",
+        description: `Research shows that multiple critical incidents create exponential psychological impact, not just additive impact. When a team member handles 5+ SEV0/SEV1 incidents, the psychological burden compounds significantly beyond simple addition.`,
+        researchBasis: `First responder studies show 5+ critical incidents create 25.6x higher PTSD probability. Multiple critical incidents cause compound trauma, not linear stress accumulation.`,
+        researchColor: "red",
+        detail: `<strong>Scoring:</strong> 5-10 critical incidents: 1.10-1.20x multiplier • 10+ critical incidents: 1.15x per additional incident (capped at 2.0x total)`,
+      },
+      {
+        icon: "Clock",
+        iconColor: "text-orange-600",
+        title: "Time Impact Multipliers",
+        description: `Research demonstrates that incident timing dramatically affects psychological impact. After-hours, weekend, and overnight incidents cause significantly higher stress due to circadian disruption, family time interference, and sleep disturbance.`,
+        researchBasis: `Studies on circadian disruption and work-life boundary violations show timing creates multiplicative stress effects, not additive ones.`,
+        researchColor: "orange",
+        timeImpacts: [
+          { label: "After-Hours", multiplier: "1.4x psychological impact", note: "(Before 8am / After 6pm)" },
+          { label: "Weekend", multiplier: "1.6x psychological impact", note: "(Family time disruption)" },
+          { label: "Overnight", multiplier: "1.8x psychological impact", note: "(Sleep disruption: 11pm-6am)" },
+        ],
+      },
+      {
+        icon: "Timer",
+        iconColor: "text-blue-600",
+        title: "Recovery Deficit Analysis",
+        description: `Psychological recovery research shows that insufficient time between stressful incidents prevents proper mental restoration. Recovery periods under 48 hours significantly impair the brain's ability to process and recover from traumatic stress.`,
+        researchBasis: `Trauma psychology research demonstrates that recovery periods <48 hours prevent psychological restoration, leading to stress accumulation and increased burnout risk.`,
+        researchColor: "blue",
+        detail: `<strong>Scoring:</strong> Recovery Score 0-100 (higher = better) • Perfect recovery: 168+ hours between incidents • Each violation (<48 hours) reduces recovery adequacy • Sustained violations indicate chronic stress`,
+      },
+    ],
+  },
+
+  // Dimensions section
+  dimensions: {
+    title: "On-Call Burnout Dimensions",
+    description: "How the five factors map to the three scientifically validated burnout dimensions",
+    items: [
+      {
+        color: "red",
+        title: "Emotional Exhaustion (40% weight)",
+        description: `Physical and psychological fatigue from work demands. This dimension measures the core stress experience and depletion of emotional resources that characterizes burnout.`,
+        calculation: "Workload Factor (50%) + After Hours Factor (30%) + Incident Load (20%)",
+      },
+      {
+        color: "yellow",
+        title: "Depersonalization/Cynicism (30% weight)",
+        description: `Detached, callous attitudes toward work and colleagues. This reflects the psychological distancing and defensive coping mechanisms that develop under chronic stress.`,
+        calculation: "Response Time Pressure (50%) + Weekend Work Factor (50%)",
+      },
+      {
+        color: "blue",
+        title: "Reduced Personal Accomplishment (30% weight)",
+        description: `Feelings of ineffectiveness and lack of achievement at work. This dimension captures the erosion of professional self-efficacy and satisfaction with one's contributions.`,
+        calculation: "Inverted measure of effectiveness under pressure, derived from response time pressure and incident load factors.",
+      },
+    ],
+    footer: `<strong>Final Score:</strong> The three dimensions are weighted and combined to produce a final burnout score from 0-100, with higher scores indicating greater burnout risk. The weighting reflects the relative importance of each dimension based on burnout research.`,
+  },
+}
+
+// ============================================================================
+// COMPONENT - Renders the content above (no need to edit below for text changes)
+// ============================================================================
+
+const iconMap = {
+  Activity: Activity,
+  Clock: Clock,
+  AlertTriangle: AlertTriangle,
+  Timer: Timer,
+  TrendingUp: TrendingUp,
+  Target: Target,
+  Eye: Eye,
+  MessageSquareHeart: MessageSquareHeart,
+  GitCompare: GitCompare,
+  Scale: Scale,
+  Database: Database,
+  Heart: Heart,
+}
+
+// Define sections for the outline navigation
+const sections = [
+  { id: "goal-and-role", title: "Goal and Role" },
+  { id: "method", title: "The Method Behind Risk Level" },
+  { id: "workload-signals", title: "Risk Signals" },
+  { id: "research-enhancements", title: "Risk Level Formula" },
+  { id: "burnout-dimensions", title: "Burnout Dimensions" },
+]
+
+export default function MethodologyPage() {
   return (
     <div className="min-h-screen bg-neutral-100">
       <TopPanel />
-      <div className="max-w-4xl mx-auto p-8">
+      <div className="max-w-7xl mx-auto p-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-black mb-2">
-            Enhanced Burnout Methodology
-          </h1>
-          <p className="text-lg text-neutral-700">
-            Research-enhanced Copenhagen Burnout Inventory with compound trauma, time impact, and recovery analysis
-          </p>
+          <h1 className="text-4xl font-bold text-black mb-2">{content.header.title}</h1>
+          <p className="text-lg text-neutral-700">{content.header.subtitle}</p>
+        </div>
+
+        <div className="flex gap-8">
+          {/* Left Sidebar - Outline Navigation */}
+          <nav className="hidden lg:block w-64 flex-shrink-0">
+            <div className="sticky top-8">
+              <h3 className="text-sm font-semibold text-neutral-500 uppercase tracking-wide mb-4">On this page</h3>
+              <ul className="space-y-2">
+                {sections.map((section) => (
+                  <li key={section.id}>
+                    <a
+                      href={`#${section.id}`}
+                      className="block text-sm text-neutral-600 hover:text-neutral-900 hover:bg-neutral-200 rounded px-3 py-2 transition-colors"
+                    >
+                      {section.title}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </nav>
+
+          {/* Main Content */}
+          <div className="flex-1 max-w-4xl">
+            {/* Goal and Role Section - Redesigned */}
+            <div id="goal-and-role" className="space-y-6 mb-8 scroll-mt-8">
+          <h2 className="text-3xl font-semibold text-neutral-900">{content.goalAndRole.title}</h2>
+          <p className="text-base text-neutral-700">{content.goalAndRole.description}</p>
+
+          {/* Purpose Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Target className="w-5 h-5 mr-2 text-blue-600" />
+                {content.goalAndRole.purpose.title}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-base text-neutral-700 mb-4">{content.goalAndRole.purpose.description}</p>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <p className="text-sm text-blue-800">{content.goalAndRole.purpose.callout}</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Two Data Types */}
+          <h2 className="text-2xl font-semibold text-neutral-900 mt-8 mb-4">{content.goalAndRole.dataTypes.title}</h2>
+          <p className="text-base text-neutral-700 mb-4">{content.goalAndRole.dataTypes.description}</p>
+          <Card>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {content.goalAndRole.dataTypes.types.map((type, idx) => {
+                  const IconComponent = iconMap[type.icon as keyof typeof iconMap]
+                  return (
+                    <div key={idx} className={`${type.bgColor} ${type.borderColor} border rounded-lg p-4`}>
+                      <div className="flex items-center mb-3">
+                        <IconComponent className={`w-5 h-5 mr-2 ${type.iconColor}`} />
+                        <h4 className="font-semibold text-neutral-900">{type.title}</h4>
+                      </div>
+                      <p className="text-sm text-neutral-700 mb-3">{type.description}</p>
+                      <div className="bg-white/60 rounded p-2 mb-3">
+                        <p className="text-sm font-medium text-neutral-800">
+                          Core question: <em>{type.question}</em>
+                        </p>
+                      </div>
+                      <ul className="text-sm text-neutral-600 space-y-1 mb-3">
+                        {type.bullets.map((bullet, bIdx) => (
+                          <li key={bIdx} className="flex items-start">
+                            <span className="mr-2">•</span>
+                            {bullet}
+                          </li>
+                        ))}
+                      </ul>
+                      <p className="text-xs text-neutral-500 italic">{type.footer}</p>
+                    </div>
+                  )
+                })}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Baselines Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <GitCompare className="w-5 h-5 mr-2 text-orange-600" />
+                {content.goalAndRole.baselines.title}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-base text-neutral-700 mb-4">{content.goalAndRole.baselines.description}</p>
+              <div className="space-y-3 mb-4">
+                {content.goalAndRole.baselines.reasons.map((reason, idx) => (
+                  <div key={idx} className="flex items-start bg-orange-50 border border-orange-100 rounded-lg p-3">
+                    <div className="w-2 h-2 bg-orange-400 rounded-full mt-2 mr-3 flex-shrink-0"></div>
+                    <div>
+                      <span className="font-medium text-neutral-900">{reason.label}.</span>{" "}
+                      <span className="text-neutral-700">{reason.detail}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="bg-neutral-100 rounded-lg p-4">
+                <p className="text-sm text-neutral-700">{content.goalAndRole.baselines.footer}</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Absolute Load Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Scale className="w-5 h-5 mr-2 text-neutral-600" />
+                {content.goalAndRole.absoluteLoad.title}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {content.goalAndRole.absoluteLoad.paragraphs.map((p, idx) => (
+                <p key={idx} className="text-base text-neutral-700 mb-3 last:mb-0">{p}</p>
+              ))}
+            </CardContent>
+          </Card>
         </div>
 
         {/* Overview */}
-        <Card className="mb-8">
+        <Card id="method" className="mb-8 scroll-mt-8">
           <CardHeader>
-            <CardTitle>The Science Behind Our Scoring</CardTitle>
-            <CardDescription>
-              Powered by the On-Call Burnout (OCB) Score — inspired by the Copenhagen Burnout Inventory (CBI)
-            </CardDescription>
+            <CardTitle dangerouslySetInnerHTML={{ __html: content.overview.title }} />
+            <CardDescription>{content.overview.description}</CardDescription>
           </CardHeader>
-
           <CardContent>
-            <p className="text-base text-neutral-700 mb-4">
-              Our burnout detection system uses the <strong>On-Call Burnout (OCB) Score</strong>, a model designed specifically for
-              engineering on-call work and incident response environments. The OCB framework is
-              inspired by the Copenhagen Burnout Inventory (CBI), a scientifically validated tool for measuring personal and
-              work-related burnout, but adapts those principles to operational data rather than survey responses.
-              <br /><br />
-              The OCB Score incorporates factors such as severity-weighted incident load, after-hours and weekend work,
-              response-time pressure, recovery gaps between incidents, and compound-trauma effects from repeated critical events.
-              This produces a real-time, practical burnout indicator tailored for modern DevOps and SRE teams.
-            </p>
+            {content.overview.paragraphs.map((p, idx) => (
+              <p key={idx} className="text-base text-neutral-700 mb-4" dangerouslySetInnerHTML={{ __html: p }} />
+            ))}
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-base text-blue-800">
-                <strong>Multi-Source Analysis:</strong> We analyze incident data from PagerDuty/Rootly as the primary source,
-                with additional insights from GitHub activity patterns and Slack communication when available.
-                The system adapts based on available integrations to provide the most comprehensive assessment possible.
-              </p>
+              <p className="text-base text-blue-800" dangerouslySetInnerHTML={{ __html: content.overview.callout }} />
             </div>
           </CardContent>
         </Card>
 
-        {/* Burnout Factors */}
-        <div className="space-y-6 mb-8">
-          <h2 className="text-3xl font-semibold text-neutral-900">The Five Key Burnout Factors</h2>
+        {/* Key Workload Signals */}
+        <div id="workload-signals" className="space-y-6 mb-8 scroll-mt-8">
+          <h2 className="text-3xl font-semibold text-neutral-900">{content.factors.title}</h2>
+          <p className="text-base text-neutral-700" dangerouslySetInnerHTML={{ __html: content.factors.intro }} />
+          <p className="text-base text-neutral-700 mb-6" dangerouslySetInnerHTML={{ __html: content.factors.subintro || '' }} />
 
-          <p className="text-base text-neutral-700 mb-6">
-            We analyze five specific factors that contribute to burnout in incident response teams. Each factor is measured
-            on a scale of 0-10, with higher scores indicating greater burnout risk. These factors are then combined using
-            the three-dimensional Copenhagen Burnout Inventory framework to produce an overall burnout score.
-          </p>
+          {content.factors.items.map((factor, idx) => {
+            const IconComponent = iconMap[factor.icon as keyof typeof iconMap]
+            return (
+              <Card key={idx}>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <IconComponent className={`w-5 h-5 mr-2 ${factor.iconColor}`} />
+                    {factor.title}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-base text-neutral-700 mb-3">{factor.description}</p>
+                  {factor.detail && (
+                    <div className="bg-neutral-100 rounded-lg p-3 mb-3">
+                      <p className="text-sm text-neutral-700" dangerouslySetInnerHTML={{ __html: factor.detail }} />
+                    </div>
+                  )}
+                  {factor.question && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                      <p className="text-sm text-blue-800">
+                        <strong>This signal helps answer:</strong> <em>{factor.question}</em>
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )
+          })}
 
-          {/* Workload */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Activity className="w-5 h-5 mr-2 text-red-500" />
-                Workload Factor
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-base text-neutral-700 mb-3">
-                Measures the frequency and volume of incidents handled by each team member over time.
-                This is one of the strongest predictors of burnout, as high incident volumes can lead to
-                chronic stress and exhaustion.
-              </p>
-              <div className="bg-neutral-100 rounded-lg p-3">
-                <p className="text-sm text-neutral-700">
-                  <strong>Scoring:</strong> 0-2 incidents/week = Low (0-3 points) • 2-5 incidents/week = Moderate (3-7 points) •
-                  5-8 incidents/week = High (7-10 points) • 8+ incidents/week = Critical (10 points)
-                </p>
+          {/* Conclusion - Different design as summary section */}
+          {content.factors.conclusion && (
+            <div className="mt-8 bg-gradient-to-r from-blue-50 to-neutral-50 border border-blue-200 rounded-xl p-6">
+              <div className="flex items-start gap-4">
+                <div className="bg-blue-100 rounded-full p-3 flex-shrink-0">
+                  <Activity className="w-6 h-6 text-blue-600" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-semibold text-neutral-900 mb-3">{content.factors.conclusion.title}</h3>
+                  <p className="text-base text-neutral-700 mb-3" dangerouslySetInnerHTML={{ __html: content.factors.conclusion.description }} />
+                  <p className="text-base text-neutral-700">{content.factors.conclusion.callout}</p>
+                </div>
               </div>
-            </CardContent>
-          </Card>
-
-          {/* After Hours */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Clock className="w-5 h-5 mr-2 text-orange-500" />
-                After Hours Factor
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-base text-neutral-700 mb-3">
-                Tracks work performed outside normal business hours, including incident responses, code commits,
-                and team communications. Excessive after-hours work disrupts work-life balance and contributes
-                to emotional exhaustion.
-              </p>
-              <div className="bg-neutral-100 rounded-lg p-3">
-                <p className="text-sm text-neutral-700">
-                  <strong>Data Sources:</strong> Incident timestamps from PagerDuty/Rootly, GitHub commit times,
-                  and Slack message activity (when connected)
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Weekend Work */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <AlertTriangle className="w-5 h-5 mr-2 text-yellow-500" />
-                Weekend Work Factor
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-base text-neutral-700 mb-3">
-                Measures weekend activity that disrupts personal time and recovery periods. Regular weekend work
-                prevents proper rest and contributes to chronic stress accumulation, leading to depersonalization
-                and cynicism toward work.
-              </p>
-              <div className="bg-neutral-100 rounded-lg p-3">
-                <p className="text-sm text-neutral-700">
-                  <strong>Boundary Health:</strong> Healthy teams typically have &lt;10% weekend activity.
-                  Scores above 25% indicate significant work-life boundary violations.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Response Time */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Timer className="w-5 h-5 mr-2 text-blue-500" />
-                Response Time Pressure
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-base text-neutral-700 mb-3">
-                Measures the time pressure to respond quickly to incidents. While fast response times are important
-                for business continuity, excessive pressure to respond immediately can create chronic stress and
-                contribute to feelings of being overwhelmed and losing control.
-              </p>
-              <div className="bg-neutral-100 rounded-lg p-3">
-                <p className="text-sm text-neutral-700">
-                  <strong>Pressure Points:</strong> Average response time under 5 minutes indicates high pressure.
-                  Sustained pressure can lead to anxiety and reduced job satisfaction.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Incident Load */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <TrendingUp className="w-5 h-5 mr-2 text-purple-500" />
-                Severity-Weighted Incident Load
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-base text-neutral-700 mb-3">
-                Goes beyond simple incident count to measure the actual psychological burden of different incident
-                severities. Critical incidents (SEV0/SEV1) cause significantly more stress than minor issues,
-                so this factor weights incidents by their business impact and stress level.
-              </p>
-              <div className="bg-neutral-100 rounded-lg p-3">
-                <p className="text-sm text-neutral-700">
-                  <strong>Research-Based Severity Weighting:</strong> SEV0/Critical = 15x weight • SEV1/High = 12x weight •
-                  Medium = 6x weight • Low = 3x weight. These weights reflect the psychological impact of
-                  critical incidents based on first responder PTSD research.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+            </div>
+          )}
         </div>
 
         {/* Research-Based Enhancements */}
-        <div className="space-y-6 mb-8">
-          <h2 className="text-3xl font-semibold text-neutral-900">Research-Based Scoring Enhancements</h2>
+        <div id="research-enhancements" className="space-y-6 mb-8 scroll-mt-8">
+          <h2 className="text-3xl font-semibold text-neutral-900">{content.enhancements.title}</h2>
+          <p className="text-base text-neutral-700 mb-6">{content.enhancements.intro}</p>
 
-          <p className="text-base text-neutral-700 mb-6">
-            Based on 2024 research from ACM studies on cybersecurity incident burnout, first responder PTSD research,
-            and critical incident stress psychology, we've enhanced our scoring with three key improvements that capture
-            the true psychological impact of incident response work.
-          </p>
-
-          {/* Compound Trauma */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <AlertTriangle className="w-5 h-5 mr-2 text-red-600" />
-                Compound Trauma Factor
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-base text-neutral-700 mb-3">
-                Research shows that multiple critical incidents create exponential psychological impact, not just additive impact.
-                When a team member handles 5+ SEV0/SEV1 incidents, the psychological burden compounds significantly beyond
-                simple addition.
-              </p>
-              <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-3">
-                <p className="text-sm text-red-800">
-                  <strong>Research Basis:</strong> First responder studies show 5+ critical incidents create 25.6x higher PTSD probability.
-                  Multiple critical incidents cause compound trauma, not linear stress accumulation.
-                </p>
-              </div>
-              <div className="bg-neutral-100 rounded-lg p-3">
-                <p className="text-sm text-neutral-700">
-                  <strong>Scoring:</strong> 5-10 critical incidents: 1.10-1.20x multiplier • 10+ critical incidents:
-                  1.15x per additional incident (capped at 2.0x total)
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Time Impact Multipliers */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Clock className="w-5 h-5 mr-2 text-orange-600" />
-                Time Impact Multipliers
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-base text-neutral-700 mb-3">
-                Research demonstrates that incident timing dramatically affects psychological impact. After-hours, weekend,
-                and overnight incidents cause significantly higher stress due to circadian disruption, family time interference,
-                and sleep disturbance.
-              </p>
-              <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-3">
-                <p className="text-sm text-orange-800">
-                  <strong>Research Basis:</strong> Studies on circadian disruption and work-life boundary violations show
-                  timing creates multiplicative stress effects, not additive ones.
-                </p>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div className="bg-neutral-100 rounded-lg p-3">
-                  <p className="text-sm text-neutral-700">
-                    <strong>After-Hours:</strong><br/>
-                    1.4x psychological impact<br/>
-                    <span className="text-neutral-500">(Before 8am / After 6pm)</span>
-                  </p>
-                </div>
-                <div className="bg-neutral-100 rounded-lg p-3">
-                  <p className="text-sm text-neutral-700">
-                    <strong>Weekend:</strong><br/>
-                    1.6x psychological impact<br/>
-                    <span className="text-neutral-500">(Family time disruption)</span>
-                  </p>
-                </div>
-                <div className="bg-neutral-100 rounded-lg p-3">
-                  <p className="text-sm text-neutral-700">
-                    <strong>Overnight:</strong><br/>
-                    1.8x psychological impact<br/>
-                    <span className="text-neutral-500">(Sleep disruption: 11pm-6am)</span>
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Recovery Deficit Analysis */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Timer className="w-5 h-5 mr-2 text-blue-600" />
-                Recovery Deficit Analysis
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-base text-neutral-700 mb-3">
-                Psychological recovery research shows that insufficient time between stressful incidents prevents proper
-                mental restoration. Recovery periods under 48 hours significantly impair the brain's ability to process
-                and recover from traumatic stress.
-              </p>
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
-                <p className="text-sm text-blue-800">
-                  <strong>Research Basis:</strong> Trauma psychology research demonstrates that recovery periods &lt;48 hours
-                  prevent psychological restoration, leading to stress accumulation and increased burnout risk.
-                </p>
-              </div>
-              <div className="bg-neutral-100 rounded-lg p-3">
-                <p className="text-sm text-neutral-700">
-                  <strong>Scoring:</strong> Recovery Score 0-100 (higher = better) • Perfect recovery: 168+ hours between incidents •
-                  Each violation (&lt;48 hours) reduces recovery adequacy • Sustained violations indicate chronic stress
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+          {content.enhancements.items.map((item, idx) => {
+            const IconComponent = iconMap[item.icon as keyof typeof iconMap]
+            return (
+              <Card key={idx}>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <IconComponent className={`w-5 h-5 mr-2 ${item.iconColor}`} />
+                    {item.title}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-base text-neutral-700 mb-3">{item.description}</p>
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
+                    <p className="text-sm text-blue-800">
+                      <strong>Research Basis:</strong> {item.researchBasis}
+                    </p>
+                  </div>
+                  {item.timeImpacts ? (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      {item.timeImpacts.map((impact, impactIdx) => (
+                        <div key={impactIdx} className="bg-neutral-100 rounded-lg p-3">
+                          <p className="text-sm text-neutral-700">
+                            <strong>{impact.label}:</strong><br />
+                            {impact.multiplier}<br />
+                            <span className="text-neutral-500">{impact.note}</span>
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="bg-neutral-100 rounded-lg p-3">
+                      <p className="text-sm text-neutral-700" dangerouslySetInnerHTML={{ __html: item.detail || '' }} />
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )
+          })}
         </div>
 
         {/* Three Dimensions */}
-        <Card className="mb-8">
+        <Card id="burnout-dimensions" className="mb-8 scroll-mt-8">
           <CardHeader>
-            <CardTitle>On-Call Burnout Dimensions</CardTitle>
-            <CardDescription>
-              How the five factors map to the three scientifically validated burnout dimensions
-            </CardDescription>
+            <CardTitle>{content.dimensions.title}</CardTitle>
+            <CardDescription>{content.dimensions.description}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
-              <div>
-                <h4 className="font-semibold text-neutral-900 mb-2 flex items-center">
-                  <div className="w-4 h-4 bg-red-500 rounded mr-2"></div>
-                  Emotional Exhaustion (40% weight)
-                </h4>
-                <p className="text-sm text-neutral-700 mb-3">
-                  Physical and psychological fatigue from work demands. This dimension measures the core stress
-                  experience and depletion of emotional resources that characterizes burnout.
-                </p>
-                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                  <p className="text-xs text-red-800">
-                    <strong>Calculation:</strong> Workload Factor (50%) + After Hours Factor (30%) + Incident Load (20%)
-                  </p>
-                </div>
-              </div>
-
-              <div>
-                <h4 className="font-semibold text-neutral-900 mb-2 flex items-center">
-                  <div className="w-4 h-4 bg-yellow-500 rounded mr-2"></div>
-                  Depersonalization/Cynicism (30% weight)
-                </h4>
-                <p className="text-sm text-neutral-700 mb-3">
-                  Detached, callous attitudes toward work and colleagues. This reflects the psychological
-                  distancing and defensive coping mechanisms that develop under chronic stress.
-                </p>
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                  <p className="text-xs text-yellow-800">
-                    <strong>Calculation:</strong> Response Time Pressure (50%) + Weekend Work Factor (50%)
-                  </p>
-                </div>
-              </div>
-
-              <div>
-                <h4 className="font-semibold text-neutral-900 mb-2 flex items-center">
-                  <div className="w-4 h-4 bg-blue-500 rounded mr-2"></div>
-                  Reduced Personal Accomplishment (30% weight)
-                </h4>
-                <p className="text-sm text-neutral-700 mb-3">
-                  Feelings of ineffectiveness and lack of achievement at work. This dimension captures
-                  the erosion of professional self-efficacy and satisfaction with one's contributions.
-                </p>
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <p className="text-xs text-blue-800">
-                    <strong>Calculation:</strong> Inverted measure of effectiveness under pressure, derived from
-                    response time pressure and incident load factors.
-                  </p>
-                </div>
-              </div>
-
+              {content.dimensions.items.map((dim, idx) => {
+                const colorClasses: Record<string, { dot: string; bg: string; border: string; text: string }> = {
+                  red: { dot: 'bg-red-500', bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-800' },
+                  yellow: { dot: 'bg-yellow-500', bg: 'bg-yellow-50', border: 'border-yellow-200', text: 'text-yellow-800' },
+                  blue: { dot: 'bg-blue-500', bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-800' },
+                }
+                const colors = colorClasses[dim.color] || colorClasses.blue
+                return (
+                  <div key={idx}>
+                    <h4 className="font-semibold text-neutral-900 mb-2 flex items-center">
+                      <div className={`w-4 h-4 ${colors.dot} rounded mr-2`}></div>
+                      {dim.title}
+                    </h4>
+                    <p className="text-sm text-neutral-700 mb-3">{dim.description}</p>
+                    <div className={`${colors.bg} ${colors.border} border rounded-lg p-3`}>
+                      <p className={`text-xs ${colors.text}`}>
+                        <strong>Calculation:</strong> {dim.calculation}
+                      </p>
+                    </div>
+                  </div>
+                )
+              })}
               <div className="mt-6 bg-neutral-100 border border-neutral-200 rounded-lg p-4">
-                <p className="text-sm text-neutral-700">
-                  <strong>Final Score:</strong> The three dimensions are weighted and combined to produce a final
-                  burnout score from 0-100, with higher scores indicating greater burnout risk. The weighting
-                  reflects the relative importance of each dimension based on burnout research.
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Enhanced User Insights */}
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle>Enhanced User Insights</CardTitle>
-            <CardDescription>
-              Research-based insights now displayed to users for better understanding and actionability
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-neutral-700 mb-4">
-              Beyond traditional burnout factors, users now see detailed research-based insights that explain
-              the specific stress patterns affecting their team members. These insights help identify root causes
-              and provide actionable intervention points.
-            </p>
-
-            <div className="space-y-4">
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <h4 className="font-semibold text-red-800 mb-2">Time Impact Factors</h4>
-                <div className="text-sm text-red-700 space-y-1">
-                  <p>• Non-business hours incidents: 8 (1.4x psychological impact)</p>
-                  <p>• Weekend incidents disrupting family time: 3 (1.6x impact)</p>
-                  <p>• Overnight incidents disrupting sleep: 2 (1.8x impact)</p>
-                </div>
-              </div>
-
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h4 className="font-semibold text-blue-800 mb-2">Recovery Deficit Factors</h4>
-                <div className="text-sm text-blue-700 space-y-1">
-                  <p>• Insufficient recovery periods: 5 violations (&lt;48 hours between incidents)</p>
-                  <p>• Average recovery time: 18.3 hours (optimal: 168+ hours)</p>
-                  <p>• Recovery adequacy: 23/100 (psychological restoration impaired)</p>
-                </div>
-              </div>
-
-              <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                <h4 className="font-semibold text-orange-800 mb-2">Compound Trauma Factors</h4>
-                <div className="text-sm text-orange-700 space-y-1">
-                  <p>• Multiple critical incidents: 13 (compound factor: 1.45x)</p>
-                  <p>• Research shows: 5+ critical incidents create exponential psychological impact</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-4 bg-neutral-100 border border-neutral-200 rounded-lg p-4">
-              <p className="text-sm text-neutral-700">
-                <strong>Actionable Intelligence:</strong> These insights help managers understand not just
-                <em>that</em> someone is at burnout risk, but <em>why</em> and <em>what specific factors</em>
-                are driving the risk. This enables targeted interventions rather than generic wellness approaches.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Risk Levels */}
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle>Risk Level Classification</CardTitle>
-            <CardDescription>
-              How we categorize burnout risk and what each level means for team intervention
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-6">
-              <div>
-                <div className="flex items-center space-x-4 mb-2">
-                  <Badge className="bg-green-500 w-24">Low Risk</Badge>
-                  <Progress value={20} className="h-3 flex-1" />
-                  <span className="text-sm font-medium">0-24 points</span>
-                </div>
-                <p className="text-sm text-neutral-700 ml-28">
-                  Sustainable workload and healthy work-life balance. Team members are functioning well
-                  with minimal stress indicators. Continue current practices and monitor for changes.
-                </p>
-              </div>
-
-              <div>
-                <div className="flex items-center space-x-4 mb-2">
-                  <Badge className="bg-yellow-500 w-24">Moderate</Badge>
-                  <Progress value={37} className="h-3 flex-1" />
-                  <span className="text-sm font-medium">25-49 points</span>
-                </div>
-                <p className="text-sm text-neutral-700 ml-28">
-                  Some stress indicators present but manageable. Consider workload distribution,
-                  schedule adjustments, or additional support. Monitor closely for escalation.
-                </p>
-              </div>
-
-              <div>
-                <div className="flex items-center space-x-4 mb-2">
-                  <Badge className="bg-orange-500 w-24">High Risk</Badge>
-                  <Progress value={62} className="h-3 flex-1" />
-                  <span className="text-sm font-medium">50-74 points</span>
-                </div>
-                <p className="text-sm text-neutral-700 ml-28">
-                  Significant burnout indicators requiring intervention. Recommend workload reduction,
-                  schedule changes, additional team support, or temporary assignment adjustments.
-                </p>
-              </div>
-
-              <div>
-                <div className="flex items-center space-x-4 mb-2">
-                  <Badge className="bg-red-500 w-24">Critical</Badge>
-                  <Progress value={87} className="h-3 flex-1" />
-                  <span className="text-sm font-medium">75-100 points</span>
-                </div>
-                <p className="text-sm text-neutral-700 ml-28">
-                  Severe burnout risk requiring immediate action. Consider temporary on-call rotation
-                  removal, significant workload reduction, or professional support resources.
-                </p>
+                <p className="text-sm text-neutral-700" dangerouslySetInnerHTML={{ __html: content.dimensions.footer }} />
               </div>
             </div>
           </CardContent>
@@ -499,6 +560,8 @@ export default function MethodologyPage() {
               className="h-12 w-auto"
             />
           </a>
+        </div>
+          </div>
         </div>
       </div>
     </div>
