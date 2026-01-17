@@ -1,21 +1,14 @@
 name: Claude Code Review
 
 on:
-  # Respond to @claude mentions in PR comments
-  issue_comment:
-    types: [created]
-  pull_request_review_comment:
-    types: [created]
   # Run on new PRs and updates
   pull_request:
     types: [opened, synchronize, reopened]
 
 jobs:
-  # Interactive Claude assistant - responds to @claude mentions
+  # Interactive Claude assistant - runs on all PRs
   claude-assistant:
-    if: |
-      (github.event_name == 'issue_comment' || github.event_name == 'pull_request_review_comment') &&
-      contains(github.event.comment.body, '@claude')
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
