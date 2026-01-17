@@ -394,33 +394,36 @@ async def list_integrations(
 
         async def refresh_permissions_background():
             """Background task to check permissions and update cache"""
-            from app.models.base import SessionLocal
-            perm_start = time.time()
-            results = await asyncio.gather(*[check_with_timeout(idx, task, int_id) for idx, task, int_id in background_tasks])
-
-            # Create new DB session for background task (request session will be closed)
-            background_db = SessionLocal()
             try:
-                for idx, permissions, error, integration_id in results:
-                    if permissions:
-                        try:
-                            integration = background_db.query(RootlyIntegration).filter(RootlyIntegration.id == integration_id).first()
-                            if integration:
-                                integration.cached_permissions = permissions
-                                integration.permissions_checked_at = datetime.now(timezone.utc)
-                                background_db.commit()
-                                logger.info(f"💾 Background: Cached permissions for integration ID={integration_id}")
-                        except Exception as e:
-                            logger.warning(f"⚠️ Background cache failed: {e}")
-                            background_db.rollback()
-                    elif error:
-                        logger.warning(f"⚠️ Integration ID={integration_id} - Permission check {error}")
-            finally:
-                background_db.close()
+                from app.models.base import SessionLocal
+                perm_start = time.time()
+                results = await asyncio.gather(*[check_with_timeout(idx, task, int_id) for idx, task, int_id in background_tasks])
 
-            logger.info(f"🔍 [ROOTLY] Background permission checks completed in {time.time() - perm_start:.2f}s")
+                # Create new DB session for background task (request session will be closed)
+                background_db = SessionLocal()
+                try:
+                    for idx, permissions, error, integration_id in results:
+                        if permissions:
+                            try:
+                                integration = background_db.query(RootlyIntegration).filter(RootlyIntegration.id == integration_id).first()
+                                if integration:
+                                    integration.cached_permissions = permissions
+                                    integration.permissions_checked_at = datetime.now(timezone.utc)
+                                    background_db.commit()
+                                    logger.info(f"💾 Background: Cached permissions for integration ID={integration_id}")
+                            except Exception as e:
+                                logger.warning(f"⚠️ Background cache failed: {e}")
+                                background_db.rollback()
+                        elif error:
+                            logger.warning(f"⚠️ Integration ID={integration_id} - Permission check {error}")
+                finally:
+                    background_db.close()
 
-        # Fire and forget
+                logger.info(f"🔍 [ROOTLY] Background permission checks completed in {time.time() - perm_start:.2f}s")
+            except Exception as e:
+                logger.error(f"❌ [ROOTLY] Background permission check failed with unhandled exception: {e}", exc_info=True)
+
+        # Fire and forget - exceptions are now logged inside the task
         asyncio.create_task(refresh_permissions_background())
 
     total_time = time.time() - start_time
