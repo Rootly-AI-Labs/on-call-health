@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { Clock, ChevronDown, ChevronRight } from "lucide-react"
+import { Clock, ChevronDown, ChevronRight, AlertTriangle, AlertCircle, Ticket } from "lucide-react"
 import { formatDistanceToNow, isPast, parseISO, isBefore, addDays, isAfter } from "date-fns"
 
 interface TicketingCardProps {
@@ -84,6 +84,22 @@ function isLinearUrgentHigh(priority: number | null): boolean {
   return priority === 1 || priority === 2
 }
 
+// Get Linear priority label from numeric value
+function getLinearPriorityLabel(priority: number | null): string {
+  switch (priority) {
+    case 1:
+      return "Urgent"
+    case 2:
+      return "High"
+    case 3:
+      return "Med"
+    case 4:
+      return "Low"
+    default:
+      return "None"
+  }
+}
+
 // Format due date relative to today
 function formatDueDate(dueDate: string | null): string {
   if (!dueDate) return "No due date"
@@ -101,6 +117,8 @@ function formatDueDate(dueDate: string | null): string {
 
 // Content component for Jira tickets (used in consolidated card)
 function JiraTicketCardContent({ memberData }: TicketingCardProps) {
+  const [isTicketsExpanded, setIsTicketsExpanded] = useState(false)
+
   if (!memberData?.jira_tickets || memberData.jira_tickets.length === 0) {
     return <p className="text-sm text-neutral-500 text-center py-4">No active Jira tickets</p>
   }
@@ -141,53 +159,115 @@ function JiraTicketCardContent({ memberData }: TicketingCardProps) {
 
   return (
     <div className="space-y-4 w-full overflow-hidden">
-      {/* Summary Metrics */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="bg-neutral-100 p-3 rounded-md">
-          <p className="text-xs text-neutral-700">Total Tickets</p>
-          <p className="text-lg font-semibold text-neutral-900">{totalTickets}</p>
+      {/* Summary Metrics - Improved Layout */}
+      <div className="flex flex-col gap-4">
+        {/* Top Row: Total count and High Priority */}
+        <div className="flex items-center justify-center gap-4">
+          {/* Hero Stat - Total Tickets */}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-neutral-100">
+              <Ticket className="w-5 h-5 text-neutral-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-neutral-900">{totalTickets}</p>
+              <p className="text-xs text-neutral-500">Active Tickets</p>
+            </div>
+          </div>
+
+          {/* High/Critical Badge */}
+          {highCriticalCount > 0 && (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-orange-50 border border-orange-200">
+              <AlertCircle className="w-3.5 h-3.5 text-orange-600" />
+              <span className="text-sm font-semibold text-orange-700">{highCriticalCount} High Priority</span>
+            </div>
+          )}
         </div>
-        <div className="bg-neutral-100 p-3 rounded-md">
-          <p className="text-xs text-neutral-700">High/Critical</p>
-          <p className="text-lg font-semibold text-red-600">{highCriticalCount}</p>
-        </div>
-        <div className="bg-neutral-100 p-3 rounded-md">
-          <p className="text-xs text-neutral-700">Due in 7 Days</p>
-          <p className="text-lg font-semibold text-orange-600">{dueIn7DaysCount}</p>
-        </div>
-        <div className="bg-neutral-100 p-3 rounded-md">
-          <p className="text-xs text-neutral-700">Overdue</p>
-          <p className="text-lg font-semibold text-red-600">{overdueCount}</p>
+
+        {/* Attention Items Row */}
+        <div className="flex gap-3">
+          {/* Overdue - Most prominent if > 0 */}
+          <div className={`flex-1 p-3 rounded-lg border ${
+            overdueCount > 0
+              ? "bg-red-50 border-red-200"
+              : "bg-neutral-50 border-neutral-200"
+          }`}>
+            <div className="flex items-center gap-2">
+              {overdueCount > 0 && <AlertTriangle className="w-4 h-4 text-red-600" />}
+              <span className={`text-2xl font-bold ${
+                overdueCount > 0 ? "text-red-600" : "text-neutral-400"
+              }`}>
+                {overdueCount}
+              </span>
+            </div>
+            <p className={`text-xs mt-1 ${
+              overdueCount > 0 ? "text-red-600 font-medium" : "text-neutral-500"
+            }`}>
+              Overdue
+            </p>
+          </div>
+
+          {/* Due in 7 Days */}
+          <div className={`flex-1 p-3 rounded-lg border ${
+            dueIn7DaysCount > 0
+              ? "bg-amber-50 border-amber-200"
+              : "bg-neutral-50 border-neutral-200"
+          }`}>
+            <div className="flex items-center gap-2">
+              {dueIn7DaysCount > 0 && <Clock className="w-4 h-4 text-amber-600" />}
+              <span className={`text-2xl font-bold ${
+                dueIn7DaysCount > 0 ? "text-amber-600" : "text-neutral-400"
+              }`}>
+                {dueIn7DaysCount}
+              </span>
+            </div>
+            <p className={`text-xs mt-1 ${
+              dueIn7DaysCount > 0 ? "text-amber-600 font-medium" : "text-neutral-500"
+            }`}>
+              Due in 7 Days
+            </p>
+          </div>
         </div>
       </div>
 
       <Separator />
 
-      {/* Ticket List */}
+      {/* Collapsible Ticket List */}
       <div className="w-full overflow-hidden">
-        <p className="text-xs font-semibold text-neutral-700 mb-3">Active Tickets ({sortedTickets.length})</p>
-        <div className="space-y-2 max-h-64 overflow-y-auto w-full">
-          {sortedTickets.map((ticket, index) => (
-            <div key={index} className="flex items-center gap-2 p-2 bg-neutral-100 rounded-md hover:bg-neutral-200 transition overflow-hidden">
-              <Badge
-                className="text-xs flex-shrink-0"
-                style={getPriorityColor(ticket.priority)}
-              >
-                {ticket.priority || "N/A"}
-              </Badge>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-neutral-900 truncate line-clamp-1">
-                  <span className="font-bold">{ticket.key}</span>
-                  {ticket.summary || ticket.title ? ` - ${ticket.summary || ticket.title}` : ""}
-                </p>
+        <button
+          onClick={() => setIsTicketsExpanded(!isTicketsExpanded)}
+          className="flex items-center gap-1 text-xs font-semibold text-neutral-700 hover:text-neutral-900 transition-colors"
+        >
+          {isTicketsExpanded ? (
+            <ChevronDown className="w-4 h-4" />
+          ) : (
+            <ChevronRight className="w-4 h-4" />
+          )}
+          View All Tickets ({sortedTickets.length})
+        </button>
+        {isTicketsExpanded && (
+          <div className="space-y-2 max-h-64 overflow-y-auto w-full mt-3">
+            {sortedTickets.map((ticket, index) => (
+              <div key={index} className="flex items-center gap-2 p-2 bg-neutral-50 rounded-md hover:bg-neutral-100 transition overflow-hidden border border-neutral-100">
+                <Badge
+                  className="text-xs flex-shrink-0"
+                  style={getPriorityColor(ticket.priority)}
+                >
+                  {ticket.priority || "N/A"}
+                </Badge>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-neutral-900 truncate line-clamp-1">
+                    <span className="font-bold">{ticket.key}</span>
+                    {ticket.summary || ticket.title ? ` - ${ticket.summary || ticket.title}` : ""}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1 text-xs text-neutral-500 whitespace-nowrap flex-shrink-0">
+                  <Clock className="w-3 h-3" />
+                  <span>{formatDueDate(ticket.duedate)}</span>
+                </div>
               </div>
-              <div className="flex items-center gap-1 text-xs text-neutral-500 whitespace-nowrap flex-shrink-0">
-                <Clock className="w-3 h-3" />
-                <span>{formatDueDate(ticket.duedate)}</span>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -195,6 +275,8 @@ function JiraTicketCardContent({ memberData }: TicketingCardProps) {
 
 // Component to display Jira tickets
 function JiraTicketCard({ memberData }: TicketingCardProps) {
+  const [isTicketsExpanded, setIsTicketsExpanded] = useState(false)
+
   if (!memberData?.jira_tickets || memberData.jira_tickets.length === 0) {
     return (
       <Card>
@@ -252,53 +334,115 @@ function JiraTicketCard({ memberData }: TicketingCardProps) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Summary Metrics */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div className="bg-neutral-100 p-3 rounded-md">
-            <p className="text-xs text-neutral-700">Total Tickets</p>
-            <p className="text-lg font-semibold text-neutral-900">{totalTickets}</p>
+        {/* Summary Metrics - Improved Layout */}
+        <div className="flex flex-col gap-4">
+          {/* Top Row: Total count and High Priority */}
+          <div className="flex items-center justify-center gap-4">
+            {/* Hero Stat - Total Tickets */}
+            <div className="flex items-center gap-3">
+              <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-neutral-100">
+                <Ticket className="w-5 h-5 text-neutral-600" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-neutral-900">{totalTickets}</p>
+                <p className="text-xs text-neutral-500">Active Tickets</p>
+              </div>
+            </div>
+
+            {/* High/Critical Badge */}
+            {highCriticalCount > 0 && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-orange-50 border border-orange-200">
+                <AlertCircle className="w-3.5 h-3.5 text-orange-600" />
+                <span className="text-sm font-semibold text-orange-700">{highCriticalCount} High Priority</span>
+              </div>
+            )}
           </div>
-          <div className="bg-neutral-100 p-3 rounded-md">
-            <p className="text-xs text-neutral-700">High/Critical</p>
-            <p className="text-lg font-semibold text-red-600">{highCriticalCount}</p>
-          </div>
-          <div className="bg-neutral-100 p-3 rounded-md">
-            <p className="text-xs text-neutral-700">Due in 7 Days</p>
-            <p className="text-lg font-semibold text-orange-600">{dueIn7DaysCount}</p>
-          </div>
-          <div className="bg-neutral-100 p-3 rounded-md">
-            <p className="text-xs text-neutral-700">Overdue</p>
-            <p className="text-lg font-semibold text-red-600">{overdueCount}</p>
+
+          {/* Attention Items Row */}
+          <div className="flex gap-3">
+            {/* Overdue - Most prominent if > 0 */}
+            <div className={`flex-1 p-3 rounded-lg border ${
+              overdueCount > 0
+                ? "bg-red-50 border-red-200"
+                : "bg-neutral-50 border-neutral-200"
+            }`}>
+              <div className="flex items-center gap-2">
+                {overdueCount > 0 && <AlertTriangle className="w-4 h-4 text-red-600" />}
+                <span className={`text-2xl font-bold ${
+                  overdueCount > 0 ? "text-red-600" : "text-neutral-400"
+                }`}>
+                  {overdueCount}
+                </span>
+              </div>
+              <p className={`text-xs mt-1 ${
+                overdueCount > 0 ? "text-red-600 font-medium" : "text-neutral-500"
+              }`}>
+                Overdue
+              </p>
+            </div>
+
+            {/* Due in 7 Days */}
+            <div className={`flex-1 p-3 rounded-lg border ${
+              dueIn7DaysCount > 0
+                ? "bg-amber-50 border-amber-200"
+                : "bg-neutral-50 border-neutral-200"
+            }`}>
+              <div className="flex items-center gap-2">
+                {dueIn7DaysCount > 0 && <Clock className="w-4 h-4 text-amber-600" />}
+                <span className={`text-2xl font-bold ${
+                  dueIn7DaysCount > 0 ? "text-amber-600" : "text-neutral-400"
+                }`}>
+                  {dueIn7DaysCount}
+                </span>
+              </div>
+              <p className={`text-xs mt-1 ${
+                dueIn7DaysCount > 0 ? "text-amber-600 font-medium" : "text-neutral-500"
+              }`}>
+                Due in 7 Days
+              </p>
+            </div>
           </div>
         </div>
 
         <Separator />
 
-        {/* Ticket List */}
-        <div>
-          <p className="text-xs font-semibold text-neutral-700 mb-3">Active Tickets ({sortedTickets.length})</p>
-          <div className="space-y-2 max-h-64 overflow-y-auto">
-            {sortedTickets.map((ticket, index) => (
-              <div key={index} className="flex items-center gap-2 p-2 bg-neutral-100 rounded-md hover:bg-neutral-200 transition">
-                <Badge
-                  className="text-xs flex-shrink-0"
-                  style={getPriorityColor(ticket.priority)}
-                >
-                  {ticket.priority || "N/A"}
-                </Badge>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-neutral-900 truncate">
-                    <span className="font-bold">{ticket.key}</span>
-                    {ticket.summary || ticket.title ? ` - ${ticket.summary || ticket.title}` : ""}
-                  </p>
+        {/* Collapsible Ticket List */}
+        <div className="w-full overflow-hidden">
+          <button
+            onClick={() => setIsTicketsExpanded(!isTicketsExpanded)}
+            className="flex items-center gap-1 text-xs font-semibold text-neutral-700 hover:text-neutral-900 transition-colors"
+          >
+            {isTicketsExpanded ? (
+              <ChevronDown className="w-4 h-4" />
+            ) : (
+              <ChevronRight className="w-4 h-4" />
+            )}
+            View All Tickets ({sortedTickets.length})
+          </button>
+          {isTicketsExpanded && (
+            <div className="space-y-2 max-h-64 overflow-y-auto w-full mt-3">
+              {sortedTickets.map((ticket, index) => (
+                <div key={index} className="flex items-center gap-2 p-2 bg-neutral-50 rounded-md hover:bg-neutral-100 transition overflow-hidden border border-neutral-100">
+                  <Badge
+                    className="text-xs flex-shrink-0"
+                    style={getPriorityColor(ticket.priority)}
+                  >
+                    {ticket.priority || "N/A"}
+                  </Badge>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-neutral-900 truncate line-clamp-1">
+                      <span className="font-bold">{ticket.key}</span>
+                      {ticket.summary || ticket.title ? ` - ${ticket.summary || ticket.title}` : ""}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1 text-xs text-neutral-500 whitespace-nowrap flex-shrink-0">
+                    <Clock className="w-3 h-3" />
+                    <span>{formatDueDate(ticket.duedate)}</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1 text-xs text-neutral-500 whitespace-nowrap flex-shrink-0">
-                  <Clock className="w-3 h-3" />
-                  <span>{formatDueDate(ticket.duedate)}</span>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
@@ -345,30 +489,80 @@ function LinearIssueCardContent({ memberData }: TicketingCardProps) {
 
   return (
     <div className="space-y-4 w-full overflow-hidden">
-      {/* Summary Metrics */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="bg-neutral-100 p-3 rounded-md">
-          <p className="text-xs text-neutral-700">Total Issues</p>
-          <p className="text-lg font-semibold text-neutral-900">{totalIssues}</p>
+      {/* Summary Metrics - Improved Layout */}
+      <div className="flex flex-col gap-4">
+        {/* Top Row: Total count and Urgent/High Priority */}
+        <div className="flex items-center justify-center gap-4">
+          {/* Hero Stat - Total Issues */}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-neutral-100">
+              <Ticket className="w-5 h-5 text-neutral-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-neutral-900">{totalIssues}</p>
+              <p className="text-xs text-neutral-500">Active Issues</p>
+            </div>
+          </div>
+
+          {/* Urgent/High Badge */}
+          {urgentHighCount > 0 && (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-orange-50 border border-orange-200">
+              <AlertCircle className="w-3.5 h-3.5 text-orange-600" />
+              <span className="text-sm font-semibold text-orange-700">{urgentHighCount} Urgent/High</span>
+            </div>
+          )}
         </div>
-        <div className="bg-neutral-100 p-3 rounded-md">
-          <p className="text-xs text-neutral-700">Urgent/High</p>
-          <p className="text-lg font-semibold text-red-600">{urgentHighCount}</p>
-        </div>
-        <div className="bg-neutral-100 p-3 rounded-md">
-          <p className="text-xs text-neutral-700">Due in 7 Days</p>
-          <p className="text-lg font-semibold text-orange-600">{dueIn7DaysCount}</p>
-        </div>
-        <div className="bg-neutral-100 p-3 rounded-md">
-          <p className="text-xs text-neutral-700">Overdue</p>
-          <p className="text-lg font-semibold text-red-600">{overdueCount}</p>
+
+        {/* Attention Items Row */}
+        <div className="flex gap-3">
+          {/* Overdue - Most prominent if > 0 */}
+          <div className={`flex-1 p-3 rounded-lg border ${
+            overdueCount > 0
+              ? "bg-red-50 border-red-200"
+              : "bg-neutral-50 border-neutral-200"
+          }`}>
+            <div className="flex items-center gap-2">
+              {overdueCount > 0 && <AlertTriangle className="w-4 h-4 text-red-600" />}
+              <span className={`text-2xl font-bold ${
+                overdueCount > 0 ? "text-red-600" : "text-neutral-400"
+              }`}>
+                {overdueCount}
+              </span>
+            </div>
+            <p className={`text-xs mt-1 ${
+              overdueCount > 0 ? "text-red-600 font-medium" : "text-neutral-500"
+            }`}>
+              Overdue
+            </p>
+          </div>
+
+          {/* Due in 7 Days */}
+          <div className={`flex-1 p-3 rounded-lg border ${
+            dueIn7DaysCount > 0
+              ? "bg-amber-50 border-amber-200"
+              : "bg-neutral-50 border-neutral-200"
+          }`}>
+            <div className="flex items-center gap-2">
+              {dueIn7DaysCount > 0 && <Clock className="w-4 h-4 text-amber-600" />}
+              <span className={`text-2xl font-bold ${
+                dueIn7DaysCount > 0 ? "text-amber-600" : "text-neutral-400"
+              }`}>
+                {dueIn7DaysCount}
+              </span>
+            </div>
+            <p className={`text-xs mt-1 ${
+              dueIn7DaysCount > 0 ? "text-amber-600 font-medium" : "text-neutral-500"
+            }`}>
+              Due in 7 Days
+            </p>
+          </div>
         </div>
       </div>
 
       <Separator />
 
       {/* Collapsible Issue List */}
-      <div>
+      <div className="w-full overflow-hidden">
         <button
           onClick={() => setIsIssuesExpanded(!isIssuesExpanded)}
           className="flex items-center gap-1 text-xs font-semibold text-neutral-700 hover:text-neutral-900 transition-colors"
@@ -378,20 +572,20 @@ function LinearIssueCardContent({ memberData }: TicketingCardProps) {
           ) : (
             <ChevronRight className="w-4 h-4" />
           )}
-          Active Issues ({sortedIssues.length})
+          View All Issues ({sortedIssues.length})
         </button>
         {isIssuesExpanded && (
-          <div className="space-y-2 max-h-64 overflow-y-auto mt-3">
+          <div className="space-y-2 max-h-64 overflow-y-auto w-full mt-3">
             {sortedIssues.map((issue, index) => (
-              <div key={index} className="flex items-center gap-2 p-2 bg-neutral-100 rounded-md hover:bg-neutral-200 transition">
+              <div key={index} className="flex items-center gap-2 p-2 bg-neutral-50 rounded-md hover:bg-neutral-100 transition overflow-hidden border border-neutral-100">
                 <Badge
                   className="text-xs flex-shrink-0"
                   style={getPriorityColor(issue.priority)}
                 >
-                  {issue.priority === 1 ? "Urgent" : issue.priority === 2 ? "High" : issue.priority === 3 ? "Med" : issue.priority === 4 ? "Low" : "None"}
+                  {getLinearPriorityLabel(issue.priority)}
                 </Badge>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-neutral-900 truncate">
+                  <p className="text-sm font-medium text-neutral-900 truncate line-clamp-1">
                     <span className="font-bold">{issue.identifier}</span>
                     {issue.title ? ` - ${issue.title}` : ""}
                   </p>
@@ -466,23 +660,73 @@ function LinearIssueCard({ memberData }: TicketingCardProps) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Summary Metrics */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div className="bg-neutral-100 p-3 rounded-md">
-            <p className="text-xs text-neutral-700">Total Issues</p>
-            <p className="text-lg font-semibold text-neutral-900">{totalIssues}</p>
+        {/* Summary Metrics - Improved Layout */}
+        <div className="flex flex-col gap-4">
+          {/* Top Row: Total count and Urgent/High Priority */}
+          <div className="flex items-center justify-center gap-4">
+            {/* Hero Stat - Total Issues */}
+            <div className="flex items-center gap-3">
+              <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-neutral-100">
+                <Ticket className="w-5 h-5 text-neutral-600" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-neutral-900">{totalIssues}</p>
+                <p className="text-xs text-neutral-500">Active Issues</p>
+              </div>
+            </div>
+
+            {/* Urgent/High Badge */}
+            {urgentHighCount > 0 && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-orange-50 border border-orange-200">
+                <AlertCircle className="w-3.5 h-3.5 text-orange-600" />
+                <span className="text-sm font-semibold text-orange-700">{urgentHighCount} Urgent/High</span>
+              </div>
+            )}
           </div>
-          <div className="bg-neutral-100 p-3 rounded-md">
-            <p className="text-xs text-neutral-700">Urgent/High</p>
-            <p className="text-lg font-semibold text-red-600">{urgentHighCount}</p>
-          </div>
-          <div className="bg-neutral-100 p-3 rounded-md">
-            <p className="text-xs text-neutral-700">Due in 7 Days</p>
-            <p className="text-lg font-semibold text-orange-600">{dueIn7DaysCount}</p>
-          </div>
-          <div className="bg-neutral-100 p-3 rounded-md">
-            <p className="text-xs text-neutral-700">Overdue</p>
-            <p className="text-lg font-semibold text-red-600">{overdueCount}</p>
+
+          {/* Attention Items Row */}
+          <div className="flex gap-3">
+            {/* Overdue - Most prominent if > 0 */}
+            <div className={`flex-1 p-3 rounded-lg border ${
+              overdueCount > 0
+                ? "bg-red-50 border-red-200"
+                : "bg-neutral-50 border-neutral-200"
+            }`}>
+              <div className="flex items-center gap-2">
+                {overdueCount > 0 && <AlertTriangle className="w-4 h-4 text-red-600" />}
+                <span className={`text-2xl font-bold ${
+                  overdueCount > 0 ? "text-red-600" : "text-neutral-400"
+                }`}>
+                  {overdueCount}
+                </span>
+              </div>
+              <p className={`text-xs mt-1 ${
+                overdueCount > 0 ? "text-red-600 font-medium" : "text-neutral-500"
+              }`}>
+                Overdue
+              </p>
+            </div>
+
+            {/* Due in 7 Days */}
+            <div className={`flex-1 p-3 rounded-lg border ${
+              dueIn7DaysCount > 0
+                ? "bg-amber-50 border-amber-200"
+                : "bg-neutral-50 border-neutral-200"
+            }`}>
+              <div className="flex items-center gap-2">
+                {dueIn7DaysCount > 0 && <Clock className="w-4 h-4 text-amber-600" />}
+                <span className={`text-2xl font-bold ${
+                  dueIn7DaysCount > 0 ? "text-amber-600" : "text-neutral-400"
+                }`}>
+                  {dueIn7DaysCount}
+                </span>
+              </div>
+              <p className={`text-xs mt-1 ${
+                dueIn7DaysCount > 0 ? "text-amber-600 font-medium" : "text-neutral-500"
+              }`}>
+                Due in 7 Days
+              </p>
+            </div>
           </div>
         </div>
 
@@ -499,17 +743,17 @@ function LinearIssueCard({ memberData }: TicketingCardProps) {
             ) : (
               <ChevronRight className="w-4 h-4" />
             )}
-            Active Issues ({sortedIssues.length})
+            View All Issues ({sortedIssues.length})
           </button>
           {isIssuesExpanded && (
             <div className="space-y-2 max-h-64 overflow-y-auto w-full mt-3">
               {sortedIssues.map((issue, index) => (
-                <div key={index} className="flex items-center gap-2 p-2 bg-neutral-100 rounded-md hover:bg-neutral-200 transition overflow-hidden">
+                <div key={index} className="flex items-center gap-2 p-2 bg-neutral-50 rounded-md hover:bg-neutral-100 transition overflow-hidden border border-neutral-100">
                   <Badge
                     className="text-xs flex-shrink-0"
                     style={getPriorityColor(issue.priority)}
                   >
-                    {issue.priority === 1 ? "Urgent" : issue.priority === 2 ? "High" : issue.priority === 3 ? "Med" : issue.priority === 4 ? "Low" : "None"}
+                    {getLinearPriorityLabel(issue.priority)}
                   </Badge>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-neutral-900 truncate line-clamp-1">
