@@ -79,7 +79,6 @@ class TestPersonalBurnoutCalculation(unittest.TestCase):
             'work_hours_trend': 50.0,      # 50% over 45hr/week limit
             'weekend_work': 20.0,          # 20% weekend work
             'after_hours_activity': 25.0,  # 25% after hours
-            'vacation_usage': 60.0,        # 60% unused vacation
             'sleep_quality_proxy': 15.0    # 15% late night commits
         }
         
@@ -135,7 +134,6 @@ class TestPersonalBurnoutCalculation(unittest.TestCase):
             'work_hours_trend': 200.0,     # Extreme value
             'weekend_work': 100.0,         # Maximum weekend work
             'after_hours_activity': 80.0,  # High after hours
-            'vacation_usage': 100.0,       # All vacation unused
             'sleep_quality_proxy': 50.0    # High late night activity
         }
         
@@ -321,7 +319,6 @@ class TestocbEdgeCases(unittest.TestCase):
             'work_hours_trend': 0.0,
             'weekend_work': 0.0,
             'after_hours_activity': 0.0,
-            'vacation_usage': 0.0,
             'sleep_quality_proxy': 0.0
         }
         

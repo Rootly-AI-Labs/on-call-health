@@ -48,14 +48,8 @@ class OCBConfig:
             'calculation': 'after_hours_percentage_with_time_multiplier',
             'scale_max': 30  # LOWERED: >30% after hours (with multiplier) = 100 burnout - more sensitive threshold
         },
-        'vacation_usage': {
-            'weight': 0.10,
-            'description': 'Recovery opportunity utilization (inverted)',
-            'calculation': 'unused_pto_percentage',
-            'scale_max': 80  # 80%+ unused PTO = 100 burnout
-        },
         'sleep_quality_proxy': {
-            'weight': 0.25,
+            'weight': 0.35,  # Increased from 0.25 after removing vacation_usage
             'description': 'Energy level estimation from late night activity and incident stress',
             'calculation': 'late_night_commits_frequency_and_incident_stress',
             'scale_max': 30
@@ -415,9 +409,6 @@ def generate_ocb_score_reasoning(
                 if factor_name == 'sleep_quality_proxy':
                     personal_factors.append(f"Sleep quality impact from critical incidents ({display_score:.1f} points)")
 
-                elif factor_name == 'vacation_usage':
-                    personal_factors.append(f"Recovery time between incidents ({display_score:.1f} points)")
-
                 elif factor_name == 'work_hours_trend':
                     personal_factors.append(f"Extended work hours ({display_score:.1f} points)")
 
@@ -526,7 +517,6 @@ def get_structured_ocb_factors(
     # Human-readable names for factors
     factor_display_names = {
         'sleep_quality_proxy': 'Sleep quality impact',
-        'vacation_usage': 'Recovery time',
         'work_hours_trend': 'Extended work hours',
         'after_hours_activity': 'After-hours activity',
         'oncall_burden': 'On-call load',

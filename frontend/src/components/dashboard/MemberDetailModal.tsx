@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, BarChart, Bar, Cell } from "recharts"
-import { Info, RefreshCw, BarChart3 } from "lucide-react"
+import { Info, RefreshCw, BarChart3, Activity } from "lucide-react"
 import { useState, useEffect, useRef } from "react"
 import { UserObjectiveDataCard } from "@/components/dashboard/UserObjectiveDataCard"
 import { UserRiskFactorsCard } from "@/components/dashboard/UserRiskFactorsCard"

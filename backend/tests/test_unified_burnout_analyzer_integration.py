@@ -854,7 +854,6 @@ class TestOffHoursContribution:
         ocb_metrics = {
             'work_hours_trend': 0,
             'after_hours_activity': 35,  # 25% * 1.4 multiplier = 35
-            'vacation_usage': 0,
             'sleep_quality_proxy': 0
         }
 
@@ -876,7 +875,6 @@ class TestOffHoursContribution:
         ocb_metrics = {
             'work_hours_trend': 50,      # 50% of scale_max
             'after_hours_activity': 15,  # 50% of scale_max (15/30)
-            'vacation_usage': 40,        # 50% of scale_max (40/80)
             'sleep_quality_proxy': 15    # 50% of scale_max (15/30)
         }
 
@@ -886,7 +884,6 @@ class TestOffHoursContribution:
         after_hours_weighted = components['after_hours_activity']['weighted_score']
         other_max_weighted = max(
             components['work_hours_trend']['weighted_score'],
-            components['vacation_usage']['weighted_score'],
             components['sleep_quality_proxy']['weighted_score']
         )
 
@@ -902,7 +899,6 @@ class TestOffHoursContribution:
         personal_metrics = {
             'work_hours_trend': 30,
             'after_hours_activity': 56,  # 40% * 1.4 = 56
-            'vacation_usage': 20,
             'sleep_quality_proxy': 15
         }
 

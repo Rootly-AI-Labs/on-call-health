@@ -1806,7 +1806,6 @@ class UnifiedBurnoutAnalyzer:
             'work_hours_trend': apply_incident_tiers(incidents_per_week) * 10,      # Scale to 0-100
             'weekend_work': after_hours_percentage * 2,                             # NO CAP: Extreme after-hours can exceed 100%
             'after_hours_activity': time_weighted_after_hours,                      # Time-multiplied for research-based impact
-            'vacation_usage': (severity_weighted_per_week / 20) * 100,              # NO CAP: Extreme SEV1s prevent recovery completely
             'sleep_quality_proxy': apply_rootly_incident_tiers(severity_weighted_per_week) * 8,  # NO CAP: SEV1s can destroy sleep
             
             # Work-related burnout factors - using Rootly's response time tiers  
