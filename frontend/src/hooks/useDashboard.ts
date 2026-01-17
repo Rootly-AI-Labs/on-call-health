@@ -600,7 +600,7 @@ export default function useDashboard() {
             // Validate the analysis has required data
             if (!mostRecentAnalysis.analysis_data) {
               console.error('Most recent analysis is missing analysis_data')
-              toast.error('Latest analysis data is incomplete. Please run a new analysis.')
+              toast.error('Latest analysis data is incomplete. Please run a new analysis or wait for any current one to finish.')
               setLoadingAnalyses(false)
               return false
             }
