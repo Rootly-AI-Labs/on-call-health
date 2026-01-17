@@ -140,6 +140,7 @@ const content = {
         iconColor: "text-orange-500",
         title: "Off-Hours Activity",
         description: `Captures work performed outside normal working hours, including evenings, nights, and weekends. This includes incident responses as well as related operational activity. Persistent off-hours work can reduce recovery time and contribute to cumulative fatigue, especially when it becomes a consistent pattern rather than an exception.`,
+        detail: `<strong>How We Determine Off-Hours:</strong> On-Call Health retrieves each user's timezone from their Rootly or PagerDuty profile settings (with Rootly taking priority). Activities are then evaluated against standard business hours (9 AM to 5 PM by default) in the user's local timezone. This ensures that an engineer in San Francisco and one in Paris are both correctly assessed based on their respective local times. The business hours thresholds are configurable via environment variables for organizations with non-standard working hours.`,
         question: `Is off-hours work increasing or becoming more frequent compared to the historical baseline?`,
       },
       {
@@ -187,9 +188,9 @@ const content = {
         researchBasis: `Studies on circadian disruption and work-life boundary violations show timing creates multiplicative stress effects, not additive ones.`,
         researchColor: "orange",
         timeImpacts: [
-          { label: "After-Hours", multiplier: "1.4x psychological impact", note: "(Before 8am / After 6pm)" },
+          { label: "After-Hours", multiplier: "1.4x psychological impact", note: "(Before 9am / After 5pm in user's timezone)" },
           { label: "Weekend", multiplier: "1.6x psychological impact", note: "(Family time disruption)" },
-          { label: "Overnight", multiplier: "1.8x psychological impact", note: "(Sleep disruption: 11pm-6am)" },
+          { label: "Overnight", multiplier: "1.8x psychological impact", note: "(Sleep disruption: 10pm-6am in user's timezone)" },
         ],
       },
       {

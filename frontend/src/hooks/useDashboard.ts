@@ -597,9 +597,17 @@ export default function useDashboard() {
             const mostRecentAnalysis = data.analyses[0] // Analyses should be ordered by created_at desc
 
             // Validate the analysis has required data
+            // Skip error if analysis is still running (pending/running/started status)
             if (!mostRecentAnalysis.analysis_data) {
+              const isStillRunning = ['pending', 'running', 'started'].includes(mostRecentAnalysis.status)
+              if (isStillRunning) {
+                // Analysis is in progress, don't show error - just wait
+                console.log('Most recent analysis is still running, waiting for completion...')
+                setLoadingAnalyses(false)
+                return false
+              }
               console.error('Most recent analysis is missing analysis_data')
-              toast.error('Latest analysis data is incomplete. Please run a new analysis or wait for any current one to finish.')
+              toast.error('Latest analysis data is incomplete. Please run a new analysis.')
               setLoadingAnalyses(false)
               return false
             }

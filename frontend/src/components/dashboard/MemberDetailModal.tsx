@@ -372,32 +372,38 @@ export function MemberDetailModal({
               </DialogHeader>
 
               <div className="mt-4 space-y-6">
-                {/* Overall Burnout Assessment */}
+                {/* Top row: Overall Risk Level and Incidents side by side */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Overall Risk Level */}
                   <Card>
-                    <CardContent className="p-4 text-center">
-                      <p className="text-sm text-gray-600 mb-2">Overall Risk Level</p>
-                      {(() => {
-                        const riskInfo = getOCBRiskInfo(memberData?.ocb_score)
-                        return (
-                          <Badge className={`px-3 py-1 ${getOCBBadgeColor(riskInfo.level)}`}>
-                            {riskInfo.label}
-                          </Badge>
-                        )
-                      })()}
-                      <div className="mt-3">
-                        <div className={`text-2xl font-bold ${getOCBScoreColor(memberData?.ocb_score)}`}>
-                          {memberData?.ocb_score !== undefined
-                            ? `${memberData.ocb_score.toFixed(0)}/100`
-                            : 'No Score Available'}
+                    <CardContent className="p-5">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="text-lg font-semibold text-neutral-900">Overall Risk Level</h3>
+                          <div className={`text-3xl font-bold mt-1 ${getOCBScoreColor(memberData?.ocb_score)}`}>
+                            {memberData?.ocb_score !== undefined
+                              ? `${memberData.ocb_score.toFixed(0)}/100`
+                              : 'N/A'}
+                          </div>
                         </div>
-                        <p className="text-xs text-gray-500">
-                          {memberData?.ocb_score !== undefined ? 'Risk Level' : 'No Score Available'}
-                        </p>
+                        {(() => {
+                          const riskInfo = getOCBRiskInfo(memberData?.ocb_score)
+                          return (
+                            <Badge className={`px-4 py-2 text-sm ${getOCBBadgeColor(riskInfo.level)}`}>
+                              {riskInfo.label}
+                            </Badge>
+                          )
+                        })()}
                       </div>
                     </CardContent>
                   </Card>
 
+                  {/* Incidents Card */}
+                  <UserIncidentCard
+                    memberData={memberData || selectedMember}
+                    timeRange={typeof timeRange === 'string' ? parseInt(timeRange) : timeRange}
+                    platform={currentAnalysis?.platform}
+                  />
                 </div>
 
                 {/* OCH Risk Levels */}
@@ -444,13 +450,6 @@ export function MemberDetailModal({
 
                 {/* User Risk Factors - Using shared component with percentage display */}
                 <UserRiskFactorsCard selectedMember={memberData || selectedMember} />
-
-                {/* User Incidents Card */}
-                <UserIncidentCard
-                  memberData={memberData || selectedMember}
-                  timeRange={typeof timeRange === 'string' ? parseInt(timeRange) : timeRange}
-                  platform={currentAnalysis?.platform}
-                />
 
                 {/* Health Check-ins (Survey Data) - Always render directly */}
                 <SurveyResultsCard
@@ -679,7 +678,7 @@ export function MemberDetailModal({
                       );
                     })()}
 
-                {/* Ticketing Workload Card */}
+                {/* Ticketing Card */}
                 <TicketingCard memberData={memberData} />
               </div>
             </>

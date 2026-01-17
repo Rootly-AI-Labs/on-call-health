@@ -157,8 +157,26 @@ async def test_pagerduty_token(
             }
         )
 
-    # Add can_add flag
+    # Generate suggested name (avoid duplicates like Rootly does)
+    existing_names = [
+        integration.name for integration in
+        db.query(RootlyIntegration).filter(
+            RootlyIntegration.user_id == current_user.id,
+            RootlyIntegration.platform == "pagerduty"
+        ).all()
+    ]
+
+    # Format: "PagerDuty - Organization Name"
+    base_name = f"PagerDuty - {org_name}"
+    suggested_name = base_name
+    counter = 2
+    while suggested_name in existing_names:
+        suggested_name = f"{base_name} #{counter}"
+        counter += 1
+
+    # Add can_add flag and suggested_name
     result["account_info"]["can_add"] = True
+    result["account_info"]["suggested_name"] = suggested_name
 
     return result
 
