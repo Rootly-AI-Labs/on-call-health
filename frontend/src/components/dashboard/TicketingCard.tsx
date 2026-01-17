@@ -1,8 +1,8 @@
 "use client"
 
+import type { ReactElement } from "react"
 import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Clock, ChevronDown, ChevronRight, AlertTriangle, AlertCircle, Ticket } from "lucide-react"
@@ -12,41 +12,30 @@ interface TicketingCardProps {
   memberData: any
 }
 
-// Helper function to determine priority badge color (matches burnout analysis colors exactly)
+// Priority color mappings
+const JIRA_PRIORITY_COLORS: Record<string, { backgroundColor: string; color: string }> = {
+  highest: { backgroundColor: "#EF4444", color: "white" },
+  high: { backgroundColor: "#F97316", color: "white" },
+  medium: { backgroundColor: "#F59E0B", color: "white" },
+  low: { backgroundColor: "#10B981", color: "white" },
+  lowest: { backgroundColor: "#9CA3AF", color: "white" },
+}
+
+const LINEAR_PRIORITY_COLORS: Record<number, { backgroundColor: string; color: string }> = {
+  1: { backgroundColor: "#EF4444", color: "white" },
+  2: { backgroundColor: "#F97316", color: "white" },
+  3: { backgroundColor: "#F59E0B", color: "white" },
+  4: { backgroundColor: "#10B981", color: "white" },
+  0: { backgroundColor: "#9CA3AF", color: "white" },
+}
+
+const DEFAULT_PRIORITY_COLOR = { backgroundColor: "#9CA3AF", color: "white" }
+
 function getPriorityColor(priority: string | number): { backgroundColor: string; color: string } {
   if (typeof priority === "string") {
-    // Jira priority - matches burnout analysis severity colors
-    switch (priority.toLowerCase()) {
-      case "highest":
-        return { backgroundColor: "#EF4444", color: "white" } // Critical
-      case "high":
-        return { backgroundColor: "#F97316", color: "white" } // Poor
-      case "medium":
-        return { backgroundColor: "#F59E0B", color: "white" } // Fair
-      case "low":
-        return { backgroundColor: "#10B981", color: "white" } // Good
-      case "lowest":
-        return { backgroundColor: "#9CA3AF", color: "white" }
-      default:
-        return { backgroundColor: "#9CA3AF", color: "white" }
-    }
-  } else {
-    // Linear priority (1=Urgent, 2=High, 3=Medium, 4=Low, 0=None) - matches burnout analysis severity colors
-    switch (priority) {
-      case 1:
-        return { backgroundColor: "#EF4444", color: "white" } // Critical
-      case 2:
-        return { backgroundColor: "#F97316", color: "white" } // Poor
-      case 3:
-        return { backgroundColor: "#F59E0B", color: "white" } // Fair
-      case 4:
-        return { backgroundColor: "#10B981", color: "white" } // Good
-      case 0:
-        return { backgroundColor: "#9CA3AF", color: "white" }
-      default:
-        return { backgroundColor: "#9CA3AF", color: "white" }
-    }
+    return JIRA_PRIORITY_COLORS[priority.toLowerCase()] || DEFAULT_PRIORITY_COLOR
   }
+  return LINEAR_PRIORITY_COLORS[priority] || DEFAULT_PRIORITY_COLOR
 }
 
 // Check if ticket is due within 7 days
@@ -84,185 +73,189 @@ function isLinearUrgentHigh(priority: number | null): boolean {
   return priority === 1 || priority === 2
 }
 
-// Get Linear priority label from numeric value
-function getLinearPriorityLabel(priority: number | null): string {
-  switch (priority) {
-    case 1:
-      return "Urgent"
-    case 2:
-      return "High"
-    case 3:
-      return "Med"
-    case 4:
-      return "Low"
-    default:
-      return "None"
-  }
+const LINEAR_PRIORITY_LABELS: Record<number, string> = {
+  1: "Urgent",
+  2: "High",
+  3: "Med",
+  4: "Low",
+  0: "None",
 }
 
-// Format due date relative to today
+function getLinearPriorityLabel(priority: number | null): string {
+  return LINEAR_PRIORITY_LABELS[priority ?? 0] || "None"
+}
+
+const JIRA_PRIORITY_ORDER: Record<string, number> = {
+  highest: 1,
+  high: 2,
+  medium: 3,
+  low: 4,
+  lowest: 5,
+}
+
+// Reusable attention metric box component
+interface AttentionMetricBoxProps {
+  count: number
+  label: string
+  activeColor: string
+  Icon: typeof AlertTriangle
+}
+
+function AttentionMetricBox({ count, label, activeColor, Icon }: AttentionMetricBoxProps): ReactElement {
+  const isActive = count > 0
+  const colorMap: Record<string, { bg: string; border: string; text: string }> = {
+    red: { bg: "bg-red-50", border: "border-red-200", text: "text-red-600" },
+    amber: { bg: "bg-amber-50", border: "border-amber-200", text: "text-amber-600" },
+    orange: { bg: "bg-orange-50", border: "border-orange-200", text: "text-orange-600" },
+  }
+  const colors = colorMap[activeColor] || colorMap.red
+
+  return (
+    <div className={`flex-1 p-3 rounded-lg border ${
+      isActive ? `${colors.bg} ${colors.border}` : "bg-neutral-50 border-neutral-200"
+    }`}>
+      <div className="flex items-center gap-2">
+        {isActive && <Icon className={`w-4 h-4 ${colors.text}`} />}
+        <span className={`text-2xl font-bold ${isActive ? colors.text : "text-neutral-400"}`}>
+          {count}
+        </span>
+      </div>
+      <p className={`text-xs mt-1 ${isActive ? `${colors.text} font-medium` : "text-neutral-500"}`}>
+        {label}
+      </p>
+    </div>
+  )
+}
+
 function formatDueDate(dueDate: string | null): string {
   if (!dueDate) return "No due date"
-
   try {
     const date = parseISO(dueDate)
-    if (isPast(date)) {
-      return `Overdue by ${formatDistanceToNow(date)}`
-    }
-    return `Due in ${formatDistanceToNow(date)}`
+    const prefix = isPast(date) ? "Overdue by" : "Due in"
+    return `${prefix} ${formatDistanceToNow(date)}`
   } catch {
     return "Invalid date"
   }
 }
 
-// Content component for Jira tickets (used in consolidated card)
-function JiraTicketCardContent({ memberData }: TicketingCardProps) {
-  const [isTicketsExpanded, setIsTicketsExpanded] = useState(false)
-
-  if (!memberData?.jira_tickets || memberData.jira_tickets.length === 0) {
-    return <p className="text-sm text-neutral-500 text-center py-4">No active Jira tickets</p>
-  }
-
-  const tickets = memberData.jira_tickets
-
-  // Calculate metrics from raw data
-  const totalTickets = tickets.length
-  const highCriticalCount = tickets.filter((ticket: any) => isJiraHighCritical(ticket.priority)).length
-  const dueIn7DaysCount = tickets.filter((ticket: any) => isDueIn7Days(ticket.duedate)).length
-  const overdueCount = tickets.filter((ticket: any) => isOverdue(ticket.duedate)).length
-
-  // Sort tickets by priority (high to low) then by due date, with None at the bottom
-  const sortedTickets = [...tickets].sort((a, b) => {
-    const priorityOrder: { [key: string]: number } = {
-      highest: 1,
-      high: 2,
-      medium: 3,
-      low: 4,
-      lowest: 5,
-    }
+// Sort Jira tickets by priority then due date
+function sortJiraTickets(tickets: any[]): any[] {
+  return [...tickets].sort((a, b) => {
     const aPriority = a.priority?.toLowerCase() || ""
     const bPriority = b.priority?.toLowerCase() || ""
+    const aOrder = JIRA_PRIORITY_ORDER[aPriority] ?? 999
+    const bOrder = JIRA_PRIORITY_ORDER[bPriority] ?? 999
 
-    const aOrder = priorityOrder[aPriority] !== undefined ? priorityOrder[aPriority] : 999
-    const bOrder = priorityOrder[bPriority] !== undefined ? priorityOrder[bPriority] : 999
-
-    if (aOrder !== bOrder) {
-      return aOrder - bOrder
-    }
-
-    // If same priority, sort by due date (earlier first)
+    if (aOrder !== bOrder) return aOrder - bOrder
     if (a.duedate && b.duedate) {
       return new Date(a.duedate).getTime() - new Date(b.duedate).getTime()
     }
     return a.duedate ? -1 : 1
   })
+}
+
+// Sort Linear issues by priority then due date
+function sortLinearIssues(issues: any[]): any[] {
+  return [...issues].sort((a, b) => {
+    const aPriority = a.priority ?? 0
+    const bPriority = b.priority ?? 0
+    const aOrder = aPriority === 0 ? 999 : aPriority
+    const bOrder = bPriority === 0 ? 999 : bPriority
+
+    if (aOrder !== bOrder) return aOrder - bOrder
+    if (a.dueDate && b.dueDate) {
+      return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
+    }
+    return a.dueDate ? -1 : 1
+  })
+}
+
+// Unified ticket/issue content component
+interface TicketListContentProps {
+  items: any[]
+  emptyMessage: string
+  itemLabel: string
+  highPriorityLabel: string
+  isHighPriority: (item: any) => boolean
+  getDueDate: (item: any) => string | null
+  getItemKey: (item: any) => string
+  getItemTitle: (item: any) => string
+  getPriorityLabel: (item: any) => string
+  sortItems: (items: any[]) => any[]
+}
+
+function TicketListContent({
+  items,
+  emptyMessage,
+  itemLabel,
+  highPriorityLabel,
+  isHighPriority,
+  getDueDate,
+  getItemKey,
+  getItemTitle,
+  getPriorityLabel,
+  sortItems,
+}: TicketListContentProps): ReactElement {
+  const [isExpanded, setIsExpanded] = useState(false)
+
+  if (!items || items.length === 0) {
+    return <p className="text-sm text-neutral-500 text-center py-4">{emptyMessage}</p>
+  }
+
+  const totalCount = items.length
+  const highPriorityCount = items.filter(isHighPriority).length
+  const dueIn7DaysCount = items.filter((item) => isDueIn7Days(getDueDate(item))).length
+  const overdueCount = items.filter((item) => isOverdue(getDueDate(item))).length
+  const sortedItems = sortItems(items)
 
   return (
     <div className="space-y-4 w-full overflow-hidden">
-      {/* Summary Metrics - Improved Layout */}
       <div className="flex flex-col gap-4">
-        {/* Top Row: Total count and High Priority */}
         <div className="flex items-center justify-center gap-4">
-          {/* Hero Stat - Total Tickets */}
           <div className="flex items-center gap-3">
             <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-neutral-100">
               <Ticket className="w-5 h-5 text-neutral-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-neutral-900">{totalTickets}</p>
-              <p className="text-xs text-neutral-500">Active Tickets</p>
+              <p className="text-2xl font-bold text-neutral-900">{totalCount}</p>
+              <p className="text-xs text-neutral-500">Active {itemLabel}</p>
             </div>
           </div>
-
-          {/* High/Critical Badge */}
-          {highCriticalCount > 0 && (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-orange-50 border border-orange-200">
-              <AlertCircle className="w-3.5 h-3.5 text-orange-600" />
-              <span className="text-sm font-semibold text-orange-700">{highCriticalCount} High Priority</span>
-            </div>
-          )}
         </div>
 
-        {/* Attention Items Row */}
         <div className="flex gap-3">
-          {/* Overdue - Most prominent if > 0 */}
-          <div className={`flex-1 p-3 rounded-lg border ${
-            overdueCount > 0
-              ? "bg-red-50 border-red-200"
-              : "bg-neutral-50 border-neutral-200"
-          }`}>
-            <div className="flex items-center gap-2">
-              {overdueCount > 0 && <AlertTriangle className="w-4 h-4 text-red-600" />}
-              <span className={`text-2xl font-bold ${
-                overdueCount > 0 ? "text-red-600" : "text-neutral-400"
-              }`}>
-                {overdueCount}
-              </span>
-            </div>
-            <p className={`text-xs mt-1 ${
-              overdueCount > 0 ? "text-red-600 font-medium" : "text-neutral-500"
-            }`}>
-              Overdue
-            </p>
-          </div>
-
-          {/* Due in 7 Days */}
-          <div className={`flex-1 p-3 rounded-lg border ${
-            dueIn7DaysCount > 0
-              ? "bg-amber-50 border-amber-200"
-              : "bg-neutral-50 border-neutral-200"
-          }`}>
-            <div className="flex items-center gap-2">
-              {dueIn7DaysCount > 0 && <Clock className="w-4 h-4 text-amber-600" />}
-              <span className={`text-2xl font-bold ${
-                dueIn7DaysCount > 0 ? "text-amber-600" : "text-neutral-400"
-              }`}>
-                {dueIn7DaysCount}
-              </span>
-            </div>
-            <p className={`text-xs mt-1 ${
-              dueIn7DaysCount > 0 ? "text-amber-600 font-medium" : "text-neutral-500"
-            }`}>
-              Due in 7 Days
-            </p>
-          </div>
+          <AttentionMetricBox count={overdueCount} label="Overdue" activeColor="red" Icon={AlertTriangle} />
+          <AttentionMetricBox count={dueIn7DaysCount} label="Due in 7 Days" activeColor="amber" Icon={Clock} />
+          <AttentionMetricBox count={highPriorityCount} label={highPriorityLabel} activeColor="orange" Icon={AlertCircle} />
         </div>
       </div>
 
       <Separator />
 
-      {/* Collapsible Ticket List */}
       <div className="w-full overflow-hidden">
         <button
-          onClick={() => setIsTicketsExpanded(!isTicketsExpanded)}
+          onClick={() => setIsExpanded(!isExpanded)}
           className="flex items-center gap-1 text-xs font-semibold text-neutral-700 hover:text-neutral-900 transition-colors"
         >
-          {isTicketsExpanded ? (
-            <ChevronDown className="w-4 h-4" />
-          ) : (
-            <ChevronRight className="w-4 h-4" />
-          )}
-          View All Tickets ({sortedTickets.length})
+          {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+          View All {itemLabel} ({sortedItems.length})
         </button>
-        {isTicketsExpanded && (
+        {isExpanded && (
           <div className="space-y-2 max-h-64 overflow-y-auto w-full mt-3">
-            {sortedTickets.map((ticket, index) => (
+            {sortedItems.map((item, index) => (
               <div key={index} className="flex items-center gap-2 p-2 bg-neutral-50 rounded-md hover:bg-neutral-100 transition overflow-hidden border border-neutral-100">
-                <Badge
-                  className="text-xs flex-shrink-0"
-                  style={getPriorityColor(ticket.priority)}
-                >
-                  {ticket.priority || "N/A"}
+                <Badge className="text-xs flex-shrink-0" style={getPriorityColor(item.priority)}>
+                  {getPriorityLabel(item)}
                 </Badge>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-neutral-900 truncate line-clamp-1">
-                    <span className="font-bold">{ticket.key}</span>
-                    {ticket.summary || ticket.title ? ` - ${ticket.summary || ticket.title}` : ""}
+                    <span className="font-bold">{getItemKey(item)}</span>
+                    {getItemTitle(item) && ` - ${getItemTitle(item)}`}
                   </p>
                 </div>
                 <div className="flex items-center gap-1 text-xs text-neutral-500 whitespace-nowrap flex-shrink-0">
                   <Clock className="w-3 h-3" />
-                  <span>{formatDueDate(ticket.duedate)}</span>
+                  <span>{formatDueDate(getDueDate(item))}</span>
                 </div>
               </div>
             ))}
@@ -273,385 +266,60 @@ function JiraTicketCardContent({ memberData }: TicketingCardProps) {
   )
 }
 
-// Component to display Jira tickets
-function JiraTicketCard({ memberData }: TicketingCardProps) {
-  const [isTicketsExpanded, setIsTicketsExpanded] = useState(false)
+// Jira-specific content component
+function JiraTicketCardContent({ memberData }: TicketingCardProps): ReactElement {
+  return (
+    <TicketListContent
+      items={memberData?.jira_tickets}
+      emptyMessage="No active Jira tickets"
+      itemLabel="Tickets"
+      highPriorityLabel="High Priority"
+      isHighPriority={(ticket) => isJiraHighCritical(ticket.priority)}
+      getDueDate={(ticket) => ticket.duedate}
+      getItemKey={(ticket) => ticket.key}
+      getItemTitle={(ticket) => ticket.summary || ticket.title || ""}
+      getPriorityLabel={(ticket) => ticket.priority || "N/A"}
+      sortItems={sortJiraTickets}
+    />
+  )
+}
 
-  if (!memberData?.jira_tickets || memberData.jira_tickets.length === 0) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <span className="text-blue-600">●</span> Jira Workload
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-neutral-500 text-center py-4">No active Jira tickets</p>
-        </CardContent>
-      </Card>
-    )
-  }
-
-  const tickets = memberData.jira_tickets
-
-  // Calculate metrics from raw data
-  const totalTickets = tickets.length
-  const highCriticalCount = tickets.filter((ticket: any) => isJiraHighCritical(ticket.priority)).length
-  const dueIn7DaysCount = tickets.filter((ticket: any) => isDueIn7Days(ticket.duedate)).length
-  const overdueCount = tickets.filter((ticket: any) => isOverdue(ticket.duedate)).length
-
-  // Sort tickets by priority (high to low) then by due date, with None at the bottom
-  const sortedTickets = [...tickets].sort((a, b) => {
-    const priorityOrder: { [key: string]: number } = {
-      highest: 1,
-      high: 2,
-      medium: 3,
-      low: 4,
-      lowest: 5,
-    }
-    const aPriority = a.priority?.toLowerCase() || ""
-    const bPriority = b.priority?.toLowerCase() || ""
-
-    const aOrder = priorityOrder[aPriority] !== undefined ? priorityOrder[aPriority] : 999
-    const bOrder = priorityOrder[bPriority] !== undefined ? priorityOrder[bPriority] : 999
-
-    if (aOrder !== bOrder) {
-      return aOrder - bOrder
-    }
-
-    // If same priority, sort by due date (earlier first)
-    if (a.duedate && b.duedate) {
-      return new Date(a.duedate).getTime() - new Date(b.duedate).getTime()
-    }
-    return a.duedate ? -1 : 1
-  })
-
+// Standalone Jira card component (used when only Jira is available)
+function JiraTicketCard({ memberData }: TicketingCardProps): ReactElement {
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <span className="text-blue-600">●</span> Jira Workload
+          <span className="text-blue-600">*</span> Jira Workload
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Summary Metrics - Improved Layout */}
-        <div className="flex flex-col gap-4">
-          {/* Top Row: Total count and High Priority */}
-          <div className="flex items-center justify-center gap-4">
-            {/* Hero Stat - Total Tickets */}
-            <div className="flex items-center gap-3">
-              <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-neutral-100">
-                <Ticket className="w-5 h-5 text-neutral-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-neutral-900">{totalTickets}</p>
-                <p className="text-xs text-neutral-500">Active Tickets</p>
-              </div>
-            </div>
-
-            {/* High/Critical Badge */}
-            {highCriticalCount > 0 && (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-orange-50 border border-orange-200">
-                <AlertCircle className="w-3.5 h-3.5 text-orange-600" />
-                <span className="text-sm font-semibold text-orange-700">{highCriticalCount} High Priority</span>
-              </div>
-            )}
-          </div>
-
-          {/* Attention Items Row */}
-          <div className="flex gap-3">
-            {/* Overdue - Most prominent if > 0 */}
-            <div className={`flex-1 p-3 rounded-lg border ${
-              overdueCount > 0
-                ? "bg-red-50 border-red-200"
-                : "bg-neutral-50 border-neutral-200"
-            }`}>
-              <div className="flex items-center gap-2">
-                {overdueCount > 0 && <AlertTriangle className="w-4 h-4 text-red-600" />}
-                <span className={`text-2xl font-bold ${
-                  overdueCount > 0 ? "text-red-600" : "text-neutral-400"
-                }`}>
-                  {overdueCount}
-                </span>
-              </div>
-              <p className={`text-xs mt-1 ${
-                overdueCount > 0 ? "text-red-600 font-medium" : "text-neutral-500"
-              }`}>
-                Overdue
-              </p>
-            </div>
-
-            {/* Due in 7 Days */}
-            <div className={`flex-1 p-3 rounded-lg border ${
-              dueIn7DaysCount > 0
-                ? "bg-amber-50 border-amber-200"
-                : "bg-neutral-50 border-neutral-200"
-            }`}>
-              <div className="flex items-center gap-2">
-                {dueIn7DaysCount > 0 && <Clock className="w-4 h-4 text-amber-600" />}
-                <span className={`text-2xl font-bold ${
-                  dueIn7DaysCount > 0 ? "text-amber-600" : "text-neutral-400"
-                }`}>
-                  {dueIn7DaysCount}
-                </span>
-              </div>
-              <p className={`text-xs mt-1 ${
-                dueIn7DaysCount > 0 ? "text-amber-600 font-medium" : "text-neutral-500"
-              }`}>
-                Due in 7 Days
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <Separator />
-
-        {/* Collapsible Ticket List */}
-        <div className="w-full overflow-hidden">
-          <button
-            onClick={() => setIsTicketsExpanded(!isTicketsExpanded)}
-            className="flex items-center gap-1 text-xs font-semibold text-neutral-700 hover:text-neutral-900 transition-colors"
-          >
-            {isTicketsExpanded ? (
-              <ChevronDown className="w-4 h-4" />
-            ) : (
-              <ChevronRight className="w-4 h-4" />
-            )}
-            View All Tickets ({sortedTickets.length})
-          </button>
-          {isTicketsExpanded && (
-            <div className="space-y-2 max-h-64 overflow-y-auto w-full mt-3">
-              {sortedTickets.map((ticket, index) => (
-                <div key={index} className="flex items-center gap-2 p-2 bg-neutral-50 rounded-md hover:bg-neutral-100 transition overflow-hidden border border-neutral-100">
-                  <Badge
-                    className="text-xs flex-shrink-0"
-                    style={getPriorityColor(ticket.priority)}
-                  >
-                    {ticket.priority || "N/A"}
-                  </Badge>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-neutral-900 truncate line-clamp-1">
-                      <span className="font-bold">{ticket.key}</span>
-                      {ticket.summary || ticket.title ? ` - ${ticket.summary || ticket.title}` : ""}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-1 text-xs text-neutral-500 whitespace-nowrap flex-shrink-0">
-                    <Clock className="w-3 h-3" />
-                    <span>{formatDueDate(ticket.duedate)}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+      <CardContent>
+        <JiraTicketCardContent memberData={memberData} />
       </CardContent>
     </Card>
   )
 }
 
-// Content component for Linear issues (used in consolidated card)
-function LinearIssueCardContent({ memberData }: TicketingCardProps) {
-  const [isIssuesExpanded, setIsIssuesExpanded] = useState(false)
-
-  if (!memberData?.linear_issues || memberData.linear_issues.length === 0) {
-    return <p className="text-sm text-neutral-500 text-center py-4">No active Linear issues</p>
-  }
-
-  const issues = memberData.linear_issues
-
-  // Calculate metrics from raw data
-  const totalIssues = issues.length
-  const urgentHighCount = issues.filter((issue: any) => isLinearUrgentHigh(issue.priority)).length
-  const dueIn7DaysCount = issues.filter((issue: any) => isDueIn7Days(issue.dueDate)).length
-  const overdueCount = issues.filter((issue: any) => isOverdue(issue.dueDate)).length
-
-  // Sort issues by priority (urgent to low) then by due date, with None (0) at the bottom
-  const sortedIssues = [...issues].sort((a, b) => {
-    // Linear priority: 1=Urgent, 2=High, 3=Medium, 4=Low, 0=None
-    const aPriority = a.priority ?? 0
-    const bPriority = b.priority ?? 0
-
-    // Put None (0) priority at the bottom by giving it highest sort order
-    const aOrder = aPriority === 0 ? 999 : aPriority
-    const bOrder = bPriority === 0 ? 999 : bPriority
-
-    if (aOrder !== bOrder) {
-      // Lower priority numbers are higher priority (1 is highest)
-      return aOrder - bOrder
-    }
-
-    // If same priority, sort by due date
-    if (a.dueDate && b.dueDate) {
-      return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
-    }
-    return a.dueDate ? -1 : 1
-  })
-
+// Linear-specific content component
+function LinearIssueCardContent({ memberData }: TicketingCardProps): ReactElement {
   return (
-    <div className="space-y-4 w-full overflow-hidden">
-      {/* Summary Metrics - Improved Layout */}
-      <div className="flex flex-col gap-4">
-        {/* Top Row: Total count and Urgent/High Priority */}
-        <div className="flex items-center justify-center gap-4">
-          {/* Hero Stat - Total Issues */}
-          <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-neutral-100">
-              <Ticket className="w-5 h-5 text-neutral-600" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-neutral-900">{totalIssues}</p>
-              <p className="text-xs text-neutral-500">Active Issues</p>
-            </div>
-          </div>
-
-          {/* Urgent/High Badge */}
-          {urgentHighCount > 0 && (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-orange-50 border border-orange-200">
-              <AlertCircle className="w-3.5 h-3.5 text-orange-600" />
-              <span className="text-sm font-semibold text-orange-700">{urgentHighCount} Urgent/High</span>
-            </div>
-          )}
-        </div>
-
-        {/* Attention Items Row */}
-        <div className="flex gap-3">
-          {/* Overdue - Most prominent if > 0 */}
-          <div className={`flex-1 p-3 rounded-lg border ${
-            overdueCount > 0
-              ? "bg-red-50 border-red-200"
-              : "bg-neutral-50 border-neutral-200"
-          }`}>
-            <div className="flex items-center gap-2">
-              {overdueCount > 0 && <AlertTriangle className="w-4 h-4 text-red-600" />}
-              <span className={`text-2xl font-bold ${
-                overdueCount > 0 ? "text-red-600" : "text-neutral-400"
-              }`}>
-                {overdueCount}
-              </span>
-            </div>
-            <p className={`text-xs mt-1 ${
-              overdueCount > 0 ? "text-red-600 font-medium" : "text-neutral-500"
-            }`}>
-              Overdue
-            </p>
-          </div>
-
-          {/* Due in 7 Days */}
-          <div className={`flex-1 p-3 rounded-lg border ${
-            dueIn7DaysCount > 0
-              ? "bg-amber-50 border-amber-200"
-              : "bg-neutral-50 border-neutral-200"
-          }`}>
-            <div className="flex items-center gap-2">
-              {dueIn7DaysCount > 0 && <Clock className="w-4 h-4 text-amber-600" />}
-              <span className={`text-2xl font-bold ${
-                dueIn7DaysCount > 0 ? "text-amber-600" : "text-neutral-400"
-              }`}>
-                {dueIn7DaysCount}
-              </span>
-            </div>
-            <p className={`text-xs mt-1 ${
-              dueIn7DaysCount > 0 ? "text-amber-600 font-medium" : "text-neutral-500"
-            }`}>
-              Due in 7 Days
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <Separator />
-
-      {/* Collapsible Issue List */}
-      <div className="w-full overflow-hidden">
-        <button
-          onClick={() => setIsIssuesExpanded(!isIssuesExpanded)}
-          className="flex items-center gap-1 text-xs font-semibold text-neutral-700 hover:text-neutral-900 transition-colors"
-        >
-          {isIssuesExpanded ? (
-            <ChevronDown className="w-4 h-4" />
-          ) : (
-            <ChevronRight className="w-4 h-4" />
-          )}
-          View All Issues ({sortedIssues.length})
-        </button>
-        {isIssuesExpanded && (
-          <div className="space-y-2 max-h-64 overflow-y-auto w-full mt-3">
-            {sortedIssues.map((issue, index) => (
-              <div key={index} className="flex items-center gap-2 p-2 bg-neutral-50 rounded-md hover:bg-neutral-100 transition overflow-hidden border border-neutral-100">
-                <Badge
-                  className="text-xs flex-shrink-0"
-                  style={getPriorityColor(issue.priority)}
-                >
-                  {getLinearPriorityLabel(issue.priority)}
-                </Badge>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-neutral-900 truncate line-clamp-1">
-                    <span className="font-bold">{issue.identifier}</span>
-                    {issue.title ? ` - ${issue.title}` : ""}
-                  </p>
-                </div>
-                <div className="flex items-center gap-1 text-xs text-neutral-500 whitespace-nowrap flex-shrink-0">
-                  <Clock className="w-3 h-3" />
-                  <span>{formatDueDate(issue.dueDate)}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
+    <TicketListContent
+      items={memberData?.linear_issues}
+      emptyMessage="No active Linear issues"
+      itemLabel="Issues"
+      highPriorityLabel="Urgent/High"
+      isHighPriority={(issue) => isLinearUrgentHigh(issue.priority)}
+      getDueDate={(issue) => issue.dueDate}
+      getItemKey={(issue) => issue.identifier}
+      getItemTitle={(issue) => issue.title || ""}
+      getPriorityLabel={(issue) => getLinearPriorityLabel(issue.priority)}
+      sortItems={sortLinearIssues}
+    />
   )
 }
 
-// Component to display Linear issues
-function LinearIssueCard({ memberData }: TicketingCardProps) {
-  const [isIssuesExpanded, setIsIssuesExpanded] = useState(false)
-
-  if (!memberData?.linear_issues || memberData.linear_issues.length === 0) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            Linear Workload
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-neutral-500 text-center py-4">No active Linear issues</p>
-        </CardContent>
-      </Card>
-    )
-  }
-
-  const issues = memberData.linear_issues
-
-  // Calculate metrics from raw data
-  const totalIssues = issues.length
-  const urgentHighCount = issues.filter((issue: any) => isLinearUrgentHigh(issue.priority)).length
-  const dueIn7DaysCount = issues.filter((issue: any) => isDueIn7Days(issue.dueDate)).length
-  const overdueCount = issues.filter((issue: any) => isOverdue(issue.dueDate)).length
-
-  // Sort issues by priority (urgent to low) then by due date, with None (0) at the bottom
-  const sortedIssues = [...issues].sort((a, b) => {
-    // Linear priority: 1=Urgent, 2=High, 3=Medium, 4=Low, 0=None
-    const aPriority = a.priority ?? 0
-    const bPriority = b.priority ?? 0
-
-    // Put None (0) priority at the bottom by giving it highest sort order
-    const aOrder = aPriority === 0 ? 999 : aPriority
-    const bOrder = bPriority === 0 ? 999 : bPriority
-
-    if (aOrder !== bOrder) {
-      // Lower priority numbers are higher priority (1 is highest)
-      return aOrder - bOrder
-    }
-
-    // If same priority, sort by due date
-    if (a.dueDate && b.dueDate) {
-      return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
-    }
-    return a.dueDate ? -1 : 1
-  })
-
+// Standalone Linear card component (used when only Linear is available)
+function LinearIssueCard({ memberData }: TicketingCardProps): ReactElement {
   return (
     <Card>
       <CardHeader>
@@ -659,117 +327,8 @@ function LinearIssueCard({ memberData }: TicketingCardProps) {
           Linear Workload
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Summary Metrics - Improved Layout */}
-        <div className="flex flex-col gap-4">
-          {/* Top Row: Total count and Urgent/High Priority */}
-          <div className="flex items-center justify-center gap-4">
-            {/* Hero Stat - Total Issues */}
-            <div className="flex items-center gap-3">
-              <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-neutral-100">
-                <Ticket className="w-5 h-5 text-neutral-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-neutral-900">{totalIssues}</p>
-                <p className="text-xs text-neutral-500">Active Issues</p>
-              </div>
-            </div>
-
-            {/* Urgent/High Badge */}
-            {urgentHighCount > 0 && (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-orange-50 border border-orange-200">
-                <AlertCircle className="w-3.5 h-3.5 text-orange-600" />
-                <span className="text-sm font-semibold text-orange-700">{urgentHighCount} Urgent/High</span>
-              </div>
-            )}
-          </div>
-
-          {/* Attention Items Row */}
-          <div className="flex gap-3">
-            {/* Overdue - Most prominent if > 0 */}
-            <div className={`flex-1 p-3 rounded-lg border ${
-              overdueCount > 0
-                ? "bg-red-50 border-red-200"
-                : "bg-neutral-50 border-neutral-200"
-            }`}>
-              <div className="flex items-center gap-2">
-                {overdueCount > 0 && <AlertTriangle className="w-4 h-4 text-red-600" />}
-                <span className={`text-2xl font-bold ${
-                  overdueCount > 0 ? "text-red-600" : "text-neutral-400"
-                }`}>
-                  {overdueCount}
-                </span>
-              </div>
-              <p className={`text-xs mt-1 ${
-                overdueCount > 0 ? "text-red-600 font-medium" : "text-neutral-500"
-              }`}>
-                Overdue
-              </p>
-            </div>
-
-            {/* Due in 7 Days */}
-            <div className={`flex-1 p-3 rounded-lg border ${
-              dueIn7DaysCount > 0
-                ? "bg-amber-50 border-amber-200"
-                : "bg-neutral-50 border-neutral-200"
-            }`}>
-              <div className="flex items-center gap-2">
-                {dueIn7DaysCount > 0 && <Clock className="w-4 h-4 text-amber-600" />}
-                <span className={`text-2xl font-bold ${
-                  dueIn7DaysCount > 0 ? "text-amber-600" : "text-neutral-400"
-                }`}>
-                  {dueIn7DaysCount}
-                </span>
-              </div>
-              <p className={`text-xs mt-1 ${
-                dueIn7DaysCount > 0 ? "text-amber-600 font-medium" : "text-neutral-500"
-              }`}>
-                Due in 7 Days
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <Separator />
-
-        {/* Collapsible Issue List */}
-        <div className="w-full overflow-hidden">
-          <button
-            onClick={() => setIsIssuesExpanded(!isIssuesExpanded)}
-            className="flex items-center gap-1 text-xs font-semibold text-neutral-700 hover:text-neutral-900 transition-colors"
-          >
-            {isIssuesExpanded ? (
-              <ChevronDown className="w-4 h-4" />
-            ) : (
-              <ChevronRight className="w-4 h-4" />
-            )}
-            View All Issues ({sortedIssues.length})
-          </button>
-          {isIssuesExpanded && (
-            <div className="space-y-2 max-h-64 overflow-y-auto w-full mt-3">
-              {sortedIssues.map((issue, index) => (
-                <div key={index} className="flex items-center gap-2 p-2 bg-neutral-50 rounded-md hover:bg-neutral-100 transition overflow-hidden border border-neutral-100">
-                  <Badge
-                    className="text-xs flex-shrink-0"
-                    style={getPriorityColor(issue.priority)}
-                  >
-                    {getLinearPriorityLabel(issue.priority)}
-                  </Badge>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-neutral-900 truncate line-clamp-1">
-                      <span className="font-bold">{issue.identifier}</span>
-                      {issue.title ? ` - ${issue.title}` : ""}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-1 text-xs text-neutral-500 whitespace-nowrap flex-shrink-0">
-                    <Clock className="w-3 h-3" />
-                    <span>{formatDueDate(issue.dueDate)}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+      <CardContent>
+        <LinearIssueCardContent memberData={memberData} />
       </CardContent>
     </Card>
   )
