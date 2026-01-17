@@ -311,7 +311,9 @@ class GitHubCollector:
             # Make resilient API calls with rate limiting and circuit breaker
             async def fetch_commits():
                 import aiohttp
-                async with aiohttp.ClientSession() as session:
+                from app.core.http_utils import get_default_timeout
+                timeout = get_default_timeout()
+                async with aiohttp.ClientSession(timeout=timeout) as session:
                     async with session.get(commits_url, headers=headers) as resp:
                         if resp.status == 200:
                             return await resp.json()
@@ -324,7 +326,9 @@ class GitHubCollector:
 
             async def fetch_prs():
                 import aiohttp
-                async with aiohttp.ClientSession() as session:
+                from app.core.http_utils import get_default_timeout
+                timeout = get_default_timeout()
+                async with aiohttp.ClientSession(timeout=timeout) as session:
                     async with session.get(prs_url, headers=headers) as resp:
                         if resp.status == 200:
                             return await resp.json()
@@ -441,7 +445,9 @@ class GitHubCollector:
         
         try:
             import aiohttp
-            async with aiohttp.ClientSession() as session:
+            from app.core.http_utils import get_default_timeout
+            timeout = get_default_timeout()
+            async with aiohttp.ClientSession(timeout=timeout) as session:
                 # Check rate limit before starting
                 rate_check_url = "https://api.github.com/rate_limit"
                 async with session.get(rate_check_url, headers=headers) as resp:
