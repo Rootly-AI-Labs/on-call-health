@@ -39,6 +39,8 @@ services:
         BASE_IMAGE: rootlyio/on-call-health:backend-base
     ports:
       - "8000:8000"
+    env_file:
+      - backend/.env
     environment:
       - DATABASE_URL=postgresql://postgres:password@postgres:5432/burnout_detector
       - REDIS_HOST=redis
@@ -49,8 +51,7 @@ services:
       - PAGERDUTY_API_KEY=${PAGERDUTY_API_KEY:-}
       - GITHUB_TOKEN=${GITHUB_TOKEN:-}
       - SLACK_TOKEN=${SLACK_TOKEN:-}
-      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
-      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      # GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET come from backend/.env via env_file
     depends_on:
       postgres:
         condition: service_healthy
