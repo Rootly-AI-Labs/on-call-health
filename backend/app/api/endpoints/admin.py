@@ -5,6 +5,11 @@ from typing import Dict, Any
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+import json
+import os
+from pathlib import Path
+from datetime import datetime
+
 from ...models import get_db
 from ...models import Analysis
 from ...models.slack_workspace_mapping import SlackWorkspaceMapping
@@ -342,3 +347,117 @@ async def add_missing_user_columns(
             "message": f"Failed to add missing user columns: {str(e)}",
             "error": str(e)
         }
+
+
+@router.post("/refresh-demo-analyses")
+async def refresh_demo_analyses(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    """
+    Refresh all demo analyses with the latest mock data.
+
+    This endpoint updates existing demo analyses and creates new ones for users
+    who don't have a demo analysis. Use this after updating mock_analysis_data.json
+    with new fields or data.
+
+    Requires admin role.
+    """
+
+    # Security check: Only admins can refresh demo data
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    try:
+        # Load mock data
+        backend_dir = Path(__file__).parent.parent.parent.parent
+        mock_data_path = backend_dir / "mock_analysis_data.json"
+
+        if not mock_data_path.exists():
+            raise HTTPException(
+                status_code=500,
+                detail=f"Mock data file not found: {mock_data_path}"
+            )
+
+        with open(mock_data_path, 'r', encoding='utf-8') as f:
+            mock_data = json.load(f)
+
+        original_analysis = mock_data.get('analysis', {})
+        new_results = original_analysis.get('results')
+
+        if not new_results:
+            raise HTTPException(
+                status_code=500,
+                detail="Mock data file is missing 'analysis.results'"
+            )
+
+        # Get all demo analyses
+        all_analyses = db.query(Analysis).all()
+        demo_analyses = [
+            a for a in all_analyses
+            if a.config and isinstance(a.config, dict) and a.config.get('is_demo') is True
+        ]
+
+        updated_count = 0
+        created_count = 0
+        errors = []
+
+        # Update existing demo analyses
+        for analysis in demo_analyses:
+            try:
+                analysis.results = new_results
+                config = analysis.config.copy() if analysis.config else {}
+                config['demo_updated_at'] = datetime.now().isoformat()
+                analysis.config = config
+                updated_count += 1
+            except Exception as e:
+                errors.append(f"Failed to update analysis #{analysis.id}: {str(e)}")
+
+        # Create demo analyses for users who don't have one
+        users = db.query(User).all()
+        users_with_demo = {a.user_id for a in demo_analyses}
+
+        for user in users:
+            if user.id not in users_with_demo:
+                try:
+                    config = original_analysis.get('config', {}).copy()
+                    config['is_demo'] = True
+                    config['demo_created_at'] = datetime.now().isoformat()
+
+                    new_analysis = Analysis(
+                        user_id=user.id,
+                        organization_id=user.organization_id if hasattr(user, 'organization_id') else None,
+                        rootly_integration_id=None,
+                        integration_name="Demo Analysis",
+                        platform=original_analysis.get('platform', 'rootly'),
+                        time_range=original_analysis.get('time_range', 30),
+                        status="completed",
+                        config=config,
+                        results=new_results,
+                        error_message=None,
+                        completed_at=datetime.now()
+                    )
+                    db.add(new_analysis)
+                    created_count += 1
+                except Exception as e:
+                    errors.append(f"Failed to create demo for user #{user.id}: {str(e)}")
+
+        db.commit()
+
+        return {
+            "status": "success",
+            "message": f"Demo analyses refreshed successfully",
+            "updated_count": updated_count,
+            "created_count": created_count,
+            "total_demo_analyses": updated_count + created_count,
+            "errors": errors if errors else None
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to refresh demo analyses: {str(e)}"
+        )
