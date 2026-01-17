@@ -105,11 +105,11 @@ export default function LandingPage() {
     <div className={`${ppMori.className} min-h-screen bg-white overflow-x-hidden`}>
 
       {/* Hero Section */}
-      <section className="bg-[url(/images/landing/rootly-bg.avif)] bg-[size:210%] bg-[position:-1200px_-300px] relative lg:pb-[120px]" id="get-started">
+      <section className="bg-[url(/images/landing/rootly-bg.avif)] bg-cover bg-center bg-no-repeat lg:bg-[size:210%] lg:bg-[position:-1200px_-300px] relative lg:pb-[120px]" id="get-started">
         {/* Header */}
         <div className="px-4 py-2">
-          <div className="flex items-center w-full justify-between">
-            <div className="flex items-center translate-x-10 translate-y-1">
+          <div className="flex w-full items-center justify-between gap-3">
+            <div className="flex items-center min-w-0 lg:translate-x-10 lg:translate-y-1">
               <div className="ml-2 mr-6 flex flex-col items-start -space-y-1">
                 <a href="https://rootly.com" target="_blank">
                   <Image 
@@ -129,15 +129,15 @@ export default function LandingPage() {
               href="https://github.com/Rootly-AI-Labs/On-Call-Health"
               target="_blank"
               rel="noreferrer"
-              className="rounded-2xl bg-[#7b6db1] px-5 py-2 text-sm font-semibold font-display text-[color:var(--text-text-primary,_#100F12)] hover:bg-[#6f62a5] -translate-x-6"
+              className="shrink-0 rounded-2xl bg-[#7b6db1] px-5 py-2 text-sm font-semibold font-display text-[color:var(--text-text-primary,_#100F12)] hover:bg-[#6f62a5] lg:-translate-x-6"
             >
               GitHub
             </a>
           </div>
         </div>
-        <div className="container flex flex-col lg:flex-row flex-grow mx-auto px-4">
-          <main className="w-full flex-grow px-5 lg:pr-10 lg:w-[60%] text-white relative top-14 -ml-4 lg:-ml-8">
-            <h1 className="text-4xl lg:text-6xl tracking-tight mb-6 leading-tight pt-10 lg:pt-20 lg:pb-1 leading-snug relative -top-8">
+        <div className="container flex flex-col gap-8 lg:gap-0 lg:flex-row flex-grow mx-auto px-4">
+          <main className="w-full flex-grow px-5 lg:pr-10 lg:w-[60%] text-white relative top-0 lg:top-14 lg:-ml-8">
+            <h1 className="text-4xl lg:text-6xl tracking-tight mb-6 leading-tight pt-10 lg:pt-20 lg:pb-1 leading-snug relative top-0 lg:-top-8">
               Catch overload
               <br />
               before it burns out
@@ -145,7 +145,7 @@ export default function LandingPage() {
               your engineers.
             </h1>
 
-            <p className="text-lg lg:text-xl lg:pr-10 mb-4 relative -top-3">
+            <p className="text-lg lg:text-xl lg:pr-10 mb-4 relative top-0 lg:-top-3">
               An open source tool that looks for early warning signs of
               <br />
               overload in your on-call engineers.
@@ -192,7 +192,7 @@ export default function LandingPage() {
 
             </div>
           </main>
-          <aside className="w-full lg:w-[40%] lg:pl-20">
+          <aside className="w-full mt-6 lg:mt-0 lg:w-[40%] lg:pl-20">
             <div className="mx-auto lg:ml-auto max-w-xl lg:max-w-none lg:-translate-x-32 lg:translate-y-32 lg:w-[128%]">
               <div className="rounded-[28px] border border-white bg-transparent p-1 lg:scale-115 lg:origin-left">
                 <div className="aspect-video w-full overflow-hidden rounded-[22px]">
@@ -331,7 +331,7 @@ export default function LandingPage() {
               />
             </div>
           </div>
-          <div className="mt-10 lg:mt-20 mb-0 w-screen relative left-1/2 right-1/2 -ml-[50vw] -mr-[50vw] bg-[url(/images/landing/cta-background.png)] bg-cover bg-[center_top_-450px]">
+          <div className="mt-10 lg:mt-20 mb-0 w-screen relative left-1/2 right-1/2 -ml-[50vw] -mr-[50vw] bg-[url(/images/landing/cta-background.png)] bg-cover bg-[center_top] lg:bg-[center_top_-450px]">
             <div className="grid place-items-center px-6 py-16 lg:py-20 text-center">
               <h2 className="text-4xl md:text-5xl font-medium text-slate-900 mb-6">Detect who's at risk of burnout<br /> in your team today.</h2>
               <div className="flex flex-col justify-center sm:flex-row gap-4 items-center mb-6">
