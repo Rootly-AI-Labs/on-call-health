@@ -76,7 +76,9 @@ class EnhancedGitHubMatcher:
             List of organization names the token can access
         """
         try:
-            async with aiohttp.ClientSession() as session:
+            from app.core.http_utils import get_default_timeout
+            timeout = get_default_timeout()
+            async with aiohttp.ClientSession(timeout=timeout) as session:
                 # Get organizations the authenticated user belongs to
                 orgs_url = "https://api.github.com/user/orgs"
                 async with session.get(orgs_url, headers=self.headers) as resp:
@@ -129,7 +131,8 @@ class EnhancedGitHubMatcher:
         # OPTIMIZED APPROACH: Get all org members first, then match against them
         try:
             # Add timeout to prevent connection issues
-            timeout = aiohttp.ClientTimeout(total=30, connect=10)
+            from app.core.http_utils import get_default_timeout
+            timeout = get_default_timeout()
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 # Get all organization members (with retry logic)
                 all_members = await self._get_all_org_members_with_profiles(session)
@@ -364,7 +367,9 @@ class EnhancedGitHubMatcher:
             return None
             
         try:
-            async with aiohttp.ClientSession() as session:
+            from app.core.http_utils import get_default_timeout
+            timeout = get_default_timeout()
+            async with aiohttp.ClientSession(timeout=timeout) as session:
                 all_members = set()
                 
                 # Get all organization members
@@ -417,7 +422,9 @@ class EnhancedGitHubMatcher:
     async def _search_github_by_name(self, name_parts: Dict[str, str], full_name: str, fallback_email: Optional[str] = None) -> Optional[str]:
         """Search GitHub users by name using the search API."""
         try:
-            async with aiohttp.ClientSession() as session:
+            from app.core.http_utils import get_default_timeout
+            timeout = get_default_timeout()
+            async with aiohttp.ClientSession(timeout=timeout) as session:
                 # Search for users by name
                 search_query = full_name.replace(' ', '+')
                 search_url = f"https://api.github.com/search/users?q={search_query}+in:fullname"
@@ -513,7 +520,9 @@ class EnhancedGitHubMatcher:
     async def _verify_username_matches_name(self, username: str, full_name: str) -> bool:
         """Verify that a username reasonably matches the given full name."""
         try:
-            async with aiohttp.ClientSession() as session:
+            from app.core.http_utils import get_default_timeout
+            timeout = get_default_timeout()
+            async with aiohttp.ClientSession(timeout=timeout) as session:
                 user_profile = await self._get_github_user_profile(username, session)
                 if user_profile and user_profile.get('name'):
                     github_name = user_profile['name'].lower()
@@ -529,7 +538,9 @@ class EnhancedGitHubMatcher:
     async def _search_by_email_api(self, email: str) -> Optional[str]:
         """Search GitHub users by email using the search API."""
         try:
-            async with aiohttp.ClientSession() as session:
+            from app.core.http_utils import get_default_timeout
+            timeout = get_default_timeout()
+            async with aiohttp.ClientSession(timeout=timeout) as session:
                 # Search users by email
                 search_url = f"https://api.github.com/search/users?q={email}+in:email"
                 async with session.get(search_url, headers=self.headers) as resp:
@@ -622,7 +633,9 @@ class EnhancedGitHubMatcher:
             return None
             
         try:
-            async with aiohttp.ClientSession() as session:
+            from app.core.http_utils import get_default_timeout
+            timeout = get_default_timeout()
+            async with aiohttp.ClientSession(timeout=timeout) as session:
                 all_members = set()
                 
                 # Get all organization members
@@ -671,7 +684,9 @@ class EnhancedGitHubMatcher:
             return None
             
         try:
-            async with aiohttp.ClientSession() as session:
+            from app.core.http_utils import get_default_timeout
+            timeout = get_default_timeout()
+            async with aiohttp.ClientSession(timeout=timeout) as session:
                 for org in self.organizations:
                     # Get recent repos with activity
                     repos_url = f"https://api.github.com/orgs/{org}/repos?sort=pushed&per_page=10"
@@ -718,7 +733,9 @@ class EnhancedGitHubMatcher:
             return None
             
         try:
-            async with aiohttp.ClientSession() as session:
+            from app.core.http_utils import get_default_timeout
+            timeout = get_default_timeout()
+            async with aiohttp.ClientSession(timeout=timeout) as session:
                 # Collect all members
                 all_members = set()
                 for org in self.organizations:
@@ -764,7 +781,9 @@ class EnhancedGitHubMatcher:
             return True  # No org restrictions configured
             
         try:
-            async with aiohttp.ClientSession() as session:
+            from app.core.http_utils import get_default_timeout
+            timeout = get_default_timeout()
+            async with aiohttp.ClientSession(timeout=timeout) as session:
                 for org in self.organizations:
                     # Get org members (use cache if available)
                     if org not in self._org_members_cache:
@@ -787,7 +806,9 @@ class EnhancedGitHubMatcher:
             return self._user_cache[username]
             
         try:
-            async with aiohttp.ClientSession() as session:
+            from app.core.http_utils import get_default_timeout
+            timeout = get_default_timeout()
+            async with aiohttp.ClientSession(timeout=timeout) as session:
                 url = f"https://api.github.com/users/{username}"
                 async with session.get(url, headers=self.headers) as resp:
                     exists = resp.status == 200
@@ -800,7 +821,9 @@ class EnhancedGitHubMatcher:
     async def _verify_user_email(self, username: str, email: str) -> bool:
         """Verify if a GitHub user has a specific email."""
         try:
-            async with aiohttp.ClientSession() as session:
+            from app.core.http_utils import get_default_timeout
+            timeout = get_default_timeout()
+            async with aiohttp.ClientSession(timeout=timeout) as session:
                 # Check public profile
                 url = f"https://api.github.com/users/{username}"
                 async with session.get(url, headers=self.headers) as resp:
@@ -819,7 +842,9 @@ class EnhancedGitHubMatcher:
     async def _check_user_commits_for_email(self, username: str, email: str) -> bool:
         """Check if a user has commits with a specific email."""
         try:
-            async with aiohttp.ClientSession() as session:
+            from app.core.http_utils import get_default_timeout
+            timeout = get_default_timeout()
+            async with aiohttp.ClientSession(timeout=timeout) as session:
                 # Get user's recent events
                 events_url = f"https://api.github.com/users/{username}/events?per_page=10"
                 async with session.get(events_url, headers=self.headers) as resp:
