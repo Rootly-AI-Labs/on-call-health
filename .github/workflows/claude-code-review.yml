@@ -64,6 +64,8 @@ jobs:
             - SQL injection, XSS, command injection
             - Authentication/authorization flaws
             - Sensitive data exposure
+            - Insecure dependencies
+            - OWASP Top 10 vulnerabilities
 
             **Code Quality:**
             - Obvious improvements or simplifications
