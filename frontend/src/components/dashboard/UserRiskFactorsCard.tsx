@@ -74,16 +74,7 @@ export function UserRiskFactorsCard({
             <Info className="w-4 h-4 text-neutral-500 cursor-help hover:text-neutral-700 transition-colors" />
             <div className="absolute top-full right-0 mt-2 px-3 py-2 bg-neutral-900/95 text-white text-xs rounded-lg w-72 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
               <div className="font-semibold mb-2">Risk Factor Contributions</div>
-              <div className="space-y-2">
-                <div>
-                  <div className="font-medium text-indigo-300">Personal Factors</div>
-                  <div className="text-xs mt-1">Physical and psychological fatigue indicators from work patterns</div>
-                </div>
-                <div>
-                  <div className="font-medium text-violet-300">Work-Related Factors</div>
-                  <div className="text-xs mt-1">Work-specific exhaustion from incident load and response patterns</div>
-                </div>
-              </div>
+              <div className="text-xs">Percentage contribution of each factor to the overall risk score based on work patterns, incident load, and timing.</div>
               <div className="absolute bottom-full right-4 w-0 h-0 border-l-4 border-r-4 border-b-4 border-l-transparent border-r-transparent border-b-gray-900/95"></div>
             </div>
           </div>
@@ -103,26 +94,15 @@ export function UserRiskFactorsCard({
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-1.5">
                   <div
-                    className="h-1.5 rounded-full transition-all duration-500"
+                    className="h-1.5 rounded-full transition-all duration-500 bg-violet-500"
                     style={{
-                      width: `${Math.min(factor.percentage * 2, 100)}%`,
-                      backgroundColor: factor.dimension === 'personal' ? '#6366F1' : '#8B5CF6'
+                      width: `${Math.min(factor.percentage * 2, 100)}%`
                     }}
                   />
                 </div>
               </div>
             </div>
           ))}
-          <div className="flex items-center gap-4 mt-3 pt-2 border-t border-neutral-100">
-            <div className="flex items-center gap-1.5">
-              <div className="w-2.5 h-2.5 rounded-full bg-indigo-500" />
-              <span className="text-xs text-neutral-500">Personal</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-2.5 h-2.5 rounded-full bg-violet-500" />
-              <span className="text-xs text-neutral-500">Work-Related</span>
-            </div>
-          </div>
         </div>
       </CardContent>
     </Card>
