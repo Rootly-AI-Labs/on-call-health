@@ -161,65 +161,47 @@ export default function useDashboard() {
     }
   }
 
-  // Helper function to check if analysis has no incidents in time period
-  const hasNoIncidentsInPeriod = () => {
-    if (!currentAnalysis || !currentAnalysis.analysis_data) return false
+  // Helper to extract members from team_analysis (handles both array and object formats)
+  function getTeamMembers(analysisData: AnalysisResult['analysis_data']): unknown[] | undefined {
+    const teamAnalysis = analysisData?.team_analysis
+    if (Array.isArray(teamAnalysis)) return teamAnalysis
+    return teamAnalysis?.members
+  }
 
-    // Check total_incidents directly on analysis_data or in partial_data.metadata
-    const totalIncidents = currentAnalysis.analysis_data.total_incidents ??
-                          currentAnalysis.analysis_data.partial_data?.metadata?.total_incidents ??
+  // Helper function to check if analysis has no incidents in time period
+  function hasNoIncidentsInPeriod(): boolean {
+    const data = currentAnalysis?.analysis_data
+    if (!data) return false
+
+    // Cast to any for accessing fields that may exist in various backend response formats
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const d = data as any
+    const totalIncidents = data.total_incidents ??
+                          d.metadata?.total_incidents ??
+                          data.partial_data?.metadata?.total_incidents ??
+                          d.team_analysis?.total_incidents ??
                           0
 
     return totalIncidents === 0
   }
 
   // Helper function to determine if insufficient data card should be shown
-  const shouldShowInsufficientDataCard = () => {
+  function shouldShowInsufficientDataCard(): boolean {
     if (!currentAnalysis || analysisRunning) return false
-
-    // Show for failed analyses
     if (currentAnalysis.status === 'failed') return true
+    if (currentAnalysis.status !== 'completed') return false
 
-    // Show for completed analyses with no meaningful data
-    if (currentAnalysis.status === 'completed') {
-      // Check if analysis_data is completely missing
-      if (!currentAnalysis.analysis_data) {
-        return true
-      }
+    const data = currentAnalysis.analysis_data
+    if (!data) return true
 
-      // Check if we have team_health or team_summary data but with no meaningful content
-      if (currentAnalysis.analysis_data?.team_health || currentAnalysis.analysis_data?.team_summary) {
-        // Check if the analysis has 0 members - this indicates insufficient data
-        const teamAnalysis = currentAnalysis.analysis_data.team_analysis
+    // Partial data analyses should show the partial data UI
+    if (data.partial_data) return false
 
-        // Handle both array format (team_analysis directly) and object format (team_analysis.members)
-        const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members
-        const hasNoMembers = !members || members.length === 0
+    // Check if we have team members - this indicates meaningful data
+    const members = getTeamMembers(data)
+    const hasMembers = members && members.length > 0
 
-        if (hasNoMembers) {
-          return true // Show insufficient data card
-        }
-
-        return false // Has meaningful data - even if 0 incidents, show normal dashboard
-      }
-
-      // If we have partial data with incidents/users, show the partial data UI
-      if (currentAnalysis.analysis_data?.partial_data) {
-        return false
-      }
-
-      // If we have team_analysis with members, we have data
-      const teamAnalysis = currentAnalysis.analysis_data?.team_analysis
-      const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members
-      if (members && members.length > 0) {
-        return false
-      }
-
-      // Otherwise, insufficient data
-      return true
-    }
-
-    return false
+    return !hasMembers
   }
 
   useEffect(() => {

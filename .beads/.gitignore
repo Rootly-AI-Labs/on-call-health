@@ -1,0 +1,6 @@
+# Temporary/local files
+.sync.lock
+last-touched
+*.db
+*.db-shm
+*.db-wal
