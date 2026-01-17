@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { Clock } from "lucide-react"
+import { Clock, ChevronDown, ChevronRight } from "lucide-react"
 import { formatDistanceToNow, isPast, parseISO, isBefore, addDays, isAfter } from "date-fns"
 
 interface TicketingCardProps {
@@ -307,6 +307,8 @@ function JiraTicketCard({ memberData }: TicketingCardProps) {
 
 // Content component for Linear issues (used in consolidated card)
 function LinearIssueCardContent({ memberData }: TicketingCardProps) {
+  const [isIssuesExpanded, setIsIssuesExpanded] = useState(false)
+
   if (!memberData?.linear_issues || memberData.linear_issues.length === 0) {
     return <p className="text-sm text-neutral-500 text-center py-4">No active Linear issues</p>
   }
@@ -365,31 +367,43 @@ function LinearIssueCardContent({ memberData }: TicketingCardProps) {
 
       <Separator />
 
-      {/* Issue List */}
+      {/* Collapsible Issue List */}
       <div>
-        <p className="text-xs font-semibold text-neutral-700 mb-3">Active Issues ({sortedIssues.length})</p>
-        <div className="space-y-2 max-h-64 overflow-y-auto">
-          {sortedIssues.map((issue, index) => (
-            <div key={index} className="flex items-center gap-2 p-2 bg-neutral-100 rounded-md hover:bg-neutral-200 transition">
-              <Badge
-                className="text-xs flex-shrink-0"
-                style={getPriorityColor(issue.priority)}
-              >
-                {issue.priority === 1 ? "Urgent" : issue.priority === 2 ? "High" : issue.priority === 3 ? "Med" : issue.priority === 4 ? "Low" : "None"}
-              </Badge>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-neutral-900 truncate">
-                  <span className="font-bold">{issue.identifier}</span>
-                  {issue.title ? ` - ${issue.title}` : ""}
-                </p>
+        <button
+          onClick={() => setIsIssuesExpanded(!isIssuesExpanded)}
+          className="flex items-center gap-1 text-xs font-semibold text-neutral-700 hover:text-neutral-900 transition-colors"
+        >
+          {isIssuesExpanded ? (
+            <ChevronDown className="w-4 h-4" />
+          ) : (
+            <ChevronRight className="w-4 h-4" />
+          )}
+          Active Issues ({sortedIssues.length})
+        </button>
+        {isIssuesExpanded && (
+          <div className="space-y-2 max-h-64 overflow-y-auto mt-3">
+            {sortedIssues.map((issue, index) => (
+              <div key={index} className="flex items-center gap-2 p-2 bg-neutral-100 rounded-md hover:bg-neutral-200 transition">
+                <Badge
+                  className="text-xs flex-shrink-0"
+                  style={getPriorityColor(issue.priority)}
+                >
+                  {issue.priority === 1 ? "Urgent" : issue.priority === 2 ? "High" : issue.priority === 3 ? "Med" : issue.priority === 4 ? "Low" : "None"}
+                </Badge>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-neutral-900 truncate">
+                    <span className="font-bold">{issue.identifier}</span>
+                    {issue.title ? ` - ${issue.title}` : ""}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1 text-xs text-neutral-500 whitespace-nowrap flex-shrink-0">
+                  <Clock className="w-3 h-3" />
+                  <span>{formatDueDate(issue.dueDate)}</span>
+                </div>
               </div>
-              <div className="flex items-center gap-1 text-xs text-neutral-500 whitespace-nowrap flex-shrink-0">
-                <Clock className="w-3 h-3" />
-                <span>{formatDueDate(issue.dueDate)}</span>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -397,6 +411,8 @@ function LinearIssueCardContent({ memberData }: TicketingCardProps) {
 
 // Component to display Linear issues
 function LinearIssueCard({ memberData }: TicketingCardProps) {
+  const [isIssuesExpanded, setIsIssuesExpanded] = useState(false)
+
   if (!memberData?.linear_issues || memberData.linear_issues.length === 0) {
     return (
       <Card>
@@ -472,31 +488,43 @@ function LinearIssueCard({ memberData }: TicketingCardProps) {
 
         <Separator />
 
-        {/* Issue List */}
+        {/* Collapsible Issue List */}
         <div className="w-full overflow-hidden">
-          <p className="text-xs font-semibold text-neutral-700 mb-3">Active Issues ({sortedIssues.length})</p>
-          <div className="space-y-2 max-h-64 overflow-y-auto w-full">
-            {sortedIssues.map((issue, index) => (
-              <div key={index} className="flex items-center gap-2 p-2 bg-neutral-100 rounded-md hover:bg-neutral-200 transition overflow-hidden">
-                <Badge
-                  className="text-xs flex-shrink-0"
-                  style={getPriorityColor(issue.priority)}
-                >
-                  {issue.priority === 1 ? "Urgent" : issue.priority === 2 ? "High" : issue.priority === 3 ? "Med" : issue.priority === 4 ? "Low" : "None"}
-                </Badge>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-neutral-900 truncate line-clamp-1">
-                    <span className="font-bold">{issue.identifier}</span>
-                    {issue.title ? ` - ${issue.title}` : ""}
-                  </p>
+          <button
+            onClick={() => setIsIssuesExpanded(!isIssuesExpanded)}
+            className="flex items-center gap-1 text-xs font-semibold text-neutral-700 hover:text-neutral-900 transition-colors"
+          >
+            {isIssuesExpanded ? (
+              <ChevronDown className="w-4 h-4" />
+            ) : (
+              <ChevronRight className="w-4 h-4" />
+            )}
+            Active Issues ({sortedIssues.length})
+          </button>
+          {isIssuesExpanded && (
+            <div className="space-y-2 max-h-64 overflow-y-auto w-full mt-3">
+              {sortedIssues.map((issue, index) => (
+                <div key={index} className="flex items-center gap-2 p-2 bg-neutral-100 rounded-md hover:bg-neutral-200 transition overflow-hidden">
+                  <Badge
+                    className="text-xs flex-shrink-0"
+                    style={getPriorityColor(issue.priority)}
+                  >
+                    {issue.priority === 1 ? "Urgent" : issue.priority === 2 ? "High" : issue.priority === 3 ? "Med" : issue.priority === 4 ? "Low" : "None"}
+                  </Badge>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-neutral-900 truncate line-clamp-1">
+                      <span className="font-bold">{issue.identifier}</span>
+                      {issue.title ? ` - ${issue.title}` : ""}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1 text-xs text-neutral-500 whitespace-nowrap flex-shrink-0">
+                    <Clock className="w-3 h-3" />
+                    <span>{formatDueDate(issue.dueDate)}</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1 text-xs text-neutral-500 whitespace-nowrap flex-shrink-0">
-                  <Clock className="w-3 h-3" />
-                  <span>{formatDueDate(issue.dueDate)}</span>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
