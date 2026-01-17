@@ -2569,7 +2569,7 @@ export default function IntegrationsPage() {
                             <div className="flex items-center justify-between w-full">
                               <div className="flex items-center gap-2">
                                 <div className={`w-3 h-3 rounded-full ${
-                                  selected.platform === 'rootly' ? 'bg-purple-2000' : 'bg-green-500'
+                                  selected.platform === 'rootly' ? 'bg-purple-500' : 'bg-green-500'
                                 }`}></div>
                                 <span className="font-medium text-base">{selected.name}</span>
                               </div>
