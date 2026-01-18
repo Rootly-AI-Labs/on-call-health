@@ -138,6 +138,19 @@ function formatDueDate(dueDate: string | null): string {
   }
 }
 
+// Safe date parsing that handles invalid dates
+function safeDateCompare(dateA: string | null, dateB: string | null): number {
+  if (!dateA && !dateB) return 0
+  if (!dateA) return 1
+  if (!dateB) return -1
+  const aTime = new Date(dateA).getTime()
+  const bTime = new Date(dateB).getTime()
+  if (isNaN(aTime) && isNaN(bTime)) return 0
+  if (isNaN(aTime)) return 1
+  if (isNaN(bTime)) return -1
+  return aTime - bTime
+}
+
 // Sort Jira tickets by priority then due date
 function sortJiraTickets(tickets: any[]): any[] {
   return [...tickets].sort((a, b) => {
@@ -147,10 +160,7 @@ function sortJiraTickets(tickets: any[]): any[] {
     const bOrder = JIRA_PRIORITY_ORDER[bPriority] ?? 999
 
     if (aOrder !== bOrder) return aOrder - bOrder
-    if (a.duedate && b.duedate) {
-      return new Date(a.duedate).getTime() - new Date(b.duedate).getTime()
-    }
-    return a.duedate ? -1 : 1
+    return safeDateCompare(a.duedate, b.duedate)
   })
 }
 
@@ -163,10 +173,7 @@ function sortLinearIssues(issues: any[]): any[] {
     const bOrder = bPriority === 0 ? 999 : bPriority
 
     if (aOrder !== bOrder) return aOrder - bOrder
-    if (a.dueDate && b.dueDate) {
-      return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
-    }
-    return a.dueDate ? -1 : 1
+    return safeDateCompare(a.dueDate, b.dueDate)
   })
 }
 
@@ -243,7 +250,7 @@ function TicketListContent({
         {isExpanded && (
           <div className="space-y-2 max-h-64 overflow-y-auto w-full mt-3">
             {sortedItems.map((item, index) => (
-              <div key={index} className="flex items-center gap-2 p-2 bg-neutral-50 rounded-md hover:bg-neutral-100 transition overflow-hidden border border-neutral-100">
+              <div key={getItemKey(item) || `item-${index}`} className="flex items-center gap-2 p-2 bg-neutral-50 rounded-md hover:bg-neutral-100 transition overflow-hidden border border-neutral-100">
                 <Badge className="text-xs flex-shrink-0" style={getPriorityColor(item.priority)}>
                   {getPriorityLabel(item)}
                 </Badge>

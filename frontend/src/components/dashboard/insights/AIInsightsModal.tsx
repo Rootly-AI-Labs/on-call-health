@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Sparkles, Copy, Check } from "lucide-react"
+import ReactMarkdown from "react-markdown"
 
 interface AIInsightsModalProps {
   isOpen: boolean
@@ -86,19 +87,18 @@ export function AIInsightsModal({ isOpen, onClose, currentAnalysis }: AIInsights
             if (aiInsights?.llm_team_analysis) {
               return (
                 <div className="prose prose-sm max-w-none">
-                  <div
+                  <ReactMarkdown
                     className="leading-relaxed text-neutral-900 [&>*:last-child]:mb-0"
-                    dangerouslySetInnerHTML={{
-                      __html: aiInsights.llm_team_analysis
-                        .replace(/^### (.*?)$/gm, '<h3 class="text-lg font-semibold mt-6 mb-3">$1</h3>')
-                        .replace(/^## (.*?)$/gm, '<h2 class="text-xl font-bold mt-6 mb-4">$1</h2>')
-                        .replace(/^# (.*?)$/gm, '<h1 class="text-2xl font-bold mt-6 mb-4">$1</h1>')
-                        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                        .replace(/\n\n/g, '</p><p class="mt-4">')
-                        .replace(/^(?!<h[123]|<p)/, '<p>')
-                        .replace(/(?<!>)$/, '</p>')
+                    components={{
+                      h1: ({ children }) => <h1 className="text-2xl font-bold mt-6 mb-4">{children}</h1>,
+                      h2: ({ children }) => <h2 className="text-xl font-bold mt-6 mb-4">{children}</h2>,
+                      h3: ({ children }) => <h3 className="text-lg font-semibold mt-6 mb-3">{children}</h3>,
+                      p: ({ children }) => <p className="mt-4">{children}</p>,
+                      strong: ({ children }) => <strong>{children}</strong>,
                     }}
-                  />
+                  >
+                    {aiInsights.llm_team_analysis}
+                  </ReactMarkdown>
                 </div>
               );
             }
