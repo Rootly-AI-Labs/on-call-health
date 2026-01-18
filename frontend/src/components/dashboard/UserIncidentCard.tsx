@@ -3,6 +3,12 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { AlertTriangle, Loader2 } from "lucide-react"
 
+// Safely extract numeric value, handling NaN and non-numbers
+const safeNum = (val: unknown): number => {
+  if (typeof val !== 'number' || isNaN(val)) return 0
+  return val
+}
+
 interface UserIncidentCardProps {
   memberData: {
     user_name?: string
@@ -50,16 +56,16 @@ export function UserIncidentCard({
   const isPagerDuty = platform === 'pagerduty'
 
   const pagerDutyCounts = {
-    high: (severityDist.sev1 || 0) + (severityDist.high || 0) + (severityDist.critical || 0),
-    low: (severityDist.sev4 || 0) + (severityDist.sev5 || 0) + (severityDist.low || 0) + (severityDist.medium || 0)
+    high: safeNum(severityDist.sev1) + safeNum(severityDist.high) + safeNum(severityDist.critical),
+    low: safeNum(severityDist.sev4) + safeNum(severityDist.sev5) + safeNum(severityDist.low) + safeNum(severityDist.medium)
   }
 
   const rootlyCounts = {
-    sev0: severityDist.sev0 || severityDist.critical || 0,
-    sev1: severityDist.sev1 || severityDist.high || 0,
-    sev2: severityDist.sev2 || severityDist.medium || 0,
-    sev3: severityDist.sev3 || severityDist.low || 0,
-    sev4: severityDist.sev4 || severityDist.info || 0
+    sev0: safeNum(severityDist.sev0) || safeNum(severityDist.critical),
+    sev1: safeNum(severityDist.sev1) || safeNum(severityDist.high),
+    sev2: safeNum(severityDist.sev2) || safeNum(severityDist.medium),
+    sev3: safeNum(severityDist.sev3) || safeNum(severityDist.low),
+    sev4: safeNum(severityDist.sev4) || safeNum(severityDist.info)
   }
 
   return (

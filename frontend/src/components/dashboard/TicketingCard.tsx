@@ -99,6 +99,24 @@ function formatDueDate(dueDate: string | null): string {
   }
 }
 
+// Safe date comparison that handles invalid dates (prevents NaN)
+function safeDateCompare(dateA: string | null, dateB: string | null): number {
+  if (!dateA && !dateB) return 0
+  if (!dateA) return 1
+  if (!dateB) return -1
+  const aTime = new Date(dateA).getTime()
+  const bTime = new Date(dateB).getTime()
+  if (isNaN(aTime) && isNaN(bTime)) return 0
+  if (isNaN(aTime)) return 1
+  if (isNaN(bTime)) return -1
+  return aTime - bTime
+}
+
+// Generate stable key for ticket/issue items
+function getItemKey(item: any): string | null {
+  return item.key || item.identifier || item.id || null
+}
+
 // Content component for Jira tickets (used in consolidated card)
 function JiraTicketCardContent({ memberData }: TicketingCardProps) {
   if (!memberData?.jira_tickets || memberData.jira_tickets.length === 0) {
@@ -133,10 +151,7 @@ function JiraTicketCardContent({ memberData }: TicketingCardProps) {
     }
 
     // If same priority, sort by due date (earlier first)
-    if (a.duedate && b.duedate) {
-      return new Date(a.duedate).getTime() - new Date(b.duedate).getTime()
-    }
-    return a.duedate ? -1 : 1
+    return safeDateCompare(a.duedate, b.duedate)
   })
 
   return (
@@ -168,7 +183,7 @@ function JiraTicketCardContent({ memberData }: TicketingCardProps) {
         <p className="text-xs font-semibold text-neutral-700 mb-3">Active Tickets ({sortedTickets.length})</p>
         <div className="space-y-2 max-h-64 overflow-y-auto w-full">
           {sortedTickets.map((ticket, index) => (
-            <div key={index} className="flex items-center gap-2 p-2 bg-neutral-100 rounded-md hover:bg-neutral-200 transition overflow-hidden">
+            <div key={getItemKey(ticket) || `ticket-${index}`} className="flex items-center gap-2 p-2 bg-neutral-100 rounded-md hover:bg-neutral-200 transition overflow-hidden">
               <Badge
                 className="text-xs flex-shrink-0"
                 style={getPriorityColor(ticket.priority)}
@@ -238,10 +253,7 @@ function JiraTicketCard({ memberData }: TicketingCardProps) {
     }
 
     // If same priority, sort by due date (earlier first)
-    if (a.duedate && b.duedate) {
-      return new Date(a.duedate).getTime() - new Date(b.duedate).getTime()
-    }
-    return a.duedate ? -1 : 1
+    return safeDateCompare(a.duedate, b.duedate)
   })
 
   return (
@@ -279,7 +291,7 @@ function JiraTicketCard({ memberData }: TicketingCardProps) {
           <p className="text-xs font-semibold text-neutral-700 mb-3">Active Tickets ({sortedTickets.length})</p>
           <div className="space-y-2 max-h-64 overflow-y-auto">
             {sortedTickets.map((ticket, index) => (
-              <div key={index} className="flex items-center gap-2 p-2 bg-neutral-100 rounded-md hover:bg-neutral-200 transition">
+              <div key={getItemKey(ticket) || `ticket-${index}`} className="flex items-center gap-2 p-2 bg-neutral-100 rounded-md hover:bg-neutral-200 transition">
                 <Badge
                   className="text-xs flex-shrink-0"
                   style={getPriorityColor(ticket.priority)}
@@ -337,10 +349,7 @@ function LinearIssueCardContent({ memberData }: TicketingCardProps) {
     }
 
     // If same priority, sort by due date
-    if (a.dueDate && b.dueDate) {
-      return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
-    }
-    return a.dueDate ? -1 : 1
+    return safeDateCompare(a.dueDate, b.dueDate)
   })
 
   return (
@@ -383,7 +392,7 @@ function LinearIssueCardContent({ memberData }: TicketingCardProps) {
         {isIssuesExpanded && (
           <div className="space-y-2 max-h-64 overflow-y-auto mt-3">
             {sortedIssues.map((issue, index) => (
-              <div key={index} className="flex items-center gap-2 p-2 bg-neutral-100 rounded-md hover:bg-neutral-200 transition">
+              <div key={getItemKey(issue) || `issue-${index}`} className="flex items-center gap-2 p-2 bg-neutral-100 rounded-md hover:bg-neutral-200 transition">
                 <Badge
                   className="text-xs flex-shrink-0"
                   style={getPriorityColor(issue.priority)}
@@ -452,10 +461,7 @@ function LinearIssueCard({ memberData }: TicketingCardProps) {
     }
 
     // If same priority, sort by due date
-    if (a.dueDate && b.dueDate) {
-      return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
-    }
-    return a.dueDate ? -1 : 1
+    return safeDateCompare(a.dueDate, b.dueDate)
   })
 
   return (
@@ -504,7 +510,7 @@ function LinearIssueCard({ memberData }: TicketingCardProps) {
           {isIssuesExpanded && (
             <div className="space-y-2 max-h-64 overflow-y-auto w-full mt-3">
               {sortedIssues.map((issue, index) => (
-                <div key={index} className="flex items-center gap-2 p-2 bg-neutral-100 rounded-md hover:bg-neutral-200 transition overflow-hidden">
+                <div key={getItemKey(issue) || `issue-${index}`} className="flex items-center gap-2 p-2 bg-neutral-100 rounded-md hover:bg-neutral-200 transition overflow-hidden">
                   <Badge
                     className="text-xs flex-shrink-0"
                     style={getPriorityColor(issue.priority)}
