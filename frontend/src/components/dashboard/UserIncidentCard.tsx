@@ -61,11 +61,11 @@ export function UserIncidentCard({
   }
 
   const rootlyCounts = {
-    sev0: safeNum(severityDist.sev0) || safeNum(severityDist.critical),
-    sev1: safeNum(severityDist.sev1) || safeNum(severityDist.high),
-    sev2: safeNum(severityDist.sev2) || safeNum(severityDist.medium),
-    sev3: safeNum(severityDist.sev3) || safeNum(severityDist.low),
-    sev4: safeNum(severityDist.sev4) || safeNum(severityDist.info)
+    sev0: safeNum(severityDist.sev0 ?? severityDist.critical),
+    sev1: safeNum(severityDist.sev1 ?? severityDist.high),
+    sev2: safeNum(severityDist.sev2 ?? severityDist.medium),
+    sev3: safeNum(severityDist.sev3 ?? severityDist.low),
+    sev4: safeNum(severityDist.sev4 ?? severityDist.info)
   }
 
   return (
