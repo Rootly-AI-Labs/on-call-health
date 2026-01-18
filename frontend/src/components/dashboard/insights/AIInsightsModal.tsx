@@ -87,18 +87,19 @@ export function AIInsightsModal({ isOpen, onClose, currentAnalysis }: AIInsights
             if (aiInsights?.llm_team_analysis) {
               return (
                 <div className="prose prose-sm max-w-none">
-                  <ReactMarkdown
-                    className="leading-relaxed text-neutral-900 [&>*:last-child]:mb-0"
-                    components={{
-                      h1: ({ children }) => <h1 className="text-2xl font-bold mt-6 mb-4">{children}</h1>,
-                      h2: ({ children }) => <h2 className="text-xl font-bold mt-6 mb-4">{children}</h2>,
-                      h3: ({ children }) => <h3 className="text-lg font-semibold mt-6 mb-3">{children}</h3>,
-                      p: ({ children }) => <p className="mt-4">{children}</p>,
-                      strong: ({ children }) => <strong>{children}</strong>,
-                    }}
-                  >
-                    {aiInsights.llm_team_analysis}
-                  </ReactMarkdown>
+                  <div className="leading-relaxed text-neutral-900 [&>*:last-child]:mb-0">
+                    <ReactMarkdown
+                      components={{
+                        h1: ({ children }) => <h1 className="text-2xl font-bold mt-6 mb-4">{children}</h1>,
+                        h2: ({ children }) => <h2 className="text-xl font-bold mt-6 mb-4">{children}</h2>,
+                        h3: ({ children }) => <h3 className="text-lg font-semibold mt-6 mb-3">{children}</h3>,
+                        p: ({ children }) => <p className="mt-4">{children}</p>,
+                        strong: ({ children }) => <strong>{children}</strong>,
+                      }}
+                    >
+                      {aiInsights.llm_team_analysis}
+                    </ReactMarkdown>
+                  </div>
                 </div>
               );
             }
