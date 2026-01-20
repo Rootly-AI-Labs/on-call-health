@@ -23,6 +23,10 @@ logger = logging.getLogger(__name__)
 _permissions_cache = {}
 PERMISSIONS_CACHE_TTL = 60  # Cache for 60 seconds
 
+# Limit concurrent API requests to avoid overwhelming PagerDuty API
+MAX_CONCURRENT_REQUESTS = 5
+_semaphore = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
+
 def get_cached_permissions(integration_id: int) -> Optional[dict]:
     """Get cached permissions if still valid."""
     if integration_id not in _permissions_cache:
@@ -233,14 +237,15 @@ async def _fetch_and_apply_permissions(
 ) -> None:
     """Fetch permissions for integrations in parallel and apply results."""
     async def fetch_single(integration_id: int, api_token: str, index: int):
-        try:
-            client = PagerDutyAPIClient(api_token)
-            permissions = await client.check_permissions()
-            set_cached_permissions(integration_id, permissions)
-            return (index, permissions, None)
-        except Exception as e:
-            logger.warning(f"Failed to check permissions for integration {integration_id}: {e}")
-            return (index, None, str(e))
+        async with _semaphore:
+            try:
+                client = PagerDutyAPIClient(api_token)
+                permissions = await client.check_permissions()
+                set_cached_permissions(integration_id, permissions)
+                return (index, permissions, None)
+            except Exception as e:
+                logger.warning(f"Failed to check permissions for integration {integration_id}: {e}")
+                return (index, None, str(e))
 
     results = await asyncio.gather(
         *[fetch_single(int_id, token, idx) for int_id, token, idx in uncached_integrations]
@@ -409,7 +414,7 @@ def update_pagerduty_integration(
         name=integration.name,
         organization_name=integration.organization_name,
         total_users=integration.total_users,
-        total_services=integration.total_users,
+        total_services=None,
         is_default=integration.is_default,
         created_at=integration.created_at.isoformat(),
         last_used_at=integration.last_used_at.isoformat() if integration.last_used_at else None,
