@@ -18,6 +18,9 @@ interface Incident {
     summary?: string
     severity?: string
     created_at?: string
+    started_at?: string
+    resolved_at?: string
+    mitigated_at?: string
     status?: string
     slug?: string
     user?: IncidentUser
@@ -29,6 +32,9 @@ interface Incident {
   title?: string
   severity?: string
   created_at?: string
+  started_at?: string
+  resolved_at?: string
+  mitigated_at?: string
   status?: string
   html_url?: string
   user?: IncidentUser
@@ -53,6 +59,39 @@ interface UserIncidentCardProps {
   platform?: string
   loading?: boolean
   incidents?: Incident[]
+}
+
+// Calculate and format incident duration
+function formatIncidentDuration(incident: Incident): string | null {
+  const attrs = incident.attributes || incident
+  const startStr = attrs.started_at || attrs.created_at
+  const endStr = attrs.resolved_at || attrs.mitigated_at
+
+  if (!startStr || !endStr) return null
+
+  try {
+    const start = new Date(startStr)
+    const end = new Date(endStr)
+    const durationMs = end.getTime() - start.getTime()
+
+    if (durationMs <= 0) return null
+
+    const minutes = Math.floor(durationMs / (1000 * 60))
+    const hours = Math.floor(minutes / 60)
+    const days = Math.floor(hours / 24)
+
+    const remainingHours = hours % 24
+    const remainingMinutes = minutes % 60
+
+    const parts: string[] = []
+    if (days > 0) parts.push(`${days}d`)
+    if (remainingHours > 0) parts.push(`${remainingHours}h`)
+    if (remainingMinutes > 0 && days === 0) parts.push(`${remainingMinutes}m`)
+
+    return parts.length > 0 ? parts.join(" ") : "<1m"
+  } catch {
+    return null
+  }
 }
 
 function getIncidentUrl(incident: Incident, platform: string): string | null {
@@ -261,6 +300,7 @@ export function UserIncidentCard({
                   }
 
                   const incidentUrl = getIncidentUrl(incident, platform)
+                  const duration = formatIncidentDuration(incident)
 
                   const incidentContent = (
                     <>
@@ -269,9 +309,12 @@ export function UserIncidentCard({
                       </span>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm text-neutral-800 truncate">{title}</p>
-                        {createdAt && (
-                          <p className="text-xs text-neutral-500">{createdAt}</p>
-                        )}
+                        <p className="text-xs text-neutral-500">
+                          {createdAt}
+                          {duration && (
+                            <span className="ml-2 text-purple-600 font-medium">({duration})</span>
+                          )}
+                        </p>
                       </div>
                       <span className={`text-xs font-medium capitalize flex-shrink-0 ${getStatusColor(status)}`}>
                         {status}
