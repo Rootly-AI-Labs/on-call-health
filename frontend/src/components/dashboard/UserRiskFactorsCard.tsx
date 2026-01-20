@@ -81,22 +81,20 @@ export function UserRiskFactorsCard({
         </div>
       </CardHeader>
       <CardContent className="p-4 pb-6">
-        <div className="space-y-2">
+        <div className="space-y-3">
           {factors.slice(0, 5).map((factor: OCBFactor) => (
-            <div key={factor.key} className="flex items-center gap-3">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm text-neutral-700 truncate">{factor.name}</span>
-                  <span className="text-sm font-semibold text-neutral-900 ml-2">{factor.percentage}%</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-1.5">
-                  <div
-                    className="h-1.5 rounded-full transition-all duration-500 bg-violet-500"
-                    style={{
-                      width: `${Math.min(factor.percentage * 2, 100)}%`
-                    }}
-                  />
-                </div>
+            <div key={factor.key}>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-sm text-neutral-700">{factor.name}</span>
+                <span className="text-sm font-semibold text-violet-600">{factor.percentage}%</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-1.5">
+                <div
+                  className="h-1.5 rounded-full transition-all duration-500 bg-violet-500"
+                  style={{
+                    width: `${Math.min(factor.percentage * 2, 100)}%`
+                  }}
+                />
               </div>
             </div>
           ))}
