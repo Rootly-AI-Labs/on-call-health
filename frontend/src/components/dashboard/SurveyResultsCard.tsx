@@ -1,5 +1,6 @@
 "use client"
 
+import type { ReactNode } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
@@ -28,14 +29,6 @@ interface SurveyData {
 
 interface SurveyResultsCardProps {
   surveyData: SurveyData | null
-  userEmail: string
-}
-
-const getScoreColor = (score: number) => {
-  if (score >= 4) return 'text-green-600'
-  if (score >= 3) return 'text-yellow-600'
-  if (score >= 2) return 'text-orange-600'
-  return 'text-red-600'
 }
 
 const getScoreBadgeColor = (score: number) => {
@@ -86,16 +79,7 @@ const getStressSourceLabel = (source: string) => {
   return labels[source] || source
 }
 
-const getPersonalCircumstancesText = (value: string) => {
-  const labels: { [key: string]: string } = {
-    'no': 'No',
-    'somewhat': 'Somewhat',
-    'significantly': 'Significantly'
-  }
-  return labels[value] || value
-}
-
-export function SurveyResultsCard({ surveyData, userEmail }: SurveyResultsCardProps) {
+export function SurveyResultsCard({ surveyData }: SurveyResultsCardProps): ReactNode {
   if (!surveyData || surveyData.survey_count_in_period === 0) {
     return (
       <Card>
@@ -110,9 +94,6 @@ export function SurveyResultsCard({ surveyData, userEmail }: SurveyResultsCardPr
   }
 
   const latestResponse = surveyData.survey_responses[surveyData.survey_responses.length - 1]
-  const previousResponse = surveyData.survey_responses.length > 1
-    ? surveyData.survey_responses[surveyData.survey_responses.length - 2]
-    : null
 
   // Prepare chart data
   const chartData = surveyData.survey_responses.map((response) => ({
@@ -158,7 +139,7 @@ export function SurveyResultsCard({ surveyData, userEmail }: SurveyResultsCardPr
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Trend Chart */}
-        {surveyData.survey_responses.length > 2 ? (
+        {surveyData.survey_responses.length > 2 && (
           <div className="space-y-2">
             <div className="text-xs font-medium text-neutral-700">Score Trends</div>
             <ResponsiveContainer width="100%" height={200}>
@@ -228,11 +209,7 @@ export function SurveyResultsCard({ surveyData, userEmail }: SurveyResultsCardPr
               </div>
             </div>
           </div>
-        ) : surveyData.survey_responses.length > 0 ? (
-          <div className="text-xs text-neutral-500 text-center py-2 bg-neutral-50 rounded-lg">
-            Need 3+ responses to show trend chart
-          </div>
-        ) : null}
+        )}
 
         {/* Latest Response */}
         <div className="space-y-4 p-3 bg-neutral-50 rounded-lg">
@@ -296,6 +273,13 @@ export function SurveyResultsCard({ surveyData, userEmail }: SurveyResultsCardPr
             </div>
           )}
         </div>
+
+        {/* Not enough data for trend chart message */}
+        {surveyData.survey_responses.length <= 2 && (
+          <div className="text-xs text-neutral-500 text-center py-2 bg-neutral-100 rounded-lg">
+            Need 3+ responses to show trend chart
+          </div>
+        )}
 
         {/* Response History */}
         {surveyData.survey_responses.length > 1 && (

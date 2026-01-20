@@ -470,7 +470,6 @@ export function MemberDetailModal({
                         <SurveyResultsCard
                           key="survey"
                           surveyData={currentAnalysis?.analysis_data?.member_surveys?.[selectedMember.user_email || selectedMember.email] || null}
-                          userEmail={selectedMember.user_email || selectedMember.email}
                         />
                       )
                     },
