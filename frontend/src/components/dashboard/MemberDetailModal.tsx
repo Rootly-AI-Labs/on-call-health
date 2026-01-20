@@ -20,10 +20,10 @@ function getOCBRiskInfo(score: number | undefined | null): { level: string; labe
   if (score === undefined || score === null) {
     return { level: 'unknown', label: 'Unknown Risk' }
   }
-  if (score < 25) return { level: 'healthy', label: 'Healthy' }
-  if (score < 50) return { level: 'fair', label: 'Fair' }
-  if (score < 75) return { level: 'poor', label: 'Poor' }
-  return { level: 'critical', label: 'Critical' }
+  if (score >= 75) return { level: 'critical', label: 'Critical' }
+  if (score >= 50) return { level: 'poor', label: 'Poor' }
+  if (score >= 25) return { level: 'fair', label: 'Fair' }
+  return { level: 'healthy', label: 'Healthy' }
 }
 
 function getOCBBadgeColor(level: string): string {
@@ -38,10 +38,16 @@ function getOCBBadgeColor(level: string): string {
 
 function getOCBScoreColor(score: number | undefined): string {
   if (score === undefined) return 'text-gray-900'
-  if (score < 25) return 'text-green-600'
-  if (score < 50) return 'text-yellow-600'
-  if (score < 75) return 'text-orange-600'
-  return 'text-red-600'
+  if (score >= 75) return 'text-red-600'
+  if (score >= 50) return 'text-orange-600'
+  if (score >= 25) return 'text-yellow-600'
+  return 'text-green-600'
+}
+
+function getGridColsClass(count: number): string {
+  if (count === 1) return 'grid-cols-1'
+  if (count === 2) return 'grid-cols-2'
+  return 'grid-cols-3'
 }
 
 // Individual Daily Health Chart component
@@ -432,7 +438,7 @@ export function MemberDetailModal({
                           key="userTrends"
                           memberData={memberData}
                           analysisId={analysisId}
-                          timeRange={timeRange}
+                          timeRange={timeRange ?? currentAnalysis?.time_range ?? 30}
                           currentAnalysis={currentAnalysis}
                         />
                       )
@@ -485,12 +491,6 @@ export function MemberDetailModal({
                         const defaultTab = hasGitHubData ? "github" : "communication"
 
                         if (tabCount === 0) return null
-
-                        function getGridColsClass(count: number): string {
-                          if (count === 1) return 'grid-cols-1'
-                          if (count === 2) return 'grid-cols-2'
-                          return 'grid-cols-3'
-                        }
 
                         return (
                           <Tabs key="githubSlack" defaultValue={defaultTab} className="w-full">
