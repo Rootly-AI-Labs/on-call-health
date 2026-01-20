@@ -4070,8 +4070,11 @@ class UnifiedBurnoutAnalyzer:
                                 
                                 
                                 # Store incident details for individual analysis
+                                # Extract slug for Rootly URL construction
+                                incident_slug = incident.get("attributes", {}).get("slug") if incident.get("attributes") else None
                                 user_day_data["incidents"].append({
                                     "id": incident.get("id", "unknown"),
+                                    "slug": incident_slug,
                                     "title": incident_title,
                                     "severity": severity_weight,
                                     "severity_level": severity_level,
