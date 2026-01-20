@@ -206,29 +206,55 @@ export function TeamMembersList({
         </div>
 
         <div className="space-y-2">
-          {member?.ocb_score !== undefined ? (
-            <div className="text-sm">
-              <span>Risk Level</span>
-            </div>
-          ) : (
-            <div className="text-sm">
-              <span>No Risk Level Available</span>
-            </div>
-          )}
-          <div className="relative h-2 w-full overflow-hidden rounded-full bg-neutral-300">
-            <div 
-              className="h-full transition-all"
-              style={{ 
-                width: `${member?.ocb_score || 0}%`,
-                backgroundColor: member?.ocb_score !== undefined 
-                  ? getOCBProgressColor(member.ocb_score)
-                  : undefined
-              }}
-            />
-          </div>
-          <div className="flex justify-between text-xs text-neutral-500">
-            <span>{member.incident_count} incidents</span>
-          </div>
+          {(() => {
+            // Use simple_health_score if available, fallback to ocb_score
+            const healthScore = member?.simple_health_score?.overall_score ?? member?.ocb_score;
+            const hasScore = healthScore !== undefined && healthScore !== null;
+            const dataIcons = [];
+
+            // Show data source icons for transparency
+            if (member?.simple_health_score) {
+              if (member.simple_health_score.data_sources?.has_survey) dataIcons.push('📊');
+              if (member.simple_health_score.data_sources?.has_github) dataIcons.push('💻');
+              if (member.simple_health_score.data_sources?.has_incidents) dataIcons.push('🚨');
+            }
+
+            return (
+              <>
+                {hasScore ? (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-neutral-600">Health Score</span>
+                    <div className="flex items-center space-x-2">
+                      {dataIcons.length > 0 && (
+                        <span className="text-xs" title={member.simple_health_score.transparency}>
+                          {dataIcons.join(' ')}
+                        </span>
+                      )}
+                      <span className="text-2xl font-bold">{Math.round(healthScore)}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-sm text-neutral-500">
+                    <span>No score available</span>
+                  </div>
+                )}
+                <div className="relative h-2 w-full overflow-hidden rounded-full bg-neutral-300">
+                  <div
+                    className="h-full transition-all"
+                    style={{
+                      width: `${healthScore || 0}%`,
+                      backgroundColor: hasScore
+                        ? getOCBProgressColor(healthScore)
+                        : undefined
+                    }}
+                  />
+                </div>
+                <div className="flex justify-between text-xs text-neutral-500">
+                  <span>{member.incident_count} incidents</span>
+                </div>
+              </>
+            );
+          })()}
         </div>
       </CardContent>
     </Card>
