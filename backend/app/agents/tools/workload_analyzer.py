@@ -157,9 +157,9 @@ class WorkloadAnalyzerTool(BaseTool):
         return metrics
     
     def _count_after_hours_activities(self, user_data: Dict[str, Any]) -> int:
-        """Count activities outside normal business hours (6 PM - 8 AM)."""
+        """Count activities outside normal business hours (9 AM - 5 PM)."""
         count = 0
-        
+
         for data_type in ['incidents', 'commits', 'messages']:
             for item in user_data.get(data_type, []):
                 if 'timestamp' in item or 'created_at' in item:
@@ -169,13 +169,13 @@ class WorkloadAnalyzerTool(BaseTool):
                             dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
                         else:
                             dt = datetime.fromtimestamp(timestamp)
-                        
-                        # After hours: before 8 AM or after 6 PM
-                        if dt.hour < 8 or dt.hour >= 18:
+
+                        # After hours: before 9 AM or after 5 PM
+                        if dt.hour < 9 or dt.hour >= 17:
                             count += 1
                     except (ValueError, TypeError):
                         continue
-        
+
         return count
     
     def _count_weekend_activities(self, user_data: Dict[str, Any]) -> int:

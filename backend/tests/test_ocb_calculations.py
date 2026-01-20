@@ -13,23 +13,23 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'app'))
 
 from core.ocb_config import (
-    ocbConfig,
-    ocbDimension,
+    OCBConfig,
+    OCBDimension,
     calculate_personal_burnout,
     calculate_work_related_burnout,
     calculate_composite_ocb_score,
     get_ocb_interpretation,
     validate_ocb_config,
-    DEFAULT_ocb_CONFIG
+    DEFAULT_OCB_CONFIG
 )
 
 
-class TestocbConfig(unittest.TestCase):
+class TestOCBConfig(unittest.TestCase):
     """Test ocb configuration and validation."""
     
     def setUp(self):
         """Set up test fixtures."""
-        self.config = ocbConfig()
+        self.config = OCBConfig()
     
     def test_dimension_weights_sum_to_one(self):
         """Test that dimension weights sum to 1.0."""
@@ -71,7 +71,7 @@ class TestPersonalBurnoutCalculation(unittest.TestCase):
     
     def setUp(self):
         """Set up test fixtures."""
-        self.config = ocbConfig()
+        self.config = OCBConfig()
     
     def test_calculate_personal_burnout_all_metrics(self):
         """Test personal burnout calculation with all metrics present."""
@@ -79,7 +79,6 @@ class TestPersonalBurnoutCalculation(unittest.TestCase):
             'work_hours_trend': 50.0,      # 50% over 45hr/week limit
             'weekend_work': 20.0,          # 20% weekend work
             'after_hours_activity': 25.0,  # 25% after hours
-            'vacation_usage': 60.0,        # 60% unused vacation
             'sleep_quality_proxy': 15.0    # 15% late night commits
         }
         
@@ -98,7 +97,7 @@ class TestPersonalBurnoutCalculation(unittest.TestCase):
         self.assertEqual(len(result['components']), 5)
         
         # Dimension should be correct
-        self.assertEqual(result['dimension'], ocbDimension.PERSONAL.value)
+        self.assertEqual(result['dimension'], OCBDimension.PERSONAL.value)
     
     def test_calculate_personal_burnout_partial_metrics(self):
         """Test personal burnout calculation with only some metrics."""
@@ -135,7 +134,6 @@ class TestPersonalBurnoutCalculation(unittest.TestCase):
             'work_hours_trend': 200.0,     # Extreme value
             'weekend_work': 100.0,         # Maximum weekend work
             'after_hours_activity': 80.0,  # High after hours
-            'vacation_usage': 100.0,       # All vacation unused
             'sleep_quality_proxy': 50.0    # High late night activity
         }
         
@@ -154,7 +152,7 @@ class TestWorkRelatedBurnoutCalculation(unittest.TestCase):
     
     def setUp(self):
         """Set up test fixtures."""
-        self.config = ocbConfig()
+        self.config = OCBConfig()
     
     def test_calculate_work_related_burnout_all_metrics(self):
         """Test work-related burnout calculation with all metrics present."""
@@ -182,7 +180,7 @@ class TestWorkRelatedBurnoutCalculation(unittest.TestCase):
         self.assertEqual(len(result['components']), 6)
         
         # Dimension should be correct
-        self.assertEqual(result['dimension'], ocbDimension.WORK_RELATED.value)
+        self.assertEqual(result['dimension'], OCBDimension.WORK_RELATED.value)
     
     def test_calculate_work_related_burnout_high_stress(self):
         """Test work-related burnout calculation with high stress indicators."""
@@ -207,7 +205,7 @@ class TestCompositeocbScore(unittest.TestCase):
     
     def setUp(self):
         """Set up test fixtures."""
-        self.config = ocbConfig()
+        self.config = OCBConfig()
     
     def test_calculate_composite_ocb_score(self):
         """Test composite ocb score calculation."""
@@ -258,7 +256,7 @@ class TestocbInterpretation(unittest.TestCase):
     
     def setUp(self):
         """Set up test fixtures."""
-        self.config = ocbConfig()
+        self.config = OCBConfig()
     
     def test_get_ocb_interpretation_ranges(self):
         """Test ocb interpretation for different score ranges."""
@@ -302,11 +300,11 @@ class TestocbValidation(unittest.TestCase):
     
     def test_validate_custom_config(self):
         """Test validation of custom configuration."""
-        config = ocbConfig()
+        config = OCBConfig()
         
         # Modify weights to create invalid configuration
-        config.DIMENSION_WEIGHTS[ocbDimension.PERSONAL] = 0.6
-        config.DIMENSION_WEIGHTS[ocbDimension.WORK_RELATED] = 0.5  # Sum > 1.0
+        config.DIMENSION_WEIGHTS[OCBDimension.PERSONAL] = 0.6
+        config.DIMENSION_WEIGHTS[OCBDimension.WORK_RELATED] = 0.5  # Sum > 1.0
         
         validation = validate_ocb_config(config)
         self.assertFalse(validation['dimension_weights_sum'])
@@ -321,7 +319,6 @@ class TestocbEdgeCases(unittest.TestCase):
             'work_hours_trend': 0.0,
             'weekend_work': 0.0,
             'after_hours_activity': 0.0,
-            'vacation_usage': 0.0,
             'sleep_quality_proxy': 0.0
         }
         
@@ -358,7 +355,7 @@ if __name__ == '__main__':
     
     # Add test classes
     test_classes = [
-        TestocbConfig,
+        TestOCBConfig,
         TestPersonalBurnoutCalculation,
         TestWorkRelatedBurnoutCalculation,
         TestCompositeocbScore,

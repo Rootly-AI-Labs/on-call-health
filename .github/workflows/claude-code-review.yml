@@ -1,0 +1,72 @@
+name: Claude Code Review
+
+on:
+  # Run on new PRs and updates
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  # Interactive Claude assistant - runs on all PRs
+  claude-assistant:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Claude Code Action
+        uses: anthropics/claude-code-action@beta
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          model: claude-sonnet-4-20250514
+          timeout_minutes: 30
+
+  # Automatic code review on every PR
+  auto-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Claude Auto Review
+        uses: anthropics/claude-code-action@beta
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          model: claude-sonnet-4-20250514
+          direct_prompt: |
+            Review this PR thoroughly. Check for:
+
+            **Bugs & Logic Errors:**
+            - Off-by-one errors, null/undefined handling
+            - Race conditions, edge cases
+            - Incorrect logic or assumptions
+
+            **Security Issues:**
+            - SQL injection, XSS, command injection
+            - Authentication/authorization flaws
+            - Sensitive data exposure
+            - Insecure dependencies
+            - OWASP Top 10 vulnerabilities
+
+            **Code Quality:**
+            - Obvious improvements or simplifications
+            - Missing error handling
+            - Performance concerns
+
+            Be concise. Only comment on actual issues found, not style preferences.
+            If the code looks good, just say "LGTM - no issues found."
+          timeout_minutes: 20

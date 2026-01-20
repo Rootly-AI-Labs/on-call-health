@@ -255,7 +255,7 @@ export async function addIntegration(
         }
       : {
           token: token,
-          name: nickname || previewData.organization_name,
+          name: nickname || previewData.suggested_name || previewData.organization_name,
           platform: 'pagerduty'
         }
 

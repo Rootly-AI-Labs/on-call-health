@@ -40,7 +40,6 @@ def main():
         'work_hours_trend': 50.0,
         'weekend_work': 20.0,
         'after_hours_activity': 25.0,
-        'vacation_usage': 60.0,
         'sleep_quality_proxy': 15.0
     }
     

@@ -19,11 +19,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import {
   Bar,
   BarChart,
-  Radar,
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
   ResponsiveContainer,
   XAxis,
   YAxis,
@@ -33,8 +28,6 @@ import {
 } from "recharts"
 import {
   Activity,
-  ChevronLeft,
-  ChevronRight,
   Play,
   Clock,
   FileText,
@@ -46,8 +39,6 @@ import {
   Download,
   AlertCircle,
   Trash2,
-  LogOut,
-  BookOpen,
   Users,
   Star,
   Info,
@@ -59,14 +50,12 @@ import {
 import { TeamHealthOverview } from "@/components/dashboard/TeamHealthOverview"
 import { AnalysisProgressSection } from "@/components/dashboard/AnalysisProgressSection"
 import { TeamMembersList } from "@/components/dashboard/TeamMembersList"
-import { HealthTrendsChart } from "@/components/dashboard/HealthTrendsChart"
 import { ObjectiveDataCard } from "@/components/dashboard/ObjectiveDataCard"
 import { TeamRiskFactorsCard } from "@/components/dashboard/TeamRiskFactorsCard"
 import { MemberDetailModal } from "@/components/dashboard/MemberDetailModal"
 import { GitHubCommitsTimeline } from "@/components/dashboard/charts/GitHubCommitsTimeline"
 import GitHubAllMetricsPopup from "@/components/dashboard/GitHubAllMetricsPopup"
 import RiskFactorsAllPopup from "@/components/dashboard/RiskFactorsAllPopup"
-import { AIInsightsCard } from "@/components/dashboard/insights/AIInsightsCard"
 import { DeleteAnalysisDialog } from "@/components/dashboard/dialogs/DeleteAnalysisDialog"
 import Image from "next/image"
 import { format } from "date-fns"
@@ -75,6 +64,12 @@ import useDashboard from "@/hooks/useDashboard"
 import { TopPanel } from "@/components/TopPanel"
 import { useOnboarding } from "@/hooks/useOnboarding"
 import IntroGuide from "@/components/IntroGuide"
+
+function getHealthImpact(healthScore: number): 'positive' | 'neutral' | 'negative' {
+  if (healthScore >= 80) return 'positive'
+  if (healthScore >= 60) return 'neutral'
+  return 'negative'
+}
 
 function DashboardContent() {
   const {
@@ -172,7 +167,6 @@ function DashboardContent() {
   getTrendIcon,
   getRiskColor,
   getProgressColor,
-  formatRadarLabel,
   getAnalysisStages,
   getAnalysisDescription,
 
@@ -606,6 +600,29 @@ function DashboardContent() {
           {/* Analysis Complete State - Only show if analysis has meaningful data */}
           {!shouldShowInsufficientDataCard() && !analysisRunning && currentAnalysis && (currentAnalysis.analysis_data?.team_health || currentAnalysis.analysis_data?.team_summary || currentAnalysis.analysis_data?.partial_data || currentAnalysis.analysis_data?.team_analysis) && (
             <>
+              {/* Demo Analysis Banner */}
+              {currentAnalysis?.config?.is_demo && (
+                <div className="mb-6 p-4 bg-gradient-to-r from-amber-500 to-orange-500 rounded-lg shadow-lg">
+                  <div className="flex items-center justify-between flex-wrap gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-white/20 rounded-full">
+                        <Info className="h-5 w-5 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-white font-semibold text-lg">You&apos;re viewing sample data</p>
+                        <p className="text-white/90 text-sm">Connect your incident management platform to see real insights</p>
+                      </div>
+                    </div>
+                    <a
+                      href="/integrations"
+                      className="px-6 py-2.5 bg-white text-orange-600 font-semibold rounded-lg hover:bg-orange-50 transition-colors shadow-md"
+                    >
+                      Connect Integrations →
+                    </a>
+                  </div>
+                </div>
+              )}
+
               {/* Debug Section - Development Only */}
               {false && process.env.NODE_ENV === 'development' && (
                 <Card className="mb-6 border-yellow-300 bg-yellow-50">
@@ -1010,7 +1027,7 @@ function DashboardContent() {
                               title: 'Current State',
                               description: `${healthScore}% organization health score`,
                               color: 'bg-purple-500',
-                              impact: healthScore >= 80 ? 'positive' : healthScore >= 60 ? 'neutral' : 'negative'
+                              impact: getHealthImpact(healthScore)
                             });
                           }
                         } else {
@@ -1021,7 +1038,7 @@ function DashboardContent() {
                             title: 'Current State',
                             description: `${healthScore}% organization health score`,
                             color: 'bg-purple-500',
-                            impact: healthScore >= 80 ? 'positive' : healthScore >= 60 ? 'neutral' : 'negative'
+                            impact: getHealthImpact(healthScore)
                           }];
                         }
 
@@ -1109,13 +1126,13 @@ function DashboardContent() {
                       const hasIncidentMembers = membersWithIncidents.length > 0;
 
                       if (hasGitHubMembers && hasIncidentMembers) {
-                        return `Holistic burnout analysis combining incident response patterns and development activity across ${allActiveMembers.length} team members`;
+                        return `Incidents + GitHub activity for ${allActiveMembers.length} members`;
                       } else if (hasGitHubMembers && !hasIncidentMembers) {
-                        return `Development-focused burnout analysis based on GitHub activity patterns from ${membersWithGitHubData.length} active developers`;
+                        return `GitHub activity for ${membersWithGitHubData.length} developers`;
                       } else if (!hasGitHubMembers && hasIncidentMembers) {
-                        return `Incident response analysis from ${membersWithIncidents.length} team members handling incidents`;
+                        return `Incident data for ${membersWithIncidents.length} responders`;
                       } else {
-                        return "Team risk assessment based on available activity data";
+                        return "Based on available activity data";
                       }
                     })()}
                     loadingAnalysis={loadingAnalyses}
@@ -1226,8 +1243,8 @@ function DashboardContent() {
               {/* GitHub and Slack Metrics Section */}
               {(currentAnalysis?.analysis_data?.github_insights || currentAnalysis?.analysis_data?.slack_insights) && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                  {/* GitHub Metrics Card */}
-                  {currentAnalysis?.analysis_data?.github_insights && (
+                  {/* GitHub Metrics Card - DISABLED: Feature temporarily hidden from home page */}
+                  {false && currentAnalysis?.analysis_data?.github_insights && (
                     <Card className="border border-neutral-300 bg-white">
                       <CardHeader className="pb-3">
                         <div className="flex items-center justify-between">
@@ -2149,11 +2166,11 @@ function DashboardContent() {
               <label className="text-sm font-medium text-neutral-700 mb-2 block">
                 AI Insights
               </label>
-              <div className={`border rounded-lg p-4 transition-all ${enableAI ? 'border-blue-500 bg-blue-50' : 'border-neutral-200 bg-white'}`}>
+              <div className={`border rounded-lg p-4 transition-all ${enableAI ? 'border-blue-500 bg-blue-50' : 'border-neutral-200 bg-white'} ${!llmConfig?.has_token ? 'opacity-60' : ''}`}>
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
-                      <div className="w-5 h-5 text-blue-600">🤖</div>
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${llmConfig?.has_token ? 'bg-blue-100' : 'bg-neutral-100'}`}>
+                      <div className={`w-5 h-5 ${llmConfig?.has_token ? 'text-blue-600' : 'text-neutral-400'}`}>🤖</div>
                     </div>
                     <div>
                       <h3 className="text-sm font-medium text-neutral-900">Executive Summary</h3>
@@ -2163,16 +2180,26 @@ function DashboardContent() {
                   <Switch
                     checked={enableAI}
                     onCheckedChange={setEnableAI}
+                    disabled={!llmConfig?.has_token}
                   />
                 </div>
-                
+
                 <div className="space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span className="text-xs font-medium text-green-700">
-                      Anthropic Claude Connected (Railway)
-                    </span>
-                  </div>
+                  {llmConfig?.has_token ? (
+                    <div className="flex items-center space-x-2">
+                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                      <span className="text-xs font-medium text-green-700">
+                        Anthropic Claude Connected
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center space-x-2">
+                      <div className="w-2 h-2 bg-neutral-400 rounded-full"></div>
+                      <span className="text-xs font-medium text-neutral-500">
+                        Enable AI Insights in Integrations first
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

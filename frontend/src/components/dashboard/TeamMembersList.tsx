@@ -1,6 +1,6 @@
 "use client"
 
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -92,6 +92,7 @@ export function TeamMembersList({
         id: member.user_id || '',
         name: member.user_name || 'Unknown',
         email: member.user_email || '',
+        avatar_url: member.avatar_url || null,
         burnoutScore: member.ocb_score || 0, // Use OCH risk level directly
         riskLevel: (member.risk_level || 'low') as 'high' | 'medium' | 'low',
         trend: 'stable' as const,
@@ -111,14 +112,72 @@ export function TeamMembersList({
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center space-x-3">
             <Avatar>
+              {member.avatar_url && (
+                <AvatarImage src={member.avatar_url} alt={member.user_name || 'User avatar'} />
+              )}
               <AvatarFallback>
                 {member.user_name
                   ? member.user_name.split(" ").map((n) => n[0]).join("")
                   : member.user_email?.charAt(0).toUpperCase() || "?"}
               </AvatarFallback>
             </Avatar>
-            <div>
+            <div className="flex items-center gap-2">
               <h3 className="font-medium">{member.user_name || member.user_email}</h3>
+              {/* Integration icons - inline with username */}
+              <div className="flex gap-1">
+                {member.github_username && (
+                  <div className="flex items-center justify-center w-5 h-5 bg-neutral-200 rounded-full border border-neutral-200" title="GitHub">
+                    <svg className="w-3 h-3 text-neutral-700" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/>
+                    </svg>
+                  </div>
+                )}
+                {member.slack_user_id && (
+                  <div className="flex items-center justify-center w-5 h-5 bg-white rounded-full border border-neutral-200" title="Slack">
+                    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none">
+                      <path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52z" fill="#E01E5A"/>
+                      <path d="M6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313z" fill="#E01E5A"/>
+                      <path d="M8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834z" fill="#36C5F0"/>
+                      <path d="M8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312z" fill="#36C5F0"/>
+                      <path d="M18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834z" fill="#2EB67D"/>
+                      <path d="M17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312z" fill="#2EB67D"/>
+                      <path d="M15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52z" fill="#ECB22E"/>
+                      <path d="M15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z" fill="#ECB22E"/>
+                    </svg>
+                  </div>
+                )}
+                {isJiraEnabled && member.jira_account_id && (
+                  <div className="flex items-center justify-center w-5 h-5 bg-blue-50 rounded-full border border-blue-200" title="Jira">
+                    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none">
+                      <path d="M11.571 11.513H0a5.218 5.218 0 0 0 5.232 5.215h2.13v2.057A5.215 5.215 0 0 0 12.575 24V12.518a1.005 1.005 0 0 0-1.005-1.005zm5.723-5.756H5.736a5.215 5.215 0 0 0 5.215 5.214h2.129v2.058a5.218 5.218 0 0 0 5.215 5.214V6.758a1.001 1.001 0 0 0-1.001-1.001zM23.013 0H11.455a5.215 5.215 0 0 0 5.215 5.215h2.129v2.057A5.215 5.215 0 0 0 24 12.483V1.005A1.001 1.001 0 0 0 23.013 0z" fill="#2684FF"/>
+                    </svg>
+                  </div>
+                )}
+                {member.linear_user_id && (
+                  <div className="flex items-center justify-center w-5 h-5" title="Linear">
+                    <Image src="/images/linear-logo.png" alt="Linear" width={14} height={14} />
+                  </div>
+                )}
+                {member.rootly_user_id && (
+                  <div className="flex items-center justify-center w-5 h-5 rounded" title="Rootly">
+                    <Image src="/images/rootly-logo-icon.jpg" alt="Rootly" width={14} height={14} className="rounded" />
+                  </div>
+                )}
+                {member.pagerduty_user_id && (
+                  <div className="flex items-center justify-center w-5 h-5 bg-green-50 rounded-full border border-green-200" title="PagerDuty">
+                    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none">
+                      <path d="M16.965 1.18C15.085.164 13.769 0 10.683 0H3.73v14.55h6.926c2.743 0 4.8-.164 6.57-1.18 2.105-1.18 3.203-3.27 3.203-6.485 0-3.436-1.207-5.035-3.462-5.705zM11.293 10.2H7.77V4.146h3.769c2.687 0 4.074.724 4.074 2.99 0 2.487-1.496 3.065-4.32 3.065zM3.73 24h4.04V16.64H3.73V24z" fill="#06AC38"/>
+                    </svg>
+                  </div>
+                )}
+                {currentAnalysis?.analysis_data?.member_surveys?.[member.user_email] && (
+                  <div className="flex items-center justify-center w-5 h-5 bg-blue-50 rounded-full border border-blue-200" title="Survey Data Available">
+                    <svg className="w-3 h-3 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
           <div className="flex items-center space-x-2">
@@ -144,60 +203,6 @@ export function TeamMembersList({
               return <Badge className={getRiskColor(riskLevel)}>{displayLabel}</Badge>;
             })()}
           </div>
-        </div>
-        
-        {/* Integration icons - show when mapping exists and data source enabled */}
-        <div className="flex flex-wrap gap-2 mb-3">
-          {/* GitHub - show if user has GitHub mapping */}
-          {member.github_username && (
-            <div className="flex items-center justify-center w-6 h-6 bg-neutral-200 rounded-full border border-neutral-200" title="GitHub">
-              <svg className="w-3.5 h-3.5 text-neutral-700" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/>
-              </svg>
-            </div>
-          )}
-
-          {/* Slack - show if user has Slack mapping */}
-          {member.slack_user_id && (
-            <div className="flex items-center justify-center w-6 h-6 bg-white rounded-full border border-neutral-200" title="Slack">
-              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
-                {/* Official Slack logo pattern */}
-                <path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52z" fill="#E01E5A"/>
-                <path d="M6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313z" fill="#E01E5A"/>
-                <path d="M8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834z" fill="#36C5F0"/>
-                <path d="M8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312z" fill="#36C5F0"/>
-                <path d="M18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834z" fill="#2EB67D"/>
-                <path d="M17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312z" fill="#2EB67D"/>
-                <path d="M15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52z" fill="#ECB22E"/>
-                <path d="M15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z" fill="#ECB22E"/>
-              </svg>
-            </div>
-          )}
-
-          {/* Jira - show if user has Jira mapping */}
-          {isJiraEnabled && member.jira_account_id && (
-            <div className="flex items-center justify-center w-6 h-6 bg-blue-50 rounded-full border border-blue-200" title="Jira">
-              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
-                <path d="M11.571 11.513H0a5.218 5.218 0 0 0 5.232 5.215h2.13v2.057A5.215 5.215 0 0 0 12.575 24V12.518a1.005 1.005 0 0 0-1.005-1.005zm5.723-5.756H5.736a5.215 5.215 0 0 0 5.215 5.214h2.129v2.058a5.218 5.218 0 0 0 5.215 5.214V6.758a1.001 1.001 0 0 0-1.001-1.001zM23.013 0H11.455a5.215 5.215 0 0 0 5.215 5.215h2.129v2.057A5.215 5.215 0 0 0 24 12.483V1.005A1.001 1.001 0 0 0 23.013 0z" fill="#2684FF"/>
-              </svg>
-            </div>
-          )}
-
-          {/* Linear - show if user has Linear mapping */}
-          {member.linear_user_id && (
-            <div className="flex items-center justify-center w-6 h-6" title="Linear">
-              <Image src="/images/linear-logo.png" alt="Linear" width={16} height={16} />
-            </div>
-          )}
-
-          {/* Survey - show if user has survey data */}
-          {currentAnalysis?.analysis_data?.member_surveys?.[member.user_email] && (
-            <div className="flex items-center justify-center w-6 h-6 bg-blue-50 rounded-full border border-blue-200" title="Survey Data Available">
-              <svg className="w-3.5 h-3.5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-            </div>
-          )}
         </div>
 
         <div className="space-y-2">

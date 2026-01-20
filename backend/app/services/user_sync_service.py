@@ -192,6 +192,8 @@ class UserSyncService:
                 "id": user.get("id"),
                 "email": attrs.get("email"),
                 "name": attrs.get("name") or attrs.get("full_name"),
+                "timezone": attrs.get("time_zone"),  # User's configured timezone
+                "avatar_url": attrs.get("avatar_url"),  # Profile image URL
                 "platform": "rootly"
             })
 
@@ -209,6 +211,8 @@ class UserSyncService:
                 "id": user.get("id"),
                 "email": user.get("email"),
                 "name": user.get("name"),
+                "timezone": user.get("time_zone"),  # User's configured timezone
+                "avatar_url": user.get("avatar_url"),  # Profile image URL
                 "platform": "pagerduty"
             })
 
@@ -372,6 +376,8 @@ class UserSyncService:
                         email_domain=email_domain,  # User's actual domain for data sharing
                         email=email,
                         name=user.get("name"),  # Store user's display name
+                        timezone=user.get("timezone"),  # User's timezone from Rootly/PagerDuty
+                        avatar_url=user.get("avatar_url"),  # Profile image from PagerDuty/Rootly
                         integration_ids=[integration_id] if integration_id else []  # Initialize array
                     )
                     self._update_correlation(correlation, user, platform, integration_id)
@@ -423,6 +429,16 @@ class UserSyncService:
         # Update name if available and different
         if user.get("name") and correlation.name != user["name"]:
             correlation.name = user["name"]
+            updated = True
+
+        # Update timezone if available and different
+        if user.get("timezone") and correlation.timezone != user["timezone"]:
+            correlation.timezone = user["timezone"]
+            updated = True
+
+        # Update avatar_url if available and different
+        if user.get("avatar_url") and correlation.avatar_url != user["avatar_url"]:
+            correlation.avatar_url = user["avatar_url"]
             updated = True
 
         if platform == "rootly":

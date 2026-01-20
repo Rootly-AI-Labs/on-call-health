@@ -42,22 +42,22 @@ cp backend/.env.example backend/.env
 ```
 
 <details>
-<summary><b><img src="frontend/public/images/google-logo.png" width="16" height="16" alt="Google"> Instructions to get token for Google Auth</b></summary>
+<summary><b><img src="frontend/public/images/google-logo.png" width="16" height="16" alt="Google"> Google Auth - Token Setup Instructions</b></summary>
 
 1. **Enable [Google People API](https://console.cloud.google.com/marketplace/product/google/people.googleapis.com)**
 2. **Get your tokens**
 	* Create a [new project](https://console.cloud.google.com/projectcreate)
- 	* In the ** Overview ** tab, click on ** Get started ** button and fill out info	
- 	* Go to the ** Clients ** tab and click on ** + Create client ** button
-  	* Set ** Appliecation type ** to ** Web application **
-	* Set ** Authorized redirect URIs ** to ** http://localhost:8000/auth/google/callback **
-	* Keep the pop-up that contains your ** Client ID ** and ** Client secret ** open
+	* In the **Overview** tab, click on **Get started** button and fill out info
+	* Go to the **Clients** tab and click on **+ Create client** button
+	* Set **Application type** to **Web application**
+	* Set **Authorized redirect URIs** to `http://localhost:8000/auth/google/callback`
+	* Keep the pop-up that contains your **Client ID** and **Client secret** open
 3. **Fill out the variable `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in your `backend/.env` file**
 4. **Restart backend `docker compose restart backend`**
 </details>
 
 <details>
-<summary><b><img src="frontend/public/images/github-logo.png" width="16" height="16" alt="GitHub"> Instructions to get token for GitHub Auth</b></summary>
+<summary><b><img src="frontend/public/images/github-logo.png" width="16" height="16" alt="GitHub"> GitHub Auth - Token Setup Instructions</b></summary>
 
 1. **Visit [https://github.com/settings/developers](https://github.com/settings/developers)**
 	*  Click **OAuth Apps** → **New OAuth App**

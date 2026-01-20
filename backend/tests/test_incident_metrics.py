@@ -358,7 +358,6 @@ class TestOCBMetricMapping(unittest.TestCase):
             'work_hours_trend': 0,
             'weekend_work': 0,
             'after_hours_activity': 0,
-            'vacation_usage': 0,
             'sleep_quality_proxy': 0,
             'sprint_completion': 0,
             'code_review_speed': 0,
@@ -371,7 +370,7 @@ class TestOCBMetricMapping(unittest.TestCase):
         # Verify all expected OCB metrics are present
         expected_metrics = [
             'work_hours_trend', 'weekend_work', 'after_hours_activity',
-            'vacation_usage', 'sleep_quality_proxy', 'sprint_completion',
+            'sleep_quality_proxy', 'sprint_completion',
             'code_review_speed', 'pr_frequency', 'deployment_frequency',
             'meeting_load', 'oncall_burden'
         ]
@@ -385,7 +384,6 @@ class TestOCBMetricMapping(unittest.TestCase):
         # - work_hours_trend: incidents_per_week
         # - weekend_work: after_hours_percentage
         # - after_hours_activity: after_hours_percentage
-        # - vacation_usage: severity_weighted_per_week
         # - sleep_quality_proxy: severity_weighted_per_week
 
         incidents_per_week = 5.0
@@ -397,7 +395,6 @@ class TestOCBMetricMapping(unittest.TestCase):
             'work_hours_trend': incidents_per_week,
             'weekend_work': after_hours_pct * 100,  # Convert to percentage
             'after_hours_activity': after_hours_pct * 100,
-            'vacation_usage': (severity_weighted_per_week / 20) * 100,
             'sleep_quality_proxy': severity_weighted_per_week
         }
 

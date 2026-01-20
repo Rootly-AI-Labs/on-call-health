@@ -100,13 +100,13 @@ async def test_rootly_token_preview(
     organization_name = account_info.get("organization_name")
     total_users = account_info.get("total_users", 0)
     
-    # Use organization name if available, otherwise use a generic name
+    # Format: "Rootly - Organization Name"
     # Don't fabricate names from email domains or other sources
     if organization_name:
-        base_name = organization_name
+        base_name = f"Rootly - {organization_name}"
     else:
         # No organization name found in Rootly - use generic name
-        base_name = "Rootly Integration"
+        base_name = "Rootly"
     
     # Check if user already has this exact token (only active integrations)
     existing_token = db.query(RootlyIntegration).filter(

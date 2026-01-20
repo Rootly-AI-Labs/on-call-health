@@ -1121,12 +1121,24 @@ class MigrationRunner:
                 "description": "Make email column required in user_burnout_reports",
                 "sql_file": "2026_01_12_make_email_required_in_user_burnout_reports.sql"
             },
-
-            # {
-            #     "name": "036_add_user_preferences",
-            #     "description": "Add user preferences table",
-            #     "sql": ["CREATE TABLE IF NOT EXISTS user_preferences (...)"]
-            # }
+            {
+                "name": "036_add_timezone_to_user_correlations",
+                "description": "Add timezone column to user_correlations for user-specific working hours",
+                "sql": [
+                    """
+                    ALTER TABLE user_correlations
+                    ADD COLUMN IF NOT EXISTS timezone VARCHAR(50)
+                    """,
+                    """
+                    COMMENT ON COLUMN user_correlations.timezone IS 'User timezone from Rootly/PagerDuty (e.g., America/New_York) for accurate after-hours calculation'
+                    """
+                ]
+            },
+            {
+                "name": "037_add_avatar_url_to_user_correlations",
+                "description": "Add avatar_url column for profile images from PagerDuty/Rootly",
+                "sql_file": "2026_01_17_add_avatar_url_to_user_correlations.sql"
+            },
             # Add future migrations here with incrementing numbers
         ]
 

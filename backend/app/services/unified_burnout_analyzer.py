@@ -12,16 +12,13 @@ from typing import Dict, List, Any, Optional
 from collections import defaultdict
 
 from ..core.rootly_client import RootlyAPIClient
-from ..core.pagerduty_client import PagerDutyAPIClient
-from ..core.ocb_config import calculate_composite_ocb_score, calculate_personal_burnout, calculate_work_related_burnout, generate_ocb_score_reasoning
+from ..core.pagerduty_client import PagerDutyAPIClient, PagerDutyDataCollector
+from ..core.ocb_config import calculate_composite_ocb_score, calculate_personal_burnout, calculate_work_related_burnout, generate_ocb_score_reasoning, get_structured_ocb_factors
 from .ai_burnout_analyzer import get_ai_burnout_analyzer
 from .github_correlation_service import GitHubCorrelationService
-from ..utils.incident_utils import slim_incidents
+from ..utils.incident_utils import slim_incidents, calculate_severity_breakdown
 
 import pytz
-from collections import defaultdict
-
-from datetime import datetime
 
 # Import mock data loader for testing
 MOCK_DATA_AVAILABLE = False
@@ -44,13 +41,20 @@ except ImportError as e:
 
 logger = logging.getLogger(__name__)
 
+# Import settings for configurable business hours
+from ..core.config import settings
 
-# === BUSINESS HOURS CONSTANTS ===
-# Standardized definitions for after-hours and late-night detection
-BUSINESS_HOURS_START = 9   # 9 AM - standard knowledge worker start time
-BUSINESS_HOURS_END = 18    # 6 PM - standard knowledge worker end time
-LATE_NIGHT_START = 22      # 10 PM - when sleep preparation should begin
-LATE_NIGHT_END = 6         # 6 AM - early morning threshold
+# === BUSINESS HOURS CONFIGURATION ===
+# These values are configurable via environment variables:
+# - BUSINESS_HOURS_START: Hour when business day starts (default: 9 = 9 AM)
+# - BUSINESS_HOURS_END: Hour when business day ends (default: 17 = 5 PM)
+# - LATE_NIGHT_START: Hour when late night begins (default: 22 = 10 PM)
+# - LATE_NIGHT_END: Hour when late night ends (default: 6 = 6 AM)
+# Times are applied in each user's local timezone (fetched from Rootly/PagerDuty)
+BUSINESS_HOURS_START = settings.BUSINESS_HOURS_START
+BUSINESS_HOURS_END = settings.BUSINESS_HOURS_END
+LATE_NIGHT_START = settings.LATE_NIGHT_START
+LATE_NIGHT_END = settings.LATE_NIGHT_END
 
 
 class UnifiedBurnoutAnalyzer:
@@ -217,9 +221,9 @@ class UnifiedBurnoutAnalyzer:
         use_mock_data = os.getenv("USE_MOCK_DATA", "false").lower() == "true"
 
         # ========== DEBUG CHECKPOINTS ==========
-        logger.error(f"🚀 CHECKPOINT 0: Analysis STARTING at {analysis_start_time.isoformat()}")
-        logger.error(f"🚀 CHECKPOINT 0: analysis_id={analysis_id}, time_range={time_range_days}d, platform={self.platform}")
-        logger.error(f"🚀 CHECKPOINT 0: features={self.features}")
+        logger.info(f"🚀 CHECKPOINT 0: Analysis STARTING at {analysis_start_time.isoformat()}")
+        logger.info(f"🚀 CHECKPOINT 0: analysis_id={analysis_id}, time_range={time_range_days}d, platform={self.platform}")
+        logger.info(f"🚀 CHECKPOINT 0: features={self.features}")
 
         logger.info(f"BURNOUT ANALYSIS START: Beginning {time_range_days}-day burnout analysis at {analysis_start_time.isoformat()}")
 
@@ -228,8 +232,8 @@ class UnifiedBurnoutAnalyzer:
         print(f"🚨 RAILWAY DEBUG: Platform = {self.platform}")
         print(f"🚨 RAILWAY DEBUG: NEW SCORING ALGORITHM ACTIVE")
         print(f"🚨 RAILWAY DEBUG: Features enabled = {self.features}")
-        logger.error(f"RAILWAY FORCE LOG: NEW SCORING ALGORITHM DEPLOYED - {analysis_start_time}")
-        logger.error(f"RAILWAY FORCE LOG: Features = {self.features}")
+        logger.info(f"RAILWAY FORCE LOG: NEW SCORING ALGORITHM DEPLOYED - {analysis_start_time}")
+        logger.info(f"RAILWAY FORCE LOG: Features = {self.features}")
 
         try:
             # Fetch data from Rootly/PagerDuty OR load mock data
@@ -246,7 +250,7 @@ class UnifiedBurnoutAnalyzer:
 
             data_fetch_duration = (datetime.now() - data_fetch_start).total_seconds()
             logger.info(f"BURNOUT ANALYSIS: Step 1 completed in {data_fetch_duration:.2f}s - Data type: {type(data)}, is_none: {data is None}")
-            logger.error(f"✅ CHECKPOINT 1: Data fetch DONE in {data_fetch_duration:.2f}s - users={len(data.get('users', []))}, incidents={len(data.get('incidents', []))}")
+            logger.info(f"✅ CHECKPOINT 1: Data fetch DONE in {data_fetch_duration:.2f}s - users={len(data.get('users', []))}, incidents={len(data.get('incidents', []))}")
             
             # Check if data was successfully fetched (data should never be None due to fallbacks)
             if data is None:
@@ -499,7 +503,7 @@ class UnifiedBurnoutAnalyzer:
                     logger.warning(f"   - Check if {self.platform} data structure matches expectation")
                 
                 if self.features['github']:
-                    logger.error(f"⏳ CHECKPOINT 2a: Starting GitHub data collection for {len(team_emails)} users")
+                    logger.info(f"⏳ CHECKPOINT 2a: Starting GitHub data collection for {len(team_emails)} users")
                     logger.info(f"UNIFIED ANALYZER: Collecting GitHub data for {len(team_emails)} team members")
                     logger.info(f"Team emails: {team_emails[:5]}...")  # Log first 5 emails
                     try:
@@ -532,14 +536,14 @@ class UnifiedBurnoutAnalyzer:
                     except Exception as e:
                         logger.error(f"❌ CHECKPOINT 2a: GitHub data collection FAILED: {e}")
                         logger.error(f"GitHub data collection failed: {e}")
-                    logger.error(f"✅ CHECKPOINT 2a: GitHub data collection DONE - {len(github_data)} users")
+                    logger.info(f"✅ CHECKPOINT 2a: GitHub data collection DONE - {len(github_data)} users")
                 else:
-                    logger.error(f"⏭️ CHECKPOINT 2a: GitHub SKIPPED (disabled)")
+                    logger.info(f"⏭️ CHECKPOINT 2a: GitHub SKIPPED (disabled)")
                     logger.info(f"UNIFIED ANALYZER: GitHub integration disabled - skipping")
                 
                 # DISABLED: Slack data collection temporarily disabled until feature is fully enabled
                 # if self.features['slack']:
-                #     logger.error(f"⏳ CHECKPOINT 2b: Starting Slack data collection for {len(team_names)} users")
+                #     logger.info(f"⏳ CHECKPOINT 2b: Starting Slack data collection for {len(team_names)} users")
                 #     logger.info(f"Collecting Slack data for {len(team_names)} team members using names")
                 #     logger.info(f"Team names: {team_names[:5]}...")  # Log first 5 names
                 #     try:
@@ -562,13 +566,13 @@ class UnifiedBurnoutAnalyzer:
                 #     except Exception as e:
                 #         logger.error(f"❌ CHECKPOINT 2b: Slack data collection FAILED: {e}")
                 #         logger.error(f"Slack data collection failed: {e}")
-                #     logger.error(f"✅ CHECKPOINT 2b: Slack data collection DONE - {len(slack_data)} users")
+                #     logger.info(f"✅ CHECKPOINT 2b: Slack data collection DONE - {len(slack_data)} users")
                 # else:
-                #     logger.error(f"⏭️ CHECKPOINT 2b: Slack SKIPPED (disabled)")
+                #     logger.info(f"⏭️ CHECKPOINT 2b: Slack SKIPPED (disabled)")
                 logger.info(f"⏭️ CHECKPOINT 2b: Slack data collection DISABLED - feature not ready for production")
 
                 if self.features['jira']:
-                    logger.error(f"⏳ CHECKPOINT 2c: Starting Jira data collection")
+                    logger.info(f"⏳ CHECKPOINT 2c: Starting Jira data collection")
                     logger.info(f"UNIFIED ANALYZER: Collecting Jira data for {len(team_emails)} team members")
                     logger.info(f"Team emails: {team_emails[:5]}...")  # Log first 5 emails
                     try:
@@ -675,16 +679,16 @@ class UnifiedBurnoutAnalyzer:
                     except Exception as e:
                         logger.error(f"❌ CHECKPOINT 2c: Jira data collection FAILED: {e}")
                         logger.error(f"Jira data collection failed: {e}")
-                    logger.error(f"✅ CHECKPOINT 2c: Jira data collection DONE - {len(jira_data)} users")
+                    logger.info(f"✅ CHECKPOINT 2c: Jira data collection DONE - {len(jira_data)} users")
                 else:
-                    logger.error(f"⏭️ CHECKPOINT 2c: Jira SKIPPED (disabled)")
+                    logger.info(f"⏭️ CHECKPOINT 2c: Jira SKIPPED (disabled)")
                     logger.info(f"UNIFIED ANALYZER: Jira integration disabled - skipping")
 
-            logger.error(f"✅ CHECKPOINT 2: All data collection COMPLETE")
+            logger.info(f"✅ CHECKPOINT 2: All data collection COMPLETE")
 
             # Analyze team burnout
             try:
-                logger.error(f"⏳ CHECKPOINT 3: Starting team data analysis")
+                logger.info(f"⏳ CHECKPOINT 3: Starting team data analysis")
                 team_analysis_start = datetime.now()
                 logger.info(f"BURNOUT ANALYSIS: Step 3 - Analyzing team data for {time_range_days}-day analysis")
                 logger.info(f"BURNOUT ANALYSIS: Team analysis inputs - {len(users)} users, {len(incidents)} incidents")
@@ -703,7 +707,7 @@ class UnifiedBurnoutAnalyzer:
                 # Log team analysis results
                 members_analyzed = len(team_analysis.get("members", [])) if team_analysis else 0
                 logger.info(f"BURNOUT ANALYSIS: Team analysis generated results for {members_analyzed} members")
-                logger.error(f"✅ CHECKPOINT 3: Team analysis DONE in {team_analysis_duration:.2f}s - {members_analyzed} members")
+                logger.info(f"✅ CHECKPOINT 3: Team analysis DONE in {team_analysis_duration:.2f}s - {members_analyzed} members")
                 
             except Exception as e:
                 team_analysis_duration = (datetime.now() - team_analysis_start).total_seconds() if 'team_analysis_start' in locals() else 0
@@ -849,7 +853,7 @@ class UnifiedBurnoutAnalyzer:
                 logger.info(f"🔍 POST_JIRA_CHECK: Member {member.get('user_email')} - github_activity: commits={github_activity.get('commits_count', 0)}, prs={github_activity.get('pull_requests_count', 0)}")
 
             # Calculate overall team health AFTER GitHub burnout adjustment
-            logger.error(f"⏳ CHECKPOINT 4: Starting health calculation")
+            logger.info(f"⏳ CHECKPOINT 4: Starting health calculation")
             health_calc_start = datetime.now()
             logger.info(f"BURNOUT ANALYSIS: Step 4 - Calculating team health for {time_range_days}-day analysis")
             team_health = self._calculate_team_health(team_analysis["members"])
@@ -864,18 +868,18 @@ class UnifiedBurnoutAnalyzer:
                 health_calc_duration = (datetime.now() - health_calc_start).total_seconds()
                 logger.info(f"BURNOUT ANALYSIS: Step 4 completed in {health_calc_duration:.3f}s - Health score: {team_health.get('overall_score', 'N/A')}")
             
-            logger.error(f"✅ CHECKPOINT 4: Health calculation DONE - score={team_health.get('overall_score', 'N/A')}")
+            logger.info(f"✅ CHECKPOINT 4: Health calculation DONE - score={team_health.get('overall_score', 'N/A')}")
 
             # Generate insights and recommendations
-            logger.error(f"⏳ CHECKPOINT 5: Starting insights generation")
+            logger.info(f"⏳ CHECKPOINT 5: Starting insights generation")
             insights_start = datetime.now()
             logger.info(f"BURNOUT ANALYSIS: Step 5 - Generating insights and recommendations")
             insights = self._generate_insights(team_analysis, team_health)
             insights_duration = (datetime.now() - insights_start).total_seconds()
             logger.info(f"BURNOUT ANALYSIS: Step 5 completed in {insights_duration:.3f}s - Generated {len(insights)} insights")
-            logger.error(f"✅ CHECKPOINT 5: Insights generation DONE - {len(insights)} insights")
+            logger.info(f"✅ CHECKPOINT 5: Insights generation DONE - {len(insights)} insights")
 
-            logger.error(f"⏳ CHECKPOINT 6: Building final result object")
+            logger.info(f"⏳ CHECKPOINT 6: Building final result object")
 
             # Calculate period summary for consistent UI display
             team_overall_score = team_health.get("overall_score", 0.0)  # This is already health scale 0-10
@@ -1073,8 +1077,11 @@ class UnifiedBurnoutAnalyzer:
             
             # Debug: Log final result structure
             total_analysis_time = (datetime.now() - analysis_start_time).total_seconds()
-            logger.error(f"🏁 CHECKPOINT 7: Analysis COMPLETE - Total time: {total_analysis_time:.2f}s")
-            logger.error(f"🏁 CHECKPOINT 7: Result has {len(result.get('team_members', []))} members, score={result.get('overall_score', 'N/A')}")
+            logger.info(f"🏁 CHECKPOINT 7: Analysis COMPLETE - Total time: {total_analysis_time:.2f}s")
+            team_analysis = result.get('team_analysis', {})
+            members_count = len(team_analysis.get('members', [])) if isinstance(team_analysis, dict) else 0
+            health_score = result.get('team_health', {}).get('overall_score', 'N/A') if isinstance(result.get('team_health'), dict) else 'N/A'
+            logger.info(f"🏁 CHECKPOINT 7: Result has {members_count} members, health_score={health_score}")
 
             return result
             
@@ -1091,9 +1098,9 @@ class UnifiedBurnoutAnalyzer:
         logger.info(f"ANALYZER DATA FETCH: Starting data collection for {days_back}-day analysis")
 
         try:
-            # If synced users provided, use them instead of fetching from API
+            # If synced users provided, use them for user list but fetch fresh data for timezones
             if self.synced_users:
-                logger.info(f"TEAM SYNC OPTIMIZATION: Using {len(self.synced_users)} pre-synced users, only fetching incidents")
+                logger.info(f"TEAM SYNC OPTIMIZATION: Using {len(self.synced_users)} pre-synced users, fetching incidents + fresh timezones")
 
                 # DEBUG: Check if jira_account_id is present in synced users
                 users_with_jira = [u for u in self.synced_users if u.get('jira_account_id')]
@@ -1104,19 +1111,27 @@ class UnifiedBurnoutAnalyzer:
                 else:
                     logger.warning(f"⚠️ NO JIRA MAPPINGS in synced_users! Sample user keys: {list(self.synced_users[0].keys()) if self.synced_users else 'empty'}")
 
-                # Only fetch incidents from API (much faster!)
-                # Different APIs use different parameters
+                # Always fetch fresh users from API to get current timezone settings
+                # Timezone is the source of truth from Rootly/PagerDuty
                 if self.platform == "pagerduty":
-                    import pytz
+                    api_users = await self.client.get_users(limit=10000)
+                else:  # rootly
+                    api_users = await self.client.get_users(limit=10000)
+
+                # Store API users for timezone map (will be used by _build_user_tz_map)
+                self._api_users_for_timezone = api_users
+                logger.info(f"Fetched {len(api_users)} users from API for fresh timezone data")
+
+                # Fetch incidents from API
+                if self.platform == "pagerduty":
                     since = datetime.now(pytz.UTC) - timedelta(days=days_back)
                     until = datetime.now(pytz.UTC)
                     raw_incidents = await self.client.get_incidents(since=since, until=until, limit=5000)
                 else:  # rootly
                     raw_incidents = await self.client.get_incidents(days_back=days_back, limit=5000)
 
-                # CRITICAL FIX: Normalize incidents for PagerDuty to extract assigned_to from assignments array
+                # Normalize incidents for PagerDuty to extract assigned_to from assignments array
                 if self.platform == "pagerduty":
-                    from app.core.pagerduty_client import PagerDutyDataCollector
                     collector = PagerDutyDataCollector(self.client.api_token)
                     # Use the enhanced normalization to extract assignments
                     normalized_data = collector._normalize_with_enhanced_assignment_extraction(
@@ -1128,8 +1143,7 @@ class UnifiedBurnoutAnalyzer:
                 else:
                     incidents = raw_incidents
 
-                # Calculate severity breakdown using shared utility
-                from app.utils.incident_utils import calculate_severity_breakdown
+                # Calculate severity breakdown
                 severity_counts = calculate_severity_breakdown(incidents)
 
                 # Build data structure with synced users
@@ -1305,23 +1319,33 @@ class UnifiedBurnoutAnalyzer:
                 }
             }
 
-    # helper for building  timezone map
     def _build_user_tz_map(self, users):
+        """Build user ID to timezone map.
+
+        Timezone source of truth is always Rootly/PagerDuty API.
+        Uses fresh API data when available to capture any timezone changes.
+        """
+        # Prefer fresh API data if we fetched it (for synced_users case)
+        api_users = getattr(self, '_api_users_for_timezone', None) or users
+
         tz_by_id = {}
-        if not users:
+        if not api_users:
             return tz_by_id
-        for user in users:
-            uid = user.get("id")        
+
+        for user in api_users:
+            uid = user.get("id")
             if not uid:
                 continue
-            if self.platform == "pagerduty":
-                tz = user.get("timezone") 
-                # print(f"User: {user.get('name')} ({user.get('email')}) → TZ: {user.get('timezone')}")
-            else:  
-                attrs = user.get("attributes", {}) or {}
-                # print(f"User: {user.get('name')} ({user.get('email')}) → TZ: {user.get('timezone')}")
 
-                tz = attrs.get("time_zone") or attrs.get("timezone")
+            # Extract timezone from API response format
+            if self.platform == "pagerduty":
+                # PagerDuty: flat format {"timezone": "America/New_York"}
+                tz = user.get("timezone")
+            else:
+                # Rootly: JSONAPI format {"attributes": {"time_zone": "America/New_York"}}
+                attrs = user.get("attributes") or {}
+                tz = attrs.get("time_zone")
+
             tz_by_id[str(uid)] = tz
         return tz_by_id
 
@@ -1539,6 +1563,9 @@ class UnifiedBurnoutAnalyzer:
         github_username = user.get("github_username")
         linear_user_id = user.get("linear_user_id")
         slack_user_id = user.get("slack_user_id")
+        rootly_user_id = user.get("rootly_user_id")
+        pagerduty_user_id = user.get("pagerduty_user_id")
+        avatar_url = user.get("avatar_url")  # Profile image from PagerDuty/Rootly
 
         # DEBUG: Log integration mappings for this user
         if jira_account_id:
@@ -1586,6 +1613,9 @@ class UnifiedBurnoutAnalyzer:
                 "slack_user_id": slack_user_id,  # Include Slack mapping for logo display
                 "jira_account_id": jira_account_id,  # Include Jira mapping for workload correlation
                 "linear_user_id": linear_user_id,  # Include Linear mapping for logo display
+                "rootly_user_id": rootly_user_id,  # Include Rootly mapping for logo display
+                "pagerduty_user_id": pagerduty_user_id,  # Include PagerDuty mapping for logo display
+                "avatar_url": avatar_url,  # Profile image URL from PagerDuty/Rootly
                 "burnout_score": 0,
                 "ocb_score": round(min(100, composite_ocb['composite_score']), 2),  # Cap display at 100 for UI
                 "risk_level": "low",
@@ -1606,6 +1636,7 @@ class UnifiedBurnoutAnalyzer:
                     "interpretation": composite_ocb['interpretation']
                 },
                 "ocb_reasoning": ocb_reasoning,  # ✅ Add explanations
+                "ocb_factors": get_structured_ocb_factors(personal_ocb, work_ocb, composite_ocb['composite_score']),
                 "metrics": {
                     "incidents_per_week": 0,
                     "after_hours_percentage": 0,
@@ -1772,12 +1803,18 @@ class UnifiedBurnoutAnalyzer:
         logger.info(f"SEVERITY_WEIGHTED: User has {severity_weighted_total:.1f} severity-weighted incidents total ({severity_weighted_per_week:.1f}/week)")
         
         # Apply Rootly's tiered scaling to all OCB metrics
+        # CRITICAL: after_hours_pct is a decimal (0.0-1.0), must convert to percentage (0-100) for OCB scale_max
+        after_hours_percentage = after_hours_pct * 100  # Convert 0.25 → 25%
+
+        # Apply time-based multipliers to increase impact of off-hours incidents
+        # Research shows off-hours incidents have 1.4-1.8x psychological impact
+        time_weighted_after_hours = after_hours_percentage * time_impacts.get('after_hours_multiplier', 1.4)
+
         ocb_metrics = {
             # Personal burnout factors - using Rootly's tiered approach
             'work_hours_trend': apply_incident_tiers(incidents_per_week) * 10,      # Scale to 0-100
-            'weekend_work': after_hours_pct * 2,                                           # NO CAP: Extreme after-hours can exceed 100%
-            'after_hours_activity': after_hours_pct,                                       # Direct mapping
-            'vacation_usage': (severity_weighted_per_week / 20) * 100,                     # NO CAP: Extreme SEV1s prevent recovery completely
+            'weekend_work': after_hours_percentage * 2,                             # NO CAP: Extreme after-hours can exceed 100%
+            'after_hours_activity': time_weighted_after_hours,                      # Time-multiplied for research-based impact
             'sleep_quality_proxy': apply_rootly_incident_tiers(severity_weighted_per_week) * 8,  # NO CAP: SEV1s can destroy sleep
             
             # Work-related burnout factors - using Rootly's response time tiers  
@@ -1834,6 +1871,9 @@ class UnifiedBurnoutAnalyzer:
             "slack_user_id": slack_user_id,  # Include Slack mapping
             "jira_account_id": jira_account_id,  # Include Jira mapping
             "linear_user_id": linear_user_id,  # Include Linear mapping
+            "rootly_user_id": rootly_user_id,  # Include Rootly mapping for logo display
+            "pagerduty_user_id": pagerduty_user_id,  # Include PagerDuty mapping for logo display
+            "avatar_url": avatar_url,  # Profile image URL from PagerDuty/Rootly
             "burnout_score": round(burnout_score, 2),
             "ocb_score": round(min(100, composite_ocb['composite_score']), 2),  # Cap display at 100 for UI
             "risk_level": risk_level,
@@ -1846,6 +1886,7 @@ class UnifiedBurnoutAnalyzer:
                 "interpretation": composite_ocb['interpretation']
             },
             "ocb_reasoning": ocb_reasoning,  # Add explanations for the score
+            "ocb_factors": get_structured_ocb_factors(personal_ocb, work_ocb, composite_ocb['composite_score']),
             "metrics": metrics,
             "confidence": confidence,  # Add confidence intervals and data quality
             # Research-based insights
