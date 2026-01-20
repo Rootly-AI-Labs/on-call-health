@@ -1,0 +1,1006 @@
+                                                                                
+ ▐▛███▜▌   Claude Code v2.1.12                                                  
+▝▜█████▛▘  Opus 4.5 · Claude Team                                               
+  ▘▘ ▝▝    ~/Dropbox/work/On-Call-Health                                        
+══════════════════ Conversation compacted · ctrl+o for history ═════════════════
+  ⎿  Read frontend/src/components/dashboard/UserIncidentCard.tsx (136 lines)    
+  ⎿ Read frontend/src/components/dashboard/insights/AIInsightsModal.tsx (132    
+    lines)                                                                      
+  ⎿  Referenced file frontend/src/components/dashboard/TicketingCard.tsx        
+  ⎿  Referenced file backend/app/services/unified_burnout_analyzer.py           
+                                                                                
+⏺ Task "Shorten team analysis description" completed in background              
+                                                                                
+⏺ Task "Add Rootly/PagerDuty icons to risk tile" completed in background        
+                                                                                
+⏺ Task "Improve Jira Workload tile readability" completed in background         
+                                                                                
+⏺ Task "Dynamic tile ordering" completed in background                          
+  ⎿  Skills restored (beads)                                                    
+                                                                                
+⏺ I'll continue applying the security fixes to the security-fixes-clean branch. 
+  Let me first check the current branch status and then apply each security fix.
+                                                                                
+⏺ Bash(git branch --show-current && git status --short)                         
+  ⎿  security-fixes-clean                                                       
+     ?? .beads/.local_version                                                   
+     ?? .beads/README.md                                                        
+     … +6 lines (ctrl+o to expand)                                              
+                                                                                
+⏺ Good, I'm on the clean branch. Let me read the current state of the files and 
+  apply the security fixes.                                                     
+                                                                                
+⏺ Read(frontend/src/components/dashboard/TicketingCard.tsx)                     
+  ⎿  Read 599 lines                                                             
+                                                                                
+⏺ Read(backend/app/services/unified_burnout_analyzer.py)                        
+  ⎿  Error reading file                                                         
+                                                                                
+⏺ Now let me search for the logger.error checkpoint messages in the backend     
+  file, and also check if ReactMarkdown is already in package.json.             
+                                                                                
+⏺ Search(pattern: "logger\.error.*CHECKPOINT", path:                            
+        "backend/app/services/unified_burnout_analyzer.py", output_mode:        
+        "content")                                                              
+  ⎿  Found 28 lines (ctrl+o to expand)                                          
+                                                                                
+⏺ Search(pattern: "react-markdown", path: "frontend/package.json", output_mode: 
+        "content")                                                              
+  ⎿  Found 1 line (ctrl+o to expand)                                            
+                                                                                
+⏺ ReactMarkdown is already installed. Let me apply all the security fixes to the
+   clean branch.                                                                
+                                                                                
+⏺ Update(frontend/src/components/dashboard/TicketingCard.tsx)                   
+  ⎿  Added 18 lines                                                             
+       99    }                                                                  
+      100  }                                                                    
+      101                                                                       
+      102 +// Safe date comparison that handles invalid dates (prevents         
+          +NaN)                                                                 
+      103 +function safeDateCompare(dateA: string | null, dateB: string         
+          +| null): number {                                                    
+      104 +  if (!dateA && !dateB) return 0                                     
+      105 +  if (!dateA) return 1                                               
+      106 +  if (!dateB) return -1                                              
+      107 +  const aTime = new Date(dateA).getTime()                            
+      108 +  const bTime = new Date(dateB).getTime()                            
+      109 +  if (isNaN(aTime) && isNaN(bTime)) return 0                         
+      110 +  if (isNaN(aTime)) return 1                                         
+      111 +  if (isNaN(bTime)) return -1                                        
+      112 +  return aTime - bTime                                               
+      113 +}                                                                    
+      114 +                                                                     
+      115 +// Generate stable key for ticket/issue items                        
+      116 +function getItemKey(item: any): string | null {                      
+      117 +  return item.key || item.identifier || item.id || null              
+      118 +}                                                                    
+      119 +                                                                     
+      120  // Content component for Jira tickets (used in consolidated          
+           card)                                                                
+      121  function JiraTicketCardContent({ memberData }:                       
+           TicketingCardProps) {                                                
+      122    if (!memberData?.jira_tickets ||                                   
+           memberData.jira_tickets.length === 0) {                              
+                                                                                
+⏺ Now let me fix the unsafe date comparisons and React keys in the              
+  JiraTicketCardContent function.                                               
+                                                                                
+⏺ Update(frontend/src/components/dashboard/TicketingCard.tsx)                   
+  ⎿  Added 2 lines, removed 5 lines                                             
+      151      }                                                                
+      152                                                                       
+      153      // If same priority, sort by due date (earlier first)            
+      154 -    if (a.duedate && b.duedate) {                                    
+      155 -      return new Date(a.duedate).getTime() - new                     
+          -Date(b.duedate).getTime()                                            
+      156 -    }                                                                
+      157 -    return a.duedate ? -1 : 1                                        
+      154 +    return safeDateCompare(a.duedate, b.duedate)                     
+      155    })                                                                 
+      156                                                                       
+      157    return (                                                           
+     ...                                                                        
+      186          <p className="text-xs font-semibold text-neutral-700         
+           mb-3">Active Tickets ({sortedTickets.length})</p>                    
+      187          <div className="space-y-2 max-h-64 overflow-y-auto           
+           w-full">                                                             
+      188            {sortedTickets.map((ticket, index) => (                    
+      189 -            <div key={index}                                         
+          - className="flex items-center gap-2 p-2 bg-neutral-100               
+          -rounded-md hover:bg-neutral-200 transition overflow-hidden">         
+      189 +            <div key={getItemKey(ticket) || `ticket-${index}`}       
+          + className="flex items-center gap-2 p-2 bg-neutral-100               
+          +rounded-md hover:bg-neutral-200 transition overflow-hidden">         
+      190                <Badge                                                 
+      191                  className="text-xs flex-shrink-0"                    
+      192                  style={getPriorityColor(ticket.priority)}            
+                                                                                
+⏺ Now let me fix the JiraTicketCard component's date comparison and key.        
+                                                                                
+⏺ Search(pattern: "new Date\(a\.duedate\)\.getTime\(\) - new                    
+        Date\(b\.duedate\)\.getTime\(\)", path:                                 
+        "frontend/src/components/dashboard/TicketingCard.tsx", output_mode:     
+        "content")                                                              
+  ⎿  Found 1 line (ctrl+o to expand)                                            
+                                                                                
+⏺ Read(frontend/src/components/dashboard/TicketingCard.tsx)                     
+  ⎿  Read 80 lines                                                              
+                                                                                
+⏺ Update(frontend/src/components/dashboard/TicketingCard.tsx)                   
+  ⎿  Added 2 lines, removed 5 lines                                             
+      253      }                                                                
+      254                                                                       
+      255      // If same priority, sort by due date (earlier first)            
+      256 -    if (a.duedate && b.duedate) {                                    
+      257 -      return new Date(a.duedate).getTime() - new                     
+          -Date(b.duedate).getTime()                                            
+      258 -    }                                                                
+      259 -    return a.duedate ? -1 : 1                                        
+      256 +    return safeDateCompare(a.duedate, b.duedate)                     
+      257    })                                                                 
+      258                                                                       
+      259    return (                                                           
+     ...                                                                        
+      294            <p className="text-xs font-semibold                        
+           text-neutral-700 mb-3">Active Tickets                                
+           ({sortedTickets.length})</p>                                         
+      295            <div className="space-y-2 max-h-64                         
+           overflow-y-auto">                                                    
+      296              {sortedTickets.map((ticket, index) => (                  
+      297 -              <div key={index}                                       
+          - className="flex items-center gap-2 p-2 bg-neutral-100               
+          -rounded-md hover:bg-neutral-200 transition">                         
+      297 +              <div key={getItemKey(ticket) || `ticket-${index}       
+          +`} className="flex items-center gap-2 p-2 bg-neutral-100             
+          +rounded-md hover:bg-neutral-200 transition">                         
+      298                  <Badge                                               
+      299                    className="text-xs flex-shrink-0"                  
+      300                    style={getPriorityColor(ticket.priority)}          
+                                                                                
+⏺ Now let me fix the Linear components. Let me find all remaining date          
+  comparisons and key={index} patterns.                                         
+                                                                                
+⏺ Search(pattern: "new Date\(a\.dueDate\)\.getTime\(\) - new                    
+        Date\(b\.dueDate\)\.getTime\(\)", path:                                 
+        "frontend/src/components/dashboard/TicketingCard.tsx", output_mode:     
+        "content")                                                              
+  ⎿  Found 2 lines (ctrl+o to expand)                                           
+                                                                                
+⏺ Search(pattern: "key=\{index\}", path:                                        
+        "frontend/src/components/dashboard/TicketingCard.tsx", output_mode:     
+        "content")                                                              
+  ⎿  Found 2 lines (ctrl+o to expand)                                           
+                                                                                
+⏺ Read(frontend/src/components/dashboard/TicketingCard.tsx)                     
+  ⎿  Read 60 lines                                                              
+                                                                                
+⏺ Update(frontend/src/components/dashboard/TicketingCard.tsx)                   
+  ⎿  Added 2 lines, removed 5 lines                                             
+      349      }                                                                
+      350                                                                       
+      351      // If same priority, sort by due date                            
+      352 -    if (a.dueDate && b.dueDate) {                                    
+      353 -      return new Date(a.dueDate).getTime() - new                     
+          -Date(b.dueDate).getTime()                                            
+      354 -    }                                                                
+      355 -    return a.dueDate ? -1 : 1                                        
+      352 +    return safeDateCompare(a.dueDate, b.dueDate)                     
+      353    })                                                                 
+      354                                                                       
+      355    return (                                                           
+     ...                                                                        
+      395          {isIssuesExpanded && (                                       
+      396            <div className="space-y-2 max-h-64 overflow-y-auto         
+           mt-3">                                                               
+      397              {sortedIssues.map((issue, index) => (                    
+      398 -              <div key={index}                                       
+          - className="flex items-center gap-2 p-2 bg-neutral-100               
+          -rounded-md hover:bg-neutral-200 transition">                         
+      398 +              <div key={getItemKey(issue) || `issue-${index}`}       
+          + className="flex items-center gap-2 p-2 bg-neutral-100               
+          +rounded-md hover:bg-neutral-200 transition">                         
+      399                  <Badge                                               
+      400                    className="text-xs flex-shrink-0"                  
+      401                    style={getPriorityColor(issue.priority)}           
+                                                                                
+⏺ Now let me fix the LinearIssueCard component (the standalone one).            
+                                                                                
+⏺ Read(frontend/src/components/dashboard/TicketingCard.tsx)                     
+  ⎿  Read 70 lines                                                              
+                                                                                
+⏺ Update(frontend/src/components/dashboard/TicketingCard.tsx)                   
+  ⎿  Added 2 lines, removed 5 lines                                             
+      461      }                                                                
+      462                                                                       
+      463      // If same priority, sort by due date                            
+      464 -    if (a.dueDate && b.dueDate) {                                    
+      465 -      return new Date(a.dueDate).getTime() - new                     
+          -Date(b.dueDate).getTime()                                            
+      466 -    }                                                                
+      467 -    return a.dueDate ? -1 : 1                                        
+      464 +    return safeDateCompare(a.dueDate, b.dueDate)                     
+      465    })                                                                 
+      466                                                                       
+      467    return (                                                           
+     ...                                                                        
+      513            {isIssuesExpanded && (                                     
+      514              <div className="space-y-2 max-h-64                       
+           overflow-y-auto w-full mt-3">                                        
+      515                {sortedIssues.map((issue, index) => (                  
+      516 -                <div key={index}                                     
+          - className="flex items-center gap-2 p-2 bg-neutral-100               
+          -rounded-md hover:bg-neutral-200 transition overflow-hidden">         
+      516 +                <div key={getItemKey(issue) || `issue-${index}       
+          +`} className="flex items-center gap-2 p-2 bg-neutral-100             
+          +rounded-md hover:bg-neutral-200 transition overflow-hidden">         
+      517                    <Badge                                             
+      518                      className="text-xs flex-shrink-0"                
+      519                      style={getPriorityColor(issue.priority)}         
+                                                                                
+⏺ TicketingCard.tsx is complete. Now let me update the todo list and fix        
+  UserIncidentCard.tsx.                                                         
+                                                                                
+⏺ Update(frontend/src/components/dashboard/UserIncidentCard.tsx)                
+  ⎿  Added 6 lines                                                              
+       3  import { Card, CardContent, CardDescription, CardHeader,              
+          CardTitle } from "@/components/ui/card"                               
+       4  import { AlertTriangle, Loader2 } from "lucide-react"                 
+       5                                                                        
+       6 +// Safely extract numeric value, handling NaN and non-numbers         
+       7 +const safeNum = (val: unknown): number => {                           
+       8 +  if (typeof val !== 'number' || isNaN(val)) return 0                 
+       9 +  return val                                                          
+      10 +}                                                                     
+      11 +                                                                      
+      12  interface UserIncidentCardProps {                                     
+      13    memberData: {                                                       
+      14      user_name?: string                                                
+                                                                                
+⏺ Now let me update the severity counts to use safeNum.                         
+                                                                                
+⏺ Read(frontend/src/components/dashboard/UserIncidentCard.tsx)                  
+  ⎿  Read 30 lines                                                              
+                                                                                
+⏺ Update(frontend/src/components/dashboard/UserIncidentCard.tsx)                
+  ⎿  Added 7 lines, removed 7 lines                                             
+      56    const isPagerDuty = platform === 'pagerduty'                        
+      57                                                                        
+      58    const pagerDutyCounts = {                                           
+      59 -    high: (severityDist.sev1 || 0) + (severityDist.high || 0          
+         -) + (severityDist.critical || 0),                                     
+      60 -    low: (severityDist.sev4 || 0) + (severityDist.sev5 || 0) +        
+         -(severityDist.low || 0) + (severityDist.medium || 0)                  
+      59 +    high: safeNum(severityDist.sev1) + safeNum                        
+         +(severityDist.high) + safeNum(severityDist.critical),                 
+      60 +    low: safeNum(severityDist.sev4) + safeNum(severityDist.sev5       
+         +) + safeNum(severityDist.low) + safeNum(severityDist.medium)          
+      61    }                                                                   
+      62                                                                        
+      63    const rootlyCounts = {                                              
+      64 -    sev0: severityDist.sev0 || severityDist.critical || 0,            
+      65 -    sev1: severityDist.sev1 || severityDist.high || 0,                
+      66 -    sev2: severityDist.sev2 || severityDist.medium || 0,              
+      67 -    sev3: severityDist.sev3 || severityDist.low || 0,                 
+      68 -    sev4: severityDist.sev4 || severityDist.info || 0                 
+      64 +    sev0: safeNum(severityDist.sev0) || safeNum(                      
+         +severityDist.critical),                                               
+      65 +    sev1: safeNum(severityDist.sev1) || safeNum(                      
+         +severityDist.high),                                                   
+      66 +    sev2: safeNum(severityDist.sev2) || safeNum(                      
+         +severityDist.medium),                                                 
+      67 +    sev3: safeNum(severityDist.sev3) || safeNum(                      
+         +severityDist.low),                                                    
+      68 +    sev4: safeNum(severityDist.sev4) || safeNum(                      
+         +severityDist.info)                                                    
+      69    }                                                                   
+      70                                                                        
+      71    return (                                                            
+                                                                                
+⏺ Update(frontend/src/components/dashboard/insights/AIInsightsModal.tsx)        
+  ⎿  Added 1 line                                                               
+       5  import { Badge } from "@/components/ui/badge"                         
+       6  import { Button } from "@/components/ui/button"                       
+       7  import { Sparkles, Copy, Check } from "lucide-react"                  
+       8 +import ReactMarkdown from "react-markdown"                            
+       9                                                                        
+      10  interface AIInsightsModalProps {                                      
+      11    isOpen: boolean                                                     
+                                                                                
+⏺ Now let me replace the dangerouslySetInnerHTML with ReactMarkdown.            
+                                                                                
+⏺ Update(frontend/src/components/dashboard/insights/AIInsightsModal.tsx)        
+  ⎿  Added 13 lines, removed 13 lines                                           
+       87              if (aiInsights?.llm_team_analysis) {                     
+       88                return (                                               
+       89                  <div className="prose prose-sm max-w-none">          
+       90 -                  <div                                               
+       91 -                    className="leading-relaxed                       
+          -text-neutral-900 [&>*:last-child]:mb-0"                              
+       92 -                    dangerouslySetInnerHTML={{                       
+       93 -                      __html: aiInsights.llm_team_analysis           
+       94 -                        .replace(/^### (.*?)$/gm, '<h3               
+          -class="text-lg font-semibold mt-6 mb-3">$1</h3>')                    
+       95 -                        .replace(/^## (.*?)$/gm, '<h2                
+          -class="text-xl font-bold mt-6 mb-4">$1</h2>')                        
+       96 -                        .replace(/^# (.*?)$/gm, '<h1                 
+          -class="text-2xl font-bold mt-6 mb-4">$1</h1>')                       
+       97 -                        .replace(/\*\*(.*?)\*\*/g,                   
+          -'<strong>$1</strong>')                                               
+       98 -                        .replace(/\n\n/g, '</p><p                    
+          -class="mt-4">')                                                      
+       99 -                        .replace(/^(?!<h[123]|<p)/, '<p>')           
+      100 -                        .replace(/(?<!>)$/, '</p>')                  
+      101 -                    }}                                               
+      102 -                  />                                                 
+       90 +                  <div className="leading-relaxed                    
+          +text-neutral-900 [&>*:last-child]:mb-0">                             
+       91 +                    <ReactMarkdown                                   
+       92 +                      components={{                                  
+       93 +                        h1: ({ children }) => <h1                    
+          +className="text-2xl font-bold mt-6 mb-4">{children}</h1>,            
+       94 +                        h2: ({ children }) => <h2                    
+          +className="text-xl font-bold mt-6 mb-4">{children}</h2>,             
+       95 +                        h3: ({ children }) => <h3                    
+          +className="text-lg font-semibold mt-6 mb-3">{children}</h3>,         
+       96 +                        p: ({ children }) => <p                      
+          +className="mt-4">{children}</p>,                                     
+       97 +                        strong: ({ children }) =>                    
+          +<strong>{children}</strong>,                                         
+       98 +                      }}                                             
+       99 +                    >                                                
+      100 +                      {aiInsights.llm_team_analysis}                 
+      101 +                    </ReactMarkdown>                                 
+      102 +                  </div>                                             
+      103                  </div>                                               
+      104                );                                                     
+      105              }                                                        
+                                                                                
+⏺ Now let me fix the backend file - changing logger.error to logger.info for    
+  checkpoint messages.                                                          
+                                                                                
+⏺ Read(backend/app/services/unified_burnout_analyzer.py)                        
+  ⎿  Read 40 lines                                                              
+                                                                                
+⏺ Update(backend/app/services/unified_burnout_analyzer.py)                      
+  ⎿  Added 3 lines, removed 3 lines                                             
+      221          use_mock_data = os.getenv("USE_MOCK_DATA",                   
+           "false").lower() == "true"                                           
+      222                                                                       
+      223          # ========== DEBUG CHECKPOINTS ==========                    
+      224 -        logger.error(f"🚀 CHECKPOINT 0: Analysis STARTING at         
+          -{analysis_start_time.isoformat()}")                                  
+      225 -        logger.error                                                 
+          -(f"🚀 CHECKPOINT 0: analysis_id={analysis_id},                       
+          -time_range={time_range_days}d, platform={self.platform}")            
+      226 -        logger.error                                                 
+          -(f"🚀 CHECKPOINT 0: features={self.features}")                       
+      224 +        logger.info(f"🚀 CHECKPOINT 0: Analysis STARTING at          
+          +{analysis_start_time.isoformat()}")                                  
+      225 +        logger.info                                                  
+          +(f"🚀 CHECKPOINT 0: analysis_id={analysis_id},                       
+          +time_range={time_range_days}d, platform={self.platform}")            
+      226 +        logger.info                                                  
+          +(f"🚀 CHECKPOINT 0: features={self.features}")                       
+      227                                                                       
+      228          logger.info(f"BURNOUT ANALYSIS START: Beginning              
+           {time_range_days}-day burnout analysis at                            
+           {analysis_start_time.isoformat()}")                                  
+      229                                                                       
+                                                                                
+⏺ Update(backend/app/services/unified_burnout_analyzer.py)                      
+  ⎿  Added 1 line, removed 1 line                                               
+      250                                                                       
+      251              data_fetch_duration = (datetime.now() -                  
+           data_fetch_start).total_seconds()                                    
+      252              logger.info(f"BURNOUT ANALYSIS: Step 1 completed         
+           in {data_fetch_duration:.2f}s - Data type: {type(data)},             
+           is_none: {data is None}")                                            
+      253 -            logger.error(f"✅ CHECKPOINT 1: Data fetch DONE in       
+          -{data_fetch_duration:.2f}s - users={len(data.get('users',            
+          -[]))}, incidents={len(data.get('incidents', []))}")                  
+      253 +            logger.info(f"✅ CHECKPOINT 1: Data fetch DONE in        
+          +{data_fetch_duration:.2f}s - users={len(data.get('users',            
+          +[]))}, incidents={len(data.get('incidents', []))}")                  
+      254                                                                       
+      255              # Check if data was successfully fetched (data           
+           should never be None due to fallbacks)                               
+      256              if data is None:                                         
+                                                                                
+⏺ Read(backend/app/services/unified_burnout_analyzer.py)                        
+  ⎿  Read 50 lines                                                              
+                                                                                
+⏺ Update(backend/app/services/unified_burnout_analyzer.py)                      
+  ⎿  Added 1 line, removed 1 line                                               
+      503                      logger.warning(f"   - Check if                   
+           {self.platform} data structure matches expectation")                 
+      504                                                                       
+      505                  if self.features['github']:                          
+      506 -                    logger.error                                     
+          -(f"⏳ CHECKPOINT 2a: Starting GitHub data collection for             
+          -{len(team_emails)} users")                                           
+      506 +                    logger.info                                      
+          +(f"⏳ CHECKPOINT 2a: Starting GitHub data collection for             
+          +{len(team_emails)} users")                                           
+      507                      logger.info(f"UNIFIED ANALYZER:                  
+           Collecting GitHub data for {len(team_emails)} team members")         
+      508                      logger.info(f"Team emails:                       
+           {team_emails[:5]}...")  # Log first 5 emails                         
+      509                      try:                                             
+                                                                                
+⏺ Update(backend/app/services/unified_burnout_analyzer.py)                      
+  ⎿  Added 2 lines, removed 2 lines                                             
+      536                      except Exception as e:                           
+      537                          logger.error(f"❌ CHECKPOINT 2a:             
+           GitHub data collection FAILED: {e}")                                 
+      538                          logger.error(f"GitHub data collection        
+            failed: {e}")                                                       
+      539 -                    logger.error                                     
+          -(f"✅ CHECKPOINT 2a: GitHub data collection DONE -                   
+          -{len(github_data)} users")                                           
+      539 +                    logger.info                                      
+          +(f"✅ CHECKPOINT 2a: GitHub data collection DONE -                   
+          +{len(github_data)} users")                                           
+      540                  else:                                                
+      541 -                    logger.error                                     
+          -(f"⏭️ CHECKPOINT 2a: GitHub SKIPPED (disabled)")                     
+      541 +                    logger.info                                      
+          +(f"⏭️ CHECKPOINT 2a: GitHub SKIPPED (disabled)")                     
+      542                      logger.info(f"UNIFIED ANALYZER: GitHub           
+           integration disabled - skipping")                                    
+      543                                                                       
+      544                  # DISABLED: Slack data collection temporarily        
+            disabled until feature is fully enabled                             
+                                                                                
+⏺ Read(backend/app/services/unified_burnout_analyzer.py)                        
+  ⎿  Read 130 lines                                                             
+                                                                                
+⏺ Update(backend/app/services/unified_burnout_analyzer.py)                      
+  ⎿  Added 1 line, removed 1 line                                               
+      572                  logger.info(f"⏭️ CHECKPOINT 2b: Slack data           
+           collection DISABLED - feature not ready for production")             
+      573                                                                       
+      574                  if self.features['jira']:                            
+      575 -                    logger.error                                     
+          -(f"⏳ CHECKPOINT 2c: Starting Jira data collection")                 
+      575 +                    logger.info                                      
+          +(f"⏳ CHECKPOINT 2c: Starting Jira data collection")                 
+      576                      logger.info(f"UNIFIED ANALYZER:                  
+           Collecting Jira data for {len(team_emails)} team members")           
+      577                      logger.info(f"Team emails:                       
+           {team_emails[:5]}...")  # Log first 5 emails                         
+      578                      try:                                             
+                                                                                
+⏺ Update(backend/app/services/unified_burnout_analyzer.py)                      
+  ⎿  Added 4 lines, removed 4 lines                                             
+      679                      except Exception as e:                           
+      680                          logger.error(f"❌ CHECKPOINT 2c: Jira        
+            data collection FAILED: {e}")                                       
+      681                          logger.error(f"Jira data collection          
+           failed: {e}")                                                        
+      682 -                    logger.error                                     
+          -(f"✅ CHECKPOINT 2c: Jira data collection DONE -                     
+          -{len(jira_data)} users")                                             
+      682 +                    logger.info                                      
+          +(f"✅ CHECKPOINT 2c: Jira data collection DONE -                     
+          +{len(jira_data)} users")                                             
+      683                  else:                                                
+      684 -                    logger.error                                     
+          -(f"⏭️ CHECKPOINT 2c: Jira SKIPPED (disabled)")                       
+      684 +                    logger.info                                      
+          +(f"⏭️ CHECKPOINT 2c: Jira SKIPPED (disabled)")                       
+      685                      logger.info(f"UNIFIED ANALYZER: Jira             
+           integration disabled - skipping")                                    
+      686                                                                       
+      687 -            logger.error                                             
+          -(f"✅ CHECKPOINT 2: All data collection COMPLETE")                   
+      687 +            logger.info                                              
+          +(f"✅ CHECKPOINT 2: All data collection COMPLETE")                   
+      688                                                                       
+      689              # Analyze team burnout                                   
+      690              try:                                                     
+      691 -                logger.error                                         
+          -(f"⏳ CHECKPOINT 3: Starting team data analysis")                    
+      691 +                logger.info                                          
+          +(f"⏳ CHECKPOINT 3: Starting team data analysis")                    
+      692                  team_analysis_start = datetime.now()                 
+      693                  logger.info(f"BURNOUT ANALYSIS: Step 3 -             
+           Analyzing team data for {time_range_days}-day analysis")             
+      694                  logger.info(f"BURNOUT ANALYSIS: Team analysis        
+            inputs - {len(users)} users, {len(incidents)} incidents")           
+                                                                                
+⏺ Read(backend/app/services/unified_burnout_analyzer.py)                        
+  ⎿  Read 10 lines                                                              
+                                                                                
+⏺ Update(backend/app/services/unified_burnout_analyzer.py)                      
+  ⎿  Added 1 line, removed 1 line                                               
+      707                  # Log team analysis results                          
+      708                  members_analyzed =                                   
+           len(team_analysis.get("members", [])) if team_analysis else 0        
+      709                  logger.info(f"BURNOUT ANALYSIS: Team analysis        
+            generated results for {members_analyzed} members")                  
+      710 -                logger.error                                         
+          -(f"✅ CHECKPOINT 3: Team analysis DONE in                            
+          -{team_analysis_duration:.2f}s - {members_analyzed} members")         
+      710 +                logger.info                                          
+          +(f"✅ CHECKPOINT 3: Team analysis DONE in                            
+          +{team_analysis_duration:.2f}s - {members_analyzed} members")         
+      711                                                                       
+      712              except Exception as e:                                   
+      713                  team_analysis_duration = (datetime.now() -           
+           team_analysis_start).total_seconds() if 'team_analysis_start'        
+            in locals() else 0                                                  
+                                                                                
+⏺ Read(backend/app/services/unified_burnout_analyzer.py)                        
+  ⎿  Read 40 lines                                                              
+                                                                                
+⏺ Update(backend/app/services/unified_burnout_analyzer.py)                      
+  ⎿  Added 1 line, removed 1 line                                               
+      853                  logger.info(f"🔍 POST_JIRA_CHECK: Member             
+           {member.get('user_email')} - github_activity:                        
+           commits={github_activity.get('commits_count', 0)},                   
+           prs={github_activity.get('pull_requests_count', 0)}")                
+      854                                                                       
+      855              # Calculate overall team health AFTER GitHub             
+           burnout adjustment                                                   
+      856 -            logger.error                                             
+          -(f"⏳ CHECKPOINT 4: Starting health calculation")                    
+      856 +            logger.info                                              
+          +(f"⏳ CHECKPOINT 4: Starting health calculation")                    
+      857              health_calc_start = datetime.now()                       
+      858              logger.info(f"BURNOUT ANALYSIS: Step 4 -                 
+           Calculating team health for {time_range_days}-day analysis")         
+      859              team_health =                                            
+           self._calculate_team_health(team_analysis["members"])                
+                                                                                
+⏺ Update(backend/app/services/unified_burnout_analyzer.py)                      
+  ⎿  Added 4 lines, removed 4 lines                                             
+      868                  health_calc_duration = (datetime.now() -             
+           health_calc_start).total_seconds()                                   
+      869                  logger.info(f"BURNOUT ANALYSIS: Step 4               
+           completed in {health_calc_duration:.3f}s - Health score:             
+           {team_health.get('overall_score', 'N/A')}")                          
+      870                                                                       
+      871 -            logger.error                                             
+          -(f"✅ CHECKPOINT 4: Health calculation DONE -                        
+          -score={team_health.get('overall_score', 'N/A')}")                    
+      871 +            logger.info                                              
+          +(f"✅ CHECKPOINT 4: Health calculation DONE -                        
+          +score={team_health.get('overall_score', 'N/A')}")                    
+      872                                                                       
+      873              # Generate insights and recommendations                  
+      874 -            logger.error                                             
+          -(f"⏳ CHECKPOINT 5: Starting insights generation")                   
+      874 +            logger.info                                              
+          +(f"⏳ CHECKPOINT 5: Starting insights generation")                   
+      875              insights_start = datetime.now()                          
+      876              logger.info(f"BURNOUT ANALYSIS: Step 5 -                 
+           Generating insights and recommendations")                            
+      877              insights = self._generate_insights(team_analysis,        
+            team_health)                                                        
+      878              insights_duration = (datetime.now() -                    
+           insights_start).total_seconds()                                      
+      879              logger.info(f"BURNOUT ANALYSIS: Step 5 completed         
+           in {insights_duration:.3f}s - Generated {len(insights)}              
+           insights")                                                           
+      880 -            logger.error                                             
+          -(f"✅ CHECKPOINT 5: Insights generation DONE - {len(insights)}       
+          - insights")                                                          
+      880 +            logger.info                                              
+          +(f"✅ CHECKPOINT 5: Insights generation DONE - {len(insights)}       
+          + insights")                                                          
+      881                                                                       
+      882 -            logger.error                                             
+          -(f"⏳ CHECKPOINT 6: Building final result object")                   
+      882 +            logger.info                                              
+          +(f"⏳ CHECKPOINT 6: Building final result object")                   
+      883                                                                       
+      884              # Calculate period summary for consistent UI             
+           display                                                              
+      885              team_overall_score =                                     
+           team_health.get("overall_score", 0.0)  # This is already             
+           health scale 0-10                                                    
+                                                                                
+⏺ Read(backend/app/services/unified_burnout_analyzer.py)                        
+  ⎿  Read 20 lines                                                              
+                                                                                
+⏺ Update(backend/app/services/unified_burnout_analyzer.py)                      
+  ⎿  Added 2 lines, removed 2 lines                                             
+      1077                                                                      
+      1078              # Debug: Log final result structure                     
+      1079              total_analysis_time = (datetime.now() -                 
+            analysis_start_time).total_seconds()                                
+      1080 -            logger.error                                            
+           -(f"🏁 CHECKPOINT 7: Analysis COMPLETE - Total time:                 
+           -{total_analysis_time:.2f}s")                                        
+      1081 -            logger.error                                            
+           -(f"🏁 CHECKPOINT 7: Result has {len(result.get('team_members        
+           -',                                                                  
+           -[]))} members, score={result.get('overall_score', 'N/A')}")         
+      1080 +            logger.info                                             
+           +(f"🏁 CHECKPOINT 7: Analysis COMPLETE - Total time:                 
+           +{total_analysis_time:.2f}s")                                        
+      1081 +            logger.info                                             
+           +(f"🏁 CHECKPOINT 7: Result has {len(result.get('team_analysis       
+           +', {}).get('members',                                               
+           +[]))} members, score={result.get('overall_score', 'N/A')}")         
+      1082                                                                      
+      1083              return result                                           
+      1084                                                                      
+                                                                                
+⏺ All security fixes have been applied. Let me update the todo list and verify  
+  the frontend builds.                                                          
+                                                                                
+⏺ Bash(cd /Users/sylvainkalache/Dropbox/work/On-Call-Health/frontend && npm run 
+      build 2>&1 | head -60)                                                    
+  ⎿  > rootly-burnout-detector-frontend@0.1.0 build                             
+     > next build                                                               
+     … +28 lines (ctrl+o to expand)                                             
+                                                                                
+⏺ The frontend builds successfully. Let me check the git status to see all the  
+  security changes applied.                                                     
+                                                                                
+⏺ Bash(cd /Users/sylvainkalache/Dropbox/work/On-Call-Health && git status && git
+       diff --stat)                                                             
+  ⎿  On branch security-fixes-clean                                             
+     Changes not staged for commit:                                             
+       (use "git add <file>..." to update what will be committed)               
+     … +26 lines (ctrl+o to expand)                                             
+                                                                                
+⏺ All security fixes have been applied to the security-fixes-clean branch (clean
+   from main). Here's a summary:                                                
+                                                                                
+  Files Modified (4):                                                           
+                                                                                
+  1. TicketingCard.tsx                                                          
+    - Added safeDateCompare() - handles invalid dates that could produce NaN    
+    - Added getItemKey() - provides stable React keys instead of array indices  
+    - Fixed 4 date comparisons and 4 React key usages                           
+  2. UserIncidentCard.tsx                                                       
+    - Added safeNum() helper - safely handles NaN in severity calculations      
+    - Updated pagerDutyCounts and rootlyCounts to use safeNum                   
+  3. AIInsightsModal.tsx                                                        
+    - Replaced dangerouslySetInnerHTML with ReactMarkdown                       
+    - Prevents XSS attacks from potentially malicious AI-generated content      
+  4. unified_burnout_analyzer.py                                                
+    - Changed ~20 logger.error calls to logger.info for checkpoint messages     
+    - Kept actual error cases (FAILED, exceptions) as logger.error              
+    - Fixed CHECKPOINT 7 to correctly read team_analysis.members                
+                                                                                
+  Build Status: Frontend compiles successfully.                                 
+                                                                                
+  The branch is ready for your review. The changes are staged but not committed,
+   awaiting your explicit instruction to commit.                                
+                                                                                
+✻ Brewed for 6m 25s                                                             
+                                                                                
+❯ let's create a pull request, explain well for the reviewers the reason of     
+  the change                                                                    
+                                                                                
+⏺ I'll stage the changes, commit them, push the branch, and create a detailed   
+  PR.                                                                           
+                                                                                
+⏺ Bash(git add frontend/src/components/dashboard/TicketingCard.tsx              
+      frontend/src/components/dashboard/UserIncidentCard.tsx                    
+      frontend/src/components/dashboard/insights/AI…)                           
+  ⎿  (No content)                                                               
+                                                                                
+⏺ Bash(git commit -m "Security and code quality improvements…)                  
+  ⎿  [security-fixes-clean 1827975] Security and code quality improvements      
+      4 files changed, 73 insertions(+), 60 deletions(-)                        
+                                                                                
+⏺ Bash(git push -u origin security-fixes-clean)                                 
+  ⎿ branch 'security-fixes-clean' set up to track 'origin/security-fixes-cl     
+    ean'.                                                                       
+    remote:                                                                     
+    … +7 lines (ctrl+o to expand)                                               
+                                                                                
+                                                                                
+⏺ Bash(gh pr create --title "Security and code quality improvements" --body "## 
+      Summary…)                                                                 
+  ⎿  https://github.com/Rootly-AI-Labs/On-Call-Health/pull/179                  
+     Warning: 7 uncommitted changes                                             
+                                                                                
+⏺ PR created: https://github.com/Rootly-AI-Labs/On-Call-Health/pull/179         
+                                                                                
+  The PR includes detailed explanations of each security fix:                   
+                                                                                
+  1. XSS Vulnerability - Replaced dangerouslySetInnerHTML with ReactMarkdown    
+  2. Safe Date Parsing - Added safeDateCompare() to handle invalid dates        
+  3. React Key Anti-Pattern - Using stable identifiers instead of array indices 
+  4. NaN Handling - Added safeNum() for severity calculations                   
+  5. Logger Levels - Changed debug checkpoints from error to info level         
+                                                                                
+✻ Cogitated for 41s                                                             
+                                                                                
+❯ This is a comment left during a code review.                                  
+  Path: frontend/src/components/dashboard/UserIncidentCard.tsx                  
+  Line: 64:68                                                                   
+                                                                                
+  Comment:                                                                      
+  **logic:** `safeNum()` returns 0 for invalid values, so `||` will use the     
+  fallback even when the first value is legitimately 0. This changes            
+  behavior when a severity count is actually 0.                                 
+                                                                                
+  ```suggestion                                                                 
+  const rootlyCounts = {                                                        
+  sev0: safeNum(severityDist.sev0 ?? severityDist.critical),                    
+  sev1: safeNum(severityDist.sev1 ?? severityDist.high),                        
+  sev2: safeNum(severityDist.sev2 ?? severityDist.medium),                      
+  sev3: safeNum(severityDist.sev3 ?? severityDist.low),                         
+  sev4: safeNum(severityDist.sev4 ?? severityDist.info)                         
+  }                                                                             
+  ```                                                                           
+                                                                                
+  How can I resolve this? If you propose a fix, please make it concise.         
+                                                                                
+⏺ The reviewer is correct. Using || with safeNum() returning 0 means a          
+  legitimate 0 count would incorrectly trigger the fallback. The fix uses ??    
+  (nullish coalescing) which only falls back on null/undefined, not 0.          
+                                                                                
+⏺ Update(frontend/src/components/dashboard/UserIncidentCard.tsx)                
+  ⎿  Added 5 lines, removed 5 lines                                             
+      61    }                                                                   
+      62                                                                        
+      63    const rootlyCounts = {                                              
+      64 -    sev0: safeNum(severityDist.sev0) || safeNum(                      
+         -severityDist.critical),                                               
+      65 -    sev1: safeNum(severityDist.sev1) || safeNum(                      
+         -severityDist.high),                                                   
+      66 -    sev2: safeNum(severityDist.sev2) || safeNum(                      
+         -severityDist.medium),                                                 
+      67 -    sev3: safeNum(severityDist.sev3) || safeNum(                      
+         -severityDist.low),                                                    
+      68 -    sev4: safeNum(severityDist.sev4) || safeNum(                      
+         -severityDist.info)                                                    
+      64 +    sev0: safeNum(severityDist.sev0 ?? severityDist.critical),        
+      65 +    sev1: safeNum(severityDist.sev1 ?? severityDist.high),            
+      66 +    sev2: safeNum(severityDist.sev2 ?? severityDist.medium),          
+      67 +    sev3: safeNum(severityDist.sev3 ?? severityDist.low),             
+      68 +    sev4: safeNum(severityDist.sev4 ?? severityDist.info)             
+      69    }                                                                   
+      70                                                                        
+      71    return (                                                            
+                                                                                
+⏺ Bash(git add frontend/src/components/dashboard/UserIncidentCard.tsx && git    
+      commit -m "Fix nullish coalescing for severity counts" && git push)       
+  ⎿ [security-fixes-clean e619bc2] Fix nullish coalescing for severity coun     
+    ts                                                                          
+     1 file changed, 5 insertions(+), 5 deletions(-)                            
+    … +2 lines (ctrl+o to expand)                                               
+                                                                                
+                                                                                
+⏺ Fixed and pushed. The ?? operator now correctly only falls back when the value
+   is null/undefined, preserving legitimate 0 counts.                           
+                                                                                
+❯ make sure testing branch is up to date with Master                            
+                                                                                
+⏺ Bash(git checkout testing && git fetch origin && git merge origin/main        
+      --no-edit)                                                                
+  ⎿  Your branch is up to date with 'origin/testing'.                           
+     Updating 28b4c32..ec72520                                                  
+     Fast-forward                                                               
+     … +3 lines (ctrl+o to expand)                                              
+                                                                                
+❯ up to date with main                                                          
+                                                                                
+⏺ Bash(git log --oneline -5)                                                    
+  ⎿  ec72520 Merge pull request #177 from Rootly-AI-Labs/testing                
+     28b4c32 Run Claude assistant on all PRs without @claude mention            
+     f4daabd Rename promo video file                                            
+     … +2 lines (ctrl+o to expand)                                              
+                                                                                
+⏺ Bash(git push origin testing)                                                 
+  ⎿  To github.com:Rootly-AI-Labs/On-Call-Health.git                            
+        28b4c32..ec72520  testing -> testing                                    
+                                                                                
+⏺ Done. Testing branch is now up to date with main (fast-forward to ec72520).   
+                                                                                
+❯ there is an issue with the incident URL in for the listed incidents, here     
+  is the URL that the app generates                                             
+  https://app.rootly.com/incidents/fba2ef6f-603a-4611-9cf0-5d9e41f5d108 but     
+  here is the actualt working URL https://rootly.com/account/incidents/957      
+  -notifications-through-alert-sources-not-going-through                        
+                                                                                
+⏺ Let me find where the incident URLs are being generated.                      
+                                                                                
+⏺ Search(pattern: "app\.rootly\.com|getIncidentUrl|incident.*url", path:        
+        "frontend")                                                             
+  ⎿  Found 1 file (ctrl+o to expand)                                            
+                                                                                
+⏺ Search(pattern: "rootly|incident.*url|getIncidentUrl", path:                  
+        "frontend/src/components/dashboard/UserIncidentCard.tsx", output_mode:  
+        "content")                                                              
+  ⎿  Found 20 lines (ctrl+o to expand)                                          
+                                                                                
+⏺ Read(frontend/src/components/dashboard/UserIncidentCard.tsx)                  
+  ⎿  Read 60 lines                                                              
+                                                                                
+⏺ Read(frontend/src/components/dashboard/UserIncidentCard.tsx)                  
+  ⎿  Read 40 lines                                                              
+                                                                                
+⏺ I see the issue. The Rootly URL format should be                              
+  https://rootly.com/account/incidents/{slug} not                               
+  https://app.rootly.com/incidents/{id}. Let me fix it.                         
+                                                                                
+⏺ Update(frontend/src/components/dashboard/UserIncidentCard.tsx)                
+  ⎿  Added 3 lines, removed 8 lines                                             
+      67      return null                                                       
+      68    }                                                                   
+      69                                                                        
+      70 -  // For Rootly, construct URL using the incident ID                  
+      71 -  // Rootly URL format: https://app.rootly.com/incidents/{id}         
+      72 -  if (incident.id) {                                                  
+      73 -    return `https://app.rootly.com/incidents/${incident.id}`          
+      74 -  }                                                                   
+      75 -                                                                      
+      76 -  // Try attributes.slug if available                                 
+      70 +  // For Rootly, use slug to construct URL                            
+      71 +  // Rootly URL format: https://rootly.com/account/incidents/{        
+         +slug}                                                                 
+      72    const slug = incident.attributes?.slug                              
+      73    if (slug) {                                                         
+      74 -    return `https://app.rootly.com/incidents/${slug}`                 
+      74 +    return `https://rootly.com/account/incidents/${slug}`             
+      75    }                                                                   
+      76                                                                        
+      77    return null                                                         
+                                                                                
+⏺ Bash(git add frontend/src/components/dashboard/UserIncidentCard.tsx && git    
+      commit -m "Fix Rootly incident URL format" && git push)                   
+  ⎿  [testing 7e99519] Fix Rootly incident URL format                           
+      1 file changed, 3 insertions(+), 8 deletions(-)                           
+     To github.com:Rootly-AI-Labs/On-Call-Health.git                            
+        ec72520..7e99519  testing -> testing                                    
+                                                                                
+⏺ Fixed. The Rootly incident URL now uses the correct format:                   
+  - Before: https://app.rootly.com/incidents/{uuid}                             
+  - After: https://rootly.com/account/incidents/{slug}                          
+                                                                                
+✻ Baked for 48s                                                                 
+                                                                                
+❯ push to testing                                                               
+                                                                                
+⏺ Bash(git status && git log --oneline -3)                                      
+  ⎿  On branch testing                                                          
+     Your branch is up to date with 'origin/testing'.                           
+     … +15 lines (ctrl+o to expand)                                             
+                                                                                
+⏺ Already done. The fix is pushed to testing (commit 7e99519).                  
+                                                                                
+❯ now for some reason the incidents are no longer clickable                     
+                                                                                
+⏺ Let me check how the incidents are rendered and what data they have.          
+                                                                                
+⏺ Read(frontend/src/components/dashboard/UserIncidentCard.tsx)                  
+  ⎿  Read 60 lines                                                              
+                                                                                
+⏺ The issue is likely that the slug field isn't in incident.attributes. Let me  
+  check how the backend structures the incident data.                           
+                                                                                
+⏺ Search(pattern: "slug", path: "backend", glob: "*.py", output_mode: "content")
+  ⎿  Found 14 lines (ctrl+o to expand)                                          
+                                                                                
+⏺ Read(backend/app/core/rootly_client.py)                                       
+  ⎿  Read 30 lines                                                              
+                                                                                
+⏺ Search(pattern: "incident.*attributes|attributes.*slug", path:                
+        "backend/app/core/rootly_client.py", output_mode: "content")            
+  ⎿  Found 15 lines (ctrl+o to expand)                                          
+                                                                                
+⏺ Search(pattern: ""slug"|'slug'", path: "backend/app/core/rootly_client.py",   
+        output_mode: "content")                                                 
+  ⎿  Found 26 lines (ctrl+o to expand)                                          
+                                                                                
+⏺ Search(pattern: "incidents.*return|return.*incidents", path: "backend/app",   
+        glob: "*.py", output_mode: "content")                                   
+  ⎿  Found 16 lines (ctrl+o to expand)                                          
+                                                                                
+⏺ Search(pattern: "user_incidents|member.*incidents", path:                     
+        "backend/app/services/unified_burnout_analyzer.py", output_mode:        
+        "content", head_limit: 40)                                              
+  ⎿  Found 16 lines (ctrl+o to expand)                                          
+                                                                                
+⏺ Search(pattern: ""incidents"|'incidents'", path:                              
+        "backend/app/services/unified_burnout_analyzer.py", output_mode:        
+        "content", head_limit: 50)                                              
+  ⎿  Found 18 lines (ctrl+o to expand)                                          
+                                                                                
+⏺ Search(pattern: "_format_incidents|incident_list|member.*incidents", path:    
+        "backend/app/services/unified_burnout_analyzer.py", output_mode:        
+        "content")                                                              
+  ⎿  Found 163 lines (ctrl+o to expand)                                         
+                                                                                
+⏺ Search(pattern: ""id".*incident|incident.*"id"", path:                        
+        "backend/app/services/unified_burnout_analyzer.py", output_mode:        
+        "content")                                                              
+  ⎿  Found 86 lines (ctrl+o to expand)                                          
+                                                                                
+⏺ Read(backend/app/services/unified_burnout_analyzer.py)                        
+  ⎿  Read 30 lines                                                              
+                                                                                
+⏺ I found the issue. When incidents are stored for the frontend, the slug field 
+  isn't being included. Let me fix this.                                        
+                                                                                
+⏺ Read(backend/app/services/unified_burnout_analyzer.py)                        
+  ⎿  Read 80 lines                                                              
+                                                                                
+⏺ Update(backend/app/services/unified_burnout_analyzer.py)                      
+  ⎿  Added 3 lines                                                              
+      4070                                                                      
+      4071                                                                      
+      4072                                  # Store incident details for        
+             individual analysis                                                
+      4073 +                                # Extract slug for Rootly           
+           +URL construction                                                    
+      4074 +                                incident_slug =                     
+           +incident.get("attributes", {}).get("slug") if                       
+           +incident.get("attributes") else None                                
+      4075                                                                      
+            user_day_data["incidents"].append({                                 
+      4076                                      "id": incident.get("id",        
+             "unknown"),                                                        
+      4077 +                                    "slug": incident_slug,          
+      4078                                      "title": incident_title,        
+      4079                                      "severity":                     
+            severity_weight,                                                    
+      4080                                      "severity_level":               
+            severity_level,                                                     
+                                                                                
+⏺ Now let me update the frontend to use the slug field directly (since it's now 
+  at the top level, not in attributes).                                         
+                                                                                
+⏺ Update(frontend/src/components/dashboard/UserIncidentCard.tsx)                
+  ⎿  Added 2 lines, removed 1 line                                              
+      69                                                                        
+      70    // For Rootly, use slug to construct URL                            
+      71    // Rootly URL format:                                               
+          https://rootly.com/account/incidents/{slug}                           
+      72 -  const slug = incident.attributes?.slug                              
+      72 +  // Check both top-level slug (from processed data) and              
+         +attributes.slug (from raw data)                                       
+      73 +  const slug = incident.slug || incident.attributes?.slug             
+      74    if (slug) {                                                         
+      75      return `https://rootly.com/account/incidents/${slug}`             
+      76    }                                                                   
+                                                                                
+⏺ Let me also add slug to the Incident interface.                               
+                                                                                
+⏺ Update(frontend/src/components/dashboard/UserIncidentCard.tsx)                
+  ⎿  Added 1 line                                                               
+      12                                                                        
+      13  interface Incident {                                                  
+      14    id?: string                                                         
+      15 +  slug?: string                                                       
+      16    attributes?: {                                                      
+      17      title?: string                                                    
+      18      summary?: string                                                  
+                                                                                
+⏺ Bash(git add frontend/src/components/dashboard/UserIncidentCard.tsx           
+      backend/app/services/unified_burnout_analyzer.py && git commit -m "Fix    
+      incident URLs: include slu…)                                              
+  ⎿ [testing 12fc199] Fix incident URLs: include slug field for Rootly link     
+    s                                                                           
+     2 files changed, 6 insertions(+), 1 deletion(-)                            
+    … +2 lines (ctrl+o to expand)                                               
+                                                                                
+                                                                                
+⏺ Fixed. I made two changes:                                                    
+                                                                                
+  1. Backend: Now includes slug field when storing incident details             
+  2. Frontend: Checks for slug at both top-level and in attributes              
+                                                                                
+  Note: You'll need to re-run an analysis for existing data to include the slug 
+  field. The fix will work for new analyses immediately.                        
+                                                                                
+✻ Crunched for 1m 58s                                                           
+                                                                                
+❯ push to testing                                                               
+                                                                                
+⏺ Bash(git status && git log --oneline -3)                                      
+  ⎿  On branch testing                                                          
+     Your branch is up to date with 'origin/testing'.                           
+     … +15 lines (ctrl+o to expand)                                             
+                                                                                
+⏺ Already pushed. Testing is up to date with commit 12fc199.                    
+
