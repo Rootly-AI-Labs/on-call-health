@@ -17,6 +17,7 @@ from ...services.demo_analysis_service import create_demo_analysis_for_new_user
 from ...core.config import settings
 from ...core.rate_limiting import auth_rate_limit
 from ...core.input_validation import BaseValidatedModel
+from urllib.parse import quote
 from pydantic import field_validator, Field
 
 router = APIRouter()
@@ -168,13 +169,13 @@ async def google_callback(
             return RedirectResponse(url=settings.FRONTEND_URL)
         else:
             # Other OAuth error
-            error_url = f"{settings.FRONTEND_URL}/auth/error?message=OAuth error: {error}"
+            error_url = f"{settings.FRONTEND_URL}/auth/error?message={quote(f'OAuth error: {error}')}"
             return RedirectResponse(url=error_url)
-    
+
     # No code means user canceled without error parameter
     if not code:
         return RedirectResponse(url=settings.FRONTEND_URL)
-    
+
     try:
         # Exchange code for token
         token_data = await google_oauth.exchange_code_for_token(code)
@@ -244,13 +245,17 @@ async def google_callback(
         success_url = f"{frontend_url}/auth/success?code={auth_code}"
         response = RedirectResponse(url=success_url)
         return response
-        
+
     except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        error_msg = str(e) if str(e) else "Unknown authentication error"
+        logger.error(f"Google OAuth callback error: {error_msg}")
         # Use state for error redirect too
         frontend_url = settings.FRONTEND_URL
         if state and state in ALLOWED_OAUTH_ORIGINS:
             frontend_url = state
-        error_url = f"{frontend_url}/auth/error?message={str(e)}"
+        error_url = f"{frontend_url}/auth/error?message={quote(error_msg)}"
         return RedirectResponse(url=error_url)
 
 @router.get("/github")
@@ -293,13 +298,13 @@ async def github_callback(
             return RedirectResponse(url=settings.FRONTEND_URL)
         else:
             # Other OAuth error
-            error_url = f"{settings.FRONTEND_URL}/auth/error?message=OAuth error: {error}"
+            error_url = f"{settings.FRONTEND_URL}/auth/error?message={quote(f'OAuth error: {error}')}"
             return RedirectResponse(url=error_url)
-    
+
     # No code means user canceled without error parameter
     if not code:
         return RedirectResponse(url=settings.FRONTEND_URL)
-    
+
     try:
         # Exchange code for token
         token_data = await github_oauth.exchange_code_for_token(code)
@@ -368,13 +373,17 @@ async def github_callback(
         success_url = f"{frontend_url}/auth/success?code={auth_code}"
         response = RedirectResponse(url=success_url)
         return response
-        
+
     except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        error_msg = str(e) if str(e) else "Unknown authentication error"
+        logger.error(f"GitHub OAuth callback error: {error_msg}")
         # Use state for error redirect too
         frontend_url = settings.FRONTEND_URL
         if state and state in ALLOWED_OAUTH_ORIGINS:
             frontend_url = state
-        error_url = f"{frontend_url}/auth/error?message={str(e)}"
+        error_url = f"{frontend_url}/auth/error?message={quote(error_msg)}"
         return RedirectResponse(url=error_url)
 
 @router.get("/me")
