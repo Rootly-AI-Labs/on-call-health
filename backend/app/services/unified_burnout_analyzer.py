@@ -1606,8 +1606,36 @@ class UnifiedBurnoutAnalyzer:
                 'late_night_commits': github_data.get('activity_data', {}).get('late_night_commits', 0)
             }
 
-        # Get survey data if available (TODO: fetch from UserBurnoutReport table)
-        survey_data = None  # Will be populated when we fetch from database
+        # Get survey data if available - fetch most recent survey within time range
+        survey_data = None
+        try:
+            from app.models.user_burnout_report import UserBurnoutReport
+            from app.models.base import SessionLocal
+
+            db = SessionLocal()
+            try:
+                # Fetch most recent survey for this user within the analysis time range
+                time_range_days = metadata.get("days_analyzed", 30) or 30
+                cutoff_date = datetime.now(pytz.UTC) - timedelta(days=time_range_days)
+
+                recent_survey = db.query(UserBurnoutReport).filter(
+                    UserBurnoutReport.email == user_email,
+                    UserBurnoutReport.submitted_at >= cutoff_date
+                ).order_by(UserBurnoutReport.submitted_at.desc()).first()
+
+                if recent_survey:
+                    survey_data = {
+                        'feeling_score': recent_survey.feeling_score,
+                        'workload_score': recent_survey.workload_score,
+                        'stress_factors': recent_survey.stress_factors or [],
+                        'submitted_at': recent_survey.submitted_at.isoformat() if recent_survey.submitted_at else None,
+                        'submitted_via': recent_survey.submitted_via
+                    }
+                    logger.info(f"✅ Found survey data for {user_email}: feeling={recent_survey.feeling_score}/5, workload={recent_survey.workload_score}/5")
+            finally:
+                db.close()
+        except Exception as e:
+            logger.warning(f"Could not fetch survey data for {user_email}: {e}")
 
         # Calculate simple health score
         health_result = health_scorer.calculate_health_score(
