@@ -21,34 +21,37 @@ logger = logging.getLogger(__name__)
 
 # In-memory cache for permission checks (key: integration_id, value: {permissions, timestamp})
 _permissions_cache = {}
+_cache_lock = asyncio.Lock()
 PERMISSIONS_CACHE_TTL = 60  # Cache for 60 seconds
 
 # Limit concurrent API requests to avoid overwhelming PagerDuty API
 MAX_CONCURRENT_REQUESTS = 5
 _semaphore = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
 
-def get_cached_permissions(integration_id: int) -> Optional[dict]:
+async def get_cached_permissions(integration_id: int) -> Optional[dict]:
     """Get cached permissions if still valid."""
-    if integration_id not in _permissions_cache:
-        return None
+    async with _cache_lock:
+        if integration_id not in _permissions_cache:
+            return None
 
-    cached = _permissions_cache[integration_id]
-    cache_age = (datetime.now() - cached['timestamp']).total_seconds()
+        cached = _permissions_cache[integration_id]
+        cache_age = (datetime.now() - cached['timestamp']).total_seconds()
 
-    if cache_age > PERMISSIONS_CACHE_TTL:
-        del _permissions_cache[integration_id]
-        return None
+        if cache_age > PERMISSIONS_CACHE_TTL:
+            del _permissions_cache[integration_id]
+            return None
 
-    logger.info(f"Using cached PagerDuty permissions for integration {integration_id} (age: {cache_age:.1f}s)")
-    return cached['permissions']
+        logger.info(f"Using cached PagerDuty permissions for integration {integration_id} (age: {cache_age:.1f}s)")
+        return cached['permissions']
 
 
-def set_cached_permissions(integration_id: int, permissions: dict) -> None:
+async def set_cached_permissions(integration_id: int, permissions: dict) -> None:
     """Cache permissions for an integration."""
-    _permissions_cache[integration_id] = {
-        'permissions': permissions,
-        'timestamp': datetime.now()
-    }
+    async with _cache_lock:
+        _permissions_cache[integration_id] = {
+            'permissions': permissions,
+            'timestamp': datetime.now()
+        }
     logger.info(f"Cached PagerDuty permissions for integration {integration_id}")
 
 class TokenTestRequest(BaseModel):
@@ -214,7 +217,7 @@ async def get_pagerduty_integrations(
             "platform": integration.platform
         }
 
-        cached_permissions = get_cached_permissions(integration.id)
+        cached_permissions = await get_cached_permissions(integration.id)
         if cached_permissions:
             data["permissions"] = cached_permissions
         elif integration.api_token:
@@ -241,7 +244,7 @@ async def _fetch_and_apply_permissions(
             try:
                 client = PagerDutyAPIClient(api_token)
                 permissions = await client.check_permissions()
-                set_cached_permissions(integration_id, permissions)
+                await set_cached_permissions(integration_id, permissions)
                 return (index, permissions, None)
             except Exception as e:
                 logger.warning(f"Failed to check permissions for integration {integration_id}: {e}")
