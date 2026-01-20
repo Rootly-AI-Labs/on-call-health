@@ -112,6 +112,41 @@ function safeDateCompare(dateA: string | null, dateB: string | null): number {
   return aTime - bTime
 }
 
+// Jira priority order mapping
+const JIRA_PRIORITY_ORDER: { [key: string]: number } = {
+  highest: 1,
+  high: 2,
+  medium: 3,
+  low: 4,
+  lowest: 5,
+}
+
+// Sort Jira tickets by priority then due date
+function sortJiraTickets(tickets: any[]): any[] {
+  return [...tickets].sort((a, b) => {
+    const aPriority = a.priority?.toLowerCase() || ""
+    const bPriority = b.priority?.toLowerCase() || ""
+    const aOrder = JIRA_PRIORITY_ORDER[aPriority] ?? 999
+    const bOrder = JIRA_PRIORITY_ORDER[bPriority] ?? 999
+
+    if (aOrder !== bOrder) return aOrder - bOrder
+    return safeDateCompare(a.duedate, b.duedate)
+  })
+}
+
+// Sort Linear issues by priority then due date
+function sortLinearIssues(issues: any[]): any[] {
+  return [...issues].sort((a, b) => {
+    const aPriority = a.priority ?? 0
+    const bPriority = b.priority ?? 0
+    const aOrder = aPriority === 0 ? 999 : aPriority
+    const bOrder = bPriority === 0 ? 999 : bPriority
+
+    if (aOrder !== bOrder) return aOrder - bOrder
+    return safeDateCompare(a.dueDate, b.dueDate)
+  })
+}
+
 // Generate stable key for ticket/issue items
 function getItemKey(item: any): string | null {
   return item.key || item.identifier || item.id || null
