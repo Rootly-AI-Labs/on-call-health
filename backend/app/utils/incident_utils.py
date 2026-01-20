@@ -125,7 +125,7 @@ def slim_incident(incident: Dict[str, Any]) -> Dict[str, Any]:
     fields actually used by the application:
 
     PRESERVED FIELDS:
-    - Core incident info: id, sequential_id, title, summary, status, severity
+    - Core incident info: id, sequential_id, slug, title, summary, status, severity
     - Timestamps: created_at, started_at, acknowledged_at, mitigated_at, resolved_at
     - Slimmed user objects: user, started_by, resolved_by, mitigated_by
       (reduced from 5KB each to 50 bytes - just id, email, name)
@@ -168,6 +168,7 @@ def slim_incident(incident: Dict[str, Any]) -> Dict[str, Any]:
         'attributes': {
             # Core incident fields (used throughout analysis logic)
             'sequential_id': attrs.get('sequential_id'),
+            'slug': attrs.get('slug'),  # Used for Rootly incident URL construction
             'title': attrs.get('title'),
             'summary': attrs.get('summary'),
             'status': attrs.get('status'),
