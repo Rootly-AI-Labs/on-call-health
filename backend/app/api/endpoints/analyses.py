@@ -2802,6 +2802,9 @@ async def run_analysis_task(
                             'slack_user_id': corr.slack_user_id,
                             'jira_account_id': corr.jira_account_id,  # Jira mapping for workload correlation
                             'linear_user_id': corr.linear_user_id,  # Linear mapping for workload correlation
+                            'rootly_user_id': corr.rootly_user_id,  # Rootly mapping for icon display
+                            'pagerduty_user_id': corr.pagerduty_user_id,  # PagerDuty mapping for icon display
+                            'avatar_url': corr.avatar_url,  # Profile image URL
                             'synced': True  # Mark as from Team Sync
                         }
                         synced_users.append(user_data)
@@ -2848,6 +2851,9 @@ async def run_analysis_task(
                                 'slack_user_id': corr.slack_user_id,
                                 'jira_account_id': corr.jira_account_id,
                                 'linear_user_id': corr.linear_user_id,
+                                'rootly_user_id': corr.rootly_user_id,
+                                'pagerduty_user_id': corr.pagerduty_user_id,
+                                'avatar_url': corr.avatar_url,  # Profile image URL
                                 'synced': False  # Mark as manual mappings, not from Team Sync
                             }
                             synced_users.append(user_data)
@@ -2890,6 +2896,9 @@ async def run_analysis_task(
                                 'slack_user_id': corr.slack_user_id,
                                 'jira_account_id': corr.jira_account_id,
                                 'linear_user_id': corr.linear_user_id,
+                                'rootly_user_id': corr.rootly_user_id,
+                                'pagerduty_user_id': corr.pagerduty_user_id,
+                                'avatar_url': corr.avatar_url,  # Profile image URL
                                 'synced': False
                             }
                             synced_users.append(user_data)

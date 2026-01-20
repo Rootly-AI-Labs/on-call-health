@@ -18,14 +18,12 @@ function IntroGuide({ isOpen, currentStep, onNext, onPrev, onClose }: IntroGuide
   const steps = [
     {
       title: "Welcome to On-Call Health",
-      description: "Detect early signs of overwork in your on-call team before it leads to burnout.",
-      details: "Connects to Rootly, PagerDuty, GitHub, Slack, Linear, and Jira to compute a risk level.",
+      description: "Go to Integrations to connect to Rootly or PagerDuty, as well as other services such as Slack, Linear, or Jira for enhanced risk analysis.",
       image: "/images/integrations-logos.png",
     },
     {
       title: "Run an Analysis",
-      description: "Choose your data sources, team members, and time range to analyze.",
-      details: "Powered by Anthropic and OpenAI for AI-generated insights.",
+      description: "To run an analysis, choose the time range, data sources, and team members.",
       image: "/images/mock-data-dashboard.png",
     },
     {
@@ -76,9 +74,6 @@ function IntroGuide({ isOpen, currentStep, onNext, onPrev, onClose }: IntroGuide
           {/* Content */}
           <div className="p-6">
             <p className="text-lg text-slate-700 dark:text-slate-300 mb-3">{step.description}</p>
-            {step.details && (
-              <p className="text-base text-slate-600 dark:text-slate-400 leading-relaxed mb-4">{step.details}</p>
-            )}
 
             {step.image && (
               <div className="mt-6 rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden bg-slate-50 dark:bg-slate-900/30">

@@ -2569,11 +2569,11 @@ export default function IntegrationsPage() {
                             <div className="flex items-center justify-between w-full">
                               <div className="flex items-center gap-2">
                                 <div className={`w-3 h-3 rounded-full ${
-                                  selected.platform === 'rootly' ? 'bg-purple-2000' : 'bg-green-500'
+                                  selected.platform === 'rootly' ? 'bg-purple-500' : 'bg-green-500'
                                 }`}></div>
                                 <span className="font-medium text-base">{selected.name}</span>
                               </div>
-                              <Star className="w-5 h-5 text-yellow-500 fill-yellow-500 flex-shrink-0" />
+                              <Star className="w-5 h-5 text-yellow-500 fill-yellow-500 flex-shrink-0 ml-2" />
                             </div>
                           )
                         }
@@ -2602,7 +2602,7 @@ export default function IntegrationsPage() {
                                   <span className="font-medium text-base">{integration.name}</span>
                                 </div>
                                 {selectedOrganization === integration.id.toString() && (
-                                  <Star className="w-5 h-5 text-yellow-500 fill-yellow-500 flex-shrink-0" />
+                                  <Star className="w-5 h-5 text-yellow-500 fill-yellow-500 flex-shrink-0 ml-2" />
                                 )}
                               </div>
                             </SelectItem>
@@ -2626,7 +2626,7 @@ export default function IntegrationsPage() {
                                   <span className="font-medium text-base">{integration.name}</span>
                                 </div>
                                 {selectedOrganization === integration.id.toString() && (
-                                  <Star className="w-5 h-5 text-yellow-500 fill-yellow-500 flex-shrink-0" />
+                                  <Star className="w-5 h-5 text-yellow-500 fill-yellow-500 flex-shrink-0 ml-2" />
                                 )}
                               </div>
                             </SelectItem>

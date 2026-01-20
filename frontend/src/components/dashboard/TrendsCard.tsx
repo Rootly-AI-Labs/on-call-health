@@ -1,5 +1,6 @@
 "use client"
 
+import type { ReactElement } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Area, AreaChart, XAxis, YAxis, Line, Tooltip, ResponsiveContainer } from "recharts"
 import {
@@ -23,6 +24,33 @@ interface TrendsCardProps {
   timeRange: number
 }
 
+function LoadingState(): ReactElement {
+  return (
+    <div className="flex items-center justify-center h-full">
+      <div className="text-center">
+        <div className="animate-spin w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full mx-auto mb-2" />
+        <p className="text-sm text-neutral-500">Loading trends...</p>
+      </div>
+    </div>
+  )
+}
+
+function EmptyState(): ReactElement {
+  return (
+    <div className="flex items-center justify-center h-full">
+      <div className="text-center">
+        <div className="w-12 h-12 bg-neutral-200 rounded-full flex items-center justify-center mx-auto mb-3">
+          <svg className="w-6 h-6 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+        </div>
+        <p className="text-sm text-neutral-500 font-medium">No Data Available</p>
+        <p className="text-xs text-neutral-500 mt-1">Run an analysis to view trends</p>
+      </div>
+    </div>
+  )
+}
+
 export function TrendsCard({
   title,
   description,
@@ -33,10 +61,9 @@ export function TrendsCard({
   metricConfig,
   metricDescriptions,
   timeRange
-}: TrendsCardProps) {
-
-  const config = metricConfig[selectedMetric];
-  const hasData = chartData.length > 0;
+}: TrendsCardProps): ReactElement {
+  const config = metricConfig[selectedMetric]
+  const hasData = chartData.length > 0
 
   return (
     <Card className="mb-6">
@@ -75,28 +102,8 @@ export function TrendsCard({
 
       <CardContent className="pb-6">
         <div className="space-y-3">
-          {/* Chart */}
           <div className="h-[300px]">
-            {loading ? (
-              <div className="flex items-center justify-center h-full">
-                <div className="text-center">
-                  <div className="animate-spin w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full mx-auto mb-2"></div>
-                  <p className="text-sm text-neutral-500">Loading trends...</p>
-                </div>
-              </div>
-            ) : !hasData ? (
-              <div className="flex items-center justify-center h-full">
-                <div className="text-center">
-                  <div className="w-12 h-12 bg-neutral-200 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <svg className="w-6 h-6 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                    </svg>
-                  </div>
-                  <p className="text-sm text-neutral-500 font-medium">No Data Available</p>
-                  <p className="text-xs text-neutral-500 mt-1">Run an analysis to view trends</p>
-                </div>
-              </div>
-            ) : (
+            {loading ? <LoadingState /> : !hasData ? <EmptyState /> : (
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart
                   data={chartData}
@@ -148,9 +155,9 @@ export function TrendsCard({
                         ? ((metricValue - meanScore) / meanScore) * 100
                         : 0;
 
-                      const isPositive = selectedMetric === 'health_score'
-                        ? percentageChange >= 0
-                        : percentageChange <= 0;
+                      // For all metrics (risk level, incidents, after hours, workload),
+                      // higher values are worse, so decrease is positive (green)
+                      const isPositive = percentageChange <= 0;
 
                       return (
                         <div className="bg-neutral-900/95 p-3 border border-neutral-700 rounded-lg shadow-lg backdrop-blur-sm">

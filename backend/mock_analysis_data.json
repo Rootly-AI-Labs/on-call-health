@@ -99,15 +99,15 @@
             "ocb_reasoning": [
               "High burnout risk (OCB: 60/100) - monitor closely",
               "PERSONAL:",
-              "• Sleep quality impact from critical incidents (37.5 points)",
-              "• Recovery time between incidents (19.0 points)",
-              "• Extended work hours (12.5 points)",
-              "• Non-business hours incident activity (0.3 points)",
+              "\u2022 Sleep quality impact from critical incidents (37.5 points)",
+              "\u2022 Recovery time between incidents (19.0 points)",
+              "\u2022 Extended work hours (12.5 points)",
+              "\u2022 Non-business hours incident activity (0.3 points)",
               "WORK-RELATED:",
-              "• On-call responsibility load: 10 total incidents (35.0 points)",
-              "• Critical production incident frequency: 2 sev3, 4 sev1, 1 sev0, 3 sev2 (6.0 points total for 10 incidents)",
-              "• Incident severity-weighted workload (5.3 points)",
-              "• Incident response meeting load (5.0 points)",
+              "\u2022 On-call responsibility load: 10 total incidents (35.0 points)",
+              "\u2022 Critical production incident frequency: 2 sev3, 4 sev1, 1 sev0, 3 sev2 (6.0 points total for 10 incidents)",
+              "\u2022 Incident severity-weighted workload (5.3 points)",
+              "\u2022 Incident response meeting load (5.0 points)",
               "Personal stress significantly higher than work stress - focus on recovery and boundaries"
             ],
             "metrics": {
@@ -395,7 +395,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.528888",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "94178"
           },
           {
             "user_id": "2381",
@@ -428,17 +429,17 @@
             "ocb_reasoning": [
               "High burnout risk (OCB: 55/100) - monitor closely",
               "PERSONAL:",
-              "• Sleep quality impact from critical incidents (37.5 points)",
-              "• Recovery time between incidents (10.5 points)",
-              "• Extended work hours (8.0 points)",
-              "• Non-business hours incident activity (0.6 points)",
+              "\u2022 Sleep quality impact from critical incidents (37.5 points)",
+              "\u2022 Recovery time between incidents (10.5 points)",
+              "\u2022 Extended work hours (8.0 points)",
+              "\u2022 Non-business hours incident activity (0.6 points)",
               "WORK-RELATED:",
-              "• On-call responsibility load: 5 total incidents (35.0 points)",
-              "• Response time requirements (6.9 points)",
-              "• Critical production incident frequency: 3 sev1, 2 sev2 (3.6 points total for 5 incidents)",
-              "• Incident severity-weighted workload (3.2 points)",
-              "• Incident response meeting load (3.0 points)",
-              "• Code review speed pressure (2.3 points)"
+              "\u2022 On-call responsibility load: 5 total incidents (35.0 points)",
+              "\u2022 Response time requirements (6.9 points)",
+              "\u2022 Critical production incident frequency: 3 sev1, 2 sev2 (3.6 points total for 5 incidents)",
+              "\u2022 Incident severity-weighted workload (3.2 points)",
+              "\u2022 Incident response meeting load (3.0 points)",
+              "\u2022 Code review speed pressure (2.3 points)"
             ],
             "metrics": {
               "incidents_per_week": 1.17,
@@ -667,7 +668,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.529882",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "2381"
           },
           {
             "user_id": "109433",
@@ -700,15 +702,15 @@
             "ocb_reasoning": [
               "Moderate stress levels (OCB: 47/100) - manageable with care",
               "PERSONAL:",
-              "• Sleep quality impact from critical incidents (37.5 points)",
-              "• Extended work hours (8.0 points)",
-              "• Recovery time between incidents (6.5 points)",
-              "• Non-business hours incident activity (0.4 points)",
+              "\u2022 Sleep quality impact from critical incidents (37.5 points)",
+              "\u2022 Extended work hours (8.0 points)",
+              "\u2022 Recovery time between incidents (6.5 points)",
+              "\u2022 Non-business hours incident activity (0.4 points)",
               "WORK-RELATED:",
-              "• On-call responsibility load: 5 total incidents (35.0 points)",
-              "• Incident severity-weighted workload (3.2 points)",
-              "• Incident response meeting load (3.0 points)",
-              "• Critical production incident frequency: 3 sev3, 1 sev2, 1 sev0 (1.2 points total for 5 incidents)"
+              "\u2022 On-call responsibility load: 5 total incidents (35.0 points)",
+              "\u2022 Incident severity-weighted workload (3.2 points)",
+              "\u2022 Incident response meeting load (3.0 points)",
+              "\u2022 Critical production incident frequency: 3 sev3, 1 sev2, 1 sev0 (1.2 points total for 5 incidents)"
             ],
             "metrics": {
               "incidents_per_week": 1.17,
@@ -987,7 +989,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.529882",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "109433"
           },
           {
             "user_id": "7341",
@@ -1020,14 +1023,14 @@
             "ocb_reasoning": [
               "Moderate stress levels (OCB: 40/100) - manageable with care",
               "PERSONAL:",
-              "• Sleep quality impact from critical incidents (37.5 points)",
-              "• Extended work hours (5.2 points)",
-              "• Recovery time between incidents (3.3 points)",
-              "• Non-business hours incident activity (0.7 points)",
+              "\u2022 Sleep quality impact from critical incidents (37.5 points)",
+              "\u2022 Extended work hours (5.2 points)",
+              "\u2022 Recovery time between incidents (3.3 points)",
+              "\u2022 Non-business hours incident activity (0.7 points)",
               "WORK-RELATED:",
-              "• On-call responsibility load: 3 total incidents (29.7 points)",
-              "• Incident severity-weighted workload (2.1 points)",
-              "• Incident response meeting load (1.9 points)"
+              "\u2022 On-call responsibility load: 3 total incidents (29.7 points)",
+              "\u2022 Incident severity-weighted workload (2.1 points)",
+              "\u2022 Incident response meeting load (1.9 points)"
             ],
             "metrics": {
               "incidents_per_week": 0.7,
@@ -1184,7 +1187,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.529882",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "7341"
           },
           {
             "user_id": "3779",
@@ -1217,15 +1221,15 @@
             "ocb_reasoning": [
               "Moderate stress levels (OCB: 43/100) - manageable with care",
               "PERSONAL:",
-              "• Sleep quality impact from critical incidents (37.5 points)",
-              "• Recovery time between incidents (4.6 points)",
-              "• Extended work hours (3.8 points)",
-              "• Non-business hours incident activity (1.0 points)",
+              "\u2022 Sleep quality impact from critical incidents (37.5 points)",
+              "\u2022 Recovery time between incidents (4.6 points)",
+              "\u2022 Extended work hours (3.8 points)",
+              "\u2022 Non-business hours incident activity (1.0 points)",
               "WORK-RELATED:",
-              "• On-call responsibility load: 2 total incidents (34.6 points)",
-              "• Incident severity-weighted workload (1.5 points)",
-              "• Incident response meeting load (1.4 points)",
-              "• Critical production incident frequency: 1 sev2, 1 sev0 (1.2 points total for 2 incidents)"
+              "\u2022 On-call responsibility load: 2 total incidents (34.6 points)",
+              "\u2022 Incident severity-weighted workload (1.5 points)",
+              "\u2022 Incident response meeting load (1.4 points)",
+              "\u2022 Critical production incident frequency: 1 sev2, 1 sev0 (1.2 points total for 2 incidents)"
             ],
             "metrics": {
               "incidents_per_week": 0.47,
@@ -1381,7 +1385,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.529882",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "3779"
           },
           {
             "user_id": "25713",
@@ -1414,15 +1419,15 @@
             "ocb_reasoning": [
               "Moderate stress levels (OCB: 44/100) - manageable with care",
               "PERSONAL:",
-              "• Sleep quality impact from critical incidents (37.5 points)",
-              "• Recovery time between incidents (5.2 points)",
-              "• Extended work hours (5.2 points)",
-              "• Non-business hours incident activity (0.3 points)",
+              "\u2022 Sleep quality impact from critical incidents (37.5 points)",
+              "\u2022 Recovery time between incidents (5.2 points)",
+              "\u2022 Extended work hours (5.2 points)",
+              "\u2022 Non-business hours incident activity (0.3 points)",
               "WORK-RELATED:",
-              "• On-call responsibility load: 3 total incidents (35.0 points)",
-              "• Incident severity-weighted workload (2.1 points)",
-              "• Incident response meeting load (1.9 points)",
-              "• Critical production incident frequency: 1 sev3, 1 sev0, 1 sev2 (1.2 points total for 3 incidents)"
+              "\u2022 On-call responsibility load: 3 total incidents (35.0 points)",
+              "\u2022 Incident severity-weighted workload (2.1 points)",
+              "\u2022 Incident response meeting load (1.9 points)",
+              "\u2022 Critical production incident frequency: 1 sev3, 1 sev0, 1 sev2 (1.2 points total for 3 incidents)"
             ],
             "metrics": {
               "incidents_per_week": 0.7,
@@ -1581,7 +1586,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.530882",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "25713"
           },
           {
             "user_id": "4261",
@@ -1614,14 +1620,14 @@
             "ocb_reasoning": [
               "Moderate stress levels (OCB: 42/100) - manageable with care",
               "PERSONAL:",
-              "• Sleep quality impact from critical incidents (37.5 points)",
-              "• Extended work hours (5.2 points)",
-              "• Recovery time between incidents (3.9 points)",
-              "• Non-business hours incident activity (0.3 points)",
+              "\u2022 Sleep quality impact from critical incidents (37.5 points)",
+              "\u2022 Extended work hours (5.2 points)",
+              "\u2022 Recovery time between incidents (3.9 points)",
+              "\u2022 Non-business hours incident activity (0.3 points)",
               "WORK-RELATED:",
-              "• On-call responsibility load: 3 total incidents (32.1 points)",
-              "• Incident severity-weighted workload (2.1 points)",
-              "• Incident response meeting load (1.9 points)"
+              "\u2022 On-call responsibility load: 3 total incidents (32.1 points)",
+              "\u2022 Incident severity-weighted workload (2.1 points)",
+              "\u2022 Incident response meeting load (1.9 points)"
             ],
             "metrics": {
               "incidents_per_week": 0.7,
@@ -1778,7 +1784,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.530882",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "4261"
           },
           {
             "user_id": "177423",
@@ -1811,14 +1818,14 @@
             "ocb_reasoning": [
               "Moderate stress levels (OCB: 28/100) - manageable with care",
               "PERSONAL:",
-              "• Sleep quality impact from critical incidents (31.2 points)",
-              "• Extended work hours (3.8 points)",
-              "• Recovery time between incidents (1.3 points)",
-              "• Non-business hours incident activity (1.0 points)",
+              "\u2022 Sleep quality impact from critical incidents (31.2 points)",
+              "\u2022 Extended work hours (3.8 points)",
+              "\u2022 Recovery time between incidents (1.3 points)",
+              "\u2022 Non-business hours incident activity (1.0 points)",
               "WORK-RELATED:",
-              "• On-call responsibility load: 2 total incidents (16.4 points)",
-              "• Incident severity-weighted workload (1.5 points)",
-              "• Incident response meeting load (1.4 points)",
+              "\u2022 On-call responsibility load: 2 total incidents (16.4 points)",
+              "\u2022 Incident severity-weighted workload (1.5 points)",
+              "\u2022 Incident response meeting load (1.4 points)",
               "Personal stress significantly higher than work stress - focus on recovery and boundaries"
             ],
             "metrics": {
@@ -1975,7 +1982,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.530882",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "177423"
           },
           {
             "user_id": "3528",
@@ -2008,14 +2016,14 @@
             "ocb_reasoning": [
               "Moderate stress levels (OCB: 28/100) - manageable with care",
               "PERSONAL:",
-              "• Sleep quality impact from critical incidents (31.2 points)",
-              "• Extended work hours (3.8 points)",
-              "• Recovery time between incidents (1.3 points)",
-              "• Non-business hours incident activity (1.0 points)",
+              "\u2022 Sleep quality impact from critical incidents (31.2 points)",
+              "\u2022 Extended work hours (3.8 points)",
+              "\u2022 Recovery time between incidents (1.3 points)",
+              "\u2022 Non-business hours incident activity (1.0 points)",
               "WORK-RELATED:",
-              "• On-call responsibility load: 2 total incidents (16.4 points)",
-              "• Incident severity-weighted workload (1.5 points)",
-              "• Incident response meeting load (1.4 points)",
+              "\u2022 On-call responsibility load: 2 total incidents (16.4 points)",
+              "\u2022 Incident severity-weighted workload (1.5 points)",
+              "\u2022 Incident response meeting load (1.4 points)",
               "Personal stress significantly higher than work stress - focus on recovery and boundaries"
             ],
             "metrics": {
@@ -2172,7 +2180,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.530882",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "3528"
           },
           {
             "user_id": "120982",
@@ -2205,14 +2214,14 @@
             "ocb_reasoning": [
               "Moderate stress levels (OCB: 40/100) - manageable with care",
               "PERSONAL:",
-              "• Sleep quality impact from critical incidents (37.5 points)",
-              "• Extended work hours (5.2 points)",
-              "• Recovery time between incidents (3.3 points)",
-              "• Non-business hours incident activity (0.3 points)",
+              "\u2022 Sleep quality impact from critical incidents (37.5 points)",
+              "\u2022 Extended work hours (5.2 points)",
+              "\u2022 Recovery time between incidents (3.3 points)",
+              "\u2022 Non-business hours incident activity (0.3 points)",
               "WORK-RELATED:",
-              "• On-call responsibility load: 3 total incidents (29.7 points)",
-              "• Incident severity-weighted workload (2.1 points)",
-              "• Incident response meeting load (1.9 points)"
+              "\u2022 On-call responsibility load: 3 total incidents (29.7 points)",
+              "\u2022 Incident severity-weighted workload (2.1 points)",
+              "\u2022 Incident response meeting load (1.9 points)"
             ],
             "metrics": {
               "incidents_per_week": 0.7,
@@ -2369,7 +2378,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.531882",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "120982"
           },
           {
             "user_id": "143909",
@@ -2402,14 +2412,14 @@
             "ocb_reasoning": [
               "Moderate stress levels (OCB: 38/100) - manageable with care",
               "PERSONAL:",
-              "• Sleep quality impact from critical incidents (37.5 points)",
-              "• Extended work hours (5.2 points)",
-              "• Recovery time between incidents (2.6 points)",
-              "• Non-business hours incident activity (0.3 points)",
+              "\u2022 Sleep quality impact from critical incidents (37.5 points)",
+              "\u2022 Extended work hours (5.2 points)",
+              "\u2022 Recovery time between incidents (2.6 points)",
+              "\u2022 Non-business hours incident activity (0.3 points)",
               "WORK-RELATED:",
-              "• On-call responsibility load: 3 total incidents (26.5 points)",
-              "• Incident severity-weighted workload (2.1 points)",
-              "• Incident response meeting load (1.9 points)",
+              "\u2022 On-call responsibility load: 3 total incidents (26.5 points)",
+              "\u2022 Incident severity-weighted workload (2.1 points)",
+              "\u2022 Incident response meeting load (1.9 points)",
               "Personal stress significantly higher than work stress - focus on recovery and boundaries"
             ],
             "metrics": {
@@ -2567,7 +2577,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.531882",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "143909"
           },
           {
             "user_id": "95623",
@@ -2600,14 +2611,14 @@
             "ocb_reasoning": [
               "Moderate stress levels (OCB: 27/100) - manageable with care",
               "PERSONAL:",
-              "• Sleep quality impact from critical incidents (31.2 points)",
-              "• Extended work hours (1.8 points)",
-              "• Recovery time between incidents (1.3 points)",
-              "• Non-business hours incident activity (1.0 points)",
+              "\u2022 Sleep quality impact from critical incidents (31.2 points)",
+              "\u2022 Extended work hours (1.8 points)",
+              "\u2022 Recovery time between incidents (1.3 points)",
+              "\u2022 Non-business hours incident activity (1.0 points)",
               "WORK-RELATED:",
-              "• On-call responsibility load: 1 total incidents (16.4 points)",
-              "• Incident severity-weighted workload (0.7 points)",
-              "• Incident response meeting load (0.7 points)",
+              "\u2022 On-call responsibility load: 1 total incidents (16.4 points)",
+              "\u2022 Incident severity-weighted workload (0.7 points)",
+              "\u2022 Incident response meeting load (0.7 points)",
               "Personal stress significantly higher than work stress - focus on recovery and boundaries"
             ],
             "metrics": {
@@ -2764,7 +2775,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.532882",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "95623"
           },
           {
             "user_id": "99334",
@@ -2797,14 +2809,14 @@
             "ocb_reasoning": [
               "Moderate stress levels (OCB: 27/100) - manageable with care",
               "PERSONAL:",
-              "• Sleep quality impact from critical incidents (31.2 points)",
-              "• Extended work hours (1.8 points)",
-              "• Recovery time between incidents (1.3 points)",
-              "• Non-business hours incident activity (1.0 points)",
+              "\u2022 Sleep quality impact from critical incidents (31.2 points)",
+              "\u2022 Extended work hours (1.8 points)",
+              "\u2022 Recovery time between incidents (1.3 points)",
+              "\u2022 Non-business hours incident activity (1.0 points)",
               "WORK-RELATED:",
-              "• On-call responsibility load: 1 total incidents (16.4 points)",
-              "• Incident severity-weighted workload (0.7 points)",
-              "• Incident response meeting load (0.7 points)",
+              "\u2022 On-call responsibility load: 1 total incidents (16.4 points)",
+              "\u2022 Incident severity-weighted workload (0.7 points)",
+              "\u2022 Incident response meeting load (0.7 points)",
               "Personal stress significantly higher than work stress - focus on recovery and boundaries"
             ],
             "metrics": {
@@ -2960,7 +2972,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.532882",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "99334"
           },
           {
             "user_id": "38699",
@@ -2993,14 +3006,14 @@
             "ocb_reasoning": [
               "Low burnout risk (OCB: 16/100) - healthy stress levels",
               "PERSONAL:",
-              "• Sleep quality impact from critical incidents (17.3 points)",
-              "• Extended work hours (1.8 points)",
-              "• Non-business hours incident activity (1.0 points)",
-              "• Recovery time between incidents (0.7 points)",
+              "\u2022 Sleep quality impact from critical incidents (17.3 points)",
+              "\u2022 Extended work hours (1.8 points)",
+              "\u2022 Non-business hours incident activity (1.0 points)",
+              "\u2022 Recovery time between incidents (0.7 points)",
               "WORK-RELATED:",
-              "• On-call responsibility load: 1 total incidents (9.1 points)",
-              "• Incident severity-weighted workload (0.7 points)",
-              "• Incident response meeting load (0.7 points)"
+              "\u2022 On-call responsibility load: 1 total incidents (9.1 points)",
+              "\u2022 Incident severity-weighted workload (0.7 points)",
+              "\u2022 Incident response meeting load (0.7 points)"
             ],
             "metrics": {
               "incidents_per_week": 0.23,
@@ -3155,7 +3168,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.532882",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "38699"
           },
           {
             "user_id": "29995",
@@ -3188,14 +3202,14 @@
             "ocb_reasoning": [
               "Low burnout risk (OCB: 16/100) - healthy stress levels",
               "PERSONAL:",
-              "• Sleep quality impact from critical incidents (17.3 points)",
-              "• Extended work hours (1.8 points)",
-              "• Non-business hours incident activity (1.0 points)",
-              "• Recovery time between incidents (0.7 points)",
+              "\u2022 Sleep quality impact from critical incidents (17.3 points)",
+              "\u2022 Extended work hours (1.8 points)",
+              "\u2022 Non-business hours incident activity (1.0 points)",
+              "\u2022 Recovery time between incidents (0.7 points)",
               "WORK-RELATED:",
-              "• On-call responsibility load: 1 total incidents (9.1 points)",
-              "• Incident severity-weighted workload (0.7 points)",
-              "• Incident response meeting load (0.7 points)"
+              "\u2022 On-call responsibility load: 1 total incidents (9.1 points)",
+              "\u2022 Incident severity-weighted workload (0.7 points)",
+              "\u2022 Incident response meeting load (0.7 points)"
             ],
             "metrics": {
               "incidents_per_week": 0.23,
@@ -3350,7 +3364,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.532882",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "29995"
           },
           {
             "user_id": "141194",
@@ -3383,14 +3398,14 @@
             "ocb_reasoning": [
               "Low burnout risk (OCB: 9/100) - healthy stress levels",
               "PERSONAL:",
-              "• Sleep quality impact from critical incidents (9.3 points)",
-              "• Extended work hours (1.8 points)",
-              "• Non-business hours incident activity (1.0 points)",
-              "• Recovery time between incidents (0.3 points)",
+              "\u2022 Sleep quality impact from critical incidents (9.3 points)",
+              "\u2022 Extended work hours (1.8 points)",
+              "\u2022 Non-business hours incident activity (1.0 points)",
+              "\u2022 Recovery time between incidents (0.3 points)",
               "WORK-RELATED:",
-              "• On-call responsibility load: 1 total incidents (4.9 points)",
-              "• Incident severity-weighted workload (0.7 points)",
-              "• Incident response meeting load (0.7 points)"
+              "\u2022 On-call responsibility load: 1 total incidents (4.9 points)",
+              "\u2022 Incident severity-weighted workload (0.7 points)",
+              "\u2022 Incident response meeting load (0.7 points)"
             ],
             "metrics": {
               "incidents_per_week": 0.23,
@@ -3553,7 +3568,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.532882",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "141194"
           },
           {
             "user_id": "15741",
@@ -3586,13 +3602,13 @@
             "ocb_reasoning": [
               "Moderate stress levels (OCB: 26/100) - manageable with care",
               "PERSONAL:",
-              "• Sleep quality impact from critical incidents (31.2 points)",
-              "• Extended work hours (1.8 points)",
-              "• Recovery time between incidents (1.3 points)",
+              "\u2022 Sleep quality impact from critical incidents (31.2 points)",
+              "\u2022 Extended work hours (1.8 points)",
+              "\u2022 Recovery time between incidents (1.3 points)",
               "WORK-RELATED:",
-              "• On-call responsibility load: 1 total incidents (16.4 points)",
-              "• Incident severity-weighted workload (0.7 points)",
-              "• Incident response meeting load (0.7 points)",
+              "\u2022 On-call responsibility load: 1 total incidents (16.4 points)",
+              "\u2022 Incident severity-weighted workload (0.7 points)",
+              "\u2022 Incident response meeting load (0.7 points)",
               "Personal stress significantly higher than work stress - focus on recovery and boundaries"
             ],
             "metrics": {
@@ -3748,7 +3764,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.533883",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "15741"
           },
           {
             "user_id": "63772",
@@ -3860,7 +3877,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.533883",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "63772"
           },
           {
             "user_id": "109673",
@@ -3993,7 +4011,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.534884",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "109673"
           },
           {
             "user_id": "201342",
@@ -4105,7 +4124,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.534884",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "201342"
           },
           {
             "user_id": "178518",
@@ -4217,7 +4237,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.534884",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "178518"
           },
           {
             "user_id": "152894",
@@ -4329,7 +4350,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.535885",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "152894"
           },
           {
             "user_id": "121366",
@@ -4441,7 +4463,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.535885",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "121366"
           },
           {
             "user_id": "120985",
@@ -4553,7 +4576,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.535885",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "120985"
           },
           {
             "user_id": "119459",
@@ -4665,7 +4689,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.535885",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "119459"
           },
           {
             "user_id": "104800",
@@ -4777,7 +4802,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.536884",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "104800"
           },
           {
             "user_id": "84195",
@@ -4889,7 +4915,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.536884",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "84195"
           },
           {
             "user_id": "66915",
@@ -5001,7 +5028,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.536884",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "66915"
           },
           {
             "user_id": "140848",
@@ -5113,11 +5141,12 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.537884",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "140848"
           },
           {
             "user_id": "206698",
-            "user_name": "Kevin O’Neill",
+            "user_name": "Kevin O\u2019Neill",
             "user_email": "kevin.oneill@example.com",
             "is_oncall": false,
             "github_username": null,
@@ -5225,7 +5254,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.537884",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "206698"
           },
           {
             "user_id": "206689",
@@ -5337,7 +5367,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.537884",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "206689"
           },
           {
             "user_id": "182573",
@@ -5449,7 +5480,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.538884",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "182573"
           },
           {
             "user_id": "62210",
@@ -5561,7 +5593,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.538884",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "62210"
           },
           {
             "user_id": "154534",
@@ -5673,7 +5706,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.539885",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "154534"
           },
           {
             "user_id": "53041",
@@ -5785,7 +5819,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.539885",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "53041"
           },
           {
             "user_id": "52747",
@@ -5897,7 +5932,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.539885",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "52747"
           },
           {
             "user_id": "25858",
@@ -6009,7 +6045,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.540884",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "25858"
           },
           {
             "user_id": "23421",
@@ -6121,7 +6158,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.540884",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "23421"
           },
           {
             "user_id": "63",
@@ -6233,7 +6271,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.540884",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "63"
           },
           {
             "user_id": "123055",
@@ -6345,7 +6384,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.540884",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "123055"
           },
           {
             "user_id": "199176",
@@ -6457,7 +6497,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.541884",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "199176"
           },
           {
             "user_id": "198851",
@@ -6569,7 +6610,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.541884",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "198851"
           },
           {
             "user_id": "198527",
@@ -6681,7 +6723,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.541884",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "198527"
           },
           {
             "user_id": "196003",
@@ -6793,7 +6836,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.541884",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "196003"
           },
           {
             "user_id": "182156",
@@ -6905,7 +6949,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.542884",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "182156"
           },
           {
             "user_id": "181831",
@@ -7017,7 +7062,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.542884",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "181831"
           },
           {
             "user_id": "179150",
@@ -7150,7 +7196,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.543884",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "179150"
           },
           {
             "user_id": "103643",
@@ -7283,11 +7330,12 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.543884",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "103643"
           },
           {
             "user_id": "101131",
-            "user_name": "Megan O’Brien",
+            "user_name": "Megan O\u2019Brien",
             "user_email": "megan.obrien@example.com",
             "is_oncall": false,
             "github_username": "ahammednafih",
@@ -7416,7 +7464,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.544885",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "101131"
           },
           {
             "user_id": "88090",
@@ -7528,11 +7577,12 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.544885",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "88090"
           },
           {
             "user_id": "86636",
-            "user_name": "Tomáš Novák",
+            "user_name": "Tom\u00e1\u0161 Nov\u00e1k",
             "user_email": "tomas.novak@example.com",
             "is_oncall": false,
             "github_username": "udai1931",
@@ -7640,7 +7690,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.544885",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "86636"
           },
           {
             "user_id": "177934",
@@ -7752,7 +7803,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.545884",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "177934"
           },
           {
             "user_id": "177229",
@@ -7864,7 +7916,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.545884",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "177229"
           },
           {
             "user_id": "143068",
@@ -7976,7 +8029,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.545884",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "143068"
           },
           {
             "user_id": "127717",
@@ -8088,11 +8142,12 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.546885",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "127717"
           },
           {
             "user_id": "126207",
-            "user_name": "Lucía Moreno",
+            "user_name": "Luc\u00eda Moreno",
             "user_email": "lucia.moreno@example.com",
             "is_oncall": false,
             "github_username": "rigelstpierre",
@@ -8200,7 +8255,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.546885",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "126207"
           },
           {
             "user_id": "123108",
@@ -8312,7 +8368,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.546885",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "123108"
           },
           {
             "user_id": "117101",
@@ -8424,7 +8481,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.546885",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "117101"
           },
           {
             "user_id": "116597",
@@ -8536,7 +8594,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.547885",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "116597"
           },
           {
             "user_id": "106628",
@@ -8648,7 +8707,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.547885",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "106628"
           },
           {
             "user_id": "101553",
@@ -8760,11 +8820,12 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.547885",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "101553"
           },
           {
             "user_id": "97764",
-            "user_name": "Diego Fernández",
+            "user_name": "Diego Fern\u00e1ndez",
             "user_email": "diego.fernandez@example.com",
             "is_oncall": false,
             "github_username": "jagannathBhat",
@@ -8872,7 +8933,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.547885",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "97764"
           },
           {
             "user_id": "94412",
@@ -8984,7 +9046,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.549386",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "94412"
           },
           {
             "user_id": "92251",
@@ -9096,7 +9159,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.549386",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "92251"
           },
           {
             "user_id": "87587",
@@ -9208,7 +9272,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.550389",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "87587"
           },
           {
             "user_id": "83970",
@@ -9320,7 +9385,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.550389",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "83970"
           },
           {
             "user_id": "81678",
@@ -9432,7 +9498,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.550389",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "81678"
           },
           {
             "user_id": "66191",
@@ -9544,7 +9611,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.550389",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "66191"
           },
           {
             "user_id": "62632",
@@ -9656,7 +9724,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.551389",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "62632"
           },
           {
             "user_id": "62208",
@@ -9768,7 +9837,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.551389",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "62208"
           },
           {
             "user_id": "39198",
@@ -9880,7 +9950,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.551389",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "39198"
           },
           {
             "user_id": "39108",
@@ -9992,7 +10063,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.551389",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "39108"
           },
           {
             "user_id": "36741",
@@ -10104,7 +10176,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.552389",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "36741"
           },
           {
             "user_id": "29983",
@@ -10216,7 +10289,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.552389",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "29983"
           },
           {
             "user_id": "29683",
@@ -10328,7 +10402,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.552389",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "29683"
           },
           {
             "user_id": "27965",
@@ -10440,7 +10515,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.552389",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "27965"
           },
           {
             "user_id": "27257",
@@ -10552,7 +10628,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.553389",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "27257"
           },
           {
             "user_id": "83940",
@@ -10664,7 +10741,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.553389",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "83940"
           },
           {
             "user_id": "25271",
@@ -10776,7 +10854,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.553389",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "25271"
           },
           {
             "user_id": "19241",
@@ -10888,7 +10967,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.554389",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "19241"
           },
           {
             "user_id": "9130",
@@ -11000,7 +11080,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.554389",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "9130"
           },
           {
             "user_id": "3497",
@@ -11112,7 +11193,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.554389",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "3497"
           },
           {
             "user_id": "65",
@@ -11224,7 +11306,8 @@
             "ai_analysis_timestamp": "2026-01-14T05:32:22.555388",
             "ai_data_sources": [
               "github"
-            ]
+            ],
+            "rootly_user_id": "65"
           }
         ],
         "total_members": 84,
@@ -85853,7 +85936,7 @@
             "mitigated_by": {
               "id": "86636",
               "email": "tomas.novak@example.com",
-              "name": "Tomáš Novák"
+              "name": "Tom\u00e1\u0161 Nov\u00e1k"
             },
             "slack_channel_id": "C0A7ABR7AB1",
             "slack_channel_name": "inc-949-sev2-01-09-26-payload-not-auto-populating-for-non-paging-api-alerts",
@@ -86105,7 +86188,7 @@
             "mitigated_by": {
               "id": "126207",
               "email": "lucia.moreno@example.com",
-              "name": "Lucía Moreno"
+              "name": "Luc\u00eda Moreno"
             },
             "slack_channel_id": "C0A855FQM5E",
             "slack_channel_name": "inc-941-sev0-01-07-26-rootly-down-or-very-slow",
@@ -86218,7 +86301,7 @@
             "mitigated_by": {
               "id": "86636",
               "email": "tomas.novak@example.com",
-              "name": "Tomáš Novák"
+              "name": "Tom\u00e1\u0161 Nov\u00e1k"
             },
             "slack_channel_id": "C0A75EH0EUC",
             "slack_channel_name": "inc-937-sev2-01-06-26-outsystem-scheduling-issues-disappearing-shifts",
@@ -86883,7 +86966,7 @@
           "attributes": {
             "sequential_id": 915,
             "title": "Custom domain not working for customer",
-            "summary": "Base44 is trying to use a custom domain with status pages but we’re failing to issue an ssl cert",
+            "summary": "Base44 is trying to use a custom domain with status pages but we\u2019re failing to issue an ssl cert",
             "status": "resolved",
             "severity": "SEV3",
             "created_at": "2025-12-17T04:35:46.485-08:00",
@@ -87100,7 +87183,7 @@
             "immediate_actions_needed": false,
             "team_trajectory": "Healthy"
           },
-          "llm_team_analysis": "## Summary\n\nThe concentration of incident response work reveals a troubling imbalance: just 18 people shoulder the entire on-call burden for an 84-person engineering organization, creating a response-to-team ratio that leaves most engineers insulated from production reality while a small subset absorbs operational stress. Alex Thompson's OCB score of 76.5 signals severe burnout territory after handling 10 incidents this month, crossing into the critical intervention threshold. Weekend work touches 6 engineers despite relatively modest after-hours commit patterns (8.7% late nights, 4.0% weekends across 298 commits), suggesting the operational load rather than development work drives the concerning patterns. With 66 members carrying zero incident responsibility, this team has inadvertently created a two-tier system where operational knowledge and stress concentrate dangerously.\n\n## Key Observations\n\n• **Alex Thompson requires immediate manager intervention** – with an OCB score of 76.5 placing him in the severe burnout range and 10 incidents handled, he's absorbed more than half the incident load of any individual responder while the median team member handles zero, indicating he's become a single point of failure for tribal knowledge and incident resolution.\n\n• **The 21.4% active responder rate creates institutional fragility** – when 78.6% of the engineering team never touches production incidents, you're building a knowledge moat where operational expertise can't diffuse, making it nearly impossible to scale on-call coverage or provide relief to the 18 people who actually respond when systems break.\n\n• **Weekend work patterns don't align with commit volume intensity** – only 4.0% of commits happen on weekends yet 6 engineers are working those days, suggesting they're handling incident follow-up, infrastructure maintenance, or synchronous production support rather than planned feature development, which represents hidden operational toil not captured in development velocity metrics.",
+          "llm_team_analysis": "## Summary\n\nThe concentration of incident response work reveals a troubling imbalance: just 18 people shoulder the entire on-call burden for an 84-person engineering organization, creating a response-to-team ratio that leaves most engineers insulated from production reality while a small subset absorbs operational stress. Alex Thompson's OCB score of 76.5 signals severe burnout territory after handling 10 incidents this month, crossing into the critical intervention threshold. Weekend work touches 6 engineers despite relatively modest after-hours commit patterns (8.7% late nights, 4.0% weekends across 298 commits), suggesting the operational load rather than development work drives the concerning patterns. With 66 members carrying zero incident responsibility, this team has inadvertently created a two-tier system where operational knowledge and stress concentrate dangerously.\n\n## Key Observations\n\n\u2022 **Alex Thompson requires immediate manager intervention** \u2013 with an OCB score of 76.5 placing him in the severe burnout range and 10 incidents handled, he's absorbed more than half the incident load of any individual responder while the median team member handles zero, indicating he's become a single point of failure for tribal knowledge and incident resolution.\n\n\u2022 **The 21.4% active responder rate creates institutional fragility** \u2013 when 78.6% of the engineering team never touches production incidents, you're building a knowledge moat where operational expertise can't diffuse, making it nearly impossible to scale on-call coverage or provide relief to the 18 people who actually respond when systems break.\n\n\u2022 **Weekend work patterns don't align with commit volume intensity** \u2013 only 4.0% of commits happen on weekends yet 6 engineers are working those days, suggesting they're handling incident follow-up, infrastructure maintenance, or synchronous production support rather than planned feature development, which represents hidden operational toil not captured in development velocity metrics.",
           "risk_distribution": {
             "distribution": {
               "low": 83,
@@ -87343,7 +87426,7 @@
                   "incident_count": 0
                 },
                 {
-                  "name": "Kevin O’Neill",
+                  "name": "Kevin O\u2019Neill",
                   "email": "kevin.oneill@example.com",
                   "user_id": "206698",
                   "burnout_score": 0.0,
@@ -87495,7 +87578,7 @@
                   "incident_count": 0
                 },
                 {
-                  "name": "Megan O’Brien",
+                  "name": "Megan O\u2019Brien",
                   "email": "megan.obrien@example.com",
                   "user_id": "101131",
                   "burnout_score": 0.0,
@@ -87511,7 +87594,7 @@
                   "incident_count": 0
                 },
                 {
-                  "name": "Tomáš Novák",
+                  "name": "Tom\u00e1\u0161 Nov\u00e1k",
                   "email": "tomas.novak@example.com",
                   "user_id": "86636",
                   "burnout_score": 0.0,
@@ -87551,7 +87634,7 @@
                   "incident_count": 0
                 },
                 {
-                  "name": "Lucía Moreno",
+                  "name": "Luc\u00eda Moreno",
                   "email": "lucia.moreno@example.com",
                   "user_id": "126207",
                   "burnout_score": 0.0,
@@ -87599,7 +87682,7 @@
                   "incident_count": 0
                 },
                 {
-                  "name": "Diego Fernández",
+                  "name": "Diego Fern\u00e1ndez",
                   "email": "diego.fernandez@example.com",
                   "user_id": "97764",
                   "burnout_score": 0.0,
@@ -87834,7 +87917,7 @@
                   "Lily Chen",
                   "Christopher Moore",
                   "Amira Khan",
-                  "Kevin O’Neill",
+                  "Kevin O\u2019Neill",
                   "Bianca Rossi",
                   "Thomas Baker",
                   "Sofia Petrova",
@@ -87853,20 +87936,20 @@
                   "Jason Miller",
                   "Anita Desai",
                   "Carlos Alvarez",
-                  "Megan O’Brien",
+                  "Megan O\u2019Brien",
                   "Claire Dubois",
-                  "Tomáš Novák",
+                  "Tom\u00e1\u0161 Nov\u00e1k",
                   "Rina Sato",
                   "Victor Kuznetsov",
                   "Aisha Bello",
                   "Ben Goldberg",
-                  "Lucía Moreno",
+                  "Luc\u00eda Moreno",
                   "Henrik Larsen",
                   "Nikhil Verma",
                   "Joanna Kowalski",
                   "Abhishek  P",
                   "Irene Papadopoulos",
-                  "Diego Fernández",
+                  "Diego Fern\u00e1ndez",
                   "Emily Watson",
                   "Pavel Ivanov",
                   "Maria Santos",
@@ -88038,7 +88121,7 @@
                   "percentage": 0
                 },
                 {
-                  "name": "Kevin O’Neill",
+                  "name": "Kevin O\u2019Neill",
                   "percentage": 0
                 },
                 {
@@ -88114,7 +88197,7 @@
                   "percentage": 0
                 },
                 {
-                  "name": "Megan O’Brien",
+                  "name": "Megan O\u2019Brien",
                   "percentage": 0
                 },
                 {
@@ -88122,7 +88205,7 @@
                   "percentage": 0
                 },
                 {
-                  "name": "Tomáš Novák",
+                  "name": "Tom\u00e1\u0161 Nov\u00e1k",
                   "percentage": 0
                 },
                 {
@@ -88142,7 +88225,7 @@
                   "percentage": 0
                 },
                 {
-                  "name": "Lucía Moreno",
+                  "name": "Luc\u00eda Moreno",
                   "percentage": 0
                 },
                 {
@@ -88166,7 +88249,7 @@
                   "percentage": 0
                 },
                 {
-                  "name": "Diego Fernández",
+                  "name": "Diego Fern\u00e1ndez",
                   "percentage": 0
                 },
                 {
@@ -88602,7 +88685,7 @@
               "manager_notes": ""
             },
             {
-              "name": "Kevin O’Neill",
+              "name": "Kevin O\u2019Neill",
               "risk_level": "low",
               "burnout_score": 0,
               "incident_load": 0,
@@ -88792,7 +88875,7 @@
               "manager_notes": ""
             },
             {
-              "name": "Megan O’Brien",
+              "name": "Megan O\u2019Brien",
               "risk_level": "low",
               "burnout_score": 0.83,
               "incident_load": 0,
@@ -88812,7 +88895,7 @@
               "manager_notes": ""
             },
             {
-              "name": "Tomáš Novák",
+              "name": "Tom\u00e1\u0161 Nov\u00e1k",
               "risk_level": "low",
               "burnout_score": 0,
               "incident_load": 0,
@@ -88862,7 +88945,7 @@
               "manager_notes": ""
             },
             {
-              "name": "Lucía Moreno",
+              "name": "Luc\u00eda Moreno",
               "risk_level": "low",
               "burnout_score": 0,
               "incident_load": 0,
@@ -88922,7 +89005,7 @@
               "manager_notes": ""
             },
             {
-              "name": "Diego Fernández",
+              "name": "Diego Fern\u00e1ndez",
               "risk_level": "low",
               "burnout_score": 0,
               "incident_load": 0,

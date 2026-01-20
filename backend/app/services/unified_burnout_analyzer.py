@@ -1077,8 +1077,11 @@ class UnifiedBurnoutAnalyzer:
             
             # Debug: Log final result structure
             total_analysis_time = (datetime.now() - analysis_start_time).total_seconds()
-            logger.error(f"🏁 CHECKPOINT 7: Analysis COMPLETE - Total time: {total_analysis_time:.2f}s")
-            logger.error(f"🏁 CHECKPOINT 7: Result has {len(result.get('team_members', []))} members, score={result.get('overall_score', 'N/A')}")
+            logger.info(f"🏁 CHECKPOINT 7: Analysis COMPLETE - Total time: {total_analysis_time:.2f}s")
+            team_analysis = result.get('team_analysis', {})
+            members_count = len(team_analysis.get('members', [])) if isinstance(team_analysis, dict) else 0
+            health_score = result.get('team_health', {}).get('overall_score', 'N/A') if isinstance(result.get('team_health'), dict) else 'N/A'
+            logger.info(f"🏁 CHECKPOINT 7: Result has {members_count} members, health_score={health_score}")
 
             return result
             
@@ -1560,6 +1563,9 @@ class UnifiedBurnoutAnalyzer:
         github_username = user.get("github_username")
         linear_user_id = user.get("linear_user_id")
         slack_user_id = user.get("slack_user_id")
+        rootly_user_id = user.get("rootly_user_id")
+        pagerduty_user_id = user.get("pagerduty_user_id")
+        avatar_url = user.get("avatar_url")  # Profile image from PagerDuty/Rootly
 
         # DEBUG: Log integration mappings for this user
         if jira_account_id:
@@ -1607,6 +1613,9 @@ class UnifiedBurnoutAnalyzer:
                 "slack_user_id": slack_user_id,  # Include Slack mapping for logo display
                 "jira_account_id": jira_account_id,  # Include Jira mapping for workload correlation
                 "linear_user_id": linear_user_id,  # Include Linear mapping for logo display
+                "rootly_user_id": rootly_user_id,  # Include Rootly mapping for logo display
+                "pagerduty_user_id": pagerduty_user_id,  # Include PagerDuty mapping for logo display
+                "avatar_url": avatar_url,  # Profile image URL from PagerDuty/Rootly
                 "burnout_score": 0,
                 "ocb_score": round(min(100, composite_ocb['composite_score']), 2),  # Cap display at 100 for UI
                 "risk_level": "low",
@@ -1862,6 +1871,9 @@ class UnifiedBurnoutAnalyzer:
             "slack_user_id": slack_user_id,  # Include Slack mapping
             "jira_account_id": jira_account_id,  # Include Jira mapping
             "linear_user_id": linear_user_id,  # Include Linear mapping
+            "rootly_user_id": rootly_user_id,  # Include Rootly mapping for logo display
+            "pagerduty_user_id": pagerduty_user_id,  # Include PagerDuty mapping for logo display
+            "avatar_url": avatar_url,  # Profile image URL from PagerDuty/Rootly
             "burnout_score": round(burnout_score, 2),
             "ocb_score": round(min(100, composite_ocb['composite_score']), 2),  # Cap display at 100 for UI
             "risk_level": risk_level,

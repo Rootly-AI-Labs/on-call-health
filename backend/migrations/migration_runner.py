@@ -1134,6 +1134,11 @@ class MigrationRunner:
                     """
                 ]
             },
+            {
+                "name": "037_add_avatar_url_to_user_correlations",
+                "description": "Add avatar_url column for profile images from PagerDuty/Rootly",
+                "sql_file": "2026_01_17_add_avatar_url_to_user_correlations.sql"
+            },
             # Add future migrations here with incrementing numbers
         ]
 
