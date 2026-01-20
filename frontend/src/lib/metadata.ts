@@ -11,7 +11,7 @@ export const SITE_CONFIG = {
   description: 'An open source tool that looks for early warning signs of overload in your on-call engineers.',
   url: process.env.NEXT_PUBLIC_SITE_URL || 'https://www.oncallhealth.ai',
   ogImage: '/images/landing/landing_page_preview.png',
-  favicon: '/images/favicon.svg',
+  favicon: '/images/rootly-logo-icon.jpg',
   twitterHandle: '@rootlyhq',
 } as const
 
