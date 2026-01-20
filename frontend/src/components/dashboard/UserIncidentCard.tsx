@@ -67,16 +67,11 @@ function getIncidentUrl(incident: Incident, platform: string): string | null {
     return null
   }
 
-  // For Rootly, construct URL using the incident ID
-  // Rootly URL format: https://app.rootly.com/incidents/{id}
-  if (incident.id) {
-    return `https://app.rootly.com/incidents/${incident.id}`
-  }
-
-  // Try attributes.slug if available
+  // For Rootly, use slug to construct URL
+  // Rootly URL format: https://rootly.com/account/incidents/{slug}
   const slug = incident.attributes?.slug
   if (slug) {
-    return `https://app.rootly.com/incidents/${slug}`
+    return `https://rootly.com/account/incidents/${slug}`
   }
 
   return null
