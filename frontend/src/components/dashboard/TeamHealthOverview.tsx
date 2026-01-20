@@ -1,10 +1,10 @@
 "use client"
 
 import {
-  Heart,
-  Shield,
   BarChart3,
-  Info
+  Heart,
+  Info,
+  Shield
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { AIInsightsCard } from "./insights/AIInsightsCard"
@@ -12,13 +12,6 @@ import { AIInsightsCard } from "./insights/AIInsightsCard"
 interface TeamHealthOverviewProps {
   currentAnalysis: any
   historicalTrends: any
-  expandedDataSources: {
-    incident: boolean
-    github: boolean
-    slack: boolean
-    jira: boolean
-  }
-  setExpandedDataSources: (fn: (prev: any) => any) => void
 }
 
 // Helper to get members array from team analysis
@@ -112,31 +105,9 @@ function hideTooltip(tooltipId: string): void {
   }
 }
 
-// Format duration from milliseconds to human-readable format
-// e.g., "2d 4h", "12h 30m", "45m"
-function formatDuration(ms: number): string {
-  if (!ms || ms <= 0) return ""
-
-  const minutes = Math.floor(ms / (1000 * 60))
-  const hours = Math.floor(minutes / 60)
-  const days = Math.floor(hours / 24)
-
-  const remainingHours = hours % 24
-  const remainingMinutes = minutes % 60
-
-  const parts: string[] = []
-  if (days > 0) parts.push(`${days}d`)
-  if (remainingHours > 0) parts.push(`${remainingHours}h`)
-  if (remainingMinutes > 0 && days === 0) parts.push(`${remainingMinutes}m`)
-
-  return parts.length > 0 ? parts.join(" ") : "<1m"
-}
-
 export function TeamHealthOverview({
   currentAnalysis,
-  historicalTrends,
-  expandedDataSources,
-  setExpandedDataSources
+  historicalTrends
 }: TeamHealthOverviewProps) {
   return (
     <>
@@ -420,12 +391,6 @@ export function TeamHealthOverview({
                   sev2_count: metadataBreakdown.sev2_count || 0,
                   sev3_count: metadataBreakdown.sev3_count || 0,
                   sev4_count: metadataBreakdown.sev4_count || 0,
-                  sev0_duration_ms: metadataBreakdown.sev0_duration_ms || 0,
-                  sev1_duration_ms: metadataBreakdown.sev1_duration_ms || 0,
-                  sev2_duration_ms: metadataBreakdown.sev2_duration_ms || 0,
-                  sev3_duration_ms: metadataBreakdown.sev3_duration_ms || 0,
-                  sev4_duration_ms: metadataBreakdown.sev4_duration_ms || 0,
-                  total_duration_ms: metadataBreakdown.total_duration_ms || 0,
                 };
               } else {
                 // Only aggregate from daily trends if they contain real incident data
@@ -470,18 +435,12 @@ export function TeamHealthOverview({
                       <div className="text-lg font-bold text-red-600">
                         {severityBreakdown.sev1_count}
                       </div>
-                      {severityBreakdown.sev1_duration_ms > 0 && (
-                        <div className="text-[10px] text-red-500 mt-0.5">{formatDuration(severityBreakdown.sev1_duration_ms)}</div>
-                      )}
                     </div>
                     <div className="bg-green-50 rounded-lg p-2 text-center">
                       <div className="text-xs font-semibold text-green-700">Low Urgency</div>
                       <div className="text-lg font-bold text-green-600">
                         {severityBreakdown.sev4_count}
                       </div>
-                      {severityBreakdown.sev4_duration_ms > 0 && (
-                        <div className="text-[10px] text-green-500 mt-0.5">{formatDuration(severityBreakdown.sev4_duration_ms)}</div>
-                      )}
                     </div>
                   </div>
                 ) : (
@@ -493,9 +452,6 @@ export function TeamHealthOverview({
                         <div className="text-lg font-bold text-purple-600">
                           {severityBreakdown.sev0_count}
                         </div>
-                        {severityBreakdown.sev0_duration_ms > 0 && (
-                          <div className="text-[10px] text-purple-500 mt-0.5">{formatDuration(severityBreakdown.sev0_duration_ms)}</div>
-                        )}
                       </div>
                     )}
                     <div className="bg-red-50 rounded-lg p-2 text-center">
@@ -503,60 +459,28 @@ export function TeamHealthOverview({
                       <div className="text-lg font-bold text-red-600">
                         {severityBreakdown.sev1_count}
                       </div>
-                      {severityBreakdown.sev1_duration_ms > 0 && (
-                        <div className="text-[10px] text-red-500 mt-0.5">{formatDuration(severityBreakdown.sev1_duration_ms)}</div>
-                      )}
                     </div>
                     <div className="bg-orange-50 rounded-lg p-2 text-center">
                       <div className="text-xs font-semibold text-orange-600">SEV2</div>
                       <div className="text-lg font-bold text-orange-600">
                         {severityBreakdown.sev2_count}
                       </div>
-                      {severityBreakdown.sev2_duration_ms > 0 && (
-                        <div className="text-[10px] text-orange-500 mt-0.5">{formatDuration(severityBreakdown.sev2_duration_ms)}</div>
-                      )}
                     </div>
                     <div className="bg-yellow-50 rounded-lg p-2 text-center">
                       <div className="text-xs font-semibold text-yellow-600">SEV3</div>
                       <div className="text-lg font-bold text-yellow-600">
                         {severityBreakdown.sev3_count}
                       </div>
-                      {severityBreakdown.sev3_duration_ms > 0 && (
-                        <div className="text-[10px] text-yellow-600 mt-0.5">{formatDuration(severityBreakdown.sev3_duration_ms)}</div>
-                      )}
                     </div>
                     <div className="bg-green-50 rounded-lg p-2 text-center">
                       <div className="text-xs font-semibold text-green-600">SEV4</div>
                       <div className="text-lg font-bold text-green-600">
                         {severityBreakdown.sev4_count}
                       </div>
-                      {severityBreakdown.sev4_duration_ms > 0 && (
-                        <div className="text-[10px] text-green-500 mt-0.5">{formatDuration(severityBreakdown.sev4_duration_ms)}</div>
-                      )}
                     </div>
                   </div>
                 )
               );
-            })()}
-            {(() => {
-              // Show total incident duration from severity_breakdown if available
-              const totalDurationMs = (currentAnalysis.analysis_data as any)?.metadata?.severity_breakdown?.total_duration_ms;
-              if (totalDurationMs && totalDurationMs > 0) {
-                return (
-                  <p className="text-xs text-neutral-700 mt-2">
-                    Total incident time: {formatDuration(totalDurationMs)}
-                  </p>
-                );
-              }
-              // Fallback to session_hours if available
-              if (currentAnalysis.analysis_data?.session_hours !== undefined) {
-                return (
-                  <p className="text-xs text-neutral-700 mt-1">
-                    {currentAnalysis.analysis_data.session_hours?.toFixed(1) || '0.0'} total hours
-                  </p>
-                );
-              }
-              return null;
             })()}
           </CardContent>
         </Card>

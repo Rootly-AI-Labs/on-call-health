@@ -234,87 +234,36 @@ def slim_incidents(incidents: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return slimmed
 
 
-def _calculate_incident_duration_ms(incident: Dict[str, Any]) -> Optional[int]:
-    """
-    Calculate incident duration in milliseconds.
-
-    Uses resolved_at if available, otherwise mitigated_at.
-    Returns None if incident is ongoing or timestamps are invalid.
-
-    Args:
-        incident: Incident object with timestamps
-
-    Returns:
-        Duration in milliseconds, or None if cannot be calculated
-    """
-    from datetime import datetime
-
-    attrs = incident.get('attributes', incident)
-
-    # Get start time (prefer started_at over created_at)
-    start_str = attrs.get('started_at') or attrs.get('created_at')
-    # Get end time (prefer resolved_at over mitigated_at)
-    end_str = attrs.get('resolved_at') or attrs.get('mitigated_at')
-
-    if not start_str or not end_str:
-        return None  # Incident is ongoing or missing timestamps
-
-    try:
-        # Parse ISO format timestamps
-        start_time = datetime.fromisoformat(start_str.replace('Z', '+00:00'))
-        end_time = datetime.fromisoformat(end_str.replace('Z', '+00:00'))
-
-        duration = end_time - start_time
-        duration_ms = int(duration.total_seconds() * 1000)
-
-        return duration_ms if duration_ms > 0 else None
-    except (ValueError, AttributeError):
-        return None
-
-
 def calculate_severity_breakdown(incidents: List[Dict[str, Any]]) -> Dict[str, Any]:
     """
-    Calculate severity breakdown counts and durations from a list of incidents.
+    Calculate severity breakdown counts from a list of incidents.
 
-    Counts incidents by severity level (SEV0-SEV4) and calculates total duration
-    for each severity level (in milliseconds) for analytics and reporting.
+    Counts incidents by severity level (SEV0-SEV4) for analytics and reporting.
 
     Args:
         incidents: List of incident objects with attributes.severity data
 
     Returns:
-        Dictionary with severity counts and durations:
+        Dictionary with severity counts:
         {
             "sev0_count": 0,
             "sev1_count": 0,
             "sev2_count": 0,
             "sev3_count": 0,
-            "sev4_count": 0,
-            "sev0_duration_ms": 0,
-            "sev1_duration_ms": 0,
-            "sev2_duration_ms": 0,
-            "sev3_duration_ms": 0,
-            "sev4_duration_ms": 0,
-            "total_duration_ms": 0
+            "sev4_count": 0
         }
 
     Example:
         >>> incidents = [{"attributes": {"severity": {"data": {"attributes": {"name": "SEV1"}}}}}]
         >>> calculate_severity_breakdown(incidents)
-        {'sev0_count': 0, 'sev1_count': 1, ..., 'sev1_duration_ms': 3600000, ...}
+        {'sev0_count': 0, 'sev1_count': 1, 'sev2_count': 0, 'sev3_count': 0, 'sev4_count': 0}
     """
     severity_counts = {
         "sev0_count": 0,
         "sev1_count": 0,
         "sev2_count": 0,
         "sev3_count": 0,
-        "sev4_count": 0,
-        "sev0_duration_ms": 0,
-        "sev1_duration_ms": 0,
-        "sev2_duration_ms": 0,
-        "sev3_duration_ms": 0,
-        "sev4_duration_ms": 0,
-        "total_duration_ms": 0
+        "sev4_count": 0
     }
 
     for incident in incidents:
@@ -377,21 +326,11 @@ def calculate_severity_breakdown(incidents: List[Dict[str, Any]]) -> Dict[str, A
                 }
                 severity_name = severity_map.get(severity_name.lower(), "sev4")
 
-            # Calculate duration for this incident
-            duration_ms = _calculate_incident_duration_ms(incident)
-
-            # Normalize "emergency" to "sev0"
-            if severity_name == "emergency":
-                severity_name = "sev0"
-
             # Map severity to bucket (default to sev4 for unknown severities)
             sev_bucket = severity_name if severity_name in ("sev0", "sev1", "sev2", "sev3") else "sev4"
 
-            # Increment count and duration for the severity bucket
+            # Increment count for the severity bucket
             severity_counts[f"{sev_bucket}_count"] += 1
-            if duration_ms:
-                severity_counts[f"{sev_bucket}_duration_ms"] += duration_ms
-                severity_counts["total_duration_ms"] += duration_ms
 
         except Exception as e:
             logger.debug(f"Error counting severity for incident: {e}")

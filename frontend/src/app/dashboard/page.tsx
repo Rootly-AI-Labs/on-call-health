@@ -675,8 +675,6 @@ function DashboardContent() {
               <TeamHealthOverview
                 currentAnalysis={currentAnalysis}
                 historicalTrends={historicalTrends}
-                expandedDataSources={expandedDataSources}
-                setExpandedDataSources={setExpandedDataSources}
               />
 
 
