@@ -347,20 +347,50 @@ class GitHubCollector:
             logger.info(f"📊 [GITHUB_API_RESPONSE] {username} PRs response: total_count={total_prs}, incomplete_results={prs_data.get('incomplete_results', 'N/A') if prs_data else 'N/A'}")
 
             logger.info(f"✅ [GITHUB_API_SUCCESS] {username} ({email}): {total_commits} commits, {total_prs} PRs")
-            
-            # For now, estimate other metrics based on commits/PRs
-            # In a full implementation, we'd make additional API calls
-            after_hours_commits = int(total_commits * 0.15)  # Estimate 15% after hours
-            weekend_commits = int(total_commits * 0.1)       # Estimate 10% weekend
+
+            # Fetch detailed daily commit data with timestamps
+            logger.debug(f"🔄 Fetching detailed daily commit data for {username}")
+            daily_commits_data = await self.fetch_daily_commit_data(username, start_date, end_date, token)
+
+            # Build commits array from daily data for timeline processing
+            commits_array = []
+            after_hours_commits = 0
+            weekend_commits = 0
+            if daily_commits_data:
+                for daily in daily_commits_data:
+                    # Create a timestamp for aggregation at midnight of that date
+                    date_str = daily.get('date', '')
+                    if date_str:
+                        # Create timestamps for this day's after-hours commits
+                        date_obj = datetime.fromisoformat(date_str)
+                        after_hours_count = daily.get('after_hours_commits', 0)
+                        weekend_count = daily.get('weekend_commits', 0)
+
+                        # Generate individual commit timestamps for after-hours and weekend commits
+                        for i in range(after_hours_count):
+                            # Distribute after-hours commits across after-business-hours times (22:00 - 23:59 or 00:00 - 08:59)
+                            hour = 22 + (i % 2)  # Alternate between 22 and 23
+                            minute = (i * 17) % 60  # Distribute by minute
+                            commit_dt = date_obj.replace(hour=hour, minute=minute).isoformat() + 'Z'
+                            commits_array.append({"timestamp": commit_dt})
+
+                        after_hours_commits += after_hours_count
+                        weekend_commits += weekend_count
+
+            # Fall back to estimates if we couldn't fetch detailed data
+            if not daily_commits_data:
+                after_hours_commits = int(total_commits * 0.15)  # Estimate 15% after hours
+                weekend_commits = int(total_commits * 0.1)       # Estimate 10% weekend
+
             total_reviews = int(total_prs * 1.5)             # Estimate 1.5 reviews per PR
-            
+
             days_analyzed = (end_date - start_date).days
             weeks = days_analyzed / 7
-            
+
             # Calculate percentages
             after_hours_percentage = (after_hours_commits / total_commits) if total_commits > 0 else 0
             weekend_percentage = (weekend_commits / total_commits) if total_commits > 0 else 0
-            
+
             # Generate burnout indicators
             commits_per_week = total_commits / weeks if weeks > 0 else 0
             burnout_indicators = {
@@ -369,7 +399,7 @@ class GitHubCollector:
                 "weekend_work": weekend_percentage > 0.15,
                 "large_prs": total_prs > 0 and (total_commits / max(total_prs, 1)) > 10
             }
-            
+
             return {
                 'username': username,
                 'email': email,
@@ -399,7 +429,8 @@ class GitHubCollector:
                     'weekend_commits': weekend_commits,
                     'avg_pr_size': int(total_commits / max(total_prs, 1)) if total_prs > 0 else 50,
                     'burnout_indicators': burnout_indicators
-                }
+                },
+                'commits': commits_array
             }
             
         except Exception as e:
@@ -596,35 +627,35 @@ class GitHubCollector:
     
     def _generate_mock_github_data(self, username: str, email: str, start_date: datetime, end_date: datetime) -> Dict:
         """Generate realistic mock GitHub data for testing."""
-        
+
         # Generate some realistic activity
         import random
-        
+
         days_analyzed = (end_date - start_date).days
-        
+
         # Base activity levels (some users more active than others)
         activity_multiplier = random.choice([0.5, 0.8, 1.0, 1.2, 1.5])
-        
+
         # Generate commits
         total_commits = int(random.randint(10, 50) * activity_multiplier)
         after_hours_commits = int(total_commits * random.uniform(0.1, 0.3))
         weekend_commits = int(total_commits * random.uniform(0.05, 0.2))
-        
+
         # Generate PRs
         total_prs = int(random.randint(2, 15) * activity_multiplier)
-        
+
         # Generate reviews
         total_reviews = int(random.randint(5, 25) * activity_multiplier)
-        
+
         # Calculate weekly averages
         weeks = days_analyzed / 7
         commits_per_week = total_commits / weeks if weeks > 0 else 0
         prs_per_week = total_prs / weeks if weeks > 0 else 0
-        
+
         # Calculate percentages
         after_hours_percentage = (after_hours_commits / total_commits) if total_commits > 0 else 0
         weekend_percentage = (weekend_commits / total_commits) if total_commits > 0 else 0
-        
+
         # Generate burnout indicators
         burnout_indicators = {
             "excessive_commits": commits_per_week > 15,
@@ -632,7 +663,22 @@ class GitHubCollector:
             "weekend_work": weekend_percentage > 0.15,
             "large_prs": random.choice([True, False])  # Simplified
         }
-        
+
+        # Generate mock commit objects with timestamps
+        commits_array = []
+        current_date = start_date
+        remaining_after_hours = after_hours_commits
+        while current_date <= end_date and remaining_after_hours > 0:
+            # Add some after-hours commits to this day
+            commits_today = random.randint(1, min(3, remaining_after_hours))
+            for i in range(commits_today):
+                hour = 22 + (i % 2)  # Alternate between 22 and 23
+                minute = (i * 17) % 60
+                commit_dt = current_date.replace(hour=hour, minute=minute).isoformat() + 'Z'
+                commits_array.append({"timestamp": commit_dt})
+                remaining_after_hours -= 1
+            current_date += timedelta(days=1)
+
         return {
             'username': username,
             'email': email,
@@ -663,7 +709,8 @@ class GitHubCollector:
                 'weekend_commits': weekend_commits,
                 'avg_pr_size': random.randint(50, 300),
                 'burnout_indicators': burnout_indicators
-            }
+            },
+            'commits': commits_array
         }
     
     def _is_business_hours(self, dt: datetime) -> bool:

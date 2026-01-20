@@ -2428,6 +2428,8 @@ async def get_member_daily_health(
         # Build factors for detailed tooltips (consistent regardless of calculation method)
         severity_weighted = day_data.get("severity_weighted_count", 0.0)
         after_hours_count = day_data.get("after_hours_count", 0)
+        after_hours_incidents_count = day_data.get("after_hours_incidents_count", 0)
+        github_after_hours_count = day_data.get("github_after_hours_count", 0)
         weekend_count = day_data.get("weekend_count", 0)
         high_severity_count = day_data.get("high_severity_count", 0)
         
@@ -2454,6 +2456,8 @@ async def get_member_daily_health(
             # Metric counts for User Objective Data dropdown
             "severity_weighted_count": severity_weighted,
             "after_hours_count": after_hours_count,
+            "after_hours_incidents_count": after_hours_incidents_count,
+            "github_after_hours_count": github_after_hours_count,
             "weekend_count": weekend_count,
             # Enhanced data for tooltips
             "severity_breakdown": severity_breakdown,
