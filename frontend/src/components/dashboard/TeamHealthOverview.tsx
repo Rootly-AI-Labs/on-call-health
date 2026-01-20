@@ -4,11 +4,6 @@ import {
   Heart,
   Shield,
   BarChart3,
-  Database,
-  CheckCircle,
-  Minus,
-  ChevronDown,
-  ChevronRight,
   Info
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -115,6 +110,26 @@ function hideTooltip(tooltipId: string): void {
     tooltip.classList.add('invisible', 'opacity-0')
     tooltip.classList.remove('visible', 'opacity-100')
   }
+}
+
+// Format duration from milliseconds to human-readable format
+// e.g., "2d 4h", "12h 30m", "45m"
+function formatDuration(ms: number): string {
+  if (!ms || ms <= 0) return ""
+
+  const minutes = Math.floor(ms / (1000 * 60))
+  const hours = Math.floor(minutes / 60)
+  const days = Math.floor(hours / 24)
+
+  const remainingHours = hours % 24
+  const remainingMinutes = minutes % 60
+
+  const parts: string[] = []
+  if (days > 0) parts.push(`${days}d`)
+  if (remainingHours > 0) parts.push(`${remainingHours}h`)
+  if (remainingMinutes > 0 && days === 0) parts.push(`${remainingMinutes}m`)
+
+  return parts.length > 0 ? parts.join(" ") : "<1m"
 }
 
 export function TeamHealthOverview({
@@ -247,87 +262,7 @@ export function TeamHealthOverview({
                     </div>
                     <div className="text-xs text-gray-500">/100</div>
                   </div>
-                  {(() => {
-                    // Remove average section completely
-                    return false
-                  })() && (
-                      <div className="hidden">
-                        <div className="text-2xl font-bold text-neutral-900 flex items-baseline space-x-1">{(() => {
-                          // PRIORITY 1: Use OCH risk levels for meaningful 30-day average (same as current calculation)
-                          const teamAnalysis = currentAnalysis?.analysis_data?.team_analysis;
-                          const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members;
-
-                          if (members && members.length > 0) {
-                            // Only include on-call members (those with incidents during the analysis period)
-                            const onCallMembers = members.filter((m: any) => m.incident_count > 0);
-                            
-                            const ocbScores = onCallMembers
-                              .map((m: any) => m.ocb_score)
-                              .filter((s: any) => s !== undefined && s !== null && s > 0);
-
-                            if (ocbScores.length > 0) {
-                              const avgOcbScore = ocbScores.reduce((a: number, b: number) => a + b, 0) / ocbScores.length;
-                              const roundedScore = Math.round(avgOcbScore * 10) / 10;
-
-                              return (
-                                <>
-                                  <span>{roundedScore}</span>
-                                  <span
-                                    className="text-xs text-neutral-500 cursor-help ml-1"
-                                    onMouseEnter={(e) => {
-                                      const tooltip = document.getElementById('ocb-score-tooltip')
-                                      if (tooltip) {
-                                        const rect = e.currentTarget.getBoundingClientRect()
-                                        tooltip.style.top = `${rect.top - 180}px`
-                                        tooltip.style.left = `${rect.left - 120}px`
-                                        tooltip.classList.remove('invisible', 'opacity-0')
-                                        tooltip.classList.add('visible', 'opacity-100')
-                                      }
-                                    }}
-                                    onMouseLeave={() => {
-                                      const tooltip = document.getElementById('ocb-score-tooltip')
-                                      if (tooltip) {
-                                        tooltip.classList.add('invisible', 'opacity-0')
-                                        tooltip.classList.remove('visible', 'opacity-100')
-                                      }
-                                    }}
-                                  >
-                                    Risk Level
-                                  </span>
-                                </>
-                              );
-                            }
-                          }
-
-                          // PRIORITY 2: Fallback to backend historical data if no OCH risk levels
-
-                          // Calculate average from Health Trends chart data (legacy method)
-                          if (historicalTrends?.daily_trends?.length > 0) {
-                            const dailyScores = historicalTrends.daily_trends.map((d: any) => d.overall_score);
-                            const average = dailyScores.reduce((a: number, b: number) => a + b, 0) / dailyScores.length;
-
-                            return `${Math.round(average * 10)}%`; // Convert 0-10 to 0-100%
-                          }
-
-                          // Fallback: Calculate from current analysis daily trends  
-                          if (currentAnalysis?.analysis_data?.daily_trends?.length > 0) {
-                            const dailyScores = currentAnalysis.analysis_data.daily_trends.map((d: any) => d.overall_score);
-                            const average = dailyScores.reduce((a: number, b: number) => a + b, 0) / dailyScores.length;
-
-                            return `${Math.round(average * 10)}%`; // Convert 0-10 to 0-100%
-                          }
-
-                          // Use current score if daily trends are empty but historical available
-                          if (historicalTrends?.daily_trends?.length > 0) {
-                            const latestTrend = historicalTrends.daily_trends[historicalTrends.daily_trends.length - 1];
-                            return `${Math.round(latestTrend.overall_score * 10)}%`;
-                          }
-                          return "No data";
-                        })()}</div>
-                        <div className="text-xs text-neutral-500">{currentAnalysis?.time_range || 30}-day avg</div>
-                      </div>
-                    )}
-                </div>
+                  </div>
                 <div className="mt-2 flex items-center space-x-1">
                   <div className="text-sm font-medium text-purple-600">
                     {getHealthStatusLabel(getHealthPercentage(currentAnalysis, historicalTrends))}
@@ -339,53 +274,7 @@ export function TeamHealthOverview({
                   />
                 </div>
                 <p className="text-xs text-neutral-700 mt-1">
-                  {(() => {
-                    // Use the same health calculation logic for consistency 
-                    const getCurrentHealthPercentage = () => {
-                      const teamAnalysis = currentAnalysis?.analysis_data?.team_analysis;
-                      const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members;
-
-                      if (members && members.length > 0) {
-                        // Only include on-call members (those with incidents during the analysis period)
-                        const onCallMembers = members.filter((m: any) => m.incident_count > 0);
-                        
-                        if (onCallMembers.length > 0) {
-                          const ocbScores = onCallMembers.map((m: any) => m.ocb_score).filter((s: any) => s !== undefined && s !== null);
-                          
-                          if (ocbScores.length > 0) {
-                            const avgOcbScore = ocbScores.reduce((a: number, b: number) => a + b, 0) / ocbScores.length;
-                            return avgOcbScore; // Return raw OCH risk level
-                          }
-                        }
-
-                        // No OCH risk levels - return null
-                      }
-
-                      // Fallback to legacy daily trends logic
-                      if (historicalTrends?.daily_trends?.length > 0) {
-                        const latestTrend = historicalTrends.daily_trends[historicalTrends.daily_trends.length - 1];
-                        return latestTrend.overall_score * 10;
-                      } else if (currentAnalysis?.analysis_data?.daily_trends?.length > 0) {
-                        const latestTrend = currentAnalysis.analysis_data.daily_trends[currentAnalysis.analysis_data.daily_trends.length - 1];
-                        return latestTrend.overall_score * 10;
-                      }
-
-                      return 50; // Default middle value
-                    };
-
-                    const ocbScore = getCurrentHealthPercentage();
-
-                    // Match OCH risk level ranges and descriptions (0-100, higher = more overwork)
-                    if (ocbScore < 25) {
-                      return 'Sustainable workload'  // Healthy
-                    } else if (ocbScore < 50) {
-                      return 'Monitor for trends'    // Fair
-                    } else if (ocbScore < 75) {
-                      return 'Consider intervention' // Poor
-                    } else {
-                      return 'Action needed'         // Critical
-                    }
-                  })()}
+                  {getHealthStatusDescription(getHealthPercentage(currentAnalysis, historicalTrends))}
                 </p>
               </div>
             ) : (
@@ -530,7 +419,13 @@ export function TeamHealthOverview({
                   sev1_count: metadataBreakdown.sev1_count || 0,
                   sev2_count: metadataBreakdown.sev2_count || 0,
                   sev3_count: metadataBreakdown.sev3_count || 0,
-                  sev4_count: metadataBreakdown.sev4_count || 0
+                  sev4_count: metadataBreakdown.sev4_count || 0,
+                  sev0_duration_ms: metadataBreakdown.sev0_duration_ms || 0,
+                  sev1_duration_ms: metadataBreakdown.sev1_duration_ms || 0,
+                  sev2_duration_ms: metadataBreakdown.sev2_duration_ms || 0,
+                  sev3_duration_ms: metadataBreakdown.sev3_duration_ms || 0,
+                  sev4_duration_ms: metadataBreakdown.sev4_duration_ms || 0,
+                  total_duration_ms: metadataBreakdown.total_duration_ms || 0,
                 };
               } else {
                 // Only aggregate from daily trends if they contain real incident data
@@ -575,12 +470,18 @@ export function TeamHealthOverview({
                       <div className="text-lg font-bold text-red-600">
                         {severityBreakdown.sev1_count}
                       </div>
+                      {severityBreakdown.sev1_duration_ms > 0 && (
+                        <div className="text-[10px] text-red-500 mt-0.5">{formatDuration(severityBreakdown.sev1_duration_ms)}</div>
+                      )}
                     </div>
                     <div className="bg-green-50 rounded-lg p-2 text-center">
                       <div className="text-xs font-semibold text-green-700">Low Urgency</div>
                       <div className="text-lg font-bold text-green-600">
                         {severityBreakdown.sev4_count}
                       </div>
+                      {severityBreakdown.sev4_duration_ms > 0 && (
+                        <div className="text-[10px] text-green-500 mt-0.5">{formatDuration(severityBreakdown.sev4_duration_ms)}</div>
+                      )}
                     </div>
                   </div>
                 ) : (
@@ -592,6 +493,9 @@ export function TeamHealthOverview({
                         <div className="text-lg font-bold text-purple-600">
                           {severityBreakdown.sev0_count}
                         </div>
+                        {severityBreakdown.sev0_duration_ms > 0 && (
+                          <div className="text-[10px] text-purple-500 mt-0.5">{formatDuration(severityBreakdown.sev0_duration_ms)}</div>
+                        )}
                       </div>
                     )}
                     <div className="bg-red-50 rounded-lg p-2 text-center">
@@ -599,151 +503,65 @@ export function TeamHealthOverview({
                       <div className="text-lg font-bold text-red-600">
                         {severityBreakdown.sev1_count}
                       </div>
+                      {severityBreakdown.sev1_duration_ms > 0 && (
+                        <div className="text-[10px] text-red-500 mt-0.5">{formatDuration(severityBreakdown.sev1_duration_ms)}</div>
+                      )}
                     </div>
                     <div className="bg-orange-50 rounded-lg p-2 text-center">
                       <div className="text-xs font-semibold text-orange-600">SEV2</div>
                       <div className="text-lg font-bold text-orange-600">
                         {severityBreakdown.sev2_count}
                       </div>
+                      {severityBreakdown.sev2_duration_ms > 0 && (
+                        <div className="text-[10px] text-orange-500 mt-0.5">{formatDuration(severityBreakdown.sev2_duration_ms)}</div>
+                      )}
                     </div>
                     <div className="bg-yellow-50 rounded-lg p-2 text-center">
                       <div className="text-xs font-semibold text-yellow-600">SEV3</div>
                       <div className="text-lg font-bold text-yellow-600">
                         {severityBreakdown.sev3_count}
                       </div>
+                      {severityBreakdown.sev3_duration_ms > 0 && (
+                        <div className="text-[10px] text-yellow-600 mt-0.5">{formatDuration(severityBreakdown.sev3_duration_ms)}</div>
+                      )}
                     </div>
                     <div className="bg-green-50 rounded-lg p-2 text-center">
                       <div className="text-xs font-semibold text-green-600">SEV4</div>
                       <div className="text-lg font-bold text-green-600">
                         {severityBreakdown.sev4_count}
                       </div>
+                      {severityBreakdown.sev4_duration_ms > 0 && (
+                        <div className="text-[10px] text-green-500 mt-0.5">{formatDuration(severityBreakdown.sev4_duration_ms)}</div>
+                      )}
                     </div>
                   </div>
                 )
               );
             })()}
-            {currentAnalysis.analysis_data?.session_hours !== undefined && (
-              <p className="text-xs text-neutral-700 mt-1">
-                {currentAnalysis.analysis_data.session_hours?.toFixed(1) || '0.0'} total hours
-              </p>
-            )}
+            {(() => {
+              // Show total incident duration from severity_breakdown if available
+              const totalDurationMs = (currentAnalysis.analysis_data as any)?.metadata?.severity_breakdown?.total_duration_ms;
+              if (totalDurationMs && totalDurationMs > 0) {
+                return (
+                  <p className="text-xs text-neutral-700 mt-2">
+                    Total incident time: {formatDuration(totalDurationMs)}
+                  </p>
+                );
+              }
+              // Fallback to session_hours if available
+              if (currentAnalysis.analysis_data?.session_hours !== undefined) {
+                return (
+                  <p className="text-xs text-neutral-700 mt-1">
+                    {currentAnalysis.analysis_data.session_hours?.toFixed(1) || '0.0'} total hours
+                  </p>
+                );
+              }
+              return null;
+            })()}
           </CardContent>
         </Card>
 
-        {/* Data Sources Card - COMMENTED OUT */}
-        {false && (
-        <Card className="border border-neutral-300">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-blue-700 flex items-center space-x-2">
-              <Database className="w-4 h-4" />
-              <span>Data Sources</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {/* Incident Data */}
-              <div className="space-y-2">
-                <div
-                  className="flex items-center cursor-pointer hover:bg-neutral-100 rounded px-1 py-0.5 transition-colors"
-                  onClick={() => setExpandedDataSources(prev => ({ ...prev, incident: !prev.incident }))}
-                >
-                  {expandedDataSources.incident ?
-                    <ChevronDown className="w-3 h-3 mr-1 text-neutral-500" /> :
-                    <ChevronRight className="w-3 h-3 mr-1 text-neutral-500" />
-                  }
-                  <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
-                  <span className="text-xs font-medium text-slate-700 flex-1">Incident Management</span>
-                  <CheckCircle className="w-3 h-3 text-green-600 ml-2" />
-                </div>
-                {expandedDataSources.incident && (
-                  <div className="ml-7 text-xs text-neutral-700 space-y-1">
-                    <div>• {(currentAnalysis?.analysis_data as any)?.metadata?.total_incidents || 0} incidents</div>
-                    <div>• {(currentAnalysis?.analysis_data as any)?.team_analysis?.members?.length || 0} users</div>
-                  </div>
-                )}
-              </div>
-
-              {/* GitHub Data */}
-              <div className="space-y-2">
-                <div
-                  className="flex items-center cursor-pointer hover:bg-neutral-100 rounded px-1 py-0.5 transition-colors"
-                  onClick={() => setExpandedDataSources(prev => ({ ...prev, github: !prev.github }))}
-                >
-                  {expandedDataSources.github ?
-                    <ChevronDown className="w-3 h-3 mr-1 text-neutral-500" /> :
-                    <ChevronRight className="w-3 h-3 mr-1 text-neutral-500" />
-                  }
-                  <div className="w-2 h-2 bg-neutral-900 rounded-full mr-2"></div>
-                  <span className="text-xs font-medium text-slate-700 flex-1">GitHub Activity</span>
-                  {currentAnalysis?.analysis_data?.data_sources?.github_data ? (
-                    <CheckCircle className="w-3 h-3 text-green-600 ml-2" />
-                  ) : (
-                    <Minus className="w-3 h-3 text-neutral-500 ml-2" />
-                  )}
-                </div>
-                {expandedDataSources.github && currentAnalysis?.analysis_data?.data_sources?.github_data && (
-                  <div className="ml-7 text-xs text-neutral-700 space-y-1">
-                    <div>• {currentAnalysis?.analysis_data?.github_insights?.total_commits?.toLocaleString() || '0'} commits</div>
-                    <div>• {currentAnalysis?.analysis_data?.github_insights?.total_pull_requests?.toLocaleString() || '0'} PRs</div>
-                  </div>
-                )}
-              </div>
-
-              {/* Slack Data - DISABLED: Feature not ready for production */}
-              {/* {currentAnalysis?.analysis_data?.data_sources?.slack_data && (
-                <div className="space-y-2">
-                  <div
-                    className="flex items-center cursor-pointer hover:bg-neutral-100 rounded px-1 py-0.5 transition-colors"
-                    onClick={() => setExpandedDataSources(prev => ({ ...prev, slack: !prev.slack }))}
-                  >
-                    {expandedDataSources.slack ?
-                      <ChevronDown className="w-3 h-3 mr-1 text-neutral-500" /> :
-                      <ChevronRight className="w-3 h-3 mr-1 text-neutral-500" />
-                    }
-                    <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
-                    <span className="text-xs font-medium text-slate-700 flex-1">Slack Communications</span>
-                    <CheckCircle className="w-3 h-3 text-green-600 ml-2" />
-                  </div>
-                  {expandedDataSources.slack && (
-                    <div className="ml-7 text-xs text-neutral-700 space-y-1">
-                      <div>• {currentAnalysis?.analysis_data?.slack_insights?.total_messages?.toLocaleString() || '0'} messages</div>
-                      <div>• {currentAnalysis?.analysis_data?.slack_insights?.active_channels?.toLocaleString() || '0'} channels</div>
-                    </div>
-                  )}
-                </div>
-              )} */}
-
-              {/* Jira Data */}
-              <div className="space-y-2">
-                <div
-                  className="flex items-center cursor-pointer hover:bg-neutral-100 rounded px-1 py-0.5 transition-colors"
-                  onClick={() => setExpandedDataSources(prev => ({ ...prev, jira: !prev.jira }))}
-                >
-                  {expandedDataSources.jira ?
-                    <ChevronDown className="w-3 h-3 mr-1 text-neutral-500" /> :
-                    <ChevronRight className="w-3 h-3 mr-1 text-neutral-500" />
-                  }
-                  <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
-                  <span className="text-xs font-medium text-slate-700 flex-1">Jira Issues</span>
-                  {currentAnalysis?.analysis_data?.data_sources?.jira_data ? (
-                    <CheckCircle className="w-3 h-3 text-green-600 ml-2" />
-                  ) : (
-                    <Minus className="w-3 h-3 text-neutral-500 ml-2" />
-                  )}
-                </div>
-                {expandedDataSources.jira && currentAnalysis?.analysis_data?.data_sources?.jira_data && (
-                  <div className="ml-7 text-xs text-neutral-700 space-y-1">
-                    <div>• {currentAnalysis?.analysis_data?.jira_insights?.total_issues?.toLocaleString() || '0'} issues</div>
-                    <div>• {currentAnalysis?.analysis_data?.jira_insights?.active_projects?.toLocaleString() || '0'} projects</div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        )}
-
-        {/* AI Insights Card - Replaces Data Sources */}
+        {/* AI Insights Card */}
         <AIInsightsCard currentAnalysis={currentAnalysis} />
       </div>
     </>
