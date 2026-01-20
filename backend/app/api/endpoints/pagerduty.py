@@ -4,9 +4,8 @@ PagerDuty integration API endpoints.
 
 import asyncio
 from datetime import datetime
-from typing import List, Optional
-import os
 import logging
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -24,31 +23,29 @@ logger = logging.getLogger(__name__)
 _permissions_cache = {}
 PERMISSIONS_CACHE_TTL = 60  # Cache for 60 seconds
 
-def get_cached_permissions(integration_id: int):
+def get_cached_permissions(integration_id: int) -> Optional[dict]:
     """Get cached permissions if still valid."""
     if integration_id not in _permissions_cache:
         return None
 
     cached = _permissions_cache[integration_id]
-    from datetime import datetime
     cache_age = (datetime.now() - cached['timestamp']).total_seconds()
 
     if cache_age > PERMISSIONS_CACHE_TTL:
-        # Cache expired
         del _permissions_cache[integration_id]
         return None
 
-    logger.info(f"🔍 [CACHE] Using cached PagerDuty permissions for integration {integration_id} (age: {cache_age:.1f}s)")
+    logger.info(f"Using cached PagerDuty permissions for integration {integration_id} (age: {cache_age:.1f}s)")
     return cached['permissions']
 
-def set_cached_permissions(integration_id: int, permissions: dict):
+
+def set_cached_permissions(integration_id: int, permissions: dict) -> None:
     """Cache permissions for an integration."""
-    from datetime import datetime
     _permissions_cache[integration_id] = {
         'permissions': permissions,
         'timestamp': datetime.now()
     }
-    logger.info(f"🔍 [CACHE] Cached PagerDuty permissions for integration {integration_id}")
+    logger.info(f"Cached PagerDuty permissions for integration {integration_id}")
 
 class TokenTestRequest(BaseModel):
     token: str
@@ -185,7 +182,7 @@ async def test_pagerduty_token(
 async def get_pagerduty_integrations(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
-):
+) -> dict:
     """Get all PagerDuty integrations for the current user."""
     integrations = db.query(RootlyIntegration).filter(
         and_(
@@ -194,71 +191,76 @@ async def get_pagerduty_integrations(
         )
     ).all()
 
-    # Build base integration data and identify which need permission checks
     integration_data_list = []
     uncached_integrations = []
 
-    for i in integrations:
-        integration_data = {
-            "id": i.id,
-            "name": i.name,
-            "organization_name": i.organization_name,
-            "total_users": i.total_users,
-            "is_default": i.is_default,
-            "created_at": i.created_at.isoformat(),
-            "last_used_at": i.last_used_at.isoformat() if i.last_used_at else None,
-            "token_suffix": f"****{i.api_token[-4:]}" if i.api_token and len(i.api_token) >= 4 else "****",
-            "platform": i.platform
+    for integration in integrations:
+        has_valid_token = integration.api_token and len(integration.api_token) >= 4
+        token_suffix = f"****{integration.api_token[-4:]}" if has_valid_token else "****"
+
+        data = {
+            "id": integration.id,
+            "name": integration.name,
+            "organization_name": integration.organization_name,
+            "total_users": integration.total_users,
+            "is_default": integration.is_default,
+            "created_at": integration.created_at.isoformat(),
+            "last_used_at": integration.last_used_at.isoformat() if integration.last_used_at else None,
+            "token_suffix": token_suffix,
+            "platform": integration.platform
         }
 
-        # Check for cached permissions first
-        cached_permissions = get_cached_permissions(i.id)
+        cached_permissions = get_cached_permissions(integration.id)
         if cached_permissions:
-            integration_data["permissions"] = cached_permissions
-        elif i.api_token:
-            # Mark for parallel fetch
-            uncached_integrations.append((i.id, i.api_token, len(integration_data_list)))
+            data["permissions"] = cached_permissions
+        elif integration.api_token:
+            uncached_integrations.append((integration.id, integration.api_token, len(integration_data_list)))
 
-        integration_data_list.append(integration_data)
+        integration_data_list.append(data)
 
-    # Fetch uncached permissions in parallel
     if uncached_integrations:
-        async def fetch_permissions(integration_id: int, api_token: str, index: int):
-            try:
-                client = PagerDutyAPIClient(api_token)
-                permissions = await client.check_permissions()
-                # Cache successful permission checks
-                set_cached_permissions(integration_id, permissions)
-                return (index, permissions, None)
-            except Exception as e:
-                logger.warning(f"Failed to check permissions for integration {integration_id}: {e}")
-                return (index, None, str(e))
-
-        # Run all permission checks in parallel
-        results = await asyncio.gather(
-            *[fetch_permissions(int_id, token, idx) for int_id, token, idx in uncached_integrations],
-            return_exceptions=True
-        )
-
-        # Apply results to integration data
-        for result in results:
-            if isinstance(result, Exception):
-                logger.error(f"Permission check failed with exception: {result}")
-                continue
-
-            index, permissions, error = result
-            if permissions:
-                integration_data_list[index]["permissions"] = permissions
-            else:
-                integration_data_list[index]["permissions"] = {
-                    "users": {"access": False, "error": f"Permission check failed: {error}"},
-                    "incidents": {"access": False, "error": f"Permission check failed: {error}"}
-                }
+        await _fetch_and_apply_permissions(uncached_integrations, integration_data_list)
 
     return {
         "integrations": integration_data_list,
         "total": len(integration_data_list)
     }
+
+
+async def _fetch_and_apply_permissions(
+    uncached_integrations: list,
+    integration_data_list: list
+) -> None:
+    """Fetch permissions for integrations in parallel and apply results."""
+    async def fetch_single(integration_id: int, api_token: str, index: int):
+        try:
+            client = PagerDutyAPIClient(api_token)
+            permissions = await client.check_permissions()
+            set_cached_permissions(integration_id, permissions)
+            return (index, permissions, None)
+        except Exception as e:
+            logger.warning(f"Failed to check permissions for integration {integration_id}: {e}")
+            return (index, None, str(e))
+
+    results = await asyncio.gather(
+        *[fetch_single(int_id, token, idx) for int_id, token, idx in uncached_integrations],
+        return_exceptions=True
+    )
+
+    for result in results:
+        if isinstance(result, Exception):
+            logger.error(f"Permission check failed with exception: {result}")
+            continue
+
+        index, permissions, error = result
+        if permissions:
+            integration_data_list[index]["permissions"] = permissions
+        else:
+            error_permission = {"access": False, "error": f"Permission check failed: {error}"}
+            integration_data_list[index]["permissions"] = {
+                "users": error_permission,
+                "incidents": error_permission
+            }
 
 @router.post("/integrations", response_model=IntegrationResponse)
 async def add_pagerduty_integration(
