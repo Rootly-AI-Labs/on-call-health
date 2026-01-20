@@ -250,20 +250,20 @@ export default function LandingPage() {
           <div className="container mx-auto px-4">
             <div className="mt-20 mx-auto w-full max-w-4xl text-white">
               <div className="mx-auto max-w-3xl text-center">
-                <div className="mb-6 flex items-center justify-center">
-                  <span className="rounded-full border border-white/40 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-white/90">
+                <div className="mb-8 flex items-center justify-center">
+                  <span className="rounded-full border border-white/40 px-3 pt-1.5 pb-0.5 text-xs font-semibold uppercase tracking-[0.2em] text-white/90">
                     Open Source · Apache License 2.0
                   </span>
                 </div>
-                <h1 className="mb-6 text-4xl font-semibold tracking-tight leading-snug lg:text-6xl">
+                <h1 className="mb-8 text-4xl font-semibold tracking-tight leading-snug lg:text-6xl">
                   Catch overload before
                   <br /> it burns out your engineers.
                 </h1>
-                <p className="mt-4 mb-8 text-lg text-white/85 lg:text-xl">
+                <p className="mt-4 mb-10 text-lg text-white/85 lg:text-xl">
                   An open source tool that looks for early warning signs of overload in your on-call engineers.
                 </p>
 
-                <div id="login" className="mt-6 flex flex-col sm:flex-row gap-5 items-center justify-center">
+                <div id="login" className="mt-8 flex flex-col sm:flex-row gap-5 items-center justify-center">
                   <Button
                     size="lg"
                     className="w-full rounded-3xl sm:w-auto bg-[#E4E5EB] hover:bg-[#d7d8de] text-[color:var(--color-blue-15,_#1E1A33)] px-8 py-7 text-lg font-display font-bold flex items-center justify-center"
@@ -306,9 +306,11 @@ export default function LandingPage() {
                     </span>
                   </Button>
                 </div>
-
-                <p className="mt-10 text-sm text-white/80">
-                  Built by the folks at Rootly who power NVIDIA, Replit, Glean, and more.
+                <div className="mx-auto mt-12 h-px w-16 bg-white/20" aria-hidden="true" />
+                <p className="mt-5 text-sm tracking-wide text-white/80">
+                  Built by engineers at Rootly.
+                  <br className="hidden sm:block" />
+                  Rootly&apos;s incident response platform powers teams at NVIDIA, Figma, Mistral AI, Replit, and more.
                 </p>
               </div>
 
@@ -563,3 +565,4 @@ export default function LandingPage() {
     </main>
   )
 }
+
