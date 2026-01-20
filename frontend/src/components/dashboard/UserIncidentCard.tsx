@@ -43,6 +43,12 @@ interface Incident {
   mitigated_by?: IncidentUser
 }
 
+// Safely extract numeric value, handling NaN and non-numbers
+const safeNum = (val: unknown): number => {
+  if (typeof val !== 'number' || isNaN(val)) return 0
+  return val
+}
+
 interface UserIncidentCardProps {
   memberData: {
     user_id?: string
@@ -94,25 +100,44 @@ function formatIncidentDuration(incident: Incident): string | null {
   }
 }
 
+// Validate URL to prevent XSS via javascript: or data: protocols
+function isValidHttpUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url)
+    return parsed.protocol === 'https:' || parsed.protocol === 'http:'
+  } catch {
+    return false
+  }
+}
+
+// Sanitize incident ID to prevent injection
+function sanitizeId(id: string | undefined): string | null {
+  if (!id) return null
+  // Only allow alphanumeric, hyphens, and underscores
+  const sanitized = id.replace(/[^a-zA-Z0-9_-]/g, '')
+  return sanitized.length > 0 ? sanitized : null
+}
+
 function getIncidentUrl(incident: Incident, platform: string): string | null {
-  // For PagerDuty, use html_url if available
+  // For PagerDuty, use html_url if available and valid
   if (platform === "pagerduty") {
-    if (incident.html_url) {
+    if (incident.html_url && isValidHttpUrl(incident.html_url)) {
       return incident.html_url
     }
-    // Construct URL if we have an ID (format: https://{subdomain}.pagerduty.com/incidents/{id})
-    if (incident.id) {
-      return `https://app.pagerduty.com/incidents/${incident.id}`
+    // Construct URL if we have a valid ID
+    const safeId = sanitizeId(incident.id)
+    if (safeId) {
+      return `https://app.pagerduty.com/incidents/${safeId}`
     }
     return null
   }
 
   // For Rootly, use slug to construct URL
   // Rootly URL format: https://rootly.com/account/incidents/{slug}
-  // Check both top-level slug (from processed data) and attributes.slug (from raw data)
   const slug = incident.slug || incident.attributes?.slug
-  if (slug) {
-    return `https://rootly.com/account/incidents/${slug}`
+  const safeSlug = sanitizeId(slug)
+  if (safeSlug) {
+    return `https://rootly.com/account/incidents/${safeSlug}`
   }
 
   return null
@@ -172,17 +197,23 @@ export function UserIncidentCard({
   const hasSeverityData = Object.keys(severityDist).length > 0
   const isPagerDuty = platform === 'pagerduty'
 
+  // Safely extract numeric value, handling NaN and non-numbers
+  const safeNum = (val: unknown): number => {
+    if (typeof val !== 'number' || isNaN(val)) return 0
+    return val
+  }
+
   const pagerDutyCounts = {
-    high: (severityDist.sev1 || 0) + (severityDist.high || 0) + (severityDist.critical || 0),
-    low: (severityDist.sev4 || 0) + (severityDist.sev5 || 0) + (severityDist.low || 0) + (severityDist.medium || 0)
+    high: safeNum(severityDist.sev1) + safeNum(severityDist.high) + safeNum(severityDist.critical),
+    low: safeNum(severityDist.sev4) + safeNum(severityDist.sev5) + safeNum(severityDist.low) + safeNum(severityDist.medium)
   }
 
   const rootlyCounts = {
-    sev0: severityDist.sev0 || severityDist.critical || 0,
-    sev1: severityDist.sev1 || severityDist.high || 0,
-    sev2: severityDist.sev2 || severityDist.medium || 0,
-    sev3: severityDist.sev3 || severityDist.low || 0,
-    sev4: severityDist.sev4 || severityDist.info || 0
+    sev0: safeNum(severityDist.sev0 ?? severityDist.critical),
+    sev1: safeNum(severityDist.sev1 ?? severityDist.high),
+    sev2: safeNum(severityDist.sev2 ?? severityDist.medium),
+    sev3: safeNum(severityDist.sev3 ?? severityDist.low),
+    sev4: safeNum(severityDist.sev4 ?? severityDist.info)
   }
 
   return (
