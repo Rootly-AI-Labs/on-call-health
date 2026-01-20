@@ -1577,6 +1577,51 @@ class UnifiedBurnoutAnalyzer:
         if not any([jira_account_id, github_username, linear_user_id, slack_user_id]):
             logger.debug(f"⚠️ NO INTEGRATION MAPPINGS: User {user_name} (email: {user_email}) has no integration mappings. User object keys: {list(user.keys())}")
 
+        # === NEW: Use SimpleHealthScorer to give EVERYONE a score ===
+        from app.core.simple_health_scorer import health_scorer
+
+        # Prepare incident data for scorer (even if empty)
+        incident_data = None
+        if incidents:
+            days_analyzed = metadata.get("days_analyzed", 30) or 30
+            user_tz = self.user_tz_by_id.get(str(user_id), "UTC")
+            base_metrics = self._calculate_member_metrics(incidents, days_analyzed, include_weekends, user_tz)
+
+            incident_data = {
+                'total_incidents': base_metrics.get('total_incidents', 0),
+                'severity_distribution': base_metrics.get('severity_distribution', {}),
+                'after_hours_incidents': base_metrics.get('after_hours_incidents', 0),
+                'weekend_incidents': base_metrics.get('weekend_incidents', 0),
+                'overnight_incidents': base_metrics.get('overnight_incidents', 0),
+                'avg_response_minutes': base_metrics.get('avg_response_time_minutes', 0)
+            }
+
+        # Prepare GitHub data for scorer
+        github_activity = None
+        if github_data:
+            github_activity = {
+                'total_commits': github_data.get('metrics', {}).get('total_commits', 0),
+                'after_hours_commits': github_data.get('activity_data', {}).get('after_hours_commits', 0),
+                'weekend_commits': github_data.get('activity_data', {}).get('weekend_commits', 0),
+                'late_night_commits': github_data.get('activity_data', {}).get('late_night_commits', 0)
+            }
+
+        # Get survey data if available (TODO: fetch from UserBurnoutReport table)
+        survey_data = None  # Will be populated when we fetch from database
+
+        # Calculate simple health score
+        health_result = health_scorer.calculate_health_score(
+            user_email=user_email,
+            survey_data=survey_data,
+            incident_data=incident_data,
+            github_data=github_activity,
+            time_range_days=metadata.get("days_analyzed", 30) or 30
+        )
+
+        # Map simple health score to burnout score format (for backward compatibility)
+        simple_health_score = health_result['overall_score']
+        simple_risk_level = health_result['interpretation']
+
         # If no incidents, return minimal analysis
         if not incidents:
             # Calculate zero-incident OCB metrics for consistency
@@ -1616,9 +1661,10 @@ class UnifiedBurnoutAnalyzer:
                 "rootly_user_id": rootly_user_id,  # Include Rootly mapping for logo display
                 "pagerduty_user_id": pagerduty_user_id,  # Include PagerDuty mapping for logo display
                 "avatar_url": avatar_url,  # Profile image URL from PagerDuty/Rootly
-                "burnout_score": 0,
+                "burnout_score": simple_health_score,  # NEW: Use simple health score
                 "ocb_score": round(min(100, composite_ocb['composite_score']), 2),  # Cap display at 100 for UI
-                "risk_level": "low",
+                "risk_level": simple_risk_level,  # NEW: Use simple risk level
+                "simple_health_score": health_result,  # NEW: Include full breakdown
                 "incident_count": 0,
                 "factors": {
                     "workload": 0,
@@ -1874,9 +1920,10 @@ class UnifiedBurnoutAnalyzer:
             "rootly_user_id": rootly_user_id,  # Include Rootly mapping for logo display
             "pagerduty_user_id": pagerduty_user_id,  # Include PagerDuty mapping for logo display
             "avatar_url": avatar_url,  # Profile image URL from PagerDuty/Rootly
-            "burnout_score": round(burnout_score, 2),
+            "burnout_score": simple_health_score,  # NEW: Use simple health score
             "ocb_score": round(min(100, composite_ocb['composite_score']), 2),  # Cap display at 100 for UI
-            "risk_level": risk_level,
+            "risk_level": simple_risk_level,  # NEW: Use simple risk level
+            "simple_health_score": health_result,  # NEW: Include full breakdown
             "incident_count": len(incidents),
             "factors": factors,
             "burnout_dimensions": dimensions,
