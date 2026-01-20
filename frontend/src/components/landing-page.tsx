@@ -202,7 +202,7 @@ export default function LandingPage() {
                     playsInline
                     preload="metadata"
                   >
-                    <source src="/videos/och-promo-v1.mp4" type="video/mp4" />
+                    <source src="/videos/on-call-health-promo-video.mp4" type="video/mp4" />
                   </video>
                 </div>
               </div>
