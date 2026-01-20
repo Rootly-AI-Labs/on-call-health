@@ -69,7 +69,7 @@ export function RootlyIntegrationForm({
       <CardHeader className="p-8">
         <div className="flex items-center space-x-3">
           <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-            <Image src="/images/rootly-logo-branded.png" alt="Rootly" width={24} height={24} />
+            <Image src="/images/rootly-logo-icon.jpg" alt="Rootly" width={24} height={24} />
           </div>
           <div>
             <CardTitle>Add Rootly Integration</CardTitle>

@@ -348,7 +348,7 @@ export function MemberDetailModal({
               <DialogHeader>
                 <DialogTitle className="flex items-center space-x-4">
                   <Avatar className="w-16 h-16">
-                    <AvatarImage src={selectedMember?.avatar} />
+                    <AvatarImage src={selectedMember?.avatar_url || selectedMember?.avatar} />
                     <AvatarFallback className="text-lg">
                       {selectedMember?.name
                         .split(" ")
@@ -372,314 +372,345 @@ export function MemberDetailModal({
               </DialogHeader>
 
               <div className="mt-4 space-y-6">
-                {/* Top row: Overall Risk Level and Incidents side by side */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Overall Risk Level */}
-                  <Card>
-                    <CardContent className="p-5">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="text-lg font-semibold text-neutral-900">Overall Risk Level</h3>
-                          <div className={`text-3xl font-bold mt-1 ${getOCBScoreColor(memberData?.ocb_score)}`}>
-                            {memberData?.ocb_score !== undefined
-                              ? `${memberData.ocb_score.toFixed(0)}/100`
-                              : 'N/A'}
-                          </div>
-                        </div>
-                        {(() => {
-                          const riskInfo = getOCBRiskInfo(memberData?.ocb_score)
-                          return (
-                            <Badge className={`px-4 py-2 text-sm ${getOCBBadgeColor(riskInfo.level)}`}>
-                              {riskInfo.label}
-                            </Badge>
-                          )
-                        })()}
+                {/* Overall Risk Level - Always shown first */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1 space-y-1.5">
+                        <CardTitle className="flex items-center gap-2">
+                          <Activity className="w-5 h-5 text-violet-500" />
+                          Risk Level
+                        </CardTitle>
+                        <CardDescription>On-Call Health assessment</CardDescription>
                       </div>
-                    </CardContent>
-                  </Card>
+                      {(() => {
+                        const riskInfo = getOCBRiskInfo(memberData?.ocb_score)
+                        return (
+                          <Badge className={`px-3 py-1 text-sm ${getOCBBadgeColor(riskInfo.level)}`}>
+                            {riskInfo.label}
+                          </Badge>
+                        )
+                      })()}
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-0 pb-6">
+                    {/* Overall score */}
+                    <div className="text-center mb-4">
+                      <div className={`text-3xl font-bold ${getOCBScoreColor(memberData?.ocb_score)}`}>
+                        {memberData?.ocb_score !== undefined
+                          ? `${memberData.ocb_score.toFixed(0)}/100`
+                          : 'N/A'}
+                      </div>
+                      <p className="text-sm text-neutral-500">Overall Risk Score</p>
+                    </div>
 
-                  {/* Incidents Card */}
-                  <UserIncidentCard
-                    memberData={memberData || selectedMember}
-                    timeRange={typeof timeRange === 'string' ? parseInt(timeRange) : timeRange}
-                    platform={currentAnalysis?.platform}
-                  />
-                </div>
-
-                {/* OCH Risk Levels */}
-                {memberData?.ocb_personal_score !== undefined && memberData?.ocb_work_score !== undefined && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-base">Risk Level Scores</CardTitle>
-                      <CardDescription>Copenhagen Burnout Inventory dimensional assessment</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="text-center p-3 rounded-lg bg-blue-50 border border-blue-100">
-                          <div className="text-lg font-bold text-blue-600">
-                            {memberData.ocb_personal_score.toFixed(1)}/100
-                          </div>
-                          <p className="text-sm font-medium text-blue-800">Personal Burnout</p>
-                          <p className="text-xs text-blue-600 mt-1">Physical and psychological fatigue</p>
+                    {/* Personal/Work-Related breakdown */}
+                    {memberData?.ocb_personal_score !== undefined && memberData?.ocb_work_score !== undefined && (
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="bg-blue-50 rounded-lg p-2 text-center">
+                          <div className="text-xs font-semibold text-blue-600">Personal</div>
+                          <div className="text-lg font-bold text-blue-600">{memberData.ocb_personal_score.toFixed(0)}</div>
                         </div>
-                        <div className="text-center p-3 rounded-lg bg-orange-50 border border-orange-100">
-                          <div className="text-lg font-bold text-orange-600">
-                            {memberData.ocb_work_score.toFixed(1)}/100
-                          </div>
-                          <p className="text-sm font-medium text-orange-800">Work-Related Burnout</p>
-                          <p className="text-xs text-orange-600 mt-1">Work-specific exhaustion and cynicism</p>
+                        <div className="bg-orange-50 rounded-lg p-2 text-center">
+                          <div className="text-xs font-semibold text-orange-600">Work-Related</div>
+                          <div className="text-lg font-bold text-orange-600">{memberData.ocb_work_score.toFixed(0)}</div>
                         </div>
                       </div>
-                      <div className="mt-4 text-center">
-                        <div className="text-2xl font-bold text-gray-900">
-                          {memberData.ocb_score.toFixed(1)}/100
-                        </div>
-                        <p className="text-sm text-gray-600">Composite Risk Level</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
+                    )}
+                  </CardContent>
+                </Card>
 
-                {/* User Objective Data Card */}
-                <UserObjectiveDataCard
-                  memberData={memberData}
-                  analysisId={analysisId}
-                  timeRange={timeRange}
-                  currentAnalysis={currentAnalysis}
-                />
-
-                {/* User Risk Factors - Using shared component with percentage display */}
-                <UserRiskFactorsCard selectedMember={memberData || selectedMember} />
-
-                {/* Health Check-ins (Survey Data) - Always render directly */}
-                <SurveyResultsCard
-                  surveyData={currentAnalysis?.analysis_data?.member_surveys?.[selectedMember.user_email || selectedMember.email] || null}
-                  userEmail={selectedMember.user_email || selectedMember.email}
-                />
-
-                {/* GitHub / Slack Tabs (conditional) */}
+                {/* Dynamic tile ordering - tiles with data appear first */}
                 {(() => {
-                  const hasGitHubData = selectedMember.github_activity?.commits_count > 0 ||
-                    selectedMember.github_activity?.pull_requests_count > 0
+                  // Define all tiles with their data availability checks
+                  const tiles = [
+                    {
+                      id: 'userTrends',
+                      hasData: memberData?.incident_count > 0, // User trends has data if there are incidents
+                      component: (
+                        <UserObjectiveDataCard
+                          key="userTrends"
+                          memberData={memberData}
+                          analysisId={analysisId}
+                          timeRange={timeRange}
+                          currentAnalysis={currentAnalysis}
+                        />
+                      )
+                    },
+                    {
+                      id: 'riskFactors',
+                      hasData: (memberData?.ocb_factors?.all?.length || 0) > 0,
+                      component: (
+                        <UserRiskFactorsCard key="riskFactors" selectedMember={memberData || selectedMember} />
+                      )
+                    },
+                    {
+                      id: 'incidents',
+                      hasData: (memberData?.incident_count || 0) > 0,
+                      component: (
+                        <UserIncidentCard
+                          key="incidents"
+                          memberData={memberData || selectedMember}
+                          timeRange={typeof timeRange === 'string' ? parseInt(timeRange) : timeRange}
+                          platform={currentAnalysis?.platform}
+                          incidents={currentAnalysis?.analysis_data?.raw_incident_data || []}
+                        />
+                      )
+                    },
+                    {
+                      id: 'survey',
+                      hasData: (currentAnalysis?.analysis_data?.member_surveys?.[selectedMember.user_email || selectedMember.email]?.survey_count_in_period || 0) > 0,
+                      component: (
+                        <SurveyResultsCard
+                          key="survey"
+                          surveyData={currentAnalysis?.analysis_data?.member_surveys?.[selectedMember.user_email || selectedMember.email] || null}
+                          userEmail={selectedMember.user_email || selectedMember.email}
+                        />
+                      )
+                    },
+                    {
+                      id: 'githubSlack',
+                      hasData: (selectedMember.github_activity?.commits_count > 0 ||
+                        selectedMember.github_activity?.pull_requests_count > 0 ||
+                        selectedMember.slack_activity?.messages_sent > 0 ||
+                        selectedMember.slack_activity?.channels_active > 0),
+                      component: (() => {
+                        const hasGitHubData = selectedMember.github_activity?.commits_count > 0 ||
+                          selectedMember.github_activity?.pull_requests_count > 0
 
-                  const hasSlackData = selectedMember.slack_activity?.messages_sent > 0 ||
-                    selectedMember.slack_activity?.channels_active > 0
+                        const hasSlackData = selectedMember.slack_activity?.messages_sent > 0 ||
+                          selectedMember.slack_activity?.channels_active > 0
 
-                  const tabCount = [hasGitHubData, hasSlackData].filter(Boolean).length
-                  const defaultTab = hasGitHubData ? "github" : "communication"
+                        const tabCount = [hasGitHubData, hasSlackData].filter(Boolean).length
+                        const defaultTab = hasGitHubData ? "github" : "communication"
 
-                  if (tabCount === 0) return null
+                        if (tabCount === 0) return null
 
-                  function getGridColsClass(count: number): string {
-                    if (count === 1) return 'grid-cols-1'
-                    if (count === 2) return 'grid-cols-2'
-                    return 'grid-cols-3'
-                  }
+                        function getGridColsClass(count: number): string {
+                          if (count === 1) return 'grid-cols-1'
+                          if (count === 2) return 'grid-cols-2'
+                          return 'grid-cols-3'
+                        }
 
-                  return (
-                    <Tabs defaultValue={defaultTab} className="w-full">
-                      <TabsList className={`grid w-full ${getGridColsClass(tabCount)}`}>
-                        {hasGitHubData && <TabsTrigger value="github">GitHub</TabsTrigger>}
-                        {hasSlackData && <TabsTrigger value="communication">Communication</TabsTrigger>}
-                      </TabsList>
+                        return (
+                          <Tabs key="githubSlack" defaultValue={defaultTab} className="w-full">
+                            <TabsList className={`grid w-full ${getGridColsClass(tabCount)}`}>
+                              {hasGitHubData && <TabsTrigger value="github">GitHub</TabsTrigger>}
+                              {hasSlackData && <TabsTrigger value="communication">Communication</TabsTrigger>}
+                            </TabsList>
 
-                      <TabsContent value="github" className="space-y-4">
-                        {selectedMember.github_activity ? (
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <Card>
-                              <CardHeader>
-                                <CardTitle className="text-sm">Development Activity</CardTitle>
-                              </CardHeader>
-                              <CardContent className="space-y-3">
-                                <div className="flex justify-between">
-                                  <span className="text-sm">Commits</span>
-                                  <span className="font-medium">{selectedMember.github_activity?.commits_count || 0}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-sm">Commits/Week</span>
-                                  <span className="font-medium">{selectedMember.github_activity?.commits_per_week?.toFixed(1) || '0.0'}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-sm">After Hours Commits</span>
-                                  <span className="font-medium">{selectedMember.github_activity?.after_hours_commits || 0}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-sm">Weekend Activity</span>
-                                  <span className="font-medium">{selectedMember.github_activity?.weekend_commits || 0}</span>
-                                </div>
-                              </CardContent>
-                            </Card>
-
-                                <Card>
-                                  <CardHeader>
-                                    <CardTitle className="text-sm">Commit Pattern</CardTitle>
-                                  </CardHeader>
-                                  <CardContent>
-                                    {loadingCommits ? (
-                                      <div className="text-center py-8">
-                                        <RefreshCw className="w-4 h-4 animate-spin text-neutral-500 mx-auto mb-2" />
-                                        <p className="text-xs text-neutral-500">Loading commit data...</p>
+                            <TabsContent value="github" className="space-y-4">
+                              {selectedMember.github_activity ? (
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                  <Card>
+                                    <CardHeader>
+                                      <CardTitle className="text-sm">Development Activity</CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="space-y-3">
+                                      <div className="flex justify-between">
+                                        <span className="text-sm">Commits</span>
+                                        <span className="font-medium">{selectedMember.github_activity?.commits_count || 0}</span>
                                       </div>
-                                    ) : dailyCommitsData && dailyCommitsData.length > 0 ? (
-                                      <div className="space-y-3">
-                                        <div className="h-32">
-                                          <ResponsiveContainer width="100%" height="100%">
-                                            <AreaChart data={dailyCommitsData}>
-                                              <XAxis
-                                                dataKey="date"
-                                                fontSize={10}
-                                                tick={{ fontSize: 10 }}
-                                                domain={[0, 'dataMax']}
-                                              />
-                                              <YAxis
-                                                fontSize={10}
-                                                tick={{ fontSize: 10 }}
-                                                domain={[0, 'dataMax']}
-                                              />
-                                              <Tooltip
-                                                content={({ payload, label }) => {
-                                                  if (payload && payload.length > 0) {
-                                                    const data = payload[0].payload;
-                                                    return (
-                                                      <div className="bg-white p-2 border border-neutral-200 rounded-lg shadow-lg">
-                                                        <p className="text-xs font-semibold text-neutral-900">{label}</p>
-                                                        <p className="text-xs text-indigo-600">
-                                                          {data.commits} commits
-                                                          {data.weekend_commits > 0 && <span className="text-neutral-500 ml-1">(Weekend)</span>}
-                                                        </p>
-                                                        {data.after_hours_commits > 0 && (
-                                                          <p className="text-xs text-neutral-500">
-                                                            {data.after_hours_commits} after hours
+                                      <div className="flex justify-between">
+                                        <span className="text-sm">Commits/Week</span>
+                                        <span className="font-medium">{selectedMember.github_activity?.commits_per_week?.toFixed(1) || '0.0'}</span>
+                                      </div>
+                                      <div className="flex justify-between">
+                                        <span className="text-sm">After Hours Commits</span>
+                                        <span className="font-medium">{selectedMember.github_activity?.after_hours_commits || 0}</span>
+                                      </div>
+                                      <div className="flex justify-between">
+                                        <span className="text-sm">Weekend Activity</span>
+                                        <span className="font-medium">{selectedMember.github_activity?.weekend_commits || 0}</span>
+                                      </div>
+                                    </CardContent>
+                                  </Card>
+
+                                  <Card>
+                                    <CardHeader>
+                                      <CardTitle className="text-sm">Commit Pattern</CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                      {loadingCommits ? (
+                                        <div className="text-center py-8">
+                                          <RefreshCw className="w-4 h-4 animate-spin text-neutral-500 mx-auto mb-2" />
+                                          <p className="text-xs text-neutral-500">Loading commit data...</p>
+                                        </div>
+                                      ) : dailyCommitsData && dailyCommitsData.length > 0 ? (
+                                        <div className="space-y-3">
+                                          <div className="h-32">
+                                            <ResponsiveContainer width="100%" height="100%">
+                                              <AreaChart data={dailyCommitsData}>
+                                                <XAxis
+                                                  dataKey="date"
+                                                  fontSize={10}
+                                                  tick={{ fontSize: 10 }}
+                                                  domain={[0, 'dataMax']}
+                                                />
+                                                <YAxis
+                                                  fontSize={10}
+                                                  tick={{ fontSize: 10 }}
+                                                  domain={[0, 'dataMax']}
+                                                />
+                                                <Tooltip
+                                                  content={({ payload, label }) => {
+                                                    if (payload && payload.length > 0) {
+                                                      const data = payload[0].payload;
+                                                      return (
+                                                        <div className="bg-white p-2 border border-neutral-200 rounded-lg shadow-lg">
+                                                          <p className="text-xs font-semibold text-neutral-900">{label}</p>
+                                                          <p className="text-xs text-indigo-600">
+                                                            {data.commits} commits
+                                                            {data.weekend_commits > 0 && <span className="text-neutral-500 ml-1">(Weekend)</span>}
                                                           </p>
-                                                        )}
-                                                      </div>
-                                                    );
-                                                  }
-                                                  return null;
-                                                }}
-                                              />
-                                              <Area
-                                                type="monotone"
-                                                dataKey="commits"
-                                                stroke="#6366F1"
-                                                strokeWidth={2}
-                                                fillOpacity={1}
-                                                fill="url(#colorCommits)"
-                                              />
-                                            </AreaChart>
-                                          </ResponsiveContainer>
+                                                          {data.after_hours_commits > 0 && (
+                                                            <p className="text-xs text-neutral-500">
+                                                              {data.after_hours_commits} after hours
+                                                            </p>
+                                                          )}
+                                                        </div>
+                                                      );
+                                                    }
+                                                    return null;
+                                                  }}
+                                                />
+                                                <Area
+                                                  type="monotone"
+                                                  dataKey="commits"
+                                                  stroke="#6366F1"
+                                                  strokeWidth={2}
+                                                  fillOpacity={1}
+                                                  fill="url(#colorCommits)"
+                                                />
+                                              </AreaChart>
+                                            </ResponsiveContainer>
+                                          </div>
+                                          <div className="text-xs text-indigo-600 text-center">
+                                            Average: {selectedMember.github_activity.commits_per_week?.toFixed(1) || '0'} commits/week
+                                            {selectedMember.github_activity.after_hours_commits > 0 && (
+                                              <span className="ml-2">
+                                                • {((selectedMember.github_activity.after_hours_commits / selectedMember.github_activity.commits_count) * 100).toFixed(0)}% after hours
+                                              </span>
+                                            )}
+                                          </div>
                                         </div>
-                                        <div className="text-xs text-indigo-600 text-center">
-                                          Average: {selectedMember.github_activity.commits_per_week?.toFixed(1) || '0'} commits/week
-                                          {selectedMember.github_activity.after_hours_commits > 0 && (
-                                            <span className="ml-2">
-                                              • {((selectedMember.github_activity.after_hours_commits / selectedMember.github_activity.commits_count) * 100).toFixed(0)}% after hours
-                                            </span>
-                                          )}
+                                      ) : (
+                                        <div className="text-center py-4">
+                                          <p className="text-xs text-neutral-500">Daily commit data not available</p>
+                                          <p className="text-xs text-neutral-500 mt-1">
+                                            Total: {selectedMember.github_activity?.commits_count || 0} commits
+                                          </p>
                                         </div>
-                                      </div>
-                                    ) : (
-                                      <div className="text-center py-4">
-                                        <p className="text-xs text-neutral-500">Daily commit data not available</p>
-                                        <p className="text-xs text-neutral-500 mt-1">
-                                          Total: {selectedMember.github_activity?.commits_count || 0} commits
-                                        </p>
-                                      </div>
-                                    )}
-                                  </CardContent>
-                                </Card>
+                                      )}
+                                    </CardContent>
+                                  </Card>
 
-                                {/* GitHub Activity Timeline */}
+                                  {/* GitHub Activity Timeline */}
+                                  <Card>
+                                    <CardHeader>
+                                      <CardTitle className="text-sm">GitHub Activity Timeline</CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="space-y-3">
+                                      <div className="flex justify-between">
+                                        <span className="text-sm">Pull Requests</span>
+                                        <span className="font-medium">{selectedMember.github_activity?.pull_requests_count || 0}</span>
+                                      </div>
+                                      <div className="flex justify-between">
+                                        <span className="text-sm">Code Reviews</span>
+                                        <span className="font-medium">{selectedMember.github_activity?.reviews_count || 0}</span>
+                                      </div>
+                                      <div className="flex justify-between">
+                                        <span className="text-sm">Avg PR Size</span>
+                                        <span className="font-medium">{selectedMember.github_activity?.avg_pr_size || 0} lines</span>
+                                      </div>
+                                      <Separator className="my-2" />
+                                      <div className="space-y-2">
+                                        <p className="text-xs font-semibold text-neutral-700">Work-life Balance</p>
+                                        <div className="flex items-center justify-between text-xs">
+                                          <span className="text-neutral-700">After-Hours</span>
+                                          <span className="font-medium text-orange-600">
+                                            {selectedMember.github_activity?.commits_count > 0
+                                              ? ((selectedMember.github_activity.after_hours_commits / selectedMember.github_activity.commits_count) * 100).toFixed(1)
+                                              : 0}%
+                                          </span>
+                                        </div>
+                                        <div className="flex items-center justify-between text-xs">
+                                          <span className="text-neutral-700">Weekend</span>
+                                          <span className="font-medium text-purple-600">
+                                            {selectedMember.github_activity?.commits_count > 0
+                                              ? ((selectedMember.github_activity.weekend_commits / selectedMember.github_activity.commits_count) * 100).toFixed(1)
+                                              : 0}%
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </CardContent>
+                                  </Card>
+                                </div>
+                              ) : (
                                 <Card>
-                                  <CardHeader>
-                                    <CardTitle className="text-sm">GitHub Activity Timeline</CardTitle>
-                                  </CardHeader>
-                                  <CardContent className="space-y-3">
-                                    <div className="flex justify-between">
-                                      <span className="text-sm">Pull Requests</span>
-                                      <span className="font-medium">{selectedMember.github_activity?.pull_requests_count || 0}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span className="text-sm">Code Reviews</span>
-                                      <span className="font-medium">{selectedMember.github_activity?.reviews_count || 0}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span className="text-sm">Avg PR Size</span>
-                                      <span className="font-medium">{selectedMember.github_activity?.avg_pr_size || 0} lines</span>
-                                    </div>
-                                    <Separator className="my-2" />
-                                    <div className="space-y-2">
-                                      <p className="text-xs font-semibold text-neutral-700">Work-life Balance</p>
-                                      <div className="flex items-center justify-between text-xs">
-                                        <span className="text-neutral-700">After-Hours</span>
-                                        <span className="font-medium text-orange-600">
-                                          {selectedMember.github_activity?.commits_count > 0
-                                            ? ((selectedMember.github_activity.after_hours_commits / selectedMember.github_activity.commits_count) * 100).toFixed(1)
-                                            : 0}%
-                                        </span>
-                                      </div>
-                                      <div className="flex items-center justify-between text-xs">
-                                        <span className="text-neutral-700">Weekend</span>
-                                        <span className="font-medium text-purple-600">
-                                          {selectedMember.github_activity?.commits_count > 0
-                                            ? ((selectedMember.github_activity.weekend_commits / selectedMember.github_activity.commits_count) * 100).toFixed(1)
-                                            : 0}%
-                                        </span>
-                                      </div>
-                                    </div>
+                                  <CardContent className="p-6 text-center">
+                                    <p className="text-neutral-500">No GitHub activity data available</p>
                                   </CardContent>
                                 </Card>
-                              </div>
-                            ) : (
-                              <Card>
-                                <CardContent className="p-6 text-center">
-                                  <p className="text-neutral-500">No GitHub activity data available</p>
-                                </CardContent>
-                              </Card>
-                            )}
-                          </TabsContent>
+                              )}
+                            </TabsContent>
 
-                          <TabsContent value="communication" className="space-y-4">
-                            {selectedMember.slack_activity ? (
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <Card className="border border-neutral-200">
-                                  <CardHeader>
-                                    <CardTitle className="text-sm">Communication Activity</CardTitle>
-                                  </CardHeader>
-                                  <CardContent className="space-y-3">
-                                    <div className="flex justify-between">
-                                      <span className="text-sm">Messages Sent</span>
-                                      <span className="font-medium">{selectedMember.slack_activity?.messages_sent || 0}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span className="text-sm">Active Channels</span>
-                                      <span className="font-medium">{selectedMember.slack_activity?.channels_active || 0}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span className="text-sm">After Hours Messages</span>
-                                      <span className="font-medium">{selectedMember.slack_activity?.after_hours_messages || 0}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span className="text-sm">Sentiment Score</span>
-                                      <span className="font-medium">{selectedMember.slack_activity?.sentiment_score || 'N/A'}</span>
-                                    </div>
+                            <TabsContent value="communication" className="space-y-4">
+                              {selectedMember.slack_activity ? (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <Card className="border border-neutral-200">
+                                    <CardHeader>
+                                      <CardTitle className="text-sm">Communication Activity</CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="space-y-3">
+                                      <div className="flex justify-between">
+                                        <span className="text-sm">Messages Sent</span>
+                                        <span className="font-medium">{selectedMember.slack_activity?.messages_sent || 0}</span>
+                                      </div>
+                                      <div className="flex justify-between">
+                                        <span className="text-sm">Active Channels</span>
+                                        <span className="font-medium">{selectedMember.slack_activity?.channels_active || 0}</span>
+                                      </div>
+                                      <div className="flex justify-between">
+                                        <span className="text-sm">After Hours Messages</span>
+                                        <span className="font-medium">{selectedMember.slack_activity?.after_hours_messages || 0}</span>
+                                      </div>
+                                      <div className="flex justify-between">
+                                        <span className="text-sm">Sentiment Score</span>
+                                        <span className="font-medium">{selectedMember.slack_activity?.sentiment_score || 'N/A'}</span>
+                                      </div>
+                                    </CardContent>
+                                  </Card>
+                                </div>
+                              ) : (
+                                <Card>
+                                  <CardContent className="p-6 text-center">
+                                    <p className="text-neutral-500">No Slack activity data available</p>
                                   </CardContent>
                                 </Card>
-                              </div>
-                            ) : (
-                              <Card>
-                                <CardContent className="p-6 text-center">
-                                  <p className="text-neutral-500">No Slack activity data available</p>
-                                </CardContent>
-                              </Card>
-                            )}
-                          </TabsContent>
-                        </Tabs>
-                      );
-                    })()}
+                              )}
+                            </TabsContent>
+                          </Tabs>
+                        );
+                      })()
+                    },
+                    {
+                      id: 'ticketing',
+                      hasData: (memberData?.jira_tickets?.length || 0) > 0 || (memberData?.linear_issues?.length || 0) > 0,
+                      component: <TicketingCard key="ticketing" memberData={memberData} />
+                    }
+                  ]
 
-                {/* Ticketing Card */}
-                <TicketingCard memberData={memberData} />
+                  // Sort tiles: those with data first, those without data last
+                  const sortedTiles = [...tiles].sort((a, b) => {
+                    if (a.hasData && !b.hasData) return -1
+                    if (!a.hasData && b.hasData) return 1
+                    return 0
+                  })
+
+                  // Render sorted tiles (filter out null components)
+                  return sortedTiles.map(tile => tile.component).filter(Boolean)
+                })()}
               </div>
             </>
           )

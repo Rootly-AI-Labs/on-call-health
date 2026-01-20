@@ -147,7 +147,7 @@ async def health():
 @app.get('/favicon.ico', include_in_schema=False)
 async def favicon():
     """Serve favicon for the API documentation."""
-    return FileResponse("app/static/favicon.png")
+    return FileResponse("app/static/favicon.svg", media_type="image/svg+xml")
 
 # Initialize database tables
 @app.on_event("startup")

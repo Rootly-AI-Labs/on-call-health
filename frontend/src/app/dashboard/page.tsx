@@ -65,6 +65,12 @@ import { TopPanel } from "@/components/TopPanel"
 import { useOnboarding } from "@/hooks/useOnboarding"
 import IntroGuide from "@/components/IntroGuide"
 
+function getHealthImpact(healthScore: number): 'positive' | 'neutral' | 'negative' {
+  if (healthScore >= 80) return 'positive'
+  if (healthScore >= 60) return 'neutral'
+  return 'negative'
+}
+
 function DashboardContent() {
   const {
   API_BASE,
@@ -594,6 +600,29 @@ function DashboardContent() {
           {/* Analysis Complete State - Only show if analysis has meaningful data */}
           {!shouldShowInsufficientDataCard() && !analysisRunning && currentAnalysis && (currentAnalysis.analysis_data?.team_health || currentAnalysis.analysis_data?.team_summary || currentAnalysis.analysis_data?.partial_data || currentAnalysis.analysis_data?.team_analysis) && (
             <>
+              {/* Demo Analysis Banner */}
+              {currentAnalysis?.config?.is_demo && (
+                <div className="mb-6 p-4 bg-gradient-to-r from-amber-500 to-orange-500 rounded-lg shadow-lg">
+                  <div className="flex items-center justify-between flex-wrap gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-white/20 rounded-full">
+                        <Info className="h-5 w-5 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-white font-semibold text-lg">You&apos;re viewing sample data</p>
+                        <p className="text-white/90 text-sm">Connect your incident management platform to see real insights</p>
+                      </div>
+                    </div>
+                    <a
+                      href="/integrations"
+                      className="px-6 py-2.5 bg-white text-orange-600 font-semibold rounded-lg hover:bg-orange-50 transition-colors shadow-md"
+                    >
+                      Connect Integrations →
+                    </a>
+                  </div>
+                </div>
+              )}
+
               {/* Debug Section - Development Only */}
               {false && process.env.NODE_ENV === 'development' && (
                 <Card className="mb-6 border-yellow-300 bg-yellow-50">
@@ -998,7 +1027,7 @@ function DashboardContent() {
                               title: 'Current State',
                               description: `${healthScore}% organization health score`,
                               color: 'bg-purple-500',
-                              impact: healthScore >= 80 ? 'positive' : healthScore >= 60 ? 'neutral' : 'negative'
+                              impact: getHealthImpact(healthScore)
                             });
                           }
                         } else {
@@ -1009,7 +1038,7 @@ function DashboardContent() {
                             title: 'Current State',
                             description: `${healthScore}% organization health score`,
                             color: 'bg-purple-500',
-                            impact: healthScore >= 80 ? 'positive' : healthScore >= 60 ? 'neutral' : 'negative'
+                            impact: getHealthImpact(healthScore)
                           }];
                         }
 
@@ -1097,13 +1126,13 @@ function DashboardContent() {
                       const hasIncidentMembers = membersWithIncidents.length > 0;
 
                       if (hasGitHubMembers && hasIncidentMembers) {
-                        return `Holistic burnout analysis combining incident response patterns and development activity across ${allActiveMembers.length} team members`;
+                        return `Incidents + GitHub activity for ${allActiveMembers.length} members`;
                       } else if (hasGitHubMembers && !hasIncidentMembers) {
-                        return `Development-focused burnout analysis based on GitHub activity patterns from ${membersWithGitHubData.length} active developers`;
+                        return `GitHub activity for ${membersWithGitHubData.length} developers`;
                       } else if (!hasGitHubMembers && hasIncidentMembers) {
-                        return `Incident response analysis from ${membersWithIncidents.length} team members handling incidents`;
+                        return `Incident data for ${membersWithIncidents.length} responders`;
                       } else {
-                        return "Team risk assessment based on available activity data";
+                        return "Based on available activity data";
                       }
                     })()}
                     loadingAnalysis={loadingAnalyses}
@@ -1214,8 +1243,8 @@ function DashboardContent() {
               {/* GitHub and Slack Metrics Section */}
               {(currentAnalysis?.analysis_data?.github_insights || currentAnalysis?.analysis_data?.slack_insights) && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                  {/* GitHub Metrics Card */}
-                  {currentAnalysis?.analysis_data?.github_insights && (
+                  {/* GitHub Metrics Card - DISABLED: Feature temporarily hidden from home page */}
+                  {false && currentAnalysis?.analysis_data?.github_insights && (
                     <Card className="border border-neutral-300 bg-white">
                       <CardHeader className="pb-3">
                         <div className="flex items-center justify-between">
