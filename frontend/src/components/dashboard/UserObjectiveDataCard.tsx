@@ -49,7 +49,7 @@ export function UserObjectiveDataCard({
     after_hours: {
       label: "After Hours Activity",
       color: "#7C63D6",  // Purple-700
-      yAxisLabel: "After Hours Incidents",
+      yAxisLabel: "After Hours Activity",
       dataKey: "afterHoursCount",
       showMeanLine: true,
       transformer: (day: any) => day.after_hours_count || 0
@@ -143,6 +143,10 @@ export function UserObjectiveDataCard({
     const chartData = dailyHealthData.map((day: any) => {
       const metricValue = config.transformer(day);
 
+      // Use actual after-hours breakdown from backend
+      const afterHoursIncidents = day.after_hours_incidents_count || 0;
+      const afterHoursCommits = day.github_after_hours_count || 0;
+
       return {
         date: new Date(day.date).toLocaleDateString('en-US', {
           month: 'short',
@@ -151,6 +155,8 @@ export function UserObjectiveDataCard({
         originalDate: day.date,
         [config.dataKey]: metricValue,
         incidentCount: day.incident_count || 0,
+        afterHoursIncidents: afterHoursIncidents,
+        afterHoursCommits: afterHoursCommits,
         hasData: day.has_data || false
       };
     });

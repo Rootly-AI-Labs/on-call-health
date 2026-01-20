@@ -888,8 +888,16 @@ class UnifiedBurnoutAnalyzer:
             logger.info(f"Period summary calculation: team_overall_score={team_overall_score}, period_average_score={period_average_score}")
             logger.info(f"Team health keys: {list(team_health.keys()) if team_health else 'None'}")
             
-            # Generate daily trends from incident data
-            daily_trends = self._generate_daily_trends(incidents, team_analysis["members"], metadata, team_health)
+            # Generate daily trends from incident data and GitHub activity
+            if github_data:
+                logger.info(f"📊 Passing GitHub data to _generate_daily_trends: {len(github_data)} users")
+                for email, data in list(github_data.items())[:3]:
+                    if data:
+                        commits = data.get('commits', [])
+                        logger.info(f"📊 {email}: {len(commits)} commits in data")
+            else:
+                logger.warning("📊 No GitHub data to pass to _generate_daily_trends")
+            daily_trends = self._generate_daily_trends(incidents, team_analysis["members"], metadata, team_health, github_data)
             
             # Get individual daily data with debug logging
             individual_daily_data = getattr(self, 'individual_daily_data', {})
@@ -1646,14 +1654,15 @@ class UnifiedBurnoutAnalyzer:
                 }
             }
         
-        # Calculate base metrics from incidents
+        # Calculate base metrics from incidents and GitHub data
         days_analyzed = metadata.get("days_analyzed", 30) or 30
         user_tz = self.user_tz_by_id.get(str(user_id), "UTC")
         base_metrics = self._calculate_member_metrics(
             incidents,
             days_analyzed,
-            include_weekends, 
-            user_tz
+            include_weekends,
+            user_tz,
+            github_data
         )
 
         # Enhance metrics with GitHub/Slack/Jira data if available
@@ -2023,15 +2032,38 @@ class UnifiedBurnoutAnalyzer:
         days_analyzed: int,
         include_weekends: bool,
         user_tz: str = "UTC",
+        github_data: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
-        """Calculate detailed metrics for a team member."""
+        """Calculate detailed metrics for a team member, including GitHub after-hours activity."""
         # Initialize counters
         after_hours_count = 0
         weekend_count = 0
         response_times = []
         severity_counts = defaultdict(int)
         status_counts = defaultdict(int)
-        
+
+        # Count GitHub after-hours commits if provided
+        github_after_hours_commits = 0
+        github_weekend_commits = 0
+        total_commits = 0
+
+        if github_data and github_data.get("commits"):
+            commits = github_data.get("commits", [])
+            total_commits = len(commits)
+            for commit in commits:
+                dt_utc = self._parse_iso_utc(commit.get("timestamp"))
+                if not dt_utc:
+                    continue
+                dt_local = self._to_local(dt_utc, user_tz)
+                if dt_local:
+                    # Count after-hours commits (before 9 AM or after 5 PM)
+                    if dt_local.hour < BUSINESS_HOURS_START or dt_local.hour >= BUSINESS_HOURS_END:
+                        github_after_hours_commits += 1
+
+                    # Count weekend commits (Saturday=5, Sunday=6)
+                    if dt_local.weekday() >= 5:
+                        github_weekend_commits += 1
+
         for incident in incidents:
             # Handle both Rootly (with attributes) and PagerDuty (normalized) formats
             if self.platform == "pagerduty":
@@ -2102,10 +2134,17 @@ class UnifiedBurnoutAnalyzer:
         safe_weekend = weekend_count if weekend_count is not None else 0
         safe_incidents_len = len(incidents) if incidents is not None else 0
         safe_days = days_analyzed if days_analyzed is not None and days_analyzed > 0 else 1
-        
+
+        # Combine GitHub and incident after-hours activity
+        total_after_hours_activities = safe_after_hours + github_after_hours_commits
+        total_weekend_activities = safe_weekend + github_weekend_commits
+        total_activities = safe_incidents_len + total_commits
+
         incidents_per_week = (safe_incidents_len / safe_days) * 7 if safe_days > 0 else 0
-        after_hours_percentage = safe_after_hours / safe_incidents_len if safe_incidents_len > 0 else 0
-        weekend_percentage = safe_weekend / safe_incidents_len if safe_incidents_len > 0 else 0
+        # Calculate after-hours percentage including both incidents and GitHub commits
+        after_hours_percentage = total_after_hours_activities / total_activities if total_activities > 0 else 0
+        # Calculate weekend percentage including both incidents and GitHub commits
+        weekend_percentage = total_weekend_activities / total_activities if total_activities > 0 else 0
         avg_response_time = sum(response_times) / len(response_times) if response_times and len(response_times) > 0 else 0
         
         # Ensure all numeric values are not None before rounding
@@ -2121,7 +2160,12 @@ class UnifiedBurnoutAnalyzer:
             "weekend_percentage": round(safe_weekend_percentage, 3),
             "avg_response_time_minutes": round(safe_avg_response_time, 1),
             "severity_distribution": dict(severity_counts),
-            "status_distribution": dict(status_counts)
+            "status_distribution": dict(status_counts),
+            # GitHub after-hours metrics
+            "github_after_hours_commits": github_after_hours_commits,
+            "github_weekend_commits": github_weekend_commits,
+            "total_commits": total_commits,
+            "total_activities": total_activities
         }
 
         # Add severity-weighted incident calculation for better load assessment
@@ -2831,13 +2875,13 @@ class UnifiedBurnoutAnalyzer:
         return final_score
 
     def _calculate_burnout_factors(self, metrics: Dict[str, Any]) -> Dict[str, float]:
-        """Calculate individual burnout factors for UI display."""
+        """Calculate individual burnout factors for UI display, including GitHub after-hours data."""
         # Calculate factors that properly reflect incident load
         incidents_per_week = metrics.get("incidents_per_week", 0)
         if incidents_per_week is None:
             incidents_per_week = 0
         incidents_per_week = float(incidents_per_week) if incidents_per_week is not None else 0.0
-        
+
         # Workload factor based on incident frequency (more direct)
         # Scale: 0-2 incidents/week = 0-3, 2-5 = 3-7, 5-8 = 7-10, 8+ = 10
         if incidents_per_week <= 2:
@@ -2848,10 +2892,11 @@ class UnifiedBurnoutAnalyzer:
             workload = 7 + ((incidents_per_week - 5) / 3) * 3 if incidents_per_week >= 5 else 7
         else:
             workload = 10
-        
-        # After hours factor - ensure numeric value
+
+        # After hours factor - NOW includes GitHub after-hours commits
         # Convert decimal percentage (0.0-1.0) to 0-10 scale
         # Scale: 0% = 0, 50% = 5, 100% = 10
+        # This percentage now includes both incidents AND GitHub commits
         after_hours_pct = metrics.get("after_hours_percentage", 0)
         after_hours_pct = float(after_hours_pct) if after_hours_pct is not None else 0.0
         after_hours = min(10, after_hours_pct * 100 * 0.1)
@@ -3743,14 +3788,27 @@ class UnifiedBurnoutAnalyzer:
         
         return incidents
 
-    def _generate_daily_trends(self, incidents: List[Dict[str, Any]], team_analysis: List[Dict[str, Any]], metadata: Dict[str, Any], team_health: Dict[str, Any] = None) -> List[Dict[str, Any]]:
-        """Generate daily trend data from incidents and team analysis - includes individual user daily tracking."""
+    def _generate_daily_trends(self, incidents: List[Dict[str, Any]], team_analysis: List[Dict[str, Any]], metadata: Dict[str, Any], team_health: Dict[str, Any] = None, github_data_by_user: Optional[Dict[str, Dict[str, Any]]] = None) -> List[Dict[str, Any]]:
+        """Generate daily trend data from incidents and team analysis - includes individual user daily tracking and GitHub after-hours commits."""
         try:
             days_analyzed = metadata.get("days_analyzed", 30) or 30 if isinstance(metadata, dict) else 30
-            
+
             # Initialize daily data structures - team level and individual level
             daily_data = {}
             individual_daily_data = {}  # New: track per-user daily data
+
+            # Map GitHub data by user email for easy lookup
+            github_commits_by_user = {}
+            if github_data_by_user:
+                logger.info(f"Processing GitHub data for {len(github_data_by_user)} users")
+                for user_email, gh_data in github_data_by_user.items():
+                    commits = gh_data.get("commits", [])
+                    logger.info(f"User {user_email}: {len(commits)} commits found")
+                    if commits:
+                        github_commits_by_user[user_email.lower()] = commits
+                logger.info(f"Total users with GitHub commits: {len(github_commits_by_user)}")
+            else:
+                logger.warning("No GitHub data provided to _generate_daily_trends")
             
             # PRE-INITIALIZE individual_daily_data with all team members
             # Also create user ID to email mapping for incident processing
@@ -3781,15 +3839,21 @@ class UnifiedBurnoutAnalyzer:
                             "incident_count": 0,
                             "severity_weighted_count": 0.0,
                             "after_hours_count": 0,
+                            "after_hours_incidents_count": 0,
+                            "github_after_hours_count": 0,
                             "weekend_count": 0,
                             "response_times": [],
                             "has_data": False,
                             "incidents": [],
                             "high_severity_count": 0,
+                            # GitHub after-hours metrics
+                            "github_commits_count": 0,
+                            "github_after_hours_commits": 0,
+                            "github_weekend_commits": 0,
                             # Enhanced severity breakdown
                             "severity_breakdown": {
                                 "sev0": 0,     # Critical/Emergency (15.0 weight)
-                                "sev1": 0,     # High/Critical (12.0 weight) 
+                                "sev1": 0,     # High/Critical (12.0 weight)
                                 "sev2": 0,     # Medium/High (6.0 weight)
                                 "sev3": 0,     # Low/Medium (3.0 weight)
                                 "low": 0       # Low (1.5 weight)
@@ -3801,7 +3865,9 @@ class UnifiedBurnoutAnalyzer:
                                 "after_hours_incidents": 0,
                                 "weekend_work": False,
                                 "peak_hour": None,
-                                "incident_titles": []
+                                "incident_titles": [],
+                                "github_commits": 0,
+                                "github_after_hours": 0
                             }
                         }
             
@@ -3841,6 +3907,9 @@ class UnifiedBurnoutAnalyzer:
                                     "incident_count": 0,
                                     "severity_weighted_count": 0.0,
                                     "after_hours_count": 0,
+                                    "after_hours_incidents_count": 0,
+                                    "github_after_hours_count": 0,
+                                    "github_commits_count": 0,
                                     "users_involved": set(),
                                     "high_severity_count": 0
                                 }
@@ -3880,6 +3949,7 @@ class UnifiedBurnoutAnalyzer:
                             incident_hour = incident_date.hour
                             if incident_hour < BUSINESS_HOURS_START or incident_hour >= BUSINESS_HOURS_END:
                                 daily_data[date_str]["after_hours_count"] += 1
+                                daily_data[date_str]["after_hours_incidents_count"] += 1
                             
                             # Track users involved - handle both platforms
                             user_id = None
@@ -3943,6 +4013,7 @@ class UnifiedBurnoutAnalyzer:
                                     # Track after-hours and weekend work (using standard constants)
                                     if incident_hour < BUSINESS_HOURS_START or incident_hour >= BUSINESS_HOURS_END:
                                         user_day_data["after_hours_count"] += 1
+                                        user_day_data["after_hours_incidents_count"] += 1
                                         daily_summary["after_hours_incidents"] = user_day_data["after_hours_count"]
                                     
                                     # Store weekend incidents
@@ -4087,7 +4158,88 @@ class UnifiedBurnoutAnalyzer:
                     except Exception as inc_error:
                         logger.debug(f"Error processing incident for daily trends: {inc_error}")
                         continue
-            
+
+            # Process GitHub commits to populate daily data with after-hours activity
+            if github_commits_by_user:
+                logger.info(f"📊 Processing GitHub commits for daily trends: {len(github_commits_by_user)} users with commits")
+                for user_email_lower, commits in github_commits_by_user.items():
+                    logger.info(f"📊 Processing {len(commits)} commits for user {user_email_lower}")
+                    # Find user timezone
+                    user_tz = "UTC"
+                    user_id = None
+                    for user in team_analysis:
+                        if user.get('user_email', '').lower() == user_email_lower:
+                            user_tz = self._get_user_tz(user.get('user_id'), "UTC")
+                            user_id = user.get('user_id')
+                            break
+
+                    after_hours_for_user = 0
+                    for commit in commits:
+                        try:
+                            # Parse commit timestamp
+                            dt_utc = self._parse_iso_utc(commit.get("timestamp"))
+                            if not dt_utc:
+                                continue
+
+                            dt_local = self._to_local(dt_utc, user_tz)
+                            if not dt_local:
+                                continue
+
+                            date_str = dt_local.strftime("%Y-%m-%d")
+
+                            # Add to team daily data
+                            if date_str not in daily_data:
+                                daily_data[date_str] = {
+                                    "date": date_str,
+                                    "incident_count": 0,
+                                    "severity_weighted_count": 0.0,
+                                    "after_hours_count": 0,
+                                    "after_hours_incidents_count": 0,
+                                    "users_involved": set(),
+                                    "high_severity_count": 0,
+                                    "github_after_hours_count": 0,
+                                    "github_commits_count": 0
+                                }
+
+                            # Count all commits for this day
+                            daily_data[date_str]["github_commits_count"] += 1
+
+                            # Count after-hours commits (before 9 AM or after 5 PM)
+                            if dt_local.hour < BUSINESS_HOURS_START or dt_local.hour >= BUSINESS_HOURS_END:
+                                daily_data[date_str]["after_hours_count"] += 1
+                                # Track as team after-hours activity
+                                if "github_after_hours_count" not in daily_data[date_str]:
+                                    daily_data[date_str]["github_after_hours_count"] = 0
+                                daily_data[date_str]["github_after_hours_count"] += 1
+                                after_hours_for_user += 1
+                                logger.debug(f"✅ After-hours commit detected for {user_email_lower} on {date_str} at hour {dt_local.hour}")
+
+                            # Add to individual daily data
+                            if user_email_lower in individual_daily_data:
+                                user_day_data = individual_daily_data[user_email_lower].get(date_str)
+                                if user_day_data:
+                                    user_day_data["github_commits_count"] += 1
+
+                                    # Count after-hours commits
+                                    if dt_local.hour < BUSINESS_HOURS_START or dt_local.hour >= BUSINESS_HOURS_END:
+                                        user_day_data["after_hours_count"] += 1
+                                        user_day_data["github_after_hours_count"] += 1
+                                        user_day_data["github_after_hours_commits"] += 1
+                                        user_day_data["daily_summary"]["github_after_hours"] += 1
+
+                                    # Count weekend commits
+                                    if dt_local.weekday() >= 5:  # Saturday=5, Sunday=6
+                                        user_day_data["github_weekend_commits"] += 1
+
+                                    user_day_data["daily_summary"]["github_commits"] = user_day_data["github_commits_count"]
+                                    user_day_data["has_data"] = True
+
+                        except Exception as commit_error:
+                            logger.debug(f"Error processing GitHub commit for daily trends: {commit_error}")
+                            continue
+
+                    logger.info(f"📊 User {user_email_lower}: Processed {len(commits)} commits, {after_hours_for_user} were after-hours")
+
             # Ensure daily_data has entries for ALL days in analysis period, not just incident days
             for day_offset in range(days_analyzed):
                 date_obj = datetime.now() - timedelta(days=days_analyzed - day_offset - 1)
@@ -4100,6 +4252,9 @@ class UnifiedBurnoutAnalyzer:
                         "incident_count": 0,
                         "severity_weighted_count": 0.0,
                         "after_hours_count": 0,
+                        "after_hours_incidents_count": 0,
+                        "github_after_hours_count": 0,
+                        "github_commits_count": 0,
                         "users_involved": set(),
                         "high_severity_count": 0
                     }
@@ -4191,14 +4346,33 @@ class UnifiedBurnoutAnalyzer:
                 health_status = self._determine_health_status_from_score(daily_score)
                 
                 # 🔍 DEBUG: Log daily score calculation details
+                after_hours_incidents = day_data.get("after_hours_incidents_count", 0)
+                github_after_hours = day_data.get("github_after_hours_count", 0)
+                github_commits_total = day_data.get("github_commits_count", 0)
+
+                # Calculate after-hours percentage (like Risk Factors calculation)
+                # total_activities = incidents + commits
+                # after_hours_percentage = (after_hours_incidents + github_after_hours) / total_activities * 100
+                total_activities = incident_count + github_commits_total
+                if total_activities > 0:
+                    after_hours_percentage = (after_hours_count / total_activities) * 100
+                else:
+                    after_hours_percentage = 0
+
                 logger.info(f"DAILY_SCORE_DEBUG for {date_str}: baseline=8.7, incidents={incident_count}, severity_weighted={severity_weighted:.1f}, after_hours={after_hours_count}, high_severity={high_severity_count}, users_involved={users_involved_count}, final_score={daily_score:.2f}")
-                
+                logger.info(f"📊 AFTER_HOURS_BREAKDOWN for {date_str}: total={after_hours_count}, incidents={after_hours_incidents}, github_commits={github_after_hours}, total_activities={total_activities}, percentage={after_hours_percentage:.1f}%")
+
                 daily_trends.append({
                     "date": date_str,
                     "overall_score": round(daily_score, 2),  # Keep as 0-10 scale (SimpleBurnoutAnalyzer approach)
                     "incident_count": incident_count,
                     "severity_weighted_count": round(severity_weighted, 1),
                     "after_hours_count": after_hours_count,
+                    "after_hours_incidents_count": day_data.get("after_hours_incidents_count", 0),
+                    "github_after_hours_count": day_data.get("github_after_hours_count", 0),
+                    "github_commits_count": github_commits_total,
+                    "total_activities": total_activities,
+                    "after_hours_percentage": round(after_hours_percentage, 1),
                     "high_severity_count": high_severity_count,
                     "users_involved": users_involved_count,  # Match SimpleBurnoutAnalyzer field name
                     "members_at_risk": members_at_risk,
