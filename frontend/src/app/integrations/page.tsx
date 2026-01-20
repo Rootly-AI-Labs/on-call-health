@@ -156,6 +156,7 @@ import { LinearDisconnectDialog } from "./dialogs/LinearDisconnectDialog"
 import { JiraWorkspaceSelector } from "./dialogs/JiraWorkspaceSelector"
 import { NewMappingDialog } from "./dialogs/NewMappingDialog"
 import { OrganizationManagementDialog } from "./dialogs/OrganizationManagementDialog"
+import { PostIntegrationSyncModal } from "./dialogs/PostIntegrationSyncModal"
 
 export default function IntegrationsPage() {
   // State management
@@ -239,6 +240,11 @@ export default function IntegrationsPage() {
 
   // Sync confirmation modal state
   const [showSyncConfirmModal, setShowSyncConfirmModal] = useState(false)
+
+  // Post-integration sync modal state
+  const [showPostIntegrationSyncModal, setShowPostIntegrationSyncModal] = useState(false)
+  const [postIntegrationModalType, setPostIntegrationModalType] = useState<'github' | 'slack' | 'jira' | 'linear' | null>(null)
+
   const [syncProgress, setSyncProgress] = useState<{
     stage: string
     details: string
@@ -1285,6 +1291,13 @@ export default function IntegrationsPage() {
                 description: `Successfully connected to ${data.integration.jira_site_url || 'your Jira workspace'}.`,
                 duration: 5000,
               })
+
+              // Show sync modal directly (OAuth callback context)
+              setTimeout(() => {
+                setPostIntegrationModalType('jira')
+                setShowPostIntegrationSyncModal(true)
+              }, 1000)
+
               return
             }
           }
@@ -1373,6 +1386,13 @@ export default function IntegrationsPage() {
                 description: `Successfully connected to ${data.integration.workspace_name || 'your Linear workspace'}.`,
                 duration: 5000,
               })
+
+              // Show sync modal directly (OAuth callback context)
+              setTimeout(() => {
+                setPostIntegrationModalType('linear')
+                setShowPostIntegrationSyncModal(true)
+              }, 1000)
+
               return
             }
           }
@@ -1997,18 +2017,35 @@ export default function IntegrationsPage() {
     return Utils.copyToClipboard(text, setCopied)
   }
 
+  // Helper function to check and show sync modal after integration connection
+  const checkAndShowSyncModal = (integrationType: 'github' | 'slack' | 'jira' | 'linear') => {
+    // Check if primary integration exists (Rootly or PagerDuty)
+    const hasPrimaryIntegration = integrations && integrations.length > 0
+
+    // Show modal whenever an integration is added, as long as primary integration exists
+    // This includes first-time connections AND re-adding integrations after removal
+    if (hasPrimaryIntegration) {
+      setPostIntegrationModalType(integrationType)
+      setShowPostIntegrationSyncModal(true)
+    }
+  }
+
   // GitHub integration handlers
   const handleGitHubConnect = async (token: string) => {
-    await GithubHandlers.handleGitHubConnect(
+    const result = await GithubHandlers.handleGitHubConnect(
       token,
       setIsConnectingGithub,
       setGithubToken,
       setActiveEnhancementTab,
       loadGitHubIntegration
     )
-    // Show sync prompt after successful connection
-    setSyncPromptMessage("GitHub connected! Sync team members to enable accurate  analysis")
-    setShowSyncPrompt(true)
+
+    if (result === 'show_sync_modal') {
+      // Wait for integration data to be reloaded, then check and show modal
+      setTimeout(() => {
+        checkAndShowSyncModal('github')
+      }, 500)
+    }
   }
 
   const handleGitHubDisconnect = async () => {
@@ -2025,7 +2062,7 @@ export default function IntegrationsPage() {
 
   // Slack integration handlers
   const handleSlackConnect = async (webhookUrl: string, botToken: string) => {
-    await SlackHandlers.handleSlackConnect(
+    const result = await SlackHandlers.handleSlackConnect(
       webhookUrl,
       botToken,
       setIsConnectingSlack,
@@ -2034,9 +2071,13 @@ export default function IntegrationsPage() {
       setActiveEnhancementTab,
       loadSlackIntegration
     )
-    // Show sync prompt after successful connection
-    setSyncPromptMessage("Slack connected! Sync team members to link Slack users with your team")
-    setShowSyncPrompt(true)
+
+    if (result === 'show_sync_modal') {
+      // Wait for integration data to be reloaded, then check and show modal
+      setTimeout(() => {
+        checkAndShowSyncModal('slack')
+      }, 500)
+    }
   }
 
   const handleSlackDisconnect = async () => {
@@ -2080,9 +2121,7 @@ export default function IntegrationsPage() {
       setActiveEnhancementTab,
       loadJiraIntegration
     )
-    // Show sync prompt after successful connection
-    setSyncPromptMessage("Jira connected! Sync team members to track workload and incidents")
-    setShowSyncPrompt(true)
+    // OAuth redirect will occur - modal will show after callback
   }
 
   const handleJiraDisconnect = async () => {
@@ -5123,6 +5162,23 @@ export default function IntegrationsPage() {
           // Refresh notifications or show success message
           toast.success("Survey delivery initiated successfully")
         }}
+      />
+
+      {/* Post-Integration Sync Guidance Modal */}
+      <PostIntegrationSyncModal
+        isOpen={showPostIntegrationSyncModal}
+        onClose={() => setShowPostIntegrationSyncModal(false)}
+        onSyncNow={() => {
+          setShowPostIntegrationSyncModal(false)
+          // Open sync confirmation modal
+          setShowSyncConfirmModal(true)
+        }}
+        integrationType={postIntegrationModalType || 'github'}
+        integrationName={
+          postIntegrationModalType === 'github' ? 'GitHub' :
+          postIntegrationModalType === 'slack' ? 'Slack' :
+          postIntegrationModalType === 'jira' ? 'Jira' : 'Linear'
+        }
       />
 
       {/* Sync Confirmation Modal */}
