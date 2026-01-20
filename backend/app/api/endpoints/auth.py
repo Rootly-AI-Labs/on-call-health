@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import text
+import logging
 
 from ...models import get_db, User, OAuthProvider, UserEmail, OrganizationInvitation
 from ...auth.oauth import google_oauth, github_oauth
@@ -21,6 +22,7 @@ from urllib.parse import quote
 from pydantic import field_validator, Field
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 # Allowed OAuth redirect origins
 ALLOWED_OAUTH_ORIGINS = [
@@ -34,6 +36,11 @@ ALLOWED_OAUTH_ORIGINS = [
     "https://www.oncallburnout.com",
     "https://oncallburnout.com"
 ]
+
+def build_error_redirect(frontend_url: str, error_msg: str) -> str:
+    """Build error redirect URL with properly encoded error message."""
+    safe_error_msg = error_msg if error_msg else "Unknown authentication error"
+    return f"{frontend_url}/auth/error?message={quote(safe_error_msg)}"
 
 # Helper functions for database-backed OAuth code storage
 def store_oauth_code(db: Session, code: str, jwt_token: str, user_id: int) -> None:
@@ -169,7 +176,7 @@ async def google_callback(
             return RedirectResponse(url=settings.FRONTEND_URL)
         else:
             # Other OAuth error
-            error_url = f"{settings.FRONTEND_URL}/auth/error?message={quote(f'OAuth error: {error}')}"
+            error_url = build_error_redirect(settings.FRONTEND_URL, f'OAuth error: {error}')
             return RedirectResponse(url=error_url)
 
     # No code means user canceled without error parameter
@@ -247,15 +254,13 @@ async def google_callback(
         return response
 
     except Exception as e:
-        import logging
-        logger = logging.getLogger(__name__)
         error_msg = str(e) if str(e) else "Unknown authentication error"
         logger.error(f"Google OAuth callback error: {error_msg}")
         # Use state for error redirect too
         frontend_url = settings.FRONTEND_URL
         if state and state in ALLOWED_OAUTH_ORIGINS:
             frontend_url = state
-        error_url = f"{frontend_url}/auth/error?message={quote(error_msg)}"
+        error_url = build_error_redirect(frontend_url, error_msg)
         return RedirectResponse(url=error_url)
 
 @router.get("/github")
@@ -298,7 +303,7 @@ async def github_callback(
             return RedirectResponse(url=settings.FRONTEND_URL)
         else:
             # Other OAuth error
-            error_url = f"{settings.FRONTEND_URL}/auth/error?message={quote(f'OAuth error: {error}')}"
+            error_url = build_error_redirect(settings.FRONTEND_URL, f'OAuth error: {error}')
             return RedirectResponse(url=error_url)
 
     # No code means user canceled without error parameter
@@ -375,15 +380,13 @@ async def github_callback(
         return response
 
     except Exception as e:
-        import logging
-        logger = logging.getLogger(__name__)
         error_msg = str(e) if str(e) else "Unknown authentication error"
         logger.error(f"GitHub OAuth callback error: {error_msg}")
         # Use state for error redirect too
         frontend_url = settings.FRONTEND_URL
         if state and state in ALLOWED_OAUTH_ORIGINS:
             frontend_url = state
-        error_url = f"{frontend_url}/auth/error?message={quote(error_msg)}"
+        error_url = build_error_redirect(frontend_url, error_msg)
         return RedirectResponse(url=error_url)
 
 @router.get("/me")
