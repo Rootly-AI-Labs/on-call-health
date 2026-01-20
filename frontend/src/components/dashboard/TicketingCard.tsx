@@ -112,6 +112,15 @@ function safeDateCompare(dateA: string | null, dateB: string | null): number {
   return aTime - bTime
 }
 
+// Jira priority order mapping
+const JIRA_PRIORITY_ORDER: { [key: string]: number } = {
+  highest: 1,
+  high: 2,
+  medium: 3,
+  low: 4,
+  lowest: 5,
+}
+
 // Sort Jira tickets by priority then due date
 function sortJiraTickets(tickets: any[]): any[] {
   return [...tickets].sort((a, b) => {
