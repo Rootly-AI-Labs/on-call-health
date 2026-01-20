@@ -243,8 +243,7 @@ async def _fetch_and_apply_permissions(
             return (index, None, str(e))
 
     results = await asyncio.gather(
-        *[fetch_single(int_id, token, idx) for int_id, token, idx in uncached_integrations],
-        return_exceptions=True
+        *[fetch_single(int_id, token, idx) for int_id, token, idx in uncached_integrations]
     )
 
     for result in results:
