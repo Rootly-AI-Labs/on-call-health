@@ -12,6 +12,7 @@ interface IncidentUser {
 
 interface Incident {
   id?: string
+  slug?: string
   attributes?: {
     title?: string
     summary?: string
@@ -69,7 +70,8 @@ function getIncidentUrl(incident: Incident, platform: string): string | null {
 
   // For Rootly, use slug to construct URL
   // Rootly URL format: https://rootly.com/account/incidents/{slug}
-  const slug = incident.attributes?.slug
+  // Check both top-level slug (from processed data) and attributes.slug (from raw data)
+  const slug = incident.slug || incident.attributes?.slug
   if (slug) {
     return `https://rootly.com/account/incidents/${slug}`
   }
