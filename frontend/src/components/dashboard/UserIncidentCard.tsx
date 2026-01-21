@@ -221,8 +221,7 @@ export function UserIncidentCard({
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex-1 space-y-1.5">
-            <CardTitle className="flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-orange-500" />
+            <CardTitle>
               Incidents
             </CardTitle>
             <CardDescription>Past {timeRange} days</CardDescription>
