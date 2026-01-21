@@ -717,7 +717,7 @@ async def delete_analysis(
     db.delete(analysis)
     db.commit()
     
-    logger.info(f"Analysis {analysis_ref} deleted by user {current_user.id}")
+    logger.info(f"Analysis {analysis_id} deleted by user {current_user.id}")
     
     return {"message": "Analysis deleted successfully"}
 
