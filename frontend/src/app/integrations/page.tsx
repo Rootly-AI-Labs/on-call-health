@@ -5174,11 +5174,6 @@ export default function IntegrationsPage() {
           setShowSyncConfirmModal(true)
         }}
         integrationType={postIntegrationModalType || 'github'}
-        integrationName={
-          postIntegrationModalType === 'github' ? 'GitHub' :
-          postIntegrationModalType === 'slack' ? 'Slack' :
-          postIntegrationModalType === 'jira' ? 'Jira' : 'Linear'
-        }
       />
 
       {/* Sync Confirmation Modal */}
