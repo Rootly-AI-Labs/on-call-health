@@ -17,9 +17,9 @@ class UserNotification(Base):
     id = Column(Integer, primary_key=True, index=True)
 
     # User targeting
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # Null for email-only notifications
-    email = Column(String(255), nullable=True)  # For unregistered users
-    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)  # Null for email-only notifications
+    email = Column(String(255), nullable=True, index=True)  # For unregistered users
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)
 
     # Notification content
     type = Column(String(50), nullable=False)  # 'invitation', 'survey', 'integration', 'analysis'
@@ -35,11 +35,11 @@ class UserNotification(Base):
     analysis_id = Column(Integer, ForeignKey("analyses.id"), nullable=True)
 
     # Status and priority
-    status = Column(String(20), default="unread")  # 'unread', 'read', 'dismissed', 'acted'
+    status = Column(String(20), default="unread", index=True)  # 'unread', 'read', 'dismissed', 'acted'
     priority = Column(String(20), default="normal")  # 'high', 'normal', 'low'
 
     # Timestamps
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     read_at = Column(DateTime(timezone=True), nullable=True)
     expires_at = Column(DateTime(timezone=True), nullable=True)
 

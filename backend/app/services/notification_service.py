@@ -1,11 +1,15 @@
 """
 Service for creating and managing user notifications.
 """
+import logging
 from datetime import datetime, timedelta, timezone
-from typing import List, Optional
+from typing import List, Optional, Tuple
+from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
 from ..models import UserNotification, User, OrganizationInvitation, Analysis, Organization
+
+logger = logging.getLogger(__name__)
 
 class NotificationService:
     """Service for creating and managing notifications."""
@@ -286,6 +290,55 @@ class NotificationService:
         ).offset(offset).limit(limit).all()
 
         return notifications
+
+    def get_notifications_with_counts(
+        self, user: User, limit: int = 20, offset: int = 0
+    ) -> Tuple[List[UserNotification], int, int]:
+        """
+        Get notifications with unread and total counts in fewer database round trips.
+
+        This optimized method reduces 3 separate database queries to 2 by combining
+        both counts in a single query using conditional aggregation (CASE statements).
+
+        Args:
+            user: The user to get notifications for
+            limit: Maximum number of notifications to return
+            offset: Number of notifications to skip for pagination
+
+        Returns:
+            Tuple of (notifications list, unread count, total count)
+        """
+        user_filter = (
+            (UserNotification.user_id == user.id) |
+            (UserNotification.email == user.email)
+        )
+
+        counts_result = self.db.query(
+            func.sum(
+                case((UserNotification.status == 'unread', 1), else_=0)
+            ).label('unread_count'),
+            func.sum(
+                case((UserNotification.status.notin_(['dismissed', 'acted']), 1), else_=0)
+            ).label('total_count')
+        ).filter(user_filter).one()
+
+        unread_count = counts_result.unread_count or 0
+        total_count = counts_result.total_count or 0
+
+        notifications = self.db.query(UserNotification).filter(
+            user_filter,
+            UserNotification.status.notin_(['dismissed', 'acted'])
+        ).order_by(
+            UserNotification.priority.desc(),
+            UserNotification.created_at.desc()
+        ).offset(offset).limit(limit).all()
+
+        logger.debug(
+            "get_notifications_with_counts: user_id=%s, fetched=%d, unread=%d, total=%d",
+            user.id, len(notifications), unread_count, total_count
+        )
+
+        return notifications, unread_count, total_count
 
     def get_unread_count(self, user: User) -> int:
         """Get count of unread notifications for a user."""
