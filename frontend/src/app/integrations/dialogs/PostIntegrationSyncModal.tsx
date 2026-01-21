@@ -35,6 +35,24 @@ export function PostIntegrationSyncModal({
 }: PostIntegrationSyncModalProps) {
   const content = integrationContent[integrationType]
 
+  // Defensive check: return empty dialog if content is undefined
+  if (!content) {
+    return (
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-center text-2xl">
+              Integration Connected
+            </DialogTitle>
+            <DialogDescription className="text-center text-base mt-2">
+              Your integration has been successfully connected.
+            </DialogDescription>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>
+    )
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-md">
