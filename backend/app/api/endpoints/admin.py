@@ -48,12 +48,20 @@ def _get_client_ip(request: Request) -> str:
     Get the real client IP, handling reverse proxies.
     Checks X-Forwarded-For header first (set by load balancers/proxies),
     then falls back to direct client connection.
+    Validates IP format to prevent header injection attacks.
     """
     forwarded_for = request.headers.get("X-Forwarded-For")
     if forwarded_for:
         # X-Forwarded-For can contain multiple IPs: "client, proxy1, proxy2"
         # The first one is the original client
-        return forwarded_for.split(",")[0].strip()
+        client_ip = forwarded_for.split(",")[0].strip()
+        try:
+            # Validate IP format to prevent header injection
+            ipaddress.ip_address(client_ip)
+            return client_ip
+        except ValueError:
+            # Invalid IP in header, fall back to direct client
+            pass
     return request.client.host if request.client else "unknown"
 
 def _is_ip_whitelisted(client_ip: str, whitelist: set) -> bool:
