@@ -51,7 +51,7 @@ import { TeamHealthOverview } from "@/components/dashboard/TeamHealthOverview"
 import { AnalysisProgressSection } from "@/components/dashboard/AnalysisProgressSection"
 import { TeamMembersList } from "@/components/dashboard/TeamMembersList"
 import { ObjectiveDataCard } from "@/components/dashboard/ObjectiveDataCard"
-import { TeamRiskFactorsCard } from "@/components/dashboard/TeamRiskFactorsCard"
+import { TeamRiskFactorsCard, FACTOR_DESCRIPTIONS } from "@/components/dashboard/TeamRiskFactorsCard"
 import { MemberDetailModal } from "@/components/dashboard/MemberDetailModal"
 import { GitHubCommitsTimeline } from "@/components/dashboard/charts/GitHubCommitsTimeline"
 import GitHubAllMetricsPopup from "@/components/dashboard/GitHubAllMetricsPopup"
@@ -1194,7 +1194,18 @@ function DashboardContent() {
                               return (
                                 <div key={factor.factor} className="relative rounded-lg p-4 bg-white">
                                   <div className="flex items-center justify-between mb-2">
-                                    <span className="font-medium text-neutral-900">{factor.factor}</span>
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="font-medium text-neutral-900">{factor.factor}</span>
+                                      {FACTOR_DESCRIPTIONS[factor.factor] && (
+                                        <div className="relative group">
+                                          <Info className="w-3.5 h-3.5 text-neutral-400 cursor-help hover:text-neutral-600 transition-colors" />
+                                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-neutral-900/95 text-white text-xs rounded-lg w-56 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                                            {FACTOR_DESCRIPTIONS[factor.factor].tooltip}
+                                            <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-900/95"></div>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
                                     <span
                                       className={`px-2 py-1 rounded-full text-xs font-medium ${
                                         factor.severity === 'Critical'

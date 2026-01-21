@@ -3,6 +3,7 @@
 import { BaseRiskFactorsCard } from "./BaseRiskFactorsCard"
 
 export const FACTOR_DESCRIPTIONS: Record<string, { tooltip: string }> = {
+  // Team-level factor names
   'Workload Intensity': {
     tooltip: 'Measures workload stress by weighting incidents based on their severity level. Higher values indicate more stressful workload.'
   },
@@ -17,6 +18,22 @@ export const FACTOR_DESCRIPTIONS: Record<string, { tooltip: string }> = {
   },
   'Response Time': {
     tooltip: 'Measures urgency of response requirements and time pressure.'
+  },
+  // Individual-level factor names
+  'After-hours activity': {
+    tooltip: 'Work outside business hours (9 AM - 5 PM) and weekends. Timezone-aware based on team member\'s local time.'
+  },
+  'High-severity incidents': {
+    tooltip: 'Count of critical and high-severity incidents handled. These require immediate attention and cause higher stress.'
+  },
+  'On-call load': {
+    tooltip: 'Total incident volume and frequency during on-call shifts. Counts all incidents regardless of severity.'
+  },
+  'Task load': {
+    tooltip: 'Number of tasks and tickets assigned. Higher counts indicate more workload pressure.'
+  },
+  'Severity-weighted workload': {
+    tooltip: 'Workload score weighted by incident severity. Critical incidents count more than lower severity ones.'
   }
 }
 
