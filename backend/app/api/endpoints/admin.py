@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from ...core.rate_limiting import admin_rate_limit
 from ...models import Analysis, get_db
 from ...models.user import User
+from ...services.demo_analysis_service import _get_or_create_demo_organization, _load_health_checkins_for_user
 
 logger = logging.getLogger(__name__)
 
@@ -187,23 +188,41 @@ async def refresh_demo_analyses(
 
         updated_count = 0
         created_count = 0
+        checkins_loaded = 0
         errors = []
+
+        # Get or create demo organization for health check-ins
+        demo_organization_id = _get_or_create_demo_organization(db)
+        logger.info(f"ADMIN: Using demo organization {demo_organization_id}")
 
         # Update existing demo analyses
         for analysis in demo_analyses:
             try:
+                logger.info(f"ADMIN: Updating demo for user #{analysis.user_id} (analysis #{analysis.id})")
                 analysis.results = new_results
                 config = analysis.config.copy() if analysis.config else {}
                 config['demo_updated_at'] = datetime.now().isoformat()
                 analysis.config = config
                 updated_count += 1
+                logger.info(f"ADMIN: Successfully updated demo for user #{analysis.user_id}")
             except Exception as e:
+                logger.error(f"ADMIN: Failed to update demo for user #{analysis.user_id}: {str(e)}")
                 errors.append(f"Failed to update analysis #{analysis.id}: {str(e)}")
 
         # Commit updates before creating new ones - prevents rollback from losing updates
         if updated_count > 0:
             db.commit()
             logger.info(f"ADMIN: Committed {updated_count} demo updates")
+
+        # Load health check-ins for users with existing demo analyses
+        for analysis in demo_analyses:
+            try:
+                checkins_result = _load_health_checkins_for_user(db, analysis.user_id, demo_organization_id, mock_data)
+                if checkins_result['created'] > 0:
+                    checkins_loaded += checkins_result['created']
+                    logger.info(f"ADMIN: Loaded {checkins_result['created']} health check-ins for user #{analysis.user_id}")
+            except Exception as e:
+                logger.warning(f"ADMIN: Failed to load health check-ins for user #{analysis.user_id}: {e}")
 
         # Create demo analyses for users who don't have one
         users = db.query(User).all()
@@ -221,7 +240,7 @@ async def refresh_demo_analyses(
 
                     new_analysis = Analysis(
                         user_id=user.id,
-                        organization_id=getattr(user, 'organization_id', None),
+                        organization_id=demo_organization_id,
                         rootly_integration_id=None,
                         integration_name="Demo Analysis",
                         platform=original_analysis.get('platform', 'rootly'),
@@ -236,6 +255,16 @@ async def refresh_demo_analyses(
                     db.flush()  # Flush immediately to catch per-user errors
                     created_count += 1
                     logger.info(f"ADMIN: Successfully created demo for user #{user.id}")
+
+                    # Load health check-ins for the new user
+                    try:
+                        checkins_result = _load_health_checkins_for_user(db, user.id, demo_organization_id, mock_data)
+                        if checkins_result['created'] > 0:
+                            checkins_loaded += checkins_result['created']
+                            logger.info(f"ADMIN: Loaded {checkins_result['created']} health check-ins for user #{user.id}")
+                    except Exception as e:
+                        logger.warning(f"ADMIN: Failed to load health check-ins for user #{user.id}: {e}")
+
                 except Exception as e:
                     logger.error(f"ADMIN: Failed to create demo for user #{user.id}: {str(e)}")
                     errors.append(f"Failed to create demo for user #{user.id} ({user.email}): {str(e)}")
@@ -254,6 +283,7 @@ async def refresh_demo_analyses(
             "updated_count": updated_count,
             "created_count": created_count,
             "total_demo_analyses": updated_count + created_count,
+            "health_checkins_loaded": checkins_loaded,
             "errors": errors or None
         }
 
