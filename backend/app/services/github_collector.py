@@ -10,6 +10,7 @@ from typing import Dict, List, Optional
 import requests
 import asyncio
 import os
+import pytz
 
 logger = logging.getLogger(__name__)
 
@@ -276,7 +277,7 @@ class GitHubCollector:
         
         return emails
         
-    async def _fetch_real_github_data(self, username: str, email: str, start_date: datetime, end_date: datetime, token: str) -> Dict:
+    async def _fetch_real_github_data(self, username: str, email: str, start_date: datetime, end_date: datetime, token: str, timezone: str = 'UTC') -> Dict:
         """Fetch real GitHub data using the GitHub API with enterprise resilience."""
 
         logger.info(f"🔍 [GITHUB_API] Starting data fetch for {username} ({email}): {start_date.date()} to {end_date.date()}")
@@ -350,7 +351,7 @@ class GitHubCollector:
 
             # Fetch detailed daily commit data with timestamps
             logger.debug(f"🔄 Fetching detailed daily commit data for {username}")
-            daily_commits_data = await self.fetch_daily_commit_data(username, start_date, end_date, token)
+            daily_commits_data = await self.fetch_daily_commit_data(username, start_date, end_date, token, timezone)
 
             # Build commits array from daily data for timeline processing
             commits_array = []
@@ -361,16 +362,24 @@ class GitHubCollector:
                     # Create a timestamp for aggregation at midnight of that date
                     date_str = daily.get('date', '')
                     if date_str:
-                        # Create timestamps for this day's after-hours commits
+                        # Create timestamps for this day's after-hours and weekend commits
                         date_obj = datetime.fromisoformat(date_str)
                         after_hours_count = daily.get('after_hours_commits', 0)
                         weekend_count = daily.get('weekend_commits', 0)
 
-                        # Generate individual commit timestamps for after-hours and weekend commits
+                        # Generate timestamps for after-hours commits (22:00-23:59)
                         for i in range(after_hours_count):
-                            # Distribute after-hours commits across after-business-hours times (22:00 - 23:59 or 00:00 - 08:59)
+                            # Distribute after-hours commits across late-night hours (22 and 23)
                             hour = 22 + (i % 2)  # Alternate between 22 and 23
                             minute = (i * 17) % 60  # Distribute by minute
+                            commit_dt = date_obj.replace(hour=hour, minute=minute).isoformat() + 'Z'
+                            commits_array.append({"timestamp": commit_dt})
+
+                        # Generate timestamps for weekend commits (10:00-16:59 for weekend daytime hours)
+                        # Note: This may include overlap with after-hours weekend commits, but captures weekend work activity
+                        for i in range(weekend_count):
+                            hour = 10 + (i % 8)  # Distribute across daytime hours
+                            minute = (i * 13) % 60  # Different distribution than after-hours
                             commit_dt = date_obj.replace(hour=hour, minute=minute).isoformat() + 'Z'
                             commits_array.append({"timestamp": commit_dt})
 
@@ -451,15 +460,16 @@ class GitHubCollector:
             # Don't fall back to mock data - return None to indicate failure
             return None
         
-    async def fetch_daily_commit_data(self, username: str, start_date: datetime, end_date: datetime, github_token: str) -> Optional[List[Dict]]:
+    async def fetch_daily_commit_data(self, username: str, start_date: datetime, end_date: datetime, github_token: str, timezone: str = 'UTC') -> Optional[List[Dict]]:
         """
         Fetch daily commit data for a GitHub user over a specified period.
-        
+
         Args:
             username: GitHub username
             start_date: Start date for the analysis period
             end_date: End date for the analysis period
             github_token: GitHub API token
+            timezone: User's timezone for business hours calculation (default: 'UTC')
             
         Returns:
             List of daily commit data or None if error
@@ -497,6 +507,7 @@ class GitHubCollector:
                     daily_commits[date_str] = {
                         'date': date_str,
                         'commits': 0,
+                        'total_commits': 0,  # Track total commits for each day
                         'after_hours_commits': 0,
                         'weekend_commits': 0
                     }
@@ -534,20 +545,30 @@ class GitHubCollector:
                                 date_str = author.get('date', '')
                                 
                                 if date_str:
-                                    # Parse commit datetime
-                                    commit_dt = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
-                                    commit_date = commit_dt.strftime('%Y-%m-%d')
-                                    
+                                    # Parse commit datetime (UTC)
+                                    commit_dt_utc = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+
+                                    # Convert to user's local timezone for business hours calculation
+                                    try:
+                                        tz = pytz.timezone(timezone)
+                                        commit_dt_local = commit_dt_utc.astimezone(tz)
+                                    except (pytz.exceptions.UnknownTimeZoneError, Exception):
+                                        logger.warning(f"Invalid timezone '{timezone}', using UTC")
+                                        commit_dt_local = commit_dt_utc
+
+                                    commit_date = commit_dt_utc.strftime('%Y-%m-%d')
+
                                     if commit_date in daily_commits:
                                         daily_commits[commit_date]['commits'] += 1
-                                        
-                                        # Check if after hours (before 9am or after 5pm local time)
-                                        hour = commit_dt.hour
-                                        if hour < 9 or hour >= 17:
+                                        daily_commits[commit_date]['total_commits'] += 1
+
+                                        # Check if after hours (using configurable business hours in local timezone)
+                                        hour = commit_dt_local.hour
+                                        if hour < self.business_hours['start'] or hour >= self.business_hours['end']:
                                             daily_commits[commit_date]['after_hours_commits'] += 1
-                                            
-                                        # Check if weekend
-                                        if commit_dt.weekday() >= 5:  # Saturday = 5, Sunday = 6
+
+                                        # Check if weekend (using local timezone date)
+                                        if commit_dt_local.weekday() >= 5:  # Saturday = 5, Sunday = 6
                                             daily_commits[commit_date]['weekend_commits'] += 1
                             
                             total_fetched += len(items)
@@ -583,7 +604,7 @@ class GitHubCollector:
             logger.error(f"Error fetching daily commit data for {username}: {e}")
             return None
     
-    async def collect_github_data_for_user(self, user_email: str, days: int = 30, github_token: str = None, user_id: Optional[int] = None, full_name: Optional[str] = None) -> Optional[Dict]:
+    async def collect_github_data_for_user(self, user_email: str, days: int = 30, github_token: str = None, user_id: Optional[int] = None, full_name: Optional[str] = None, timezone: str = 'UTC') -> Optional[Dict]:
         """
         Collect GitHub activity data for a single user using email correlation.
 
@@ -592,6 +613,8 @@ class GitHubCollector:
             days: Number of days to analyze
             github_token: GitHub API token for authentication
             user_id: User ID for checking manual mappings
+            full_name: User's full name
+            timezone: User's timezone for business hours calculation (default: 'UTC')
 
         Returns:
             GitHub activity data or None if no correlation found
@@ -615,7 +638,7 @@ class GitHubCollector:
         # Use real GitHub API if token provided
         if github_token:
             logger.info(f"🔄 [GITHUB_COLLECTION] Fetching data from GitHub API for {github_username}")
-            result = await self._fetch_real_github_data(github_username, user_email, start_date, end_date, github_token)
+            result = await self._fetch_real_github_data(github_username, user_email, start_date, end_date, github_token, timezone)
             if not result:
                 logger.error(f"❌ [GITHUB_COLLECTION] Failed to fetch GitHub data for {github_username}")
                 return None
@@ -732,25 +755,26 @@ class GitHubCollector:
         self.last_request_time = time.time()
 
 
-async def collect_team_github_data(team_emails: List[str], days: int = 30, github_token: str = None, user_id: Optional[int] = None) -> Dict[str, Dict]:
+async def collect_team_github_data(team_emails: List[str], days: int = 30, github_token: str = None, user_id: Optional[int] = None, timezone: str = 'UTC') -> Dict[str, Dict]:
     """
     Collect GitHub data for all team members.
-    
+
     Args:
         team_emails: List of team member emails
         days: Number of days to analyze
         github_token: GitHub API token for real data collection
         user_id: User ID for checking manual mappings
-        
+        timezone: User's timezone for business hours calculation (default: 'UTC')
+
     Returns:
         Dict mapping email -> github_activity_data
     """
     collector = GitHubCollector()
     github_data = {}
-    
+
     for email in team_emails:
         try:
-            user_data = await collector.collect_github_data_for_user(email, days, github_token, user_id)
+            user_data = await collector.collect_github_data_for_user(email, days, github_token, user_id, timezone=timezone)
             if user_data:
                 github_data[email] = user_data
         except Exception as e:
