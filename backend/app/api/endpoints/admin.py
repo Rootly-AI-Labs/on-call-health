@@ -15,10 +15,6 @@ from sqlalchemy.orm import Session
 from ...core.rate_limiting import admin_rate_limit
 from ...models import Analysis, get_db
 from ...models.user import User
-from ...models.user_burnout_report import UserBurnoutReport
-from ...models.user_correlation import UserCorrelation
-from ...services.demo_analysis_service import _get_or_create_demo_organization, _load_health_checkins_for_user
-from sqlalchemy.exc import IntegrityError
 
 logger = logging.getLogger(__name__)
 
@@ -196,26 +192,18 @@ async def refresh_demo_analyses(
         # Update existing demo analyses
         for analysis in demo_analyses:
             try:
-                logger.info(f"ADMIN: Updating demo for user #{analysis.user_id} (analysis #{analysis.id})")
                 analysis.results = new_results
                 config = analysis.config.copy() if analysis.config else {}
                 config['demo_updated_at'] = datetime.now().isoformat()
-                config['demo_note'] = 'This is a sample analysis to help you explore the platform'
                 analysis.config = config
                 updated_count += 1
-                logger.info(f"ADMIN: Successfully updated demo for user #{analysis.user_id}")
             except Exception as e:
-                logger.error(f"ADMIN: Failed to update demo for user #{analysis.user_id}: {str(e)}")
                 errors.append(f"Failed to update analysis #{analysis.id}: {str(e)}")
 
         # Commit updates before creating new ones - prevents rollback from losing updates
         if updated_count > 0:
             db.commit()
             logger.info(f"ADMIN: Committed {updated_count} demo updates")
-
-        # Get or create demo organization for new analyses
-        demo_organization_id = _get_or_create_demo_organization(db)
-        logger.info(f"ADMIN: Using demo organization {demo_organization_id}")
 
         # Create demo analyses for users who don't have one
         users = db.query(User).all()
@@ -230,14 +218,13 @@ async def refresh_demo_analyses(
                     config = original_analysis.get('config', {}).copy()
                     config['is_demo'] = True
                     config['demo_created_at'] = datetime.now().isoformat()
-                    config['demo_note'] = 'This is a sample analysis to help you explore the platform'
 
                     new_analysis = Analysis(
                         user_id=user.id,
-                        organization_id=demo_organization_id,
+                        organization_id=getattr(user, 'organization_id', None),
                         rootly_integration_id=None,
                         integration_name="Demo Analysis",
-                        platform=original_analysis.get('platform', 'pagerduty'),
+                        platform=original_analysis.get('platform', 'rootly'),
                         time_range=original_analysis.get('time_range', 30),
                         status="completed",
                         config=config,
@@ -249,20 +236,6 @@ async def refresh_demo_analyses(
                     db.flush()  # Flush immediately to catch per-user errors
                     created_count += 1
                     logger.info(f"ADMIN: Successfully created demo for user #{user.id}")
-
-                    # Load health check-in data (burnout reports) for the user
-                    try:
-                        checkins_result = _load_health_checkins_for_user(db, user.id, demo_organization_id, mock_data)
-                        if checkins_result['created'] > 0 or checkins_result['skipped'] > 0:
-                            logger.info(f"ADMIN: Loaded {checkins_result['created']} new and {checkins_result['skipped']} "
-                                      f"duplicate health check-ins for user #{user.id}")
-                    except Exception as e:
-                        logger.warning(f"ADMIN: Failed to load health check-ins for user #{user.id}: {e}")
-
-                except IntegrityError as e:
-                    logger.error(f"ADMIN: Integrity error creating demo for user #{user.id}: {str(e)}")
-                    errors.append(f"Failed to create demo for user #{user.id} ({user.email}): {str(e)}")
-                    db.rollback()  # Rollback this specific failure
                 except Exception as e:
                     logger.error(f"ADMIN: Failed to create demo for user #{user.id}: {str(e)}")
                     errors.append(f"Failed to create demo for user #{user.id} ({user.email}): {str(e)}")
