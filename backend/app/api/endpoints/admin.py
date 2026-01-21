@@ -31,9 +31,9 @@ router = APIRouter(
 ADMIN_API_KEY = os.getenv("ADMIN_API_KEY")
 MIN_API_KEY_LENGTH = 32
 
-# ADMIN_IP_WHITELIST: Optional comma-separated list of allowed IP addresses or CIDR ranges
+# ADMIN_IP_WHITELIST: Required comma-separated list of allowed IP addresses or CIDR ranges
 # Example: "10.0.0.1,192.168.1.0/24,203.0.113.50"
-# If not set, IP whitelist is disabled (all IPs allowed if API key is valid)
+# Must be configured for admin endpoints to function (defense in depth)
 ADMIN_IP_WHITELIST = os.getenv("ADMIN_IP_WHITELIST", "").strip()
 
 def _parse_ip_whitelist() -> set:
@@ -66,39 +66,41 @@ def _get_client_ip(request: Request) -> str:
 def _is_ip_whitelisted(client_ip: str, whitelist: set) -> bool:
     """Check if client IP is in the whitelist. Supports both exact IPs and CIDR ranges."""
     if not whitelist:
-        return True  # No whitelist configured, allow all
+        return False
 
     try:
         client_addr = ipaddress.ip_address(client_ip)
-        for entry in whitelist:
-            try:
-                if '/' in entry:
-                    # CIDR range (e.g., "192.168.1.0/24")
-                    if client_addr in ipaddress.ip_network(entry, strict=False):
-                        return True
-                else:
-                    # Exact IP match
-                    if client_addr == ipaddress.ip_address(entry):
-                        return True
-            except ValueError:
-                # Invalid entry in whitelist, skip it
-                continue
     except ValueError:
-        # Invalid client IP format
         return False
+
+    for entry in whitelist:
+        try:
+            if '/' in entry:
+                if client_addr in ipaddress.ip_network(entry, strict=False):
+                    return True
+            elif client_addr == ipaddress.ip_address(entry):
+                return True
+        except ValueError:
+            continue
 
     return False
 
 def _validate_admin_api_key() -> bool:
     """Validate that ADMIN_API_KEY meets security requirements."""
     if not ADMIN_API_KEY:
+        logger.error(
+            f"SECURITY: ADMIN_API_KEY is not configured. Admin endpoints will be disabled. "
+            f"Set ADMIN_API_KEY env var with at least {MIN_API_KEY_LENGTH} characters."
+        )
         return False
+
     if len(ADMIN_API_KEY) < MIN_API_KEY_LENGTH:
         logger.error(
-            "SECURITY: ADMIN_API_KEY is too short. "
+            f"SECURITY: ADMIN_API_KEY is too short ({len(ADMIN_API_KEY)} chars). "
             f"Minimum required: {MIN_API_KEY_LENGTH} chars. Admin endpoints will be disabled."
         )
         return False
+
     return True
 
 # Validate API key at module load time
@@ -107,6 +109,8 @@ _ip_whitelist = _parse_ip_whitelist()
 
 if _ip_whitelist:
     logger.info(f"SECURITY: Admin IP whitelist enabled with {len(_ip_whitelist)} entries")
+else:
+    logger.error("SECURITY: ADMIN_IP_WHITELIST is not configured. Admin endpoints will be disabled.")
 
 
 @router.post("/refresh-demo-analyses")
@@ -123,10 +127,14 @@ async def refresh_demo_analyses(
     who don't have a demo analysis. Use this after updating mock_analysis_data.json
     with new fields or data.
 
-    Security: API key authentication with optional IP whitelist.
-    - Requires valid X-Admin-API-Key header (32+ char key)
-    - Optional IP whitelist via ADMIN_IP_WHITELIST env var
+    Security Requirements:
+    - ADMIN_API_KEY env var: Must be at least 32 characters (required)
+    - ADMIN_IP_WHITELIST env var: Comma-separated IPs/CIDRs (required)
+    - X-Admin-API-Key header: Must match ADMIN_API_KEY
     - Rate limited to 5 requests/minute
+
+    Returns 503 if ADMIN_API_KEY or ADMIN_IP_WHITELIST is not properly configured.
+    Returns 403 if IP not whitelisted or API key doesn't match.
     """
     client_ip = _get_client_ip(request)
 
