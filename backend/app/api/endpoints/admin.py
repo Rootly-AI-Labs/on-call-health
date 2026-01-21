@@ -230,6 +230,9 @@ async def refresh_demo_analyses(
                 logger.warning(f"ADMIN: Failed to load health check-ins for user #{analysis.user_id}: {e}")
 
         # Ensure UserCorrelation records exist for all team members with health check-ins
+        # Clear session to get fresh database state after _load_health_checkins_for_user calls
+        db.expire_all()
+
         # Query directly from database to get emails that exist in user_burnout_reports
         correlations_created = 0
         existing_emails = db.query(distinct(UserBurnoutReport.email)).filter(
