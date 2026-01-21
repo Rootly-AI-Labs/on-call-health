@@ -43,6 +43,7 @@ export async function loadGitHubIntegration(
 
 /**
  * Connect GitHub integration with personal access token
+ * Returns 'show_sync_modal' if modal should be shown, 'no_modal' otherwise
  */
 export async function handleGitHubConnect(
   token: string,
@@ -50,7 +51,7 @@ export async function handleGitHubConnect(
   setGithubToken: (token: string) => void,
   setActiveEnhancementTab: (tab: "github" | "slack" | null) => void,
   loadGitHubIntegration: (forceRefresh: boolean) => void
-): Promise<void> {
+): Promise<'show_sync_modal' | 'no_modal'> {
   setIsConnectingGithub(true)
   try {
     const authToken = localStorage.getItem('auth_token')
@@ -77,9 +78,12 @@ export async function handleGitHubConnect(
     setGithubToken('')
     setActiveEnhancementTab(null)
     loadGitHubIntegration(true) // Force refresh to update cache
+
+    return 'show_sync_modal'
   } catch (error) {
     console.error('Error connecting GitHub:', error)
     toast.error(error instanceof Error ? error.message : "An unexpected error occurred.")
+    return 'no_modal'
   } finally {
     setIsConnectingGithub(false)
   }
