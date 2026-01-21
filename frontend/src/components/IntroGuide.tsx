@@ -106,12 +106,9 @@ function IntroGuide({ isOpen, currentStep, onNext, onPrev, onClose }: IntroGuide
 
           {/* Footer */}
           <div className="flex items-center justify-between p-6 gap-3 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-200 dark:border-slate-800">
-            <button
-              onClick={onClose}
-              className="text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors"
-            >
+            <Button variant="outline" onClick={onClose} className="bg-transparent">
               Skip
-            </button>
+            </Button>
 
             <div className="flex gap-3">
               <Button variant="outline" onClick={onPrev} disabled={currentStep === 0} className="gap-2 bg-transparent">

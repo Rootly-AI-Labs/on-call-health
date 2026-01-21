@@ -174,6 +174,24 @@ export function TrendsCard({
                               <p className="text-sm text-neutral-300 font-semibold">{metricValue}</p>
                               <p className="text-xs text-neutral-400 mt-1">{meanScore}</p>
                             </>
+                          ) : selectedMetric === 'after_hours' ? (
+                            <>
+                              <p className="text-sm text-neutral-300">
+                                {config.label}: <span className="font-semibold">{metricValue}%</span>
+                              </p>
+                              <p className="text-xs text-neutral-400 mt-1">
+                                {data?.afterHours || 0} of {data?.totalActivities || 0} activities
+                              </p>
+                              <p className="text-xs text-neutral-400 mt-1">
+                                • After Hours Incidents: {data?.afterHoursIncidents || 0}
+                              </p>
+                              <p className="text-xs text-neutral-400">
+                                • After Hours Commits: {data?.afterHoursCommits || 0}
+                              </p>
+                              <p className="text-xs text-neutral-400 mt-1">
+                                Mean: {meanScore}%
+                              </p>
+                            </>
                           ) : (
                             <>
                               <p className="text-sm text-neutral-300">

@@ -103,9 +103,28 @@ export default function LandingPage() {
       // Pass the current origin to the backend
       const currentOrigin = window.location.origin
       const response = await fetch(`${API_BASE}/auth/github?redirect_origin=${encodeURIComponent(currentOrigin)}`)
+
+      // Check if response is ok before parsing JSON
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('GitHub auth API error:', response.status, errorText)
+        throw new Error(`Authentication failed: ${response.status}`)
+      }
+
+      // Check content type to ensure it's JSON
+      const contentType = response.headers.get('content-type')
+      if (!contentType || !contentType.includes('application/json')) {
+        const responseText = await response.text()
+        console.error('Expected JSON but got:', contentType, responseText)
+        throw new Error('Invalid response format from authentication server')
+      }
+
       const data = await response.json()
       if (data.authorization_url) {
         window.location.href = data.authorization_url
+      } else {
+        console.error('No authorization URL in response:', data)
+        throw new Error('Invalid authentication response')
       }
     } catch (error) {
       console.error('GitHub login error:', error)
@@ -117,11 +136,11 @@ export default function LandingPage() {
     <div className={`${ppMori.className} min-h-screen bg-white overflow-x-hidden`}>
 
       {/* Hero Section */}
-      <section className="bg-[url(/images/landing/rootly-bg.avif)] bg-[size:210%] bg-[position:-1200px_-300px] relative lg:pb-[120px]" id="get-started">
+      <section className="bg-[url(/images/landing/rootly-bg.avif)] bg-cover bg-[position:50%_15%] lg:bg-[size:210%] lg:bg-[position:-1200px_-300px] relative lg:pb-[120px]" id="get-started">
         {/* Header */}
         <div className="px-4 py-2">
           <div className="flex items-center w-full justify-between">
-            <div className="flex items-center translate-x-10 translate-y-1">
+            <div className="flex items-center lg:translate-x-10 lg:translate-y-1">
               <div className="ml-2 mr-6 flex flex-col items-start -space-y-1">
                 <a href="https://rootly.com" target="_blank">
                   <Image 
@@ -141,15 +160,16 @@ export default function LandingPage() {
               href="https://github.com/Rootly-AI-Labs/On-Call-Health"
               target="_blank"
               rel="noreferrer"
-              className="rounded-2xl bg-[#7b6db1] px-5 py-2 text-sm font-semibold font-display text-[color:var(--text-text-primary,_#100F12)] hover:bg-[#6f62a5] -translate-x-6"
+              className="rounded-2xl bg-[#7b6db1] px-5 py-2 text-sm font-semibold font-display text-[color:var(--text-text-primary,_#100F12)] hover:bg-[#6f62a5] lg:-translate-x-6 flex items-center gap-2"
             >
+              <Image src="/images/github-logo.png" alt="GitHub" width={20} height={20} />
               GitHub
             </a>
           </div>
         </div>
         <div className="container flex flex-col lg:flex-row flex-grow mx-auto px-4">
-          <main className="w-full flex-grow px-5 lg:pr-10 lg:w-[60%] text-white relative top-14 -ml-4 lg:-ml-8">
-            <h1 className="text-4xl lg:text-6xl tracking-tight mb-6 leading-tight pt-10 lg:pt-20 lg:pb-1 leading-snug relative -top-8">
+          <main className="w-full flex-grow px-5 lg:pr-10 lg:w-[60%] text-white relative lg:top-14 lg:-ml-8">
+            <h1 className="text-4xl lg:text-6xl tracking-tight mb-6 leading-tight pt-10 lg:pt-20 lg:pb-1 leading-snug relative lg:-top-8">
               Catch overload
               <br />
               before it burns out
@@ -157,7 +177,7 @@ export default function LandingPage() {
               your engineers.
             </h1>
 
-            <p className="text-lg lg:text-xl lg:pr-10 mb-4 relative -top-3">
+            <p className="text-lg lg:text-xl lg:pr-10 mb-4 relative lg:-top-3">
               An open source tool that looks for early warning signs of
               <br />
               overload in your on-call engineers.
@@ -178,7 +198,10 @@ export default function LandingPage() {
                     Connecting to Google...
                   </>
                 ) : (
-                  <>Start with Google</>
+                  <>
+                    <Chrome className="h-6 w-6 -translate-y-0.5" aria-hidden="true" />
+                    Sign in with Google
+                  </>
                 )}
               </span>
             </Button>
@@ -196,7 +219,10 @@ export default function LandingPage() {
                     Connecting to GitHub...
                   </>
                 ) : (
-                  <>Start with GitHub</>
+                  <>
+                    <Github className="h-6 w-6 -translate-y-0.5" aria-hidden="true" />
+                    Sign in with GitHub
+                  </>
                 )}
               </span>
             </Button>
@@ -204,9 +230,9 @@ export default function LandingPage() {
 
             </div>
           </main>
-          <aside className="w-full lg:w-[40%] lg:pl-20">
-            <div className="mx-auto lg:ml-auto max-w-xl lg:max-w-none lg:-translate-x-32 lg:translate-y-32 lg:w-[128%]">
-              <div className="rounded-[28px] border border-white bg-transparent p-1 lg:scale-115 lg:origin-left">
+          <aside className="w-full mt-10 lg:mt-0 lg:w-[40%] lg:pl-20">
+            <div className="mx-auto lg:ml-auto max-w-2xl lg:max-w-none lg:-translate-x-48 lg:translate-y-28 lg:w-[135%]">
+              <div className="rounded-[28px] border border-white bg-transparent p-1 lg:scale-125 lg:origin-left">
                 <div className="aspect-video w-full overflow-hidden rounded-[22px]">
                   <video
                     className="h-full w-full object-cover"
@@ -222,17 +248,18 @@ export default function LandingPage() {
           </aside>
         </div>
         {/* Features Banner */}
-        <div className="container mx-auto px-4 py-20 mt-40 relative z-10">
+        <div className="container mx-auto px-4 py-20 mt-12 lg:mt-40 relative z-10">
           <Image
             src="/images/landing/upstart-asset.png"
             alt="Rootly customer story"
-            width={1200}
-            height={301}
-            className="w-full h-auto"
+            width={1784}
+            height={602}
+            className="w-2/3 h-auto mx-auto"
             priority
+            quality={90}
           />
         </div>
-    <div className="w-full mb-[-1px] absolute h-[120px] bottom-0 left-0 z-0 lg:h-[250px] bg-[url(/images/landing/rootly-bg-gradient.avif)] bg-contain bg-repeat-x pointer-events-none">                               
+    <div className="w-full mb-[-1px] absolute h-[240px] bottom-0 left-0 z-0 lg:h-[250px] bg-gradient-to-b from-transparent via-white/60 to-white pointer-events-none">                               
     </div> 
       </section>
 
@@ -247,9 +274,11 @@ export default function LandingPage() {
             <Image
               src="/images/landing/integration-dashboard.png"
               alt="Integration dashboard overview"
-              width={1200}
-              height={661}
+              width={2400}
+              height={1322}
+              sizes="80vw"
               className="w-[80%] h-auto mt-20 mb-20 mx-auto"
+              quality={90}
             />
           </div>
 
@@ -297,53 +326,61 @@ export default function LandingPage() {
               </p>
 
             </div>
-            <div className="relative w-full aspect-[645/562]">
-              <Image 
-                src="/images/landing/risk-factors.png" 
-                alt="Risk factors team card" 
-                fill
-                sizes="(min-width: 1024px) 50vw, 100vw"
-                className="object-contain"
-              />
+            <Image
+              src="/images/landing/risk-factors.png"
+              alt="Risk factors team card"
+              width={1935}
+              height={1686}
+              sizes="(min-width: 1280px) 60vw, (min-width: 1024px) 70vw, 100vw"
+              className="w-full h-auto object-contain"
+              quality={90}
+            />
+
+          </div>
+          </div>
+          <div className="container">
+            <div className="grid grid-cols-1 lg:grid-cols-2 items-center gap-12 mt-20 mb-20 w-[80%] mx-auto">
+              <div className="order-2 lg:order-1">
+                <Image
+                  src="/images/landing/trends.png"
+                  alt="Team Risk Factors Trends"
+                  width={1935}
+                  height={1686}
+                  sizes="(min-width: 1280px) 60vw, (min-width: 1024px) 70vw, 100vw"
+                  className="w-full h-auto object-contain"
+                  quality={90}
+                />
+              </div>
+              <div className="py-10 order-1 lg:order-2">
+                <h2 className="text-3xl md:text-4xl text-slate-900 mb-4">Make on-call health measurable and fair.</h2>
+                <p className="mb-2 text-lg text-[#787685]">
+                On-Call Health uses team and individual-specific baselines to track trends over time, 
+                rather than relying on fixed thresholds or comparing people to each other.
+                </p>
+              </div>
             </div>
           </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 items-center gap-12 mt-20 mb-20 w-[80%] mx-auto">
-            <div className="py-10 lg:order-last">
-              <h2 className="text-3xl md:text-4xl text-slate-900 mb-4">Make on-call health measurable and fair.</h2>
-              <p className="mb-2 text-lg text-[#787685]">
-              On-Call Health uses team and individual-specific baselines to track trends over time, 
-              rather than relying on fixed thresholds or comparing people to each other.
+          <div className="container">
+            <div className="grid grid-cols-1 lg:grid-cols-2 items-center gap-12 mt-20 w-[80%] mx-auto">
+              <div className="py-10">
+                <h2 className="text-3xl md:text-4xl text-slate-900 mb-4">Align the team and act <br/> faster.</h2>
+                <p className="mb-2 text-lg text-[#787685]">
+                AI summaries help stakeholders quickly get up to speed on trends they may have missed, turning weekly incident
+                reviews into conversations about not just systems, but also the people behind them.             
               </p>
-            </div>
-            <div className="relative w-full aspect-[645/562]">
-              <Image 
-                src="/images/landing/trends.png" 
-                alt="Team Risk Factors Trends" 
-                fill
-                sizes="(min-width: 1024px) 50vw, 100vw"
-                className="object-contain"
+              </div>
+              <Image
+                src="/images/landing/ai-views.png"
+                alt="Screenshots of AI Team insights"
+                width={1935}
+                height={1686}
+                sizes="(min-width: 1280px) 60vw, (min-width: 1024px) 70vw, 100vw"
+                className="w-full h-auto object-contain"
+                quality={90}
               />
             </div>
           </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 items-center gap-12 mt-20 w-[80%] mx-auto">
-            <div className="py-10">
-              <h2 className="text-3xl md:text-4xl text-slate-900 mb-4">Align the team and act <br/> faster.</h2>
-              <p className="mb-2 text-lg text-[#787685]">
-              AI summaries help stakeholders quickly get up to speed on trends they may have missed, turning weekly incident
-              reviews into conversations about not just systems, but also the people behind them.             
-            </p>
-            </div>
-            <div className="relative w-full aspect-[645/562]">
-              <Image 
-                src="/images/landing/ai-views.png" 
-                alt="Screenshots of AI Team insights" 
-                fill
-                sizes="(min-width: 1024px) 50vw, 100vw"
-                className="object-contain"
-              />
-            </div>
-          </div>
-          <div className="mt-10 lg:mt-20 mb-0 w-screen relative left-1/2 right-1/2 -ml-[50vw] -mr-[50vw] bg-[url(/images/landing/cta-background.png)] bg-cover bg-[center_top_-450px]">
+          <div className="mt-10 lg:mt-20 mb-0 w-screen relative left-1/2 right-1/2 -ml-[50vw] -mr-[50vw] bg-[url(/images/landing/cta-background.png)] bg-cover bg-center lg:bg-[center_top_-450px]">
             <div className="grid place-items-center px-6 py-16 lg:py-20 text-center">
               <h2 className="text-4xl md:text-5xl font-medium text-slate-900 mb-6">Detect who's at risk of burnout<br /> in your team today.</h2>
               <div className="flex flex-col justify-center sm:flex-row gap-4 items-center mb-6">
@@ -362,7 +399,6 @@ export default function LandingPage() {
               </div>
             </div>
           </div>
-        </div>
       </section>
 
       <footer className="bg-[#0b0c10] text-white py-8 lg:py-12">

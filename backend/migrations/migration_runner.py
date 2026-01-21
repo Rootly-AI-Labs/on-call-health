@@ -1139,6 +1139,16 @@ class MigrationRunner:
                 "description": "Add avatar_url column for profile images from PagerDuty/Rootly",
                 "sql_file": "2026_01_17_add_avatar_url_to_user_correlations.sql"
             },
+            {
+                "name": "038_add_cascade_delete_to_integration_mappings",
+                "description": "Add CASCADE DELETE to integration_mappings.analysis_id foreign key to fix user deletion foreign key violations",
+                "sql_file": "2026_01_21_add_cascade_delete_to_integration_mappings.sql"
+            },
+            {
+                "name": "039_add_performance_indexes",
+                "description": "Add missing indexes to analyses, integration_mappings, user_notifications, and rootly_integrations for query performance",
+                "sql_file": "2026_01_21_add_performance_indexes.sql"
+            },
             # Add future migrations here with incrementing numbers
         ]
 

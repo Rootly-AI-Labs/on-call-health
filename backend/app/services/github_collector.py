@@ -1,15 +1,14 @@
 """
 GitHub data collector for web app burnout analysis.
 """
-
-import json
 import logging
+import random
 from datetime import datetime, timedelta
-from pathlib import Path
 from typing import Dict, List, Optional
 import requests
 import asyncio
 import os
+import pytz
 
 logger = logging.getLogger(__name__)
 
@@ -276,7 +275,7 @@ class GitHubCollector:
         
         return emails
         
-    async def _fetch_real_github_data(self, username: str, email: str, start_date: datetime, end_date: datetime, token: str) -> Dict:
+    async def _fetch_real_github_data(self, username: str, email: str, start_date: datetime, end_date: datetime, token: str, timezone: str = 'UTC') -> Dict:
         """Fetch real GitHub data using the GitHub API with enterprise resilience."""
 
         logger.info(f"🔍 [GITHUB_API] Starting data fetch for {username} ({email}): {start_date.date()} to {end_date.date()}")
@@ -347,20 +346,65 @@ class GitHubCollector:
             logger.info(f"📊 [GITHUB_API_RESPONSE] {username} PRs response: total_count={total_prs}, incomplete_results={prs_data.get('incomplete_results', 'N/A') if prs_data else 'N/A'}")
 
             logger.info(f"✅ [GITHUB_API_SUCCESS] {username} ({email}): {total_commits} commits, {total_prs} PRs")
-            
-            # For now, estimate other metrics based on commits/PRs
-            # In a full implementation, we'd make additional API calls
-            after_hours_commits = int(total_commits * 0.15)  # Estimate 15% after hours
-            weekend_commits = int(total_commits * 0.1)       # Estimate 10% weekend
+
+            # Fetch detailed daily commit data with timestamps
+            logger.debug(f"🔄 Fetching detailed daily commit data for {username}")
+            daily_commits_data = await self.fetch_daily_commit_data(username, start_date, end_date, token, timezone)
+
+            # Build commits array from daily data for timeline processing
+            commits_array = []
+            after_hours_commits = 0
+            weekend_commits = 0
+            if daily_commits_data:
+                for daily in daily_commits_data:
+                    # Create a timestamp for aggregation at midnight of that date
+                    date_str = daily.get('date', '')
+                    if date_str:
+                        # Create timestamps for all commits on this day
+                        date_obj = datetime.fromisoformat(date_str)
+                        after_hours_count = daily.get('after_hours_commits', 0)
+                        weekend_count = daily.get('weekend_commits', 0)  # Tracked for metrics, not separate timestamps
+                        total_today = daily.get('total_commits', 0)
+
+                        # Calculate business-hours commits (all commits that are NOT after-hours)
+                        business_hours_count = max(0, total_today - after_hours_count)
+
+                        # IMPORTANT: Generate timestamps for BOTH after-hours and business-hours commits
+                        # Note: weekend_commits are a subset of after_hours_count or business_hours_count
+                        # (a weekend commit is counted in after_hours if at night, or business_hours if during day)
+                        # We do NOT generate separate weekend timestamps to avoid double-counting
+
+                        # Generate timestamps for after-hours commits (22:00-23:59 or 00:00-08:59)
+                        for i in range(after_hours_count):
+                            hour = 22 + (i % 2)  # Alternate between 22 and 23
+                            minute = (i * 17) % 60  # Distribute by minute
+                            commit_dt = date_obj.replace(hour=hour, minute=minute).isoformat() + 'Z'
+                            commits_array.append({"timestamp": commit_dt})
+
+                        # Generate timestamps for business-hours commits (09:00-16:59)
+                        for i in range(business_hours_count):
+                            hour = 9 + (i % 8)  # Distribute across 8 business hours (9-16)
+                            minute = (i * 13) % 60  # Different distribution than after-hours
+                            commit_dt = date_obj.replace(hour=hour, minute=minute).isoformat() + 'Z'
+                            commits_array.append({"timestamp": commit_dt})
+
+                        after_hours_commits += after_hours_count
+                        weekend_commits += weekend_count
+
+            # Fall back to estimates if we couldn't fetch detailed data
+            if not daily_commits_data:
+                after_hours_commits = int(total_commits * 0.15)  # Estimate 15% after hours
+                weekend_commits = int(total_commits * 0.1)       # Estimate 10% weekend
+
             total_reviews = int(total_prs * 1.5)             # Estimate 1.5 reviews per PR
-            
+
             days_analyzed = (end_date - start_date).days
             weeks = days_analyzed / 7
-            
+
             # Calculate percentages
             after_hours_percentage = (after_hours_commits / total_commits) if total_commits > 0 else 0
             weekend_percentage = (weekend_commits / total_commits) if total_commits > 0 else 0
-            
+
             # Generate burnout indicators
             commits_per_week = total_commits / weeks if weeks > 0 else 0
             burnout_indicators = {
@@ -369,7 +413,7 @@ class GitHubCollector:
                 "weekend_work": weekend_percentage > 0.15,
                 "large_prs": total_prs > 0 and (total_commits / max(total_prs, 1)) > 10
             }
-            
+
             return {
                 'username': username,
                 'email': email,
@@ -399,7 +443,8 @@ class GitHubCollector:
                     'weekend_commits': weekend_commits,
                     'avg_pr_size': int(total_commits / max(total_prs, 1)) if total_prs > 0 else 50,
                     'burnout_indicators': burnout_indicators
-                }
+                },
+                'commits': commits_array
             }
             
         except Exception as e:
@@ -420,15 +465,16 @@ class GitHubCollector:
             # Don't fall back to mock data - return None to indicate failure
             return None
         
-    async def fetch_daily_commit_data(self, username: str, start_date: datetime, end_date: datetime, github_token: str) -> Optional[List[Dict]]:
+    async def fetch_daily_commit_data(self, username: str, start_date: datetime, end_date: datetime, github_token: str, timezone: str = 'UTC') -> Optional[List[Dict]]:
         """
         Fetch daily commit data for a GitHub user over a specified period.
-        
+
         Args:
             username: GitHub username
             start_date: Start date for the analysis period
             end_date: End date for the analysis period
             github_token: GitHub API token
+            timezone: User's timezone for business hours calculation (default: 'UTC')
             
         Returns:
             List of daily commit data or None if error
@@ -449,13 +495,13 @@ class GitHubCollector:
                         rate_data = await resp.json()
                         remaining = rate_data['rate']['remaining']
                         reset_time = rate_data['rate']['reset']
-                        logger.info(f"GitHub API rate limit: {remaining} calls remaining, resets at {datetime.fromtimestamp(reset_time)}")
-                        
-                        if remaining < 50:
-                            logger.warning(f"Low GitHub API rate limit: only {remaining} calls remaining!")
-                            if remaining < 10:
-                                logger.error("Critical GitHub API rate limit! Aborting to prevent hitting limit.")
-                                return None
+                        logger.info(f"GITHUB API: Rate limit remaining: {remaining}, resets at {datetime.fromtimestamp(reset_time)}")
+
+                        if remaining < 100:
+                            logger.warning(f"GITHUB API: ⚠️ Rate limit low! Remaining: {remaining}, Reset: {reset_time}")
+                        if remaining < 10:
+                            logger.error(f"GITHUB API: 🚫 Critical rate limit ({remaining} remaining)! Aborting.")
+                            return None
                 
                 # Initialize daily data structure
                 daily_commits = {}
@@ -465,9 +511,9 @@ class GitHubCollector:
                     date_str = current_date.strftime('%Y-%m-%d')
                     daily_commits[date_str] = {
                         'date': date_str,
-                        'commits': 0,
-                        'after_hours_commits': 0,
-                        'weekend_commits': 0
+                        'total_commits': 0,  # Total commits for this day
+                        'after_hours_commits': 0,  # Commits during after-hours (22:00-08:59)
+                        'weekend_commits': 0  # Commits on weekends
                     }
                     current_date += timedelta(days=1)
                 
@@ -503,20 +549,29 @@ class GitHubCollector:
                                 date_str = author.get('date', '')
                                 
                                 if date_str:
-                                    # Parse commit datetime
-                                    commit_dt = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
-                                    commit_date = commit_dt.strftime('%Y-%m-%d')
-                                    
+                                    # Parse commit datetime (UTC)
+                                    commit_dt_utc = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+
+                                    # Convert to user's local timezone for business hours calculation
+                                    try:
+                                        tz = pytz.timezone(timezone)
+                                        commit_dt_local = commit_dt_utc.astimezone(tz)
+                                    except (pytz.exceptions.UnknownTimeZoneError, Exception):
+                                        logger.warning(f"Invalid timezone '{timezone}', using UTC")
+                                        commit_dt_local = commit_dt_utc
+
+                                    commit_date = commit_dt_utc.strftime('%Y-%m-%d')
+
                                     if commit_date in daily_commits:
-                                        daily_commits[commit_date]['commits'] += 1
-                                        
-                                        # Check if after hours (before 9am or after 5pm local time)
-                                        hour = commit_dt.hour
-                                        if hour < 9 or hour >= 17:
+                                        daily_commits[commit_date]['total_commits'] += 1
+
+                                        # Check if after hours (using configurable business hours in local timezone)
+                                        hour = commit_dt_local.hour
+                                        if hour < self.business_hours['start'] or hour >= self.business_hours['end']:
                                             daily_commits[commit_date]['after_hours_commits'] += 1
-                                            
-                                        # Check if weekend
-                                        if commit_dt.weekday() >= 5:  # Saturday = 5, Sunday = 6
+
+                                        # Check if weekend (using local timezone date)
+                                        if commit_dt_local.weekday() >= 5:  # Saturday = 5, Sunday = 6
                                             daily_commits[commit_date]['weekend_commits'] += 1
                             
                             total_fetched += len(items)
@@ -533,13 +588,19 @@ class GitHubCollector:
                                 break
                                 
                         elif resp.status == 401:
-                            logger.error(f"GitHub API authentication failed for user {username} - token may be expired or invalid")
+                            logger.error(f"GITHUB API: 🔐 Authentication failed for user {username} - token may be expired or invalid")
                             return None
                         elif resp.status == 403:
-                            logger.error("GitHub API rate limit exceeded or forbidden")
+                            rate_remaining = resp.headers.get('X-RateLimit-Remaining', 'unknown')
+                            rate_reset = resp.headers.get('X-RateLimit-Reset', 'unknown')
+                            logger.error(f"GITHUB API: 🚫 RATE LIMITED (403)! Remaining: {rate_remaining}, Reset: {rate_reset}")
+                            return None
+                        elif resp.status == 429:
+                            retry_after = resp.headers.get('Retry-After', 'unknown')
+                            logger.error(f"GITHUB API: 🚫 RATE LIMITED (429)! Retry-After: {retry_after}s")
                             return None
                         else:
-                            logger.error(f"GitHub API error: {resp.status}")
+                            logger.error(f"GITHUB API: Request failed with status {resp.status}")
                             return None
                 
                 # Convert to list sorted by date
@@ -552,7 +613,7 @@ class GitHubCollector:
             logger.error(f"Error fetching daily commit data for {username}: {e}")
             return None
     
-    async def collect_github_data_for_user(self, user_email: str, days: int = 30, github_token: str = None, user_id: Optional[int] = None, full_name: Optional[str] = None) -> Optional[Dict]:
+    async def collect_github_data_for_user(self, user_email: str, days: int = 30, github_token: str = None, user_id: Optional[int] = None, full_name: Optional[str] = None, timezone: str = 'UTC') -> Optional[Dict]:
         """
         Collect GitHub activity data for a single user using email correlation.
 
@@ -561,6 +622,8 @@ class GitHubCollector:
             days: Number of days to analyze
             github_token: GitHub API token for authentication
             user_id: User ID for checking manual mappings
+            full_name: User's full name
+            timezone: User's timezone for business hours calculation (default: 'UTC')
 
         Returns:
             GitHub activity data or None if no correlation found
@@ -584,7 +647,7 @@ class GitHubCollector:
         # Use real GitHub API if token provided
         if github_token:
             logger.info(f"🔄 [GITHUB_COLLECTION] Fetching data from GitHub API for {github_username}")
-            result = await self._fetch_real_github_data(github_username, user_email, start_date, end_date, github_token)
+            result = await self._fetch_real_github_data(github_username, user_email, start_date, end_date, github_token, timezone)
             if not result:
                 logger.error(f"❌ [GITHUB_COLLECTION] Failed to fetch GitHub data for {github_username}")
                 return None
@@ -596,35 +659,33 @@ class GitHubCollector:
     
     def _generate_mock_github_data(self, username: str, email: str, start_date: datetime, end_date: datetime) -> Dict:
         """Generate realistic mock GitHub data for testing."""
-        
+
         # Generate some realistic activity
-        import random
-        
         days_analyzed = (end_date - start_date).days
-        
+
         # Base activity levels (some users more active than others)
         activity_multiplier = random.choice([0.5, 0.8, 1.0, 1.2, 1.5])
-        
+
         # Generate commits
         total_commits = int(random.randint(10, 50) * activity_multiplier)
         after_hours_commits = int(total_commits * random.uniform(0.1, 0.3))
         weekend_commits = int(total_commits * random.uniform(0.05, 0.2))
-        
+
         # Generate PRs
         total_prs = int(random.randint(2, 15) * activity_multiplier)
-        
+
         # Generate reviews
         total_reviews = int(random.randint(5, 25) * activity_multiplier)
-        
+
         # Calculate weekly averages
         weeks = days_analyzed / 7
         commits_per_week = total_commits / weeks if weeks > 0 else 0
         prs_per_week = total_prs / weeks if weeks > 0 else 0
-        
+
         # Calculate percentages
         after_hours_percentage = (after_hours_commits / total_commits) if total_commits > 0 else 0
         weekend_percentage = (weekend_commits / total_commits) if total_commits > 0 else 0
-        
+
         # Generate burnout indicators
         burnout_indicators = {
             "excessive_commits": commits_per_week > 15,
@@ -632,7 +693,22 @@ class GitHubCollector:
             "weekend_work": weekend_percentage > 0.15,
             "large_prs": random.choice([True, False])  # Simplified
         }
-        
+
+        # Generate mock commit objects with timestamps
+        commits_array = []
+        current_date = start_date
+        remaining_after_hours = after_hours_commits
+        while current_date <= end_date and remaining_after_hours > 0:
+            # Add some after-hours commits to this day
+            commits_today = random.randint(1, min(3, remaining_after_hours))
+            for i in range(commits_today):
+                hour = 22 + (i % 2)  # Alternate between 22 and 23
+                minute = (i * 17) % 60
+                commit_dt = current_date.replace(hour=hour, minute=minute).isoformat() + 'Z'
+                commits_array.append({"timestamp": commit_dt})
+                remaining_after_hours -= 1
+            current_date += timedelta(days=1)
+
         return {
             'username': username,
             'email': email,
@@ -663,7 +739,8 @@ class GitHubCollector:
                 'weekend_commits': weekend_commits,
                 'avg_pr_size': random.randint(50, 300),
                 'burnout_indicators': burnout_indicators
-            }
+            },
+            'commits': commits_array
         }
     
     def _is_business_hours(self, dt: datetime) -> bool:
@@ -685,25 +762,26 @@ class GitHubCollector:
         self.last_request_time = time.time()
 
 
-async def collect_team_github_data(team_emails: List[str], days: int = 30, github_token: str = None, user_id: Optional[int] = None) -> Dict[str, Dict]:
+async def collect_team_github_data(team_emails: List[str], days: int = 30, github_token: str = None, user_id: Optional[int] = None, timezone: str = 'UTC') -> Dict[str, Dict]:
     """
     Collect GitHub data for all team members.
-    
+
     Args:
         team_emails: List of team member emails
         days: Number of days to analyze
         github_token: GitHub API token for real data collection
         user_id: User ID for checking manual mappings
-        
+        timezone: User's timezone for business hours calculation (default: 'UTC')
+
     Returns:
         Dict mapping email -> github_activity_data
     """
     collector = GitHubCollector()
     github_data = {}
-    
+
     for email in team_emails:
         try:
-            user_data = await collector.collect_github_data_for_user(email, days, github_token, user_id)
+            user_data = await collector.collect_github_data_for_user(email, days, github_token, user_id, timezone=timezone)
             if user_data:
                 github_data[email] = user_data
         except Exception as e:

@@ -13,15 +13,25 @@ from .models import create_tables
 from .core.config import settings
 from .core.rate_limiting import limiter, custom_rate_limit_exceeded_handler
 from .middleware.security import security_middleware
+from .middleware.user_logging import user_logging_middleware
+from .middleware.logging_context import UserContextFilter
 from .api.endpoints import auth, rootly, analysis, analyses, pagerduty, github, slack, jira, linear, llm, mappings, manual_mappings, debug_mappings, migrate, admin, notifications, invitations, surveys
 
 # Configure logging based on environment variable
 LOG_LEVEL = getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO)
+
+# Create and configure the UserContextFilter to add user_id to all log records
+user_context_filter = UserContextFilter()
+
+# Configure logging with user_id in the format
 logging.basicConfig(
     level=LOG_LEVEL,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    format='%(asctime)s - %(name)s - %(levelname)s - [user_id=%(user_id)s] - %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S'
 )
+
+# Add the user context filter to the root logger so all loggers inherit it
+logging.getLogger().addFilter(user_context_filter)
 
 # Set specific loggers to WARNING in production to reduce noise
 if settings.ENVIRONMENT == "production" or LOG_LEVEL >= logging.WARNING:
@@ -64,6 +74,9 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # Add security middleware
 app.middleware("http")(security_middleware)
+
+# Add user logging middleware (sets user context for all logs)
+app.middleware("http")(user_logging_middleware)
 
 # Configure CORS - Secure configuration
 def get_cors_origins():

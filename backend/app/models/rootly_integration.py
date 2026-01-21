@@ -8,11 +8,11 @@ class RootlyIntegration(Base):
     __tablename__ = "rootly_integrations"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     name = Column(String(255), nullable=False)  # User-defined name or auto-generated
     organization_name = Column(String(255), nullable=True)  # From API
     api_token = Column(Text, nullable=False)  # Encrypted API token (Rootly or PagerDuty)
-    platform = Column(String(50), nullable=False, default="rootly")  # "rootly" or "pagerduty"
+    platform = Column(String(50), nullable=False, default="rootly", index=True)  # "rootly" or "pagerduty"
     total_users = Column(Integer, nullable=True)  # From API metadata
     is_default = Column(Boolean, default=False, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)

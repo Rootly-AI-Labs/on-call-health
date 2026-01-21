@@ -2,12 +2,16 @@
 OAuth providers for GitHub and Slack integrations.
 These are specialized OAuth providers for data collection purposes.
 """
-import httpx
-from typing import Dict, Any, Optional, List
-from fastapi import HTTPException, status
+import logging
+from typing import Any, Dict, List, Optional
 from urllib.parse import urlencode
 
+import httpx
+from fastapi import HTTPException, status
+
 from ..core.config import settings
+
+logger = logging.getLogger(__name__)
 
 class GitHubIntegrationOAuth:
     """GitHub OAuth provider for integration purposes."""
@@ -376,7 +380,6 @@ class JiraIntegrationOAuth:
         self.api_base = "https://api.atlassian.com/ex/jira"
 
     def get_authorization_url(self, state: str = "") -> str:
-        from urllib.parse import urlencode
         params = {
             "audience": "api.atlassian.com",
             "client_id": self.client_id,
@@ -476,11 +479,30 @@ class JiraIntegrationOAuth:
         if expand:
             params["expand"] = expand
 
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=30.0) as client:
             resp = await client.get(url, headers=headers, params=params)
+
+        # Log rate limit headers for debugging
+        rate_limit_remaining = resp.headers.get("X-RateLimit-Remaining")
+        rate_limit_reset = resp.headers.get("X-RateLimit-Reset")
+        retry_after = resp.headers.get("Retry-After")
+
+        if rate_limit_remaining:
+            logger.info(f"JIRA API: Rate limit remaining: {rate_limit_remaining}")
+        if rate_limit_remaining and int(rate_limit_remaining) < 50:
+            logger.warning(f"JIRA API: ⚠️ Rate limit low! Remaining: {rate_limit_remaining}, Reset: {rate_limit_reset}")
+
+        # Handle rate limiting (429)
+        if resp.status_code == 429:
+            logger.error(f"JIRA API: 🚫 RATE LIMITED (429)! Retry-After: {retry_after}, Reset: {rate_limit_reset}")
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Jira API rate limited. Retry after: {retry_after or 'unknown'}",
+            )
 
         # Atlassian sends 410 Gone when calling old endpoints; surface error if any non-200
         if resp.status_code != 200:
+            logger.error(f"JIRA API: Request failed with status {resp.status_code}: {resp.text[:500]}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Failed to search issues: {resp.text}",
@@ -668,10 +690,29 @@ class LinearIntegrationOAuth:
         if variables:
             payload["variables"] = variables
 
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=30.0) as client:
             resp = await client.post(self.graphql_url, json=payload, headers=headers)
 
+        # Log rate limit headers for debugging
+        rate_limit_remaining = resp.headers.get("X-RateLimit-Remaining")
+        rate_limit_reset = resp.headers.get("X-RateLimit-Reset")
+        retry_after = resp.headers.get("Retry-After")
+
+        if rate_limit_remaining:
+            logger.info(f"LINEAR API: Rate limit remaining: {rate_limit_remaining}")
+        if rate_limit_remaining and int(rate_limit_remaining) < 100:
+            logger.warning(f"LINEAR API: ⚠️ Rate limit low! Remaining: {rate_limit_remaining}, Reset: {rate_limit_reset}")
+
+        # Handle rate limiting (429)
+        if resp.status_code == 429:
+            logger.error(f"LINEAR API: 🚫 RATE LIMITED (429)! Retry-After: {retry_after}, Reset: {rate_limit_reset}")
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Linear API rate limited. Retry after: {retry_after or 'unknown'}",
+            )
+
         if resp.status_code != 200:
+            logger.error(f"LINEAR API: Request failed with status {resp.status_code}: {resp.text[:500]}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"GraphQL request failed: {resp.text}",
@@ -679,6 +720,7 @@ class LinearIntegrationOAuth:
 
         result = resp.json()
         if "errors" in result:
+            logger.error(f"LINEAR API: GraphQL errors: {result['errors']}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"GraphQL errors: {result['errors']}",

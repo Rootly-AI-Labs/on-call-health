@@ -11,16 +11,16 @@ class IntegrationMapping(Base):
     __tablename__ = "integration_mappings"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # NULL for org-scoped users
-    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True)  # For org-scoped mappings
-    analysis_id = Column(Integer, ForeignKey("analyses.id"), nullable=True)  # Track which analysis this was from
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)  # NULL for org-scoped users
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)  # For org-scoped mappings
+    analysis_id = Column(Integer, ForeignKey("analyses.id", ondelete="CASCADE"), nullable=True, index=True)  # Track which analysis this was from
     
     # Source platform (where we got the identifier from)
     source_platform = Column(String(50), nullable=False)  # "rootly", "pagerduty"
     source_identifier = Column(String(255), nullable=False)  # email, name, etc.
     
     # Target platform (what we're trying to map to)
-    target_platform = Column(String(50), nullable=False)  # "github", "slack"
+    target_platform = Column(String(50), nullable=False, index=True)  # "github", "slack"
     target_identifier = Column(String(255), nullable=True)  # username, user_id if successful
     
     # Mapping result
@@ -38,7 +38,7 @@ class IntegrationMapping(Base):
     # confidence_score = Column(Float, nullable=True)  # For auto-detected mappings (0.0-1.0)
     # last_verified = Column(DateTime(timezone=True), nullable=True)  # When mapping was last verified
     
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
     # Relationships

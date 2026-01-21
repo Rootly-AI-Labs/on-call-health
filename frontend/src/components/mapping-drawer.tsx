@@ -259,10 +259,15 @@ export function MappingDrawer({ isOpen, onClose, platform, onRefresh }: MappingD
         break
     }
     
+    // Case-insensitive comparison for strings
+    const comparison = typeof aValue === 'string' && typeof bValue === 'string'
+      ? aValue.toLowerCase().localeCompare(bValue.toLowerCase())
+      : aValue < bValue ? -1 : aValue > bValue ? 1 : 0
+
     if (sortDirection === 'asc') {
-      return aValue < bValue ? -1 : aValue > bValue ? 1 : 0
+      return comparison
     } else {
-      return aValue > bValue ? -1 : aValue < bValue ? 1 : 0
+      return -comparison
     }
   })
 
