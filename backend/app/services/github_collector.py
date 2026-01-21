@@ -362,23 +362,30 @@ class GitHubCollector:
                     # Create a timestamp for aggregation at midnight of that date
                     date_str = daily.get('date', '')
                     if date_str:
-                        # Create timestamps for this day's after-hours and weekend commits
+                        # Create timestamps for all commits on this day
                         date_obj = datetime.fromisoformat(date_str)
                         after_hours_count = daily.get('after_hours_commits', 0)
-                        weekend_count = daily.get('weekend_commits', 0)
+                        weekend_count = daily.get('weekend_commits', 0)  # Tracked for metrics, not separate timestamps
+                        total_today = daily.get('total_commits', 0)
 
-                        # Generate timestamps for after-hours commits (22:00-23:59)
+                        # Calculate business-hours commits (all commits that are NOT after-hours)
+                        business_hours_count = max(0, total_today - after_hours_count)
+
+                        # IMPORTANT: Generate timestamps for BOTH after-hours and business-hours commits
+                        # Note: weekend_commits are a subset of after_hours_count or business_hours_count
+                        # (a weekend commit is counted in after_hours if at night, or business_hours if during day)
+                        # We do NOT generate separate weekend timestamps to avoid double-counting
+
+                        # Generate timestamps for after-hours commits (22:00-23:59 or 00:00-08:59)
                         for i in range(after_hours_count):
-                            # Distribute after-hours commits across late-night hours (22 and 23)
                             hour = 22 + (i % 2)  # Alternate between 22 and 23
                             minute = (i * 17) % 60  # Distribute by minute
                             commit_dt = date_obj.replace(hour=hour, minute=minute).isoformat() + 'Z'
                             commits_array.append({"timestamp": commit_dt})
 
-                        # Generate timestamps for weekend commits (10:00-16:59 for weekend daytime hours)
-                        # Note: This may include overlap with after-hours weekend commits, but captures weekend work activity
-                        for i in range(weekend_count):
-                            hour = 10 + (i % 8)  # Distribute across daytime hours
+                        # Generate timestamps for business-hours commits (09:00-16:59)
+                        for i in range(business_hours_count):
+                            hour = 9 + (i % 8)  # Distribute across 8 business hours (9-16)
                             minute = (i * 13) % 60  # Different distribution than after-hours
                             commit_dt = date_obj.replace(hour=hour, minute=minute).isoformat() + 'Z'
                             commits_array.append({"timestamp": commit_dt})
@@ -506,10 +513,9 @@ class GitHubCollector:
                     date_str = current_date.strftime('%Y-%m-%d')
                     daily_commits[date_str] = {
                         'date': date_str,
-                        'commits': 0,
-                        'total_commits': 0,  # Track total commits for each day
-                        'after_hours_commits': 0,
-                        'weekend_commits': 0
+                        'total_commits': 0,  # Total commits for this day
+                        'after_hours_commits': 0,  # Commits during after-hours (22:00-08:59)
+                        'weekend_commits': 0  # Commits on weekends
                     }
                     current_date += timedelta(days=1)
                 
@@ -559,7 +565,6 @@ class GitHubCollector:
                                     commit_date = commit_dt_utc.strftime('%Y-%m-%d')
 
                                     if commit_date in daily_commits:
-                                        daily_commits[commit_date]['commits'] += 1
                                         daily_commits[commit_date]['total_commits'] += 1
 
                                         # Check if after hours (using configurable business hours in local timezone)

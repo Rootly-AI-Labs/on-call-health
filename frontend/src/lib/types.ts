@@ -38,6 +38,51 @@ export interface GitHubActivity {
   }
 }
 
+/**
+ * Safe accessor for GitHubActivity with fallback defaults
+ * Prevents runtime errors when GitHub integration is disabled
+ */
+export function getGitHubActivitySafe(activity: GitHubActivity | undefined | null): Required<GitHubActivity> {
+  if (!activity) {
+    return {
+      commits_count: 0,
+      pull_requests_count: 0,
+      reviews_count: 0,
+      after_hours_commits: 0,
+      weekend_commits: 0,
+      avg_pr_size: 0,
+      commits_per_week: 0,
+      prs_per_week: 0,
+      after_hours_percentage: 0,
+      weekend_percentage: 0,
+      burnout_indicators: {
+        excessive_commits: false,
+        late_night_activity: false,
+        weekend_work: false,
+        large_prs: false
+      }
+    }
+  }
+  return {
+    commits_count: activity.commits_count ?? 0,
+    pull_requests_count: activity.pull_requests_count ?? 0,
+    reviews_count: activity.reviews_count ?? 0,
+    after_hours_commits: activity.after_hours_commits ?? 0,
+    weekend_commits: activity.weekend_commits ?? 0,
+    avg_pr_size: activity.avg_pr_size ?? 0,
+    commits_per_week: activity.commits_per_week ?? 0,
+    prs_per_week: activity.prs_per_week ?? 0,
+    after_hours_percentage: activity.after_hours_percentage ?? 0,
+    weekend_percentage: activity.weekend_percentage ?? 0,
+    burnout_indicators: activity.burnout_indicators ?? {
+      excessive_commits: false,
+      late_night_activity: false,
+      weekend_work: false,
+      large_prs: false
+    }
+  }
+}
+
 export interface IncidentActivity {
   incident_count: number
   after_hours_incidents: number
@@ -46,6 +91,33 @@ export interface IncidentActivity {
   severity_weighted_incidents?: number
   after_hours_percentage?: number
   weekend_percentage?: number
+}
+
+/**
+ * Safe accessor for IncidentActivity with fallback defaults
+ * Prevents runtime errors when incident data is missing
+ */
+export function getIncidentActivitySafe(activity: IncidentActivity | undefined | null): Required<IncidentActivity> {
+  if (!activity) {
+    return {
+      incident_count: 0,
+      after_hours_incidents: 0,
+      weekend_incidents: 0,
+      avg_response_time_minutes: 0,
+      severity_weighted_incidents: 0,
+      after_hours_percentage: 0,
+      weekend_percentage: 0
+    }
+  }
+  return {
+    incident_count: activity.incident_count ?? 0,
+    after_hours_incidents: activity.after_hours_incidents ?? 0,
+    weekend_incidents: activity.weekend_incidents ?? 0,
+    avg_response_time_minutes: activity.avg_response_time_minutes ?? 0,
+    severity_weighted_incidents: activity.severity_weighted_incidents ?? 0,
+    after_hours_percentage: activity.after_hours_percentage ?? 0,
+    weekend_percentage: activity.weekend_percentage ?? 0
+  }
 }
 
 export interface GitHubIntegration {
