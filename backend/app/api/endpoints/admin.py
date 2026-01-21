@@ -13,9 +13,12 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from ...core.rate_limiting import admin_rate_limit
+from sqlalchemy import distinct
+
 from ...models import Analysis, get_db
 from ...models.user import User
 from ...models.user_correlation import UserCorrelation
+from ...models.user_burnout_report import UserBurnoutReport
 from ...services.demo_analysis_service import _get_or_create_demo_organization, _load_health_checkins_for_user
 
 logger = logging.getLogger(__name__)
@@ -226,11 +229,15 @@ async def refresh_demo_analyses(
             except Exception as e:
                 logger.warning(f"ADMIN: Failed to load health check-ins for user #{analysis.user_id}: {e}")
 
-        # Ensure UserCorrelation records exist for all team members in mock data
-        # This is needed for get_member_surveys to find the health check-in data
+        # Ensure UserCorrelation records exist for all team members with health check-ins
+        # Query directly from database to get emails that exist in user_burnout_reports
         correlations_created = 0
-        reports_data = mock_data.get('user_burnout_reports', [])
-        unique_emails = set(r.get('email') for r in reports_data if r.get('email'))
+        existing_emails = db.query(distinct(UserBurnoutReport.email)).filter(
+            UserBurnoutReport.organization_id == demo_organization_id,
+            UserBurnoutReport.email.isnot(None)
+        ).all()
+        unique_emails = [e[0] for e in existing_emails]
+        logger.info(f"ADMIN: Found {len(unique_emails)} unique emails in health check-ins for org {demo_organization_id}")
 
         for email in unique_emails:
             try:
