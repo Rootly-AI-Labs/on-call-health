@@ -299,9 +299,14 @@ async def list_analyses(
     db: Session = Depends(get_db)
 ):
     """List all previous analyses for the current user."""
+    import time
+    start_time = time.time()
+    logger.info(f"📋 [LIST_ANALYSES] Request received - user_id={current_user.id}, limit={limit}, offset={offset}")
+
     # Simplified: Filter by user_id only (no organization_id requirement)
     # TODO: Re-enable organization_id filtering after multi-tenant migration is stable
     query = db.query(Analysis).filter(Analysis.user_id == current_user.id)
+    logger.info(f"📋 [LIST_ANALYSES] Query built in {time.time() - start_time:.3f}s")
 
     # Filter by integration if specified
     if integration_id:
@@ -322,16 +327,23 @@ async def list_analyses(
     # Fast check: if offset is 0, first check if any analyses exist
     # This optimizes the common case of new users with no analyses
     if offset == 0:
+        exists_start = time.time()
         exists = db.query(query.exists()).scalar()
+        logger.info(f"📋 [LIST_ANALYSES] Exists check: {exists} in {time.time() - exists_start:.3f}s")
         if not exists:
+            logger.info(f"📋 [LIST_ANALYSES] No analyses found, returning empty - total time: {time.time() - start_time:.3f}s")
             return AnalysisListResponse(analyses=[], total=0)
 
     # Get total count
+    count_start = time.time()
     total = query.count()
+    logger.info(f"📋 [LIST_ANALYSES] Count: {total} in {time.time() - count_start:.3f}s")
 
     # Apply pagination and ordering
+    fetch_start = time.time()
     analyses = query.order_by(Analysis.created_at.desc()).offset(offset).limit(limit).all()
-    
+    logger.info(f"📋 [LIST_ANALYSES] Fetched {len(analyses)} analyses in {time.time() - fetch_start:.3f}s")
+
     # Convert to response format
     response_analyses = []
     for analysis in analyses:
@@ -340,11 +352,11 @@ async def list_analyses(
                 id=analysis.id,
                 uuid=getattr(analysis, 'uuid', None),
                 integration_id=analysis.rootly_integration_id,
-                
+
                 # Include new integration fields
                 integration_name=analysis.integration_name,
                 platform=analysis.platform,
-                
+
                 status=analysis.status,
                 created_at=analysis.created_at,
                 completed_at=analysis.completed_at,
@@ -353,7 +365,8 @@ async def list_analyses(
                 config=analysis.config
             )
         )
-    
+
+    logger.info(f"📋 [LIST_ANALYSES] COMPLETE - returning {len(response_analyses)} analyses, total time: {time.time() - start_time:.3f}s")
     return AnalysisListResponse(
         analyses=response_analyses,
         total=total
