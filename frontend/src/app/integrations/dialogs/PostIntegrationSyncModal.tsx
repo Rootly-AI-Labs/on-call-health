@@ -6,7 +6,6 @@ interface PostIntegrationSyncModalProps {
   onClose: () => void
   onSyncNow: () => void
   integrationType: 'github' | 'slack' | 'jira' | 'linear'
-  integrationType: 'github' | 'slack' | 'jira' | 'linear'
 }
 
 const integrationContent = {
@@ -32,8 +31,7 @@ export function PostIntegrationSyncModal({
   isOpen,
   onClose,
   onSyncNow,
-  integrationType,
-  integrationName
+  integrationType
 }: PostIntegrationSyncModalProps) {
   const content = integrationContent[integrationType]
 
