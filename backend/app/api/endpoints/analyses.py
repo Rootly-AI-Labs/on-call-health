@@ -377,7 +377,7 @@ async def list_analyses(
                 created_at=analysis.created_at,
                 completed_at=analysis.completed_at,
                 time_range=analysis.time_range or 30,
-                analysis_data=extract_analysis_summary(analysis.results),
+                analysis_data=extract_analysis_summary(None),  # Don't access results - excluded via load_only()
                 config=analysis.config
             )
         )
