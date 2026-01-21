@@ -104,8 +104,8 @@
               "Critical burnout risk (OCB: 89/100) - immediate attention needed",
               "PERSONAL:",
               "\u00e2\u20ac\u00a2 Non-business hours incident activity (60.4 points)",
-              "\u00e2\u20ac\u00a2 Sleep quality impact from critical incidents (52.5 points)",
-              "\u00e2\u20ac\u00a2 Extended work hours (13.8 points)",
+              "\u00e2\u20ac\u00a2 High-severity incident stress (52.5 points)",
+              "\u00e2\u20ac\u00a2 High task workload (13.8 points)",
               "WORK-RELATED:",
               "\u00e2\u20ac\u00a2 On-call responsibility load: 27 total incidents (35.0 points)",
               "\u00e2\u20ac\u00a2 Incident severity-weighted workload (8.0 points)",
@@ -124,14 +124,14 @@
                 },
                 {
                   "key": "sleep_quality_proxy",
-                  "name": "Sleep quality impact",
+                  "name": "High-severity incidents",
                   "points": 52.5,
                   "percentage": 29.4,
                   "dimension": "personal"
                 },
                 {
                   "key": "work_hours_trend",
-                  "name": "Extended work hours",
+                  "name": "Task workload",
                   "points": 13.8,
                   "percentage": 7.7,
                   "dimension": "personal"
@@ -177,7 +177,7 @@
                 },
                 {
                   "key": "sleep_quality_proxy",
-                  "name": "Sleep quality impact",
+                  "name": "High-severity incidents",
                   "points": 52.5,
                   "percentage": 29.4,
                   "dimension": "personal"
@@ -191,7 +191,7 @@
                 },
                 {
                   "key": "work_hours_trend",
-                  "name": "Extended work hours",
+                  "name": "Task workload",
                   "points": 13.8,
                   "percentage": 7.7,
                   "dimension": "personal"
@@ -484,9 +484,9 @@
             "ocb_reasoning": [
               "High burnout risk (OCB: 67/100) - monitor closely",
               "PERSONAL:",
-              "\u00e2\u20ac\u00a2 Sleep quality impact from critical incidents (52.5 points)",
+              "\u00e2\u20ac\u00a2 High-severity incident stress (52.5 points)",
               "\u00e2\u20ac\u00a2 Non-business hours incident activity (16.6 points)",
-              "\u00e2\u20ac\u00a2 Extended work hours (13.9 points)",
+              "\u00e2\u20ac\u00a2 High task workload (13.9 points)",
               "WORK-RELATED:",
               "\u00e2\u20ac\u00a2 On-call responsibility load: 28 total incidents (35.0 points)",
               "\u00e2\u20ac\u00a2 Incident severity-weighted workload (8.0 points)",
@@ -497,7 +497,7 @@
               "personal": [
                 {
                   "key": "sleep_quality_proxy",
-                  "name": "Sleep quality impact",
+                  "name": "High-severity incidents",
                   "points": 52.5,
                   "percentage": 39.3,
                   "dimension": "personal"
@@ -511,7 +511,7 @@
                 },
                 {
                   "key": "work_hours_trend",
-                  "name": "Extended work hours",
+                  "name": "Task workload",
                   "points": 13.9,
                   "percentage": 10.4,
                   "dimension": "personal"
@@ -543,7 +543,7 @@
               "all": [
                 {
                   "key": "sleep_quality_proxy",
-                  "name": "Sleep quality impact",
+                  "name": "High-severity incidents",
                   "points": 52.5,
                   "percentage": 39.3,
                   "dimension": "personal"
@@ -564,7 +564,7 @@
                 },
                 {
                   "key": "work_hours_trend",
-                  "name": "Extended work hours",
+                  "name": "Task workload",
                   "points": 13.9,
                   "percentage": 10.4,
                   "dimension": "personal"
@@ -721,8 +721,8 @@
             "ocb_reasoning": [
               "High burnout risk (OCB: 54/100) - monitor closely",
               "PERSONAL:",
-              "\u00e2\u20ac\u00a2 Sleep quality impact from critical incidents (52.5 points)",
-              "\u00e2\u20ac\u00a2 Extended work hours (9.9 points)",
+              "\u00e2\u20ac\u00a2 High-severity incident stress (52.5 points)",
+              "\u00e2\u20ac\u00a2 High task workload (9.9 points)",
               "WORK-RELATED:",
               "\u00e2\u20ac\u00a2 On-call responsibility load: 11 total incidents (35.0 points)",
               "\u00e2\u20ac\u00a2 Incident severity-weighted workload (5.7 points)",
@@ -733,14 +733,14 @@
               "personal": [
                 {
                   "key": "sleep_quality_proxy",
-                  "name": "Sleep quality impact",
+                  "name": "High-severity incidents",
                   "points": 52.5,
                   "percentage": 48.4,
                   "dimension": "personal"
                 },
                 {
                   "key": "work_hours_trend",
-                  "name": "Extended work hours",
+                  "name": "Task workload",
                   "points": 9.9,
                   "percentage": 9.1,
                   "dimension": "personal"
@@ -772,7 +772,7 @@
               "all": [
                 {
                   "key": "sleep_quality_proxy",
-                  "name": "Sleep quality impact",
+                  "name": "High-severity incidents",
                   "points": 52.5,
                   "percentage": 48.4,
                   "dimension": "personal"
@@ -786,7 +786,7 @@
                 },
                 {
                   "key": "work_hours_trend",
-                  "name": "Extended work hours",
+                  "name": "Task workload",
                   "points": 9.9,
                   "percentage": 9.1,
                   "dimension": "personal"
@@ -942,8 +942,8 @@
               "Critical burnout risk (OCB: 86/100) - immediate attention needed",
               "PERSONAL:",
               "\u00e2\u20ac\u00a2 Non-business hours incident activity (75.0 points)",
-              "\u00e2\u20ac\u00a2 Sleep quality impact from critical incidents (52.5 points)",
-              "\u00e2\u20ac\u00a2 Extended work hours (6.0 points)",
+              "\u00e2\u20ac\u00a2 High-severity incident stress (52.5 points)",
+              "\u00e2\u20ac\u00a2 High task workload (6.0 points)",
               "WORK-RELATED:",
               "\u00e2\u20ac\u00a2 On-call responsibility load: 5 total incidents (32.1 points)",
               "\u00e2\u20ac\u00a2 Incident severity-weighted workload (3.2 points)",
@@ -961,14 +961,14 @@
                 },
                 {
                   "key": "sleep_quality_proxy",
-                  "name": "Sleep quality impact",
+                  "name": "High-severity incidents",
                   "points": 52.5,
                   "percentage": 30.5,
                   "dimension": "personal"
                 },
                 {
                   "key": "work_hours_trend",
-                  "name": "Extended work hours",
+                  "name": "Task workload",
                   "points": 6.0,
                   "percentage": 3.5,
                   "dimension": "personal"
@@ -1007,7 +1007,7 @@
                 },
                 {
                   "key": "sleep_quality_proxy",
-                  "name": "Sleep quality impact",
+                  "name": "High-severity incidents",
                   "points": 52.5,
                   "percentage": 30.5,
                   "dimension": "personal"
@@ -1021,7 +1021,7 @@
                 },
                 {
                   "key": "work_hours_trend",
-                  "name": "Extended work hours",
+                  "name": "Task workload",
                   "points": 6.0,
                   "percentage": 3.5,
                   "dimension": "personal"
@@ -1305,8 +1305,8 @@
               "Critical burnout risk (OCB: 83/100) - immediate attention needed",
               "PERSONAL:",
               "\u00e2\u20ac\u00a2 Non-business hours incident activity (75.0 points)",
-              "\u00e2\u20ac\u00a2 Sleep quality impact from critical incidents (52.5 points)",
-              "\u00e2\u20ac\u00a2 Extended work hours (3.9 points)",
+              "\u00e2\u20ac\u00a2 High-severity incident stress (52.5 points)",
+              "\u00e2\u20ac\u00a2 High task workload (3.9 points)",
               "WORK-RELATED:",
               "\u00e2\u20ac\u00a2 On-call responsibility load: 3 total incidents (29.7 points)",
               "\u00e2\u20ac\u00a2 Incident severity-weighted workload (2.1 points)",
@@ -1325,14 +1325,14 @@
                 },
                 {
                   "key": "sleep_quality_proxy",
-                  "name": "Sleep quality impact",
+                  "name": "High-severity incidents",
                   "points": 52.5,
                   "percentage": 31.6,
                   "dimension": "personal"
                 },
                 {
                   "key": "work_hours_trend",
-                  "name": "Extended work hours",
+                  "name": "Task workload",
                   "points": 3.9,
                   "percentage": 2.3,
                   "dimension": "personal"
@@ -1378,7 +1378,7 @@
                 },
                 {
                   "key": "sleep_quality_proxy",
-                  "name": "Sleep quality impact",
+                  "name": "High-severity incidents",
                   "points": 52.5,
                   "percentage": 31.6,
                   "dimension": "personal"
@@ -1392,7 +1392,7 @@
                 },
                 {
                   "key": "work_hours_trend",
-                  "name": "Extended work hours",
+                  "name": "Task workload",
                   "points": 3.9,
                   "percentage": 2.3,
                   "dimension": "personal"
@@ -1602,8 +1602,8 @@
             "ocb_reasoning": [
               "High burnout risk (OCB: 52/100) - monitor closely",
               "PERSONAL:",
-              "\u00e2\u20ac\u00a2 Sleep quality impact from critical incidents (52.5 points)",
-              "\u00e2\u20ac\u00a2 Extended work hours (7.0 points)",
+              "\u00e2\u20ac\u00a2 High-severity incident stress (52.5 points)",
+              "\u00e2\u20ac\u00a2 High task workload (7.0 points)",
               "WORK-RELATED:",
               "\u00e2\u20ac\u00a2 On-call responsibility load: 6 total incidents (35.0 points)",
               "\u00e2\u20ac\u00a2 Incident severity-weighted workload (3.8 points)",
@@ -1614,14 +1614,14 @@
               "personal": [
                 {
                   "key": "sleep_quality_proxy",
-                  "name": "Sleep quality impact",
+                  "name": "High-severity incidents",
                   "points": 52.5,
                   "percentage": 50.4,
                   "dimension": "personal"
                 },
                 {
                   "key": "work_hours_trend",
-                  "name": "Extended work hours",
+                  "name": "Task workload",
                   "points": 7.0,
                   "percentage": 6.8,
                   "dimension": "personal"
@@ -1660,7 +1660,7 @@
               "all": [
                 {
                   "key": "sleep_quality_proxy",
-                  "name": "Sleep quality impact",
+                  "name": "High-severity incidents",
                   "points": 52.5,
                   "percentage": 50.4,
                   "dimension": "personal"
@@ -1674,7 +1674,7 @@
                 },
                 {
                   "key": "work_hours_trend",
-                  "name": "Extended work hours",
+                  "name": "Task workload",
                   "points": 7.0,
                   "percentage": 6.8,
                   "dimension": "personal"
@@ -1839,8 +1839,8 @@
             "ocb_reasoning": [
               "High burnout risk (OCB: 52/100) - monitor closely",
               "PERSONAL:",
-              "\u00e2\u20ac\u00a2 Sleep quality impact from critical incidents (52.5 points)",
-              "\u00e2\u20ac\u00a2 Extended work hours (7.0 points)",
+              "\u00e2\u20ac\u00a2 High-severity incident stress (52.5 points)",
+              "\u00e2\u20ac\u00a2 High task workload (7.0 points)",
               "WORK-RELATED:",
               "\u00e2\u20ac\u00a2 On-call responsibility load: 6 total incidents (35.0 points)",
               "\u00e2\u20ac\u00a2 Incident severity-weighted workload (3.8 points)",
@@ -1852,14 +1852,14 @@
               "personal": [
                 {
                   "key": "sleep_quality_proxy",
-                  "name": "Sleep quality impact",
+                  "name": "High-severity incidents",
                   "points": 52.5,
                   "percentage": 51.0,
                   "dimension": "personal"
                 },
                 {
                   "key": "work_hours_trend",
-                  "name": "Extended work hours",
+                  "name": "Task workload",
                   "points": 7.0,
                   "percentage": 6.8,
                   "dimension": "personal"
@@ -1898,7 +1898,7 @@
               "all": [
                 {
                   "key": "sleep_quality_proxy",
-                  "name": "Sleep quality impact",
+                  "name": "High-severity incidents",
                   "points": 52.5,
                   "percentage": 51.0,
                   "dimension": "personal"
@@ -1912,7 +1912,7 @@
                 },
                 {
                   "key": "work_hours_trend",
-                  "name": "Extended work hours",
+                  "name": "Task workload",
                   "points": 7.0,
                   "percentage": 6.8,
                   "dimension": "personal"
@@ -2077,8 +2077,8 @@
               "Critical burnout risk (OCB: 82/100) - immediate attention needed",
               "PERSONAL:",
               "\u00e2\u20ac\u00a2 Non-business hours incident activity (75.0 points)",
-              "\u00e2\u20ac\u00a2 Sleep quality impact from critical incidents (52.5 points)",
-              "\u00e2\u20ac\u00a2 Extended work hours (3.9 points)",
+              "\u00e2\u20ac\u00a2 High-severity incident stress (52.5 points)",
+              "\u00e2\u20ac\u00a2 High task workload (3.9 points)",
               "WORK-RELATED:",
               "\u00e2\u20ac\u00a2 On-call responsibility load: 3 total incidents (28.5 points)",
               "\u00e2\u20ac\u00a2 Incident severity-weighted workload (2.1 points)",
@@ -2096,14 +2096,14 @@
                 },
                 {
                   "key": "sleep_quality_proxy",
-                  "name": "Sleep quality impact",
+                  "name": "High-severity incidents",
                   "points": 52.5,
                   "percentage": 32.0,
                   "dimension": "personal"
                 },
                 {
                   "key": "work_hours_trend",
-                  "name": "Extended work hours",
+                  "name": "Task workload",
                   "points": 3.9,
                   "percentage": 2.4,
                   "dimension": "personal"
@@ -2142,7 +2142,7 @@
                 },
                 {
                   "key": "sleep_quality_proxy",
-                  "name": "Sleep quality impact",
+                  "name": "High-severity incidents",
                   "points": 52.5,
                   "percentage": 32.0,
                   "dimension": "personal"
@@ -2156,7 +2156,7 @@
                 },
                 {
                   "key": "work_hours_trend",
-                  "name": "Extended work hours",
+                  "name": "Task workload",
                   "points": 3.9,
                   "percentage": 2.4,
                   "dimension": "personal"
@@ -2313,8 +2313,8 @@
               "Moderate stress levels (OCB: 48/100) - manageable with care",
               "PERSONAL:",
               "\u00e2\u20ac\u00a2 Non-business hours incident activity (75.0 points)",
-              "\u00e2\u20ac\u00a2 Sleep quality impact from critical incidents (13.0 points)",
-              "\u00e2\u20ac\u00a2 Extended work hours (1.4 points)",
+              "\u00e2\u20ac\u00a2 High-severity incident stress (13.0 points)",
+              "\u00e2\u20ac\u00a2 High task workload (1.4 points)",
               "WORK-RELATED:",
               "\u00e2\u20ac\u00a2 On-call responsibility load: 1 total incidents (4.9 points)",
               "\u00e2\u20ac\u00a2 Incident severity-weighted workload (0.7 points)",
@@ -2332,14 +2332,14 @@
                 },
                 {
                   "key": "sleep_quality_proxy",
-                  "name": "Sleep quality impact",
+                  "name": "High-severity incidents",
                   "points": 13.0,
                   "percentage": 13.6,
                   "dimension": "personal"
                 },
                 {
                   "key": "work_hours_trend",
-                  "name": "Extended work hours",
+                  "name": "Task workload",
                   "points": 1.4,
                   "percentage": 1.4,
                   "dimension": "personal"
@@ -2378,7 +2378,7 @@
                 },
                 {
                   "key": "sleep_quality_proxy",
-                  "name": "Sleep quality impact",
+                  "name": "High-severity incidents",
                   "points": 13.0,
                   "percentage": 13.6,
                   "dimension": "personal"
@@ -2392,7 +2392,7 @@
                 },
                 {
                   "key": "work_hours_trend",
-                  "name": "Extended work hours",
+                  "name": "Task workload",
                   "points": 1.4,
                   "percentage": 1.4,
                   "dimension": "personal"
@@ -2556,8 +2556,8 @@
             "ocb_reasoning": [
               "Moderate stress levels (OCB: 47/100) - manageable with care",
               "PERSONAL:",
-              "\u00e2\u20ac\u00a2 Sleep quality impact from critical incidents (52.5 points)",
-              "\u00e2\u20ac\u00a2 Extended work hours (4.9 points)",
+              "\u00e2\u20ac\u00a2 High-severity incident stress (52.5 points)",
+              "\u00e2\u20ac\u00a2 High task workload (4.9 points)",
               "WORK-RELATED:",
               "\u00e2\u20ac\u00a2 On-call responsibility load: 4 total incidents (30.9 points)",
               "\u00e2\u20ac\u00a2 Incident severity-weighted workload (2.6 points)",
@@ -2568,14 +2568,14 @@
               "personal": [
                 {
                   "key": "sleep_quality_proxy",
-                  "name": "Sleep quality impact",
+                  "name": "High-severity incidents",
                   "points": 52.5,
                   "percentage": 56.2,
                   "dimension": "personal"
                 },
                 {
                   "key": "work_hours_trend",
-                  "name": "Extended work hours",
+                  "name": "Task workload",
                   "points": 4.9,
                   "percentage": 5.3,
                   "dimension": "personal"
@@ -2607,7 +2607,7 @@
               "all": [
                 {
                   "key": "sleep_quality_proxy",
-                  "name": "Sleep quality impact",
+                  "name": "High-severity incidents",
                   "points": 52.5,
                   "percentage": 56.2,
                   "dimension": "personal"
@@ -2621,7 +2621,7 @@
                 },
                 {
                   "key": "work_hours_trend",
-                  "name": "Extended work hours",
+                  "name": "Task workload",
                   "points": 4.9,
                   "percentage": 5.3,
                   "dimension": "personal"
@@ -2779,8 +2779,8 @@
             "ocb_reasoning": [
               "Low burnout risk (OCB: 20/100) - healthy stress levels",
               "PERSONAL:",
-              "\u00e2\u20ac\u00a2 Sleep quality impact from critical incidents (24.2 points)",
-              "\u00e2\u20ac\u00a2 Extended work hours (2.8 points)",
+              "\u00e2\u20ac\u00a2 High-severity incident stress (24.2 points)",
+              "\u00e2\u20ac\u00a2 High task workload (2.8 points)",
               "WORK-RELATED:",
               "\u00e2\u20ac\u00a2 On-call responsibility load: 2 total incidents (9.1 points)",
               "\u00e2\u20ac\u00a2 Incident severity-weighted workload (1.5 points)",
@@ -2791,14 +2791,14 @@
               "personal": [
                 {
                   "key": "sleep_quality_proxy",
-                  "name": "Sleep quality impact",
+                  "name": "High-severity incidents",
                   "points": 24.2,
                   "percentage": 62.1,
                   "dimension": "personal"
                 },
                 {
                   "key": "work_hours_trend",
-                  "name": "Extended work hours",
+                  "name": "Task workload",
                   "points": 2.8,
                   "percentage": 7.2,
                   "dimension": "personal"
@@ -2830,7 +2830,7 @@
               "all": [
                 {
                   "key": "sleep_quality_proxy",
-                  "name": "Sleep quality impact",
+                  "name": "High-severity incidents",
                   "points": 24.2,
                   "percentage": 62.1,
                   "dimension": "personal"
@@ -2844,7 +2844,7 @@
                 },
                 {
                   "key": "work_hours_trend",
-                  "name": "Extended work hours",
+                  "name": "Task workload",
                   "points": 2.8,
                   "percentage": 7.2,
                   "dimension": "personal"
