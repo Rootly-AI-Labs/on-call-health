@@ -12,7 +12,6 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy.orm import Session
 
-from ...auth.dependencies import get_current_active_user
 from ...core.rate_limiting import admin_rate_limit
 from ...models import Analysis, get_db
 from ...models.user import User
@@ -115,7 +114,6 @@ if _ip_whitelist:
 async def refresh_demo_analyses(
     request: Request,
     x_admin_api_key: str = Header(None, alias="X-Admin-API-Key"),
-    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ) -> dict:
     """
@@ -125,47 +123,29 @@ async def refresh_demo_analyses(
     who don't have a demo analysis. Use this after updating mock_analysis_data.json
     with new fields or data.
 
-    Security: Requires BOTH admin role AND valid API key (defense-in-depth).
-    Optional IP whitelist can be configured via ADMIN_IP_WHITELIST env var.
+    Security: API key authentication with optional IP whitelist.
+    - Requires valid X-Admin-API-Key header (32+ char key)
+    - Optional IP whitelist via ADMIN_IP_WHITELIST env var
+    - Rate limited to 5 requests/minute
     """
     client_ip = _get_client_ip(request)
 
     # Security Layer 1: Validate API key is properly configured
     if not _admin_api_key_valid:
-        logger.warning(
-            f"ADMIN AUDIT: Rejected request - API key not configured or invalid. "
-            f"IP: {client_ip}, User: {current_user.id}"
-        )
+        logger.warning(f"ADMIN AUDIT: Rejected - API key not configured. IP: {client_ip}")
         raise HTTPException(status_code=503, detail="Admin endpoint temporarily unavailable")
 
     # Security Layer 2: IP whitelist check (if configured)
     if not _is_ip_whitelisted(client_ip, _ip_whitelist):
-        logger.warning(
-            f"ADMIN AUDIT: Rejected request - IP not whitelisted. "
-            f"IP: {client_ip}, User: {current_user.id}"
-        )
+        logger.warning(f"ADMIN AUDIT: Rejected - IP not whitelisted. IP: {client_ip}")
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    # Security Layer 3: Verify admin role (defense-in-depth)
-    if current_user.role != 'admin':
-        logger.warning(
-            f"ADMIN AUDIT: Rejected request - User lacks admin role. "
-            f"IP: {client_ip}, User: {current_user.id}, Role: {current_user.role}"
-        )
-        raise HTTPException(status_code=403, detail="Forbidden")
-
-    # Security Layer 4: Validate API key with constant-time comparison
+    # Security Layer 3: Validate API key with constant-time comparison
     if not secrets.compare_digest(x_admin_api_key or "", ADMIN_API_KEY):
-        logger.warning(
-            f"ADMIN AUDIT: Rejected request - Invalid API key. "
-            f"IP: {client_ip}, User: {current_user.id}"
-        )
+        logger.warning(f"ADMIN AUDIT: Rejected - Invalid API key. IP: {client_ip}")
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    logger.info(
-        f"ADMIN AUDIT: Authorized access to /refresh-demo-analyses. "
-        f"IP: {client_ip}, User: {current_user.id}"
-    )
+    logger.info(f"ADMIN AUDIT: Authorized access to /refresh-demo-analyses. IP: {client_ip}")
 
     try:
         # Load mock data
@@ -244,9 +224,8 @@ async def refresh_demo_analyses(
         db.commit()
 
         logger.info(
-            f"ADMIN AUDIT: /refresh-demo-analyses completed successfully. "
-            f"IP: {client_ip}, User: {current_user.id}, "
-            f"Updated: {updated_count}, Created: {created_count}"
+            f"ADMIN AUDIT: /refresh-demo-analyses completed. "
+            f"IP: {client_ip}, Updated: {updated_count}, Created: {created_count}"
         )
 
         return {
@@ -262,11 +241,7 @@ async def refresh_demo_analyses(
         raise
     except Exception as e:
         db.rollback()
-        logger.error(
-            f"ADMIN AUDIT: /refresh-demo-analyses failed. "
-            f"IP: {client_ip}, User: {current_user.id}, "
-            f"Error: {str(e)}"
-        )
+        logger.error(f"ADMIN AUDIT: /refresh-demo-analyses failed. IP: {client_ip}, Error: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail="Failed to refresh demo analyses"
