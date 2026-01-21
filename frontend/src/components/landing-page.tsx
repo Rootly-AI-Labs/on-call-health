@@ -160,8 +160,9 @@ export default function LandingPage() {
               href="https://github.com/Rootly-AI-Labs/On-Call-Health"
               target="_blank"
               rel="noreferrer"
-              className="rounded-2xl bg-[#7b6db1] px-5 py-2 text-sm font-semibold font-display text-[color:var(--text-text-primary,_#100F12)] hover:bg-[#6f62a5] lg:-translate-x-6"
+              className="rounded-2xl bg-[#7b6db1] px-5 py-2 text-sm font-semibold font-display text-[color:var(--text-text-primary,_#100F12)] hover:bg-[#6f62a5] lg:-translate-x-6 flex items-center gap-2"
             >
+              <Image src="/images/github-logo.png" alt="GitHub" width={20} height={20} />
               GitHub
             </a>
           </div>
@@ -199,7 +200,7 @@ export default function LandingPage() {
                 ) : (
                   <>
                     <Chrome className="h-6 w-6 -translate-y-0.5" aria-hidden="true" />
-                    Start with Google
+                    Sign in with Google
                   </>
                 )}
               </span>
@@ -220,7 +221,7 @@ export default function LandingPage() {
                 ) : (
                   <>
                     <Github className="h-6 w-6 -translate-y-0.5" aria-hidden="true" />
-                    Start with GitHub
+                    Sign in with GitHub
                   </>
                 )}
               </span>
