@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Union
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, load_only
 
 from ...models import get_db, User, Analysis, RootlyIntegration, SlackIntegration, GitHubIntegration, JiraIntegration, LinearIntegration, UserCorrelation
 from ...auth.dependencies import get_current_active_user
@@ -25,7 +25,13 @@ def extract_analysis_summary(full_results: dict) -> dict:
     Reduces 30MB+ payloads to <1KB summaries.
     """
     if not full_results:
-        return None
+        return {
+            "team_analysis": {"members": []},
+            "metadata": {},
+            "team_health": {},
+            "ai_enhanced": False,
+            "ai_team_insights": {"available": False}
+        }
 
     # Essential structure for frontend compatibility
     summary = {
@@ -340,8 +346,18 @@ async def list_analyses(
     logger.info(f"📋 [LIST_ANALYSES] Count: {total} in {time.time() - count_start:.3f}s")
 
     # Apply pagination and ordering
+    # Use load_only to exclude heavy 'results' column (can be 30MB+) - not needed for list view
     fetch_start = time.time()
-    analyses = query.order_by(Analysis.created_at.desc()).offset(offset).limit(limit).all()
+    analyses = query.options(
+        load_only(
+            Analysis.id, Analysis.uuid, Analysis.status,
+            Analysis.created_at, Analysis.completed_at,
+            Analysis.time_range, Analysis.config,
+            Analysis.integration_name, Analysis.platform,
+            Analysis.rootly_integration_id, Analysis.user_id,
+            Analysis.organization_id
+        )
+    ).order_by(Analysis.created_at.desc()).offset(offset).limit(limit).all()
     logger.info(f"📋 [LIST_ANALYSES] Fetched {len(analyses)} analyses in {time.time() - fetch_start:.3f}s")
 
     # Convert to response format
