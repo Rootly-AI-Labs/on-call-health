@@ -66,26 +66,22 @@ def _get_client_ip(request: Request) -> str:
 def _is_ip_whitelisted(client_ip: str, whitelist: set) -> bool:
     """Check if client IP is in the whitelist. Supports both exact IPs and CIDR ranges."""
     if not whitelist:
-        return False  # No whitelist configured, reject all (defense in depth)
+        return False
 
     try:
         client_addr = ipaddress.ip_address(client_ip)
-        for entry in whitelist:
-            try:
-                if '/' in entry:
-                    # CIDR range (e.g., "192.168.1.0/24")
-                    if client_addr in ipaddress.ip_network(entry, strict=False):
-                        return True
-                else:
-                    # Exact IP match
-                    if client_addr == ipaddress.ip_address(entry):
-                        return True
-            except ValueError:
-                # Invalid entry in whitelist, skip it
-                continue
     except ValueError:
-        # Invalid client IP format
         return False
+
+    for entry in whitelist:
+        try:
+            if '/' in entry:
+                if client_addr in ipaddress.ip_network(entry, strict=False):
+                    return True
+            elif client_addr == ipaddress.ip_address(entry):
+                return True
+        except ValueError:
+            continue
 
     return False
 
@@ -93,17 +89,18 @@ def _validate_admin_api_key() -> bool:
     """Validate that ADMIN_API_KEY meets security requirements."""
     if not ADMIN_API_KEY:
         logger.error(
-            "SECURITY: ADMIN_API_KEY is not configured. "
-            "Admin endpoints will be disabled. "
+            f"SECURITY: ADMIN_API_KEY is not configured. Admin endpoints will be disabled. "
             f"Set ADMIN_API_KEY env var with at least {MIN_API_KEY_LENGTH} characters."
         )
         return False
+
     if len(ADMIN_API_KEY) < MIN_API_KEY_LENGTH:
         logger.error(
             f"SECURITY: ADMIN_API_KEY is too short ({len(ADMIN_API_KEY)} chars). "
             f"Minimum required: {MIN_API_KEY_LENGTH} chars. Admin endpoints will be disabled."
         )
         return False
+
     return True
 
 # Validate API key at module load time
