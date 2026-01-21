@@ -2,11 +2,10 @@
 Burnout analysis API endpoints.
 """
 import logging
-import os
 from datetime import datetime, timedelta
-from typing import List, Optional, Dict, Any, Union
-from collections import defaultdict
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Query, Request
+from typing import Any, Dict, List, Optional, Union
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -242,6 +241,7 @@ async def run_burnout_analysis(
             background_tasks.add_task(
                 run_analysis_task,
                 analysis_id=analysis.id,
+                analysis_uuid=analysis.uuid,
                 integration_id=integration.id,
                 api_token=integration.api_token,
                 platform=integration.platform,
@@ -688,7 +688,7 @@ async def delete_analysis(
     db.delete(analysis)
     db.commit()
     
-    logger.info(f"Analysis {analysis_id} deleted by user {current_user.id}")
+    logger.info(f"Analysis {analysis_ref} deleted by user {current_user.id}")
     
     return {"message": "Analysis deleted successfully"}
 
@@ -723,7 +723,7 @@ async def regenerate_analysis_trends(
         
         # Check if we already have daily trends
         if analysis_data.get("daily_trends") and len(analysis_data["daily_trends"]) > 0:
-            logger.info(f"Analysis {analysis_id} already has {len(analysis_data['daily_trends'])} daily trends data points")
+            logger.info(f"Analysis {analysis_ref} already has {len(analysis_data['daily_trends'])} daily trends data points")
             return {
                 "message": "Daily trends already exist",
                 "trends_count": len(analysis_data["daily_trends"]),
@@ -741,7 +741,7 @@ async def regenerate_analysis_trends(
             )
         
         # Generate daily trends from existing analysis data
-        logger.info(f"Regenerating daily trends for analysis {analysis_id}")
+        logger.info(f"Regenerating daily trends for analysis {analysis_ref}")
         
         # Get time range from metadata or analysis record
         time_range_days = metadata.get("days_analyzed", analysis.time_range or 30)
@@ -822,7 +822,7 @@ async def regenerate_analysis_trends(
         analysis.results = analysis_data
         db.commit()
         
-        logger.info(f"Successfully regenerated {len(daily_trends)} daily trends for analysis {analysis_id}")
+        logger.info(f"Successfully regenerated {len(daily_trends)} daily trends for analysis {analysis_ref}")
         
         return {
             "message": "Daily trends regenerated successfully",
@@ -833,7 +833,7 @@ async def regenerate_analysis_trends(
         }
         
     except Exception as e:
-        logger.error(f"Failed to regenerate trends for analysis {analysis_id}: {str(e)}")
+        logger.error(f"Failed to regenerate trends for analysis {analysis_ref}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to regenerate trends: {str(e)}"
@@ -1013,12 +1013,12 @@ async def verify_analysis_consistency(
             ) if consistency_report["consistency_checks"] else 0
         }
         
-        logger.info(f"Consistency check for analysis {analysis_id}: {consistency_report['summary']['consistency_percentage']}% consistent")
+        logger.info(f"Consistency check for analysis {analysis_ref}: {consistency_report['summary']['consistency_percentage']}% consistent")
         
         return consistency_report
         
     except Exception as e:
-        logger.error(f"Failed to verify consistency for analysis {analysis_id}: {str(e)}")
+        logger.error(f"Failed to verify consistency for analysis {analysis_ref}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Consistency check failed: {str(e)}"
@@ -2546,6 +2546,7 @@ def _calculate_individual_daily_health(day: dict, member_data: dict, analysis_re
 
 async def run_analysis_task(
     analysis_id: int,
+    analysis_uuid: str,
     integration_id: int,
     api_token: str,
     platform: str,
@@ -2566,12 +2567,15 @@ async def run_analysis_task(
     import os
     import sys
 
+    # Helper to format analysis ID with UUID for consistent logging
+    analysis_ref = f"{analysis_id} ({analysis_uuid})"
+
     # Force output to stderr to ensure we see it
-    sys.stderr.write(f"\n🔥🔥🔥 BACKGROUND TASK STARTED: Analysis {analysis_id} 🔥🔥🔥\n")
+    sys.stderr.write(f"\n🔥🔥🔥 BACKGROUND TASK STARTED: Analysis {analysis_ref} 🔥🔥🔥\n")
     sys.stderr.flush()
 
     logger = logging.getLogger(__name__)
-    logger.info(f"BACKGROUND_TASK: Starting analysis {analysis_id} with timeout mechanism")
+    logger.info(f"BACKGROUND_TASK: Starting analysis {analysis_ref} with timeout mechanism")
     logger.info(f"BACKGROUND_TASK: Integration params - GitHub: {include_github}, Slack: {include_slack}, Jira: {include_jira}, Linear: {include_linear}")
     logger.info(f"BACKGROUND_TASK: User ID received: {user_id}")
     logger.info(f"BACKGROUND_TASK: AI params - enable_ai: {enable_ai}")
@@ -2585,18 +2589,18 @@ async def run_analysis_task(
     
     try:
         # Log database connection info
-        logger.info(f"BACKGROUND_TASK: Got new database session for analysis {analysis_id}")
+        logger.info(f"BACKGROUND_TASK: Got new database session for analysis {analysis_ref}")
         
         # Update status to running
         analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
         if not analysis:
-            logger.error(f"BACKGROUND_TASK: Analysis {analysis_id} not found in database")
+            logger.error(f"BACKGROUND_TASK: Analysis {analysis_ref} not found in database")
             # Try to debug what analyses exist
             all_analyses = db.query(Analysis.id).order_by(Analysis.id.desc()).limit(5).all()
             logger.error(f"BACKGROUND_TASK: Recent analysis IDs in database: {[a.id for a in all_analyses]}")
             return  # Analysis doesn't exist
             
-        logger.info(f"BACKGROUND_TASK: Setting analysis {analysis_id} to running status")
+        logger.info(f"BACKGROUND_TASK: Setting analysis {analysis_ref} to running status")
         analysis.status = "running"
         db.commit()
         
@@ -2605,12 +2609,12 @@ async def run_analysis_task(
             from ...services.mapping_recorder import MappingRecorder
             recorder = MappingRecorder(db)
             cleared_count = recorder.clear_analysis_mappings(analysis_id)
-            logger.info(f"BACKGROUND_TASK: Cleared {cleared_count} existing mappings for analysis {analysis_id}")
+            logger.info(f"BACKGROUND_TASK: Cleared {cleared_count} existing mappings for analysis {analysis_ref}")
         
         # Use the customer's token - beta tokens are handled separately during integration creation
         # DO NOT override customer tokens with beta tokens here!
         effective_api_token = api_token
-        logger.info(f"BACKGROUND_TASK: Using customer token for analysis {analysis_id} (integration_id: {integration_id})")
+        logger.info(f"BACKGROUND_TASK: Using customer token for analysis {analysis_ref} (integration_id: {integration_id})")
         
         # Fetch user-specific integration tokens if needed
         slack_token = None
@@ -2621,7 +2625,7 @@ async def run_analysis_task(
         logger.info(f"BACKGROUND_TASK: Checking conditions - user_id: {user_id}, include_slack: {include_slack}, include_github: {include_github}, include_jira: {include_jira}, include_linear: {include_linear}")
 
         if user_id and (include_slack or include_github or include_jira or include_linear):
-            logger.info(f"BACKGROUND_TASK: Fetching user {user_id} integrations for analysis {analysis_id}")
+            logger.info(f"BACKGROUND_TASK: Fetching user {user_id} integrations for analysis {analysis_ref}")
 
             if include_slack:
                 logger.info(f"BACKGROUND_TASK: Looking for Slack integration for user {user_id}")
@@ -2682,7 +2686,7 @@ async def run_analysis_task(
             logger.info(f"BACKGROUND_TASK: Skipping user integrations - user_id: {user_id}, include_slack: {include_slack}, include_github: {include_github}, include_jira: {include_jira}, include_linear: {include_linear}")
 
         # Initialize analyzer service based on platform and AI enablement
-        logger.info(f"BACKGROUND_TASK: Initializing {platform} analyzer service for analysis {analysis_id}, enable_ai: {enable_ai}")
+        logger.info(f"BACKGROUND_TASK: Initializing {platform} analyzer service for analysis {analysis_ref}, enable_ai: {enable_ai}")
         
         # Check if user has LLM token and AI is enabled
         use_ai_analyzer = False
@@ -2934,7 +2938,7 @@ async def run_analysis_task(
         logger.info(f"BACKGROUND_TASK: UnifiedBurnoutAnalyzer initialized - Features: AI={use_ai_analyzer}, GitHub={include_github}, Slack={include_slack}, Jira={include_jira}, Linear={include_linear}, current_user_id={user_id}")
         
         # Run the analysis with timeout (15 minutes max)
-        logger.info(f"BACKGROUND_TASK: Starting burnout analysis with 15-minute timeout for analysis {analysis_id}")
+        logger.info(f"BACKGROUND_TASK: Starting burnout analysis with 15-minute timeout for analysis {analysis_ref}")
         try:
             # Ensure analyzer_service is properly initialized
             if not analyzer_service:
@@ -2945,9 +2949,9 @@ async def run_analysis_task(
 
             # Call UnifiedBurnoutAnalyzer
             logger.info(f"BACKGROUND_TASK: Calling UnifiedBurnoutAnalyzer.analyze_burnout()")
-            logger.info(f"BACKGROUND_TASK: Analysis parameters - time_range_days={time_range}, include_weekends={include_weekends}, user_id={user_id}, analysis_id={analysis_id}")
+            logger.info(f"BACKGROUND_TASK: Analysis parameters - time_range_days={time_range}, include_weekends={include_weekends}, user_id={user_id}, analysis={analysis_ref}")
 
-            logger.info(f"⏳ Analysis {analysis_id}: Starting analyze_burnout()")
+            logger.info(f"⏳ Analysis {analysis_ref}: Starting analyze_burnout()")
             try:
                 results = await asyncio.wait_for(
                     analyzer_service.analyze_burnout(
@@ -2958,23 +2962,23 @@ async def run_analysis_task(
                     ),
                     timeout=900.0  # 15 minutes timeout
                 )
-                logger.info(f"✅ Analysis {analysis_id}: analyze_burnout() completed")
+                logger.info(f"✅ Analysis {analysis_ref}: analyze_burnout() completed")
             except Exception as analyze_error:
-                logger.error(f"❌ Analysis {analysis_id} failed: {str(analyze_error)}")
+                logger.error(f"❌ Analysis {analysis_ref} failed: {str(analyze_error)}")
                 raise
 
             # Check if analysis was deleted during execution
             analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
             if not analysis:
-                logger.info(f"BACKGROUND_TASK: Analysis {analysis_id} was deleted during execution, stopping")
+                logger.info(f"BACKGROUND_TASK: Analysis {analysis_ref} was deleted during execution, stopping")
                 return
             
             # Validate results
             if not results:
-                logger.warning(f"BACKGROUND_TASK: Analysis {analysis_id} returned empty results")
+                logger.warning(f"BACKGROUND_TASK: Analysis {analysis_ref} returned empty results")
                 results = {"error": "Analysis completed but returned empty results"}
             
-            logger.info(f"BACKGROUND_TASK: Analysis {analysis_id} completed successfully with {len(str(results))} characters of results")
+            logger.info(f"BACKGROUND_TASK: Analysis {analysis_ref} completed successfully with {len(str(results))} characters of results")
             
             # A/B Testing: Log comparative metrics for monitoring
             try:
@@ -2999,50 +3003,50 @@ async def run_analysis_task(
                 logger.warning(f"A/B testing monitoring failed: {monitoring_error}")
             
             # Update analysis with results
-            logger.info(f"💾 Analysis {analysis_id}: Saving results to database")
+            logger.info(f"💾 Analysis {analysis_ref}: Saving results to database")
             analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
             if analysis:
                 analysis.status = "completed"
                 analysis.results = results
                 analysis.completed_at = datetime.now()
-                logger.info(f"💾 Analysis {analysis_id}: Committing to database")
+                logger.info(f"💾 Analysis {analysis_ref}: Committing to database")
                 db.commit()
-                logger.info(f"✅ Analysis {analysis_id}: Successfully saved and committed")
+                logger.info(f"✅ Analysis {analysis_ref}: Successfully saved and committed")
             else:
-                logger.error(f"❌ Analysis {analysis_id}: Not found when trying to save results")
+                logger.error(f"❌ Analysis {analysis_ref}: Not found when trying to save results")
                 
         except asyncio.TimeoutError:
             # Handle timeout
-            logger.error(f"BACKGROUND_TASK: Analysis {analysis_id} timed out after 15 minutes")
+            logger.error(f"BACKGROUND_TASK: Analysis {analysis_ref} timed out after 15 minutes")
             logger.error(f"BACKGROUND_TASK: Timeout occurred at {datetime.now()}")
             logger.error(f"BACKGROUND_TASK: Analysis was stuck - likely during incident data collection phase")
             logger.error(f"BACKGROUND_TASK: This typically happens when Rootly API is slow or experiencing connectivity issues")
 
             analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
             if not analysis:
-                logger.info(f"BACKGROUND_TASK: Analysis {analysis_id} was deleted, not updating status")
+                logger.info(f"BACKGROUND_TASK: Analysis {analysis_ref} was deleted, not updating status")
                 return
 
             analysis.status = "failed"
             analysis.error_message = "Analysis timed out after 15 minutes. This may be due to network connectivity issues or API slowness. Please try again."
             analysis.completed_at = datetime.now()
             db.commit()
-            logger.info(f"BACKGROUND_TASK: Updated analysis {analysis_id} status to failed due to timeout")
+            logger.info(f"BACKGROUND_TASK: Updated analysis {analysis_ref} status to failed due to timeout")
                 
         except Exception as analysis_error:
             # Handle analysis-specific errors
-            logger.error(f"BACKGROUND_TASK: Analysis {analysis_id} failed: {analysis_error}")
+            logger.error(f"BACKGROUND_TASK: Analysis {analysis_ref} failed: {analysis_error}")
 
             analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
             if not analysis:
-                logger.info(f"BACKGROUND_TASK: Analysis {analysis_id} was deleted, not updating status")
+                logger.info(f"BACKGROUND_TASK: Analysis {analysis_ref} was deleted, not updating status")
                 return
 
             if analysis:
                 # Check if this is a permission error - if so, fail immediately
                 error_message = str(analysis_error)
                 if "Cannot access incidents endpoint" in error_message or "incidents:read" in error_message:
-                    logger.error(f"BACKGROUND_TASK: Permission error detected for analysis {analysis_id}, failing immediately")
+                    logger.error(f"BACKGROUND_TASK: Permission error detected for analysis {analysis_ref}, failing immediately")
                     analysis.status = "failed"
                     analysis.error_message = error_message
                     analysis.completed_at = datetime.now()
@@ -3051,27 +3055,27 @@ async def run_analysis_task(
                 
                 # For other errors, try to collect raw data even if analysis failed
                 try:
-                    logger.info(f"BACKGROUND_TASK: Attempting to save raw data for failed analysis {analysis_id}")
+                    logger.info(f"BACKGROUND_TASK: Attempting to save raw data for failed analysis {analysis_ref}")
                     raw_data = None
                     
                     # Access the appropriate client based on platform with comprehensive error handling
                     try:
                         # Check if analyzer_service exists and is not None
                         if analyzer_service is None:
-                            logger.warning(f"BACKGROUND_TASK: analyzer_service is None for analysis {analysis_id}")
+                            logger.warning(f"BACKGROUND_TASK: analyzer_service is None for analysis {analysis_ref}")
                         elif hasattr(analyzer_service, 'client'):
                             client = getattr(analyzer_service, 'client', None)
                             if client is not None:
                                 try:
                                     logger.info(f"BACKGROUND_TASK: Attempting raw data collection with client type: {type(client).__name__}")
                                     raw_data = await client.collect_analysis_data(days_back=time_range)
-                                    logger.info(f"BACKGROUND_TASK: Successfully collected raw data for analysis {analysis_id}")
+                                    logger.info(f"BACKGROUND_TASK: Successfully collected raw data for analysis {analysis_ref}")
                                 except Exception as client_error:
-                                    logger.warning(f"BACKGROUND_TASK: Failed to collect raw data for analysis {analysis_id}: {client_error}")
+                                    logger.warning(f"BACKGROUND_TASK: Failed to collect raw data for analysis {analysis_ref}: {client_error}")
                             else:
-                                logger.warning(f"BACKGROUND_TASK: analyzer_service.client is None for analysis {analysis_id}")
+                                logger.warning(f"BACKGROUND_TASK: analyzer_service.client is None for analysis {analysis_ref}")
                         else:
-                            logger.warning(f"BACKGROUND_TASK: analyzer_service has no 'client' attribute for analysis {analysis_id} (type: {type(analyzer_service).__name__})")
+                            logger.warning(f"BACKGROUND_TASK: analyzer_service has no 'client' attribute for analysis {analysis_ref} (type: {type(analyzer_service).__name__})")
                             
                             # Try alternative approaches for different analyzer types
                             if hasattr(analyzer_service, 'api_token'):
@@ -3080,11 +3084,11 @@ async def run_analysis_task(
                                     from ...core.rootly_client import RootlyAPIClient
                                     temp_client = RootlyAPIClient(analyzer_service.api_token)
                                     raw_data = await temp_client.collect_analysis_data(days_back=time_range)
-                                    logger.info(f"BACKGROUND_TASK: Successfully collected raw data using temporary client for analysis {analysis_id}")
+                                    logger.info(f"BACKGROUND_TASK: Successfully collected raw data using temporary client for analysis {analysis_ref}")
                                 except Exception as temp_client_error:
-                                    logger.warning(f"BACKGROUND_TASK: Failed to collect raw data using temporary client for analysis {analysis_id}: {temp_client_error}")
+                                    logger.warning(f"BACKGROUND_TASK: Failed to collect raw data using temporary client for analysis {analysis_ref}: {temp_client_error}")
                     except Exception as client_access_error:
-                        logger.error(f"BACKGROUND_TASK: Error accessing client for raw data collection in analysis {analysis_id}: {client_access_error}")
+                        logger.error(f"BACKGROUND_TASK: Error accessing client for raw data collection in analysis {analysis_ref}: {client_access_error}")
                     
                     # Save partial results with raw data (safely handle None raw_data)
                     try:
@@ -3116,9 +3120,9 @@ async def run_analysis_task(
                                     
                                 partial_results["data_collection_successful"] = True
                             except Exception as extract_error:
-                                logger.warning(f"BACKGROUND_TASK: Error extracting partial data for analysis {analysis_id}: {extract_error}")
+                                logger.warning(f"BACKGROUND_TASK: Error extracting partial data for analysis {analysis_ref}: {extract_error}")
                     except Exception as partial_error:
-                        logger.error(f"BACKGROUND_TASK: Error creating partial results for analysis {analysis_id}: {partial_error}")
+                        logger.error(f"BACKGROUND_TASK: Error creating partial results for analysis {analysis_ref}: {partial_error}")
                         partial_results = {
                             "error": f"Analysis failed: {str(analysis_error)}",
                             "partial_data": {"users": [], "incidents": [], "metadata": {}},
@@ -3131,10 +3135,10 @@ async def run_analysis_task(
                     analysis.results = partial_results
                     analysis.completed_at = datetime.now()
                     db.commit()
-                    logger.info(f"BACKGROUND_TASK: Saved partial data for failed analysis {analysis_id}")
+                    logger.info(f"BACKGROUND_TASK: Saved partial data for failed analysis {analysis_ref}")
                     
                 except Exception as data_error:
-                    logger.error(f"BACKGROUND_TASK: Could not save partial data for analysis {analysis_id}: {data_error}")
+                    logger.error(f"BACKGROUND_TASK: Could not save partial data for analysis {analysis_ref}: {data_error}")
                     analysis.status = "failed"
                     analysis.error_message = f"Analysis failed: {str(analysis_error)}"
                     analysis.completed_at = datetime.now()
@@ -3142,7 +3146,7 @@ async def run_analysis_task(
         
     except Exception as e:
         # Handle any other errors (DB, etc.)
-        logger.error(f"BACKGROUND_TASK: Critical error in analysis {analysis_id}: {str(e)}", exc_info=True)
+        logger.error(f"BACKGROUND_TASK: Critical error in analysis {analysis_ref}: {str(e)}", exc_info=True)
         try:
             analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
             if analysis:
@@ -3150,11 +3154,11 @@ async def run_analysis_task(
                 analysis.error_message = f"Task failed: {str(e)}"
                 analysis.completed_at = datetime.now()
                 db.commit()
-                logger.info(f"BACKGROUND_TASK: Updated analysis {analysis_id} status to failed due to critical error")
+                logger.info(f"BACKGROUND_TASK: Updated analysis {analysis_ref} status to failed due to critical error")
             else:
-                logger.error(f"BACKGROUND_TASK: Could not find analysis {analysis_id} to update error status")
+                logger.error(f"BACKGROUND_TASK: Could not find analysis {analysis_ref} to update error status")
         except Exception as db_error:
-            logger.error(f"BACKGROUND_TASK: Failed to update database for analysis {analysis_id}: {str(db_error)}", exc_info=True)
+            logger.error(f"BACKGROUND_TASK: Failed to update database for analysis {analysis_ref}: {str(db_error)}", exc_info=True)
     
     finally:
         try:

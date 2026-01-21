@@ -1,5 +1,14 @@
 """
 Rootly API client for direct HTTP integration.
+
+Timeout and retry settings based on API benchmark (2026-01-20):
+- incidents endpoints: avg 10-15s, p95 15-21s, max 21s
+- users/schedules: avg <1s, p95 <2s
+
+Recommended settings:
+- Default timeout: 30s (covers most endpoints)
+- Incidents timeout: 32s (1.5x P99 latency)
+- Retries: 3 with exponential backoff [2s, 4s, 8s]
 """
 import asyncio
 import httpx
@@ -11,6 +20,14 @@ from urllib.parse import urlencode
 from .config import settings
 
 logger = logging.getLogger(__name__)
+
+# Timeout settings based on API benchmark
+DEFAULT_TIMEOUT = httpx.Timeout(30.0, connect=10.0)
+INCIDENTS_TIMEOUT = httpx.Timeout(32.0, connect=10.0)  # Incidents are slow (p95=21s)
+
+# Retry settings
+MAX_RETRIES = 3
+RETRY_DELAYS = [2, 4, 8]  # Exponential backoff delays in seconds
 
 # Retryable exceptions for network errors
 RETRYABLE_EXCEPTIONS = (
@@ -42,19 +59,19 @@ class RootlyAPIClient:
         client: httpx.AsyncClient,
         method: str,
         url: str,
-        max_retries: int = 3,
-        base_delay: float = 1.0,
+        max_retries: int = MAX_RETRIES,
         **kwargs
     ) -> httpx.Response:
         """
         Make an HTTP request with retry logic for transient network errors.
 
+        Uses exponential backoff with delays defined in RETRY_DELAYS.
+
         Args:
             client: The httpx AsyncClient to use
             method: HTTP method (GET, POST, etc.)
             url: The URL to request
-            max_retries: Maximum number of retry attempts
-            base_delay: Base delay between retries (exponential backoff)
+            max_retries: Maximum number of retry attempts (default: MAX_RETRIES)
             **kwargs: Additional arguments to pass to the request
 
         Returns:
@@ -78,10 +95,11 @@ class RootlyAPIClient:
             except RETRYABLE_EXCEPTIONS as e:
                 last_exception = e
                 if attempt < max_retries:
-                    delay = base_delay * (2 ** attempt)  # Exponential backoff
+                    # Use predefined exponential backoff delays
+                    delay = RETRY_DELAYS[attempt] if attempt < len(RETRY_DELAYS) else RETRY_DELAYS[-1]
                     logger.warning(
                         f"Rootly API request failed (attempt {attempt + 1}/{max_retries + 1}): "
-                        f"{type(e).__name__}: {e}. Retrying in {delay:.1f}s..."
+                        f"{type(e).__name__}: {e}. Retrying in {delay}s..."
                     )
                     await asyncio.sleep(delay)
                 else:
@@ -107,14 +125,13 @@ class RootlyAPIClient:
         }
         
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as client:
                 # Test users endpoint
                 try:
                     response = await client.get(
                         f"{self.base_url}/v1/users",
                         headers=self.headers,
-                        params={"page[size]": 1},
-                        timeout=30.0  # Increased from 10s to match other API calls
+                        params={"page[size]": 1}
                     )
                     
                     if response.status_code == 200:
@@ -170,19 +187,15 @@ class RootlyAPIClient:
     async def test_connection(self) -> Dict[str, Any]:
         """Test API connection and return basic account info with permissions."""
         try:
-            import asyncio
-
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as client:
                 # Make both API calls in parallel for faster response
                 me_task = client.get(
                     f"{self.base_url}/v1/users/me",
-                    headers=self.headers,
-                    timeout=30.0
+                    headers=self.headers
                 )
                 users_task = client.get(
                     f"{self.base_url}/v1/users?page[size]=1",
-                    headers=self.headers,
-                    timeout=30.0
+                    headers=self.headers
                 )
 
                 # Wait for both calls to complete in parallel
@@ -297,7 +310,7 @@ class RootlyAPIClient:
         page_size = min(limit, 100)  # Rootly API typically limits to 100 per page
 
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as client:
                 while len(all_users) < limit:
                     # URL encode the parameters manually since httpx doesn't encode brackets properly
                     params = {
@@ -313,8 +326,7 @@ class RootlyAPIClient:
 
                     response = await client.get(
                         f"{self.base_url}/v1/users?{params_encoded}",
-                        headers=self.headers,
-                        timeout=30.0
+                        headers=self.headers
                     )
 
                     if response.status_code != 200:
@@ -367,7 +379,7 @@ class RootlyAPIClient:
         1. First get all schedules via /v1/schedules
         2. For each schedule, get shifts via /v1/schedules/{id}/shifts with date filters
 
-        Uses retry logic for transient network errors (ConnectionResetError, etc.)
+        Uses parallel fetching with asyncio.gather() for performance.
         """
         try:
             # Format dates for API (Rootly expects ISO format)
@@ -393,13 +405,12 @@ class RootlyAPIClient:
 
                 schedules_data = schedules_response.json()
                 schedules = schedules_data.get('data', [])
-                logger.info(f"Fetching shifts for {len(schedules)} schedules...")
+                logger.info(f"Fetching shifts for {len(schedules)} schedules in parallel...")
 
-                # Step 2: For each schedule, get shifts in the time range (with retry)
-                for i, schedule in enumerate(schedules):
+                # Step 2: Fetch shifts for ALL schedules in parallel
+                async def fetch_schedule_shifts(schedule):
                     schedule_id = schedule.get('id')
                     schedule_name = schedule.get('attributes', {}).get('name', 'Unknown')
-
                     try:
                         shifts_response = await self._request_with_retry(
                             client,
@@ -417,19 +428,25 @@ class RootlyAPIClient:
 
                         if shifts_response.status_code == 200:
                             shifts_data = shifts_response.json()
-                            shifts = shifts_data.get('data', [])
-                            all_shifts.extend(shifts)
+                            return shifts_data.get('data', [])
                         else:
                             logger.warning(f"Failed to fetch shifts for schedule {schedule_name}: {shifts_response.status_code}")
+                            return []
 
                     except RETRYABLE_EXCEPTIONS as e:
-                        # Log but continue with other schedules if one fails after retries
                         logger.error(f"Failed to fetch shifts for schedule {schedule_name} after retries: {e}")
-                        continue
+                        return []
 
-                    # Log progress every 10 schedules
-                    if (i + 1) % 10 == 0:
-                        logger.info(f"Processed {i + 1}/{len(schedules)} schedules...")
+                # Run all schedule fetches in parallel
+                results = await asyncio.gather(*[fetch_schedule_shifts(s) for s in schedules], return_exceptions=True)
+
+                # Collect results, handling any exceptions
+                for i, result in enumerate(results):
+                    if isinstance(result, Exception):
+                        schedule_name = schedules[i].get('attributes', {}).get('name', 'Unknown')
+                        logger.error(f"Exception fetching shifts for schedule {schedule_name}: {result}")
+                    elif result:
+                        all_shifts.extend(result)
 
                 logger.info(f"Found {len(all_shifts)} shifts across {len(schedules)} schedules")
                 return all_shifts
@@ -468,22 +485,19 @@ class RootlyAPIClient:
                 logger.warning(f"Error extracting user from shift: {e}")
                 continue
         
-        # Step 2: Fetch user details to get emails
+        # Step 2: Fetch user details to get emails (in parallel)
         on_call_user_emails = set()
-        
+
         if user_ids:
             try:
-                # Fetch all users (we already have this data from get_users)
-                # Instead of making new API calls, we'll match against existing user data
-                # For now, let's make targeted calls for the on-call user IDs
-                
-                async with httpx.AsyncClient() as client:
-                    for user_id in user_ids:
+                logger.info(f"Fetching {len(user_ids)} user details in parallel...")
+
+                async with httpx.AsyncClient(timeout=15.0) as client:
+                    async def fetch_user_email(user_id):
                         try:
                             response = await client.get(
                                 f"{self.base_url}/v1/users/{user_id}",
-                                headers=self.headers,
-                                timeout=10.0
+                                headers=self.headers
                             )
 
                             if response.status_code == 200:
@@ -492,15 +506,28 @@ class RootlyAPIClient:
                                     attributes = user_data['data'].get('attributes', {})
                                     email = attributes.get('email')
                                     if email:
-                                        on_call_user_emails.add(email.lower().strip())
+                                        return email.lower().strip()
+                            return None
 
                         except Exception as e:
                             logger.warning(f"Error fetching user {user_id}: {e}")
-                            continue
-                            
+                            return None
+
+                    # Fetch all users in parallel
+                    results = await asyncio.gather(*[fetch_user_email(uid) for uid in user_ids], return_exceptions=True)
+
+                    # Collect valid emails
+                    for result in results:
+                        if isinstance(result, str):
+                            on_call_user_emails.add(result)
+                        elif isinstance(result, Exception):
+                            logger.warning(f"Exception fetching user: {result}")
+
+                logger.info(f"Found {len(on_call_user_emails)} on-call user emails")
+
             except Exception as e:
                 logger.error(f"Error fetching on-call user details: {e}")
-        
+
         return on_call_user_emails
 
     def filter_incident_responders(self, users: List[Dict[str, Any]], included_data: List[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
@@ -574,25 +601,28 @@ class RootlyAPIClient:
         return incident_responders
 
     async def get_incidents(self, days_back: int = 30, limit: int = 1000) -> List[Dict[str, Any]]:
-        """Fetch incidents from Rootly API."""
+        """Fetch incidents from Rootly API.
+
+        Uses INCIDENTS_TIMEOUT (32s) based on benchmark showing incidents
+        endpoints have avg 10-15s latency with p95 up to 21s.
+        """
         fetch_start_time = datetime.now()
         all_incidents = []
         page = 1
         page_size = min(100, limit)  # Rootly API page size limit
         api_calls_made = 0
-        
+
         # Calculate date range
         end_date = datetime.now()
         start_date = end_date - timedelta(days=days_back)
 
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=INCIDENTS_TIMEOUT) as client:
                 # Test basic access to incidents endpoint
                 test_response = await client.get(
                     f"{self.base_url}/v1/incidents",
                     headers=self.headers,
-                    params={"page[size]": 1},
-                    timeout=30.0
+                    params={"page[size]": 1}
                 )
                 api_calls_made += 1
 
@@ -640,13 +670,12 @@ class RootlyAPIClient:
 
                         response = await client.get(
                             f"{self.base_url}/v1/incidents?{params_encoded}",
-                            headers=self.headers,
-                            timeout=15.0
+                            headers=self.headers
                         )
                         api_calls_made += 1
-                    except asyncio.TimeoutError:
+                    except (asyncio.TimeoutError, httpx.TimeoutException):
                         # Explicit timeout exception handling
-                        logger.error(f"🕐 API REQUEST TIMEOUT: Rootly incidents request exceeded 15s timeout")
+                        logger.error(f"🕐 API REQUEST TIMEOUT: Rootly incidents request timed out")
                         logger.error(f"🕐 API REQUEST TIMEOUT: Page {page}, collected {len(all_incidents)} incidents so far")
                         consecutive_failures += 1
 
@@ -657,7 +686,9 @@ class RootlyAPIClient:
                             else:
                                 raise
                         else:
-                            await asyncio.sleep(2 ** consecutive_failures)
+                            # Use predefined retry delays
+                            delay = RETRY_DELAYS[consecutive_failures - 1] if consecutive_failures <= len(RETRY_DELAYS) else RETRY_DELAYS[-1]
+                            await asyncio.sleep(delay)
                             continue
                     except Exception as request_error:
                         consecutive_failures += 1
@@ -671,10 +702,11 @@ class RootlyAPIClient:
                             else:
                                 raise request_error
                         else:
-                            # Wait before retrying
-                            await asyncio.sleep(2 ** consecutive_failures)  # Exponential backoff
+                            # Use predefined retry delays
+                            delay = RETRY_DELAYS[consecutive_failures - 1] if consecutive_failures <= len(RETRY_DELAYS) else RETRY_DELAYS[-1]
+                            await asyncio.sleep(delay)
                             continue
-                    
+
                     if response.status_code != 200:
                         consecutive_failures += 1
                         error_detail = response.text
@@ -691,7 +723,9 @@ class RootlyAPIClient:
                                 else:
                                     raise Exception(f"API repeatedly failing: {response.status_code}")
                             else:
-                                await asyncio.sleep(5 * consecutive_failures)
+                                # Use longer delays for server errors/rate limits
+                                delay = RETRY_DELAYS[consecutive_failures - 1] * 2 if consecutive_failures <= len(RETRY_DELAYS) else RETRY_DELAYS[-1] * 2
+                                await asyncio.sleep(delay)
                                 continue
                         else:
                             raise Exception(f"API request failed: {response.status_code}")
@@ -760,8 +794,6 @@ class RootlyAPIClient:
                 raise Exception(f"Connection test failed: {connection_test['message']}")
 
             # Collect users and incidents in parallel (no limits for complete data collection)
-            users_start = datetime.now()
-            incidents_start = datetime.now()
             users_task = self.get_users(limit=10000)  # Get all users (increased from 1000)
 
             # Use conservative incident limits to prevent timeout on longer analyses

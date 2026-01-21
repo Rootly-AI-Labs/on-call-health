@@ -1,11 +1,9 @@
 """
 GitHub data collector for web app burnout analysis.
 """
-
-import json
 import logging
+import random
 from datetime import datetime, timedelta
-from pathlib import Path
 from typing import Dict, List, Optional
 import requests
 import asyncio
@@ -497,13 +495,13 @@ class GitHubCollector:
                         rate_data = await resp.json()
                         remaining = rate_data['rate']['remaining']
                         reset_time = rate_data['rate']['reset']
-                        logger.info(f"GitHub API rate limit: {remaining} calls remaining, resets at {datetime.fromtimestamp(reset_time)}")
-                        
-                        if remaining < 50:
-                            logger.warning(f"Low GitHub API rate limit: only {remaining} calls remaining!")
-                            if remaining < 10:
-                                logger.error("Critical GitHub API rate limit! Aborting to prevent hitting limit.")
-                                return None
+                        logger.info(f"GITHUB API: Rate limit remaining: {remaining}, resets at {datetime.fromtimestamp(reset_time)}")
+
+                        if remaining < 100:
+                            logger.warning(f"GITHUB API: ⚠️ Rate limit low! Remaining: {remaining}, Reset: {reset_time}")
+                        if remaining < 10:
+                            logger.error(f"GITHUB API: 🚫 Critical rate limit ({remaining} remaining)! Aborting.")
+                            return None
                 
                 # Initialize daily data structure
                 daily_commits = {}
@@ -590,13 +588,19 @@ class GitHubCollector:
                                 break
                                 
                         elif resp.status == 401:
-                            logger.error(f"GitHub API authentication failed for user {username} - token may be expired or invalid")
+                            logger.error(f"GITHUB API: 🔐 Authentication failed for user {username} - token may be expired or invalid")
                             return None
                         elif resp.status == 403:
-                            logger.error("GitHub API rate limit exceeded or forbidden")
+                            rate_remaining = resp.headers.get('X-RateLimit-Remaining', 'unknown')
+                            rate_reset = resp.headers.get('X-RateLimit-Reset', 'unknown')
+                            logger.error(f"GITHUB API: 🚫 RATE LIMITED (403)! Remaining: {rate_remaining}, Reset: {rate_reset}")
+                            return None
+                        elif resp.status == 429:
+                            retry_after = resp.headers.get('Retry-After', 'unknown')
+                            logger.error(f"GITHUB API: 🚫 RATE LIMITED (429)! Retry-After: {retry_after}s")
                             return None
                         else:
-                            logger.error(f"GitHub API error: {resp.status}")
+                            logger.error(f"GITHUB API: Request failed with status {resp.status}")
                             return None
                 
                 # Convert to list sorted by date
@@ -657,8 +661,6 @@ class GitHubCollector:
         """Generate realistic mock GitHub data for testing."""
 
         # Generate some realistic activity
-        import random
-
         days_analyzed = (end_date - start_date).days
 
         # Base activity levels (some users more active than others)
