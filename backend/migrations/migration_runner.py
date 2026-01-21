@@ -33,7 +33,13 @@ except ImportError as e:
     from sqlalchemy import text, create_engine
     from sqlalchemy.exc import SQLAlchemyError
 
-logging.basicConfig(level=logging.INFO)
+# Configure logging for migration runner
+# Use a simple format without user_id since this runs at startup before any user context
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
 logger = logging.getLogger(__name__)
 
 class MigrationRunner:
@@ -1006,12 +1012,24 @@ class MigrationRunner:
                 "description": "Rename user_burnout_reports columns from self_reported_score/energy_level to feeling_score/workload_score",
                 "sql": [
                     """
-                    ALTER TABLE user_burnout_reports
-                    RENAME COLUMN self_reported_score TO workload_score
+                    DO $$
+                    BEGIN
+                        -- Only rename if old column exists and new column doesn't
+                        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'user_burnout_reports' AND column_name = 'self_reported_score')
+                        AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'user_burnout_reports' AND column_name = 'workload_score') THEN
+                            ALTER TABLE user_burnout_reports RENAME COLUMN self_reported_score TO workload_score;
+                        END IF;
+                    END $$;
                     """,
                     """
-                    ALTER TABLE user_burnout_reports
-                    RENAME COLUMN energy_level TO feeling_score
+                    DO $$
+                    BEGIN
+                        -- Only rename if old column exists and new column doesn't
+                        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'user_burnout_reports' AND column_name = 'energy_level')
+                        AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'user_burnout_reports' AND column_name = 'feeling_score') THEN
+                            ALTER TABLE user_burnout_reports RENAME COLUMN energy_level TO feeling_score;
+                        END IF;
+                    END $$;
                     """,
                     """
                     ALTER TABLE user_burnout_reports
@@ -1022,14 +1040,24 @@ class MigrationRunner:
                     DROP CONSTRAINT IF EXISTS user_burnout_reports_energy_level_check
                     """,
                     """
-                    ALTER TABLE user_burnout_reports
-                    ADD CONSTRAINT user_burnout_reports_feeling_score_check
-                    CHECK (feeling_score >= 1 AND feeling_score <= 5)
+                    DO $$
+                    BEGIN
+                        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'user_burnout_reports_feeling_score_check') THEN
+                            ALTER TABLE user_burnout_reports
+                            ADD CONSTRAINT user_burnout_reports_feeling_score_check
+                            CHECK (feeling_score >= 1 AND feeling_score <= 5);
+                        END IF;
+                    END $$;
                     """,
                     """
-                    ALTER TABLE user_burnout_reports
-                    ADD CONSTRAINT user_burnout_reports_workload_score_check
-                    CHECK (workload_score >= 1 AND workload_score <= 5)
+                    DO $$
+                    BEGIN
+                        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'user_burnout_reports_workload_score_check') THEN
+                            ALTER TABLE user_burnout_reports
+                            ADD CONSTRAINT user_burnout_reports_workload_score_check
+                            CHECK (workload_score >= 1 AND workload_score <= 5);
+                        END IF;
+                    END $$;
                     """
                 ]
             },
@@ -1046,38 +1074,6 @@ class MigrationRunner:
                     -- Add index for faster lookups by organization
                     CREATE INDEX IF NOT EXISTS idx_integration_mappings_org_id
                     ON integration_mappings(organization_id)
-                    """
-                ]
-            },
-            {
-                "name": "027_rename_survey_columns",
-                "description": "Rename user_burnout_reports columns from self_reported_score/energy_level to feeling_score/workload_score",
-                "sql": [
-                    """
-                    ALTER TABLE user_burnout_reports
-                    RENAME COLUMN self_reported_score TO workload_score
-                    """,
-                    """
-                    ALTER TABLE user_burnout_reports
-                    RENAME COLUMN energy_level TO feeling_score
-                    """,
-                    """
-                    ALTER TABLE user_burnout_reports
-                    DROP CONSTRAINT IF EXISTS user_burnout_reports_self_reported_score_check
-                    """,
-                    """
-                    ALTER TABLE user_burnout_reports
-                    DROP CONSTRAINT IF EXISTS user_burnout_reports_energy_level_check
-                    """,
-                    """
-                    ALTER TABLE user_burnout_reports
-                    ADD CONSTRAINT user_burnout_reports_feeling_score_check
-                    CHECK (feeling_score >= 1 AND feeling_score <= 5)
-                    """,
-                    """
-                    ALTER TABLE user_burnout_reports
-                    ADD CONSTRAINT user_burnout_reports_workload_score_check
-                    CHECK (workload_score >= 1 AND workload_score <= 5)
                     """
                 ]
             },
