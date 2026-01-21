@@ -92,10 +92,15 @@ def _is_ip_whitelisted(client_ip: str, whitelist: set) -> bool:
 def _validate_admin_api_key() -> bool:
     """Validate that ADMIN_API_KEY meets security requirements."""
     if not ADMIN_API_KEY:
+        logger.error(
+            "SECURITY: ADMIN_API_KEY is not configured. "
+            "Admin endpoints will be disabled. "
+            f"Set ADMIN_API_KEY env var with at least {MIN_API_KEY_LENGTH} characters."
+        )
         return False
     if len(ADMIN_API_KEY) < MIN_API_KEY_LENGTH:
         logger.error(
-            "SECURITY: ADMIN_API_KEY is too short. "
+            f"SECURITY: ADMIN_API_KEY is too short ({len(ADMIN_API_KEY)} chars). "
             f"Minimum required: {MIN_API_KEY_LENGTH} chars. Admin endpoints will be disabled."
         )
         return False
@@ -125,10 +130,14 @@ async def refresh_demo_analyses(
     who don't have a demo analysis. Use this after updating mock_analysis_data.json
     with new fields or data.
 
-    Security: API key authentication with optional IP whitelist.
-    - Requires valid X-Admin-API-Key header (32+ char key)
-    - Optional IP whitelist via ADMIN_IP_WHITELIST env var
+    Security Requirements:
+    - ADMIN_API_KEY env var: Must be at least 32 characters (required)
+    - ADMIN_IP_WHITELIST env var: Comma-separated IPs/CIDRs (required)
+    - X-Admin-API-Key header: Must match ADMIN_API_KEY
     - Rate limited to 5 requests/minute
+
+    Returns 503 if ADMIN_API_KEY or ADMIN_IP_WHITELIST is not properly configured.
+    Returns 403 if IP not whitelisted or API key doesn't match.
     """
     client_ip = _get_client_ip(request)
 
