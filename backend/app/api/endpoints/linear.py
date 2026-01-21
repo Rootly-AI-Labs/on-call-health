@@ -229,27 +229,32 @@ async def _process_callback(code: str, state: Optional[str], db: Session, curren
             db.add(integration)
             logger.info("[Linear] Created integration for user %s", user_id)
 
-        # 5) Workspace mapping
+        # 5) Workspace mapping - use atomic insert-or-update to avoid race condition
         if organization_id:
-            mapping = db.query(LinearWorkspaceMapping).filter(
-                LinearWorkspaceMapping.workspace_id == workspace_id,
-                LinearWorkspaceMapping.organization_id == organization_id,
-            ).first()
-            if not mapping:
-                mapping = LinearWorkspaceMapping(
-                    workspace_id=workspace_id,
+            from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+            stmt = pg_insert(LinearWorkspaceMapping).values(
+                workspace_id=workspace_id,
+                workspace_name=workspace_name,
+                workspace_url_key=workspace_url_key,
+                owner_user_id=user_id,
+                organization_id=organization_id,
+                registered_via="oauth",
+                status="active",
+                collection_enabled=True,
+                workload_metrics_enabled=True,
+                granted_scopes=",".join(REQUESTED_SCOPES),
+            ).on_conflict_do_update(
+                index_elements=['workspace_id'],
+                set_=dict(
                     workspace_name=workspace_name,
                     workspace_url_key=workspace_url_key,
-                    owner_user_id=user_id,
-                    organization_id=organization_id,
-                    registered_via="oauth",
                     status="active",
-                    collection_enabled=True,
-                    workload_metrics_enabled=True,
-                    granted_scopes=",".join(REQUESTED_SCOPES),
+                    organization_id=organization_id,
                 )
-                db.add(mapping)
-                logger.info("[Linear] Created workspace mapping for org %s", organization_id)
+            )
+            db.execute(stmt)
+            logger.info("[Linear] Created or updated workspace mapping for org %s", organization_id)
 
         # 6) Correlate user - enforce one-to-one mapping across all users in org
         if linear_email and linear_user_id and organization_id:
