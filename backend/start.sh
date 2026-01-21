@@ -68,7 +68,7 @@ if [ -n "$NEW_RELIC_LICENSE_KEY" ]; then
     export NEW_RELIC_CONFIG_FILE=newrelic.ini
     export NEW_RELIC_LICENSE_KEY="$NEW_RELIC_LICENSE_KEY"
     export NEW_RELIC_APP_NAME="$NEW_RELIC_APP_NAME"
-    exec newrelic-admin run-program uvicorn app.main:app --host 0.0.0.0 --port 8000
+    exec newrelic-admin run-program uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 16
 else
-    exec uvicorn app.main:app --host 0.0.0.0 --port 8000
+    exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 16
 fi
