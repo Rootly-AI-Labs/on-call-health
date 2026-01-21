@@ -44,6 +44,7 @@ export async function loadSlackIntegration(
 
 /**
  * Connect Slack integration with webhook and bot token
+ * Returns 'show_sync_modal' if modal should be shown, 'no_modal' otherwise
  */
 export async function handleSlackConnect(
   webhookUrl: string,
@@ -53,7 +54,7 @@ export async function handleSlackConnect(
   setSlackBotToken: (token: string) => void,
   setActiveEnhancementTab: (tab: "github" | "slack" | null) => void,
   loadSlackIntegration: (forceRefresh: boolean) => void
-): Promise<void> {
+): Promise<'show_sync_modal' | 'no_modal'> {
   setIsConnectingSlack(true)
   try {
     const authToken = localStorage.getItem('auth_token')
@@ -84,9 +85,12 @@ export async function handleSlackConnect(
     setSlackBotToken('')
     setActiveEnhancementTab(null)
     loadSlackIntegration(true)
+
+    return 'show_sync_modal'
   } catch (error) {
     console.error('Error connecting Slack:', error)
     toast.error(error instanceof Error ? error.message : "An unexpected error occurred.")
+    return 'no_modal'
   } finally {
     setIsConnectingSlack(false)
   }

@@ -26,17 +26,17 @@ function JiraCallbackContent() {
       const errDesc = searchParams.get('error_description') || ''
 
       if (err) {
-        window.location.href = `/integrations?jira_error=${encodeURIComponent(
-          `${err}${errDesc ? `: ${errDesc}` : ''}`
-        )}`
+        const errorMsg = `${err}${errDesc ? `: ${errDesc}` : ''}`
+        sessionStorage.setItem('jira_callback_error', errorMsg)
+        window.location.href = `/integrations?jira_error=1`
         sessionStorage.removeItem(lockKey)
         return
       }
 
       if (!code || !state) {
-        window.location.href = `/integrations?jira_error=${encodeURIComponent(
-          'Invalid callback parameters'
-        )}`
+        const errorMsg = 'Invalid callback parameters'
+        sessionStorage.setItem('jira_callback_error', errorMsg)
+        window.location.href = `/integrations?jira_error=1`
         sessionStorage.removeItem(lockKey)
         return
       }
@@ -77,12 +77,13 @@ function JiraCallbackContent() {
           window.location.href = redirect
         } else {
           const msg = (data && (data.detail || data.message)) || text || 'Failed to complete OAuth flow'
-          window.location.href = `/integrations?jira_error=${encodeURIComponent(msg)}`
+          sessionStorage.setItem('jira_callback_error', msg)
+          window.location.href = `/integrations?jira_error=1`
         }
       } catch (e: any) {
-        window.location.href = `/integrations?jira_error=${encodeURIComponent(
-          e?.message || 'Network error completing OAuth flow'
-        )}`
+        const msg = e?.message || 'Network error completing OAuth flow'
+        sessionStorage.setItem('jira_callback_error', msg)
+        window.location.href = `/integrations?jira_error=1`
       } finally {
         sessionStorage.removeItem(lockKey)
       }
