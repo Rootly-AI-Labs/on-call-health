@@ -1,34 +1,79 @@
 """
 Admin endpoints for database maintenance and fixes.
 """
-from typing import Dict, Any
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-
 import json
+import logging
 import os
-from pathlib import Path
+import secrets
 from datetime import datetime
+from pathlib import Path
 
-from ...models import get_db
-from ...models import Analysis
-from ...models.slack_workspace_mapping import SlackWorkspaceMapping
-from ...models.slack_integration import SlackIntegration
-from ...models.user import User
-from ...auth.dependencies import get_current_active_user
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
+
+from ...auth.dependencies import get_current_active_user
+from ...core.rate_limiting import admin_rate_limit, limiter
+from ...models import Analysis, get_db
+from ...models.user import User
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/admin",
     tags=["admin"]
 )
 
+# Security Configuration
+# ----------------------
+# ADMIN_API_KEY: Required for sensitive admin operations.
+# Must be at least 32 characters for security. Store in secrets manager (AWS Secrets Manager,
+# HashiCorp Vault, etc.) rather than plain environment variables in production.
+ADMIN_API_KEY = os.getenv("ADMIN_API_KEY")
+MIN_API_KEY_LENGTH = 32
+
+# ADMIN_IP_WHITELIST: Optional comma-separated list of allowed IP addresses/CIDR ranges
+# Example: "10.0.0.1,192.168.1.0/24,203.0.113.50"
+# If not set, IP whitelist is disabled (all IPs allowed if API key is valid)
+ADMIN_IP_WHITELIST = os.getenv("ADMIN_IP_WHITELIST", "").strip()
+
+def _parse_ip_whitelist() -> set:
+    """Parse the IP whitelist from environment variable."""
+    if not ADMIN_IP_WHITELIST:
+        return set()
+    return {ip.strip() for ip in ADMIN_IP_WHITELIST.split(",") if ip.strip()}
+
+def _is_ip_whitelisted(client_ip: str, whitelist: set) -> bool:
+    """Check if client IP is in the whitelist. Supports exact match only for simplicity."""
+    if not whitelist:
+        return True  # No whitelist configured, allow all
+    return client_ip in whitelist
+
+def _validate_admin_api_key() -> bool:
+    """Validate that ADMIN_API_KEY meets security requirements."""
+    if not ADMIN_API_KEY:
+        return False
+    if len(ADMIN_API_KEY) < MIN_API_KEY_LENGTH:
+        logger.error(
+            f"SECURITY: ADMIN_API_KEY is too short ({len(ADMIN_API_KEY)} chars). "
+            f"Minimum required: {MIN_API_KEY_LENGTH} chars. Admin endpoints will be disabled."
+        )
+        return False
+    return True
+
+# Validate API key at module load time
+_admin_api_key_valid = _validate_admin_api_key()
+_ip_whitelist = _parse_ip_whitelist()
+
+if _ip_whitelist:
+    logger.info(f"SECURITY: Admin IP whitelist enabled with {len(_ip_whitelist)} entries")
+
 @router.post("/fix-null-organizations")
 async def fix_null_organizations(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
-) -> Dict[str, Any]:
+) -> dict:
     """
     Fix historical analyses that have null organization names.
     This is a one-time maintenance endpoint.
@@ -99,7 +144,7 @@ async def fix_null_organizations(
 async def migrate_slack_workspace_mappings(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
-) -> Dict[str, Any]:
+) -> dict:
     """
     Create slack_workspace_mappings table and migrate existing Slack integrations.
     This is a one-time migration endpoint for multi-org Slack support.
@@ -232,7 +277,7 @@ async def migrate_slack_workspace_mappings(
 async def migrate_organizations(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
-) -> Dict[str, Any]:
+) -> dict:
     """
     Run the complete organizations migration - creates organizations, invitations, and notifications tables.
     This is a one-time migration for multi-org support.
@@ -306,7 +351,7 @@ async def migrate_organizations(
 async def add_missing_user_columns(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
-) -> Dict[str, Any]:
+) -> dict:
     """
     Add missing user columns that were not included in the original migration.
     Fixes: column users.joined_org_at does not exist
@@ -350,10 +395,13 @@ async def add_missing_user_columns(
 
 
 @router.post("/refresh-demo-analyses")
+@limiter.limit("5/minute")
 async def refresh_demo_analyses(
+    request: Request,
+    x_admin_api_key: str = Header(None, alias="X-Admin-API-Key"),
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
-) -> Dict[str, Any]:
+) -> dict:
     """
     Refresh all demo analyses with the latest mock data.
 
@@ -361,12 +409,47 @@ async def refresh_demo_analyses(
     who don't have a demo analysis. Use this after updating mock_analysis_data.json
     with new fields or data.
 
-    Requires admin role.
+    Security: Requires BOTH admin role AND valid API key (defense-in-depth).
+    Optional IP whitelist can be configured via ADMIN_IP_WHITELIST env var.
     """
+    client_ip = request.client.host if request.client else "unknown"
 
-    # Security check: Only admins can refresh demo data
+    # Security Layer 1: Validate API key is properly configured
+    if not _admin_api_key_valid:
+        logger.warning(
+            f"ADMIN AUDIT: Rejected request - API key not configured or invalid. "
+            f"IP: {client_ip}, User: {current_user.id}"
+        )
+        raise HTTPException(status_code=503, detail="Admin endpoint temporarily unavailable")
+
+    # Security Layer 2: IP whitelist check (if configured)
+    if not _is_ip_whitelisted(client_ip, _ip_whitelist):
+        logger.warning(
+            f"ADMIN AUDIT: Rejected request - IP not whitelisted. "
+            f"IP: {client_ip}, User: {current_user.id}"
+        )
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    # Security Layer 3: Verify admin role (defense-in-depth)
     if current_user.role != 'admin':
-        raise HTTPException(status_code=403, detail="Admin access required")
+        logger.warning(
+            f"ADMIN AUDIT: Rejected request - User lacks admin role. "
+            f"IP: {client_ip}, User: {current_user.id}, Role: {current_user.role}"
+        )
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    # Security Layer 4: Validate API key with constant-time comparison
+    if not secrets.compare_digest(x_admin_api_key or "", ADMIN_API_KEY):
+        logger.warning(
+            f"ADMIN AUDIT: Rejected request - Invalid API key. "
+            f"IP: {client_ip}, User: {current_user.id}"
+        )
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    logger.info(
+        f"ADMIN AUDIT: Authorized access to /refresh-demo-analyses. "
+        f"IP: {client_ip}, User: {current_user.id}"
+    )
 
     try:
         # Load mock data
@@ -426,7 +509,7 @@ async def refresh_demo_analyses(
 
                     new_analysis = Analysis(
                         user_id=user.id,
-                        organization_id=user.organization_id if hasattr(user, 'organization_id') else None,
+                        organization_id=getattr(user, 'organization_id', None),
                         rootly_integration_id=None,
                         integration_name="Demo Analysis",
                         platform=original_analysis.get('platform', 'rootly'),
@@ -444,20 +527,31 @@ async def refresh_demo_analyses(
 
         db.commit()
 
+        logger.info(
+            f"ADMIN AUDIT: /refresh-demo-analyses completed successfully. "
+            f"IP: {client_ip}, User: {current_user.id}, "
+            f"Updated: {updated_count}, Created: {created_count}"
+        )
+
         return {
             "status": "success",
-            "message": f"Demo analyses refreshed successfully",
+            "message": "Demo analyses refreshed successfully",
             "updated_count": updated_count,
             "created_count": created_count,
             "total_demo_analyses": updated_count + created_count,
-            "errors": errors if errors else None
+            "errors": errors or None
         }
 
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
+        logger.error(
+            f"ADMIN AUDIT: /refresh-demo-analyses failed. "
+            f"IP: {client_ip}, User: {current_user.id}, "
+            f"Error: {str(e)}"
+        )
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to refresh demo analyses: {str(e)}"
+            detail="Failed to refresh demo analyses"
         )
