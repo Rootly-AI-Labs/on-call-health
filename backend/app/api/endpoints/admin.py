@@ -1,6 +1,7 @@
 """
 Admin endpoints for database maintenance and fixes.
 """
+import ipaddress
 import json
 import logging
 import os
@@ -14,7 +15,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from ...auth.dependencies import get_current_active_user
-from ...core.rate_limiting import admin_rate_limit, limiter
+from ...core.rate_limiting import admin_rate_limit
 from ...models import Analysis, get_db
 from ...models.user import User
 
@@ -33,7 +34,7 @@ router = APIRouter(
 ADMIN_API_KEY = os.getenv("ADMIN_API_KEY")
 MIN_API_KEY_LENGTH = 32
 
-# ADMIN_IP_WHITELIST: Optional comma-separated list of allowed IP addresses/CIDR ranges
+# ADMIN_IP_WHITELIST: Optional comma-separated list of allowed IP addresses or CIDR ranges
 # Example: "10.0.0.1,192.168.1.0/24,203.0.113.50"
 # If not set, IP whitelist is disabled (all IPs allowed if API key is valid)
 ADMIN_IP_WHITELIST = os.getenv("ADMIN_IP_WHITELIST", "").strip()
@@ -44,11 +45,44 @@ def _parse_ip_whitelist() -> set:
         return set()
     return {ip.strip() for ip in ADMIN_IP_WHITELIST.split(",") if ip.strip()}
 
+def _get_client_ip(request: Request) -> str:
+    """
+    Get the real client IP, handling reverse proxies.
+    Checks X-Forwarded-For header first (set by load balancers/proxies),
+    then falls back to direct client connection.
+    """
+    forwarded_for = request.headers.get("X-Forwarded-For")
+    if forwarded_for:
+        # X-Forwarded-For can contain multiple IPs: "client, proxy1, proxy2"
+        # The first one is the original client
+        return forwarded_for.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
 def _is_ip_whitelisted(client_ip: str, whitelist: set) -> bool:
-    """Check if client IP is in the whitelist. Supports exact match only for simplicity."""
+    """Check if client IP is in the whitelist. Supports both exact IPs and CIDR ranges."""
     if not whitelist:
         return True  # No whitelist configured, allow all
-    return client_ip in whitelist
+
+    try:
+        client_addr = ipaddress.ip_address(client_ip)
+        for entry in whitelist:
+            try:
+                if '/' in entry:
+                    # CIDR range (e.g., "192.168.1.0/24")
+                    if client_addr in ipaddress.ip_network(entry, strict=False):
+                        return True
+                else:
+                    # Exact IP match
+                    if client_addr == ipaddress.ip_address(entry):
+                        return True
+            except ValueError:
+                # Invalid entry in whitelist, skip it
+                continue
+    except ValueError:
+        # Invalid client IP format
+        return False
+
+    return False
 
 def _validate_admin_api_key() -> bool:
     """Validate that ADMIN_API_KEY meets security requirements."""
@@ -56,7 +90,7 @@ def _validate_admin_api_key() -> bool:
         return False
     if len(ADMIN_API_KEY) < MIN_API_KEY_LENGTH:
         logger.error(
-            f"SECURITY: ADMIN_API_KEY is too short ({len(ADMIN_API_KEY)} chars). "
+            "SECURITY: ADMIN_API_KEY is too short. "
             f"Minimum required: {MIN_API_KEY_LENGTH} chars. Admin endpoints will be disabled."
         )
         return False
@@ -395,7 +429,7 @@ async def add_missing_user_columns(
 
 
 @router.post("/refresh-demo-analyses")
-@limiter.limit("5/minute")
+@admin_rate_limit()
 async def refresh_demo_analyses(
     request: Request,
     x_admin_api_key: str = Header(None, alias="X-Admin-API-Key"),
@@ -412,7 +446,7 @@ async def refresh_demo_analyses(
     Security: Requires BOTH admin role AND valid API key (defense-in-depth).
     Optional IP whitelist can be configured via ADMIN_IP_WHITELIST env var.
     """
-    client_ip = request.client.host if request.client else "unknown"
+    client_ip = _get_client_ip(request)
 
     # Security Layer 1: Validate API key is properly configured
     if not _admin_api_key_valid:
