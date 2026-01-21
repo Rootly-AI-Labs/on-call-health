@@ -43,6 +43,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from app.models.base import SessionLocal
 from app.models.user import User
 from app.models.analysis import Analysis
+from app.models.user_burnout_report import UserBurnoutReport
 
 
 def load_mock_data(json_path: str) -> dict:
@@ -87,7 +88,11 @@ def create_demo_analysis(db, user: User, mock_data: dict, dry_run: bool = True) 
     config['demo_created_at'] = datetime.now().isoformat()
 
     if dry_run:
+        # Count what would be loaded
+        reports_count = len(mock_data.get('user_burnout_reports', []))
         print(f"  [DRY-RUN] Would create demo analysis for user {user.id} ({user.email})")
+        if reports_count > 0:
+            print(f"            Would load {reports_count} health check-in records")
         return True
 
     try:
@@ -109,10 +114,86 @@ def create_demo_analysis(db, user: User, mock_data: dict, dry_run: bool = True) 
         db.flush()
 
         print(f"  [OK] Created demo analysis #{analysis.id} for user {user.id} ({user.email})")
+
+        # Load burnout reports (health check-ins) for this user
+        reports_loaded = load_demo_burnout_reports(db, user.id, mock_data, dry_run=False)
+        if reports_loaded > 0:
+            print(f"       Loaded {reports_loaded} health check-in records")
+
         return True
 
     except Exception as e:
         print(f"  [ERROR] Failed to create analysis for user {user.id}: {str(e)}")
+        raise
+
+
+def load_demo_burnout_reports(db, user_id: int, mock_data: dict, dry_run: bool = True) -> int:
+    """
+    Load user burnout reports (health check-ins) from mock data.
+
+    Args:
+        db: Database session
+        user_id: User ID to link reports to
+        mock_data: Mock analysis data containing user_burnout_reports
+        dry_run: If True, don't actually create records
+
+    Returns:
+        Number of burnout reports loaded
+    """
+    reports_data = mock_data.get('user_burnout_reports', [])
+
+    if not reports_data:
+        return 0
+
+    created_count = 0
+
+    if dry_run:
+        return len(reports_data)
+
+    try:
+        # Delete existing burnout reports for this user first
+        db.query(UserBurnoutReport).filter(
+            UserBurnoutReport.user_id == user_id
+        ).delete()
+
+        # Load burnout reports from mock data
+        for report_data in reports_data:
+            email = report_data.get('email', '')
+
+            if not email:
+                continue
+
+            # Parse timestamps from exported data
+            submitted_at = report_data.get('submitted_at')
+            if isinstance(submitted_at, str):
+                # Parse ISO format datetime string
+                submitted_at = datetime.fromisoformat(submitted_at.replace('Z', '+00:00'))
+
+            try:
+                report = UserBurnoutReport(
+                    user_id=user_id,  # Link to the user
+                    email=email,
+                    email_domain=report_data.get('email_domain'),
+                    analysis_id=None,  # Not linked to specific analysis
+                    feeling_score=report_data.get('feeling_score'),
+                    workload_score=report_data.get('workload_score'),
+                    stress_factors=report_data.get('stress_factors'),
+                    personal_circumstances=report_data.get('personal_circumstances'),
+                    additional_comments=report_data.get('additional_comments'),
+                    submitted_via=report_data.get('submitted_via', 'web'),
+                    is_anonymous=report_data.get('is_anonymous', False),
+                    submitted_at=submitted_at  # Preserve timestamp
+                )
+                db.add(report)
+                created_count += 1
+            except Exception as e:
+                # Continue loading other reports even if one fails
+                continue
+
+        return created_count
+
+    except Exception as e:
+        print(f"    [ERROR] Failed to load burnout reports: {str(e)}")
         raise
 
 
@@ -122,7 +203,11 @@ def update_demo_analysis(db, analysis: Analysis, mock_data: dict, dry_run: bool 
     new_results = original_analysis.get('results')
 
     if dry_run:
+        # Count what would be loaded
+        reports_count = len(mock_data.get('user_burnout_reports', []))
         print(f"  [DRY-RUN] Would update demo analysis #{analysis.id} (user {analysis.user_id})")
+        if reports_count > 0:
+            print(f"            Would load {reports_count} health check-in records")
         return True
 
     try:
@@ -136,7 +221,12 @@ def update_demo_analysis(db, analysis: Analysis, mock_data: dict, dry_run: bool 
 
         db.flush()
 
+        # Load/update burnout reports for this user
+        reports_loaded = load_demo_burnout_reports(db, analysis.user_id, mock_data, dry_run=False)
+
         print(f"  [OK] Updated demo analysis #{analysis.id} (user {analysis.user_id})")
+        if reports_loaded > 0:
+            print(f"       Loaded {reports_loaded} health check-in records")
         return True
 
     except Exception as e:
