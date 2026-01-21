@@ -13,7 +13,7 @@ class IntegrationMapping(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # NULL for org-scoped users
     organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True)  # For org-scoped mappings
-    analysis_id = Column(Integer, ForeignKey("analyses.id"), nullable=True)  # Track which analysis this was from
+    analysis_id = Column(Integer, ForeignKey("analyses.id", ondelete="CASCADE"), nullable=True)  # Track which analysis this was from
     
     # Source platform (where we got the identifier from)
     source_platform = Column(String(50), nullable=False)  # "rootly", "pagerduty"
