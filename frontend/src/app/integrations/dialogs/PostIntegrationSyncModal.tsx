@@ -6,7 +6,7 @@ interface PostIntegrationSyncModalProps {
   onClose: () => void
   onSyncNow: () => void
   integrationType: 'github' | 'slack' | 'jira' | 'linear'
-  integrationName: string
+  integrationType: 'github' | 'slack' | 'jira' | 'linear'
 }
 
 const integrationContent = {
