@@ -179,9 +179,11 @@ export function TrendsCard({
                               <p className="text-sm text-neutral-300">
                                 {config.label}: <span className="font-semibold">{metricValue}</span>
                               </p>
-                              <p className="text-xs text-neutral-400 mt-1">
-                                Mean: {meanScore}
-                              </p>
+                              {selectedMetric !== 'incident_load' && selectedMetric !== 'after_hours' && selectedMetric !== 'severity_weighted' && (
+                                <p className="text-xs text-neutral-400 mt-1">
+                                  Mean: {meanScore}
+                                </p>
+                              )}
                             </>
                           )}
                         </div>

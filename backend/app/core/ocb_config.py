@@ -407,10 +407,10 @@ def generate_ocb_score_reasoning(
                 else:
                     display_score = round(normalized_score, 1)
                 if factor_name == 'sleep_quality_proxy':
-                    personal_factors.append(f"Sleep quality impact from critical incidents ({display_score:.1f} points)")
+                    personal_factors.append(f"High-severity incident stress ({display_score:.1f} points)")
 
                 elif factor_name == 'work_hours_trend':
-                    personal_factors.append(f"Extended work hours ({display_score:.1f} points)")
+                    personal_factors.append(f"Long incident duration ({display_score:.1f} points)")
 
                 elif factor_name == 'after_hours_activity':
                     personal_factors.append(f"Non-business hours incident activity ({display_score:.1f} points)")
@@ -516,8 +516,8 @@ def get_structured_ocb_factors(
     """
     # Human-readable names for factors
     factor_display_names = {
-        'sleep_quality_proxy': 'Sleep quality impact',
-        'work_hours_trend': 'Extended work hours',
+        'sleep_quality_proxy': 'High-severity incidents',
+        'work_hours_trend': 'Incident duration',
         'after_hours_activity': 'After-hours activity',
         'oncall_burden': 'On-call load',
         'deployment_frequency': 'Incident frequency',
