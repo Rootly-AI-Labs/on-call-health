@@ -3963,7 +3963,7 @@
         }
       ],
       "individual_daily_data": {
-        "karn@rootly.com": {
+        "maya.fernandez@example.com": {
           "2025-12-23": {
             "date": "2025-12-23",
             "incident_count": 3,
@@ -6533,7 +6533,7 @@
             "day_name": "Wed, Jan 21"
           }
         },
-        "jp@rootly.com": {
+        "sophia.nguyen@example.com": {
           "2025-12-23": {
             "date": "2025-12-23",
             "incident_count": 0,
@@ -12460,7 +12460,7 @@
             "day_name": "Wed, Jan 21"
           }
         },
-        "purvai@rootly.com": {
+        "zara.ali@example.com": {
           "2025-12-23": {
             "date": "2025-12-23",
             "incident_count": 0,
@@ -15833,7 +15833,7 @@
             "day_name": "Wed, Jan 21"
           }
         },
-        "jamie@rootly.com": {
+        "isabella.rossi@example.com": {
           "2025-12-23": {
             "date": "2025-12-23",
             "incident_count": 1,
@@ -16983,7 +16983,7 @@
             "day_name": "Wed, Jan 21"
           }
         },
-        "alex.conrad@rootly.com": {
+        "priya.shah@example.com": {
           "2025-12-23": {
             "date": "2025-12-23",
             "incident_count": 0,
@@ -21622,17 +21622,17 @@
             "resolved_at": "2026-01-21T09:36:18.854-08:00",
             "user": {
               "id": "3497",
-              "email": "jp@rootly.com",
+              "email": "sophia.nguyen@example.com",
               "name": "Sophia Nguyen"
             },
             "started_by": {
               "id": "3497",
-              "email": "jp@rootly.com",
+              "email": "sophia.nguyen@example.com",
               "name": "Sophia Nguyen"
             },
             "resolved_by": {
               "id": "3497",
-              "email": "jp@rootly.com",
+              "email": "sophia.nguyen@example.com",
               "name": "Sophia Nguyen"
             },
             "slack_channel_id": "C0AAYGD044Q",
@@ -21724,12 +21724,12 @@
             "started_at": "2026-01-20T10:43:09.321-08:00",
             "user": {
               "id": "29683",
-              "email": "purvai@rootly.com",
+              "email": "zara.ali@example.com",
               "name": "Zara Ali"
             },
             "started_by": {
               "id": "29683",
-              "email": "purvai@rootly.com",
+              "email": "zara.ali@example.com",
               "name": "Zara Ali"
             },
             "slack_channel_id": "C0A9PL91BK5",
@@ -21750,12 +21750,12 @@
             "started_at": "2026-01-20T10:40:32.842-08:00",
             "user": {
               "id": "29683",
-              "email": "purvai@rootly.com",
+              "email": "zara.ali@example.com",
               "name": "Zara Ali"
             },
             "started_by": {
               "id": "29683",
-              "email": "purvai@rootly.com",
+              "email": "zara.ali@example.com",
               "name": "Zara Ali"
             },
             "slack_channel_id": "C0A9ZK2J9QC",
@@ -21780,17 +21780,17 @@
             "resolved_at": "2026-01-20T09:42:52.037-08:00",
             "user": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "started_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "resolved_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "slack_channel_id": "C0A9P2T9A3V",
@@ -21814,17 +21814,17 @@
             "resolved_at": "2026-01-20T09:33:06.383-08:00",
             "user": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "started_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "resolved_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "slack_channel_id": "C0AAPNK452L",
@@ -21909,17 +21909,17 @@
             "resolved_at": "2026-01-20T09:32:39.510-08:00",
             "user": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "started_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "resolved_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "slack_channel_id": "C0A9Q9TL4UD",
@@ -22124,17 +22124,17 @@
             "resolved_at": "2026-01-19T06:08:59.098-08:00",
             "user": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "started_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "resolved_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "slack_channel_id": "C0A9GV5FX2R",
@@ -22193,22 +22193,22 @@
             "resolved_at": "2026-01-16T10:09:35.022-08:00",
             "user": {
               "id": "62208",
-              "email": "alex.conrad@rootly.com",
+              "email": "priya.shah@example.com",
               "name": "Priya Shah"
             },
             "started_by": {
               "id": "62208",
-              "email": "alex.conrad@rootly.com",
+              "email": "priya.shah@example.com",
               "name": "Priya Shah"
             },
             "resolved_by": {
               "id": "62208",
-              "email": "alex.conrad@rootly.com",
+              "email": "priya.shah@example.com",
               "name": "Priya Shah"
             },
             "mitigated_by": {
               "id": "62208",
-              "email": "alex.conrad@rootly.com",
+              "email": "priya.shah@example.com",
               "name": "Priya Shah"
             },
             "slack_channel_id": "C0AA2EMHM96",
@@ -22344,17 +22344,17 @@
             "resolved_at": "2026-01-15T12:24:30.649-08:00",
             "user": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "started_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "resolved_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "slack_channel_id": "C0A8YRYM7TQ",
@@ -22446,17 +22446,17 @@
             "resolved_at": "2026-01-15T10:26:25.877-08:00",
             "user": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "started_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "resolved_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "slack_channel_id": "C0A8Y0GD2KY",
@@ -22481,17 +22481,17 @@
             "resolved_at": "2026-01-15T08:57:25.143-08:00",
             "user": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "started_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "resolved_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "slack_channel_id": "C0A8SPTED6X",
@@ -22675,17 +22675,17 @@
             "resolved_at": "2026-01-14T09:59:03.436-08:00",
             "user": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "started_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "resolved_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "slack_channel_id": "C0A89T47XB9",
@@ -23059,12 +23059,12 @@
             "started_at": "2026-01-12T11:15:18.134-08:00",
             "user": {
               "id": "29683",
-              "email": "purvai@rootly.com",
+              "email": "zara.ali@example.com",
               "name": "Zara Ali"
             },
             "started_by": {
               "id": "29683",
-              "email": "purvai@rootly.com",
+              "email": "zara.ali@example.com",
               "name": "Zara Ali"
             },
             "slack_channel_id": "C0A86UEJJFQ",
@@ -23088,17 +23088,17 @@
             "resolved_at": "2026-01-12T10:41:24.915-08:00",
             "user": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "started_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "resolved_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "slack_channel_id": "C0A9316U7Q8",
@@ -23122,17 +23122,17 @@
             "resolved_at": "2026-01-12T10:37:41.815-08:00",
             "user": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "started_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "resolved_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "slack_channel_id": "C0A930F0B4Y",
@@ -23157,17 +23157,17 @@
             "resolved_at": "2026-01-12T09:31:58.086-08:00",
             "user": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "started_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "resolved_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "slack_channel_id": "C0A8BNL7H60",
@@ -23224,17 +23224,17 @@
             "resolved_at": "2026-01-09T13:39:22.090-08:00",
             "user": {
               "id": "38699",
-              "email": "jamie@rootly.com",
+              "email": "isabella.rossi@example.com",
               "name": "Isabella Rossi"
             },
             "started_by": {
               "id": "38699",
-              "email": "jamie@rootly.com",
+              "email": "isabella.rossi@example.com",
               "name": "Isabella Rossi"
             },
             "resolved_by": {
               "id": "38699",
-              "email": "jamie@rootly.com",
+              "email": "isabella.rossi@example.com",
               "name": "Isabella Rossi"
             },
             "slack_channel_id": "C0A88UK7CEM",
@@ -23258,17 +23258,17 @@
             "resolved_at": "2026-01-09T11:52:08.993-08:00",
             "user": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "started_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "resolved_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "slack_channel_id": "C0A7RA53VC5",
@@ -23327,17 +23327,17 @@
             "resolved_at": "2026-01-09T11:52:17.798-08:00",
             "user": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "started_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "resolved_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "slack_channel_id": "C0A7BQ6J015",
@@ -23531,17 +23531,17 @@
             "resolved_at": "2026-01-08T12:57:33.584-08:00",
             "user": {
               "id": "38699",
-              "email": "jamie@rootly.com",
+              "email": "isabella.rossi@example.com",
               "name": "Isabella Rossi"
             },
             "started_by": {
               "id": "38699",
-              "email": "jamie@rootly.com",
+              "email": "isabella.rossi@example.com",
               "name": "Isabella Rossi"
             },
             "resolved_by": {
               "id": "38699",
-              "email": "jamie@rootly.com",
+              "email": "isabella.rossi@example.com",
               "name": "Isabella Rossi"
             },
             "slack_channel_id": "C0A8G3JQNFJ",
@@ -23567,17 +23567,17 @@
             "resolved_at": "2026-01-08T11:44:49.521-08:00",
             "user": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "started_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "resolved_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "slack_channel_id": "C0A809ALSLR",
@@ -23629,17 +23629,17 @@
             "resolved_at": "2026-01-08T09:53:29.030-08:00",
             "user": {
               "id": "3497",
-              "email": "jp@rootly.com",
+              "email": "sophia.nguyen@example.com",
               "name": "Sophia Nguyen"
             },
             "started_by": {
               "id": "3497",
-              "email": "jp@rootly.com",
+              "email": "sophia.nguyen@example.com",
               "name": "Sophia Nguyen"
             },
             "resolved_by": {
               "id": "3497",
-              "email": "jp@rootly.com",
+              "email": "sophia.nguyen@example.com",
               "name": "Sophia Nguyen"
             },
             "slack_channel_id": "C0A7H4G7YQM",
@@ -23699,17 +23699,17 @@
             "resolved_at": "2026-01-08T09:01:30.178-08:00",
             "user": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "started_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "resolved_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "slack_channel_id": "C0A7J3F4K9C",
@@ -23731,12 +23731,12 @@
             "started_at": "2026-01-08T08:46:56.186-08:00",
             "user": {
               "id": "62208",
-              "email": "alex.conrad@rootly.com",
+              "email": "priya.shah@example.com",
               "name": "Priya Shah"
             },
             "started_by": {
               "id": "62208",
-              "email": "alex.conrad@rootly.com",
+              "email": "priya.shah@example.com",
               "name": "Priya Shah"
             }
           }
@@ -23806,17 +23806,17 @@
             "resolved_at": "2026-01-08T08:46:39.093-08:00",
             "user": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "started_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "resolved_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "slack_channel_id": "C0A7SR2055F",
@@ -23841,17 +23841,17 @@
             "resolved_at": "2026-01-07T13:23:21.708-08:00",
             "user": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "started_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "resolved_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "slack_channel_id": "C0A77BU43EF",
@@ -23906,12 +23906,12 @@
             "started_at": "2026-01-07T12:25:43.239-08:00",
             "user": {
               "id": "29683",
-              "email": "purvai@rootly.com",
+              "email": "zara.ali@example.com",
               "name": "Zara Ali"
             },
             "started_by": {
               "id": "29683",
-              "email": "purvai@rootly.com",
+              "email": "zara.ali@example.com",
               "name": "Zara Ali"
             }
           }
@@ -23928,12 +23928,12 @@
             "started_at": "2026-01-07T12:23:29.718-08:00",
             "user": {
               "id": "29683",
-              "email": "purvai@rootly.com",
+              "email": "zara.ali@example.com",
               "name": "Zara Ali"
             },
             "started_by": {
               "id": "29683",
-              "email": "purvai@rootly.com",
+              "email": "zara.ali@example.com",
               "name": "Zara Ali"
             }
           }
@@ -23984,12 +23984,12 @@
             "started_at": "2026-01-07T11:51:41.561-08:00",
             "user": {
               "id": "38699",
-              "email": "jamie@rootly.com",
+              "email": "isabella.rossi@example.com",
               "name": "Isabella Rossi"
             },
             "started_by": {
               "id": "38699",
-              "email": "jamie@rootly.com",
+              "email": "isabella.rossi@example.com",
               "name": "Isabella Rossi"
             },
             "slack_channel_id": "C0A76RBNHGT",
@@ -24041,12 +24041,12 @@
             "started_at": "2026-01-07T09:19:55.751-08:00",
             "user": {
               "id": "29683",
-              "email": "purvai@rootly.com",
+              "email": "zara.ali@example.com",
               "name": "Zara Ali"
             },
             "started_by": {
               "id": "29683",
-              "email": "purvai@rootly.com",
+              "email": "zara.ali@example.com",
               "name": "Zara Ali"
             },
             "slack_channel_id": "C0A86D1NPEC",
@@ -24138,17 +24138,17 @@
             "resolved_at": "2026-01-07T06:31:22.697-08:00",
             "user": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "started_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "resolved_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "slack_channel_id": "C0A7770KHFX",
@@ -24172,17 +24172,17 @@
             "resolved_at": "2026-01-07T06:23:25.515-08:00",
             "user": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "started_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "resolved_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "slack_channel_id": "C0A73K26VS7",
@@ -24207,17 +24207,17 @@
             "resolved_at": "2026-01-06T11:43:43.121-08:00",
             "user": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "started_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "resolved_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "slack_channel_id": "C0A6Y198YRH",
@@ -24259,17 +24259,17 @@
             "resolved_at": "2026-01-06T08:46:21.441-08:00",
             "user": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "started_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "resolved_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "slack_channel_id": "C0A779WRH28",
@@ -24293,17 +24293,17 @@
             "resolved_at": "2026-01-06T08:46:13.573-08:00",
             "user": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "started_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "resolved_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "slack_channel_id": "C0A6X8QNEH1",
@@ -24362,17 +24362,17 @@
             "resolved_at": "2026-01-06T08:30:47.595-08:00",
             "user": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "started_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "resolved_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "slack_channel_id": "C0A6N370EH5",
@@ -24397,17 +24397,17 @@
             "resolved_at": "2026-01-06T07:47:25.216-08:00",
             "user": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "started_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "resolved_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "slack_channel_id": "C0A6WNV37V1",
@@ -24501,17 +24501,17 @@
             "resolved_at": "2026-01-05T09:06:12.899-08:00",
             "user": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "started_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "resolved_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "slack_channel_id": "C0A6ZHJK5SQ",
@@ -24571,17 +24571,17 @@
             "resolved_at": "2025-12-29T08:23:13.855-08:00",
             "user": {
               "id": "3497",
-              "email": "jp@rootly.com",
+              "email": "sophia.nguyen@example.com",
               "name": "Sophia Nguyen"
             },
             "started_by": {
               "id": "3497",
-              "email": "jp@rootly.com",
+              "email": "sophia.nguyen@example.com",
               "name": "Sophia Nguyen"
             },
             "resolved_by": {
               "id": "3497",
-              "email": "jp@rootly.com",
+              "email": "sophia.nguyen@example.com",
               "name": "Sophia Nguyen"
             },
             "slack_channel_id": "C0A5XLYSBHU",
@@ -24763,17 +24763,17 @@
             "resolved_at": "2025-12-23T09:29:32.428-08:00",
             "user": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "started_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "resolved_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "slack_channel_id": "C0A56FK279T",
@@ -24796,17 +24796,17 @@
             "resolved_at": "2026-01-06T10:00:55.514-08:00",
             "user": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "started_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "resolved_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "slack_channel_id": "C0A57MFGYPQ",
@@ -24830,17 +24830,17 @@
             "resolved_at": "2026-01-06T10:01:07.265-08:00",
             "user": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "started_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "resolved_by": {
               "id": "199176",
-              "email": "karn@rootly.com",
+              "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
             "slack_channel_id": "C0A5N63HHCH",
@@ -24864,17 +24864,17 @@
             "resolved_at": "2025-12-23T06:28:01.042-08:00",
             "user": {
               "id": "38699",
-              "email": "jamie@rootly.com",
+              "email": "isabella.rossi@example.com",
               "name": "Isabella Rossi"
             },
             "started_by": {
               "id": "38699",
-              "email": "jamie@rootly.com",
+              "email": "isabella.rossi@example.com",
               "name": "Isabella Rossi"
             },
             "resolved_by": {
               "id": "38699",
-              "email": "jamie@rootly.com",
+              "email": "isabella.rossi@example.com",
               "name": "Isabella Rossi"
             },
             "slack_channel_id": "C0A52G6TRV1",
