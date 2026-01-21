@@ -31,9 +31,9 @@ router = APIRouter(
 ADMIN_API_KEY = os.getenv("ADMIN_API_KEY")
 MIN_API_KEY_LENGTH = 32
 
-# ADMIN_IP_WHITELIST: Optional comma-separated list of allowed IP addresses or CIDR ranges
+# ADMIN_IP_WHITELIST: Required comma-separated list of allowed IP addresses or CIDR ranges
 # Example: "10.0.0.1,192.168.1.0/24,203.0.113.50"
-# If not set, IP whitelist is disabled (all IPs allowed if API key is valid)
+# Must be configured for admin endpoints to function (defense in depth)
 ADMIN_IP_WHITELIST = os.getenv("ADMIN_IP_WHITELIST", "").strip()
 
 def _parse_ip_whitelist() -> set:
@@ -66,7 +66,7 @@ def _get_client_ip(request: Request) -> str:
 def _is_ip_whitelisted(client_ip: str, whitelist: set) -> bool:
     """Check if client IP is in the whitelist. Supports both exact IPs and CIDR ranges."""
     if not whitelist:
-        return True  # No whitelist configured, allow all
+        return False  # No whitelist configured, reject all (defense in depth)
 
     try:
         client_addr = ipaddress.ip_address(client_ip)
@@ -107,6 +107,8 @@ _ip_whitelist = _parse_ip_whitelist()
 
 if _ip_whitelist:
     logger.info(f"SECURITY: Admin IP whitelist enabled with {len(_ip_whitelist)} entries")
+else:
+    logger.error("SECURITY: ADMIN_IP_WHITELIST is not configured. Admin endpoints will be disabled.")
 
 
 @router.post("/refresh-demo-analyses")
