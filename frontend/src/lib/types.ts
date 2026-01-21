@@ -19,6 +19,35 @@ export interface Integration {
   }
 }
 
+export interface GitHubActivity {
+  commits_count: number
+  pull_requests_count: number
+  reviews_count: number
+  after_hours_commits: number
+  weekend_commits: number
+  avg_pr_size: number
+  commits_per_week?: number
+  prs_per_week?: number
+  after_hours_percentage?: number
+  weekend_percentage?: number
+  burnout_indicators?: {
+    excessive_commits?: boolean
+    late_night_activity?: boolean
+    weekend_work?: boolean
+    large_prs?: boolean
+  }
+}
+
+export interface IncidentActivity {
+  incident_count: number
+  after_hours_incidents: number
+  weekend_incidents: number
+  avg_response_time_minutes: number
+  severity_weighted_incidents?: number
+  after_hours_percentage?: number
+  weekend_percentage?: number
+}
+
 export interface GitHubIntegration {
   id: number
   github_username: string
@@ -81,20 +110,7 @@ export interface OrganizationMember {
     weekend_percentage: number
     status_distribution?: any
   }
-  github_activity?: {
-    commits_count: number
-    pull_requests_count: number
-    reviews_count: number
-    after_hours_commits: number
-    weekend_commits: number
-    avg_pr_size: number
-    burnout_indicators: {
-      excessive_commits: boolean
-      late_night_activity: boolean
-      weekend_work: boolean
-      large_prs: boolean
-    }
-  }
+  github_activity?: GitHubActivity
   slack_activity?: {
     messages_sent: number
     channels_active: number
@@ -204,8 +220,12 @@ export interface AnalysisResult {
           weekend_percentage: number
           status_distribution?: any
         }
-        github_activity?: any
+        github_activity?: GitHubActivity
         slack_activity?: any
+        after_hours_incidents?: number
+        weekend_incidents?: number
+        total_activities?: number
+        github_after_hours_count?: number
       }>
     } | Array<{
       user_id: string
@@ -214,6 +234,10 @@ export interface AnalysisResult {
       cbi_score: number  // CBI score (0-100)
       risk_level?: string // Optional legacy field
       incident_count: number
+      after_hours_incidents?: number
+      weekend_incidents?: number
+      total_activities?: number
+      github_after_hours_count?: number
       key_metrics?: {
         incidents_per_week: number
         severity_weighted_per_week?: number
@@ -223,7 +247,7 @@ export interface AnalysisResult {
       recommendations?: string[]
       factors?: any
       metrics?: any
-      github_activity?: any
+      github_activity?: GitHubActivity
       slack_activity?: any
     }>
     github_insights?: {
@@ -244,14 +268,7 @@ export interface AnalysisResult {
         large_pr_pattern: number
         weekend_workers: number
       }
-      activity_data?: {
-        commits_count: number
-        pull_requests_count: number
-        reviews_count: number
-        after_hours_commits: number
-        weekend_commits: number
-        avg_pr_size: number
-      }
+      activity_data?: GitHubActivity
     }
     slack_insights?: {
       total_messages: number

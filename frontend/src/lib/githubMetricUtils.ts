@@ -2,6 +2,8 @@
  * Utility functions for GitHub Activity metrics and burnout factor analysis
  */
 
+import type { GitHubActivity } from '@/lib/types'
+
 export type MetricType = 'after_hours' | 'high_commits' | 'code_reviews' | 'pull_requests'
 
 export interface MemberWithContribution {
