@@ -13,6 +13,14 @@ class UserBurnoutReport(Base):
     """
     __tablename__ = "user_burnout_reports"
 
+    # Prevent duplicate reports: one unique combination per organization/email/timestamp
+    __table_args__ = (
+        UniqueConstraint(
+            'organization_id', 'email', 'submitted_at',
+            name='uq_burnout_report_org_email_timestamp'
+        ),
+    )
+
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # NULL for team members without accounts
     organization_id = Column(Integer, nullable=True)  # Nullable - FK removed in migration 019
