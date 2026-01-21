@@ -30,19 +30,15 @@ logging.basicConfig(
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 
-# Add the user context filter to all handlers on the root logger
-# This ensures user_id is set BEFORE the formatter tries to access it
-# Filters on handlers process records before formatting, which is required for %(user_id)s to work
+# Add user context filter to root logger and all handlers
+# This ensures user_id is set before formatting for %(user_id)s to work
 root_logger = logging.getLogger()
+root_logger.addFilter(user_context_filter)
 for handler in root_logger.handlers:
     handler.addFilter(user_context_filter)
 
-# Also add to the logger itself for records that bypass handlers
-root_logger.addFilter(user_context_filter)
-
-# Ensure any handlers added by uvicorn or other frameworks also get the filter
-# by storing the filter globally and adding it in a way that's accessible
-logging.user_context_filter = user_context_filter  # Store reference for potential later use
+# Store reference for handlers added later (e.g., by uvicorn)
+logging.user_context_filter = user_context_filter
 
 # Set specific loggers to WARNING in production to reduce noise
 if settings.ENVIRONMENT == "production" or LOG_LEVEL >= logging.WARNING:
@@ -90,53 +86,34 @@ app.middleware("http")(security_middleware)
 app.middleware("http")(user_logging_middleware)
 
 # Configure CORS - Secure configuration
-def get_cors_origins():
+def get_cors_origins() -> list[str]:
     """Get allowed CORS origins based on environment."""
-    # Always allow the configured frontend URL
     origins = [settings.FRONTEND_URL]
-    
-    # Add common development ports for localhost
-    if settings.FRONTEND_URL.startswith("http://localhost"):
-        # Allow common Next.js development ports
-        origins.extend([
-            "http://localhost:3000",
-            "http://localhost:3001", 
-            "http://localhost:3002"
-        ])
-    
-    # ALWAYS allow localhost and 127.0.0.1 for development and testing
-    # This is safe because the backend requires auth tokens anyway
-    if not any("localhost:3000" in origin for origin in origins):
-        origins.append("http://localhost:3000")
-    if not any("localhost:3001" in origin for origin in origins):
-        origins.append("http://localhost:3001")
-    if not any("localhost:3002" in origin for origin in origins):
-        origins.append("http://localhost:3002")
-    # Also allow 127.0.0.1 (same as localhost but different origin)
-    origins.append("http://127.0.0.1:3000")
-    origins.append("http://127.0.0.1:3001")
-    origins.append("http://127.0.0.1:3002")
 
-    # Add production domains if they exist
-    production_frontend = os.getenv("PRODUCTION_FRONTEND_URL")
-    if production_frontend:
-        origins.append(production_frontend)
-    
-    # Add the production domain explicitly
+    # Development origins - localhost and 127.0.0.1 on common Next.js ports
+    dev_ports = ["3000", "3001", "3002"]
+    for port in dev_ports:
+        origins.append(f"http://localhost:{port}")
+        origins.append(f"http://127.0.0.1:{port}")
+
+    # Production domains
     origins.extend([
         "https://www.oncallburnout.com",
         "https://oncallburnout.com"
     ])
-    
-    # Add Vercel preview URLs if in development/staging
-    vercel_url = os.getenv("VERCEL_URL") 
+
+    # Optional environment-based origins
+    production_frontend = os.getenv("PRODUCTION_FRONTEND_URL")
+    if production_frontend:
+        origins.append(production_frontend)
+
+    vercel_url = os.getenv("VERCEL_URL")
     if vercel_url:
         origins.append(f"https://{vercel_url}")
-    
+
     # Remove duplicates while preserving order
     origins = list(dict.fromkeys(origins))
 
-    # Log CORS origins for visibility (at INFO level so it always shows)
     logger.info(f"CORS allowed origins: {origins}")
 
     return origins
@@ -176,8 +153,7 @@ async def favicon():
 # Initialize database tables
 @app.on_event("startup")
 async def startup_event():
-    # Ensure user context filter is added to any handlers that uvicorn may have added
-    # This covers handlers that are added after our initial logging.basicConfig() call
+    # Add user context filter to any handlers added by uvicorn after initial setup
     for handler in logging.getLogger().handlers:
         if user_context_filter not in handler.filters:
             handler.addFilter(user_context_filter)
