@@ -1,10 +1,11 @@
 "use client"
 
 import type { ReactNode } from "react"
+import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { TrendingUp, TrendingDown, Minus, MessageSquare } from "lucide-react"
+import { TrendingUp, TrendingDown, Minus, MessageSquare, ChevronDown, ChevronUp } from "lucide-react"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts"
 
 interface SurveyResponse {
@@ -80,6 +81,8 @@ const getStressSourceLabel = (source: string) => {
 }
 
 export function SurveyResultsCard({ surveyData }: SurveyResultsCardProps): ReactNode {
+  const [showHistory, setShowHistory] = useState(false)
+
   if (!surveyData || surveyData.survey_count_in_period === 0) {
     return (
       <Card>
@@ -286,72 +289,88 @@ export function SurveyResultsCard({ surveyData }: SurveyResultsCardProps): React
           <>
             <Separator />
             <div>
-              <div className="text-xs font-medium text-neutral-700 mb-3">
-                Previous Check-ins ({surveyData.survey_responses.length - 1})
-              </div>
-              <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
-                {surveyData.survey_responses.slice().reverse().slice(1).map((response, index) => (
-                  <div key={index} className="space-y-3 p-3 border rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-neutral-500">
-                        {new Date(response.submitted_at).toLocaleDateString(undefined, {
-                          month: 'short',
-                          day: 'numeric',
-                          hour: 'numeric',
-                          minute: '2-digit'
-                        })} via {response.submitted_via || 'web'}
-                      </span>
-                    </div>
+              <button
+                onClick={() => setShowHistory(!showHistory)}
+                className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg border border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50 transition-colors"
+              >
+                <span className="text-sm font-semibold text-neutral-900">
+                  Previous Check-ins ({surveyData.survey_responses.length - 1})
+                </span>
+                <div className="flex items-center gap-1 text-xs text-neutral-600">
+                  <span>{showHistory ? 'Hide' : 'Show'}</span>
+                  {showHistory ? (
+                    <ChevronUp className="w-4 h-4" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4" />
+                  )}
+                </div>
+              </button>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <span className="text-xs text-neutral-500">Feeling</span>
-                        <div className="flex items-center gap-2">
-                          <Badge className={getScoreBadgeColor(response.feeling_score)}>
-                            {response.feeling_score}/5
-                          </Badge>
-                          <span className="text-xs">{getFeelingText(response.feeling_score)}</span>
-                        </div>
+              {showHistory && (
+                <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1 mt-3">
+                  {surveyData.survey_responses.slice().reverse().slice(1).map((response, index) => (
+                    <div key={index} className="space-y-3 p-3 border rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-neutral-500">
+                          {new Date(response.submitted_at).toLocaleDateString(undefined, {
+                            month: 'short',
+                            day: 'numeric',
+                            hour: 'numeric',
+                            minute: '2-digit'
+                          })} via {response.submitted_via || 'web'}
+                        </span>
                       </div>
 
-                      <div className="space-y-1">
-                        <span className="text-xs text-neutral-500">Workload</span>
-                        <div className="flex items-center gap-2">
-                          <Badge className={getScoreBadgeColor(response.workload_score)}>
-                            {response.workload_score}/5
-                          </Badge>
-                          <span className="text-xs">{getWorkloadText(response.workload_score)}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {response.stress_factors && response.stress_factors.length > 0 && (
-                      <div>
-                        <div className="text-xs font-medium text-neutral-700 mb-2">
-                          {response.stress_factors.length === 1 ? 'Primary Concern' : 'Primary Concerns'}
-                        </div>
-                        <div className="flex flex-wrap gap-1">
-                          {response.stress_factors.map((factor, factorIndex) => (
-                            <Badge key={factorIndex} variant="outline" className="text-xs">
-                              {getStressSourceLabel(factor)}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <span className="text-xs text-neutral-500">Feeling</span>
+                          <div className="flex items-center gap-2">
+                            <Badge className={getScoreBadgeColor(response.feeling_score)}>
+                              {response.feeling_score}/5
                             </Badge>
-                          ))}
+                            <span className="text-xs">{getFeelingText(response.feeling_score)}</span>
+                          </div>
                         </div>
-                      </div>
-                    )}
 
-                    {response.additional_comments && (
-                      <div>
-                        <div className="flex items-center gap-1 text-xs font-medium text-neutral-700 mb-1">
-                          <MessageSquare className="w-3 h-3" />
-                          <span>Comments</span>
+                        <div className="space-y-1">
+                          <span className="text-xs text-neutral-500">Workload</span>
+                          <div className="flex items-center gap-2">
+                            <Badge className={getScoreBadgeColor(response.workload_score)}>
+                              {response.workload_score}/5
+                            </Badge>
+                            <span className="text-xs">{getWorkloadText(response.workload_score)}</span>
+                          </div>
                         </div>
-                        <p className="text-xs text-neutral-700">{response.additional_comments}</p>
                       </div>
-                    )}
-                  </div>
-                ))}
-              </div>
+
+                      {response.stress_factors && response.stress_factors.length > 0 && (
+                        <div>
+                          <div className="text-xs font-medium text-neutral-700 mb-2">
+                            {response.stress_factors.length === 1 ? 'Primary Concern' : 'Primary Concerns'}
+                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            {response.stress_factors.map((factor, factorIndex) => (
+                              <Badge key={factorIndex} variant="outline" className="text-xs">
+                                {getStressSourceLabel(factor)}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {response.additional_comments && (
+                        <div>
+                          <div className="flex items-center gap-1 text-xs font-medium text-neutral-700 mb-1">
+                            <MessageSquare className="w-3 h-3" />
+                            <span>Comments</span>
+                          </div>
+                          <p className="text-xs text-neutral-700">{response.additional_comments}</p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </>
         )}
