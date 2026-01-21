@@ -291,7 +291,7 @@ export function SurveyResultsCard({ surveyData }: SurveyResultsCardProps): React
             <div>
               <button
                 onClick={() => setShowHistory(!showHistory)}
-                className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-neutral-100 hover:bg-neutral-200 transition-colors"
+                className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg border border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50 transition-colors"
               >
                 <span className="text-sm font-semibold text-neutral-900">
                   Previous Check-ins ({surveyData.survey_responses.length - 1})
