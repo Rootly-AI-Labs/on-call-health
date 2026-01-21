@@ -295,9 +295,9 @@ class NotificationService:
         self, user: User, limit: int = 20, offset: int = 0
     ) -> Tuple[List[UserNotification], int, int]:
         """
-        Get notifications with unread and total counts in a single database round trip.
+        Get notifications with unread and total counts in fewer database round trips.
 
-        This optimized method reduces 3 separate database queries to 1 by fetching
+        This optimized method reduces 3 separate database queries to 2 by combining
         both counts in a single query using conditional aggregation (CASE statements).
 
         Args:
