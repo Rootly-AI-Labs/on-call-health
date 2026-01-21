@@ -367,10 +367,16 @@ class GitHubCollector:
                         weekend_count = daily.get('weekend_commits', 0)
 
                         # Generate individual commit timestamps for after-hours and weekend commits
-                        for i in range(after_hours_count):
-                            # Distribute after-hours commits across after-business-hours times (22:00 - 23:59 or 00:00 - 08:59)
-                            hour = 22 + (i % 2)  # Alternate between 22 and 23
-                            minute = (i * 17) % 60  # Distribute by minute
+                        # Generate timestamps for ALL commits
+                        total_commits_today = daily.get('total_commits', after_hours_count)
+                        for i in range(total_commits_today):
+                            if i < after_hours_count:
+                                # After-hours commits (22:00 - 23:59 or 00:00 - 08:59)
+                                hour = 22 + (i % 2)  # Alternate between 22 and 23
+                            else:
+                                # Business-hours commits (09:00 - 16:59)
+                                hour = 9 + ((i - after_hours_count) % 8)
+                            minute = (i * 17) % 60
                             commit_dt = date_obj.replace(hour=hour, minute=minute).isoformat() + 'Z'
                             commits_array.append({"timestamp": commit_dt})
 
