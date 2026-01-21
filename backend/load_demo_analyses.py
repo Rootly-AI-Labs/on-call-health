@@ -24,6 +24,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from app.models.base import SessionLocal
 from app.models.user import User
 from app.models.analysis import Analysis
+from app.models.user_burnout_report import UserBurnoutReport
 
 
 def load_mock_data(json_path: str) -> dict:
@@ -39,6 +40,82 @@ def load_mock_data(json_path: str) -> dict:
 
     print(f"[OK] Mock data loaded successfully")
     return data
+
+
+def load_exported_burnout_reports(db, user_id: int, mock_data: dict, dry_run: bool = True) -> int:
+    """
+    Load exported burnout reports from mock data and link them to a user.
+
+    Args:
+        db: Database session
+        user_id: User ID to link reports to
+        mock_data: Mock analysis data containing exported burnout reports
+        dry_run: If True, don't actually create records
+
+    Returns:
+        Number of burnout reports loaded (or would be loaded in dry-run)
+    """
+    created_count = 0
+
+    try:
+        # Extract exported burnout reports from mock data
+        reports_data = mock_data.get('user_burnout_reports', [])
+
+        if not reports_data:
+            print(f"    [WARN] No exported burnout reports found in mock data")
+            return 0
+
+        print(f"    [*] Found {len(reports_data)} exported burnout reports")
+
+        if dry_run:
+            print(f"    [DRY-RUN] Would load {len(reports_data)} burnout reports for user_id {user_id}")
+            for report in reports_data[:3]:  # Show first 3 as example
+                submitted = report.get('submitted_at', 'unknown')
+                print(f"      - {report.get('email', 'unknown')}: feeling={report.get('feeling_score')}, workload={report.get('workload_score')}, submitted={submitted}")
+            if len(reports_data) > 3:
+                print(f"      ... and {len(reports_data) - 3} more")
+            return len(reports_data)
+
+        # Load burnout reports for each entry
+        for report_data in reports_data:
+            email = report_data.get('email', '')
+
+            if not email:
+                continue
+
+            # Create burnout report linked to the user
+            try:
+                # Parse timestamps from exported data
+                submitted_at = report_data.get('submitted_at')
+                if isinstance(submitted_at, str):
+                    # Parse ISO format datetime string
+                    submitted_at = datetime.fromisoformat(submitted_at.replace('Z', '+00:00'))
+
+                report = UserBurnoutReport(
+                    user_id=user_id,  # Link to the user
+                    email=email,
+                    email_domain=report_data.get('email_domain'),
+                    analysis_id=None,  # Keep as None - not linked to specific analysis
+                    feeling_score=report_data.get('feeling_score'),
+                    workload_score=report_data.get('workload_score'),
+                    stress_factors=report_data.get('stress_factors'),
+                    personal_circumstances=report_data.get('personal_circumstances'),
+                    additional_comments=report_data.get('additional_comments'),
+                    submitted_via=report_data.get('submitted_via', 'web'),
+                    is_anonymous=report_data.get('is_anonymous', False),
+                    submitted_at=submitted_at  # Preserve the original submission time
+                )
+                db.add(report)
+                created_count += 1
+            except Exception as e:
+                print(f"      [WARN] Failed to load report for {email}: {str(e)}")
+                continue
+
+        return created_count
+
+    except Exception as e:
+        print(f"    [ERROR] Failed to load burnout reports: {str(e)}")
+        raise
 
 
 def has_demo_analysis(db, user_id: int) -> bool:
@@ -95,6 +172,8 @@ def create_demo_analysis(db, user: User, mock_data: dict, dry_run: bool = True) 
                 print(f"    - Total users in analysis: {results['metadata'].get('total_users', 'N/A')}")
             if 'team_health' in results:
                 print(f"    - Team health score: {results['team_health'].get('overall_score', 'N/A')}")
+        # Show burnout reports preview
+        load_exported_burnout_reports(db, user.id, mock_data, dry_run=True)
         return True
 
     # Create the analysis
@@ -117,6 +196,16 @@ def create_demo_analysis(db, user: User, mock_data: dict, dry_run: bool = True) 
         db.flush()  # Flush to get the ID without committing
 
         print(f"  [OK] Created demo analysis {analysis.id} for user {user.id} ({user.email})")
+
+        # Load burnout reports for team members
+        try:
+            burnout_reports_count = load_exported_burnout_reports(db, user.id, mock_data, dry_run=False)
+            if burnout_reports_count > 0:
+                print(f"  [OK] Loaded {burnout_reports_count} health check-in records for team members")
+        except Exception as e:
+            print(f"  [WARN] Failed to load burnout reports: {str(e)}")
+            # Continue without failing - analysis was created successfully
+
         return True
 
     except Exception as e:
