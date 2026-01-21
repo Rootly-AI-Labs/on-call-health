@@ -163,13 +163,6 @@ export function TeamMembersList({
                     <Image src="/images/rootly-logo-icon.jpg" alt="Rootly" width={14} height={14} className="rounded" />
                   </div>
                 )}
-                {member.pagerduty_user_id && (
-                  <div className="flex items-center justify-center w-5 h-5 bg-green-50 rounded-full border border-green-200" title="PagerDuty">
-                    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none">
-                      <path d="M16.965 1.18C15.085.164 13.769 0 10.683 0H3.73v14.55h6.926c2.743 0 4.8-.164 6.57-1.18 2.105-1.18 3.203-3.27 3.203-6.485 0-3.436-1.207-5.035-3.462-5.705zM11.293 10.2H7.77V4.146h3.769c2.687 0 4.074.724 4.074 2.99 0 2.487-1.496 3.065-4.32 3.065zM3.73 24h4.04V16.64H3.73V24z" fill="#06AC38"/>
-                    </svg>
-                  </div>
-                )}
                 {currentAnalysis?.analysis_data?.member_surveys?.[member.user_email] && (
                   <div className="flex items-center justify-center w-5 h-5 bg-blue-50 rounded-full border border-blue-200" title="Survey Data Available">
                     <svg className="w-3 h-3 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">

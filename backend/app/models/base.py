@@ -14,7 +14,11 @@ if not DATABASE_URL:
         "For local development, use PostgreSQL (e.g., postgresql://user:password@localhost/dbname)"
     )
 
-# Create PostgreSQL engine with increased pool limits
+# Query timeout settings (in milliseconds)
+STATEMENT_TIMEOUT_MS = int(os.getenv("DB_STATEMENT_TIMEOUT_MS", "60000"))  # 60 seconds default
+LOCK_TIMEOUT_MS = int(os.getenv("DB_LOCK_TIMEOUT_MS", "30000"))  # 30 seconds default
+
+# Create PostgreSQL engine with increased pool limits and query timeouts
 engine = create_engine(
     DATABASE_URL,
     pool_size=30,           # Increased from 20 to 30 base connections
@@ -22,7 +26,10 @@ engine = create_engine(
     pool_pre_ping=True,     # Test connections before use
     pool_recycle=300,       # Recycle connections every 5 minutes
     pool_timeout=60,        # Wait up to 60 seconds for connection
-    echo_pool=False         # Set to True for debugging pool issues
+    echo_pool=False,        # Set to True for debugging pool issues
+    connect_args={
+        "options": f"-c statement_timeout={STATEMENT_TIMEOUT_MS} -c lock_timeout={LOCK_TIMEOUT_MS}"
+    }
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

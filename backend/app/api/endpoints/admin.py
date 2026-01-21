@@ -200,13 +200,21 @@ async def refresh_demo_analyses(
             except Exception as e:
                 errors.append(f"Failed to update analysis #{analysis.id}: {str(e)}")
 
+        # Commit updates before creating new ones - prevents rollback from losing updates
+        if updated_count > 0:
+            db.commit()
+            logger.info(f"ADMIN: Committed {updated_count} demo updates")
+
         # Create demo analyses for users who don't have one
         users = db.query(User).all()
         users_with_demo = {a.user_id for a in demo_analyses}
 
+        logger.info(f"ADMIN: Found {len(users)} total users, {len(users_with_demo)} already have demos")
+
         for user in users:
             if user.id not in users_with_demo:
                 try:
+                    logger.info(f"ADMIN: Creating demo for user #{user.id} ({user.email})")
                     config = original_analysis.get('config', {}).copy()
                     config['is_demo'] = True
                     config['demo_created_at'] = datetime.now().isoformat()
@@ -225,9 +233,13 @@ async def refresh_demo_analyses(
                         completed_at=datetime.now()
                     )
                     db.add(new_analysis)
+                    db.flush()  # Flush immediately to catch per-user errors
                     created_count += 1
+                    logger.info(f"ADMIN: Successfully created demo for user #{user.id}")
                 except Exception as e:
-                    errors.append(f"Failed to create demo for user #{user.id}: {str(e)}")
+                    logger.error(f"ADMIN: Failed to create demo for user #{user.id}: {str(e)}")
+                    errors.append(f"Failed to create demo for user #{user.id} ({user.email}): {str(e)}")
+                    db.rollback()  # Rollback this specific failure
 
         db.commit()
 
