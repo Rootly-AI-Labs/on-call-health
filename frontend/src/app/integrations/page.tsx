@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react"
+import { INTEGRATION_TIMEOUTS, getModalDelay } from "./constants"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -1296,7 +1297,7 @@ export default function IntegrationsPage() {
               setTimeout(() => {
                 setPostIntegrationModalType('jira')
                 setShowPostIntegrationSyncModal(true)
-              }, 1000)
+              }, getModalDelay('jira'))
 
               return
             }
@@ -1391,7 +1392,7 @@ export default function IntegrationsPage() {
               setTimeout(() => {
                 setPostIntegrationModalType('linear')
                 setShowPostIntegrationSyncModal(true)
-              }, 1000)
+              }, getModalDelay('linear'))
 
               return
             }
@@ -2022,12 +2023,38 @@ export default function IntegrationsPage() {
     // Check if primary integration exists (Rootly or PagerDuty)
     const hasPrimaryIntegration = integrations && integrations.length > 0
 
-    // Show modal whenever an integration is added, as long as primary integration exists
-    // This includes first-time connections AND re-adding integrations after removal
-    if (hasPrimaryIntegration) {
-      setPostIntegrationModalType(integrationType)
-      setShowPostIntegrationSyncModal(true)
+    // Show modal only if:
+    // 1. A primary integration (Rootly/PagerDuty) exists
+    // 2. AND integration-specific data has finished loading
+    if (!hasPrimaryIntegration) {
+      console.debug(`[Integration Modal] Skipped ${integrationType} modal: no primary integration`)
+      return
     }
+
+    // Check if the specific integration data has loaded
+    const isLoading = (() => {
+      switch (integrationType) {
+        case 'github':
+          return isLoadingGithub
+        case 'slack':
+          return isLoadingSlack
+        case 'jira':
+          return isLoadingJira
+        case 'linear':
+          return isLoadingLinear
+        default:
+          return true
+      }
+    })()
+
+    if (isLoading) {
+      console.debug(`[Integration Modal] Skipped ${integrationType} modal: still loading`)
+      return
+    }
+
+    // All conditions met - show the sync modal
+    setPostIntegrationModalType(integrationType)
+    setShowPostIntegrationSyncModal(true)
   }
 
   // GitHub integration handlers
@@ -2044,7 +2071,7 @@ export default function IntegrationsPage() {
       // Wait for integration data to be reloaded, then check and show modal
       setTimeout(() => {
         checkAndShowSyncModal('github')
-      }, 500)
+      }, getModalDelay('github'))
     }
   }
 
@@ -2076,7 +2103,7 @@ export default function IntegrationsPage() {
       // Wait for integration data to be reloaded, then check and show modal
       setTimeout(() => {
         checkAndShowSyncModal('slack')
-      }, 500)
+      }, getModalDelay('slack'))
     }
   }
 
