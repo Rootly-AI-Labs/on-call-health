@@ -35,10 +35,10 @@ export function ObjectiveDataCard({
     after_hours: {
       label: "After Hours Activity",
       color: "#7C63D6",
-      yAxisLabel: "After Hours Incidents",
-      dataKey: "afterHoursCount",
+      yAxisLabel: "After Hours Activity %",
+      dataKey: "afterHoursPercentage",
       showMeanLine: true,
-      transformer: (trend: any) => trend.after_hours_count || 0
+      transformer: (trend: any) => trend.after_hours_percentage || 0
     },
     severity_weighted: {
       label: "Workload Intensity",
@@ -160,6 +160,12 @@ export function ObjectiveDataCard({
         metricValue = config.transformer(trend);
       }
 
+      // Use actual after-hours breakdown from backend
+      const afterHoursIncidents = trend.after_hours_incidents_count || 0;
+      const afterHoursCommits = trend.github_after_hours_count || 0;
+      const totalActivities = trend.total_activities || 0;
+      const afterHoursPercentage = trend.after_hours_percentage || 0;
+
       return {
         date: new Date(trend.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
         originalDate: trend.date,
@@ -167,6 +173,10 @@ export function ObjectiveDataCard({
         // Keep these for tooltip
         incidentCount: trend.incident_count || 0,
         afterHours: trend.after_hours_count || 0,
+        afterHoursIncidents: afterHoursIncidents,
+        afterHoursCommits: afterHoursCommits,
+        totalActivities: totalActivities,
+        afterHoursPercentage: afterHoursPercentage,
         membersAtRisk: trend.members_at_risk || 0,
         totalMembers: trend.total_members || 0,
         hasData: trend.incident_count > 0
