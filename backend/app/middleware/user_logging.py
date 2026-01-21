@@ -8,7 +8,6 @@ import logging
 from typing import Callable, Optional
 
 from fastapi import Request, Response
-from fastapi.responses import JSONResponse
 
 from ..auth.jwt import get_user_id_from_token
 from .logging_context import set_user_context, clear_user_context
@@ -64,28 +63,19 @@ async def user_logging_middleware(request: Request, call_next: Callable) -> Resp
         token = _extract_token_from_request(request)
         if token:
             user_id = get_user_id_from_token(token)
-
-        # Set user context for logging
-        set_user_context(user_id)
-
-        # Process the request
-        response = await call_next(request)
-
-        return response
-
+            if user_id is None:
+                logger.debug(f"Failed to extract user ID from token for {request.url.path}")
     except Exception as e:
-        # Log any middleware errors (user context may or may not be set)
-        logger.error(f"Error in user logging middleware: {e}")
+        # Only log token extraction errors, don't fail the request
+        logger.warning(f"Failed to extract user ID for logging: {e}")
 
-        # Return error response
-        return JSONResponse(
-            status_code=500,
-            content={
-                "error": "internal_server_error",
-                "detail": "An internal error occurred"
-            }
-        )
+    # Set user context for logging (always, even if user_id is None)
+    set_user_context(user_id)
 
+    try:
+        # Process the request - let FastAPI handle any exceptions normally
+        response = await call_next(request)
+        return response
     finally:
         # Always clear the user context after request processing
         clear_user_context()
