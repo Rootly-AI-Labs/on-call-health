@@ -405,8 +405,8 @@
             "is_oncall": false,
             "github_username": "kwent",
             "slack_user_id": null,
-            "jira_account_id": "712020:4fbd855f-efac-46f8-9390-16fc53a56af7",
-            "linear_user_id": "40a50883-800a-438c-80c4-7dafc622e103",
+            "jira_account_id": "712020:8a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p",
+            "linear_user_id": "8a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p",
             "burnout_score": 2.7,
             "ocb_score": 74.01,
             "risk_level": "low",
@@ -540,73 +540,127 @@
             },
             "jira_tickets": [
               {
-                "key": "RD-8",
-                "priority": "Highest",
-                "duedate": "2026-02-12"
+                "key": "INFRA-892",
+                "priority": "Blocker",
+                "duedate": "2026-01-22"
               },
               {
-                "key": "RD-9",
-                "priority": "Low",
-                "duedate": "2026-02-23"
+                "key": "INFRA-893",
+                "priority": "Urgent",
+                "duedate": "2026-01-23"
+              },
+              {
+                "key": "SEC-145",
+                "priority": "Blocker",
+                "duedate": "2026-01-21"
+              },
+              {
+                "key": "PROD-567",
+                "priority": "High",
+                "duedate": "2026-01-25"
+              },
+              {
+                "key": "PROD-568",
+                "priority": "Urgent",
+                "duedate": "2026-01-24"
+              },
+              {
+                "key": "DEBT-234",
+                "priority": "High",
+                "duedate": "2026-01-28"
+              },
+              {
+                "key": "FEAT-901",
+                "priority": "Medium",
+                "duedate": "2026-02-01"
+              },
+              {
+                "key": "BUG-445",
+                "priority": "Blocker",
+                "duedate": "2026-01-22"
               }
             ],
             "jira_burnout_breakdown": {
-              "jira_ocb_score": 18.3,
-              "original_ocb": 55.33,
-              "final_ocb": 63.5,
-              "jira_added_risk": 8.17,
+              "jira_ocb_score": 72.5,
+              "original_ocb": 66.75,
+              "final_ocb": 78.25,
+              "jira_added_risk": 11.5,
               "jira_indicators": {
-                "ticket_count": 2,
-                "critical_high_priority_count": 1,
-                "critical_ratio": 50.0,
-                "high_workload": false,
+                "ticket_count": 8,
+                "critical_high_priority_count": 6,
+                "critical_ratio": 75.0,
+                "high_workload": true,
                 "critical_ratio_high": true
               }
             },
             "linear_issues": [
               {
-                "id": "6bb6513a-b1d8-4162-982f-868781699c64",
-                "identifier": "AIL-111",
-                "title": "ENG-627 - Implement test coverage to improve observability",
+                "id": "b72ccde3-a2ac-4357-afd6-30f08b84f3cf",
+                "identifier": "FIRE-101",
+                "title": "Production database failing over",
                 "priority": 1,
-                "dueDate": null,
+                "dueDate": "2026-01-21",
                 "state": "In Progress"
               },
               {
-                "id": "8f4256d5-1c6f-4def-ac0a-e85d7506dd4a",
-                "identifier": "AIL-90",
-                "title": "APP-765 - Harden feature flags to improve performance",
+                "id": "bc7c859e-7efd-4d9b-9117-70a1d9877ce5",
+                "identifier": "FIRE-102",
+                "title": "API latency spike investigation",
+                "priority": 1,
+                "dueDate": "2026-01-22",
+                "state": "In Progress"
+              },
+              {
+                "id": "f2767cb0-23d7-4247-9555-75977300a101",
+                "identifier": "SEC-201",
+                "title": "Security vulnerability patch",
+                "priority": 1,
+                "dueDate": "2026-01-21",
+                "state": "Todo"
+              },
+              {
+                "id": "53877245-00cb-4f07-b77a-8b2086909ea3",
+                "identifier": "INFRA-301",
+                "title": "Kubernetes cluster scaling",
                 "priority": 2,
-                "dueDate": null,
+                "dueDate": "2026-01-23",
                 "state": "In Progress"
               },
               {
-                "id": "fc827134-3942-4dcb-a5ed-2a95611adb44",
-                "identifier": "AIL-60",
-                "title": "CORE-315 - Validate metrics tracking to simplify onboarding",
-                "priority": 0,
-                "dueDate": null,
+                "id": "d25095a8-10c1-43bf-b432-3b1d08cc70b4",
+                "identifier": "INFRA-302",
+                "title": "Redis cluster migration",
+                "priority": 2,
+                "dueDate": "2026-01-24",
+                "state": "Todo"
+              },
+              {
+                "id": "25e1de66-1cb4-41ae-a72b-1ec7ffc952f0",
+                "identifier": "OPS-401",
+                "title": "Monitoring dashboard updates",
+                "priority": 2,
+                "dueDate": "2026-01-25",
+                "state": "Todo"
+              },
+              {
+                "id": "6dd913c7-130b-4569-a170-542b63ad3f8e",
+                "identifier": "DEBT-501",
+                "title": "Legacy service deprecation",
+                "priority": 3,
+                "dueDate": "2026-01-28",
                 "state": "Backlog"
-              },
-              {
-                "id": "1e52bde9-a58f-45bd-9497-785f167297a9",
-                "identifier": "AIL-8",
-                "title": "ENG-563 - Investigate metrics tracking to avoid regressions",
-                "priority": 1,
-                "dueDate": "2025-12-16",
-                "state": "In Progress"
               }
             ],
             "linear_burnout_breakdown": {
-              "linear_ocb_score": 28.8,
-              "original_ocb": 63.5,
-              "final_ocb": 74.01,
-              "linear_added_risk": 10.51,
+              "linear_ocb_score": 68.5,
+              "original_ocb": 78.25,
+              "final_ocb": 85.2,
+              "linear_added_risk": 6.95,
               "linear_indicators": {
-                "issue_count": 4,
-                "urgent_high_priority_count": 3,
-                "urgent_high_ratio": 75.0,
-                "high_workload": false,
+                "issue_count": 7,
+                "urgent_high_priority_count": 6,
+                "urgent_high_ratio": 85.7,
+                "high_workload": true,
                 "urgent_ratio_high": true
               }
             },
@@ -678,8 +732,8 @@
             "is_oncall": false,
             "github_username": "owen-sheppard",
             "slack_user_id": null,
-            "jira_account_id": "712020:2ead812d-3001-4a9f-915f-e0e7ee23b2b8",
-            "linear_user_id": "7857d9d6-4f4a-435b-8dc1-f3322093e35b",
+            "jira_account_id": "712020:9b8c7d6e-5f4g-3h2i-1j0k-9l8m7n6o5p4q",
+            "linear_user_id": "9b8c7d6e-5f4g-3h2i-1j0k-9l8m7n6o5p4q",
             "burnout_score": 2.55,
             "ocb_score": 71.22,
             "risk_level": "low",
@@ -813,121 +867,101 @@
             },
             "jira_tickets": [
               {
-                "key": "RD-5",
-                "priority": "High",
-                "duedate": "2026-01-07"
+                "key": "ONCALL-123",
+                "priority": "Blocker",
+                "duedate": "2026-01-21"
               },
               {
-                "key": "RD-3",
-                "priority": "Medium",
+                "key": "ONCALL-124",
+                "priority": "Blocker",
+                "duedate": "2026-01-22"
+              },
+              {
+                "key": "ALERT-789",
+                "priority": "Urgent",
                 "duedate": "2026-01-23"
+              },
+              {
+                "key": "INCIDENT-456",
+                "priority": "High",
+                "duedate": "2026-01-24"
+              },
+              {
+                "key": "RUNBOOK-321",
+                "priority": "Urgent",
+                "duedate": "2026-01-25"
+              },
+              {
+                "key": "SRE-654",
+                "priority": "High",
+                "duedate": "2026-01-26"
               }
             ],
             "jira_burnout_breakdown": {
-              "jira_ocb_score": 26.5,
-              "original_ocb": 47.44,
-              "final_ocb": 61.37,
-              "jira_added_risk": 13.93,
+              "jira_ocb_score": 65.8,
+              "original_ocb": 52.3,
+              "final_ocb": 68.5,
+              "jira_added_risk": 16.2,
               "jira_indicators": {
-                "ticket_count": 2,
-                "critical_high_priority_count": 1,
-                "critical_ratio": 50.0,
-                "high_workload": false,
+                "ticket_count": 6,
+                "critical_high_priority_count": 5,
+                "critical_ratio": 83.3,
+                "high_workload": true,
                 "critical_ratio_high": true
               }
             },
             "linear_issues": [
               {
-                "id": "34e630e7-c22c-41c2-822d-a6bac2f23250",
-                "identifier": "AIL-127",
-                "title": "API-585 - Optimize export to CSV to simplify onboarding",
+                "id": "b1e4a6c6-5ba7-4a88-96f2-b7fba75866fd",
+                "identifier": "ONCALL-201",
+                "title": "Runbook automation",
                 "priority": 1,
-                "dueDate": null,
+                "dueDate": "2026-01-21",
                 "state": "In Progress"
               },
               {
-                "id": "e8845205-b7cf-4113-8b10-463396478469",
-                "identifier": "AIL-126",
-                "title": "OBS-618 - Add audit logging",
-                "priority": 3,
-                "dueDate": null,
+                "id": "d27d2dea-53e4-430b-b481-d29b9f3bd651",
+                "identifier": "ONCALL-202",
+                "title": "Alert fatigue reduction",
+                "priority": 1,
+                "dueDate": "2026-01-22",
+                "state": "In Progress"
+              },
+              {
+                "id": "37ce8fd7-e284-4680-9db1-673011c5ac4c",
+                "identifier": "SRE-301",
+                "title": "SLO dashboard implementation",
+                "priority": 2,
+                "dueDate": "2026-01-23",
+                "state": "In Progress"
+              },
+              {
+                "id": "eef8a2ad-9501-4093-8980-a510874dcfb0",
+                "identifier": "SRE-302",
+                "title": "Incident response playbook",
+                "priority": 2,
+                "dueDate": "2026-01-24",
                 "state": "Todo"
               },
               {
-                "id": "631ea4de-c5d1-45b8-8790-1748d0700773",
-                "identifier": "AIL-123",
-                "title": "API-944 - Add caching layer",
-                "priority": 1,
-                "dueDate": null,
-                "state": "In Progress"
-              },
-              {
-                "id": "6dbf1486-c4a7-4dc8-b382-1e88a342e05a",
-                "identifier": "AIL-117",
-                "title": "API-910 - Improve caching layer to avoid regressions",
+                "id": "53246639-c286-43ff-8fa4-29164f50a4f8",
+                "identifier": "CHAOS-401",
+                "title": "Chaos engineering tests",
                 "priority": 2,
-                "dueDate": null,
-                "state": "Backlog"
-              },
-              {
-                "id": "32cb41a5-e00d-452c-86fd-aab96da718b6",
-                "identifier": "AIL-110",
-                "title": "APP-074 - Improve login flow",
-                "priority": 3,
-                "dueDate": null,
-                "state": "Backlog"
-              },
-              {
-                "id": "d24df99d-0069-41d3-9e7e-adf5c7d3e14d",
-                "identifier": "AIL-109",
-                "title": "API-112 - Improve caching layer for better reliability",
-                "priority": 1,
-                "dueDate": null,
-                "state": "In Progress"
-              },
-              {
-                "id": "7047d43b-b6ca-4793-b265-438b7d57be8f",
-                "identifier": "AIL-108",
-                "title": "ENG-202 - Fix integration sync to prevent duplicates",
-                "priority": 3,
-                "dueDate": null,
-                "state": "Backlog"
-              },
-              {
-                "id": "e5767646-ace1-40bc-b353-ed8c40d16b7c",
-                "identifier": "AIL-100",
-                "title": "APP-853 - Remove rate limiting",
-                "priority": 2,
-                "dueDate": null,
-                "state": "Backlog"
-              },
-              {
-                "id": "39afe973-c54d-4ccc-b97e-0169a8ffbf96",
-                "identifier": "AIL-94",
-                "title": "Ability to set duration for slack surveys",
-                "priority": 3,
-                "dueDate": null,
-                "state": "In Progress"
-              },
-              {
-                "id": "63ce772a-b162-4b4e-8eb6-7db398441328",
-                "identifier": "AIL-75",
-                "title": "DATA-815 - Instrument data pipeline to align with design system",
-                "priority": 2,
-                "dueDate": null,
-                "state": "In Progress"
+                "dueDate": "2026-01-25",
+                "state": "Todo"
               }
             ],
             "linear_burnout_breakdown": {
-              "linear_ocb_score": 25.5,
-              "original_ocb": 61.37,
-              "final_ocb": 71.22,
-              "linear_added_risk": 9.85,
+              "linear_ocb_score": 62.3,
+              "original_ocb": 68.5,
+              "final_ocb": 74.8,
+              "linear_added_risk": 6.3,
               "linear_indicators": {
-                "issue_count": 10,
-                "urgent_high_priority_count": 6,
-                "urgent_high_ratio": 60.0,
-                "high_workload": false,
+                "issue_count": 5,
+                "urgent_high_priority_count": 5,
+                "urgent_high_ratio": 100.0,
+                "high_workload": true,
                 "urgent_ratio_high": true
               }
             },
@@ -1197,8 +1231,8 @@
             "is_oncall": true,
             "github_username": null,
             "slack_user_id": null,
-            "jira_account_id": null,
-            "linear_user_id": "0f4f5546-ae38-4bbc-ab3f-806eb2a593e1",
+            "jira_account_id": "712020:9b8c7d6e-5f4g-3h2i-1j0k-9l8m7n6o5p4q",
+            "linear_user_id": "9b8c7d6e-5f4g-3h2i-1j0k-9l8m7n6o5p4q",
             "burnout_score": 2.0,
             "ocb_score": 42.78,
             "risk_level": "low",
@@ -1325,8 +1359,80 @@
                 "weekend_work": false
               }
             },
-            "jira_tickets": [],
-            "linear_issues": [],
+            "jira_tickets": [
+              {
+                "key": "ONCALL-123",
+                "priority": "Blocker",
+                "duedate": "2026-01-21"
+              },
+              {
+                "key": "ONCALL-124",
+                "priority": "Blocker",
+                "duedate": "2026-01-22"
+              },
+              {
+                "key": "ALERT-789",
+                "priority": "Urgent",
+                "duedate": "2026-01-23"
+              },
+              {
+                "key": "INCIDENT-456",
+                "priority": "High",
+                "duedate": "2026-01-24"
+              },
+              {
+                "key": "RUNBOOK-321",
+                "priority": "Urgent",
+                "duedate": "2026-01-25"
+              },
+              {
+                "key": "SRE-654",
+                "priority": "High",
+                "duedate": "2026-01-26"
+              }
+            ],
+            "linear_issues": [
+              {
+                "id": "18f0fff4-5d3a-4767-9377-d81470b21b53",
+                "identifier": "ONCALL-201",
+                "title": "Runbook automation",
+                "priority": 1,
+                "dueDate": "2026-01-21",
+                "state": "In Progress"
+              },
+              {
+                "id": "f7cedd5b-580d-43e3-8305-64adfb586e12",
+                "identifier": "ONCALL-202",
+                "title": "Alert fatigue reduction",
+                "priority": 1,
+                "dueDate": "2026-01-22",
+                "state": "In Progress"
+              },
+              {
+                "id": "ac5d4460-cd87-4ff0-b2f8-97f483482c3f",
+                "identifier": "SRE-301",
+                "title": "SLO dashboard implementation",
+                "priority": 2,
+                "dueDate": "2026-01-23",
+                "state": "In Progress"
+              },
+              {
+                "id": "fb4f6c47-2b8e-42df-95ac-06c759328106",
+                "identifier": "SRE-302",
+                "title": "Incident response playbook",
+                "priority": 2,
+                "dueDate": "2026-01-24",
+                "state": "Todo"
+              },
+              {
+                "id": "b8126e52-d11f-49d7-b6eb-b8b88af9a622",
+                "identifier": "CHAOS-401",
+                "title": "Chaos engineering tests",
+                "priority": 2,
+                "dueDate": "2026-01-25",
+                "state": "Todo"
+              }
+            ],
             "ai_insights": {
               "workload": {
                 "workload_status": "sustainable",
@@ -1386,7 +1492,33 @@
             "ai_data_sources": [
               "github"
             ],
-            "rootly_user_id": "3779"
+            "rootly_user_id": "3779",
+            "jira_burnout_breakdown": {
+              "jira_ocb_score": 65.8,
+              "original_ocb": 52.3,
+              "final_ocb": 68.5,
+              "jira_added_risk": 16.2,
+              "jira_indicators": {
+                "ticket_count": 6,
+                "critical_high_priority_count": 5,
+                "critical_ratio": 83.3,
+                "high_workload": true,
+                "critical_ratio_high": true
+              }
+            },
+            "linear_burnout_breakdown": {
+              "linear_ocb_score": 62.3,
+              "original_ocb": 68.5,
+              "final_ocb": 74.8,
+              "linear_added_risk": 6.3,
+              "linear_indicators": {
+                "issue_count": 5,
+                "urgent_high_priority_count": 5,
+                "urgent_high_ratio": 100.0,
+                "high_workload": true,
+                "urgent_ratio_high": true
+              }
+            }
           },
           {
             "user_id": "25713",
@@ -1395,8 +1527,8 @@
             "is_oncall": false,
             "github_username": "shadabp18",
             "slack_user_id": null,
-            "jira_account_id": null,
-            "linear_user_id": "9f34d2e8-8182-4890-8f5a-f29c26233fa5",
+            "jira_account_id": "712020:1a2b3c4d-5e6f-7g8h-9i0j-klmnopqrstuv",
+            "linear_user_id": "1a2b3c4d-5e6f-7g8h-9i0j-klmnopqrstuv",
             "burnout_score": 1.92,
             "ocb_score": 44.25,
             "risk_level": "low",
@@ -1526,8 +1658,93 @@
                 "weekend_work": false
               }
             },
-            "jira_tickets": [],
-            "linear_issues": [],
+            "jira_tickets": [
+              {
+                "key": "API-234",
+                "priority": "Urgent",
+                "duedate": "2026-01-22"
+              },
+              {
+                "key": "API-235",
+                "priority": "High",
+                "duedate": "2026-01-23"
+              },
+              {
+                "key": "PERF-567",
+                "priority": "Blocker",
+                "duedate": "2026-01-21"
+              },
+              {
+                "key": "SCALE-890",
+                "priority": "Urgent",
+                "duedate": "2026-01-24"
+              },
+              {
+                "key": "SCALE-891",
+                "priority": "High",
+                "duedate": "2026-01-25"
+              },
+              {
+                "key": "DEPLOY-123",
+                "priority": "High",
+                "duedate": "2026-01-26"
+              },
+              {
+                "key": "MONITOR-456",
+                "priority": "Medium",
+                "duedate": "2026-01-28"
+              }
+            ],
+            "linear_issues": [
+              {
+                "id": "c7b8eee6-b9be-42b5-8695-94066d9cf088",
+                "identifier": "API-101",
+                "title": "Rate limiting implementation",
+                "priority": 1,
+                "dueDate": "2026-01-21",
+                "state": "In Progress"
+              },
+              {
+                "id": "212109b9-d497-4dca-b605-9628cc7bdee7",
+                "identifier": "API-102",
+                "title": "GraphQL migration phase 2",
+                "priority": 1,
+                "dueDate": "2026-01-22",
+                "state": "In Progress"
+              },
+              {
+                "id": "99aa1e2c-6e2a-4d05-81fe-5fedf7f8fc31",
+                "identifier": "PERF-201",
+                "title": "Database query optimization",
+                "priority": 2,
+                "dueDate": "2026-01-23",
+                "state": "In Progress"
+              },
+              {
+                "id": "ee94b866-d397-4592-8334-ef16040df3c7",
+                "identifier": "PERF-202",
+                "title": "Caching layer redesign",
+                "priority": 2,
+                "dueDate": "2026-01-24",
+                "state": "Todo"
+              },
+              {
+                "id": "637a8f7e-ce20-44d9-8f55-4eec659385ed",
+                "identifier": "SCALE-301",
+                "title": "Horizontal scaling setup",
+                "priority": 2,
+                "dueDate": "2026-01-25",
+                "state": "Todo"
+              },
+              {
+                "id": "fc35a203-cf64-450f-b8fb-6af9c13ca228",
+                "identifier": "SCALE-302",
+                "title": "Load balancer configuration",
+                "priority": 2,
+                "dueDate": "2026-01-26",
+                "state": "Backlog"
+              }
+            ],
             "ai_insights": {
               "workload": {
                 "workload_status": "sustainable",
@@ -1587,7 +1804,33 @@
             "ai_data_sources": [
               "github"
             ],
-            "rootly_user_id": "25713"
+            "rootly_user_id": "25713",
+            "jira_burnout_breakdown": {
+              "jira_ocb_score": 58.2,
+              "original_ocb": 45.6,
+              "final_ocb": 62.8,
+              "jira_added_risk": 17.2,
+              "jira_indicators": {
+                "ticket_count": 7,
+                "critical_high_priority_count": 5,
+                "critical_ratio": 71.4,
+                "high_workload": true,
+                "critical_ratio_high": true
+              }
+            },
+            "linear_burnout_breakdown": {
+              "linear_ocb_score": 55.8,
+              "original_ocb": 62.8,
+              "final_ocb": 70.2,
+              "linear_added_risk": 7.4,
+              "linear_indicators": {
+                "issue_count": 6,
+                "urgent_high_priority_count": 6,
+                "urgent_high_ratio": 100.0,
+                "high_workload": true,
+                "urgent_ratio_high": true
+              }
+            }
           },
           {
             "user_id": "4261",
@@ -1596,8 +1839,8 @@
             "is_oncall": false,
             "github_username": "alexmingoia",
             "slack_user_id": null,
-            "jira_account_id": null,
-            "linear_user_id": "f1c5826f-420e-4e69-ada7-32c446e62f49",
+            "jira_account_id": "712020:wxyz1234-5678-90ab-cdef-ghijklmnopqr",
+            "linear_user_id": "wxyz1234-5678-90ab-cdef-ghijklmnopqr",
             "burnout_score": 1.86,
             "ocb_score": 41.57,
             "risk_level": "low",
@@ -1724,8 +1967,91 @@
                 "weekend_work": false
               }
             },
-            "jira_tickets": [],
-            "linear_issues": [],
+            "jira_tickets": [
+              {
+                "key": "DATA-111",
+                "priority": "Blocker",
+                "duedate": "2026-01-21"
+              },
+              {
+                "key": "DATA-112",
+                "priority": "Urgent",
+                "duedate": "2026-01-22"
+              },
+              {
+                "key": "PIPELINE-333",
+                "priority": "Urgent",
+                "duedate": "2026-01-23"
+              },
+              {
+                "key": "PIPELINE-334",
+                "priority": "High",
+                "duedate": "2026-01-24"
+              },
+              {
+                "key": "ETL-555",
+                "priority": "Blocker",
+                "duedate": "2026-01-22"
+              }
+            ],
+            "linear_issues": [
+              {
+                "id": "f6b3ac02-c0c3-4584-8bd5-94c68f3b7d18",
+                "identifier": "DATA-101",
+                "title": "Data pipeline failure recovery",
+                "priority": 1,
+                "dueDate": "2026-01-21",
+                "state": "In Progress"
+              },
+              {
+                "id": "9daa8d69-0842-4b55-9ccb-5240a143b01a",
+                "identifier": "DATA-102",
+                "title": "ETL job optimization",
+                "priority": 1,
+                "dueDate": "2026-01-22",
+                "state": "In Progress"
+              },
+              {
+                "id": "6e34d346-7317-4981-9fcc-3caf84b9a49e",
+                "identifier": "ML-201",
+                "title": "Model retraining pipeline",
+                "priority": 2,
+                "dueDate": "2026-01-23",
+                "state": "In Progress"
+              },
+              {
+                "id": "2ed78107-1e9c-4675-a4ee-76fa29c27f02",
+                "identifier": "ML-202",
+                "title": "Feature store migration",
+                "priority": 2,
+                "dueDate": "2026-01-24",
+                "state": "Todo"
+              },
+              {
+                "id": "f17ef122-6808-46a2-95fa-78f547594f02",
+                "identifier": "REPORT-301",
+                "title": "Analytics dashboard rebuild",
+                "priority": 2,
+                "dueDate": "2026-01-25",
+                "state": "Todo"
+              },
+              {
+                "id": "38f7f2b8-e670-4390-9bc4-563aaa65f747",
+                "identifier": "REPORT-302",
+                "title": "Real-time metrics system",
+                "priority": 2,
+                "dueDate": "2026-01-26",
+                "state": "Todo"
+              },
+              {
+                "id": "7b7831f3-25ab-4963-ad75-73068ebaa929",
+                "identifier": "ARCH-401",
+                "title": "Data lakehouse architecture",
+                "priority": 3,
+                "dueDate": "2026-01-28",
+                "state": "Backlog"
+              }
+            ],
             "ai_insights": {
               "workload": {
                 "workload_status": "sustainable",
@@ -1785,7 +2111,33 @@
             "ai_data_sources": [
               "github"
             ],
-            "rootly_user_id": "4261"
+            "rootly_user_id": "4261",
+            "jira_burnout_breakdown": {
+              "jira_ocb_score": 61.0,
+              "original_ocb": 38.2,
+              "final_ocb": 55.4,
+              "jira_added_risk": 17.2,
+              "jira_indicators": {
+                "ticket_count": 5,
+                "critical_high_priority_count": 4,
+                "critical_ratio": 80.0,
+                "high_workload": true,
+                "critical_ratio_high": true
+              }
+            },
+            "linear_burnout_breakdown": {
+              "linear_ocb_score": 59.2,
+              "original_ocb": 55.4,
+              "final_ocb": 65.8,
+              "linear_added_risk": 10.4,
+              "linear_indicators": {
+                "issue_count": 7,
+                "urgent_high_priority_count": 6,
+                "urgent_high_ratio": 85.7,
+                "high_workload": true,
+                "urgent_ratio_high": true
+              }
+            }
           },
           {
             "user_id": "177423",
@@ -11203,8 +11555,8 @@
             "is_oncall": false,
             "github_username": null,
             "slack_user_id": null,
-            "jira_account_id": null,
-            "linear_user_id": "0f4f5546-ae38-4bbc-ab3f-806eb2a593e1",
+            "jira_account_id": "712020:9b8c7d6e-5f4g-3h2i-1j0k-9l8m7n6o5p4q",
+            "linear_user_id": "9b8c7d6e-5f4g-3h2i-1j0k-9l8m7n6o5p4q",
             "burnout_score": 0,
             "ocb_score": 0.0,
             "risk_level": "low",
@@ -11246,8 +11598,80 @@
                 "weekend_work": false
               }
             },
-            "jira_tickets": [],
-            "linear_issues": [],
+            "jira_tickets": [
+              {
+                "key": "ONCALL-123",
+                "priority": "Blocker",
+                "duedate": "2026-01-21"
+              },
+              {
+                "key": "ONCALL-124",
+                "priority": "Blocker",
+                "duedate": "2026-01-22"
+              },
+              {
+                "key": "ALERT-789",
+                "priority": "Urgent",
+                "duedate": "2026-01-23"
+              },
+              {
+                "key": "INCIDENT-456",
+                "priority": "High",
+                "duedate": "2026-01-24"
+              },
+              {
+                "key": "RUNBOOK-321",
+                "priority": "Urgent",
+                "duedate": "2026-01-25"
+              },
+              {
+                "key": "SRE-654",
+                "priority": "High",
+                "duedate": "2026-01-26"
+              }
+            ],
+            "linear_issues": [
+              {
+                "id": "18f0fff4-5d3a-4767-9377-d81470b21b53",
+                "identifier": "ONCALL-201",
+                "title": "Runbook automation",
+                "priority": 1,
+                "dueDate": "2026-01-21",
+                "state": "In Progress"
+              },
+              {
+                "id": "f7cedd5b-580d-43e3-8305-64adfb586e12",
+                "identifier": "ONCALL-202",
+                "title": "Alert fatigue reduction",
+                "priority": 1,
+                "dueDate": "2026-01-22",
+                "state": "In Progress"
+              },
+              {
+                "id": "ac5d4460-cd87-4ff0-b2f8-97f483482c3f",
+                "identifier": "SRE-301",
+                "title": "SLO dashboard implementation",
+                "priority": 2,
+                "dueDate": "2026-01-23",
+                "state": "In Progress"
+              },
+              {
+                "id": "fb4f6c47-2b8e-42df-95ac-06c759328106",
+                "identifier": "SRE-302",
+                "title": "Incident response playbook",
+                "priority": 2,
+                "dueDate": "2026-01-24",
+                "state": "Todo"
+              },
+              {
+                "id": "b8126e52-d11f-49d7-b6eb-b8b88af9a622",
+                "identifier": "CHAOS-401",
+                "title": "Chaos engineering tests",
+                "priority": 2,
+                "dueDate": "2026-01-25",
+                "state": "Todo"
+              }
+            ],
             "ai_insights": {
               "workload": {
                 "workload_status": "sustainable",
@@ -11307,7 +11731,33 @@
             "ai_data_sources": [
               "github"
             ],
-            "rootly_user_id": "65"
+            "rootly_user_id": "65",
+            "jira_burnout_breakdown": {
+              "jira_ocb_score": 65.8,
+              "original_ocb": 52.3,
+              "final_ocb": 68.5,
+              "jira_added_risk": 16.2,
+              "jira_indicators": {
+                "ticket_count": 6,
+                "critical_high_priority_count": 5,
+                "critical_ratio": 83.3,
+                "high_workload": true,
+                "critical_ratio_high": true
+              }
+            },
+            "linear_burnout_breakdown": {
+              "linear_ocb_score": 62.3,
+              "original_ocb": 68.5,
+              "final_ocb": 74.8,
+              "linear_added_risk": 6.3,
+              "linear_indicators": {
+                "issue_count": 5,
+                "urgent_high_priority_count": 5,
+                "urgent_high_ratio": 100.0,
+                "high_workload": true,
+                "urgent_ratio_high": true
+              }
+            }
           }
         ],
         "total_members": 84,
