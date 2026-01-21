@@ -30,8 +30,19 @@ logging.basicConfig(
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 
-# Add the user context filter to the root logger so all loggers inherit it
-logging.getLogger().addFilter(user_context_filter)
+# Add the user context filter to all handlers on the root logger
+# This ensures user_id is set BEFORE the formatter tries to access it
+# Filters on handlers process records before formatting, which is required for %(user_id)s to work
+root_logger = logging.getLogger()
+for handler in root_logger.handlers:
+    handler.addFilter(user_context_filter)
+
+# Also add to the logger itself for records that bypass handlers
+root_logger.addFilter(user_context_filter)
+
+# Ensure any handlers added by uvicorn or other frameworks also get the filter
+# by storing the filter globally and adding it in a way that's accessible
+logging.user_context_filter = user_context_filter  # Store reference for potential later use
 
 # Set specific loggers to WARNING in production to reduce noise
 if settings.ENVIRONMENT == "production" or LOG_LEVEL >= logging.WARNING:
@@ -165,6 +176,12 @@ async def favicon():
 # Initialize database tables
 @app.on_event("startup")
 async def startup_event():
+    # Ensure user context filter is added to any handlers that uvicorn may have added
+    # This covers handlers that are added after our initial logging.basicConfig() call
+    for handler in logging.getLogger().handlers:
+        if user_context_filter not in handler.filters:
+            handler.addFilter(user_context_filter)
+
     create_tables()
 
     # Run database migrations
