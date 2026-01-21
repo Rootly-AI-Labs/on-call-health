@@ -192,6 +192,11 @@ async def refresh_demo_analyses(
             except Exception as e:
                 errors.append(f"Failed to update analysis #{analysis.id}: {str(e)}")
 
+        # Commit updates before creating new ones - prevents rollback from losing updates
+        if updated_count > 0:
+            db.commit()
+            logger.info(f"ADMIN: Committed {updated_count} demo updates")
+
         # Create demo analyses for users who don't have one
         users = db.query(User).all()
         users_with_demo = {a.user_id for a in demo_analyses}
