@@ -1,7 +1,7 @@
 """
-AI-Enhanced Burnout Analysis Service
+AI-Enhanced Workload Health Analysis Service
 
-Integrates the smolagents-powered burnout detection agent with the existing analysis pipeline.
+Integrates the smolagents-powered workload health detection agent with the existing analysis pipeline.
 """
 import logging
 from typing import Dict, List, Any, Optional
@@ -27,9 +27,9 @@ def get_user_context():
 
 class AIBurnoutAnalyzerService:
     """
-    Service that adds AI-powered insights to the existing burnout analysis.
+    Service that adds AI-powered insights to the existing workload health analysis.
 
-    This service works alongside the traditional burnout analysis to provide:
+    This service works alongside the traditional workload analysis to provide:
     - Dynamic, context-aware analysis
     - Intelligent recommendations
     - Pattern recognition across multiple data sources
@@ -37,7 +37,7 @@ class AIBurnoutAnalyzerService:
     """
 
     def __init__(self, api_key: Optional[str] = None, provider: Optional[str] = None):
-        """Initialize the AI burnout analyzer service."""
+        """Initialize the AI workload health analyzer service."""
         self.logger = logging.getLogger(__name__)
         self.api_key = api_key
         self.provider = provider
@@ -51,7 +51,7 @@ class AIBurnoutAnalyzerService:
 
             self.agent = create_burnout_agent(model_name=model_name, api_key=api_key, provider=provider)
             self.available = True
-            self.logger.info(f"AI Burnout Analyzer initialized successfully (provider: {provider}, with API key: {bool(api_key)})")
+            self.logger.info(f"AI Workload Analyzer initialized successfully (provider: {provider}, with API key: {bool(api_key)})")
         except Exception as e:
             self.logger.error(f"Failed to initialize AI agent: {e}")
             self.available = False
@@ -63,11 +63,11 @@ class AIBurnoutAnalyzerService:
         available_integrations: List[str]
     ) -> Dict[str, Any]:
         """
-        Enhance traditional burnout analysis with AI insights.
+        Enhance traditional workload health analysis with AI insights.
 
         Args:
             member_data: Raw member data from all sources
-            traditional_analysis: Results from traditional burnout analysis
+            traditional_analysis: Results from traditional workload analysis
             available_integrations: List of available data sources
 
         Returns:
@@ -81,7 +81,7 @@ class AIBurnoutAnalyzerService:
             ai_member_data = self._prepare_ai_data(member_data, available_integrations)
 
             # Get AI analysis
-            ai_insights = self.agent.analyze_member_burnout(
+            ai_insights = self.agent.analyze_member_workload(
                 ai_member_data,
                 available_integrations
             )
@@ -137,7 +137,7 @@ class AIBurnoutAnalyzerService:
                 "risk_distribution": self._analyze_team_risk_distribution(team_members),
                 "detailed_risk_analysis": self._generate_detailed_risk_analysis(team_members),
                 "common_patterns": self._identify_common_patterns(team_members),
-                "burnout_indicators": self._analyze_burnout_indicators(team_members),
+                "stress_indicators": self._analyze_stress_indicators(team_members),
                 "workload_distribution": self._analyze_workload_distribution(team_members),
                 "communication_analysis": self._analyze_team_communication(team_members),
                 "temporal_patterns": self._analyze_temporal_patterns(team_members),
@@ -371,7 +371,7 @@ class AIBurnoutAnalyzerService:
                     "name": member_name,
                     "email": member_email,
                     "user_id": member.get("user_id"),
-                    "burnout_score": member.get("ocb_score") if member.get("ocb_score") is not None else member.get("burnout_score", 0),
+                    "health_score": member.get("ocb_score") if member.get("ocb_score") is not None else member.get("burnout_score", 0),
                     "scoring_type": "OCB" if member.get("ocb_score") is not None else "Legacy",
                     "incident_count": len(member.get("incidents", []))
                 })
@@ -467,8 +467,8 @@ class AIBurnoutAnalyzerService:
             recommendations.append({
                 "priority": "urgent",
                 "category": "team_health",
-                "title": "Team Burnout Risk Critical",
-                "description": f"{high_risk_pct:.1f}% of team members show high burnout risk",
+                "title": "Team Workload Risk Critical",
+                "description": f"{high_risk_pct:.1f}% of team members show high workload risk",
                 "at_risk_members": high_risk_names,
                 "member_details": high_risk_members,
                 "actions": [
@@ -484,8 +484,8 @@ class AIBurnoutAnalyzerService:
             recommendations.append({
                 "priority": "high",
                 "category": "team_health",
-                "title": "Team Burnout Prevention",
-                "description": f"{high_risk_pct:.1f}% of team members show elevated burnout risk",
+                "title": "Team Workload Prevention",
+                "description": f"{high_risk_pct:.1f}% of team members show elevated workload risk",
                 "at_risk_members": elevated_risk_names,
                 "member_details": elevated_risk_members,
                 "actions": [
@@ -612,7 +612,7 @@ class AIBurnoutAnalyzerService:
 
 
     def _generate_executive_summary(self, team_members: List[Dict[str, Any]], available_integrations: List[str]) -> Dict[str, Any]:
-        """Generate a comprehensive executive summary of team burnout status using OCB methodology."""
+        """Generate a comprehensive executive summary of team workload health status."""
         risk_dist = self._analyze_team_risk_distribution(team_members)
         total_incidents = sum(len(member.get("incidents", [])) for member in team_members)
 
@@ -628,45 +628,45 @@ class AIBurnoutAnalyzerService:
                 legacy_score = member.get("burnout_score", 0)
                 legacy_scores.append(legacy_score)
 
-        # Calculate average burnout level
+        # Calculate average stress level
         if ocb_scores:
             avg_ocb_score = sum(ocb_scores) / len(ocb_scores)
             avg_legacy_score = 0  # Not used but defined for consistency
             using_ocb = True
             # For display, convert OCB to health score (100 - OCB score)
             overall_health_score = round(100 - avg_ocb_score, 1)
-            avg_burnout_display = round(avg_ocb_score, 1)
+            avg_stress_display = round(avg_ocb_score, 1)
             trajectory_score = avg_ocb_score
         else:
             avg_legacy_score = sum(legacy_scores) / len(legacy_scores) if legacy_scores else 0
             avg_ocb_score = 0  # Not used but defined for consistency
             using_ocb = False
             overall_health_score = round(100 - (avg_legacy_score * 10), 1)
-            avg_burnout_display = round(avg_legacy_score, 2)
+            avg_stress_display = round(avg_legacy_score, 2)
             trajectory_score = avg_legacy_score * 10  # Convert to 0-100 scale
 
         high_risk_count = risk_dist["distribution"]["high"] + risk_dist["distribution"]["critical"]
         medium_risk_count = risk_dist["distribution"]["medium"]
 
-        # Generate narrative summary using OCB terminology
+        # Generate narrative summary
         if high_risk_count > 0:
             urgency_level = "Critical"
             if using_ocb:
-                primary_concern = f"{high_risk_count} team member(s) showing severe OCB burnout symptoms (>75/100) requiring immediate intervention"
+                primary_concern = f"{high_risk_count} team member(s) showing severe stress symptoms (>75/100) requiring immediate intervention"
             else:
-                primary_concern = f"{high_risk_count} team member(s) showing severe burnout symptoms requiring immediate intervention"
+                primary_concern = f"{high_risk_count} team member(s) showing severe stress symptoms requiring immediate intervention"
         elif medium_risk_count > len(team_members) * 0.5:
             urgency_level = "High"
             primary_concern = f"Over half the team ({medium_risk_count} members) showing elevated stress levels"
         elif medium_risk_count > 0:
             urgency_level = "Moderate"
             if using_ocb:
-                primary_concern = f"{medium_risk_count} team member(s) showing moderate OCB burnout warning signs (25-74/100)"
+                primary_concern = f"{medium_risk_count} team member(s) showing moderate stress warning signs (25-74/100)"
             else:
-                primary_concern = f"{medium_risk_count} team member(s) showing early burnout warning signs"
+                primary_concern = f"{medium_risk_count} team member(s) showing early stress warning signs"
         else:
             urgency_level = "Low"
-            primary_concern = "Team appears to be managing workload effectively with healthy OCB scores" if using_ocb else "Team appears to be managing workload effectively"
+            primary_concern = "Team appears to be managing workload effectively with healthy scores" if using_ocb else "Team appears to be managing workload effectively"
 
         return {
             "urgency_level": urgency_level,
@@ -674,8 +674,8 @@ class AIBurnoutAnalyzerService:
             "primary_concern": primary_concern,
             "key_metrics": {
                 "total_team_incidents": total_incidents,
-                "average_burnout_score": avg_burnout_display,
-                "scoring_methodology": "OCB (0-100)" if using_ocb else "Legacy (0-10)",
+                "average_stress_score": avg_stress_display,
+                "scoring_methodology": "OCH (0-100)" if using_ocb else "Legacy (0-10)",
                 "high_risk_percentage": risk_dist["high_risk_percentage"],
                 "data_completeness": len(available_integrations)
             },
@@ -683,23 +683,23 @@ class AIBurnoutAnalyzerService:
             "team_trajectory": self._determine_team_trajectory(trajectory_score, using_ocb)
         }
 
-    def _determine_team_trajectory(self, burnout_score: float, is_ocb: bool) -> str:
-        """Determine team trajectory based on burnout score and methodology."""
+    def _determine_team_trajectory(self, stress_score: float, is_ocb: bool) -> str:
+        """Determine team trajectory based on stress score and methodology."""
         if is_ocb:
-            # OCB scoring: 0-100 where higher = more burnout
-            if burnout_score >= 75:
+            # OCH scoring: 0-100 where higher = more stress
+            if stress_score >= 75:
                 return "Critical Risk"
-            elif burnout_score >= 50:
+            elif stress_score >= 50:
                 return "Declining"
-            elif burnout_score >= 25:
+            elif stress_score >= 25:
                 return "Stable"
             else:
                 return "Healthy"
         else:
             # Legacy scoring converted to 0-100 scale
-            if burnout_score >= 70:
+            if stress_score >= 70:
                 return "Declining"
-            elif burnout_score >= 30:
+            elif stress_score >= 30:
                 return "Stable"
             else:
                 return "Healthy"
@@ -752,12 +752,12 @@ class AIBurnoutAnalyzerService:
 
         return detailed_analysis
 
-    def _analyze_burnout_indicators(self, team_members: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Analyze specific burnout indicators across the team."""
+    def _analyze_stress_indicators(self, team_members: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Analyze specific stress indicators across the team."""
         indicators = {
-            "emotional_exhaustion": {"severe": 0, "moderate": 0, "mild": 0},
-            "depersonalization": {"severe": 0, "moderate": 0, "mild": 0},
-            "reduced_accomplishment": {"severe": 0, "moderate": 0, "mild": 0},
+            "exhaustion": {"severe": 0, "moderate": 0, "mild": 0},
+            "disengagement": {"severe": 0, "moderate": 0, "mild": 0},
+            "reduced_effectiveness": {"severe": 0, "moderate": 0, "mild": 0},
             "after_hours_activity": {"concerning": [], "moderate": [], "normal": []},
             "communication_stress": {"high": [], "moderate": [], "low": []},
             "workload_sustainability": {"unsustainable": [], "concerning": [], "manageable": []}
@@ -767,8 +767,8 @@ class AIBurnoutAnalyzerService:
             name = member.get("user_name", "Unknown")
             ai_insights = member.get("ai_insights", {})
 
-            # Analyze burnout dimensions if available
-            burnout_dims = ai_insights.get("burnout_analysis", {}) if ai_insights else {}
+            # Analyze stress dimensions if available
+            stress_dims = ai_insights.get("stress_analysis", {}) if ai_insights else {}
 
             # After-hours analysis
             after_hours_pct = member.get("after_hours_percentage", 0)
@@ -836,7 +836,7 @@ class AIBurnoutAnalyzerService:
             "peak_activity_hours": {},
             "weekend_work_analysis": {},
             "after_hours_trends": {},
-            "burnout_progression": []
+            "stress_progression": []
         }
 
         # Aggregate temporal data
@@ -876,14 +876,14 @@ class AIBurnoutAnalyzerService:
         for member in team_members:
             name = member.get("user_name", "Unknown")
             risk_level = member.get("risk_level", "low")
-            burnout_score = member.get("burnout_score", 0)
+            stress_score = member.get("burnout_score", 0)
             incident_count = len(member.get("incidents", []))
 
             ai_insights = member.get("ai_insights", {})
             member_insight = {
                 "name": name,
                 "risk_level": risk_level,
-                "burnout_score": burnout_score,
+                "stress_score": stress_score,
                 "incident_load": incident_count,
                 "key_concerns": [],
                 "strengths": [],
@@ -910,7 +910,7 @@ class AIBurnoutAnalyzerService:
         return individual_insights
 
     def _analyze_team_trends(self, team_members: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Analyze trends and patterns in team burnout risk."""
+        """Analyze trends and patterns in team workload risk."""
         trends = {
             "risk_trajectory": "stable",
             "emerging_patterns": [],
@@ -938,7 +938,7 @@ class AIBurnoutAnalyzerService:
 
         if high_risk_count > total_members * 0.5:
             trends["risk_trajectory"] = "rapidly_declining"
-            trends["early_warning_signs"].append("Over 50% of team showing high burnout risk")
+            trends["early_warning_signs"].append("Over 50% of team showing high workload risk")
         elif high_risk_count > total_members * 0.3:
             trends["risk_trajectory"] = "concerning"
             trends["early_warning_signs"].append("Significant portion of team under stress")
@@ -1009,9 +1009,9 @@ class AIBurnoutAnalyzerService:
         """Get severity indicators for members at risk."""
         indicators = []
 
-        avg_burnout = sum(m.get("burnout_score", 0) for m in members_at_risk) / len(members_at_risk)
-        if avg_burnout > 7:
-            indicators.append("Severe burnout scores")
+        avg_stress = sum(m.get("burnout_score", 0) for m in members_at_risk) / len(members_at_risk)
+        if avg_stress > 7:
+            indicators.append("Severe stress scores")
 
         total_incidents = sum(len(m.get("incidents", [])) for m in members_at_risk)
         if total_incidents > len(members_at_risk) * 15:
@@ -1069,7 +1069,7 @@ You are an Engineering Manager who is mindful of your on-call team workload and 
 **Team Data:**
 - Team Size: {team_data['team_size']} members
 - Active Incident Responders: {team_data['active_responders']} ({team_data['responder_percentage']:.1f}%)
-- Average Burnout Score: {team_data['avg_burnout_score']:.1f} ({team_data['burnout_scale']})
+- Average Stress Score: {team_data['avg_stress_score']:.1f} ({team_data['stress_scale']})
 - Scoring Method: {team_data['scoring_explanation']}
 - Data Sources: {', '.join(available_integrations)}
 
@@ -1101,25 +1101,26 @@ You are an Engineering Manager who is mindful of your on-call team workload and 
 - Do not compare individuals work performances
 - 100 words maximum
 
-**Key Observations Section (3-4 observations):**
+**Key Observations Section (2-3 observations):**
 - Only display strong and relevant observations
-- Bullet point style
-- One or two sentences per point
-- Relevant observation must be tight to the main topic of team and individuals workload and health
-- Each observation must be data-driven and specific to this team
-- Look for non-obvious patterns or correlations in their data
-- Explain the "why" - what might be causing these specific patterns?
-- Connect different data sources to reveal unique insights
-- Suggest root causes based on the specific data combinations
+- Use icons to categorize: 📊 for data patterns, ⏰ for time-related, 👥 for team dynamics, ⚡ for workload
+- One sentence per observation - be concise
+- Data-driven and specific to this team
+- Focus on patterns, not judgments
+
+**Quick Suggestions Section (1-2 suggestions only):**
+- Keep it light - only if there's a clear actionable insight
+- Use icons: 💡 for ideas, 🔄 for process changes, 📅 for scheduling
+- One short sentence each - no lengthy recommendations
+- Skip this section entirely if no clear suggestion emerges from the data
 
 **MANDATORY - Make it unique by:**
 - Varying sentence structure and writing style
-- Referencing specific numbers in creative ways
-- Acknowledging data limitations honestly
-- Never using phrases that could apply to any team
-- Making each insight actionable and specific
+- Referencing specific numbers
+- Being concise - quality over quantity
+- Never using generic phrases that could apply to any team
 
-**Remember:** This team is unique. Their data tells a specific story. Your analysis should feel custom-written for their exact situation, with insights they couldn't get from a generic report.
+**Remember:** Keep it brief and actionable. Engineering managers are busy - give them quick insights, not lengthy reports.
 """
 
             # Call LLM for narrative generation
@@ -1147,18 +1148,18 @@ You are an Engineering Manager who is mindful of your on-call team workload and 
         """Prepare detailed team data for LLM analysis."""
         active_responders = [m for m in team_members if m.get("incident_count", 0) > 0]
 
-        # Calculate comprehensive metrics using OCB when available
+        # Calculate comprehensive metrics using OCH when available
         ocb_scores = [m.get("ocb_score") for m in team_members if m.get("ocb_score") is not None]
         legacy_scores = [m.get("burnout_score", 0) for m in team_members if m.get("ocb_score") is None]
 
         if ocb_scores:
-            avg_burnout = sum(ocb_scores) / len(ocb_scores)
+            avg_stress = sum(ocb_scores) / len(ocb_scores)
             using_ocb = True
-            burnout_scale = "OCB (0-100)"
+            stress_scale = "OCH (0-100)"
         else:
-            avg_burnout = sum(legacy_scores) / len(legacy_scores) if legacy_scores else 0
+            avg_stress = sum(legacy_scores) / len(legacy_scores) if legacy_scores else 0
             using_ocb = False
-            burnout_scale = "Legacy (0-10)"
+            stress_scale = "Legacy (0-10)"
 
         total_incidents = sum(m.get("incident_count", 0) for m in team_members)
 
@@ -1217,14 +1218,14 @@ You are an Engineering Manager who is mindful of your on-call team workload and 
                 key=lambda x: x.get("ocb_score", 0),
                 reverse=True
             )
-            risk_criteria = "OCB score ≥75/100 (severe burnout)"
+            risk_criteria = "OCH score ≥75/100 (severe stress)"
         else:
             high_risk_members = sorted(
                 [m for m in team_members if m.get("burnout_score", 0) >= 7],
                 key=lambda x: x.get("burnout_score", 0),
                 reverse=True
             )
-            risk_criteria = "Legacy score ≥7/10 (high burnout)"
+            risk_criteria = "Legacy score ≥7/10 (high stress)"
 
         individual_insights = []
         for member in high_risk_members[:5]:  # Top 5 highest risk
@@ -1235,7 +1236,7 @@ You are an Engineering Manager who is mindful of your on-call team workload and 
             # Use appropriate scoring method
             if using_ocb:
                 score = member.get("ocb_score", 0)
-                score_display = f"{score:.1f}/100 OCB"
+                score_display = f"{score:.1f}/100 OCH"
             else:
                 score = member.get("burnout_score", 0)
                 score_display = f"{score:.1f}/10 legacy"
@@ -1244,7 +1245,7 @@ You are an Engineering Manager who is mindful of your on-call team workload and 
             github_commits = member.get("github_activity", {}).get("commits_count", 0)
             after_hours_pct = member.get("after_hours_percentage", 0)
 
-            insight = f"{name}: {score_display} burnout ({risk_level} risk), {incidents} incidents"
+            insight = f"{name}: {score_display} stress ({risk_level} risk), {incidents} incidents"
             if github_commits > 0:
                 insight += f", {github_commits} commits ({after_hours_pct:.1f}% after hours)"
 
@@ -1281,8 +1282,8 @@ You are an Engineering Manager who is mindful of your on-call team workload and 
             "team_size": len(team_members),
             "active_responders": len(active_responders),
             "responder_percentage": len(active_responders) / len(team_members) * 100 if team_members else 0,
-            "avg_burnout_score": avg_burnout,
-            "burnout_scale": burnout_scale,
+            "avg_stress_score": avg_stress,
+            "stress_scale": stress_scale,
             "scoring_explanation": self._get_scoring_explanation(using_ocb),
             "high_risk_count": len(high_risk_members),
             "risk_criteria": risk_criteria,
@@ -1298,18 +1299,18 @@ You are an Engineering Manager who is mindful of your on-call team workload and 
     def _get_scoring_explanation(self, using_ocb: bool) -> str:
         """Get explanation of the scoring methodology for the LLM."""
         if using_ocb:
-            return """This team uses the On-Call Burnout (OCB) methodology:
-- Scale: 0-100 where HIGHER scores = MORE burnout (opposite of health scores)
-- 0-24: Low/minimal burnout (healthy)
-- 25-49: Mild burnout symptoms
-- 50-74: Moderate/significant burnout
-- 75-100: High/severe burnout (critical intervention needed)
-- OCB is scientifically validated and measures Personal + Work-Related burnout dimensions"""
+            return """This team uses the On-Call Health (OCH) methodology:
+- Scale: 0-100 where HIGHER scores = MORE stress (opposite of health scores)
+- 0-24: Low/minimal stress (healthy)
+- 25-49: Mild stress symptoms
+- 50-74: Moderate/significant stress
+- 75-100: High/severe stress (critical intervention needed)
+- OCH is scientifically validated and measures Personal + Work-Related stress dimensions"""
         else:
-            return """This team uses legacy burnout scoring:
-- Scale: 0-10 where higher scores = more burnout
+            return """This team uses legacy stress scoring:
+- Scale: 0-10 where higher scores = more stress
 - Converted to 0-100 scale for display (multiply by 10)
-- Less precise than OCB methodology"""
+- Less precise than OCH methodology"""
 
     def _call_anthropic_for_narrative(self, prompt: str, api_key: str) -> str:
         """Call Anthropic API for narrative generation."""
@@ -1378,7 +1379,7 @@ _ai_analyzer_cache = {}
 
 def get_ai_burnout_analyzer(api_key: Optional[str] = None, provider: Optional[str] = None) -> AIBurnoutAnalyzerService:
     """
-    Get AI burnout analyzer instance.
+    Get AI workload health analyzer instance.
 
     Respects user's token preference: uses custom token if provided, otherwise system token.
 
