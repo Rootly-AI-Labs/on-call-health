@@ -1,21 +1,20 @@
 "use client"
 
-import { useState, useEffect, useMemo, useCallback } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { toast } from "sonner"
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-
-
 import type {
-  Integration,
-  GitHubIntegration,
-  SlackIntegration,
-  JiraIntegration,
-  OrganizationMember,
   AnalysisResult,
   AnalysisStage,
-} from "@/lib/types";
+  GitHubIntegration,
+  Integration,
+  JiraIntegration,
+  OrganizationMember,
+  SlackIntegration,
+} from "@/lib/types"
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 
 export default function useDashboard() {
@@ -1208,7 +1207,7 @@ export default function useDashboard() {
       { key: "loading", label: "Initializing Analysis", detail: "Setting up analysis parameters", progress: 5 },
       { key: "connecting", label: "Connecting to Platform", detail: "Validating API credentials", progress: 12 },
       { key: "fetching_users", label: "Fetching Organization Members", detail: "Loading user profiles and permissions", progress: 20 },
-      { key: "fetching", label: "Collecting Incident Data", detail: "Gathering 30-day incident history", progress: 35 }
+      { key: "fetching", label: "Collecting Incident Data", detail: "Fetching incidents from API (this is the slowest step)", progress: 35 }
     ]
 
     let currentProgress = 35
@@ -1276,11 +1275,11 @@ export default function useDashboard() {
       currentProgress += 12
     }
 
-    // Final preparation 
+    // Final preparation
     stages.push({
       key: "preparing",
       label: "Finalizing Analysis",
-      detail: "Preparing results",
+      detail: "This may take 5-15 minutes depending on incident volume",
       progress: 95
     })
 

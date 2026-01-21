@@ -20,6 +20,7 @@ RATE_LIMITS = {
     "auth_exchange": "5/minute",         # Token exchange attempts
     "auth_refresh": "20/minute",         # Token refresh attempts
     "account_delete": "3/hour",          # Account deletion attempts (very strict)
+    "admin_api_key": "5/minute",          # Admin API key attempts (strict to prevent brute force)
 
     # Analysis endpoints - moderate limits
     "analysis_create": "3/minute",       # Create new analysis
@@ -126,7 +127,17 @@ def custom_rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded)
     """
     Custom rate limit exceeded response with security headers.
     """
-    logger.warning(f"🚨 Rate limit exceeded for {get_rate_limit_key(request)} on {request.url.path}")
+    client_ip = request.client.host if request.client else "unknown"
+    rate_key = get_rate_limit_key(request)
+
+    # Structured logging for easier alerting and monitoring
+    logger.warning(
+        f"RATE_LIMIT_EXCEEDED: "
+        f"path={request.url.path}, "
+        f"ip={client_ip}, "
+        f"key={rate_key}, "
+        f"limit={getattr(exc, 'limit', 'unknown')}"
+    )
     
     response = JSONResponse(
         status_code=429,
@@ -168,6 +179,10 @@ def general_rate_limit(endpoint_type: str = "api_general"):
 def heavy_rate_limit(endpoint_type: str = "api_heavy"):
     """Rate limiter for heavy/expensive operations."""
     return limiter.limit(RATE_LIMITS.get(endpoint_type, "100/minute"))
+
+def admin_rate_limit(endpoint_type: str = "admin_api_key"):
+    """Rate limiter for admin API key protected endpoints (strict to prevent brute force)."""
+    return limiter.limit(RATE_LIMITS.get(endpoint_type, "5/minute"))
 
 # Rate limiting bypass for testing/development
 def bypass_rate_limiting() -> bool:
