@@ -1329,17 +1329,18 @@ export default function IntegrationsPage() {
       // Start checking immediately
       checkJiraConnection()
     } else if (jiraError) {
-      // Show error toast
-      const errorMessage = decodeURIComponent(jiraError)
+      // Show error toast - get message from sessionStorage to avoid URL length issues
+      const errorMessage = sessionStorage.getItem('jira_callback_error') || jiraError
 
       toast.error('Failed to connect Jira', {
         description: errorMessage,
         duration: 8000,
       })
 
-      // Clean up URL parameters
+      // Clean up URL parameters and sessionStorage
       const newUrl = window.location.pathname
       window.history.replaceState({}, '', newUrl)
+      sessionStorage.removeItem('jira_callback_error')
     }
 
     // Handle Linear OAuth success
@@ -1424,17 +1425,18 @@ export default function IntegrationsPage() {
       // Start checking immediately
       checkLinearConnection()
     } else if (linearError) {
-      // Show error toast
-      const errorMessage = decodeURIComponent(linearError)
+      // Show error toast - get message from sessionStorage to avoid URL length issues
+      const errorMessage = sessionStorage.getItem('linear_callback_error') || linearError
 
       toast.error('Failed to connect Linear', {
         description: errorMessage,
         duration: 8000,
       })
 
-      // Clean up URL parameters
+      // Clean up URL parameters and sessionStorage
       const newUrl = window.location.pathname
       window.history.replaceState({}, '', newUrl)
+      sessionStorage.removeItem('linear_callback_error')
     }
   }, [])
 
