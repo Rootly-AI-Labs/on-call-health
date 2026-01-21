@@ -249,16 +249,21 @@ async def refresh_demo_analyses(
                     UserCorrelation.email == email
                 ).first()
 
-                if not existing:
+                if existing:
+                    logger.info(f"ADMIN: UserCorrelation already exists for {email} (id={existing.id})")
+                else:
+                    logger.info(f"ADMIN: Creating UserCorrelation for {email}")
                     correlation = UserCorrelation(
                         organization_id=demo_organization_id,
                         email=email,
-                        name=email.split('@')[0].replace('.', ' ').title()  # Generate name from email
+                        name=email.split('@')[0].replace('.', ' ').title()
                     )
                     db.add(correlation)
+                    db.flush()  # Flush immediately to catch errors
                     correlations_created += 1
+                    logger.info(f"ADMIN: Created UserCorrelation for {email} (id={correlation.id})")
             except Exception as e:
-                logger.warning(f"ADMIN: Failed to create UserCorrelation for {email}: {e}")
+                logger.error(f"ADMIN: Failed to create UserCorrelation for {email}: {e}")
 
         if correlations_created > 0:
             db.commit()
