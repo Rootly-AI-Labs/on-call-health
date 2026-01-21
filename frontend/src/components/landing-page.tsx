@@ -103,9 +103,28 @@ export default function LandingPage() {
       // Pass the current origin to the backend
       const currentOrigin = window.location.origin
       const response = await fetch(`${API_BASE}/auth/github?redirect_origin=${encodeURIComponent(currentOrigin)}`)
+
+      // Check if response is ok before parsing JSON
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('GitHub auth API error:', response.status, errorText)
+        throw new Error(`Authentication failed: ${response.status}`)
+      }
+
+      // Check content type to ensure it's JSON
+      const contentType = response.headers.get('content-type')
+      if (!contentType || !contentType.includes('application/json')) {
+        const responseText = await response.text()
+        console.error('Expected JSON but got:', contentType, responseText)
+        throw new Error('Invalid response format from authentication server')
+      }
+
       const data = await response.json()
       if (data.authorization_url) {
         window.location.href = data.authorization_url
+      } else {
+        console.error('No authorization URL in response:', data)
+        throw new Error('Invalid authentication response')
       }
     } catch (error) {
       console.error('GitHub login error:', error)
@@ -236,7 +255,7 @@ export default function LandingPage() {
             height={602}
             className="w-2/3 h-auto mx-auto"
             priority
-            quality={100}
+            quality={90}
           />
         </div>
     <div className="w-full mb-[-1px] absolute h-[240px] bottom-0 left-0 z-0 lg:h-[250px] bg-gradient-to-b from-transparent via-white/60 to-white pointer-events-none">                               
@@ -313,7 +332,7 @@ export default function LandingPage() {
               height={1686}
               sizes="(min-width: 1280px) 60vw, (min-width: 1024px) 70vw, 100vw"
               className="w-full h-auto object-contain"
-              quality={100}
+              quality={90}
             />
 
           </div>
@@ -328,7 +347,7 @@ export default function LandingPage() {
                   height={1686}
                   sizes="(min-width: 1280px) 60vw, (min-width: 1024px) 70vw, 100vw"
                   className="w-full h-auto object-contain"
-                  quality={100}
+                  quality={90}
                 />
               </div>
               <div className="py-10 order-1 lg:order-2">
@@ -356,7 +375,7 @@ export default function LandingPage() {
                 height={1686}
                 sizes="(min-width: 1280px) 60vw, (min-width: 1024px) 70vw, 100vw"
                 className="w-full h-auto object-contain"
-                quality={100}
+                quality={90}
               />
             </div>
           </div>
