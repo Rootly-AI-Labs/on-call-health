@@ -102,7 +102,14 @@ export function JiraMapppingGrid({
           return acc
         }, [])
 
-        setTeamMembers(deduplicatedMembers)
+        // Sort team members alphabetically by name or email
+        const sortedMembers = deduplicatedMembers.sort((a, b) => {
+          const aName = (a.name || a.email).toLowerCase()
+          const bName = (b.name || b.email).toLowerCase()
+          return aName.localeCompare(bName)
+        })
+
+        setTeamMembers(sortedMembers)
       } else {
         toast.error('Failed to load team members')
       }
@@ -126,7 +133,11 @@ export function JiraMapppingGrid({
 
       if (response.ok) {
         const data = await response.json()
-        setUnmappedJiraUsers(data.unmapped_users || [])
+        // Sort Jira users alphabetically by display name
+        const sortedJiraUsers = (data.unmapped_users || []).sort((a: JiraUser, b: JiraUser) => {
+          return a.display_name.toLowerCase().localeCompare(b.display_name.toLowerCase())
+        })
+        setUnmappedJiraUsers(sortedJiraUsers)
       } else {
         toast.error('Failed to load unmapped Jira users')
       }
