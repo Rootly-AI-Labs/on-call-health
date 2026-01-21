@@ -2035,13 +2035,13 @@ export default function IntegrationsPage() {
     const isLoading = (() => {
       switch (integrationType) {
         case 'github':
-          return isLoadingGithub
+          return loadingGitHub
         case 'slack':
-          return isLoadingSlack
+          return loadingSlack
         case 'jira':
-          return isLoadingJira
+          return loadingJira
         case 'linear':
-          return isLoadingLinear
+          return loadingLinear
         default:
           return true
       }
