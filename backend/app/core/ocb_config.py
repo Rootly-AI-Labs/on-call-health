@@ -410,7 +410,7 @@ def generate_ocb_score_reasoning(
                     personal_factors.append(f"High-severity incident stress ({display_score:.1f} points)")
 
                 elif factor_name == 'work_hours_trend':
-                    personal_factors.append(f"Long incident duration ({display_score:.1f} points)")
+                    personal_factors.append(f"High task load ({display_score:.1f} points)")
 
                 elif factor_name == 'after_hours_activity':
                     personal_factors.append(f"Non-business hours incident activity ({display_score:.1f} points)")
@@ -467,7 +467,7 @@ def generate_ocb_score_reasoning(
                     work_factors.append(f"Incident severity-weighted workload ({display_score:.1f} points)")
 
                 elif factor_name == 'sprint_completion':
-                    work_factors.append(f"Response time requirements ({display_score:.1f} points)")
+                    work_factors.append(f"Consecutive days with incidents ({display_score:.1f} points)")
 
                 elif factor_name == 'meeting_load':
                     work_factors.append(f"Incident response meeting load ({display_score:.1f} points)")
@@ -517,12 +517,12 @@ def get_structured_ocb_factors(
     # Human-readable names for factors
     factor_display_names = {
         'sleep_quality_proxy': 'High-severity incidents',
-        'work_hours_trend': 'Incident duration',
+        'work_hours_trend': 'Task load',
         'after_hours_activity': 'After-hours activity',
         'oncall_burden': 'On-call load',
         'deployment_frequency': 'Incident frequency',
         'pr_frequency': 'Severity-weighted workload',
-        'sprint_completion': 'Response time pressure',
+        'sprint_completion': 'Consecutive incident days',
         'meeting_load': 'Meeting load',
         'code_review_speed': 'Review speed pressure'
     }
