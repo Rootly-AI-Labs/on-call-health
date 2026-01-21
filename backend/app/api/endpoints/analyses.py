@@ -701,7 +701,7 @@ async def delete_analysis(
     db.delete(analysis)
     db.commit()
     
-    logger.info(f"Analysis {analysis_id} deleted by user {current_user.id}")
+    logger.info(f"Analysis {analysis_ref} deleted by user {current_user.id}")
     
     return {"message": "Analysis deleted successfully"}
 
@@ -736,7 +736,7 @@ async def regenerate_analysis_trends(
         
         # Check if we already have daily trends
         if analysis_data.get("daily_trends") and len(analysis_data["daily_trends"]) > 0:
-            logger.info(f"Analysis {analysis_id} already has {len(analysis_data['daily_trends'])} daily trends data points")
+            logger.info(f"Analysis {analysis_ref} already has {len(analysis_data['daily_trends'])} daily trends data points")
             return {
                 "message": "Daily trends already exist",
                 "trends_count": len(analysis_data["daily_trends"]),
@@ -754,7 +754,7 @@ async def regenerate_analysis_trends(
             )
         
         # Generate daily trends from existing analysis data
-        logger.info(f"Regenerating daily trends for analysis {analysis_id}")
+        logger.info(f"Regenerating daily trends for analysis {analysis_ref}")
         
         # Get time range from metadata or analysis record
         time_range_days = metadata.get("days_analyzed", analysis.time_range or 30)
@@ -835,7 +835,7 @@ async def regenerate_analysis_trends(
         analysis.results = analysis_data
         db.commit()
         
-        logger.info(f"Successfully regenerated {len(daily_trends)} daily trends for analysis {analysis_id}")
+        logger.info(f"Successfully regenerated {len(daily_trends)} daily trends for analysis {analysis_ref}")
         
         return {
             "message": "Daily trends regenerated successfully",
@@ -846,7 +846,7 @@ async def regenerate_analysis_trends(
         }
         
     except Exception as e:
-        logger.error(f"Failed to regenerate trends for analysis {analysis_id}: {str(e)}")
+        logger.error(f"Failed to regenerate trends for analysis {analysis_ref}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to regenerate trends: {str(e)}"
@@ -1026,12 +1026,12 @@ async def verify_analysis_consistency(
             ) if consistency_report["consistency_checks"] else 0
         }
         
-        logger.info(f"Consistency check for analysis {analysis_id}: {consistency_report['summary']['consistency_percentage']}% consistent")
+        logger.info(f"Consistency check for analysis {analysis_ref}: {consistency_report['summary']['consistency_percentage']}% consistent")
         
         return consistency_report
         
     except Exception as e:
-        logger.error(f"Failed to verify consistency for analysis {analysis_id}: {str(e)}")
+        logger.error(f"Failed to verify consistency for analysis {analysis_ref}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Consistency check failed: {str(e)}"
