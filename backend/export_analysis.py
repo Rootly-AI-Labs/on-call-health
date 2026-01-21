@@ -6,14 +6,25 @@ import json
 import sys
 import os
 from datetime import datetime
+from pathlib import Path
+from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from pathlib import Path
 
-# Local database connection
-DATABASE_URL = "postgresql://postgres:1234@localhost:5432/burnout_detector"
+# Load environment variables from .env file
+load_dotenv()
 
-# Set DATABASE_URL in environment BEFORE importing models
+# Get DATABASE_URL from environment variable
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+# Validate that DATABASE_URL is set
+if not DATABASE_URL:
+    print("[ERROR] DATABASE_URL environment variable not set")
+    print("Please set it in your .env file or export it:")
+    print("  export DATABASE_URL=postgresql://postgres:<password>@localhost:5432/burnout_detector")
+    sys.exit(1)
+
+# Set DATABASE_URL in environment for importing models
 # This prevents the config from throwing an error
 os.environ["DATABASE_URL"] = DATABASE_URL
 
@@ -38,7 +49,9 @@ def export_analysis(analysis_id: int, output_file: str = "mock_analysis_data.jso
         analysis_id: The ID of the analysis to export
         output_file: Name of the output JSON file
     """
-    print(f"[*] Connecting to database: {DATABASE_URL}")
+    # Mask password in output
+    masked_url = DATABASE_URL.split("://")[0] + "://***:***@" + DATABASE_URL.split("@")[1] if "@" in DATABASE_URL else "***"
+    print(f"[*] Connecting to database: {masked_url}")
 
     # Create database connection
     engine = create_engine(DATABASE_URL)
@@ -134,7 +147,7 @@ def export_analysis(analysis_id: int, output_file: str = "mock_analysis_data.jso
             ],
             "metadata": {
                 "exported_at": datetime.now(),
-                "source_database": DATABASE_URL.replace("1234", "****"),  # Hide password
+                "source_database": masked_url,  # Password masked
                 "original_analysis_id": analysis_id,
             }
         }

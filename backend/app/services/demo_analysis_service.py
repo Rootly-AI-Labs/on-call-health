@@ -6,10 +6,12 @@ the dashboard and see example burnout analysis data without setting up integrati
 """
 import json
 import logging
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
 from ..models.user import User
 from ..models.analysis import Analysis
@@ -19,28 +21,37 @@ from ..models.user_correlation import UserCorrelation
 
 logger = logging.getLogger(__name__)
 
-# Cache for mock data to avoid loading 7.4MB JSON file on every user signup
+# Cache for mock data with TTL (time-to-live)
 _MOCK_DATA_CACHE: Optional[dict] = None
+_MOCK_DATA_CACHE_TIME: float = 0
+_MOCK_DATA_CACHE_TTL: int = 3600  # 1 hour TTL in seconds
 
 
 def _load_mock_data() -> dict:
     """
-    Load mock analysis data from JSON file with caching.
+    Load mock analysis data from JSON file with TTL-based caching.
+
+    Cache is automatically invalidated after 1 hour or when file is modified.
+    This prevents stale data in production while reducing repeated file I/O.
 
     Returns:
         dict: Mock analysis data
     """
-    global _MOCK_DATA_CACHE
+    global _MOCK_DATA_CACHE, _MOCK_DATA_CACHE_TIME
 
-    if _MOCK_DATA_CACHE is not None:
-        logger.debug("Using cached mock analysis data")
+    # Navigate to backend directory from services directory
+    backend_dir = Path(__file__).parent.parent.parent
+    mock_data_path = backend_dir / "mock_analysis_data.json"
+
+    current_time = time.time()
+    cache_age = current_time - _MOCK_DATA_CACHE_TIME
+
+    # Check if cache is still valid (younger than TTL)
+    if _MOCK_DATA_CACHE is not None and cache_age < _MOCK_DATA_CACHE_TTL:
+        logger.debug(f"Using cached mock data (age: {cache_age:.0f}s)")
         return _MOCK_DATA_CACHE
 
     try:
-        # Navigate to backend directory from services directory
-        backend_dir = Path(__file__).parent.parent.parent
-        mock_data_path = backend_dir / "mock_analysis_data.json"
-
         logger.info(f"Loading mock analysis data from: {mock_data_path}")
 
         if not mock_data_path.exists():
@@ -50,9 +61,11 @@ def _load_mock_data() -> dict:
         with open(mock_data_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
 
-        # Cache the data
+        # Update cache with new data and timestamp
         _MOCK_DATA_CACHE = data
-        logger.info("Mock analysis data loaded and cached successfully")
+        _MOCK_DATA_CACHE_TIME = current_time
+
+        logger.info(f"Loaded mock data from file (cache TTL: {_MOCK_DATA_CACHE_TTL}s)")
 
         return data
 
@@ -109,8 +122,8 @@ def _get_or_create_demo_organization(db: Session) -> int:
         # Rollback to clear the pending transaction
         try:
             db.rollback()
-        except:
-            pass
+        except Exception as rollback_error:
+            logger.error(f"Failed to rollback demo organization transaction: {rollback_error}")
 
         # Fallback: try to use the first organization
         try:
@@ -149,7 +162,7 @@ def _has_demo_analysis(db: Session, user_id: int) -> bool:
     return False
 
 
-def _load_health_checkins_for_user(db: Session, user_id: int, organization_id: int, mock_data: dict) -> int:
+def _load_health_checkins_for_user(db: Session, user_id: int, organization_id: int, mock_data: dict) -> dict:
     """
     Load health check-in records from mock data for a user.
 
@@ -164,18 +177,28 @@ def _load_health_checkins_for_user(db: Session, user_id: int, organization_id: i
         mock_data: Mock analysis data containing user_burnout_reports
 
     Returns:
-        int: Number of health check-in records loaded
+        dict: {
+            'created': number of records created,
+            'skipped': number of duplicates skipped,
+            'failed': number of failed records,
+            'errors': list of error messages
+        }
     """
     try:
         reports_data = mock_data.get('user_burnout_reports', [])
 
         if not reports_data:
             logger.debug(f"No health check-in data found in mock data for user {user_id}")
-            return 0
+            return {'created': 0, 'skipped': 0, 'failed': 0, 'errors': []}
 
         logger.info(f"Loading {len(reports_data)} health check-in records for user {user_id}")
 
-        created_count = 0
+        result = {
+            'created': 0,
+            'skipped': 0,
+            'failed': 0,
+            'errors': []
+        }
 
         # First, ensure team members exist in UserCorrelation for this organization
         logger.info(f"Creating UserCorrelation records for {len(reports_data)} team members")
@@ -216,6 +239,8 @@ def _load_health_checkins_for_user(db: Session, user_id: int, organization_id: i
 
             if not email:
                 logger.warning(f"Skipping health check-in record with missing email")
+                result['failed'] += 1
+                result['errors'].append("Missing email in report data")
                 continue
 
             try:
@@ -235,7 +260,8 @@ def _load_health_checkins_for_user(db: Session, user_id: int, organization_id: i
 
                 if existing_report:
                     logger.debug(f"Report for {email} at {submitted_at} already exists in organization {organization_id}, skipping")
-                    continue  # Skip duplicate
+                    result['skipped'] += 1
+                    continue
 
                 # Create burnout report linked to the user (only if it doesn't exist)
                 report = UserBurnoutReport(
@@ -254,20 +280,33 @@ def _load_health_checkins_for_user(db: Session, user_id: int, organization_id: i
                     submitted_at=submitted_at  # Preserve timestamp
                 )
                 db.add(report)
-                created_count += 1
+                result['created'] += 1
+
+            except IntegrityError as e:
+                # Unique constraint violation - another user created same report concurrently
+                logger.debug(f"Concurrent insert for {email}: {e.orig}")
+                db.rollback()
+                result['skipped'] += 1
 
             except Exception as e:
-                logger.warning(f"Failed to load health check-in for {email}: {e}")
-                # Continue loading other records even if one fails
-                continue
+                logger.error(f"Failed to load health check-in for {email}: {e}", exc_info=True)
+                db.rollback()
+                result['failed'] += 1
+                result['errors'].append(f"{email}: {str(e)}")
 
-        logger.info(f"Successfully loaded {created_count} health check-in records for user {user_id}")
-        return created_count
+        logger.info(f"Health check-ins loaded for user {user_id}: "
+                    f"{result['created']} created, {result['skipped']} skipped, "
+                    f"{result['failed']} failed")
+
+        if result['errors']:
+            logger.warning(f"Errors during health check-in load: {result['errors']}")
+
+        return result
 
     except Exception as e:
         logger.error(f"Failed to load health check-ins for user {user_id}: {e}", exc_info=True)
-        # Don't fail - return 0 and let registration continue
-        return 0
+        # Don't fail - return summary and let registration continue
+        return {'created': 0, 'skipped': 0, 'failed': 1, 'errors': [str(e)]}
 
 
 def create_demo_analysis_for_new_user(db: Session, user: User) -> bool:
@@ -347,19 +386,18 @@ def create_demo_analysis_for_new_user(db: Session, user: User) -> bool:
 
         # Load health check-in data (burnout reports) for the user
         try:
-            checkins_loaded = _load_health_checkins_for_user(db, user.id, organization_id, mock_data)
-            if checkins_loaded > 0:
+            checkins_result = _load_health_checkins_for_user(db, user.id, organization_id, mock_data)
+            if checkins_result['created'] > 0 or checkins_result['skipped'] > 0:
                 db.commit()
-                logger.info(
-                    f"Loaded {checkins_loaded} health check-in records for user {user.id}"
-                )
+                logger.info(f"Committed {checkins_result['created']} new and {checkins_result['skipped']} "
+                            f"duplicate health check-ins for user {user.id}")
         except Exception as e:
             logger.warning(f"Failed to load health check-ins for user {user.id}: {e}")
             # Don't fail the entire operation if health check-ins fail
             try:
                 db.rollback()
-            except:
-                pass
+            except Exception as rollback_error:
+                logger.error(f"Failed to rollback health check-in transaction: {rollback_error}")
 
         return True
 
@@ -378,10 +416,12 @@ def create_demo_analysis_for_new_user(db: Session, user: User) -> bool:
 
 def clear_mock_data_cache():
     """
-    Clear the cached mock data.
+    Clear the cached mock data immediately.
 
-    This is useful for testing or if the mock data file is updated.
+    Call this function if you update the mock_analysis_data.json file
+    in production and want changes to be picked up immediately.
     """
-    global _MOCK_DATA_CACHE
+    global _MOCK_DATA_CACHE, _MOCK_DATA_CACHE_TIME
     _MOCK_DATA_CACHE = None
+    _MOCK_DATA_CACHE_TIME = 0
     logger.info("Mock data cache cleared")
