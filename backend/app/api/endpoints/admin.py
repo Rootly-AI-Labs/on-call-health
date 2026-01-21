@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from ...core.rate_limiting import admin_rate_limit
 from ...models import Analysis, get_db
 from ...models.user import User
+from ...models.user_correlation import UserCorrelation
 from ...services.demo_analysis_service import _get_or_create_demo_organization, _load_health_checkins_for_user
 
 logger = logging.getLogger(__name__)
@@ -225,6 +226,34 @@ async def refresh_demo_analyses(
             except Exception as e:
                 logger.warning(f"ADMIN: Failed to load health check-ins for user #{analysis.user_id}: {e}")
 
+        # Ensure UserCorrelation records exist for all team members in mock data
+        # This is needed for get_member_surveys to find the health check-in data
+        correlations_created = 0
+        reports_data = mock_data.get('user_burnout_reports', [])
+        unique_emails = set(r.get('email') for r in reports_data if r.get('email'))
+
+        for email in unique_emails:
+            try:
+                existing = db.query(UserCorrelation).filter(
+                    UserCorrelation.organization_id == demo_organization_id,
+                    UserCorrelation.email == email
+                ).first()
+
+                if not existing:
+                    correlation = UserCorrelation(
+                        organization_id=demo_organization_id,
+                        email=email,
+                        name=email.split('@')[0].replace('.', ' ').title()  # Generate name from email
+                    )
+                    db.add(correlation)
+                    correlations_created += 1
+            except Exception as e:
+                logger.warning(f"ADMIN: Failed to create UserCorrelation for {email}: {e}")
+
+        if correlations_created > 0:
+            db.commit()
+            logger.info(f"ADMIN: Created {correlations_created} UserCorrelation records")
+
         # Create demo analyses for users who don't have one
         users = db.query(User).all()
         users_with_demo = {a.user_id for a in demo_analyses}
@@ -285,6 +314,7 @@ async def refresh_demo_analyses(
             "created_count": created_count,
             "total_demo_analyses": updated_count + created_count,
             "health_checkins_loaded": checkins_loaded,
+            "correlations_created": correlations_created,
             "errors": errors or None
         }
 
