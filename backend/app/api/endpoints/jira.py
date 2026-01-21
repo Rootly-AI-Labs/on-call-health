@@ -187,26 +187,31 @@ async def _process_callback(code: str, state: Optional[str], db: Session, curren
             db.add(integration)
             logger.info("[Jira] Created integration for user %s", user_id)
 
-        # 5) Workspace mapping
+        # 5) Workspace mapping - use atomic insert-or-update to avoid race condition
         if organization_id:
-            mapping = db.query(JiraWorkspaceMapping).filter(
-                JiraWorkspaceMapping.jira_cloud_id == jira_cloud_id,
-                JiraWorkspaceMapping.organization_id == organization_id,
-            ).first()
-            if not mapping:
-                mapping = JiraWorkspaceMapping(
-                    jira_cloud_id=jira_cloud_id,
+            from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+            stmt = pg_insert(JiraWorkspaceMapping).values(
+                jira_cloud_id=jira_cloud_id,
+                jira_site_url=jira_site_url,
+                jira_site_name=jira_site_name,
+                owner_user_id=user_id,
+                organization_id=organization_id,
+                registered_via="oauth",
+                status="active",
+                collection_enabled=True,
+                workload_metrics_enabled=True,
+            ).on_conflict_do_update(
+                index_elements=['jira_cloud_id'],
+                set_=dict(
                     jira_site_url=jira_site_url,
                     jira_site_name=jira_site_name,
-                    owner_user_id=user_id,
-                    organization_id=organization_id,
-                    registered_via="oauth",
                     status="active",
-                    collection_enabled=True,
-                    workload_metrics_enabled=True,
+                    organization_id=organization_id,
                 )
-                db.add(mapping)
-                logger.info("[Jira] Created workspace mapping for org %s", organization_id)
+            )
+            db.execute(stmt)
+            logger.info("[Jira] Created or updated workspace mapping for org %s", organization_id)
 
         # 6) Correlate user - enforce one-to-one mapping across all users in org
         if jira_email and jira_account_id and organization_id:
