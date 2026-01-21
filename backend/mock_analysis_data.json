@@ -74,7 +74,7 @@
             "user_name": "Marcus Thompson",
             "user_email": "marcus.thompson@example.com",
             "is_oncall": false,
-            "github_username": "vishnuMohanan01",
+            "github_username": "marcusthompson",
             "slack_user_id": "U08JRM2AS91",
             "jira_account_id": "712020:2ead812d-3001-4a9f-915f-e0e7ee23b2b8",
             "linear_user_id": "7857d9d6-4f4a-435b-8dc1-f3322093e35b",
@@ -453,7 +453,7 @@
           {
             "user_id": "199176",
             "user_name": "Maya Fernandez",
-            "user_email": "karn@rootly.com",
+            "user_email": "maya.fernandez@example.com",
             "is_oncall": false,
             "github_username": null,
             "slack_user_id": "U0A20RU0H8U",
@@ -1571,7 +1571,7 @@
           {
             "user_id": "29683",
             "user_name": "Zara Ali",
-            "user_email": "purvai@rootly.com",
+            "user_email": "zara.ali@example.com",
             "is_oncall": true,
             "github_username": null,
             "slack_user_id": "U06CYGSJ6S2",
@@ -2045,7 +2045,7 @@
           {
             "user_id": "3497",
             "user_name": "Sophia Nguyen",
-            "user_email": "jp@rootly.com",
+            "user_email": "sophia.nguyen@example.com",
             "is_oncall": false,
             "github_username": null,
             "slack_user_id": "U02V8EY4YPM",
@@ -2525,7 +2525,7 @@
           {
             "user_id": "38699",
             "user_name": "Isabella Rossi",
-            "user_email": "jamie@rootly.com",
+            "user_email": "isabella.rossi@example.com",
             "is_oncall": true,
             "github_username": null,
             "slack_user_id": "U07483ZFTU6",
@@ -2748,7 +2748,7 @@
           {
             "user_id": "62208",
             "user_name": "Priya Shah",
-            "user_email": "alex.conrad@rootly.com",
+            "user_email": "priya.shah@example.com",
             "is_oncall": false,
             "github_username": null,
             "slack_user_id": "U07TQ22V8HG",
@@ -2970,7 +2970,7 @@
           {
             "user_id": "109673",
             "user_name": "Lucas Moreau",
-            "user_email": "spencer.cheng@rootly.com",
+            "user_email": "lucas.moreau@example.com",
             "is_oncall": false,
             "github_username": null,
             "slack_user_id": "U091GE54T6J",
@@ -3092,7 +3092,7 @@
           {
             "user_id": "19241",
             "user_name": "John (Ioannis) tzikas",
-            "user_email": "john@rootly.com",
+            "user_email": "john.tzikas@example.com",
             "is_oncall": false,
             "github_username": null,
             "slack_user_id": "U05KNBGGCF9",
