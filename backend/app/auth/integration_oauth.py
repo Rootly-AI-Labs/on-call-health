@@ -700,7 +700,7 @@ class LinearIntegrationOAuth:
 
         if rate_limit_remaining:
             logger.info(f"LINEAR API: Rate limit remaining: {rate_limit_remaining}")
-        if int(rate_limit_remaining or 1000) < 100:
+        if rate_limit_remaining and int(rate_limit_remaining) < 100:
             logger.warning(f"LINEAR API: ⚠️ Rate limit low! Remaining: {rate_limit_remaining}, Reset: {rate_limit_reset}")
 
         # Handle rate limiting (429)
