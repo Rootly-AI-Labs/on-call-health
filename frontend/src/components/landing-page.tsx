@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import localFont from "next/font/local"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -49,6 +49,18 @@ const ppMori = localFont({
 
 export default function LandingPage() {
   const [isLoading, setIsLoading] = useState<'google' | 'github' | null>(null)
+
+  // Preload background images on mount
+  useEffect(() => {
+    const preloadImage = (url: string) => {
+      const img = new window.Image()
+      img.src = url
+    }
+
+    preloadImage('/images/landing/rootly-bg.avif')
+    preloadImage('/images/landing/rootly-bg-gradient.avif')
+    preloadImage('/images/landing/cta-background.png')
+  }, [])
 
   const handleGoogleLogin = async () => {
     try {
