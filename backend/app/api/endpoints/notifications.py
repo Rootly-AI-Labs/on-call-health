@@ -23,12 +23,11 @@ async def get_notifications(
     db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     """Get notifications for the current user with pagination support."""
-
     notification_service = NotificationService(db)
 
-    notifications = notification_service.get_user_notifications(current_user, limit, offset)
-    unread_count = notification_service.get_unread_count(current_user)
-    total_count = notification_service.get_total_count(current_user)
+    notifications, unread_count, total_count = notification_service.get_notifications_with_counts(
+        current_user, limit, offset
+    )
 
     return {
         "notifications": [n.to_dict() for n in notifications],
