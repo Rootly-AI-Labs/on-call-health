@@ -200,6 +200,7 @@ async def refresh_demo_analyses(
             try:
                 logger.info(f"ADMIN: Updating demo for user #{analysis.user_id} (analysis #{analysis.id})")
                 analysis.results = new_results
+                analysis.organization_id = demo_organization_id  # Ensure org is set for health check-ins
                 config = analysis.config.copy() if analysis.config else {}
                 config['demo_updated_at'] = datetime.now().isoformat()
                 analysis.config = config
