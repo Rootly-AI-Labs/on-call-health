@@ -10,11 +10,10 @@ from datetime import datetime
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from sqlalchemy import distinct
 from sqlalchemy.orm import Session
 
 from ...core.rate_limiting import admin_rate_limit
-from sqlalchemy import distinct
-
 from ...models import Analysis, get_db
 from ...models.user import User
 from ...models.user_correlation import UserCorrelation
@@ -193,10 +192,9 @@ async def refresh_demo_analyses(
         logger.info(f"ADMIN: Using demo organization {demo_organization_id}")
 
         # DELETE all existing demo analyses first (clean slate approach)
-        all_analyses = db.query(Analysis).all()
         demo_analyses = [
-            a for a in all_analyses
-            if a.config and isinstance(a.config, dict) and a.config.get('is_demo') is True
+            a for a in db.query(Analysis).all()
+            if isinstance(a.config, dict) and a.config.get('is_demo') is True
         ]
 
         for analysis in demo_analyses:
@@ -218,11 +216,12 @@ async def refresh_demo_analyses(
 
         # Query directly from database to get emails that exist in user_burnout_reports
         correlations_created = 0
-        existing_emails = db.query(distinct(UserBurnoutReport.email)).filter(
-            UserBurnoutReport.organization_id == demo_organization_id,
-            UserBurnoutReport.email.isnot(None)
-        ).all()
-        unique_emails = [e[0] for e in existing_emails]
+        unique_emails = [
+            row[0] for row in db.query(distinct(UserBurnoutReport.email)).filter(
+                UserBurnoutReport.organization_id == demo_organization_id,
+                UserBurnoutReport.email.isnot(None)
+            ).all()
+        ]
         logger.info(f"ADMIN: Found {len(unique_emails)} unique emails in health check-ins for org {demo_organization_id}")
 
         for email in unique_emails:
