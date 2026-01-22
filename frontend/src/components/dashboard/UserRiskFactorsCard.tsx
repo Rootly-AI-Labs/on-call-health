@@ -2,6 +2,9 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Info, Loader2 } from "lucide-react"
+import { Tooltip } from "@/components/ui/tooltip"
+import { InfoTooltip } from "@/components/ui/info-tooltip"
+import { FACTOR_DESCRIPTIONS } from "./TeamRiskFactorsCard"
 
 interface OCBFactor {
   key: string
@@ -70,34 +73,39 @@ export function UserRiskFactorsCard({
             <CardTitle>Risk Factors</CardTitle>
             <CardDescription>Top 5 risk factors for {memberName}</CardDescription>
           </div>
-          <div className="relative group ml-4">
+          <Tooltip
+            content="Percentage contribution of each factor to the overall risk score based on work patterns, incident load, and timing."
+            side="bottom"
+            className="ml-4"
+          >
             <Info className="w-4 h-4 text-neutral-500 cursor-help hover:text-neutral-700 transition-colors" />
-            <div className="absolute top-full right-0 mt-2 px-3 py-2 bg-neutral-900/95 text-white text-xs rounded-lg w-72 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-              <div className="font-semibold mb-2">Risk Factor Contributions</div>
-              <div className="text-xs">Percentage contribution of each factor to the overall risk score based on work patterns, incident load, and timing.</div>
-              <div className="absolute bottom-full right-4 w-0 h-0 border-l-4 border-r-4 border-b-4 border-l-transparent border-r-transparent border-b-gray-900/95"></div>
-            </div>
-          </div>
+          </Tooltip>
         </div>
       </CardHeader>
       <CardContent className="p-4 pb-6">
         <div className="space-y-3">
-          {factors.slice(0, 5).map((factor: OCBFactor) => (
-            <div key={factor.key}>
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-sm text-neutral-700">{factor.name}</span>
-                <span className="text-sm font-semibold text-violet-600">{factor.percentage}%</span>
+          {factors.slice(0, 5).map((factor: OCBFactor) => {
+            const factorDescription = FACTOR_DESCRIPTIONS[factor.name]
+            return (
+              <div key={factor.key}>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-sm text-neutral-700">{factor.name}</span>
+                  {factorDescription && (
+                    <InfoTooltip content={factorDescription} side="top" />
+                  )}
+                  <span className="text-sm font-semibold text-violet-600 ml-auto">{factor.percentage}%</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-1.5">
+                  <div
+                    className="h-1.5 rounded-full transition-all duration-500 bg-violet-500"
+                    style={{
+                      width: `${Math.min(factor.percentage * 2, 100)}%`
+                    }}
+                  />
+                </div>
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-1.5">
-                <div
-                  className="h-1.5 rounded-full transition-all duration-500 bg-violet-500"
-                  style={{
-                    width: `${Math.min(factor.percentage * 2, 100)}%`
-                  }}
-                />
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </CardContent>
     </Card>

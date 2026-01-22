@@ -10,11 +10,15 @@ from datetime import datetime
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from sqlalchemy import distinct
 from sqlalchemy.orm import Session
 
 from ...core.rate_limiting import admin_rate_limit
 from ...models import Analysis, get_db
 from ...models.user import User
+from ...models.user_correlation import UserCorrelation
+from ...models.user_burnout_report import UserBurnoutReport
+from ...services.demo_analysis_service import _get_or_create_demo_organization, _load_health_checkins_for_user
 
 logger = logging.getLogger(__name__)
 
@@ -178,82 +182,133 @@ async def refresh_demo_analyses(
                 detail="Mock data file is missing 'analysis.results'"
             )
 
-        # Get all demo analyses
-        all_analyses = db.query(Analysis).all()
-        demo_analyses = [
-            a for a in all_analyses
-            if a.config and isinstance(a.config, dict) and a.config.get('is_demo') is True
-        ]
-
-        updated_count = 0
         created_count = 0
+        deleted_count = 0
+        checkins_loaded = 0
         errors = []
 
-        # Update existing demo analyses
+        # Get or create demo organization for health check-ins
+        demo_organization_id = _get_or_create_demo_organization(db)
+        logger.info(f"ADMIN: Using demo organization {demo_organization_id}")
+
+        # DELETE all existing demo analyses first (clean slate approach)
+        demo_analyses = [
+            a for a in db.query(Analysis).all()
+            if isinstance(a.config, dict) and a.config.get('is_demo') is True
+        ]
+
         for analysis in demo_analyses:
             try:
-                analysis.results = new_results
-                config = analysis.config.copy() if analysis.config else {}
-                config['demo_updated_at'] = datetime.now().isoformat()
-                analysis.config = config
-                updated_count += 1
+                logger.info(f"ADMIN: Deleting old demo analysis #{analysis.id} for user #{analysis.user_id}")
+                db.delete(analysis)
+                deleted_count += 1
             except Exception as e:
-                errors.append(f"Failed to update analysis #{analysis.id}: {str(e)}")
+                logger.error(f"ADMIN: Failed to delete demo #{analysis.id}: {str(e)}")
+                errors.append(f"Failed to delete analysis #{analysis.id}: {str(e)}")
 
-        # Commit updates before creating new ones - prevents rollback from losing updates
-        if updated_count > 0:
+        if deleted_count > 0:
             db.commit()
-            logger.info(f"ADMIN: Committed {updated_count} demo updates")
+            logger.info(f"ADMIN: Deleted {deleted_count} old demo analyses")
 
-        # Create demo analyses for users who don't have one
+        # Ensure UserCorrelation records exist for all team members with health check-ins
+        # Clear session to get fresh database state after _load_health_checkins_for_user calls
+        db.expire_all()
+
+        # Query directly from database to get emails that exist in user_burnout_reports
+        correlations_created = 0
+        unique_emails = [
+            row[0] for row in db.query(distinct(UserBurnoutReport.email)).filter(
+                UserBurnoutReport.organization_id == demo_organization_id,
+                UserBurnoutReport.email.isnot(None)
+            ).all()
+        ]
+        logger.info(f"ADMIN: Found {len(unique_emails)} unique emails in health check-ins for org {demo_organization_id}")
+
+        for email in unique_emails:
+            try:
+                existing = db.query(UserCorrelation).filter(
+                    UserCorrelation.organization_id == demo_organization_id,
+                    UserCorrelation.email == email
+                ).first()
+
+                if existing:
+                    logger.info(f"ADMIN: UserCorrelation already exists for {email} (id={existing.id})")
+                else:
+                    logger.info(f"ADMIN: Creating UserCorrelation for {email}")
+                    correlation = UserCorrelation(
+                        organization_id=demo_organization_id,
+                        email=email,
+                        name=email.split('@')[0].replace('.', ' ').title()
+                    )
+                    db.add(correlation)
+                    db.flush()  # Flush immediately to catch errors
+                    correlations_created += 1
+                    logger.info(f"ADMIN: Created UserCorrelation for {email} (id={correlation.id})")
+            except Exception as e:
+                logger.error(f"ADMIN: Failed to create UserCorrelation for {email}: {e}")
+
+        if correlations_created > 0:
+            db.commit()
+            logger.info(f"ADMIN: Created {correlations_created} UserCorrelation records")
+
+        # Create fresh demo analyses for ALL users
         users = db.query(User).all()
-        users_with_demo = {a.user_id for a in demo_analyses}
-
-        logger.info(f"ADMIN: Found {len(users)} total users, {len(users_with_demo)} already have demos")
+        logger.info(f"ADMIN: Found {len(users)} total users, creating demos for all")
 
         for user in users:
-            if user.id not in users_with_demo:
-                try:
-                    logger.info(f"ADMIN: Creating demo for user #{user.id} ({user.email})")
-                    config = original_analysis.get('config', {}).copy()
-                    config['is_demo'] = True
-                    config['demo_created_at'] = datetime.now().isoformat()
+            try:
+                logger.info(f"ADMIN: Creating demo for user #{user.id} ({user.email})")
+                config = original_analysis.get('config', {}).copy()
+                config['is_demo'] = True
+                config['demo_created_at'] = datetime.now().isoformat()
 
-                    new_analysis = Analysis(
-                        user_id=user.id,
-                        organization_id=getattr(user, 'organization_id', None),
-                        rootly_integration_id=None,
-                        integration_name="Demo Analysis",
-                        platform=original_analysis.get('platform', 'rootly'),
-                        time_range=original_analysis.get('time_range', 30),
-                        status="completed",
-                        config=config,
-                        results=new_results,
-                        error_message=None,
-                        completed_at=datetime.now()
-                    )
-                    db.add(new_analysis)
-                    db.flush()  # Flush immediately to catch per-user errors
-                    created_count += 1
-                    logger.info(f"ADMIN: Successfully created demo for user #{user.id}")
+                new_analysis = Analysis(
+                    user_id=user.id,
+                    organization_id=demo_organization_id,
+                    rootly_integration_id=None,
+                    integration_name="Demo Analysis",
+                    platform=original_analysis.get('platform', 'rootly'),
+                    time_range=original_analysis.get('time_range', 30),
+                    status="completed",
+                    config=config,
+                    results=new_results,
+                    error_message=None,
+                    completed_at=datetime.now()
+                )
+                db.add(new_analysis)
+                db.flush()
+                created_count += 1
+                logger.info(f"ADMIN: Successfully created demo for user #{user.id}")
+
+                # Load health check-ins for the user
+                try:
+                    checkins_result = _load_health_checkins_for_user(db, user.id, demo_organization_id, mock_data)
+                    if checkins_result['created'] > 0:
+                        checkins_loaded += checkins_result['created']
+                        logger.info(f"ADMIN: Loaded {checkins_result['created']} health check-ins for user #{user.id}")
                 except Exception as e:
-                    logger.error(f"ADMIN: Failed to create demo for user #{user.id}: {str(e)}")
-                    errors.append(f"Failed to create demo for user #{user.id} ({user.email}): {str(e)}")
-                    db.rollback()  # Rollback this specific failure
+                    logger.warning(f"ADMIN: Failed to load health check-ins for user #{user.id}: {e}")
+
+            except Exception as e:
+                logger.error(f"ADMIN: Failed to create demo for user #{user.id}: {str(e)}")
+                errors.append(f"Failed to create demo for user #{user.id} ({user.email}): {str(e)}")
+                db.rollback()
 
         db.commit()
 
         logger.info(
             f"ADMIN AUDIT: /refresh-demo-analyses completed. "
-            f"IP: {client_ip}, Updated: {updated_count}, Created: {created_count}"
+            f"IP: {client_ip}, Deleted: {deleted_count}, Created: {created_count}"
         )
 
         return {
             "status": "success",
             "message": "Demo analyses refreshed successfully",
-            "updated_count": updated_count,
+            "deleted_count": deleted_count,
             "created_count": created_count,
-            "total_demo_analyses": updated_count + created_count,
+            "total_demo_analyses": created_count,
+            "health_checkins_loaded": checkins_loaded,
+            "correlations_created": correlations_created,
             "errors": errors or None
         }
 

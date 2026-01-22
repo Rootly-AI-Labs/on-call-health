@@ -13,7 +13,7 @@ export interface BaseRiskFactorsCardProps {
   showAlert?: boolean
   alertCount?: number
   showInfoTooltip?: boolean
-  factorDescriptions?: Record<string, { tooltip: string }>
+  factorDescriptions?: Record<string, string>
 
   // Chart configuration
   domain?: [number, number]
@@ -104,15 +104,15 @@ export function BaseRiskFactorsCard({
                 <div className="font-semibold mb-2">Risk Factors Scoring</div>
                 <div className="space-y-2">
                   {factorsData.map((factor) => {
-                    const description = factorDescriptions[factor.factor];
+                    const description = factorDescriptions[factor.factor]
                     return (
                       <div key={factor.factor}>
                         <div className="font-medium text-blue-300">{factor.factor}</div>
                         {description && (
-                          <div className="text-xs mt-1">{description.tooltip}</div>
+                          <div className="text-xs mt-1">{description}</div>
                         )}
                       </div>
-                    );
+                    )
                   })}
                 </div>
                 <div className="absolute bottom-full right-4 w-0 h-0 border-l-4 border-r-4 border-b-4 border-l-transparent border-r-transparent border-b-gray-900/95"></div>

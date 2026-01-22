@@ -457,8 +457,8 @@
             "is_oncall": false,
             "github_username": null,
             "slack_user_id": "U0A20RU0H8U",
-            "jira_account_id": null,
-            "linear_user_id": null,
+            "jira_account_id": "712020:maya-fernandez-jira-id",
+            "linear_user_id": "maya-fernandez-linear-id",
             "rootly_user_id": "199176",
             "pagerduty_user_id": null,
             "avatar_url": "/images/female/maya_fernandez.png",
@@ -684,8 +684,132 @@
                 "weekend_work": false
               }
             },
-            "jira_tickets": [],
-            "linear_issues": []
+            "jira_tickets": [
+              {
+                "key": "ENG-1234",
+                "summary": "Implement caching layer",
+                "priority": "High",
+                "status": "In Progress",
+                "duedate": "2026-01-25"
+              },
+              {
+                "key": "ENG-1235",
+                "summary": "Fix memory leak in worker",
+                "priority": "Critical",
+                "status": "In Progress",
+                "duedate": "2026-01-22"
+              },
+              {
+                "key": "ENG-1236",
+                "summary": "Update API documentation",
+                "priority": "Medium",
+                "status": "To Do",
+                "duedate": "2026-01-28"
+              },
+              {
+                "key": "ENG-1237",
+                "summary": "Review security patches",
+                "priority": "High",
+                "status": "In Progress",
+                "duedate": "2026-01-23"
+              },
+              {
+                "key": "ENG-1238",
+                "summary": "Database migration script",
+                "priority": "High",
+                "status": "To Do",
+                "duedate": "2026-01-26"
+              },
+              {
+                "key": "ENG-1239",
+                "summary": "Performance testing",
+                "priority": "Medium",
+                "status": "To Do",
+                "duedate": "2026-01-30"
+              },
+              {
+                "key": "ENG-1240",
+                "summary": "Code review backlog",
+                "priority": "Low",
+                "status": "In Progress",
+                "duedate": "2026-01-27"
+              },
+              {
+                "key": "ENG-1241",
+                "summary": "Incident postmortem writeup",
+                "priority": "High",
+                "status": "To Do",
+                "duedate": "2026-01-24"
+              }
+            ],
+            "linear_issues": [
+              {
+                "id": "issue-1",
+                "identifier": "FE-101",
+                "title": "Dashboard performance optimization",
+                "priority": 1,
+                "dueDate": "2026-01-23",
+                "state": "In Progress"
+              },
+              {
+                "id": "issue-2",
+                "identifier": "FE-102",
+                "title": "Fix mobile responsive issues",
+                "priority": 2,
+                "dueDate": "2026-01-24",
+                "state": "In Progress"
+              },
+              {
+                "id": "issue-3",
+                "identifier": "FE-103",
+                "title": "Implement dark mode",
+                "priority": 2,
+                "dueDate": "2026-01-28",
+                "state": "Todo"
+              },
+              {
+                "id": "issue-4",
+                "identifier": "FE-104",
+                "title": "Update component library",
+                "priority": 3,
+                "dueDate": "2026-01-30",
+                "state": "Todo"
+              },
+              {
+                "id": "issue-5",
+                "identifier": "FE-105",
+                "title": "Accessibility audit fixes",
+                "priority": 1,
+                "dueDate": "2026-01-25",
+                "state": "In Progress"
+              },
+              {
+                "id": "issue-6",
+                "identifier": "FE-106",
+                "title": "Unit test coverage",
+                "priority": 2,
+                "dueDate": "2026-01-27",
+                "state": "Todo"
+              },
+              {
+                "id": "issue-7",
+                "identifier": "FE-107",
+                "title": "Error boundary implementation",
+                "priority": 1,
+                "dueDate": "2026-01-22",
+                "state": "In Progress"
+              }
+            ],
+            "jira_burnout_breakdown": {
+              "task_volume": 35,
+              "overdue_tasks": 15,
+              "high_priority_ratio": 25
+            },
+            "linear_burnout_breakdown": {
+              "task_volume": 30,
+              "urgent_issues": 20,
+              "blocked_issues": 10
+            }
           },
           {
             "user_id": "87587",
@@ -1812,8 +1936,8 @@
             "is_oncall": false,
             "github_username": null,
             "slack_user_id": "U08GAVBEEUE",
-            "jira_account_id": null,
-            "linear_user_id": null,
+            "jira_account_id": "712020:daniel-kowalski-jira-id",
+            "linear_user_id": "daniel-kowalski-linear-id",
             "rootly_user_id": "94178",
             "pagerduty_user_id": null,
             "avatar_url": "/images/male/kenji_tanaka.png",
@@ -2039,8 +2163,117 @@
                 "weekend_work": false
               }
             },
-            "jira_tickets": [],
-            "linear_issues": []
+            "jira_tickets": [
+              {
+                "key": "INFRA-301",
+                "summary": "K8s cluster upgrade",
+                "priority": "Critical",
+                "status": "In Progress",
+                "duedate": "2026-01-23"
+              },
+              {
+                "key": "INFRA-302",
+                "summary": "Terraform modules",
+                "priority": "High",
+                "status": "In Progress",
+                "duedate": "2026-01-25"
+              },
+              {
+                "key": "INFRA-303",
+                "summary": "Monitoring alerts",
+                "priority": "High",
+                "status": "To Do",
+                "duedate": "2026-01-26"
+              },
+              {
+                "key": "INFRA-304",
+                "summary": "Cost optimization",
+                "priority": "Medium",
+                "status": "In Progress",
+                "duedate": "2026-01-28"
+              },
+              {
+                "key": "INFRA-305",
+                "summary": "Disaster recovery",
+                "priority": "Critical",
+                "status": "To Do",
+                "duedate": "2026-01-24"
+              },
+              {
+                "key": "INFRA-306",
+                "summary": "CI/CD pipeline",
+                "priority": "High",
+                "status": "In Progress",
+                "duedate": "2026-01-27"
+              },
+              {
+                "key": "INFRA-307",
+                "summary": "Security scanning",
+                "priority": "High",
+                "status": "To Do",
+                "duedate": "2026-01-29"
+              }
+            ],
+            "linear_issues": [
+              {
+                "id": "issue-13",
+                "identifier": "OPS-401",
+                "title": "Runbook updates",
+                "priority": 2,
+                "dueDate": "2026-01-26",
+                "state": "In Progress"
+              },
+              {
+                "id": "issue-14",
+                "identifier": "OPS-402",
+                "title": "Incident response automation",
+                "priority": 1,
+                "dueDate": "2026-01-24",
+                "state": "In Progress"
+              },
+              {
+                "id": "issue-15",
+                "identifier": "OPS-403",
+                "title": "Capacity planning",
+                "priority": 2,
+                "dueDate": "2026-01-28",
+                "state": "Todo"
+              },
+              {
+                "id": "issue-16",
+                "identifier": "OPS-404",
+                "title": "SLO dashboard",
+                "priority": 1,
+                "dueDate": "2026-01-25",
+                "state": "In Progress"
+              },
+              {
+                "id": "issue-17",
+                "identifier": "OPS-405",
+                "title": "On-call rotation review",
+                "priority": 3,
+                "dueDate": "2026-01-30",
+                "state": "Todo"
+              },
+              {
+                "id": "issue-18",
+                "identifier": "OPS-406",
+                "title": "Alerting thresholds",
+                "priority": 2,
+                "dueDate": "2026-01-27",
+                "state": "In Progress"
+              }
+            ],
+            "jira_burnout_breakdown": {
+              "task_volume": 32,
+              "overdue_tasks": 18,
+              "high_priority_ratio": 28
+            },
+            "linear_burnout_breakdown": {
+              "task_volume": 28,
+              "urgent_issues": 18,
+              "blocked_issues": 12
+            }
           },
           {
             "user_id": "3497",
@@ -2049,8 +2282,8 @@
             "is_oncall": false,
             "github_username": null,
             "slack_user_id": "U02V8EY4YPM",
-            "jira_account_id": null,
-            "linear_user_id": null,
+            "jira_account_id": "712020:sophia-nguyen-jira-id",
+            "linear_user_id": "sophia-nguyen-linear-id",
             "rootly_user_id": "3497",
             "pagerduty_user_id": null,
             "avatar_url": "/images/female/sophia_nguyen.png",
@@ -2275,8 +2508,102 @@
                 "weekend_work": false
               }
             },
-            "jira_tickets": [],
-            "linear_issues": []
+            "jira_tickets": [
+              {
+                "key": "BE-501",
+                "summary": "API rate limiting",
+                "priority": "High",
+                "status": "In Progress",
+                "duedate": "2026-01-24"
+              },
+              {
+                "key": "BE-502",
+                "summary": "Database indexing",
+                "priority": "Critical",
+                "status": "In Progress",
+                "duedate": "2026-01-22"
+              },
+              {
+                "key": "BE-503",
+                "summary": "Webhook reliability",
+                "priority": "High",
+                "status": "To Do",
+                "duedate": "2026-01-26"
+              },
+              {
+                "key": "BE-504",
+                "summary": "Auth token refresh",
+                "priority": "Medium",
+                "status": "In Progress",
+                "duedate": "2026-01-28"
+              },
+              {
+                "key": "BE-505",
+                "summary": "Logging improvements",
+                "priority": "Low",
+                "status": "To Do",
+                "duedate": "2026-01-30"
+              },
+              {
+                "key": "BE-506",
+                "summary": "Service mesh config",
+                "priority": "High",
+                "status": "To Do",
+                "duedate": "2026-01-25"
+              }
+            ],
+            "linear_issues": [
+              {
+                "id": "issue-8",
+                "identifier": "API-201",
+                "title": "GraphQL schema updates",
+                "priority": 2,
+                "dueDate": "2026-01-25",
+                "state": "In Progress"
+              },
+              {
+                "id": "issue-9",
+                "identifier": "API-202",
+                "title": "Caching strategy",
+                "priority": 1,
+                "dueDate": "2026-01-23",
+                "state": "In Progress"
+              },
+              {
+                "id": "issue-10",
+                "identifier": "API-203",
+                "title": "Error handling refactor",
+                "priority": 2,
+                "dueDate": "2026-01-27",
+                "state": "Todo"
+              },
+              {
+                "id": "issue-11",
+                "identifier": "API-204",
+                "title": "API versioning",
+                "priority": 3,
+                "dueDate": "2026-01-30",
+                "state": "Todo"
+              },
+              {
+                "id": "issue-12",
+                "identifier": "API-205",
+                "title": "Load testing setup",
+                "priority": 1,
+                "dueDate": "2026-01-24",
+                "state": "In Progress"
+              }
+            ],
+            "jira_burnout_breakdown": {
+              "task_volume": 28,
+              "overdue_tasks": 12,
+              "high_priority_ratio": 22
+            },
+            "linear_burnout_breakdown": {
+              "task_volume": 25,
+              "urgent_issues": 15,
+              "blocked_issues": 8
+            }
           },
           {
             "user_id": "9130",
@@ -2285,8 +2612,8 @@
             "is_oncall": false,
             "github_username": "arjunreddy",
             "slack_user_id": "U04BULGB4E8",
-            "jira_account_id": null,
-            "linear_user_id": null,
+            "jira_account_id": "712020:marcus-johnson-jira-id",
+            "linear_user_id": "marcus-johnson-linear-id",
             "rootly_user_id": "9130",
             "pagerduty_user_id": null,
             "avatar_url": "/images/male/arjun_reddy.png",
@@ -2519,8 +2846,111 @@
                 "weekend_work": false
               }
             },
-            "jira_tickets": [],
-            "linear_issues": []
+            "jira_tickets": [
+              {
+                "key": "SEC-101",
+                "summary": "Vulnerability assessment",
+                "priority": "Critical",
+                "status": "In Progress",
+                "duedate": "2026-01-22"
+              },
+              {
+                "key": "SEC-102",
+                "summary": "Penetration testing",
+                "priority": "High",
+                "status": "To Do",
+                "duedate": "2026-01-26"
+              },
+              {
+                "key": "SEC-103",
+                "summary": "Access control audit",
+                "priority": "High",
+                "status": "In Progress",
+                "duedate": "2026-01-24"
+              },
+              {
+                "key": "SEC-104",
+                "summary": "Compliance documentation",
+                "priority": "Medium",
+                "status": "To Do",
+                "duedate": "2026-01-30"
+              },
+              {
+                "key": "SEC-105",
+                "summary": "Secret rotation",
+                "priority": "Critical",
+                "status": "In Progress",
+                "duedate": "2026-01-23"
+              }
+            ],
+            "linear_issues": [
+              {
+                "id": "issue-19",
+                "identifier": "SEC-501",
+                "title": "SSO implementation",
+                "priority": 1,
+                "dueDate": "2026-01-25",
+                "state": "In Progress"
+              },
+              {
+                "id": "issue-20",
+                "identifier": "SEC-502",
+                "title": "Encryption at rest",
+                "priority": 1,
+                "dueDate": "2026-01-23",
+                "state": "In Progress"
+              },
+              {
+                "id": "issue-21",
+                "identifier": "SEC-503",
+                "title": "Audit logging",
+                "priority": 2,
+                "dueDate": "2026-01-27",
+                "state": "Todo"
+              },
+              {
+                "id": "issue-22",
+                "identifier": "SEC-504",
+                "title": "Security training",
+                "priority": 3,
+                "dueDate": "2026-01-30",
+                "state": "Todo"
+              },
+              {
+                "id": "issue-23",
+                "identifier": "SEC-505",
+                "title": "Incident playbooks",
+                "priority": 2,
+                "dueDate": "2026-01-26",
+                "state": "In Progress"
+              },
+              {
+                "id": "issue-24",
+                "identifier": "SEC-506",
+                "title": "Zero trust network",
+                "priority": 1,
+                "dueDate": "2026-01-24",
+                "state": "In Progress"
+              },
+              {
+                "id": "issue-25",
+                "identifier": "SEC-507",
+                "title": "API security review",
+                "priority": 2,
+                "dueDate": "2026-01-28",
+                "state": "Todo"
+              }
+            ],
+            "jira_burnout_breakdown": {
+              "task_volume": 25,
+              "overdue_tasks": 10,
+              "high_priority_ratio": 30
+            },
+            "linear_burnout_breakdown": {
+              "task_volume": 30,
+              "urgent_issues": 22,
+              "blocked_issues": 8
+            }
           },
           {
             "user_id": "38699",

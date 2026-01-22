@@ -51,7 +51,8 @@ import { TeamHealthOverview } from "@/components/dashboard/TeamHealthOverview"
 import { AnalysisProgressSection } from "@/components/dashboard/AnalysisProgressSection"
 import { TeamMembersList } from "@/components/dashboard/TeamMembersList"
 import { ObjectiveDataCard } from "@/components/dashboard/ObjectiveDataCard"
-import { TeamRiskFactorsCard } from "@/components/dashboard/TeamRiskFactorsCard"
+import { TeamRiskFactorsCard, FACTOR_DESCRIPTIONS } from "@/components/dashboard/TeamRiskFactorsCard"
+import { InfoTooltip } from "@/components/ui/info-tooltip"
 import { MemberDetailModal } from "@/components/dashboard/MemberDetailModal"
 import { GitHubCommitsTimeline } from "@/components/dashboard/charts/GitHubCommitsTimeline"
 import GitHubAllMetricsPopup from "@/components/dashboard/GitHubAllMetricsPopup"
@@ -1194,7 +1195,12 @@ function DashboardContent() {
                               return (
                                 <div key={factor.factor} className="relative rounded-lg p-4 bg-white">
                                   <div className="flex items-center justify-between mb-2">
-                                    <span className="font-medium text-neutral-900">{factor.factor}</span>
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="font-medium text-neutral-900">{factor.factor}</span>
+                                      {FACTOR_DESCRIPTIONS[factor.factor] && (
+                                        <InfoTooltip content={FACTOR_DESCRIPTIONS[factor.factor]} side="top" />
+                                      )}
+                                    </div>
                                     <span
                                       className={`px-2 py-1 rounded-full text-xs font-medium ${
                                         factor.severity === 'Critical'
