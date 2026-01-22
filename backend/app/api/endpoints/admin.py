@@ -183,15 +183,8 @@ async def refresh_demo_analyses(
                 detail="Mock data file is missing 'analysis.results'"
             )
 
-        # Get all demo analyses
-        all_analyses = db.query(Analysis).all()
-        demo_analyses = [
-            a for a in all_analyses
-            if a.config and isinstance(a.config, dict) and a.config.get('is_demo') is True
-        ]
-
-        updated_count = 0
         created_count = 0
+        deleted_count = 0
         checkins_loaded = 0
         errors = []
 
@@ -199,35 +192,25 @@ async def refresh_demo_analyses(
         demo_organization_id = _get_or_create_demo_organization(db)
         logger.info(f"ADMIN: Using demo organization {demo_organization_id}")
 
-        # Update existing demo analyses
+        # DELETE all existing demo analyses first (clean slate approach)
+        all_analyses = db.query(Analysis).all()
+        demo_analyses = [
+            a for a in all_analyses
+            if a.config and isinstance(a.config, dict) and a.config.get('is_demo') is True
+        ]
+
         for analysis in demo_analyses:
             try:
-                logger.info(f"ADMIN: Updating demo for user #{analysis.user_id} (analysis #{analysis.id})")
-                analysis.results = new_results
-                analysis.organization_id = demo_organization_id  # Ensure org is set for health check-ins
-                config = analysis.config.copy() if analysis.config else {}
-                config['demo_updated_at'] = datetime.now().isoformat()
-                analysis.config = config
-                updated_count += 1
-                logger.info(f"ADMIN: Successfully updated demo for user #{analysis.user_id}")
+                logger.info(f"ADMIN: Deleting old demo analysis #{analysis.id} for user #{analysis.user_id}")
+                db.delete(analysis)
+                deleted_count += 1
             except Exception as e:
-                logger.error(f"ADMIN: Failed to update demo for user #{analysis.user_id}: {str(e)}")
-                errors.append(f"Failed to update analysis #{analysis.id}: {str(e)}")
+                logger.error(f"ADMIN: Failed to delete demo #{analysis.id}: {str(e)}")
+                errors.append(f"Failed to delete analysis #{analysis.id}: {str(e)}")
 
-        # Commit updates before creating new ones - prevents rollback from losing updates
-        if updated_count > 0:
+        if deleted_count > 0:
             db.commit()
-            logger.info(f"ADMIN: Committed {updated_count} demo updates")
-
-        # Load health check-ins for users with existing demo analyses
-        for analysis in demo_analyses:
-            try:
-                checkins_result = _load_health_checkins_for_user(db, analysis.user_id, demo_organization_id, mock_data)
-                if checkins_result['created'] > 0:
-                    checkins_loaded += checkins_result['created']
-                    logger.info(f"ADMIN: Loaded {checkins_result['created']} health check-ins for user #{analysis.user_id}")
-            except Exception as e:
-                logger.warning(f"ADMIN: Failed to load health check-ins for user #{analysis.user_id}: {e}")
+            logger.info(f"ADMIN: Deleted {deleted_count} old demo analyses")
 
         # Ensure UserCorrelation records exist for all team members with health check-ins
         # Clear session to get fresh database state after _load_health_checkins_for_user calls
@@ -269,65 +252,62 @@ async def refresh_demo_analyses(
             db.commit()
             logger.info(f"ADMIN: Created {correlations_created} UserCorrelation records")
 
-        # Create demo analyses for users who don't have one
+        # Create fresh demo analyses for ALL users
         users = db.query(User).all()
-        users_with_demo = {a.user_id for a in demo_analyses}
-
-        logger.info(f"ADMIN: Found {len(users)} total users, {len(users_with_demo)} already have demos")
+        logger.info(f"ADMIN: Found {len(users)} total users, creating demos for all")
 
         for user in users:
-            if user.id not in users_with_demo:
+            try:
+                logger.info(f"ADMIN: Creating demo for user #{user.id} ({user.email})")
+                config = original_analysis.get('config', {}).copy()
+                config['is_demo'] = True
+                config['demo_created_at'] = datetime.now().isoformat()
+
+                new_analysis = Analysis(
+                    user_id=user.id,
+                    organization_id=demo_organization_id,
+                    rootly_integration_id=None,
+                    integration_name="Demo Analysis",
+                    platform=original_analysis.get('platform', 'rootly'),
+                    time_range=original_analysis.get('time_range', 30),
+                    status="completed",
+                    config=config,
+                    results=new_results,
+                    error_message=None,
+                    completed_at=datetime.now()
+                )
+                db.add(new_analysis)
+                db.flush()
+                created_count += 1
+                logger.info(f"ADMIN: Successfully created demo for user #{user.id}")
+
+                # Load health check-ins for the user
                 try:
-                    logger.info(f"ADMIN: Creating demo for user #{user.id} ({user.email})")
-                    config = original_analysis.get('config', {}).copy()
-                    config['is_demo'] = True
-                    config['demo_created_at'] = datetime.now().isoformat()
-
-                    new_analysis = Analysis(
-                        user_id=user.id,
-                        organization_id=demo_organization_id,
-                        rootly_integration_id=None,
-                        integration_name="Demo Analysis",
-                        platform=original_analysis.get('platform', 'rootly'),
-                        time_range=original_analysis.get('time_range', 30),
-                        status="completed",
-                        config=config,
-                        results=new_results,
-                        error_message=None,
-                        completed_at=datetime.now()
-                    )
-                    db.add(new_analysis)
-                    db.flush()  # Flush immediately to catch per-user errors
-                    created_count += 1
-                    logger.info(f"ADMIN: Successfully created demo for user #{user.id}")
-
-                    # Load health check-ins for the new user
-                    try:
-                        checkins_result = _load_health_checkins_for_user(db, user.id, demo_organization_id, mock_data)
-                        if checkins_result['created'] > 0:
-                            checkins_loaded += checkins_result['created']
-                            logger.info(f"ADMIN: Loaded {checkins_result['created']} health check-ins for user #{user.id}")
-                    except Exception as e:
-                        logger.warning(f"ADMIN: Failed to load health check-ins for user #{user.id}: {e}")
-
+                    checkins_result = _load_health_checkins_for_user(db, user.id, demo_organization_id, mock_data)
+                    if checkins_result['created'] > 0:
+                        checkins_loaded += checkins_result['created']
+                        logger.info(f"ADMIN: Loaded {checkins_result['created']} health check-ins for user #{user.id}")
                 except Exception as e:
-                    logger.error(f"ADMIN: Failed to create demo for user #{user.id}: {str(e)}")
-                    errors.append(f"Failed to create demo for user #{user.id} ({user.email}): {str(e)}")
-                    db.rollback()  # Rollback this specific failure
+                    logger.warning(f"ADMIN: Failed to load health check-ins for user #{user.id}: {e}")
+
+            except Exception as e:
+                logger.error(f"ADMIN: Failed to create demo for user #{user.id}: {str(e)}")
+                errors.append(f"Failed to create demo for user #{user.id} ({user.email}): {str(e)}")
+                db.rollback()
 
         db.commit()
 
         logger.info(
             f"ADMIN AUDIT: /refresh-demo-analyses completed. "
-            f"IP: {client_ip}, Updated: {updated_count}, Created: {created_count}"
+            f"IP: {client_ip}, Deleted: {deleted_count}, Created: {created_count}"
         )
 
         return {
             "status": "success",
             "message": "Demo analyses refreshed successfully",
-            "updated_count": updated_count,
+            "deleted_count": deleted_count,
             "created_count": created_count,
-            "total_demo_analyses": updated_count + created_count,
+            "total_demo_analyses": created_count,
             "health_checkins_loaded": checkins_loaded,
             "correlations_created": correlations_created,
             "errors": errors or None
