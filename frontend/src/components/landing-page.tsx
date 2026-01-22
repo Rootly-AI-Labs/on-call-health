@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import localFont from "next/font/local"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -49,8 +49,9 @@ const ppMori = localFont({
 
 export default function LandingPage() {
   const [isLoading, setIsLoading] = useState<'google' | 'github' | null>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
 
-  // Preload background images on mount
+  // Preload background images and autoplay video on mount
   useEffect(() => {
     const preloadImage = (url: string) => {
       const img = new window.Image()
@@ -60,6 +61,12 @@ export default function LandingPage() {
     preloadImage('/images/landing/rootly-bg.avif')
     preloadImage('/images/landing/rootly-bg-gradient.avif')
     preloadImage('/images/landing/cta-background.png')
+
+    // Autoplay and set volume
+    if (videoRef.current) {
+      videoRef.current.volume = 0.2
+      videoRef.current.play().catch(err => console.log('Autoplay failed:', err))
+    }
   }, [])
 
   const handleGoogleLogin = async () => {
@@ -235,15 +242,20 @@ export default function LandingPage() {
           </main>
           <aside className="w-full mt-10 lg:mt-0 lg:w-[40%] lg:pl-20">
             <div className="mx-auto lg:ml-auto max-w-2xl lg:max-w-none lg:-translate-x-48 lg:translate-y-28 lg:w-[135%]">
-              <div className="rounded-[28px] border border-white bg-transparent p-1 lg:scale-125 lg:origin-left">
+              <div className="rounded-[28px] border border-white bg-transparent" style={{ padding: '4px', transform: 'scale(1.25)', transformOrigin: 'left center' }}>
                 <div className="aspect-video w-full overflow-hidden rounded-[22px]">
                   <video
+                    ref={videoRef}
                     className="h-full w-full object-cover"
                     controls
                     playsInline
                     preload="metadata"
+                    crossOrigin="anonymous"
+                    autoPlay
+                    muted
                   >
                     <source src="/videos/on-call-health-promo-video.mp4" type="video/mp4" />
+                    Your browser does not support the video tag.
                   </video>
                 </div>
               </div>
