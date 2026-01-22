@@ -154,6 +154,8 @@ function getItemKey(item: any): string | null {
 
 // Content component for Jira tickets (used in consolidated card)
 function JiraTicketCardContent({ memberData }: TicketingCardProps) {
+  const [isTicketsExpanded, setIsTicketsExpanded] = useState(false)
+
   if (!memberData?.jira_tickets || memberData.jira_tickets.length === 0) {
     return <p className="text-sm text-neutral-500 text-center py-4">No active Jira tickets</p>
   }
@@ -213,31 +215,43 @@ function JiraTicketCardContent({ memberData }: TicketingCardProps) {
 
       <Separator />
 
-      {/* Ticket List */}
+      {/* Collapsible Ticket List */}
       <div className="w-full overflow-hidden">
-        <p className="text-xs font-semibold text-neutral-700 mb-3">Active Tickets ({sortedTickets.length})</p>
-        <div className="space-y-2 max-h-64 overflow-y-auto w-full">
-          {sortedTickets.map((ticket, index) => (
-            <div key={getItemKey(ticket) || `ticket-${index}`} className="flex items-center gap-2 p-2 bg-neutral-100 rounded-md hover:bg-neutral-200 transition overflow-hidden">
-              <Badge
-                className="text-xs flex-shrink-0"
-                style={getPriorityColor(ticket.priority)}
-              >
-                {ticket.priority || "N/A"}
-              </Badge>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-neutral-900 truncate line-clamp-1">
-                  <span className="font-bold">{ticket.key}</span>
-                  {ticket.summary || ticket.title ? ` - ${ticket.summary || ticket.title}` : ""}
-                </p>
+        <button
+          onClick={() => setIsTicketsExpanded(!isTicketsExpanded)}
+          className="flex items-center gap-1 text-xs font-semibold text-neutral-700 hover:text-neutral-900 transition-colors"
+        >
+          {isTicketsExpanded ? (
+            <ChevronDown className="w-4 h-4" />
+          ) : (
+            <ChevronRight className="w-4 h-4" />
+          )}
+          Active Tickets ({sortedTickets.length})
+        </button>
+        {isTicketsExpanded && (
+          <div className="space-y-2 max-h-64 overflow-y-auto w-full mt-3">
+            {sortedTickets.map((ticket, index) => (
+              <div key={getItemKey(ticket) || `ticket-${index}`} className="flex items-center gap-2 p-2 bg-neutral-100 rounded-md hover:bg-neutral-200 transition overflow-hidden">
+                <Badge
+                  className="text-xs flex-shrink-0"
+                  style={getPriorityColor(ticket.priority)}
+                >
+                  {ticket.priority || "N/A"}
+                </Badge>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-neutral-900 truncate line-clamp-1">
+                    <span className="font-bold">{ticket.key}</span>
+                    {ticket.summary || ticket.title ? ` - ${ticket.summary || ticket.title}` : ""}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1 text-xs text-neutral-500 whitespace-nowrap flex-shrink-0">
+                  <Clock className="w-3 h-3" />
+                  <span>{formatDueDate(ticket.duedate)}</span>
+                </div>
               </div>
-              <div className="flex items-center gap-1 text-xs text-neutral-500 whitespace-nowrap flex-shrink-0">
-                <Clock className="w-3 h-3" />
-                <span>{formatDueDate(ticket.duedate)}</span>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -245,6 +259,8 @@ function JiraTicketCardContent({ memberData }: TicketingCardProps) {
 
 // Component to display Jira tickets
 function JiraTicketCard({ memberData }: TicketingCardProps) {
+  const [isTicketsExpanded, setIsTicketsExpanded] = useState(false)
+
   if (!memberData?.jira_tickets || memberData.jira_tickets.length === 0) {
     return (
       <Card>
@@ -321,31 +337,43 @@ function JiraTicketCard({ memberData }: TicketingCardProps) {
 
         <Separator />
 
-        {/* Ticket List */}
-        <div>
-          <p className="text-xs font-semibold text-neutral-700 mb-3">Active Tickets ({sortedTickets.length})</p>
-          <div className="space-y-2 max-h-64 overflow-y-auto">
-            {sortedTickets.map((ticket, index) => (
-              <div key={getItemKey(ticket) || `ticket-${index}`} className="flex items-center gap-2 p-2 bg-neutral-100 rounded-md hover:bg-neutral-200 transition">
-                <Badge
-                  className="text-xs flex-shrink-0"
-                  style={getPriorityColor(ticket.priority)}
-                >
-                  {ticket.priority || "N/A"}
-                </Badge>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-neutral-900 truncate">
-                    <span className="font-bold">{ticket.key}</span>
-                    {ticket.summary || ticket.title ? ` - ${ticket.summary || ticket.title}` : ""}
-                  </p>
+        {/* Collapsible Ticket List */}
+        <div className="w-full overflow-hidden">
+          <button
+            onClick={() => setIsTicketsExpanded(!isTicketsExpanded)}
+            className="flex items-center gap-1 text-xs font-semibold text-neutral-700 hover:text-neutral-900 transition-colors"
+          >
+            {isTicketsExpanded ? (
+              <ChevronDown className="w-4 h-4" />
+            ) : (
+              <ChevronRight className="w-4 h-4" />
+            )}
+            Active Tickets ({sortedTickets.length})
+          </button>
+          {isTicketsExpanded && (
+            <div className="space-y-2 max-h-64 overflow-y-auto w-full mt-3">
+              {sortedTickets.map((ticket, index) => (
+                <div key={getItemKey(ticket) || `ticket-${index}`} className="flex items-center gap-2 p-2 bg-neutral-100 rounded-md hover:bg-neutral-200 transition overflow-hidden">
+                  <Badge
+                    className="text-xs flex-shrink-0"
+                    style={getPriorityColor(ticket.priority)}
+                  >
+                    {ticket.priority || "N/A"}
+                  </Badge>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-neutral-900 truncate line-clamp-1">
+                      <span className="font-bold">{ticket.key}</span>
+                      {ticket.summary || ticket.title ? ` - ${ticket.summary || ticket.title}` : ""}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1 text-xs text-neutral-500 whitespace-nowrap flex-shrink-0">
+                    <Clock className="w-3 h-3" />
+                    <span>{formatDueDate(ticket.duedate)}</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1 text-xs text-neutral-500 whitespace-nowrap flex-shrink-0">
-                  <Clock className="w-3 h-3" />
-                  <span>{formatDueDate(ticket.duedate)}</span>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
