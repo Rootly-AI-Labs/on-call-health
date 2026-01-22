@@ -5,7 +5,7 @@
     "user_id": 46,
     "rootly_integration_id": 78,
     "organization_id": 2,
-    "integration_name": "FailWhale Tales",
+    "integration_name": "Demo Organization",
     "platform": "rootly",
     "time_range": 30,
     "status": "completed",
@@ -16,7 +16,7 @@
       "include_jira": true,
       "include_linear": true,
       "permission_warnings": [],
-      "organization_name": "FailWhale Tales",
+      "organization_name": "Demo Organization",
       "enable_ai": true
     },
     "results": {
@@ -39,7 +39,7 @@
           "start": "2025-12-22T17:39:36.313138",
           "end": "2026-01-21T17:39:36.313145"
         },
-        "organization_name": "FailWhale Tales",
+        "organization_name": "Demo Organization",
         "include_weekends": true,
         "include_github": true,
         "include_slack": true,
@@ -4683,8 +4683,8 @@
             "incidents": [
               {
                 "id": "d8f3adcd-907d-414e-8e40-5b4385aeaf6a",
-                "slug": "rootly-demo-portal-service-errors-a9902693-ed8f-432e-b698-3f746fa5c5cc",
-                "title": "Rootly demo - Portal Service - Errors",
+                "slug": "portal-service-errors-a9902693-ed8f-432e-b698-3f746fa5c5cc",
+                "title": "Portal Service - Errors",
                 "severity": 6.0,
                 "severity_level": "sev2",
                 "after_hours": false,
@@ -4703,8 +4703,8 @@
               },
               {
                 "id": "a2ff7142-f34f-41f8-a82b-c0ec97d6e32f",
-                "slug": "rootly-demo-ordering-service-errors-9a6f3d2f-78b9-4d7a-af8d-0a194f4a0c67",
-                "title": "Rootly demo - Ordering Service - Errors",
+                "slug": "ordering-service-errors-9a6f3d2f-78b9-4d7a-af8d-0a194f4a0c67",
+                "title": "Ordering Service - Errors",
                 "severity": 1.5,
                 "severity_level": "sev3",
                 "after_hours": true,
@@ -4732,11 +4732,11 @@
               "weekend_work": false,
               "peak_hour": "09:00",
               "incident_titles": [
-                "Rootly demo - Portal Service - Errors",
-                "Rootly demo - Portal Service - Errors",
+                "Portal Service - Errors",
+                "Portal Service - Errors",
                 "Twilight Upliftment",
                 "Twilight Upliftment",
-                "Rootly demo - Ordering Service - Errors"
+                "Ordering Service - Errors"
               ],
               "github_commits": 0,
               "github_after_hours": 0,
@@ -5651,8 +5651,8 @@
             "incidents": [
               {
                 "id": "1f3331fb-a671-4680-9d80-c9df0d175cf4",
-                "slug": "rootly-demo-portal-service-errors-818026d6-dc6d-4db6-928d-8b4e4f230c9d",
-                "title": "Rootly demo - Portal Service - Errors",
+                "slug": "portal-service-errors-818026d6-dc6d-4db6-928d-8b4e4f230c9d",
+                "title": "Portal Service - Errors",
                 "severity": 6.0,
                 "severity_level": "sev2",
                 "after_hours": false,
@@ -5700,8 +5700,8 @@
               "weekend_work": false,
               "peak_hour": "10:00",
               "incident_titles": [
-                "Rootly demo - Portal Service - Errors",
-                "Rootly demo - Portal Service - Errors",
+                "Portal Service - Errors",
+                "Portal Service - Errors",
                 "db at 100",
                 "db at 100",
                 "Passionate Lushness"
@@ -5817,8 +5817,8 @@
             "incidents": [
               {
                 "id": "a5af482c-1129-4ddf-8aa2-3725b7fc31b6",
-                "slug": "rootly-demo-portal-service-errors-0944efe2-07d3-4feb-a432-602c3b2f2258",
-                "title": "Rootly demo - Portal Service - Errors",
+                "slug": "portal-service-errors-0944efe2-07d3-4feb-a432-602c3b2f2258",
+                "title": "Portal Service - Errors",
                 "severity": 1.5,
                 "severity_level": "sev3",
                 "after_hours": false,
@@ -5827,8 +5827,8 @@
               },
               {
                 "id": "fbe28664-3a1c-4fd3-98ce-82a78d73c31b",
-                "slug": "rootly-demo-portal-service-errors-8f204b95-6ec1-4040-8276-05cfb0f45e14",
-                "title": "Rootly demo - Portal Service - Errors",
+                "slug": "portal-service-errors-8f204b95-6ec1-4040-8276-05cfb0f45e14",
+                "title": "Portal Service - Errors",
                 "severity": 3.0,
                 "severity_level": "sev3",
                 "after_hours": false,
@@ -5866,10 +5866,10 @@
               "weekend_work": false,
               "peak_hour": "12:00",
               "incident_titles": [
-                "Rootly demo - Portal Service - Errors",
-                "Rootly demo - Portal Service - Errors",
-                "Rootly demo - Portal Service - Errors",
-                "Rootly demo - Portal Service - Errors",
+                "Portal Service - Errors",
+                "Portal Service - Errors",
+                "Portal Service - Errors",
+                "Portal Service - Errors",
                 "Organized Lavishness"
               ],
               "github_commits": 0,
@@ -6003,8 +6003,8 @@
             "incidents": [
               {
                 "id": "e6798cd7-1c73-4d7c-a5fa-72e32423b17b",
-                "slug": "rootly-demo-ordering-service-errors-aaa9cdbd-1c38-4f68-88f8-13e4037528a1",
-                "title": "Rootly demo - Ordering Service - Errors",
+                "slug": "ordering-service-errors-aaa9cdbd-1c38-4f68-88f8-13e4037528a1",
+                "title": "Ordering Service - Errors",
                 "severity": 1.5,
                 "severity_level": "sev3",
                 "after_hours": true,
@@ -6032,8 +6032,8 @@
               "weekend_work": false,
               "peak_hour": "05:00",
               "incident_titles": [
-                "Rootly demo - Ordering Service - Errors",
-                "Rootly demo - Ordering Service - Errors"
+                "Ordering Service - Errors",
+                "Ordering Service - Errors"
               ],
               "github_commits": 0,
               "github_after_hours": 0,
@@ -10081,8 +10081,8 @@
               },
               {
                 "id": "1c6436e1-fdce-4b11-91e1-c030100a3876",
-                "slug": "rootly-demo-ordering-service-errors-87fab631-a32c-4d44-a6a7-5b615330998d",
-                "title": "Rootly demo - Ordering Service - Errors",
+                "slug": "ordering-service-errors-87fab631-a32c-4d44-a6a7-5b615330998d",
+                "title": "Ordering Service - Errors",
                 "severity": 1.5,
                 "severity_level": "sev3",
                 "after_hours": true,
@@ -10114,7 +10114,7 @@
                 "CPU usage is high",
                 "Independent Petal",
                 "Independent Petal",
-                "Rootly demo - Ordering Service - Errors"
+                "Ordering Service - Errors"
               ],
               "github_commits": 0,
               "github_after_hours": 0,
@@ -11666,8 +11666,8 @@
               },
               {
                 "id": "91a9ec15-d109-4120-8b37-99b624b2e2e4",
-                "slug": "rootly-demo-portal-service-errors-720cc50e-b3ad-451d-98f0-790c16c0034e",
-                "title": "Rootly demo - Portal Service - Errors",
+                "slug": "portal-service-errors-720cc50e-b3ad-451d-98f0-790c16c0034e",
+                "title": "Portal Service - Errors",
                 "severity": 3.0,
                 "severity_level": "sev3",
                 "after_hours": false,
@@ -11707,8 +11707,8 @@
               "incident_titles": [
                 "Cool Wave",
                 "Cool Wave",
-                "Rootly demo - Portal Service - Errors",
-                "Rootly demo - Portal Service - Errors",
+                "Portal Service - Errors",
+                "Portal Service - Errors",
                 "Cultured Wisdom"
               ],
               "github_commits": 0,
@@ -17233,7 +17233,7 @@
               "weekend_work": false,
               "peak_hour": "08:00",
               "incident_titles": [
-                "Rootly demo - Ordering Service - Errors"
+                "Ordering Service - Errors"
               ],
               "github_commits": 0,
               "github_after_hours": 0,
@@ -22818,19 +22818,19 @@
             "sequential_id": 3760,
             "slug": "failed-login-attempt-events-exceeded-threshold-7cebadca-06be-4c96-b920-14017319ddb6",
             "title": "Failed Login Attempt Events Exceeded Threshold",
-            "summary": "This is a summary generated by Rootly AI:\n\nThe alert from Datadog indicated a test of failed login attempt events exceeding the set threshold. This event was triggered by data that was filtered out of sight. The number of these attempts within the last 5 minutes exceeded 10. This alert was issued on January 19, 2026, and includes links for the monitor status, the edit monitor function, and related logs. The event is categorized as high urgency, requiring immediate attention due to its severe impact. The alert is designated for the Apple team.",
+            "summary": "This is an AI-generated summary:\n\nThe alert from Datadog indicated a test of failed login attempt events exceeding the set threshold. This event was triggered by data that was filtered out of sight. The number of these attempts within the last 5 minutes exceeded 10. This alert was issued on January 19, 2026, and includes links for the monitor status, the edit monitor function, and related logs. The event is categorized as high urgency, requiring immediate attention due to its severe impact. The alert is designated for the Apple team.",
             "status": "cancelled",
             "created_at": "2026-01-19T13:05:40.303-08:00",
             "started_at": "2026-01-19T13:05:40.152-08:00",
             "user": {
               "id": "3066",
-              "email": "bot@rootly.com",
-              "name": "Rootly"
+              "email": "bot@demo.com",
+              "name": "Demo Bot"
             },
             "started_by": {
               "id": "3066",
-              "email": "bot@rootly.com",
-              "name": "Rootly"
+              "email": "bot@demo.com",
+              "name": "Demo Bot"
             },
             "slack_channel_id": "C0A97CG72F9",
             "slack_channel_name": "incident-20260119-failedloginattempteventsexceededthreshold-3760",
@@ -22845,19 +22845,19 @@
             "sequential_id": 3759,
             "slug": "failed-login-attempt-events-exceeded-threshold",
             "title": "Failed Login Attempt Events Exceeded Threshold",
-            "summary": "This is a summary generated by Rootly AI:\n\nAn alert titled \"[TEST] Test RD1 Webhook Monitor\" with the ID \"f1a42a23-239d-4985-a822-8f4def0153f3\" was triggered by the source \"datadog\" on January 19, 2026. The alert was triggered due to the count of events matching a certain query exceeding 10 during the last 5 minutes. The alert message was directed \"@webhook-Apple\" and was regarding \"Failed Login Attempt Events Exceeded Threshold.\" The alert status was marked as \"triggered\" with a priority level described as \"High\" requiring immediate attention due to a severe impact. You can find more details about this alert or edit it through the provided links to the datadoghq platform. The alert originates from a team tagged as \"apple\".\n",
+            "summary": "This is an AI-generated summary:\n\nAn alert titled \"[TEST] Test RD1 Webhook Monitor\" with the ID \"f1a42a23-239d-4985-a822-8f4def0153f3\" was triggered by the source \"datadog\" on January 19, 2026. The alert was triggered due to the count of events matching a certain query exceeding 10 during the last 5 minutes. The alert message was directed \"@webhook-Apple\" and was regarding \"Failed Login Attempt Events Exceeded Threshold.\" The alert status was marked as \"triggered\" with a priority level described as \"High\" requiring immediate attention due to a severe impact. You can find more details about this alert or edit it through the provided links to the datadoghq platform. The alert originates from a team tagged as \"apple\".\n",
             "status": "cancelled",
             "created_at": "2026-01-19T13:00:19.092-08:00",
             "started_at": "2026-01-19T13:00:18.915-08:00",
             "user": {
               "id": "3066",
-              "email": "bot@rootly.com",
-              "name": "Rootly"
+              "email": "bot@demo.com",
+              "name": "Demo Bot"
             },
             "started_by": {
               "id": "3066",
-              "email": "bot@rootly.com",
-              "name": "Rootly"
+              "email": "bot@demo.com",
+              "name": "Demo Bot"
             },
             "slack_channel_id": "C0A9LPRLE7Q",
             "slack_channel_name": "incident-20260119-failed-login-attempt-events-exceeded-threshold",
@@ -22879,13 +22879,13 @@
             "acknowledged_at": "2026-01-19T12:39:00.000-08:00",
             "user": {
               "id": "3066",
-              "email": "bot@rootly.com",
-              "name": "Rootly"
+              "email": "bot@demo.com",
+              "name": "Demo Bot"
             },
             "started_by": {
               "id": "3066",
-              "email": "bot@rootly.com",
-              "name": "Rootly"
+              "email": "bot@demo.com",
+              "name": "Demo Bot"
             },
             "slack_channel_id": "C0A9799B7HV",
             "slack_channel_name": "incident-20260119-crazy",
@@ -22933,8 +22933,8 @@
           "type": "incidents",
           "attributes": {
             "sequential_id": 3756,
-            "slug": "rootly-demo-ordering-service-errors-aaa9cdbd-1c38-4f68-88f8-13e4037528a1",
-            "title": "Rootly demo - Ordering Service - Errors",
+            "slug": "ordering-service-errors-aaa9cdbd-1c38-4f68-88f8-13e4037528a1",
+            "title": "Ordering Service - Errors",
             "status": "resolved",
             "created_at": "2026-01-19T05:43:38.098-08:00",
             "started_at": "2026-01-19T05:43:38.005-08:00",
@@ -22956,7 +22956,7 @@
               "name": "Maya Fernandez"
             },
             "slack_channel_id": "C0A9GV5FX2R",
-            "slack_channel_name": "incident-20260119-rootly-demo-ordering-service-errors",
+            "slack_channel_name": "incident-20260119-ordering-service-errors",
             "slack_channel_url": "https://slack.com/app_redirect?channel=C0A9GV5FX2R&team=T04JUSX0VPT",
             "slack_channel_deep_link": "slack://channel?id=C0A9GV5FX2R&team=T04JUSX0VPT"
           }
@@ -23153,8 +23153,8 @@
           "type": "incidents",
           "attributes": {
             "sequential_id": 3749,
-            "slug": "rootly-demo-portal-service-errors-0944efe2-07d3-4feb-a432-602c3b2f2258",
-            "title": "Rootly demo - Portal Service - Errors",
+            "slug": "portal-service-errors-0944efe2-07d3-4feb-a432-602c3b2f2258",
+            "title": "Portal Service - Errors",
             "status": "resolved",
             "created_at": "2026-01-15T12:22:09.360-08:00",
             "started_at": "2026-01-15T12:22:09.211-08:00",
@@ -23176,7 +23176,7 @@
               "name": "Maya Fernandez"
             },
             "slack_channel_id": "C0A8YRYM7TQ",
-            "slack_channel_name": "incident-20260115-rootlydemo-portalservice-errors-3749",
+            "slack_channel_name": "incident-20260115-portal-service-errors-3749",
             "slack_channel_url": "https://slack.com/app_redirect?channel=C0A8YRYM7TQ&team=T04JUSX0VPT",
             "slack_channel_deep_link": "slack://channel?id=C0A8YRYM7TQ&team=T04JUSX0VPT"
           }
@@ -23254,8 +23254,8 @@
           "type": "incidents",
           "attributes": {
             "sequential_id": 3746,
-            "slug": "rootly-demo-portal-service-errors-8f204b95-6ec1-4040-8276-05cfb0f45e14",
-            "title": "Rootly demo - Portal Service - Errors",
+            "slug": "portal-service-errors-8f204b95-6ec1-4040-8276-05cfb0f45e14",
+            "title": "Portal Service - Errors",
             "status": "resolved",
             "severity": "SEV3",
             "created_at": "2026-01-15T10:22:11.393-08:00",
@@ -23278,7 +23278,7 @@
               "name": "Maya Fernandez"
             },
             "slack_channel_id": "C0A8Y0GD2KY",
-            "slack_channel_name": "incident-20260115-rootly-demo-portal-service-errors",
+            "slack_channel_name": "incident-20260115-portal-service-errors",
             "slack_channel_url": "https://slack.com/app_redirect?channel=C0A8Y0GD2KY&team=T04JUSX0VPT",
             "slack_channel_deep_link": "slack://channel?id=C0A8Y0GD2KY&team=T04JUSX0VPT"
           }
@@ -23449,8 +23449,8 @@
           "type": "incidents",
           "attributes": {
             "sequential_id": 3740,
-            "slug": "rootly-demo-portal-service-errors-720cc50e-b3ad-451d-98f0-790c16c0034e",
-            "title": "Rootly demo - Portal Service - Errors",
+            "slug": "portal-service-errors-720cc50e-b3ad-451d-98f0-790c16c0034e",
+            "title": "Portal Service - Errors",
             "status": "resolved",
             "severity": "SEV3",
             "created_at": "2026-01-14T12:45:47.524-08:00",
@@ -23473,7 +23473,7 @@
               "name": "Marcus Thompson"
             },
             "slack_channel_id": "C0A8L78JVKM",
-            "slack_channel_name": "incident-20260114-rootly-demo-portal-service-errors",
+            "slack_channel_name": "incident-20260114-portal-service-errors",
             "slack_channel_url": "https://slack.com/app_redirect?channel=C0A8L78JVKM&team=T04JUSX0VPT",
             "slack_channel_deep_link": "slack://channel?id=C0A8L78JVKM&team=T04JUSX0VPT"
           }
@@ -23896,8 +23896,8 @@
           "type": "incidents",
           "attributes": {
             "sequential_id": 3725,
-            "slug": "rootly-demo-portal-service-errors-818026d6-dc6d-4db6-928d-8b4e4f230c9d",
-            "title": "Rootly demo - Portal Service - Errors",
+            "slug": "portal-service-errors-818026d6-dc6d-4db6-928d-8b4e4f230c9d",
+            "title": "Portal Service - Errors",
             "status": "resolved",
             "severity": "SEV2",
             "created_at": "2026-01-12T10:37:52.080-08:00",
@@ -23920,7 +23920,7 @@
               "name": "Maya Fernandez"
             },
             "slack_channel_id": "C0A9316U7Q8",
-            "slack_channel_name": "incident-20260112-rootly-demo-portal-service-errors",
+            "slack_channel_name": "incident-20260112-portal-service-errors",
             "slack_channel_url": "https://slack.com/app_redirect?channel=C0A9316U7Q8&team=T04JUSX0VPT",
             "slack_channel_deep_link": "slack://channel?id=C0A9316U7Q8&team=T04JUSX0VPT"
           }
@@ -24541,8 +24541,8 @@
           "type": "incidents",
           "attributes": {
             "sequential_id": 3706,
-            "slug": "rootly-demo-ordering-service-errors-045a99e2-e24c-488b-bdbe-266613ae5de9",
-            "title": "Rootly demo - Ordering Service - Errors",
+            "slug": "ordering-service-errors-045a99e2-e24c-488b-bdbe-266613ae5de9",
+            "title": "Ordering Service - Errors",
             "status": "started",
             "severity": "SEV4",
             "created_at": "2026-01-08T08:46:56.279-08:00",
@@ -24564,8 +24564,8 @@
           "type": "incidents",
           "attributes": {
             "sequential_id": 3705,
-            "slug": "rootly-demo-ordering-service-errors-87fab631-a32c-4d44-a6a7-5b615330998d",
-            "title": "Rootly demo - Ordering Service - Errors",
+            "slug": "ordering-service-errors-87fab631-a32c-4d44-a6a7-5b615330998d",
+            "title": "Ordering Service - Errors",
             "status": "resolved",
             "created_at": "2026-01-08T06:53:03.922-08:00",
             "started_at": "2026-01-08T06:53:03.813-08:00",
@@ -24587,7 +24587,7 @@
               "name": "Kenji Tanaka"
             },
             "slack_channel_id": "C0A7CNU51C3",
-            "slack_channel_name": "incident-20260108-rootly-demo-ordering-service-errors",
+            "slack_channel_name": "incident-20260108-ordering-service-errors",
             "slack_channel_url": "https://slack.com/app_redirect?channel=C0A7CNU51C3&team=T04JUSX0VPT",
             "slack_channel_deep_link": "slack://channel?id=C0A7CNU51C3&team=T04JUSX0VPT"
           }
@@ -25571,8 +25571,8 @@
           "type": "incidents",
           "attributes": {
             "sequential_id": 3672,
-            "slug": "rootly-demo-portal-service-errors-a9902693-ed8f-432e-b698-3f746fa5c5cc",
-            "title": "Rootly demo - Portal Service - Errors",
+            "slug": "portal-service-errors-a9902693-ed8f-432e-b698-3f746fa5c5cc",
+            "title": "Portal Service - Errors",
             "status": "resolved",
             "severity": "SEV2",
             "created_at": "2025-12-23T09:10:47.661-08:00",
@@ -25595,7 +25595,7 @@
               "name": "Maya Fernandez"
             },
             "slack_channel_id": "C0A56FK279T",
-            "slack_channel_name": "incident-20251223-rootly-demo-portal-service-errors",
+            "slack_channel_name": "incident-20251223-portal-service-errors",
             "slack_channel_url": "https://slack.com/app_redirect?channel=C0A56FK279T&team=T04JUSX0VPT",
             "slack_channel_deep_link": "slack://channel?id=C0A56FK279T&team=T04JUSX0VPT"
           }
@@ -25638,8 +25638,8 @@
           "type": "incidents",
           "attributes": {
             "sequential_id": 3670,
-            "slug": "rootly-demo-ordering-service-errors-9a6f3d2f-78b9-4d7a-af8d-0a194f4a0c67",
-            "title": "Rootly demo - Ordering Service - Errors",
+            "slug": "ordering-service-errors-9a6f3d2f-78b9-4d7a-af8d-0a194f4a0c67",
+            "title": "Ordering Service - Errors",
             "status": "resolved",
             "created_at": "2025-12-23T07:19:58.612-08:00",
             "started_at": "2025-12-23T07:19:58.431-08:00",
@@ -25662,7 +25662,7 @@
               "name": "Maya Fernandez"
             },
             "slack_channel_id": "C0A5N63HHCH",
-            "slack_channel_name": "incident-20251223-rootly-demo-ordering-service-errors",
+            "slack_channel_name": "incident-20251223-ordering-service-errors",
             "slack_channel_url": "https://slack.com/app_redirect?channel=C0A5N63HHCH&team=T04JUSX0VPT",
             "slack_channel_deep_link": "slack://channel?id=C0A5N63HHCH&team=T04JUSX0VPT"
           }
