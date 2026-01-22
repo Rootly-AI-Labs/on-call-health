@@ -184,6 +184,7 @@ async def refresh_demo_analyses(
 
         created_count = 0
         deleted_count = 0
+        reports_deleted = 0
         checkins_loaded = 0
         errors = []
 
@@ -209,6 +210,22 @@ async def refresh_demo_analyses(
         if deleted_count > 0:
             db.commit()
             logger.info(f"ADMIN: Deleted {deleted_count} old demo analyses")
+
+        # DELETE all UserBurnoutReport records for the demo organization (clean slate)
+        # This ensures health check-ins are refreshed with the latest mock data
+        try:
+            reports_to_delete = db.query(UserBurnoutReport).filter(
+                UserBurnoutReport.organization_id == demo_organization_id
+            ).all()
+            for report in reports_to_delete:
+                db.delete(report)
+                reports_deleted += 1
+            if reports_deleted > 0:
+                db.commit()
+                logger.info(f"ADMIN: Deleted {reports_deleted} old UserBurnoutReport records for demo organization")
+        except Exception as e:
+            logger.error(f"ADMIN: Failed to delete UserBurnoutReport records: {e}")
+            db.rollback()
 
         # Ensure UserCorrelation records exist for all team members with health check-ins
         # Clear session to get fresh database state after _load_health_checkins_for_user calls
@@ -306,6 +323,7 @@ async def refresh_demo_analyses(
             "message": "Demo analyses refreshed successfully",
             "deleted_count": deleted_count,
             "created_count": created_count,
+            "reports_deleted": reports_deleted,
             "total_demo_analyses": created_count,
             "health_checkins_loaded": checkins_loaded,
             "correlations_created": correlations_created,
