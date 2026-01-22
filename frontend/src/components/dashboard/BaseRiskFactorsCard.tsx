@@ -81,11 +81,13 @@ export function BaseRiskFactorsCard({
           <div className="flex-1 space-y-1.5">
             <div className="flex items-center space-x-2">
               <CardTitle>{title}</CardTitle>
-              {showAlert && alertCount && alertCount > 0 && (
+              {showAlert && alertCount > 0 && (
                 <div className="flex items-center space-x-1">
                   <AlertTriangle className="w-4 h-4 text-red-500" />
                   <span className="text-sm font-medium text-red-600">
-                    {alertCount} factor{alertCount > 1 ? 's' : ''} need{alertCount === 1 ? 's' : ''} attention
+                    {alertCount === 1
+                      ? '1 factor needs attention'
+                      : `${alertCount} factors need attention`}
                   </span>
                 </div>
               )}
