@@ -518,14 +518,16 @@ def get_member_surveys(analysis: Analysis, db: Session) -> dict:
     """
     Fetch survey responses for all team members within the analysis timeline.
     Returns a dict keyed by user email with survey data.
+
+    Optimized to use 2 bulk queries instead of N+1 queries.
     """
-    from datetime import timedelta
+    from datetime import timedelta, datetime
+    from collections import defaultdict
     from ...models.user_burnout_report import UserBurnoutReport
     from ...models.user_correlation import UserCorrelation
 
     # Calculate analysis date range
     # Use current time as end date for live survey data (surveys update without re-running analysis)
-    from datetime import datetime
     analysis_end_date = datetime.utcnow()
     analysis_start_date = analysis.created_at - timedelta(days=analysis.time_range or 30)
 
@@ -533,23 +535,31 @@ def get_member_surveys(analysis: Analysis, db: Session) -> dict:
     if not analysis.organization_id:
         return {}
 
+    # Query 1: Get all team member emails
     correlations = db.query(UserCorrelation).filter(
         UserCorrelation.organization_id == analysis.organization_id
     ).all()
 
+    member_emails = [c.email for c in correlations if c.email]
+    if not member_emails:
+        return {}
+
+    # Query 2: Get ALL surveys for ALL members in one bulk query (instead of N queries)
+    all_surveys = db.query(UserBurnoutReport).filter(
+        UserBurnoutReport.email.in_(member_emails),
+        UserBurnoutReport.submitted_at >= analysis_start_date,
+        UserBurnoutReport.submitted_at <= analysis_end_date
+    ).order_by(UserBurnoutReport.email, UserBurnoutReport.submitted_at.asc()).all()
+
+    # Group surveys by email in Python (O(n) operation)
+    surveys_by_email = defaultdict(list)
+    for survey in all_surveys:
+        surveys_by_email[survey.email].append(survey)
+
+    # Process each member's surveys
     member_surveys = {}
-
-    for corr in correlations:
-        if not corr.email:
-            continue
-
-        # Get surveys within analysis period for this team member (match by email)
-        surveys = db.query(UserBurnoutReport).filter(
-            UserBurnoutReport.email == corr.email,
-            UserBurnoutReport.submitted_at >= analysis_start_date,
-            UserBurnoutReport.submitted_at <= analysis_end_date
-        ).order_by(UserBurnoutReport.submitted_at.asc()).all()
-
+    for email in member_emails:
+        surveys = surveys_by_email.get(email, [])
         if not surveys:
             continue
 
@@ -592,7 +602,7 @@ def get_member_surveys(analysis: Analysis, db: Session) -> dict:
         # Get latest scores
         latest = surveys[-1]
 
-        member_surveys[corr.email] = {
+        member_surveys[email] = {
             'survey_count_in_period': len(surveys),
             'latest_feeling_score': latest.feeling_score,
             'latest_workload_score': latest.workload_score,
