@@ -1134,8 +1134,123 @@
                 "weekend_work": false
               }
             },
-            "jira_tickets": [],
-            "linear_issues": []
+            "jira_tickets": [
+              {
+                "key": "SRE-101",
+                "priority": "Critical",
+                "duedate": "2026-01-22"
+              },
+              {
+                "key": "INCIDENT-445",
+                "priority": "High",
+                "duedate": "2026-01-23"
+              },
+              {
+                "key": "MONITOR-332",
+                "priority": "Critical",
+                "duedate": "2026-01-24"
+              },
+              {
+                "key": "RUNBOOK-221",
+                "priority": "High",
+                "duedate": "2026-01-25"
+              },
+              {
+                "key": "ONCALL-556",
+                "priority": "High",
+                "duedate": "2026-01-26"
+              },
+              {
+                "key": "ALERT-789",
+                "priority": "Critical",
+                "duedate": "2026-01-20"
+              },
+              {
+                "key": "CAPACITY-112",
+                "priority": "Medium",
+                "duedate": "2026-01-28"
+              }
+            ],
+            "jira_burnout_breakdown": {
+              "jira_ocb_score": 42.0,
+              "original_ocb": 50.24,
+              "final_ocb": 55.24,
+              "jira_added_risk": 5.0,
+              "jira_indicators": {
+                "ticket_count": 7,
+                "critical_high_priority_count": 6,
+                "critical_ratio": 85.7,
+                "high_workload": true,
+                "critical_ratio_high": true,
+                "overdue_count": 1,
+                "due_in_7_days": 5
+              }
+            },
+            "linear_issues": [
+              {
+                "id": "jamal-1",
+                "identifier": "OPS-101",
+                "title": "Production alert storm investigation",
+                "priority": 1,
+                "dueDate": "2026-01-22",
+                "state": "In Progress"
+              },
+              {
+                "id": "jamal-2",
+                "identifier": "SRE-202",
+                "title": "Update disaster recovery runbook",
+                "priority": 1,
+                "dueDate": "2026-01-23",
+                "state": "Todo"
+              },
+              {
+                "id": "jamal-3",
+                "identifier": "INFRA-303",
+                "title": "Kubernetes cluster upgrade",
+                "priority": 2,
+                "dueDate": "2026-01-24",
+                "state": "In Progress"
+              },
+              {
+                "id": "jamal-4",
+                "identifier": "MON-404",
+                "title": "Fix false positive alerts",
+                "priority": 2,
+                "dueDate": "2026-01-25",
+                "state": "Todo"
+              },
+              {
+                "id": "jamal-5",
+                "identifier": "SCALE-505",
+                "title": "Auto-scaling policy tuning",
+                "priority": 1,
+                "dueDate": "2026-01-19",
+                "state": "Blocked"
+              },
+              {
+                "id": "jamal-6",
+                "identifier": "SEC-606",
+                "title": "Security patch deployment",
+                "priority": 1,
+                "dueDate": "2026-01-26",
+                "state": "Todo"
+              }
+            ],
+            "linear_burnout_breakdown": {
+              "linear_ocb_score": 40.0,
+              "original_ocb": 55.24,
+              "final_ocb": 59.24,
+              "linear_added_risk": 4.0,
+              "linear_indicators": {
+                "issue_count": 6,
+                "urgent_high_priority_count": 5,
+                "urgent_high_ratio": 83.3,
+                "high_workload": true,
+                "urgent_ratio_high": true,
+                "overdue_count": 1,
+                "due_in_7_days": 5
+              }
+            }
           },
           {
             "user_id": "3528",
