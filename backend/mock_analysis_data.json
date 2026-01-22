@@ -19800,7 +19800,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -19828,7 +19828,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Tue, Dec 23"
           },
@@ -19839,7 +19839,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -19867,7 +19867,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Wed, Dec 24"
           },
@@ -19878,7 +19878,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -19906,7 +19906,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Thu, Dec 25"
           },
@@ -19917,7 +19917,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -19945,7 +19945,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Fri, Dec 26"
           },
@@ -19956,7 +19956,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -19984,7 +19984,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Sat, Dec 27"
           },
@@ -19995,7 +19995,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -20023,7 +20023,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Sun, Dec 28"
           },
@@ -20034,7 +20034,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -20062,7 +20062,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Mon, Dec 29"
           },
@@ -20073,7 +20073,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -20101,7 +20101,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Tue, Dec 30"
           },
@@ -20112,7 +20112,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -20140,7 +20140,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Wed, Dec 31"
           },
@@ -20151,7 +20151,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -20179,7 +20179,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Thu, Jan 01"
           },
@@ -20190,7 +20190,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -20218,7 +20218,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Fri, Jan 02"
           },
@@ -20229,7 +20229,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -20257,7 +20257,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Sat, Jan 03"
           },
@@ -20268,7 +20268,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -20296,7 +20296,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Sun, Jan 04"
           },
@@ -20307,7 +20307,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -20335,7 +20335,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Mon, Jan 05"
           },
@@ -20346,7 +20346,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -20374,7 +20374,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Tue, Jan 06"
           },
@@ -20385,7 +20385,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -20413,7 +20413,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Wed, Jan 07"
           },
@@ -20424,7 +20424,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -20452,7 +20452,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Thu, Jan 08"
           },
@@ -20463,7 +20463,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -20491,7 +20491,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Fri, Jan 09"
           },
@@ -20502,7 +20502,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -20530,7 +20530,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Sat, Jan 10"
           },
@@ -20541,7 +20541,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -20569,7 +20569,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Sun, Jan 11"
           },
@@ -20580,7 +20580,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -20608,7 +20608,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Mon, Jan 12"
           },
@@ -20619,7 +20619,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -20647,7 +20647,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Tue, Jan 13"
           },
@@ -20658,7 +20658,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -20686,7 +20686,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Wed, Jan 14"
           },
@@ -20697,7 +20697,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -20725,7 +20725,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Thu, Jan 15"
           },
@@ -20736,7 +20736,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -20764,7 +20764,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Fri, Jan 16"
           },
@@ -20775,7 +20775,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -20803,7 +20803,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Sat, Jan 17"
           },
@@ -20814,7 +20814,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -20842,7 +20842,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Sun, Jan 18"
           },
@@ -20853,7 +20853,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -20881,7 +20881,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Mon, Jan 19"
           },
@@ -20892,7 +20892,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -20920,7 +20920,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Tue, Jan 20"
           },
@@ -20931,7 +20931,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -20959,7 +20959,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Wed, Jan 21"
           }
@@ -20972,7 +20972,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -21000,7 +21000,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Tue, Dec 23"
           },
@@ -21011,7 +21011,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -21039,7 +21039,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Wed, Dec 24"
           },
@@ -21050,7 +21050,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -21078,7 +21078,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Thu, Dec 25"
           },
@@ -21089,7 +21089,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -21117,7 +21117,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Fri, Dec 26"
           },
@@ -21128,7 +21128,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -21156,7 +21156,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Sat, Dec 27"
           },
@@ -21208,7 +21208,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -21236,7 +21236,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Mon, Dec 29"
           },
@@ -21247,7 +21247,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -21275,7 +21275,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Tue, Dec 30"
           },
@@ -21286,7 +21286,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -21314,7 +21314,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Wed, Dec 31"
           },
@@ -21325,7 +21325,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -21353,7 +21353,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Thu, Jan 01"
           },
@@ -21364,7 +21364,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -21392,7 +21392,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Fri, Jan 02"
           },
@@ -21444,7 +21444,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -21472,7 +21472,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Sun, Jan 04"
           },
@@ -21483,7 +21483,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -21511,7 +21511,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Mon, Jan 05"
           },
@@ -21522,7 +21522,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -21550,7 +21550,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Tue, Jan 06"
           },
@@ -21561,7 +21561,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -21589,7 +21589,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Wed, Jan 07"
           },
@@ -21641,7 +21641,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -21669,7 +21669,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Fri, Jan 09"
           },
@@ -21680,7 +21680,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -21708,7 +21708,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Sat, Jan 10"
           },
@@ -21719,7 +21719,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -21747,7 +21747,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Sun, Jan 11"
           },
@@ -21758,7 +21758,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -21786,7 +21786,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Mon, Jan 12"
           },
@@ -21797,7 +21797,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -21825,7 +21825,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Tue, Jan 13"
           },
@@ -21877,7 +21877,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -21905,7 +21905,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Thu, Jan 15"
           },
@@ -21916,7 +21916,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -21944,7 +21944,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Fri, Jan 16"
           },
@@ -21955,7 +21955,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -21983,7 +21983,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Sat, Jan 17"
           },
@@ -21994,7 +21994,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -22022,7 +22022,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Sun, Jan 18"
           },
@@ -22074,7 +22074,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -22102,7 +22102,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Tue, Jan 20"
           },
@@ -22113,7 +22113,7 @@
             "after_hours_count": 0,
             "weekend_count": 0,
             "response_times": [],
-            "has_data": false,
+            "has_data": true,
             "incidents": [],
             "high_severity_count": 0,
             "after_hours_incidents_count": 0,
@@ -22141,7 +22141,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 0,
+            "health_score": 5,
             "team_health": 0,
             "day_name": "Wed, Jan 21"
           }
