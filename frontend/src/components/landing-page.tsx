@@ -241,8 +241,8 @@ export default function LandingPage() {
             </div>
           </main>
           <aside className="w-full mt-10 lg:mt-0 lg:w-[40%] lg:pl-20">
-            <div className="mx-auto lg:ml-auto max-w-2xl lg:max-w-none lg:-translate-x-48 lg:translate-y-28 lg:w-[135%]">
-              <div className="rounded-[28px] border border-white bg-transparent" style={{ padding: '4px', transform: 'scale(1.25)', transformOrigin: 'left center' }}>
+            <div className="mx-auto lg:ml-auto max-w-2xl lg:max-w-none lg:-translate-x-48 lg:translate-y-28 lg:w-[135%] overflow-visible">
+              <div className="rounded-[28px] border border-white bg-transparent p-1" style={{ WebkitBackfaceVisibility: 'hidden' }}>
                 <div className="aspect-video w-full overflow-hidden rounded-[22px]">
                   <video
                     ref={videoRef}
