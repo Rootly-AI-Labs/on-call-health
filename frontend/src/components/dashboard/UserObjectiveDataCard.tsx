@@ -114,6 +114,14 @@ export function UserObjectiveDataCard({
         // This avoids an API call and works for both real and mock/demo analyses
         const userEmail = memberData.user_email.toLowerCase();
 
+        console.log('🔍 UserTrends Debug:', {
+          userEmail,
+          hasIndividualDailyData: !!individualDailyData,
+          availableKeys: individualDailyData ? Object.keys(individualDailyData).slice(0, 5) : [],
+          userExistsInData: individualDailyData ? userEmail in individualDailyData : false,
+          currentAnalysisKeys: currentAnalysis ? Object.keys(currentAnalysis) : []
+        });
+
         if (individualDailyData && individualDailyData[userEmail]) {
           // Transform the data from individual_daily_data into the format expected by the chart
           const dailyData = individualDailyData[userEmail];
@@ -133,12 +141,14 @@ export function UserObjectiveDataCard({
             .sort((a, b) => a.date.localeCompare(b.date))
             .slice(-30); // Last 30 days
 
+          console.log('✅ UserTrends: Using individual_daily_data, entries:', transformedData.length);
           setDailyHealthData(transformedData);
           setLoading(false);
           return;
         }
 
         // FALLBACK: If individual_daily_data not available, fetch from API
+        console.log('⚠️ UserTrends: Falling back to API call');
         const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
         const url = `${API_BASE}/analyses/${analysisId}/members/${encodeURIComponent(memberData.user_email)}/daily-health`;
 
@@ -152,8 +162,13 @@ export function UserObjectiveDataCard({
         if (response.ok) {
           const result = await response.json();
           if (result.status === 'success' && result.data?.daily_health) {
+            console.log('✅ UserTrends: API returned data, entries:', result.data.daily_health.length);
             setDailyHealthData(result.data.daily_health);
+          } else {
+            console.log('❌ UserTrends: API response missing daily_health');
           }
+        } else {
+          console.log('❌ UserTrends: API call failed:', response.status);
         }
       } catch (err) {
         console.error('Error fetching user daily health:', err);
