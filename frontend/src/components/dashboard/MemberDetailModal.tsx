@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, BarChart, Bar, Cell } from "recharts"
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, BarChart, Bar } from "recharts"
 import { Info, RefreshCw, BarChart3, Activity } from "lucide-react"
 import { useState, useEffect, useRef } from "react"
 import { UserObjectiveDataCard } from "@/components/dashboard/UserObjectiveDataCard"
@@ -87,18 +87,35 @@ function IndividualDailyHealthChart({ memberData, analysisId, currentAnalysis }:
         const result = await response.json();
 
         if (result.status === 'success' && result.data?.daily_health) {
-          const formattedData = result.data.daily_health.map((day: any) => ({
-            date: day.date,
-            health_score: day.health_score,
-            incident_count: day.incident_count,
-            team_health: day.team_health,
-            day_name: day.day_name || new Date(day.date).toLocaleDateString('en-US', {
-              weekday: 'short', month: 'short', day: 'numeric'
-            }),
-            factors: day.factors,
-            has_data: day.has_data !== undefined ? day.has_data : day.incident_count > 0,
-            tooltip_summary: day.tooltip_summary
-          }));
+          const formattedData = result.data.daily_health.map((day: any) => {
+            const has_data = day.has_data !== undefined ? day.has_data : day.incident_count > 0;
+            const health_score = day.health_score;
+
+            // Calculate fill color based on health score and has_data
+            const fill = !has_data ? '#D1D5DB' :
+              health_score >= 75 ? '#EF4444' :
+              health_score >= 50 ? '#F97316' :
+              health_score >= 25 ? '#F59E0B' :
+              '#10B981';
+
+            return {
+              date: day.date,
+              health_score: health_score,
+              incident_count: day.incident_count,
+              team_health: day.team_health,
+              day_name: day.day_name || new Date(day.date).toLocaleDateString('en-US', {
+                weekday: 'short', month: 'short', day: 'numeric'
+              }),
+              factors: day.factors,
+              has_data: has_data,
+              tooltip_summary: day.tooltip_summary,
+              fill: fill,
+              stroke: !has_data ? '#9CA3AF' : 'none',
+              strokeWidth: !has_data ? 2 : 0,
+              strokeDasharray: !has_data ? '4,4' : 'none',
+              opacity: !has_data ? 0.7 : 1
+            };
+          });
 
           setDailyHealthData(formattedData);
         } else {
@@ -242,24 +259,7 @@ function IndividualDailyHealthChart({ memberData, analysisId, currentAnalysis }:
                 dataKey="health_score"
                 radius={[4, 4, 0, 0]}
                 maxBarSize={40}
-              >
-                {dailyHealthData.map((entry, index) => (
-                  <Cell
-                    key={`cell-${index}`}
-                    fill={
-                      !entry.has_data ? '#D1D5DB' :
-                      entry.health_score >= 75 ? '#EF4444' :
-                      entry.health_score >= 50 ? '#F97316' :
-                      entry.health_score >= 25 ? '#F59E0B' :
-                      '#10B981'
-                    }
-                    stroke={!entry.has_data ? '#9CA3AF' : 'none'}
-                    strokeWidth={!entry.has_data ? 2 : 0}
-                    strokeDasharray={!entry.has_data ? '4,4' : 'none'}
-                    opacity={!entry.has_data ? 0.7 : 1}
-                  />
-                ))}
-              </Bar>
+              />
             </BarChart>
           </ResponsiveContainer>
         </div>
