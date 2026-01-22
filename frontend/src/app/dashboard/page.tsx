@@ -1135,7 +1135,6 @@ function DashboardContent() {
                       }
                     })()}
                     loadingAnalysis={loadingAnalyses}
-                    membersCount={allActiveMembers.length}
                   />
                 )}
                 
