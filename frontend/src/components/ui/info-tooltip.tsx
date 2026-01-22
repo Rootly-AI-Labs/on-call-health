@@ -14,7 +14,7 @@ export function InfoTooltip({
   content,
   side = "top",
   iconClassName = ""
-}: InfoTooltipProps) {
+}: InfoTooltipProps): React.ReactElement {
   return (
     <Tooltip content={content} side={side}>
       <Info
