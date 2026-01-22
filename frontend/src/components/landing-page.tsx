@@ -139,7 +139,7 @@ export default function LandingPage() {
       <section className="bg-[url(/images/landing/rootly-bg.avif)] bg-cover bg-[position:50%_15%] lg:bg-[size:210%] lg:bg-[position:-1200px_-300px] relative lg:pb-[120px]" id="get-started">
         {/* Header */}
         <div className="px-4 py-2">
-          <div className="flex items-center w-full justify-between">
+          <div className="flex items-center w-full justify-between mb-4 lg:mb-0">
             <div className="flex items-center lg:translate-x-10 lg:translate-y-1">
               <div className="ml-2 mr-6 flex flex-col items-start -space-y-1">
                 <a href="https://rootly.com" target="_blank">
@@ -169,7 +169,7 @@ export default function LandingPage() {
         </div>
         <div className="container flex flex-col lg:flex-row flex-grow mx-auto px-4">
           <main className="w-full flex-grow px-5 lg:pr-10 lg:w-[60%] text-white relative lg:top-14 lg:-ml-8">
-            <div className="inline-flex items-center rounded-full border-[0.25px] border-white/50 px-2.5 py-1 text-[10px] tracking-[0.35em] uppercase font-bold text-white/80 mb-4 mt-4 lg:mb-6 translate-x-1 translate-y-1">
+            <div className="inline-flex items-center rounded-full border-[0.25px] border-white/50 px-2.5 py-1 text-[9px] tracking-[0.3em] uppercase font-bold text-white/80 mb-2 mt-4 lg:mb-6 translate-x-1 translate-y-1 lg:text-[10px] lg:tracking-[0.35em]">
               <span className="relative top-[1px]">OPEN SOURCE - APACHE LICENSE 2.0</span>
             </div>
             <h1 className="text-4xl lg:text-6xl tracking-tight mb-6 leading-tight pt-2 lg:pt-10 lg:pb-1 leading-snug relative lg:-top-8">
@@ -190,7 +190,7 @@ export default function LandingPage() {
             <div id="login" className="mt-6 flex flex-col sm:flex-row gap-4 items-center mb-6">
             <Button
               size="lg"
-              className="w-full rounded-3xl sm:w-auto bg-[#E4E5EB] hover:bg-[#d7d8de] text-[color:var(--color-blue-15,_#1E1A33)] px-8 py-7 text-lg font-display font-bold flex items-center justify-center"
+              className="w-full rounded-3xl sm:w-auto bg-[#E4E5EB] hover:bg-[#d7d8de] text-[color:var(--color-blue-15,_#1E1A33)] px-6 py-5 text-base font-display font-bold flex items-center justify-center lg:px-8 lg:py-7 lg:text-lg"
               onClick={handleGoogleLogin}
               disabled={isLoading === "google"}
             >
@@ -211,7 +211,7 @@ export default function LandingPage() {
 
             <Button
               size="lg"
-              className="w-full rounded-3xl sm:w-auto bg-[#100F12] hover:bg-[#1b1a1e] text-[color:var(--text-text-contrast,_#FFFFFF)] px-8 py-7 text-lg font-display font-bold flex items-center justify-center"
+              className="w-full rounded-3xl sm:w-auto bg-[#100F12] hover:bg-[#1b1a1e] text-[color:var(--text-text-contrast,_#FFFFFF)] px-6 py-5 text-base font-display font-bold flex items-center justify-center lg:px-8 lg:py-7 lg:text-lg"
               onClick={handleGitHubLogin}
               disabled={isLoading === "github"}
             >
@@ -251,13 +251,13 @@ export default function LandingPage() {
           </aside>
         </div>
         {/* Features Banner */}
-        <div className="container mx-auto px-4 py-20 mt-12 lg:mt-40 relative z-10">
+        <div className="container mx-auto px-4 pt-12 pb-0 mt-6 lg:mt-40 lg:py-20 relative z-10">
           <Image
             src="/images/landing/upstart-asset.png"
             alt="Rootly customer story"
             width={1784}
             height={602}
-            className="w-2/3 h-auto mx-auto"
+            className="w-11/12 sm:w-4/5 lg:w-2/3 h-auto mx-auto mt-2 lg:mt-0"
             priority
             quality={90}
           />
@@ -265,9 +265,10 @@ export default function LandingPage() {
     <div className="w-full mb-[-1px] absolute h-[240px] bottom-0 left-0 z-0 lg:h-[250px] bg-gradient-to-b from-transparent via-white/60 to-white pointer-events-none">                               
     </div> 
       </section>
+      <div className="mx-auto my-12 h-px w-2/3 bg-slate-200 lg:hidden" />
 
       {/* How It Works Section */}
-      <section className="pt-8 pb-12 bg-white lg:pt-8">
+      <section className="pt-0 pb-0 bg-white lg:pt-8 lg:pb-12">
         <div className="container mx-auto px-4">
           <div className="text-center mb-4">
             <h2 className="text-4xl md:text-5xl font-semibold text-slate-900 mb-4">Sustainable work backed by data.</h2>
@@ -280,25 +281,25 @@ export default function LandingPage() {
               width={2400}
               height={1322}
               sizes="80vw"
-              className="w-[80%] h-auto mt-20 mb-20 mx-auto"
+              className="w-[95%] sm:w-[90%] lg:w-[80%] h-auto mt-10 lg:mt-20 mb-20 mx-auto"
               quality={90}
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 w-[80%] mx-auto items-stretch">
-            <div className="rounded-2xl border border-purple-100 px-7 pt-7 pb-2 h-full min-h-[300px]" style={{ background: "var(--surface-surface-bg-accent-shade, #F7F5FF)" }}>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 w-[95%] sm:w-[90%] lg:w-[80%] mx-auto items-stretch">
+            <div className="rounded-2xl border border-purple-100 px-7 pt-7 pb-2 h-full min-h-[220px] sm:min-h-[260px] lg:min-h-[300px]" style={{ background: "var(--surface-surface-bg-accent-shade, #F7F5FF)" }}>
               <h3 className="text-xl font-semibold text-slate-900 mb-6">Connect signals</h3>
               <p className="text-slate-600 leading-relaxed mb-0 mt-2">
                 Start with Rootly or PagerDuty for incident data, add Linear for ticket workload, GitHub for after-hours signals, and Slack for communication patterns and context.
               </p>
             </div>
-            <div className="rounded-2xl border border-purple-100 px-6 pt-6 pb-0 h-full min-h-[300px]" style={{ background: "var(--surface-surface-bg-accent-shade, #F7F5FF)" }}>
+            <div className="rounded-2xl border border-purple-100 px-6 pt-6 pb-0 h-full min-h-[220px] sm:min-h-[260px] lg:min-h-[300px]" style={{ background: "var(--surface-surface-bg-accent-shade, #F7F5FF)" }}>
               <h3 className="text-xl font-semibold text-slate-900 mb-6">Collect sentiment</h3>
               <p className="text-slate-600 leading-relaxed mb-0 mt-2">
                 Periodically send short surveys in Slack so responders can share how they're doing. Fast, low-friction, and designed to reduce stigma (not create it).
               </p>
             </div>
-            <div className="rounded-2xl border border-purple-100 px-6 pt-6 pb-0 h-full min-h-[300px]" style={{ background: "var(--surface-surface-bg-accent-shade, #F7F5FF)" }}>
+            <div className="rounded-2xl border border-purple-100 px-6 pt-6 pb-0 h-full min-h-[220px] sm:min-h-[260px] lg:min-h-[300px]" style={{ background: "var(--surface-surface-bg-accent-shade, #F7F5FF)" }}>
               <h3 className="text-xl font-semibold text-slate-900 mb-6">See who's at risk</h3>
               <p className="text-slate-600 leading-relaxed mb-0 mt-2">
                 On-Call Health computes individual risk scores from ingested data:
@@ -308,20 +309,21 @@ export default function LandingPage() {
                 <span className="text-red-600 font-semibold"> 75-100</span> Immediate action.
               </p>
             </div>
-            <div className="rounded-2xl border border-purple-100 px-6 pt-6 pb-0 h-full min-h-[300px]" style={{ background: "var(--surface-surface-bg-accent-shade, #F7F5FF)" }}>
+            <div className="rounded-2xl border border-purple-100 px-6 pt-6 pb-0 h-full min-h-[220px] sm:min-h-[260px] lg:min-h-[300px]" style={{ background: "var(--surface-surface-bg-accent-shade, #F7F5FF)" }}>
               <h3 className="text-xl font-semibold text-slate-900 mb-6">Act early with confidence</h3>
               <p className="text-slate-600 leading-relaxed mb-0 mt-2">
                 AI analyzes what changed (and what’s driving it) so you can make better, informed decisions to protect your engineers before risk becomes burnout.
                 </p>
             </div>
           </div>
+          <div className="mx-auto my-12 h-px w-2/3 bg-slate-200 lg:hidden" />
 
         </div>
       </section>
-      <section className="mt-32">
-        <div className="container mt-10">
-          <div className="grid grid-cols-1 lg:grid-cols-2 items-center gap-12 w-[80%] mx-auto">
-            <div className="py-10">
+      <section className="mt-0 lg:mt-32">
+        <div className="container mt-0 lg:mt-10">
+          <div className="grid grid-cols-1 lg:grid-cols-2 items-center gap-1 lg:gap-12 w-[95%] sm:w-[90%] lg:w-[80%] mx-auto">
+            <div className="pt-0 pb-4 lg:py-10">
               <h2 className="text-3xl md:text-4xl text-slate-900 mb-4">Catch overload before it becomes burnout.</h2>
               <p className="mb-2 text-lg text-[#787685]">
               Spot trend shifts before burnout becomes reality—so you can intervene while fixes are still small: 
@@ -342,7 +344,7 @@ export default function LandingPage() {
           </div>
           </div>
           <div className="container">
-            <div className="grid grid-cols-1 lg:grid-cols-2 items-center gap-12 mt-20 mb-20 w-[80%] mx-auto">
+            <div className="grid grid-cols-1 lg:grid-cols-2 items-center gap-1 lg:gap-12 mt-20 mb-20 w-[95%] sm:w-[90%] lg:w-[80%] mx-auto">
               <div className="order-2 lg:order-1">
                 <Image
                   src="/images/landing/trends.png"
@@ -354,7 +356,7 @@ export default function LandingPage() {
                   quality={90}
                 />
               </div>
-              <div className="py-10 order-1 lg:order-2">
+              <div className="py-4 lg:py-10 order-1 lg:order-2">
                 <h2 className="text-3xl md:text-4xl text-slate-900 mb-4">Make on-call health measurable and fair.</h2>
                 <p className="mb-2 text-lg text-[#787685]">
                 On-Call Health uses team and individual-specific baselines to track trends over time, 
@@ -364,8 +366,8 @@ export default function LandingPage() {
             </div>
           </div>
           <div className="container">
-            <div className="grid grid-cols-1 lg:grid-cols-2 items-center gap-12 mt-20 w-[80%] mx-auto">
-              <div className="py-10">
+            <div className="grid grid-cols-1 lg:grid-cols-2 items-center gap-1 lg:gap-12 mt-20 w-[95%] sm:w-[90%] lg:w-[80%] mx-auto">
+              <div className="py-4 lg:py-10">
                 <h2 className="text-3xl md:text-4xl text-slate-900 mb-4">Align the team and act <br/> faster.</h2>
                 <p className="mb-2 text-lg text-[#787685]">
                 AI summaries help stakeholders quickly get up to speed on trends they may have missed, turning weekly incident
