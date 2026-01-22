@@ -12,7 +12,7 @@
 ![OpenAI](https://img.shields.io/badge/OpenAI-412991?logo=openai&logoColor=white)
 ![Anthropic](https://img.shields.io/badge/Anthropic-D4A27F?logo=anthropic&logoColor=white)
 
-Catch exhaustion before it burns out your engineers.
+Catch overload before it burns out your engineers.
 
 On-Call Health integrates with Rootly, PagerDuty, GitHub, Slack, Linear, and Jira to collect objective and self-reported data to look for sign of overload in on-call engineers. Free and open-source.
 

@@ -74,7 +74,7 @@ export function UserRiskFactorsCard({
           </div>
           <InfoTooltip
             content="Percentage contribution of each factor to the overall risk score based on work patterns, incident load, and timing."
-            side="bottom"
+            side="left"
             iconClassName="ml-4 w-4 h-4"
           />
         </div>
@@ -88,7 +88,7 @@ export function UserRiskFactorsCard({
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-sm text-neutral-700">{factor.name}</span>
                   {factorDescription && (
-                    <InfoTooltip content={factorDescription} side="top" />
+                    <InfoTooltip content={factorDescription} side="right" />
                   )}
                   <span className="text-sm font-semibold text-violet-600 ml-auto">{factor.percentage}%</span>
                 </div>

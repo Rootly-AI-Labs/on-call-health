@@ -188,7 +188,7 @@ export default function LandingPage() {
               <span className="relative top-[1px]">OPEN SOURCE - APACHE LICENSE 2.0</span>
             </div>
             <h1 className="text-4xl lg:text-6xl tracking-tight mb-6 leading-tight pt-2 lg:pt-10 lg:pb-1 leading-snug relative lg:-top-8">
-              Catch exhaustion
+              Catch overload
               <br />
               before it burns out
               <br />
@@ -344,7 +344,7 @@ export default function LandingPage() {
         <div className="container mt-0 lg:mt-10">
           <div className="grid grid-cols-1 lg:grid-cols-2 items-center gap-1 lg:gap-12 w-[95%] sm:w-[90%] lg:w-[80%] mx-auto">
             <div className="pt-0 pb-4 lg:py-10">
-              <h2 className="text-3xl md:text-4xl text-slate-900 mb-4">Catch exhaustion before it becomes burnout.</h2>
+              <h2 className="text-3xl md:text-4xl text-slate-900 mb-4">Catch overload before it becomes burnout.</h2>
               <p className="mb-2 text-lg text-[#787685]">
               Spot trend shifts before burnout becomes reality—so you can intervene while fixes are still small: 
               rebalance rotations, add automation, pause non-urgent work, or staff up.

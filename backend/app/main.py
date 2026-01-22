@@ -20,10 +20,10 @@ from .api.endpoints import auth, rootly, analysis, analyses, pagerduty, github, 
 # Configure logging based on environment variable
 LOG_LEVEL = getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO)
 
-# Create and configure the UserContextFilter to add user identity to all log records
+# Create and configure the UserContextFilter to add user_id to all log records
 user_context_filter = UserContextFilter()
 
-# Configure logging with user identifier (email preferred) in the format
+# Configure logging with user_id in the format
 logging.basicConfig(
     level=LOG_LEVEL,
     format='%(asctime)s - %(name)s - %(levelname)s - [user_id=%(user_id)s] - %(message)s',
@@ -88,15 +88,19 @@ app.middleware("http")(user_logging_middleware)
 # Configure CORS - Secure configuration
 def get_cors_origins() -> list[str]:
     """Get allowed CORS origins based on environment."""
-    # Start with configured frontend URL
     origins = [settings.FRONTEND_URL]
 
     # Development origins - localhost and 127.0.0.1 on common Next.js ports
     dev_ports = ["3000", "3001", "3002"]
-    origins.extend(f"http://{host}:{port}" for host in ["localhost", "127.0.0.1"] for port in dev_ports)
+    for port in dev_ports:
+        origins.append(f"http://localhost:{port}")
+        origins.append(f"http://127.0.0.1:{port}")
 
     # Production domains
-    origins.extend(["https://www.oncallburnout.com", "https://oncallburnout.com"])
+    origins.extend([
+        "https://www.oncallburnout.com",
+        "https://oncallburnout.com"
+    ])
 
     # Optional environment-based origins
     production_frontend = os.getenv("PRODUCTION_FRONTEND_URL")
@@ -108,10 +112,11 @@ def get_cors_origins() -> list[str]:
         origins.append(f"https://{vercel_url}")
 
     # Remove duplicates while preserving order
-    unique_origins = list(dict.fromkeys(origins))
-    logger.info(f"CORS allowed origins: {unique_origins}")
+    origins = list(dict.fromkeys(origins))
 
-    return unique_origins
+    logger.info(f"CORS allowed origins: {origins}")
+
+    return origins
 
 app.add_middleware(
     CORSMiddleware,
@@ -166,6 +171,8 @@ async def startup_event():
             print("⚠️  Some migrations failed - check logs")
     except Exception as e:
         print(f"⚠️  Migration runner failed: {e}")
+        # Don't fail startup if migrations fail
+        pass
 
     # Start survey scheduler
     from app.services.survey_scheduler import survey_scheduler
@@ -183,7 +190,7 @@ async def startup_event():
         print(f"⚠️ Error loading survey schedules: {str(e)}")
     finally:
         db.close()
-
+    
 
 # Include API routers
 app.include_router(auth.router, prefix="/auth", tags=["authentication"])

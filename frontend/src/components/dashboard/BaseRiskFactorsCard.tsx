@@ -3,6 +3,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Tooltip } from "recharts"
 import { Info, AlertTriangle, Loader2 } from "lucide-react"
+import { InfoTooltip } from "@/components/ui/info-tooltip"
 
 export interface BaseRiskFactorsCardProps {
   title: string
@@ -96,25 +97,16 @@ export function BaseRiskFactorsCard({
           </div>
 
           {showInfoTooltip && Object.keys(factorDescriptions).length > 0 && (
-            <div className="relative group ml-4">
-              <Info className="w-4 h-4 text-neutral-500 cursor-help hover:text-neutral-700 transition-colors" />
-              <div className="absolute top-full right-0 mt-2 px-3 py-2 bg-neutral-900/95 text-white text-xs rounded-lg w-72 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                <div className="font-semibold mb-2">Risk Factors Scoring</div>
-                <div className="space-y-2">
-                  {factorsData.map((factor) => {
+            <div className="ml-4">
+              <InfoTooltip
+                content={
+                  factorsData.map((factor) => {
                     const description = factorDescriptions[factor.factor]
-                    return (
-                      <div key={factor.factor}>
-                        <div className="font-medium text-blue-300">{factor.factor}</div>
-                        {description && (
-                          <div className="text-xs mt-1">{description}</div>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-                <div className="absolute bottom-full right-4 w-0 h-0 border-l-4 border-r-4 border-b-4 border-l-transparent border-r-transparent border-b-gray-900/95"></div>
-              </div>
+                    return description ? `${factor.factor}: ${description}` : factor.factor
+                  }).join('\n\n')
+                }
+                side="left"
+              />
             </div>
           )}
         </div>
