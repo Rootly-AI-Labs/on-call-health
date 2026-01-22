@@ -40,7 +40,7 @@ MIN_API_KEY_LENGTH = 32
 # Must be configured for admin endpoints to function (defense in depth)
 ADMIN_IP_WHITELIST = os.getenv("ADMIN_IP_WHITELIST", "").strip()
 
-def _parse_ip_whitelist() -> set:
+def _parse_ip_whitelist() -> set[str]:
     """Parse the IP whitelist from environment variable."""
     if not ADMIN_IP_WHITELIST:
         return set()
@@ -67,7 +67,7 @@ def _get_client_ip(request: Request) -> str:
             pass
     return request.client.host if request.client else "unknown"
 
-def _is_ip_whitelisted(client_ip: str, whitelist: set) -> bool:
+def _is_ip_whitelisted(client_ip: str, whitelist: set[str]) -> bool:
     """Check if client IP is in the whitelist. Supports both exact IPs and CIDR ranges."""
     if not whitelist:
         return False

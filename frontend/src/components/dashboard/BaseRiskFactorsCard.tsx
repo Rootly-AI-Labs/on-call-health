@@ -34,13 +34,11 @@ export function BaseRiskFactorsCard({
   showInfoTooltip = true,
   factorDescriptions = {},
   domain = [0, 100],
-  height = "h-64",
+  height = "h-80",
   chartColor = "#8b5cf6",
   loading = false,
   className = ""
-}: BaseRiskFactorsCardProps) {
-
-  // Show loading state
+}: BaseRiskFactorsCardProps): React.ReactElement {
   if (loading) {
     return (
       <Card className={className}>
@@ -60,7 +58,6 @@ export function BaseRiskFactorsCard({
     )
   }
 
-  // Show empty state
   if (!factorsData || factorsData.length === 0) {
     return (
       <Card className={className}>
@@ -78,17 +75,19 @@ export function BaseRiskFactorsCard({
   }
 
   return (
-    <Card className={className}>
+    <Card className={`h-full flex flex-col ${className}`}>
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex-1 space-y-1.5">
             <div className="flex items-center space-x-2">
               <CardTitle>{title}</CardTitle>
-              {showAlert && alertCount && alertCount > 0 && (
+              {showAlert && alertCount > 0 && (
                 <div className="flex items-center space-x-1">
                   <AlertTriangle className="w-4 h-4 text-red-500" />
                   <span className="text-sm font-medium text-red-600">
-                    {alertCount} factor{alertCount > 1 ? 's' : ''} need{alertCount === 1 ? 's' : ''} attention
+                    {alertCount === 1
+                      ? '1 factor needs attention'
+                      : `${alertCount} factors need attention`}
                   </span>
                 </div>
               )}
@@ -96,7 +95,6 @@ export function BaseRiskFactorsCard({
             <CardDescription>{description}</CardDescription>
           </div>
 
-          {/* Info icon with tooltip */}
           {showInfoTooltip && Object.keys(factorDescriptions).length > 0 && (
             <div className="relative group ml-4">
               <Info className="w-4 h-4 text-neutral-500 cursor-help hover:text-neutral-700 transition-colors" />
@@ -121,10 +119,10 @@ export function BaseRiskFactorsCard({
           )}
         </div>
       </CardHeader>
-      <CardContent>
-        <div className={height}>
+      <CardContent className="flex-1 flex flex-col min-h-0 pb-2">
+        <div className="flex-1 min-h-[320px]">
           <ResponsiveContainer width="100%" height="100%">
-            <RadarChart data={factorsData}>
+            <RadarChart data={factorsData} cx="50%" cy="55%" outerRadius="95%">
               <PolarGrid gridType="polygon" />
               <PolarAngleAxis
                 dataKey="factor"

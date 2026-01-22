@@ -1,8 +1,7 @@
 "use client"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Info, Loader2 } from "lucide-react"
-import { Tooltip } from "@/components/ui/tooltip"
+import { Loader2 } from "lucide-react"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
 import { FACTOR_DESCRIPTIONS } from "./TeamRiskFactorsCard"
 
@@ -26,7 +25,7 @@ interface UserRiskFactorsCardProps {
 export function UserRiskFactorsCard({
   selectedMember,
   loading = false
-}: UserRiskFactorsCardProps) {
+}: UserRiskFactorsCardProps): React.ReactElement {
   const memberName = selectedMember?.user_name || 'Team Member'
   const factors = selectedMember?.ocb_factors?.all || []
 
@@ -73,13 +72,11 @@ export function UserRiskFactorsCard({
             <CardTitle>Risk Factors</CardTitle>
             <CardDescription>Top 5 risk factors for {memberName}</CardDescription>
           </div>
-          <Tooltip
+          <InfoTooltip
             content="Percentage contribution of each factor to the overall risk score based on work patterns, incident load, and timing."
             side="bottom"
-            className="ml-4"
-          >
-            <Info className="w-4 h-4 text-neutral-500 cursor-help hover:text-neutral-700 transition-colors" />
-          </Tooltip>
+            iconClassName="ml-4 w-4 h-4"
+          />
         </div>
       </CardHeader>
       <CardContent className="p-4 pb-6">

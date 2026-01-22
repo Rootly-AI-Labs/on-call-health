@@ -113,7 +113,7 @@ function safeDateCompare(dateA: string | null, dateB: string | null): number {
 }
 
 // Jira priority order mapping
-const JIRA_PRIORITY_ORDER: { [key: string]: number } = {
+const JIRA_PRIORITY_ORDER: Record<string, number> = {
   highest: 1,
   high: 2,
   medium: 3,
@@ -147,6 +147,17 @@ function sortLinearIssues(issues: any[]): any[] {
   })
 }
 
+// Convert Linear numeric priority to display label
+function getLinearPriorityLabel(priority: number): string {
+  switch (priority) {
+    case 1: return "Urgent"
+    case 2: return "High"
+    case 3: return "Med"
+    case 4: return "Low"
+    default: return "None"
+  }
+}
+
 // Generate stable key for ticket/issue items
 function getItemKey(item: any): string | null {
   return item.key || item.identifier || item.id || null
@@ -154,6 +165,8 @@ function getItemKey(item: any): string | null {
 
 // Content component for Jira tickets (used in consolidated card)
 function JiraTicketCardContent({ memberData }: TicketingCardProps) {
+  const [isTicketsExpanded, setIsTicketsExpanded] = useState(false)
+
   if (!memberData?.jira_tickets || memberData.jira_tickets.length === 0) {
     return <p className="text-sm text-neutral-500 text-center py-4">No active Jira tickets</p>
   }
@@ -166,28 +179,7 @@ function JiraTicketCardContent({ memberData }: TicketingCardProps) {
   const dueIn7DaysCount = tickets.filter((ticket: any) => isDueIn7Days(ticket.duedate)).length
   const overdueCount = tickets.filter((ticket: any) => isOverdue(ticket.duedate)).length
 
-  // Sort tickets by priority (high to low) then by due date, with None at the bottom
-  const sortedTickets = [...tickets].sort((a, b) => {
-    const priorityOrder: { [key: string]: number } = {
-      highest: 1,
-      high: 2,
-      medium: 3,
-      low: 4,
-      lowest: 5,
-    }
-    const aPriority = a.priority?.toLowerCase() || ""
-    const bPriority = b.priority?.toLowerCase() || ""
-
-    const aOrder = priorityOrder[aPriority] !== undefined ? priorityOrder[aPriority] : 999
-    const bOrder = priorityOrder[bPriority] !== undefined ? priorityOrder[bPriority] : 999
-
-    if (aOrder !== bOrder) {
-      return aOrder - bOrder
-    }
-
-    // If same priority, sort by due date (earlier first)
-    return safeDateCompare(a.duedate, b.duedate)
-  })
+  const sortedTickets = sortJiraTickets(tickets)
 
   return (
     <div className="space-y-4 w-full overflow-hidden">
@@ -213,44 +205,58 @@ function JiraTicketCardContent({ memberData }: TicketingCardProps) {
 
       <Separator />
 
-      {/* Ticket List */}
+      {/* Collapsible Ticket List */}
       <div className="w-full overflow-hidden">
-        <p className="text-xs font-semibold text-neutral-700 mb-3">Active Tickets ({sortedTickets.length})</p>
-        <div className="space-y-2 max-h-64 overflow-y-auto w-full">
-          {sortedTickets.map((ticket, index) => (
-            <div key={getItemKey(ticket) || `ticket-${index}`} className="flex items-center gap-2 p-2 bg-neutral-100 rounded-md hover:bg-neutral-200 transition overflow-hidden">
-              <Badge
-                className="text-xs flex-shrink-0"
-                style={getPriorityColor(ticket.priority)}
-              >
-                {ticket.priority || "N/A"}
-              </Badge>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-neutral-900 truncate line-clamp-1">
-                  <span className="font-bold">{ticket.key}</span>
-                  {ticket.summary || ticket.title ? ` - ${ticket.summary || ticket.title}` : ""}
-                </p>
+        <button
+          onClick={() => setIsTicketsExpanded(!isTicketsExpanded)}
+          className="flex items-center gap-1 text-xs font-semibold text-neutral-700 hover:text-neutral-900 transition-colors"
+        >
+          {isTicketsExpanded ? (
+            <ChevronDown className="w-4 h-4" />
+          ) : (
+            <ChevronRight className="w-4 h-4" />
+          )}
+          Active Tickets ({sortedTickets.length})
+        </button>
+        {isTicketsExpanded && (
+          <div className="space-y-2 max-h-64 overflow-y-auto w-full mt-3">
+            {sortedTickets.map((ticket, index) => (
+              <div key={getItemKey(ticket) || `ticket-${index}`} className="flex items-center gap-2 p-2 bg-neutral-100 rounded-md hover:bg-neutral-200 transition overflow-hidden">
+                <Badge
+                  className="text-xs flex-shrink-0"
+                  style={getPriorityColor(ticket.priority)}
+                >
+                  {ticket.priority || "N/A"}
+                </Badge>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-neutral-900 truncate line-clamp-1">
+                    <span className="font-bold">{ticket.key}</span>
+                    {ticket.summary || ticket.title ? ` - ${ticket.summary || ticket.title}` : ""}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1 text-xs text-neutral-500 whitespace-nowrap flex-shrink-0">
+                  <Clock className="w-3 h-3" />
+                  <span>{formatDueDate(ticket.duedate)}</span>
+                </div>
               </div>
-              <div className="flex items-center gap-1 text-xs text-neutral-500 whitespace-nowrap flex-shrink-0">
-                <Clock className="w-3 h-3" />
-                <span>{formatDueDate(ticket.duedate)}</span>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
 }
 
 // Component to display Jira tickets
-function JiraTicketCard({ memberData }: TicketingCardProps) {
+function JiraTicketCard({ memberData }: TicketingCardProps): React.ReactElement {
+  const [isTicketsExpanded, setIsTicketsExpanded] = useState(false)
+
   if (!memberData?.jira_tickets || memberData.jira_tickets.length === 0) {
     return (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <span className="text-blue-600">●</span> Jira Workload
+            <span className="text-blue-600">*</span> Jira Workload
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -268,28 +274,7 @@ function JiraTicketCard({ memberData }: TicketingCardProps) {
   const dueIn7DaysCount = tickets.filter((ticket: any) => isDueIn7Days(ticket.duedate)).length
   const overdueCount = tickets.filter((ticket: any) => isOverdue(ticket.duedate)).length
 
-  // Sort tickets by priority (high to low) then by due date, with None at the bottom
-  const sortedTickets = [...tickets].sort((a, b) => {
-    const priorityOrder: { [key: string]: number } = {
-      highest: 1,
-      high: 2,
-      medium: 3,
-      low: 4,
-      lowest: 5,
-    }
-    const aPriority = a.priority?.toLowerCase() || ""
-    const bPriority = b.priority?.toLowerCase() || ""
-
-    const aOrder = priorityOrder[aPriority] !== undefined ? priorityOrder[aPriority] : 999
-    const bOrder = priorityOrder[bPriority] !== undefined ? priorityOrder[bPriority] : 999
-
-    if (aOrder !== bOrder) {
-      return aOrder - bOrder
-    }
-
-    // If same priority, sort by due date (earlier first)
-    return safeDateCompare(a.duedate, b.duedate)
-  })
+  const sortedTickets = sortJiraTickets(tickets)
 
   return (
     <Card>
@@ -321,31 +306,43 @@ function JiraTicketCard({ memberData }: TicketingCardProps) {
 
         <Separator />
 
-        {/* Ticket List */}
-        <div>
-          <p className="text-xs font-semibold text-neutral-700 mb-3">Active Tickets ({sortedTickets.length})</p>
-          <div className="space-y-2 max-h-64 overflow-y-auto">
-            {sortedTickets.map((ticket, index) => (
-              <div key={getItemKey(ticket) || `ticket-${index}`} className="flex items-center gap-2 p-2 bg-neutral-100 rounded-md hover:bg-neutral-200 transition">
-                <Badge
-                  className="text-xs flex-shrink-0"
-                  style={getPriorityColor(ticket.priority)}
-                >
-                  {ticket.priority || "N/A"}
-                </Badge>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-neutral-900 truncate">
-                    <span className="font-bold">{ticket.key}</span>
-                    {ticket.summary || ticket.title ? ` - ${ticket.summary || ticket.title}` : ""}
-                  </p>
+        {/* Collapsible Ticket List */}
+        <div className="w-full overflow-hidden">
+          <button
+            onClick={() => setIsTicketsExpanded(!isTicketsExpanded)}
+            className="flex items-center gap-1 text-xs font-semibold text-neutral-700 hover:text-neutral-900 transition-colors"
+          >
+            {isTicketsExpanded ? (
+              <ChevronDown className="w-4 h-4" />
+            ) : (
+              <ChevronRight className="w-4 h-4" />
+            )}
+            Active Tickets ({sortedTickets.length})
+          </button>
+          {isTicketsExpanded && (
+            <div className="space-y-2 max-h-64 overflow-y-auto w-full mt-3">
+              {sortedTickets.map((ticket, index) => (
+                <div key={getItemKey(ticket) || `ticket-${index}`} className="flex items-center gap-2 p-2 bg-neutral-100 rounded-md hover:bg-neutral-200 transition overflow-hidden">
+                  <Badge
+                    className="text-xs flex-shrink-0"
+                    style={getPriorityColor(ticket.priority)}
+                  >
+                    {ticket.priority || "N/A"}
+                  </Badge>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-neutral-900 truncate line-clamp-1">
+                      <span className="font-bold">{ticket.key}</span>
+                      {ticket.summary || ticket.title ? ` - ${ticket.summary || ticket.title}` : ""}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1 text-xs text-neutral-500 whitespace-nowrap flex-shrink-0">
+                    <Clock className="w-3 h-3" />
+                    <span>{formatDueDate(ticket.duedate)}</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1 text-xs text-neutral-500 whitespace-nowrap flex-shrink-0">
-                  <Clock className="w-3 h-3" />
-                  <span>{formatDueDate(ticket.duedate)}</span>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
@@ -368,24 +365,7 @@ function LinearIssueCardContent({ memberData }: TicketingCardProps) {
   const dueIn7DaysCount = issues.filter((issue: any) => isDueIn7Days(issue.dueDate)).length
   const overdueCount = issues.filter((issue: any) => isOverdue(issue.dueDate)).length
 
-  // Sort issues by priority (urgent to low) then by due date, with None (0) at the bottom
-  const sortedIssues = [...issues].sort((a, b) => {
-    // Linear priority: 1=Urgent, 2=High, 3=Medium, 4=Low, 0=None
-    const aPriority = a.priority ?? 0
-    const bPriority = b.priority ?? 0
-
-    // Put None (0) priority at the bottom by giving it highest sort order
-    const aOrder = aPriority === 0 ? 999 : aPriority
-    const bOrder = bPriority === 0 ? 999 : bPriority
-
-    if (aOrder !== bOrder) {
-      // Lower priority numbers are higher priority (1 is highest)
-      return aOrder - bOrder
-    }
-
-    // If same priority, sort by due date
-    return safeDateCompare(a.dueDate, b.dueDate)
-  })
+  const sortedIssues = sortLinearIssues(issues)
 
   return (
     <div className="space-y-4 w-full overflow-hidden">
@@ -432,7 +412,7 @@ function LinearIssueCardContent({ memberData }: TicketingCardProps) {
                   className="text-xs flex-shrink-0"
                   style={getPriorityColor(issue.priority)}
                 >
-                  {issue.priority === 1 ? "Urgent" : issue.priority === 2 ? "High" : issue.priority === 3 ? "Med" : issue.priority === 4 ? "Low" : "None"}
+                  {getLinearPriorityLabel(issue.priority)}
                 </Badge>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-neutral-900 truncate">
@@ -454,7 +434,7 @@ function LinearIssueCardContent({ memberData }: TicketingCardProps) {
 }
 
 // Component to display Linear issues
-function LinearIssueCard({ memberData }: TicketingCardProps) {
+function LinearIssueCard({ memberData }: TicketingCardProps): React.ReactElement {
   const [isIssuesExpanded, setIsIssuesExpanded] = useState(false)
 
   if (!memberData?.linear_issues || memberData.linear_issues.length === 0) {
@@ -480,24 +460,7 @@ function LinearIssueCard({ memberData }: TicketingCardProps) {
   const dueIn7DaysCount = issues.filter((issue: any) => isDueIn7Days(issue.dueDate)).length
   const overdueCount = issues.filter((issue: any) => isOverdue(issue.dueDate)).length
 
-  // Sort issues by priority (urgent to low) then by due date, with None (0) at the bottom
-  const sortedIssues = [...issues].sort((a, b) => {
-    // Linear priority: 1=Urgent, 2=High, 3=Medium, 4=Low, 0=None
-    const aPriority = a.priority ?? 0
-    const bPriority = b.priority ?? 0
-
-    // Put None (0) priority at the bottom by giving it highest sort order
-    const aOrder = aPriority === 0 ? 999 : aPriority
-    const bOrder = bPriority === 0 ? 999 : bPriority
-
-    if (aOrder !== bOrder) {
-      // Lower priority numbers are higher priority (1 is highest)
-      return aOrder - bOrder
-    }
-
-    // If same priority, sort by due date
-    return safeDateCompare(a.dueDate, b.dueDate)
-  })
+  const sortedIssues = sortLinearIssues(issues)
 
   return (
     <Card>
@@ -550,7 +513,7 @@ function LinearIssueCard({ memberData }: TicketingCardProps) {
                     className="text-xs flex-shrink-0"
                     style={getPriorityColor(issue.priority)}
                   >
-                    {issue.priority === 1 ? "Urgent" : issue.priority === 2 ? "High" : issue.priority === 3 ? "Med" : issue.priority === 4 ? "Low" : "None"}
+                    {getLinearPriorityLabel(issue.priority)}
                   </Badge>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-neutral-900 truncate line-clamp-1">
