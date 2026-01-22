@@ -169,7 +169,7 @@ export default function LandingPage() {
         </div>
         <div className="container flex flex-col lg:flex-row flex-grow mx-auto px-4">
           <main className="w-full flex-grow px-5 lg:pr-10 lg:w-[60%] text-white relative lg:top-14 lg:-ml-8">
-            <div className="inline-flex items-center rounded-full border-[0.25px] border-white/50 px-2.5 py-1 text-[10px] tracking-[0.35em] uppercase font-bold text-white/80 mb-4 mt-4 lg:mb-6">
+            <div className="inline-flex items-center rounded-full border-[0.25px] border-white/50 px-2.5 py-1 text-[10px] tracking-[0.35em] uppercase font-bold text-white/80 mb-4 mt-4 lg:mb-6 translate-x-1 translate-y-1">
               <span className="relative top-[1px]">OPEN SOURCE - APACHE LICENSE 2.0</span>
             </div>
             <h1 className="text-4xl lg:text-6xl tracking-tight mb-6 leading-tight pt-2 lg:pt-10 lg:pb-1 leading-snug relative lg:-top-8">
