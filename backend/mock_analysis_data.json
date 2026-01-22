@@ -21278,7 +21278,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 5,
+            "health_score": 3,
             "team_health": 0,
             "day_name": "Tue, Dec 23"
           },
@@ -21317,7 +21317,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 5,
+            "health_score": 7,
             "team_health": 0,
             "day_name": "Wed, Dec 24"
           },
@@ -21356,13 +21356,13 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 5,
+            "health_score": 4,
             "team_health": 0,
             "day_name": "Thu, Dec 25"
           },
           "2025-12-26": {
             "date": "2025-12-26",
-            "incident_count": 0,
+            "incident_count": 1,
             "severity_weighted_count": 0.0,
             "after_hours_count": 0,
             "weekend_count": 0,
@@ -21395,7 +21395,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 5,
+            "health_score": 12,
             "team_health": 0,
             "day_name": "Fri, Dec 26"
           },
@@ -21434,13 +21434,13 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 5,
+            "health_score": 8,
             "team_health": 0,
             "day_name": "Sat, Dec 27"
           },
           "2025-12-28": {
             "date": "2025-12-28",
-            "incident_count": 1,
+            "incident_count": 0,
             "severity_weighted_count": 1.5,
             "after_hours_count": 0,
             "weekend_count": 0,
@@ -21475,7 +21475,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 15,
+            "health_score": 6,
             "team_health": 0,
             "day_name": "Sun, Dec 28"
           },
@@ -21514,7 +21514,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 5,
+            "health_score": 3,
             "team_health": 0,
             "day_name": "Mon, Dec 29"
           },
@@ -21559,7 +21559,7 @@
           },
           "2025-12-31": {
             "date": "2025-12-31",
-            "incident_count": 0,
+            "incident_count": 2,
             "severity_weighted_count": 0.0,
             "after_hours_count": 0,
             "weekend_count": 0,
@@ -21592,13 +21592,13 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 5,
+            "health_score": 18,
             "team_health": 0,
             "day_name": "Wed, Dec 31"
           },
           "2026-01-01": {
             "date": "2026-01-01",
-            "incident_count": 0,
+            "incident_count": 1,
             "severity_weighted_count": 0.0,
             "after_hours_count": 0,
             "weekend_count": 0,
@@ -21631,7 +21631,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 5,
+            "health_score": 14,
             "team_health": 0,
             "day_name": "Thu, Jan 01"
           },
@@ -21670,13 +21670,13 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 5,
+            "health_score": 9,
             "team_health": 0,
             "day_name": "Fri, Jan 02"
           },
           "2026-01-03": {
             "date": "2026-01-03",
-            "incident_count": 1,
+            "incident_count": 0,
             "severity_weighted_count": 1.5,
             "after_hours_count": 0,
             "weekend_count": 0,
@@ -21711,7 +21711,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 15,
+            "health_score": 4,
             "team_health": 0,
             "day_name": "Sat, Jan 03"
           },
@@ -21750,7 +21750,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 5,
+            "health_score": 6,
             "team_health": 0,
             "day_name": "Sun, Jan 04"
           },
@@ -21789,7 +21789,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 5,
+            "health_score": 3,
             "team_health": 0,
             "day_name": "Mon, Jan 05"
           },
@@ -21828,13 +21828,13 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 5,
+            "health_score": 8,
             "team_health": 0,
             "day_name": "Tue, Jan 06"
           },
           "2026-01-07": {
             "date": "2026-01-07",
-            "incident_count": 0,
+            "incident_count": 1,
             "severity_weighted_count": 0.0,
             "after_hours_count": 0,
             "weekend_count": 0,
@@ -21867,13 +21867,13 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 5,
+            "health_score": 11,
             "team_health": 0,
             "day_name": "Wed, Jan 07"
           },
           "2026-01-08": {
             "date": "2026-01-08",
-            "incident_count": 1,
+            "incident_count": 0,
             "severity_weighted_count": 1.5,
             "after_hours_count": 0,
             "weekend_count": 0,
@@ -21908,7 +21908,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 15,
+            "health_score": 7,
             "team_health": 0,
             "day_name": "Thu, Jan 08"
           },
@@ -21986,7 +21986,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 5,
+            "health_score": 4,
             "team_health": 0,
             "day_name": "Sat, Jan 10"
           },
@@ -22025,7 +22025,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 5,
+            "health_score": 6,
             "team_health": 0,
             "day_name": "Sun, Jan 11"
           },
@@ -22064,7 +22064,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 5,
+            "health_score": 3,
             "team_health": 0,
             "day_name": "Mon, Jan 12"
           },
@@ -22103,7 +22103,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 5,
+            "health_score": 9,
             "team_health": 0,
             "day_name": "Tue, Jan 13"
           },
@@ -22144,13 +22144,13 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 15,
+            "health_score": 16,
             "team_health": 0,
             "day_name": "Wed, Jan 14"
           },
           "2026-01-15": {
             "date": "2026-01-15",
-            "incident_count": 0,
+            "incident_count": 1,
             "severity_weighted_count": 0.0,
             "after_hours_count": 0,
             "weekend_count": 0,
@@ -22183,7 +22183,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 5,
+            "health_score": 12,
             "team_health": 0,
             "day_name": "Thu, Jan 15"
           },
@@ -22222,7 +22222,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 5,
+            "health_score": 8,
             "team_health": 0,
             "day_name": "Fri, Jan 16"
           },
@@ -22300,13 +22300,13 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 5,
+            "health_score": 4,
             "team_health": 0,
             "day_name": "Sun, Jan 18"
           },
           "2026-01-19": {
             "date": "2026-01-19",
-            "incident_count": 1,
+            "incident_count": 0,
             "severity_weighted_count": 1.5,
             "after_hours_count": 0,
             "weekend_count": 0,
@@ -22341,7 +22341,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 15,
+            "health_score": 7,
             "team_health": 0,
             "day_name": "Mon, Jan 19"
           },
@@ -22380,7 +22380,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 5,
+            "health_score": 10,
             "team_health": 0,
             "day_name": "Tue, Jan 20"
           },
@@ -22419,7 +22419,7 @@
               "response_times": [],
               "avg_response_time_minutes": 0
             },
-            "health_score": 5,
+            "health_score": 6,
             "team_health": 0,
             "day_name": "Wed, Jan 21"
           }
