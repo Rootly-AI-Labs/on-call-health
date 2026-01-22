@@ -159,7 +159,7 @@ export function UserObjectiveDataCard({
     };
 
     fetchDailyHealth();
-  }, [memberData?.user_email, analysisId, currentAnalysis]);
+  }, [memberData?.user_email, analysisId]);
 
   // Get the chart data with dynamic metric support
   const getChartData = () => {
