@@ -105,6 +105,36 @@ export function UserObjectiveDataCard({
       setLoading(true);
 
       try {
+        // OPTIMIZATION: For analyses with individual_daily_data in results, use it directly
+        // This avoids an API call and works for both real and mock/demo analyses
+        const individualDailyData = currentAnalysis?.analysis_data?.individual_daily_data;
+        const userEmail = memberData.user_email.toLowerCase();
+
+        if (individualDailyData && individualDailyData[userEmail]) {
+          // Transform the data from individual_daily_data into the format expected by the chart
+          const dailyData = individualDailyData[userEmail];
+          const transformedData = Object.entries(dailyData)
+            .map(([dateStr, dayData]: [string, any]) => ({
+              date: dateStr,
+              health_score: dayData.health_score || 0,
+              incident_count: dayData.incident_count || 0,
+              team_health: dayData.team_health || 0,
+              day_name: dayData.day_name || new Date(dateStr).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
+              has_data: dayData.has_data || false,
+              severity_weighted_count: dayData.severity_weighted_count || 0,
+              after_hours_count: dayData.after_hours_count || 0,
+              after_hours_incidents_count: dayData.after_hours_incidents_count || 0,
+              github_after_hours_count: dayData.github_after_hours_count || 0
+            }))
+            .sort((a, b) => a.date.localeCompare(b.date))
+            .slice(-30); // Last 30 days
+
+          setDailyHealthData(transformedData);
+          setLoading(false);
+          return;
+        }
+
+        // FALLBACK: If individual_daily_data not available, fetch from API
         const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
         const url = `${API_BASE}/analyses/${analysisId}/members/${encodeURIComponent(memberData.user_email)}/daily-health`;
 
@@ -129,7 +159,7 @@ export function UserObjectiveDataCard({
     };
 
     fetchDailyHealth();
-  }, [memberData?.user_email, analysisId]);
+  }, [memberData?.user_email, analysisId, currentAnalysis]);
 
   // Get the chart data with dynamic metric support
   const getChartData = () => {
