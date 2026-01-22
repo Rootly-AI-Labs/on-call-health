@@ -331,122 +331,208 @@
             },
             "jira_tickets": [
               {
-                "key": "FEAT-412",
-                "priority": "Low",
-                "duedate": null
+                "key": "PROD-101",
+                "priority": "Critical",
+                "duedate": "2026-01-22"
+              },
+              {
+                "key": "SEC-892",
+                "priority": "Critical",
+                "duedate": "2026-01-23"
               },
               {
                 "key": "PERF-184",
-                "priority": "Urgent",
-                "duedate": "2026-02-15"
+                "priority": "High",
+                "duedate": "2026-01-24"
+              },
+              {
+                "key": "BUG-445",
+                "priority": "High",
+                "duedate": "2026-01-25"
+              },
+              {
+                "key": "INFRA-332",
+                "priority": "High",
+                "duedate": "2026-01-26"
+              },
+              {
+                "key": "API-556",
+                "priority": "Critical",
+                "duedate": "2026-01-27"
+              },
+              {
+                "key": "DB-221",
+                "priority": "High",
+                "duedate": "2026-01-28"
+              },
+              {
+                "key": "FEAT-412",
+                "priority": "Medium",
+                "duedate": "2026-02-01"
+              },
+              {
+                "key": "TECH-789",
+                "priority": "High",
+                "duedate": "2026-01-20"
+              },
+              {
+                "key": "OPS-667",
+                "priority": "Critical",
+                "duedate": "2026-01-19"
+              },
+              {
+                "key": "SCALE-234",
+                "priority": "High",
+                "duedate": "2026-01-30"
+              },
+              {
+                "key": "ALERT-111",
+                "priority": "Medium",
+                "duedate": "2026-02-05"
               }
             ],
             "jira_burnout_breakdown": {
-              "jira_ocb_score": 26.5,
+              "jira_ocb_score": 45.5,
               "original_ocb": 89.22,
-              "final_ocb": 92.08,
-              "jira_added_risk": 2.86,
+              "final_ocb": 94.72,
+              "jira_added_risk": 5.5,
               "jira_indicators": {
-                "ticket_count": 2,
-                "critical_high_priority_count": 1,
-                "critical_ratio": 50.0,
-                "high_workload": false,
-                "critical_ratio_high": true
+                "ticket_count": 12,
+                "critical_high_priority_count": 8,
+                "critical_ratio": 66.7,
+                "high_workload": true,
+                "critical_ratio_high": true,
+                "overdue_count": 2,
+                "due_in_7_days": 6
               }
             },
             "linear_issues": [
               {
                 "id": "4cdde008-80c3-4ec4-a7b4-91aae76a495b",
                 "identifier": "OPS-528",
-                "title": "Implement custom date range filters",
-                "priority": 4,
-                "dueDate": null,
+                "title": "Critical: Database connection pool exhaustion",
+                "priority": 1,
+                "dueDate": "2026-01-22",
                 "state": "In Progress"
               },
               {
                 "id": "9b8f242b-5b89-4e69-95ec-009ba6bbb32e",
                 "identifier": "BUG-556",
-                "title": "Implement bulk user import feature",
-                "priority": 3,
-                "dueDate": null,
-                "state": "Todo"
+                "title": "Production: Memory leak in worker process",
+                "priority": 1,
+                "dueDate": "2026-01-23",
+                "state": "In Progress"
               },
               {
                 "id": "d6c4056a-aff7-4d4b-b0e7-2833d9d4a159",
                 "identifier": "IL-207",
-                "title": "Add audit logging for admin actions",
-                "priority": 2,
-                "dueDate": "2026-01-31",
-                "state": "Blocked"
+                "title": "Security: Update auth token rotation",
+                "priority": 1,
+                "dueDate": "2026-01-24",
+                "state": "Todo"
               },
               {
                 "id": "2219daf7-8159-4df6-ab7a-e49021e3e8ca",
                 "identifier": "DEV-706",
-                "title": "Add keyboard shortcuts for dashboard",
-                "priority": 4,
-                "dueDate": null,
+                "title": "API rate limiting not working correctly",
+                "priority": 2,
+                "dueDate": "2026-01-25",
                 "state": "Todo"
               },
               {
                 "id": "5801c419-6766-4ea8-b6c2-608963975cb8",
                 "identifier": "ENG-614",
-                "title": "Add Slack integration for alerts",
-                "priority": 1,
-                "dueDate": null,
+                "title": "Cache invalidation causing stale data",
+                "priority": 2,
+                "dueDate": "2026-01-26",
                 "state": "In Review"
               },
               {
                 "id": "dd83eb06-2298-4402-816b-9b6df729b97e",
                 "identifier": "OPS-227",
-                "title": "Refactor state machine for analysis workflow",
-                "priority": 3,
-                "dueDate": "2026-02-06",
-                "state": "Todo"
+                "title": "Kubernetes pod restart loop",
+                "priority": 1,
+                "dueDate": "2026-01-20",
+                "state": "Blocked"
               },
               {
                 "id": "ceb2adcd-f847-4e3f-a03c-d60ee4262797",
                 "identifier": "DEV-667",
-                "title": "Add audit logging for admin actions",
-                "priority": 4,
-                "dueDate": null,
-                "state": "Blocked"
+                "title": "CI/CD pipeline failing intermittently",
+                "priority": 2,
+                "dueDate": "2026-01-27",
+                "state": "In Progress"
               },
               {
                 "id": "87e61a2a-69ba-4be3-86a0-2666a160be22",
                 "identifier": "OPS-350",
-                "title": "Dropdown loses selection after page refresh",
-                "priority": 3,
-                "dueDate": null,
-                "state": "Done"
+                "title": "Monitoring alerts not firing",
+                "priority": 1,
+                "dueDate": "2026-01-19",
+                "state": "Todo"
               },
               {
                 "id": "6efa9c00-8fe2-4a45-bfa2-45a9f134d6db",
                 "identifier": "DEV-944",
-                "title": "Improve search indexing performance",
-                "priority": 4,
-                "dueDate": null,
+                "title": "Search indexing performance degradation",
+                "priority": 2,
+                "dueDate": "2026-01-28",
                 "state": "In Review"
               },
               {
                 "id": "aa2a9641-f49f-460e-949b-6a5588a8f189",
                 "identifier": "FEAT-137",
-                "title": "Support mixed-case email matching during invites",
-                "priority": 4,
-                "dueDate": null,
-                "state": "In Review"
+                "title": "Webhook delivery failures",
+                "priority": 2,
+                "dueDate": "2026-01-29",
+                "state": "Todo"
+              },
+              {
+                "id": "bb3b0752-f50f-461f-950c-7b6699b9f290",
+                "identifier": "PERF-891",
+                "title": "Query optimization for dashboard",
+                "priority": 2,
+                "dueDate": "2026-01-30",
+                "state": "Todo"
+              },
+              {
+                "id": "cc4c1863-g61g-572g-a61d-8c7700c0g3a1",
+                "identifier": "SEC-445",
+                "title": "SSL certificate renewal automation",
+                "priority": 1,
+                "dueDate": "2026-01-21",
+                "state": "In Progress"
+              },
+              {
+                "id": "dd5d2974-h72h-683h-b72e-9d8811d1h4b2",
+                "identifier": "INFRA-223",
+                "title": "Load balancer health check tuning",
+                "priority": 2,
+                "dueDate": "2026-01-31",
+                "state": "Todo"
+              },
+              {
+                "id": "ee6e3085-i83i-794i-c83f-0e9922e2i5c3",
+                "identifier": "DATA-112",
+                "title": "Backup job timing out",
+                "priority": 1,
+                "dueDate": "2026-01-22",
+                "state": "Blocked"
               }
             ],
             "linear_burnout_breakdown": {
-              "linear_ocb_score": 25.0,
+              "linear_ocb_score": 48.0,
               "original_ocb": 92.08,
-              "final_ocb": 94.06,
-              "linear_added_risk": 1.98,
+              "final_ocb": 96.08,
+              "linear_added_risk": 4.0,
               "linear_indicators": {
-                "issue_count": 10,
-                "urgent_high_priority_count": 6,
-                "urgent_high_ratio": 60.0,
-                "high_workload": false,
-                "urgent_ratio_high": true
+                "issue_count": 14,
+                "urgent_high_priority_count": 12,
+                "urgent_high_ratio": 85.7,
+                "high_workload": true,
+                "urgent_ratio_high": true,
+                "overdue_count": 2,
+                "due_in_7_days": 8
               }
             }
           },
@@ -801,14 +887,34 @@
               }
             ],
             "jira_burnout_breakdown": {
-              "task_volume": 35,
-              "overdue_tasks": 15,
-              "high_priority_ratio": 25
+              "jira_ocb_score": 52.0,
+              "original_ocb": 60.75,
+              "final_ocb": 66.75,
+              "jira_added_risk": 6.0,
+              "jira_indicators": {
+                "ticket_count": 8,
+                "critical_high_priority_count": 5,
+                "critical_ratio": 62.5,
+                "high_workload": true,
+                "critical_ratio_high": true,
+                "overdue_count": 1,
+                "due_in_7_days": 5
+              }
             },
             "linear_burnout_breakdown": {
-              "task_volume": 30,
-              "urgent_issues": 20,
-              "blocked_issues": 10
+              "linear_ocb_score": 45.0,
+              "original_ocb": 66.75,
+              "final_ocb": 71.75,
+              "linear_added_risk": 5.0,
+              "linear_indicators": {
+                "issue_count": 7,
+                "urgent_high_priority_count": 5,
+                "urgent_high_ratio": 71.4,
+                "high_workload": true,
+                "urgent_ratio_high": true,
+                "overdue_count": 1,
+                "due_in_7_days": 4
+              }
             }
           },
           {
@@ -1267,27 +1373,64 @@
             },
             "jira_tickets": [
               {
-                "key": "DOC-82",
-                "priority": "Urgent",
-                "duedate": "2026-01-30"
+                "key": "ONCALL-101",
+                "priority": "Critical",
+                "duedate": "2026-01-21"
+              },
+              {
+                "key": "ALERT-892",
+                "priority": "Critical",
+                "duedate": "2026-01-22"
+              },
+              {
+                "key": "DEPLOY-445",
+                "priority": "High",
+                "duedate": "2026-01-23"
+              },
+              {
+                "key": "MAINT-667",
+                "priority": "High",
+                "duedate": "2026-01-24"
+              },
+              {
+                "key": "INFRA-112",
+                "priority": "Critical",
+                "duedate": "2026-01-25"
+              },
+              {
+                "key": "SCALE-789",
+                "priority": "High",
+                "duedate": "2026-01-26"
               },
               {
                 "key": "OPS-416",
-                "priority": "Low",
-                "duedate": null
+                "priority": "High",
+                "duedate": "2026-01-27"
+              },
+              {
+                "key": "DOC-82",
+                "priority": "Medium",
+                "duedate": "2026-01-30"
+              },
+              {
+                "key": "TEST-223",
+                "priority": "High",
+                "duedate": "2026-01-19"
               }
             ],
             "jira_burnout_breakdown": {
-              "jira_ocb_score": 24.3,
+              "jira_ocb_score": 48.3,
               "original_ocb": 85.94,
-              "final_ocb": 89.36,
-              "jira_added_risk": 3.42,
+              "final_ocb": 91.94,
+              "jira_added_risk": 6.0,
               "jira_indicators": {
-                "ticket_count": 2,
-                "critical_high_priority_count": 0,
-                "critical_ratio": 0.0,
-                "high_workload": false,
-                "critical_ratio_high": false
+                "ticket_count": 9,
+                "critical_high_priority_count": 7,
+                "critical_ratio": 77.8,
+                "high_workload": true,
+                "critical_ratio_high": true,
+                "overdue_count": 2,
+                "due_in_7_days": 7
               }
             },
             "linear_issues": [
@@ -2595,14 +2738,34 @@
               }
             ],
             "jira_burnout_breakdown": {
-              "task_volume": 28,
-              "overdue_tasks": 12,
-              "high_priority_ratio": 22
+              "jira_ocb_score": 42.0,
+              "original_ocb": 78.96,
+              "final_ocb": 83.96,
+              "jira_added_risk": 5.0,
+              "jira_indicators": {
+                "ticket_count": 6,
+                "critical_high_priority_count": 4,
+                "critical_ratio": 66.7,
+                "high_workload": true,
+                "critical_ratio_high": true,
+                "overdue_count": 1,
+                "due_in_7_days": 4
+              }
             },
             "linear_burnout_breakdown": {
-              "task_volume": 25,
-              "urgent_issues": 15,
-              "blocked_issues": 8
+              "linear_ocb_score": 38.0,
+              "original_ocb": 83.96,
+              "final_ocb": 86.96,
+              "linear_added_risk": 3.0,
+              "linear_indicators": {
+                "issue_count": 5,
+                "urgent_high_priority_count": 4,
+                "urgent_high_ratio": 80.0,
+                "high_workload": true,
+                "urgent_ratio_high": true,
+                "overdue_count": 0,
+                "due_in_7_days": 3
+              }
             }
           },
           {
