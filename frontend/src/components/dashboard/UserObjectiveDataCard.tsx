@@ -21,6 +21,11 @@ export function UserObjectiveDataCard({
   const [loading, setLoading] = useState(false);
   const [selectedMetric, setSelectedMetric] = useState<string>("health_score");
 
+  // Memoize individual_daily_data to avoid dependency issues in useEffect
+  const individualDailyData = useMemo(() => {
+    return currentAnalysis?.analysis_data?.individual_daily_data;
+  }, [currentAnalysis?.analysis_data?.individual_daily_data]);
+
   // Metric configuration for dropdown selector
   const METRIC_CONFIG: Record<string, {
     label: string
@@ -107,7 +112,6 @@ export function UserObjectiveDataCard({
       try {
         // OPTIMIZATION: For analyses with individual_daily_data in results, use it directly
         // This avoids an API call and works for both real and mock/demo analyses
-        const individualDailyData = currentAnalysis?.analysis_data?.individual_daily_data;
         const userEmail = memberData.user_email.toLowerCase();
 
         if (individualDailyData && individualDailyData[userEmail]) {
@@ -159,7 +163,7 @@ export function UserObjectiveDataCard({
     };
 
     fetchDailyHealth();
-  }, [memberData?.user_email, analysisId]);
+  }, [memberData?.user_email, analysisId, individualDailyData]);
 
   // Get the chart data with dynamic metric support
   const getChartData = () => {
