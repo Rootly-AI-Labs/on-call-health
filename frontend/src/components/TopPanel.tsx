@@ -58,17 +58,26 @@ export function TopPanel() {
         <div className="flex h-16 items-center justify-between">
           {/* Left: brand + nav */}
           <div className="flex items-center gap-10">
-            {/* On-Call Health powered by Rootly AI */}
-            <div className="flex flex-col items-start gap-1">
-              <span className="text-sm font-extrabold text-neutral-900">On-Call Health</span>
+            {/* On-Call Health logo */}
+            <div className="flex flex-col items-start -space-y-0.5">
               <div className="flex items-center gap-1.5">
-                <span className="text-[10px] uppercase tracking-wide leading-none text-neutral-500 font-medium">powered by</span>
+                <span className="text-lg font-normal text-black">On-Call Health</span>
+                <Image
+                  src="/images/on-call-health-logo.svg"
+                  alt="On-Call Health"
+                  width={32}
+                  height={32}
+                  className="w-6 h-6"
+                />
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[9px] text-black/70 font-light">Powered by</span>
                 <Image
                   src="/images/rootly-ai-logo.png"
-                  alt="Rootly AI"
-                  width={112}
-                  height={44}
-                  className="h-5 w-auto"
+                  alt="Rootly"
+                  width={321}
+                  height={129}
+                  className="w-[60px]"
                   priority
                 />
               </div>

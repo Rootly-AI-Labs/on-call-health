@@ -145,29 +145,37 @@ export default function LandingPage() {
       {/* Hero Section */}
       <section className="bg-[url(/images/landing/rootly-bg.avif)] bg-cover bg-[position:50%_15%] lg:bg-[size:210%] lg:bg-[position:-1200px_-300px] relative lg:pb-[120px]" id="get-started">
         {/* Header */}
-        <div className="px-4 py-2">
-          <div className="flex items-center w-full justify-between mb-4 lg:mb-0">
-            <div className="flex items-center lg:translate-x-10 lg:translate-y-1">
-              <div className="ml-2 mr-6 flex flex-col items-start -space-y-1">
+        <div className="px-4 pt-6 pb-2 lg:px-16 lg:pt-8">
+          <div className="flex items-start justify-between w-full">
+            <div className="flex flex-col items-start -space-y-0.5">
+              <div className="flex items-center gap-1.5">
+                <div className="text-xl leading-[1rem] lg:text-3xl font-normal text-black">On-Call Health</div>
+                <Image
+                  src="/images/on-call-health-logo.svg"
+                  alt="On-Call Health"
+                  width={32}
+                  height={32}
+                  className="w-7 h-7 lg:w-10 lg:h-10"
+                />
+              </div>
+              <div className="text-[10px] lg:text-xs text-black/70 font-light flex items-center gap-1.5">
+                <span>Powered by</span>
                 <a href="https://rootly.com" target="_blank">
-                  <Image 
-                    src="/images/rootly-ai-logo.png" 
-                    alt="Rootly AI" 
-                    width={321} 
+                  <Image
+                    src="/images/rootly-ai-logo.png"
+                    alt="Rootly"
+                    width={321}
                     height={129}
-                    className="w-[140px] lg:w-[180px]"
+                    className="w-[60px] lg:w-[70px]"
                   />
                 </a>
-              </div>
-              <div className="flex items-center gap-3 -ml-2">
-                <div className="text-base leading-[1rem] lg:text-xl font-semibold text-slate-900">On-Call Health</div>
               </div>
             </div>
             <a
               href="https://github.com/Rootly-AI-Labs/On-Call-Health"
               target="_blank"
               rel="noreferrer"
-              className="rounded-2xl bg-[#7b6db1] px-5 py-2 text-sm font-semibold font-display text-[color:var(--text-text-primary,_#100F12)] hover:bg-[#6f62a5] lg:-translate-x-6 flex items-center gap-2"
+              className="rounded-2xl bg-[#7b6db1] px-5 py-2 text-sm font-semibold font-display text-[color:var(--text-text-primary,_#100F12)] hover:bg-[#6f62a5] flex items-center gap-2"
             >
               <Image src="/images/github-logo.png" alt="GitHub" width={20} height={20} className="h-4 w-4 lg:h-5 lg:w-5" />
               GitHub
