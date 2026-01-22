@@ -804,11 +804,7 @@ function DashboardContent() {
                                 <Bar
                                   dataKey="score"
                                   radius={[4, 4, 0, 0]}
-                                >
-                                  {memberBarData.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={entry.fill} />
-                                  ))}
-                                </Bar>
+                                />
                               </BarChart>
                             </ResponsiveContainer>
                           </div>

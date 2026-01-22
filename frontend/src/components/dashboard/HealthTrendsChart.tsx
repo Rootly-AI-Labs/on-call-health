@@ -2,7 +2,7 @@
 
 import React from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell } from "recharts"
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts"
 
 interface HealthTrendsChartProps {
   currentAnalysis: any
@@ -44,7 +44,7 @@ function transformDailyTrends(dailyTrends: any[]): any[] {
     const hasRealData = incidentCount > 0
     const ocbScore = 100 - Math.round(trend.overall_score * 10)
 
-    return {
+    const entry = {
       date: new Date(trend.date).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }),
       score: hasRealData ? Math.max(0, Math.min(100, ocbScore)) : 0,
       riskLevel: hasRealData ? getRiskLevel(ocbScore) : null,
@@ -57,6 +57,11 @@ function transformDailyTrends(dailyTrends: any[]): any[] {
       index,
       hasRealData,
       dataType: hasRealData ? 'real' : 'no_data'
+    }
+
+    return {
+      ...entry,
+      fill: getBarColor(entry)
     }
   })
 }
@@ -181,11 +186,7 @@ export function HealthTrendsChart({
             tickFormatter={(value) => `${value}%`}
           />
           <Tooltip content={({ payload, label }) => <ChartTooltip payload={payload || []} label={label || ''} />} />
-          <Bar dataKey="score" radius={[4, 4, 0, 0]}>
-            {chartData.map((entry: any, index: number) => (
-              <Cell key={`cell-${index}`} fill={getBarColor(entry)} />
-            ))}
-          </Bar>
+          <Bar dataKey="score" radius={[4, 4, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
     )
