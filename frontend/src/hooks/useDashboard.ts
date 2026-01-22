@@ -98,7 +98,6 @@ export default function useDashboard() {
     const authToken = localStorage.getItem('auth_token')
     if (!authToken && !hasShownAuthError) {
       setHasShownAuthError(true)
-      toast.error("No authentication token found - please log in")
       router.push('/auth/login')
     }
     return authToken
@@ -441,7 +440,6 @@ export default function useDashboard() {
           timeoutId = setTimeout(loadAnalysisWithDelay, 500)
         } else {
           // Max retries exceeded - redirect to login
-          toast.error("Authentication required - please log in")
           router.push('/auth/login')
         }
       }
