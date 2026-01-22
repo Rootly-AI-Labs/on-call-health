@@ -152,7 +152,7 @@ export default function LandingPage() {
                   />
                 </a>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 -ml-2">
                 <div className="text-base leading-[1rem] lg:text-xl font-semibold text-slate-900">On-Call Health</div>
               </div>
             </div>
@@ -162,7 +162,7 @@ export default function LandingPage() {
               rel="noreferrer"
               className="rounded-2xl bg-[#7b6db1] px-5 py-2 text-sm font-semibold font-display text-[color:var(--text-text-primary,_#100F12)] hover:bg-[#6f62a5] lg:-translate-x-6 flex items-center gap-2"
             >
-              <Image src="/images/github-logo.png" alt="GitHub" width={20} height={20} />
+              <Image src="/images/github-logo.png" alt="GitHub" width={20} height={20} className="h-4 w-4 lg:h-5 lg:w-5" />
               GitHub
             </a>
           </div>
