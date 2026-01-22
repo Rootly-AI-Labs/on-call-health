@@ -75,9 +75,9 @@
             "user_email": "marcus.thompson@example.com",
             "is_oncall": false,
             "github_username": "marcusthompson",
-            "slack_user_id": "U08JRM2AS91",
-            "jira_account_id": "712020:2ead812d-3001-4a9f-915f-e0e7ee23b2b8",
-            "linear_user_id": "7857d9d6-4f4a-435b-8dc1-f3322093e35b",
+            "slack_user_id": "U0DEMO00011",
+            "jira_account_id": "000000:demo-user-00002",
+            "linear_user_id": "00000000-demo-0002-0000-000000000000",
             "rootly_user_id": "99334",
             "pagerduty_user_id": null,
             "avatar_url": "/images/male/marcus_thompson.png",
@@ -542,9 +542,9 @@
             "user_email": "maya.fernandez@example.com",
             "is_oncall": false,
             "github_username": null,
-            "slack_user_id": "U0A20RU0H8U",
-            "jira_account_id": "712020:maya-fernandez-jira-id",
-            "linear_user_id": "maya-fernandez-linear-id",
+            "slack_user_id": "U0DEMO00015",
+            "jira_account_id": "000000:demo-user-00006",
+            "linear_user_id": "00000000-demo-0006-0000-000000000000",
             "rootly_user_id": "199176",
             "pagerduty_user_id": null,
             "avatar_url": "/images/female/maya_fernandez.png",
@@ -923,7 +923,7 @@
             "user_email": "jamal.williams@example.com",
             "is_oncall": false,
             "github_username": null,
-            "slack_user_id": "U08DLG3K6DT",
+            "slack_user_id": "U0DEMO00009",
             "jira_account_id": null,
             "linear_user_id": null,
             "rootly_user_id": "87587",
@@ -1258,9 +1258,9 @@
             "user_email": "david.chen@example.com",
             "is_oncall": true,
             "github_username": null,
-            "slack_user_id": "U02V8E0NT34",
-            "jira_account_id": "712020:1ed93397-f9bf-4177-987d-6caf6a198c8c",
-            "linear_user_id": "8c89ffe5-f8c7-439d-a7c0-964c4a28cf77",
+            "slack_user_id": "U0DEMO00001",
+            "jira_account_id": "000000:demo-user-00001",
+            "linear_user_id": "00000000-demo-0003-0000-000000000000",
             "rootly_user_id": "3528",
             "pagerduty_user_id": null,
             "avatar_url": "/images/male/david_chen.png",
@@ -1658,9 +1658,9 @@
             "user_email": "minjun.park@example.com",
             "is_oncall": false,
             "github_username": null,
-            "slack_user_id": "U099HGSPQQZ",
-            "jira_account_id": "712020:4fbd855f-efac-46f8-9390-16fc53a56af7",
-            "linear_user_id": "40a50883-800a-438c-80c4-7dafc622e103",
+            "slack_user_id": "U0DEMO00013",
+            "jira_account_id": "000000:demo-user-00003",
+            "linear_user_id": "00000000-demo-0001-0000-000000000000",
             "rootly_user_id": "117101",
             "pagerduty_user_id": null,
             "avatar_url": "/images/male/minjun_park.png",
@@ -1956,7 +1956,7 @@
             "user_email": "zara.ali@example.com",
             "is_oncall": true,
             "github_username": null,
-            "slack_user_id": "U06CYGSJ6S2",
+            "slack_user_id": "U0DEMO00005",
             "jira_account_id": null,
             "linear_user_id": null,
             "rootly_user_id": "29683",
@@ -2193,9 +2193,9 @@
             "user_email": "kenji.tanaka@example.com",
             "is_oncall": false,
             "github_username": null,
-            "slack_user_id": "U08GAVBEEUE",
-            "jira_account_id": "712020:daniel-kowalski-jira-id",
-            "linear_user_id": "daniel-kowalski-linear-id",
+            "slack_user_id": "U0DEMO00010",
+            "jira_account_id": "000000:demo-user-00004",
+            "linear_user_id": "00000000-demo-0004-0000-000000000000",
             "rootly_user_id": "94178",
             "pagerduty_user_id": null,
             "avatar_url": "/images/male/kenji_tanaka.png",
@@ -2539,9 +2539,9 @@
             "user_email": "sophia.nguyen@example.com",
             "is_oncall": false,
             "github_username": null,
-            "slack_user_id": "U02V8EY4YPM",
-            "jira_account_id": "712020:sophia-nguyen-jira-id",
-            "linear_user_id": "sophia-nguyen-linear-id",
+            "slack_user_id": "U0DEMO00002",
+            "jira_account_id": "000000:demo-user-00007",
+            "linear_user_id": "00000000-demo-0007-0000-000000000000",
             "rootly_user_id": "3497",
             "pagerduty_user_id": null,
             "avatar_url": "/images/female/sophia_nguyen.png",
@@ -2889,9 +2889,9 @@
             "user_email": "arjun.reddy@example.com",
             "is_oncall": false,
             "github_username": "arjunreddy",
-            "slack_user_id": "U04BULGB4E8",
-            "jira_account_id": "712020:marcus-johnson-jira-id",
-            "linear_user_id": "marcus-johnson-linear-id",
+            "slack_user_id": "U0DEMO00003",
+            "jira_account_id": "000000:demo-user-00005",
+            "linear_user_id": "00000000-demo-0005-0000-000000000000",
             "rootly_user_id": "9130",
             "pagerduty_user_id": null,
             "avatar_url": "/images/male/arjun_reddy.png",
@@ -3236,7 +3236,7 @@
             "user_email": "isabella.rossi@example.com",
             "is_oncall": true,
             "github_username": null,
-            "slack_user_id": "U07483ZFTU6",
+            "slack_user_id": "U0DEMO00007",
             "jira_account_id": null,
             "linear_user_id": null,
             "rootly_user_id": "38699",
@@ -3459,7 +3459,7 @@
             "user_email": "priya.shah@example.com",
             "is_oncall": false,
             "github_username": null,
-            "slack_user_id": "U07TQ22V8HG",
+            "slack_user_id": "U0DEMO00008",
             "jira_account_id": null,
             "linear_user_id": null,
             "rootly_user_id": "62208",
@@ -3681,7 +3681,7 @@
             "user_email": "lucas.moreau@example.com",
             "is_oncall": false,
             "github_username": null,
-            "slack_user_id": "U091GE54T6J",
+            "slack_user_id": "U0DEMO00012",
             "jira_account_id": null,
             "linear_user_id": null,
             "rootly_user_id": "109673",
@@ -3742,7 +3742,7 @@
             "user_email": "emily.oconnor@example.com",
             "is_oncall": false,
             "github_username": null,
-            "slack_user_id": "U06FFAWJRME",
+            "slack_user_id": "U0DEMO00006",
             "jira_account_id": null,
             "linear_user_id": null,
             "rootly_user_id": "29995",
@@ -3803,7 +3803,7 @@
             "user_email": "john.tzikas@example.com",
             "is_oncall": false,
             "github_username": null,
-            "slack_user_id": "U05KNBGGCF9",
+            "slack_user_id": "U0DEMO00004",
             "jira_account_id": null,
             "linear_user_id": null,
             "rootly_user_id": "19241",
@@ -3864,7 +3864,7 @@
             "user_email": "ava.reynolds@example.com",
             "is_oncall": false,
             "github_username": null,
-            "slack_user_id": "U09SEKH0H46",
+            "slack_user_id": "U0DEMO00014",
             "jira_account_id": null,
             "linear_user_id": null,
             "rootly_user_id": "154534",
@@ -22453,10 +22453,10 @@
               "email": "sophia.nguyen@example.com",
               "name": "Sophia Nguyen"
             },
-            "slack_channel_id": "C0AAYGD044Q",
+            "slack_channel_id": "C0DEMO00093",
             "slack_channel_name": "incident-20260121-new-retro-test",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0AAYGD044Q&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0AAYGD044Q&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0AAYGD044Q&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0AAYGD044Q&team=T0DEMOTEAM1"
           }
         },
         {
@@ -22488,10 +22488,10 @@
               "email": "marcus.thompson@example.com",
               "name": "Marcus Thompson"
             },
-            "slack_channel_id": "C0AA7CZ350C",
+            "slack_channel_id": "C0DEMO00090",
             "slack_channel_name": "incident-20260121-vivacious-excitement",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0AA7CZ350C&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0AA7CZ350C&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0AA7CZ350C&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0AA7CZ350C&team=T0DEMOTEAM1"
           }
         },
         {
@@ -22523,10 +22523,10 @@
               "email": "jamal.williams@example.com",
               "name": "Jamal Williams"
             },
-            "slack_channel_id": "C0A9ZTE9D1S",
+            "slack_channel_id": "C0DEMO00086",
             "slack_channel_name": "incident-20260120-website-is-down",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A9ZTE9D1S&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A9ZTE9D1S&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A9ZTE9D1S&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A9ZTE9D1S&team=T0DEMOTEAM1"
           }
         },
         {
@@ -22550,10 +22550,10 @@
               "email": "zara.ali@example.com",
               "name": "Zara Ali"
             },
-            "slack_channel_id": "C0A9PL91BK5",
+            "slack_channel_id": "C0DEMO00083",
             "slack_channel_name": "incident-20260120-sev0",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A9PL91BK5&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A9PL91BK5&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A9PL91BK5&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A9PL91BK5&team=T0DEMOTEAM1"
           }
         },
         {
@@ -22576,10 +22576,10 @@
               "email": "zara.ali@example.com",
               "name": "Zara Ali"
             },
-            "slack_channel_id": "C0A9ZK2J9QC",
+            "slack_channel_id": "C0DEMO00085",
             "slack_channel_name": "incident-20260120-there-is-an-incident",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A9ZK2J9QC&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A9ZK2J9QC&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A9ZK2J9QC&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A9ZK2J9QC&team=T0DEMOTEAM1"
           }
         },
         {
@@ -22611,10 +22611,10 @@
               "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
-            "slack_channel_id": "C0A9P2T9A3V",
+            "slack_channel_id": "C0DEMO00082",
             "slack_channel_name": "incident-20260120-thrumming-exultation",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A9P2T9A3V&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A9P2T9A3V&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A9P2T9A3V&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A9P2T9A3V&team=T0DEMOTEAM1"
           }
         },
         {
@@ -22645,10 +22645,10 @@
               "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
-            "slack_channel_id": "C0AAPNK452L",
+            "slack_channel_id": "C0DEMO00092",
             "slack_channel_name": "incident-20260120-empathetic-alliance",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0AAPNK452L&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0AAPNK452L&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0AAPNK452L&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0AAPNK452L&team=T0DEMOTEAM1"
           }
         },
         {
@@ -22679,10 +22679,10 @@
               "email": "kenji.tanaka@example.com",
               "name": "David Chen"
             },
-            "slack_channel_id": "C0A9D3AHRQX",
+            "slack_channel_id": "C0DEMO00078",
             "slack_channel_name": "incident-20260120-exhilarating-elevation",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A9D3AHRQX&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A9D3AHRQX&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A9D3AHRQX&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A9D3AHRQX&team=T0DEMOTEAM1"
           }
         },
         {
@@ -22706,10 +22706,10 @@
               "email": "marcus.thompson@example.com",
               "name": "Marcus Thompson"
             },
-            "slack_channel_id": "C0AA79K4U9F",
+            "slack_channel_id": "C0DEMO00089",
             "slack_channel_name": "incident-20260120-efficient-bush",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0AA79K4U9F&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0AA79K4U9F&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0AA79K4U9F&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0AA79K4U9F&team=T0DEMOTEAM1"
           }
         },
         {
@@ -22740,10 +22740,10 @@
               "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
-            "slack_channel_id": "C0A9Q9TL4UD",
+            "slack_channel_id": "C0DEMO00084",
             "slack_channel_name": "incident-20260120-damp-flourish",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A9Q9TL4UD&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A9Q9TL4UD&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A9Q9TL4UD&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A9Q9TL4UD&team=T0DEMOTEAM1"
           }
         },
         {
@@ -22774,10 +22774,10 @@
               "email": "marcus.thompson@example.com",
               "name": "Marcus Thompson"
             },
-            "slack_channel_id": "C0A9NUJ649G",
+            "slack_channel_id": "C0DEMO00081",
             "slack_channel_name": "incident-20260119-luminous-luxuriance",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A9NUJ649G&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A9NUJ649G&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A9NUJ649G&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A9NUJ649G&team=T0DEMOTEAM1"
           }
         },
         {
@@ -22832,10 +22832,10 @@
               "email": "bot@demo.com",
               "name": "Demo Bot"
             },
-            "slack_channel_id": "C0A97CG72F9",
+            "slack_channel_id": "C0DEMO00074",
             "slack_channel_name": "incident-20260119-failedloginattempteventsexceededthreshold-3760",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A97CG72F9&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A97CG72F9&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A97CG72F9&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A97CG72F9&team=T0DEMOTEAM1"
           }
         },
         {
@@ -22859,10 +22859,10 @@
               "email": "bot@demo.com",
               "name": "Demo Bot"
             },
-            "slack_channel_id": "C0A9LPRLE7Q",
+            "slack_channel_id": "C0DEMO00080",
             "slack_channel_name": "incident-20260119-failed-login-attempt-events-exceeded-threshold",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A9LPRLE7Q&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A9LPRLE7Q&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A9LPRLE7Q&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A9LPRLE7Q&team=T0DEMOTEAM1"
           }
         },
         {
@@ -22872,7 +22872,7 @@
             "sequential_id": 3758,
             "slug": "crazy",
             "title": "CRAZY",
-            "summary": "%%%\n@webhook-Apple\n\nTest notification triggered by arjun.reddy@example.com.\n\nThe **count** of events matching **[*](https://app.datadoghq.com/event/explorer?query=%2A&from_ts=1768854760000&to_ts=1768855060000&live=false)** was **> 10.0** during the **last 5m**.\n\nThe monitor was last triggered at Mon Jan 19 2026 20:37:40 UTC.\n\n- - -\n\n[[Monitor Status](https://app.datadoghq.com/monitors/137617737?from_ts=1768854160000&to_ts=1768855360000&event_id=8465652244875351515&link_source=monitor_notif)] \u00c2\u00b7 [[Edit Monitor](https://app.datadoghq.com/monitors/137617737/edit?link_source=monitor_notif)] \u00c2\u00b7 [[Related Logs](https://app.datadoghq.com/logs?from_ts=1768854760000&to_ts=1768855060000&live=false&link_source=monitor_notif)]\n%%%",
+            "summary": "%%%\n@webhook-Apple\n\nTest notification triggered by arjun.reddy@example.com.\n\nThe **count** of events matching **[*](https://demo.datadoghq.com/event/explorer?query=%2A&from_ts=1768854760000&to_ts=1768855060000&live=false)** was **> 10.0** during the **last 5m**.\n\nThe monitor was last triggered at Mon Jan 19 2026 20:37:40 UTC.\n\n- - -\n\n[[Monitor Status](https://app.datadoghq.com/monitors/137617737?from_ts=1768854160000&to_ts=1768855360000&event_id=8465652244875351515&link_source=monitor_notif)] \u00c2\u00b7 [[Edit Monitor](https://app.datadoghq.com/monitors/137617737/edit?link_source=monitor_notif)] \u00c2\u00b7 [[Related Logs](https://app.datadoghq.com/logs?from_ts=1768854760000&to_ts=1768855060000&live=false&link_source=monitor_notif)]\n%%%",
             "status": "cancelled",
             "created_at": "2026-01-19T12:38:57.428-08:00",
             "started_at": "2026-01-19T12:38:57.367-08:00",
@@ -22887,10 +22887,10 @@
               "email": "bot@demo.com",
               "name": "Demo Bot"
             },
-            "slack_channel_id": "C0A9799B7HV",
+            "slack_channel_id": "C0DEMO00073",
             "slack_channel_name": "incident-20260119-crazy",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A9799B7HV&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A9799B7HV&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A9799B7HV&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A9799B7HV&team=T0DEMOTEAM1"
           }
         },
         {
@@ -22922,10 +22922,10 @@
               "email": "minjun.park@example.com",
               "name": "Min-jun Park"
             },
-            "slack_channel_id": "C0AAG2XK856",
+            "slack_channel_id": "C0DEMO00091",
             "slack_channel_name": "incident-20260119-the-server-is-down",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0AAG2XK856&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0AAG2XK856&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0AAG2XK856&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0AAG2XK856&team=T0DEMOTEAM1"
           }
         },
         {
@@ -22955,10 +22955,10 @@
               "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
-            "slack_channel_id": "C0A9GV5FX2R",
+            "slack_channel_id": "C0DEMO00079",
             "slack_channel_name": "incident-20260119-ordering-service-errors",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A9GV5FX2R&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A9GV5FX2R&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A9GV5FX2R&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A9GV5FX2R&team=T0DEMOTEAM1"
           }
         },
         {
@@ -22990,10 +22990,10 @@
               "email": "marcus.thompson@example.com",
               "name": "Marcus Thompson"
             },
-            "slack_channel_id": "C0AA3QJGAM6",
+            "slack_channel_id": "C0DEMO00088",
             "slack_channel_name": "incident-20260116-imaginative-excitement",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0AA3QJGAM6&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0AA3QJGAM6&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0AA3QJGAM6&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0AA3QJGAM6&team=T0DEMOTEAM1"
           }
         },
         {
@@ -23029,10 +23029,10 @@
               "email": "priya.shah@example.com",
               "name": "Priya Shah"
             },
-            "slack_channel_id": "C0AA2EMHM96",
+            "slack_channel_id": "C0DEMO00087",
             "slack_channel_name": "incident-20260116-imaginative-embrace",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0AA2EMHM96&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0AA2EMHM96&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0AA2EMHM96&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0AA2EMHM96&team=T0DEMOTEAM1"
           }
         },
         {
@@ -23142,10 +23142,10 @@
               "email": "marcus.thompson@example.com",
               "name": "Marcus Thompson"
             },
-            "slack_channel_id": "C0A8XM0FZ37",
+            "slack_channel_id": "C0DEMO00066",
             "slack_channel_name": "incident-20260115-dynamic-tree",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A8XM0FZ37&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A8XM0FZ37&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A8XM0FZ37&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A8XM0FZ37&team=T0DEMOTEAM1"
           }
         },
         {
@@ -23175,10 +23175,10 @@
               "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
-            "slack_channel_id": "C0A8YRYM7TQ",
+            "slack_channel_id": "C0DEMO00069",
             "slack_channel_name": "incident-20260115-portal-service-errors-3749",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A8YRYM7TQ&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A8YRYM7TQ&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A8YRYM7TQ&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A8YRYM7TQ&team=T0DEMOTEAM1"
           }
         },
         {
@@ -23209,10 +23209,10 @@
               "email": "marcus.thompson@example.com",
               "name": "Marcus Thompson"
             },
-            "slack_channel_id": "C0A8U9AE02X",
+            "slack_channel_id": "C0DEMO00064",
             "slack_channel_name": "incident-20260115-appreciative-butterfly",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A8U9AE02X&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A8U9AE02X&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A8U9AE02X&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A8U9AE02X&team=T0DEMOTEAM1"
           }
         },
         {
@@ -23243,10 +23243,10 @@
               "email": "jamal.williams@example.com",
               "name": "Jamal Williams"
             },
-            "slack_channel_id": "C0A8U6P2GKV",
+            "slack_channel_id": "C0DEMO00063",
             "slack_channel_name": "incident-20260115-db100-3747",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A8U6P2GKV&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A8U6P2GKV&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A8U6P2GKV&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A8U6P2GKV&team=T0DEMOTEAM1"
           }
         },
         {
@@ -23277,10 +23277,10 @@
               "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
-            "slack_channel_id": "C0A8Y0GD2KY",
+            "slack_channel_id": "C0DEMO00067",
             "slack_channel_name": "incident-20260115-portal-service-errors",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A8Y0GD2KY&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A8Y0GD2KY&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A8Y0GD2KY&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A8Y0GD2KY&team=T0DEMOTEAM1"
           }
         },
         {
@@ -23312,10 +23312,10 @@
               "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
-            "slack_channel_id": "C0A8SPTED6X",
+            "slack_channel_id": "C0DEMO00062",
             "slack_channel_name": "incident-20260115-organized-lavishness",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A8SPTED6X&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A8SPTED6X&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A8SPTED6X&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A8SPTED6X&team=T0DEMOTEAM1"
           }
         },
         {
@@ -23338,10 +23338,10 @@
               "email": "kenji.tanaka@example.com",
               "name": "Kenji Tanaka"
             },
-            "slack_channel_id": "C0A8W77KW6A",
+            "slack_channel_id": "C0DEMO00065",
             "slack_channel_name": "incident-20260115-extraordinary-zing",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A8W77KW6A&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A8W77KW6A&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A8W77KW6A&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A8W77KW6A&team=T0DEMOTEAM1"
           }
         },
         {
@@ -23372,10 +23372,10 @@
               "email": "jamal.williams@example.com",
               "name": "Jamal Williams"
             },
-            "slack_channel_id": "C0A8Y6A1SKU",
+            "slack_channel_id": "C0DEMO00068",
             "slack_channel_name": "incident-20260115-db-100",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A8Y6A1SKU&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A8Y6A1SKU&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A8Y6A1SKU&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A8Y6A1SKU&team=T0DEMOTEAM1"
           }
         },
         {
@@ -23408,10 +23408,10 @@
               "email": "marcus.thompson@example.com",
               "name": "Marcus Thompson"
             },
-            "slack_channel_id": "C0A8LL4TRJ7",
+            "slack_channel_id": "C0DEMO00061",
             "slack_channel_name": "incident-20260114-cool-wave",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A8LL4TRJ7&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A8LL4TRJ7&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A8LL4TRJ7&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A8LL4TRJ7&team=T0DEMOTEAM1"
           }
         },
         {
@@ -23472,10 +23472,10 @@
               "email": "marcus.thompson@example.com",
               "name": "Marcus Thompson"
             },
-            "slack_channel_id": "C0A8L78JVKM",
+            "slack_channel_id": "C0DEMO00059",
             "slack_channel_name": "incident-20260114-portal-service-errors",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A8L78JVKM&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A8L78JVKM&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A8L78JVKM&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A8L78JVKM&team=T0DEMOTEAM1"
           }
         },
         {
@@ -23506,10 +23506,10 @@
               "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
-            "slack_channel_id": "C0A89T47XB9",
+            "slack_channel_id": "C0DEMO00051",
             "slack_channel_name": "incident-20260114-db-at-100",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A89T47XB9&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A89T47XB9&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A89T47XB9&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A89T47XB9&team=T0DEMOTEAM1"
           }
         },
         {
@@ -23541,10 +23541,10 @@
               "email": "jamal.williams@example.com",
               "name": "Jamal Williams"
             },
-            "slack_channel_id": "C0A898R07AB",
+            "slack_channel_id": "C0DEMO00050",
             "slack_channel_name": "incident-20260114-db-100",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A898R07AB&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A898R07AB&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A898R07AB&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A898R07AB&team=T0DEMOTEAM1"
           }
         },
         {
@@ -23576,10 +23576,10 @@
               "email": "marcus.thompson@example.com",
               "name": "Marcus Thompson"
             },
-            "slack_channel_id": "C0A893UE6CF",
+            "slack_channel_id": "C0DEMO00049",
             "slack_channel_name": "incident-20260114-cultured-wisdom",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A893UE6CF&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A893UE6CF&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A893UE6CF&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A893UE6CF&team=T0DEMOTEAM1"
           }
         },
         {
@@ -23593,10 +23593,10 @@
             "created_at": "2026-01-13T20:18:57.389-08:00",
             "started_at": "2026-01-13T20:18:57.364-08:00",
             "acknowledged_at": "2026-01-13T20:19:00.000-08:00",
-            "slack_channel_id": "C0A8Z4M1VUH",
+            "slack_channel_id": "C0DEMO00070",
             "slack_channel_name": "incident-20260113-tender-illumination",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A8Z4M1VUH&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A8Z4M1VUH&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A8Z4M1VUH&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A8Z4M1VUH&team=T0DEMOTEAM1"
           }
         },
         {
@@ -23628,10 +23628,10 @@
               "email": "marcus.thompson@example.com",
               "name": "Marcus Thompson"
             },
-            "slack_channel_id": "C0A8GN1AGRL",
+            "slack_channel_id": "C0DEMO00057",
             "slack_channel_name": "incident-20260113-majestic-pond",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A8GN1AGRL&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A8GN1AGRL&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A8GN1AGRL&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A8GN1AGRL&team=T0DEMOTEAM1"
           }
         },
         {
@@ -23663,10 +23663,10 @@
               "email": "marcus.thompson@example.com",
               "name": "Marcus Thompson"
             },
-            "slack_channel_id": "C0A9D1FLQV6",
+            "slack_channel_id": "C0DEMO00077",
             "slack_channel_name": "incident-20260113-something-s-wrong",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A9D1FLQV6&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A9D1FLQV6&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A9D1FLQV6&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A9D1FLQV6&team=T0DEMOTEAM1"
           }
         },
         {
@@ -23698,10 +23698,10 @@
               "email": "marcus.thompson@example.com",
               "name": "Marcus Thompson"
             },
-            "slack_channel_id": "C0A8BNW7YSF",
+            "slack_channel_id": "C0DEMO00053",
             "slack_channel_name": "incident-20260113-young-blossom",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A8BNW7YSF&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A8BNW7YSF&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A8BNW7YSF&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A8BNW7YSF&team=T0DEMOTEAM1"
           }
         },
         {
@@ -23732,10 +23732,10 @@
               "email": "jamal.williams@example.com",
               "name": "Jamal Williams"
             },
-            "slack_channel_id": "C0A9BVC7WL8",
+            "slack_channel_id": "C0DEMO00076",
             "slack_channel_name": "incident-20260113-db100-3731",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A9BVC7WL8&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A9BVC7WL8&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A9BVC7WL8&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A9BVC7WL8&team=T0DEMOTEAM1"
           }
         },
         {
@@ -23759,10 +23759,10 @@
               "email": "kenji.tanaka@example.com",
               "name": "Kenji Tanaka"
             },
-            "slack_channel_id": "C0A8H5T9QV8",
+            "slack_channel_id": "C0DEMO00058",
             "slack_channel_name": "incident-20260113-test",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A8H5T9QV8&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A8H5T9QV8&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A8H5T9QV8&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A8H5T9QV8&team=T0DEMOTEAM1"
           }
         },
         {
@@ -23793,10 +23793,10 @@
               "email": "jamal.williams@example.com",
               "name": "Jamal Williams"
             },
-            "slack_channel_id": "C0A8LBZEHHA",
+            "slack_channel_id": "C0DEMO00060",
             "slack_channel_name": "incident-20260113-db-100",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A8LBZEHHA&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A8LBZEHHA&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A8LBZEHHA&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A8LBZEHHA&team=T0DEMOTEAM1"
           }
         },
         {
@@ -23827,10 +23827,10 @@
               "email": "jamal.williams@example.com",
               "name": "Jamal Williams"
             },
-            "slack_channel_id": "C0A9AF6GKFA",
+            "slack_channel_id": "C0DEMO00075",
             "slack_channel_name": "incident-20260113-webiste-is-down",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A9AF6GKFA&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A9AF6GKFA&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A9AF6GKFA&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A9AF6GKFA&team=T0DEMOTEAM1"
           }
         },
         {
@@ -23885,10 +23885,10 @@
               "email": "zara.ali@example.com",
               "name": "Zara Ali"
             },
-            "slack_channel_id": "C0A86UEJJFQ",
+            "slack_channel_id": "C0DEMO00046",
             "slack_channel_name": "incident-20260112-test",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A86UEJJFQ&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A86UEJJFQ&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A86UEJJFQ&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A86UEJJFQ&team=T0DEMOTEAM1"
           }
         },
         {
@@ -23919,10 +23919,10 @@
               "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
-            "slack_channel_id": "C0A9316U7Q8",
+            "slack_channel_id": "C0DEMO00072",
             "slack_channel_name": "incident-20260112-portal-service-errors",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A9316U7Q8&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A9316U7Q8&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A9316U7Q8&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A9316U7Q8&team=T0DEMOTEAM1"
           }
         },
         {
@@ -23953,10 +23953,10 @@
               "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
-            "slack_channel_id": "C0A930F0B4Y",
+            "slack_channel_id": "C0DEMO00071",
             "slack_channel_name": "incident-20260112-db-at-100",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A930F0B4Y&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A930F0B4Y&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A930F0B4Y&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A930F0B4Y&team=T0DEMOTEAM1"
           }
         },
         {
@@ -23988,10 +23988,10 @@
               "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
-            "slack_channel_id": "C0A8BNL7H60",
+            "slack_channel_id": "C0DEMO00052",
             "slack_channel_name": "incident-20260112-passionate-lushness",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A8BNL7H60&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A8BNL7H60&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A8BNL7H60&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A8BNL7H60&team=T0DEMOTEAM1"
           }
         },
         {
@@ -24021,10 +24021,10 @@
               "email": "marcus.thompson@example.com",
               "name": "Marcus Thompson"
             },
-            "slack_channel_id": "C0A843CST3Q",
+            "slack_channel_id": "C0DEMO00044",
             "slack_channel_name": "incident-20260112-cheerful-excitement",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A843CST3Q&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A843CST3Q&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A843CST3Q&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A843CST3Q&team=T0DEMOTEAM1"
           }
         },
         {
@@ -24055,10 +24055,10 @@
               "email": "isabella.rossi@example.com",
               "name": "Isabella Rossi"
             },
-            "slack_channel_id": "C0A88UK7CEM",
+            "slack_channel_id": "C0DEMO00048",
             "slack_channel_name": "incident-20260109-problem-with-our-elastic-search",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A88UK7CEM&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A88UK7CEM&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A88UK7CEM&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A88UK7CEM&team=T0DEMOTEAM1"
           }
         },
         {
@@ -24089,10 +24089,10 @@
               "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
-            "slack_channel_id": "C0A7RA53VC5",
+            "slack_channel_id": "C0DEMO00037",
             "slack_channel_name": "incident-20260109-test-1",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A7RA53VC5&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A7RA53VC5&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A7RA53VC5&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A7RA53VC5&team=T0DEMOTEAM1"
           }
         },
         {
@@ -24123,10 +24123,10 @@
               "email": "kenji.tanaka@example.com",
               "name": "David Chen"
             },
-            "slack_channel_id": "C0A7XJ1TR36",
+            "slack_channel_id": "C0DEMO00040",
             "slack_channel_name": "incident-20260109-productive-field",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A7XJ1TR36&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A7XJ1TR36&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A7XJ1TR36&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A7XJ1TR36&team=T0DEMOTEAM1"
           }
         },
         {
@@ -24158,10 +24158,10 @@
               "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
-            "slack_channel_id": "C0A7BQ6J015",
+            "slack_channel_id": "C0DEMO00031",
             "slack_channel_name": "incident-20260109-db-80",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A7BQ6J015&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A7BQ6J015&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A7BQ6J015&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A7BQ6J015&team=T0DEMOTEAM1"
           }
         },
         {
@@ -24191,10 +24191,10 @@
               "email": "marcus.thompson@example.com",
               "name": "Marcus Thompson"
             },
-            "slack_channel_id": "C0A7W81A15J",
+            "slack_channel_id": "C0DEMO00039",
             "slack_channel_name": "incident-20260109-happy-nirvana",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A7W81A15J&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A7W81A15J&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A7W81A15J&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A7W81A15J&team=T0DEMOTEAM1"
           }
         },
         {
@@ -24226,10 +24226,10 @@
               "email": "marcus.thompson@example.com",
               "name": "Marcus Thompson"
             },
-            "slack_channel_id": "C0A8GLYQWC8",
+            "slack_channel_id": "C0DEMO00056",
             "slack_channel_name": "incident-20260108-cold-supernova",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A8GLYQWC8&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A8GLYQWC8&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A8GLYQWC8&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A8GLYQWC8&team=T0DEMOTEAM1"
           }
         },
         {
@@ -24260,10 +24260,10 @@
               "email": "marcus.thompson@example.com",
               "name": "Marcus Thompson"
             },
-            "slack_channel_id": "C0A76E11H7H",
+            "slack_channel_id": "C0DEMO00023",
             "slack_channel_name": "incident-20260108-red-grace",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A76E11H7H&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A76E11H7H&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A76E11H7H&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A76E11H7H&team=T0DEMOTEAM1"
           }
         },
         {
@@ -24293,10 +24293,10 @@
               "email": "kenji.tanaka@example.com",
               "name": "Kenji Tanaka"
             },
-            "slack_channel_id": "C0A8G44D92L",
+            "slack_channel_id": "C0DEMO00055",
             "slack_channel_name": "incident-20260108-cpu-usage-is-high",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A8G44D92L&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A8G44D92L&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A8G44D92L&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A8G44D92L&team=T0DEMOTEAM1"
           }
         },
         {
@@ -24328,10 +24328,10 @@
               "email": "marcus.thompson@example.com",
               "name": "Marcus Thompson"
             },
-            "slack_channel_id": "C0A80MWCX33",
+            "slack_channel_id": "C0DEMO00043",
             "slack_channel_name": "incident-20260108-search-is-slow",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A80MWCX33&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A80MWCX33&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A80MWCX33&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A80MWCX33&team=T0DEMOTEAM1"
           }
         },
         {
@@ -24362,10 +24362,10 @@
               "email": "isabella.rossi@example.com",
               "name": "Isabella Rossi"
             },
-            "slack_channel_id": "C0A8G3JQNFJ",
+            "slack_channel_id": "C0DEMO00054",
             "slack_channel_name": "incident-20260108-elastic-search-issue",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A8G3JQNFJ&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A8G3JQNFJ&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A8G3JQNFJ&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A8G3JQNFJ&team=T0DEMOTEAM1"
           }
         },
         {
@@ -24398,10 +24398,10 @@
               "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
-            "slack_channel_id": "C0A809ALSLR",
+            "slack_channel_id": "C0DEMO00042",
             "slack_channel_name": "incident-20260108-snowy-delight",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A809ALSLR&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A809ALSLR&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A809ALSLR&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A809ALSLR&team=T0DEMOTEAM1"
           }
         },
         {
@@ -24425,10 +24425,10 @@
               "email": "kenji.tanaka@example.com",
               "name": "Kenji Tanaka"
             },
-            "slack_channel_id": "C0A7EC22NLT",
+            "slack_channel_id": "C0DEMO00033",
             "slack_channel_name": "incident-20260108-independent-petal",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A7EC22NLT&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A7EC22NLT&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A7EC22NLT&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A7EC22NLT&team=T0DEMOTEAM1"
           }
         },
         {
@@ -24460,10 +24460,10 @@
               "email": "sophia.nguyen@example.com",
               "name": "Sophia Nguyen"
             },
-            "slack_channel_id": "C0A7H4G7YQM",
+            "slack_channel_id": "C0DEMO00034",
             "slack_channel_name": "incident-20260108-sample-alert-for-the-met",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A7H4G7YQM&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A7H4G7YQM&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A7H4G7YQM&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A7H4G7YQM&team=T0DEMOTEAM1"
           }
         },
         {
@@ -24495,10 +24495,10 @@
               "email": "marcus.thompson@example.com",
               "name": "Marcus Thompson"
             },
-            "slack_channel_id": "C0A7ZDZ1K17",
+            "slack_channel_id": "C0DEMO00041",
             "slack_channel_name": "incident-20260108-caring-joy",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A7ZDZ1K17&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A7ZDZ1K17&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A7ZDZ1K17&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A7ZDZ1K17&team=T0DEMOTEAM1"
           }
         },
         {
@@ -24530,10 +24530,10 @@
               "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
-            "slack_channel_id": "C0A7J3F4K9C",
+            "slack_channel_id": "C0DEMO00035",
             "slack_channel_name": "incident-20260108-flourishing-paper",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A7J3F4K9C&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A7J3F4K9C&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A7J3F4K9C&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A7J3F4K9C&team=T0DEMOTEAM1"
           }
         },
         {
@@ -24586,10 +24586,10 @@
               "email": "kenji.tanaka@example.com",
               "name": "Kenji Tanaka"
             },
-            "slack_channel_id": "C0A7CNU51C3",
+            "slack_channel_id": "C0DEMO00032",
             "slack_channel_name": "incident-20260108-ordering-service-errors",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A7CNU51C3&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A7CNU51C3&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A7CNU51C3&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A7CNU51C3&team=T0DEMOTEAM1"
           }
         },
         {
@@ -24602,10 +24602,10 @@
             "status": "started",
             "created_at": "2026-01-07T21:21:22.018-08:00",
             "started_at": "2026-01-07T21:21:21.982-08:00",
-            "slack_channel_id": "C0A70D44EMV",
+            "slack_channel_id": "C0DEMO00017",
             "slack_channel_name": "incident-20260107-experienced-illumination",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A70D44EMV&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A70D44EMV&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A70D44EMV&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A70D44EMV&team=T0DEMOTEAM1"
           }
         },
         {
@@ -24637,10 +24637,10 @@
               "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
-            "slack_channel_id": "C0A7SR2055F",
+            "slack_channel_id": "C0DEMO00038",
             "slack_channel_name": "incident-20260107-beautiful-support",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A7SR2055F&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A7SR2055F&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A7SR2055F&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A7SR2055F&team=T0DEMOTEAM1"
           }
         },
         {
@@ -24672,10 +24672,10 @@
               "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
-            "slack_channel_id": "C0A77BU43EF",
+            "slack_channel_id": "C0DEMO00027",
             "slack_channel_name": "incident-20260107-chic-sunset",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A77BU43EF&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A77BU43EF&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A77BU43EF&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A77BU43EF&team=T0DEMOTEAM1"
           }
         },
         {
@@ -24706,10 +24706,10 @@
               "email": "marcus.thompson@example.com",
               "name": "Marcus Thompson"
             },
-            "slack_channel_id": "C0A87U4H2KA",
+            "slack_channel_id": "C0DEMO00047",
             "slack_channel_name": "incident-20260107-aged-wanderlust",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A87U4H2KA&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A87U4H2KA&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A87U4H2KA&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A87U4H2KA&team=T0DEMOTEAM1"
           }
         },
         {
@@ -24784,10 +24784,10 @@
               "email": "jamal.williams@example.com",
               "name": "Jamal Williams"
             },
-            "slack_channel_id": "C0A7B6R0CQ6",
+            "slack_channel_id": "C0DEMO00029",
             "slack_channel_name": "incident-20260107-db-100",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A7B6R0CQ6&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A7B6R0CQ6&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A7B6R0CQ6&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A7B6R0CQ6&team=T0DEMOTEAM1"
           }
         },
         {
@@ -24810,10 +24810,10 @@
               "email": "isabella.rossi@example.com",
               "name": "Isabella Rossi"
             },
-            "slack_channel_id": "C0A76RBNHGT",
+            "slack_channel_id": "C0DEMO00024",
             "slack_channel_name": "incident-20260107-sfsff",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A76RBNHGT&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A76RBNHGT&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A76RBNHGT&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A76RBNHGT&team=T0DEMOTEAM1"
           }
         },
         {
@@ -24867,10 +24867,10 @@
               "email": "zara.ali@example.com",
               "name": "Zara Ali"
             },
-            "slack_channel_id": "C0A86D1NPEC",
+            "slack_channel_id": "C0DEMO00045",
             "slack_channel_name": "incident-20260107-test",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A86D1NPEC&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A86D1NPEC&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A86D1NPEC&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A86D1NPEC&team=T0DEMOTEAM1"
           }
         },
         {
@@ -24883,10 +24883,10 @@
             "status": "started",
             "created_at": "2026-01-07T09:16:14.858-08:00",
             "started_at": "2026-01-07T09:16:14.831-08:00",
-            "slack_channel_id": "C0A75MC8V0B",
+            "slack_channel_id": "C0DEMO00022",
             "slack_channel_name": "incident-20260107-common-room-running-into-issues",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A75MC8V0B&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A75MC8V0B&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A75MC8V0B&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A75MC8V0B&team=T0DEMOTEAM1"
           }
         },
         {
@@ -24918,10 +24918,10 @@
               "email": "marcus.thompson@example.com",
               "name": "Marcus Thompson"
             },
-            "slack_channel_id": "C0A7BNS1TV0",
+            "slack_channel_id": "C0DEMO00030",
             "slack_channel_name": "incident-20260107-skillful-unity",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A7BNS1TV0&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A7BNS1TV0&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A7BNS1TV0&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A7BNS1TV0&team=T0DEMOTEAM1"
           }
         },
         {
@@ -24934,10 +24934,10 @@
             "status": "started",
             "created_at": "2026-01-07T06:49:23.833-08:00",
             "started_at": "2026-01-07T06:49:23.599-08:00",
-            "slack_channel_id": "C0A7PPFR14Z",
+            "slack_channel_id": "C0DEMO00036",
             "slack_channel_name": "incident-20260107-chic-haven",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A7PPFR14Z&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A7PPFR14Z&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A7PPFR14Z&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A7PPFR14Z&team=T0DEMOTEAM1"
           }
         },
         {
@@ -24969,10 +24969,10 @@
               "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
-            "slack_channel_id": "C0A7770KHFX",
+            "slack_channel_id": "C0DEMO00025",
             "slack_channel_name": "incident-20260107-polite-fire",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A7770KHFX&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A7770KHFX&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A7770KHFX&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A7770KHFX&team=T0DEMOTEAM1"
           }
         },
         {
@@ -25003,10 +25003,10 @@
               "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
-            "slack_channel_id": "C0A73K26VS7",
+            "slack_channel_id": "C0DEMO00020",
             "slack_channel_name": "incident-20260107-heroic-hope",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A73K26VS7&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A73K26VS7&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A73K26VS7&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A73K26VS7&team=T0DEMOTEAM1"
           }
         },
         {
@@ -25038,10 +25038,10 @@
               "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
-            "slack_channel_id": "C0A6Y198YRH",
+            "slack_channel_id": "C0DEMO00014",
             "slack_channel_name": "incident-20260106-abundant-wallaby",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A6Y198YRH&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A6Y198YRH&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A6Y198YRH&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A6Y198YRH&team=T0DEMOTEAM1"
           }
         },
         {
@@ -25056,10 +25056,10 @@
             "started_at": "2026-01-06T08:54:40.000-08:00",
             "mitigated_at": "2026-01-06T08:54:56.780-08:00",
             "resolved_at": "2026-01-06T08:54:56.780-08:00",
-            "slack_channel_id": "C0A71NSNG5U",
+            "slack_channel_id": "C0DEMO00019",
             "slack_channel_name": "incident-20260106-supportive-brilliance",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A71NSNG5U&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A71NSNG5U&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A71NSNG5U&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A71NSNG5U&team=T0DEMOTEAM1"
           }
         },
         {
@@ -25090,10 +25090,10 @@
               "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
-            "slack_channel_id": "C0A779WRH28",
+            "slack_channel_id": "C0DEMO00026",
             "slack_channel_name": "incident-20260106-dynamic-friend",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A779WRH28&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A779WRH28&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A779WRH28&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A779WRH28&team=T0DEMOTEAM1"
           }
         },
         {
@@ -25124,10 +25124,10 @@
               "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
-            "slack_channel_id": "C0A6X8QNEH1",
+            "slack_channel_id": "C0DEMO00013",
             "slack_channel_name": "incident-20260106-charismatic-growth",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A6X8QNEH1&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A6X8QNEH1&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A6X8QNEH1&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A6X8QNEH1&team=T0DEMOTEAM1"
           }
         },
         {
@@ -25158,10 +25158,10 @@
               "email": "kenji.tanaka@example.com",
               "name": "David Chen"
             },
-            "slack_channel_id": "C0A73KRNY74",
+            "slack_channel_id": "C0DEMO00021",
             "slack_channel_name": "incident-20260106-thrumming-violet",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A73KRNY74&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A73KRNY74&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A73KRNY74&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A73KRNY74&team=T0DEMOTEAM1"
           }
         },
         {
@@ -25193,10 +25193,10 @@
               "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
-            "slack_channel_id": "C0A6N370EH5",
+            "slack_channel_id": "C0DEMO00011",
             "slack_channel_name": "incident-20260106-ci-pipelines-are-failing",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A6N370EH5&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A6N370EH5&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A6N370EH5&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A6N370EH5&team=T0DEMOTEAM1"
           }
         },
         {
@@ -25228,10 +25228,10 @@
               "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
-            "slack_channel_id": "C0A6WNV37V1",
+            "slack_channel_id": "C0DEMO00012",
             "slack_channel_name": "incident-20260106-ci-pipelines-failure",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A6WNV37V1&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A6WNV37V1&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A6WNV37V1&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A6WNV37V1&team=T0DEMOTEAM1"
           }
         },
         {
@@ -25262,10 +25262,10 @@
               "email": "jamal.williams@example.com",
               "name": "Jamal Williams"
             },
-            "slack_channel_id": "C0A70TKNQ86",
+            "slack_channel_id": "C0DEMO00018",
             "slack_channel_name": "incident-20260106-db-100",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A70TKNQ86&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A70TKNQ86&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A70TKNQ86&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A70TKNQ86&team=T0DEMOTEAM1"
           }
         },
         {
@@ -25297,10 +25297,10 @@
               "email": "marcus.thompson@example.com",
               "name": "Marcus Thompson"
             },
-            "slack_channel_id": "C0A6YDKQ3SR",
+            "slack_channel_id": "C0DEMO00015",
             "slack_channel_name": "incident-20260106-humble-savor",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A6YDKQ3SR&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A6YDKQ3SR&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A6YDKQ3SR&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A6YDKQ3SR&team=T0DEMOTEAM1"
           }
         },
         {
@@ -25332,10 +25332,10 @@
               "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
-            "slack_channel_id": "C0A6ZHJK5SQ",
+            "slack_channel_id": "C0DEMO00016",
             "slack_channel_name": "incident-20260105-ci-pipelines-runners-exhuasted",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A6ZHJK5SQ&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A6ZHJK5SQ&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A6ZHJK5SQ&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A6ZHJK5SQ&team=T0DEMOTEAM1"
           }
         },
         {
@@ -25367,10 +25367,10 @@
               "email": "marcus.thompson@example.com",
               "name": "Marcus Thompson"
             },
-            "slack_channel_id": "C0A78BSHC81",
+            "slack_channel_id": "C0DEMO00028",
             "slack_channel_name": "incident-20260105-heartwarming-love",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A78BSHC81&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A78BSHC81&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A78BSHC81&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A78BSHC81&team=T0DEMOTEAM1"
           }
         },
         {
@@ -25402,10 +25402,10 @@
               "email": "sophia.nguyen@example.com",
               "name": "Sophia Nguyen"
             },
-            "slack_channel_id": "C0A5XLYSBHU",
+            "slack_channel_id": "C0DEMO00010",
             "slack_channel_name": "incident-20251229-db-at-100",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A5XLYSBHU&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A5XLYSBHU&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A5XLYSBHU&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A5XLYSBHU&team=T0DEMOTEAM1"
           }
         },
         {
@@ -25437,10 +25437,10 @@
               "email": "marcus.thompson@example.com",
               "name": "Marcus Thompson"
             },
-            "slack_channel_id": "C0A5EQ3KVGC",
+            "slack_channel_id": "C0DEMO00007",
             "slack_channel_name": "incident-20251223-energetic-grass",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A5EQ3KVGC&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A5EQ3KVGC&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A5EQ3KVGC&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A5EQ3KVGC&team=T0DEMOTEAM1"
           }
         },
         {
@@ -25472,10 +25472,10 @@
               "email": "marcus.thompson@example.com",
               "name": "Marcus Thompson"
             },
-            "slack_channel_id": "C0A5PRDJK2M",
+            "slack_channel_id": "C0DEMO00009",
             "slack_channel_name": "incident-20251223-dark-whiz",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A5PRDJK2M&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A5PRDJK2M&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A5PRDJK2M&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A5PRDJK2M&team=T0DEMOTEAM1"
           }
         },
         {
@@ -25499,10 +25499,10 @@
               "email": "kenji.tanaka@example.com",
               "name": "Kenji Tanaka"
             },
-            "slack_channel_id": "C0A58K0UCP8",
+            "slack_channel_id": "C0DEMO00006",
             "slack_channel_name": "incident-20251223-lucky-benevolence",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A58K0UCP8&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A58K0UCP8&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A58K0UCP8&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A58K0UCP8&team=T0DEMOTEAM1"
           }
         },
         {
@@ -25534,10 +25534,10 @@
               "email": "kenji.tanaka@example.com",
               "name": "David Chen"
             },
-            "slack_channel_id": "C0A56RE490D",
+            "slack_channel_id": "C0DEMO00004",
             "slack_channel_name": "incident-20251223-proud-marvel",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A56RE490D&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A56RE490D&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A56RE490D&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A56RE490D&team=T0DEMOTEAM1"
           }
         },
         {
@@ -25560,10 +25560,10 @@
               "email": "kenji.tanaka@example.com",
               "name": "David Chen"
             },
-            "slack_channel_id": "C0A4UQZH1CP",
+            "slack_channel_id": "C0DEMO00001",
             "slack_channel_name": "incident-20251223-clever-phenomenon",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A4UQZH1CP&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A4UQZH1CP&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A4UQZH1CP&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A4UQZH1CP&team=T0DEMOTEAM1"
           }
         },
         {
@@ -25594,10 +25594,10 @@
               "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
-            "slack_channel_id": "C0A56FK279T",
+            "slack_channel_id": "C0DEMO00003",
             "slack_channel_name": "incident-20251223-portal-service-errors",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A56FK279T&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A56FK279T&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A56FK279T&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A56FK279T&team=T0DEMOTEAM1"
           }
         },
         {
@@ -25627,10 +25627,10 @@
               "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
-            "slack_channel_id": "C0A57MFGYPQ",
+            "slack_channel_id": "C0DEMO00005",
             "slack_channel_name": "incident-20251223-twilight-upliftment",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A57MFGYPQ&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A57MFGYPQ&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A57MFGYPQ&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A57MFGYPQ&team=T0DEMOTEAM1"
           }
         },
         {
@@ -25661,10 +25661,10 @@
               "email": "maya.fernandez@example.com",
               "name": "Maya Fernandez"
             },
-            "slack_channel_id": "C0A5N63HHCH",
+            "slack_channel_id": "C0DEMO00008",
             "slack_channel_name": "incident-20251223-ordering-service-errors",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A5N63HHCH&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A5N63HHCH&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A5N63HHCH&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A5N63HHCH&team=T0DEMOTEAM1"
           }
         },
         {
@@ -25695,10 +25695,10 @@
               "email": "isabella.rossi@example.com",
               "name": "Isabella Rossi"
             },
-            "slack_channel_id": "C0A52G6TRV1",
+            "slack_channel_id": "C0DEMO00002",
             "slack_channel_name": "incident-20251223-elastic-search-issue",
-            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A52G6TRV1&team=T04JUSX0VPT",
-            "slack_channel_deep_link": "slack://channel?id=C0A52G6TRV1&team=T04JUSX0VPT"
+            "slack_channel_url": "https://slack.com/app_redirect?channel=C0A52G6TRV1&team=T0DEMOTEAM1",
+            "slack_channel_deep_link": "slack://channel?id=C0A52G6TRV1&team=T0DEMOTEAM1"
           }
         }
       ],
