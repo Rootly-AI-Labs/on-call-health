@@ -514,6 +514,28 @@ async def get_analysis(
     )
 
 
+def _calculate_trend(combined_scores: list[float]) -> str | None:
+    """
+    Calculate trend from combined scores by comparing first half vs second half.
+    Requires at least 3 responses for meaningful trend analysis.
+    Higher score = better (less burnout), so improving means score went up.
+    """
+    if len(combined_scores) < 3:
+        return None
+
+    mid = len(combined_scores) // 2
+    first_half_avg = sum(combined_scores[:mid]) / mid
+    second_half_avg = sum(combined_scores[mid:]) / (len(combined_scores) - mid)
+    difference = second_half_avg - first_half_avg
+
+    if difference > 0.3:
+        return 'improving'
+    elif difference < -0.3:
+        return 'declining'
+    else:
+        return 'stable'
+
+
 def get_member_surveys(analysis: Analysis, db: Session) -> dict:
     """
     Fetch survey responses for all team members within the analysis timeline.
@@ -526,14 +548,12 @@ def get_member_surveys(analysis: Analysis, db: Session) -> dict:
     from ...models.user_burnout_report import UserBurnoutReport
     from ...models.user_correlation import UserCorrelation
 
-    # Calculate analysis date range
+    if not analysis.organization_id:
+        return {}
+
     # Use current time as end date for live survey data (surveys update without re-running analysis)
     analysis_end_date = datetime.utcnow()
     analysis_start_date = analysis.created_at - timedelta(days=analysis.time_range or 30)
-
-    # Get all team members for this organization
-    if not analysis.organization_id:
-        return {}
 
     # Query 1: Get all team member emails
     correlations = db.query(UserCorrelation).filter(
@@ -544,14 +564,14 @@ def get_member_surveys(analysis: Analysis, db: Session) -> dict:
     if not member_emails:
         return {}
 
-    # Query 2: Get ALL surveys for ALL members in one bulk query (instead of N queries)
+    # Query 2: Bulk fetch all surveys for all members (instead of N queries)
     all_surveys = db.query(UserBurnoutReport).filter(
         UserBurnoutReport.email.in_(member_emails),
         UserBurnoutReport.submitted_at >= analysis_start_date,
         UserBurnoutReport.submitted_at <= analysis_end_date
     ).order_by(UserBurnoutReport.email, UserBurnoutReport.submitted_at.asc()).all()
 
-    # Group surveys by email in Python (O(n) operation)
+    # Group surveys by email
     surveys_by_email = defaultdict(list)
     for survey in all_surveys:
         surveys_by_email[survey.email].append(survey)
@@ -559,16 +579,15 @@ def get_member_surveys(analysis: Analysis, db: Session) -> dict:
     # Process each member's surveys
     member_surveys = {}
     for email in member_emails:
-        surveys = surveys_by_email.get(email, [])
+        surveys = surveys_by_email[email]
         if not surveys:
             continue
 
-        # Build survey responses
+        # Build survey responses and collect combined scores
         survey_responses = []
         combined_scores = []
 
         for survey in surveys:
-            # Combined score: average of feeling and workload (1-5 scale, higher = better)
             combined = (survey.feeling_score + survey.workload_score) / 2.0
             combined_scores.append(combined)
 
@@ -583,31 +602,13 @@ def get_member_surveys(analysis: Analysis, db: Session) -> dict:
                 'submitted_via': survey.submitted_via
             })
 
-        # Calculate trend (first half vs second half)
-        # Require at least 3 responses for meaningful trend analysis
-        trend = None
-        if len(combined_scores) >= 3:
-            mid = len(combined_scores) // 2
-            first_half_avg = sum(combined_scores[:mid]) / mid
-            second_half_avg = sum(combined_scores[mid:]) / (len(combined_scores) - mid)
-
-            # Higher score = better (less burnout), so improving means score went up
-            if second_half_avg > first_half_avg + 0.3:
-                trend = 'improving'
-            elif second_half_avg < first_half_avg - 0.3:
-                trend = 'declining'
-            else:
-                trend = 'stable'
-
-        # Get latest scores
         latest = surveys[-1]
-
         member_surveys[email] = {
             'survey_count_in_period': len(surveys),
             'latest_feeling_score': latest.feeling_score,
             'latest_workload_score': latest.workload_score,
-            'latest_combined_score': round((latest.feeling_score + latest.workload_score) / 2.0, 1),
-            'trend': trend,
+            'latest_combined_score': round(combined_scores[-1], 1),
+            'trend': _calculate_trend(combined_scores),
             'survey_responses': survey_responses
         }
 
