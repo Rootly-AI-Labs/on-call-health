@@ -75,7 +75,7 @@ export function BaseRiskFactorsCard({
   }
 
   return (
-    <Card className={className}>
+    <Card className={`h-full flex flex-col ${className}`}>
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex-1 space-y-1.5">
@@ -117,10 +117,10 @@ export function BaseRiskFactorsCard({
           )}
         </div>
       </CardHeader>
-      <CardContent>
-        <div className={height}>
+      <CardContent className="flex-1 flex flex-col min-h-0">
+        <div className="flex-1 min-h-[200px]">
           <ResponsiveContainer width="100%" height="100%">
-            <RadarChart data={factorsData} outerRadius="80%">
+            <RadarChart data={factorsData} outerRadius="85%">
               <PolarGrid gridType="polygon" />
               <PolarAngleAxis
                 dataKey="factor"
