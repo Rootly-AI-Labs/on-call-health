@@ -34,13 +34,11 @@ export function BaseRiskFactorsCard({
   showInfoTooltip = true,
   factorDescriptions = {},
   domain = [0, 100],
-  height = "h-64",
+  height = "h-80",
   chartColor = "#8b5cf6",
   loading = false,
   className = ""
-}: BaseRiskFactorsCardProps) {
-
-  // Show loading state
+}: BaseRiskFactorsCardProps): React.ReactElement {
   if (loading) {
     return (
       <Card className={className}>
@@ -60,7 +58,6 @@ export function BaseRiskFactorsCard({
     )
   }
 
-  // Show empty state
   if (!factorsData || factorsData.length === 0) {
     return (
       <Card className={className}>
@@ -96,7 +93,6 @@ export function BaseRiskFactorsCard({
             <CardDescription>{description}</CardDescription>
           </div>
 
-          {/* Info icon with tooltip */}
           {showInfoTooltip && Object.keys(factorDescriptions).length > 0 && (
             <div className="relative group ml-4">
               <Info className="w-4 h-4 text-neutral-500 cursor-help hover:text-neutral-700 transition-colors" />
@@ -124,7 +120,7 @@ export function BaseRiskFactorsCard({
       <CardContent>
         <div className={height}>
           <ResponsiveContainer width="100%" height="100%">
-            <RadarChart data={factorsData}>
+            <RadarChart data={factorsData} outerRadius="80%">
               <PolarGrid gridType="polygon" />
               <PolarAngleAxis
                 dataKey="factor"

@@ -22,17 +22,14 @@ interface TeamRiskFactorsCardProps {
   highRiskFactorsCount: number
   description: string | React.ReactNode
   loadingAnalysis?: boolean
-  membersCount?: number
 }
 
 export function TeamRiskFactorsCard({
   factorsData,
   highRiskFactorsCount,
   description,
-  loadingAnalysis = false,
-  membersCount = 0
-}: TeamRiskFactorsCardProps) {
-
+  loadingAnalysis = false
+}: TeamRiskFactorsCardProps): React.ReactElement {
   return (
     <BaseRiskFactorsCard
       title="Team Risk Factors"
@@ -40,11 +37,7 @@ export function TeamRiskFactorsCard({
       factorsData={factorsData}
       showAlert={highRiskFactorsCount > 0}
       alertCount={highRiskFactorsCount}
-      showInfoTooltip={true}
       factorDescriptions={FACTOR_DESCRIPTIONS}
-      domain={[0, 100]}
-      height="h-64"
-      chartColor="#8b5cf6"
       loading={loadingAnalysis}
     />
   )
