@@ -139,10 +139,57 @@ class IntegrationValidationResponse(BaseModel):
     integrations: Dict[str, Dict[str, Any]]
 
 
+class WarmCacheResponse(BaseModel):
+    status: str
+    message: str
+
+
+async def _warm_cache_background_task(user_id: int) -> None:
+    """Background task to warm all integration permission caches."""
+    from ...database import SessionLocal
+    from ...services.integration_validator import IntegrationValidator
+
+    try:
+        with SessionLocal() as db:
+            validator = IntegrationValidator(db)
+            results = await validator.validate_all_integrations(user_id=user_id)
+
+            valid_count = sum(1 for r in results.values() if r.get("valid", False))
+            logger.info(
+                f"[WARM_CACHE] Complete for user {user_id}: "
+                f"{valid_count}/{len(results)} integrations valid"
+            )
+    except Exception as e:
+        logger.error(f"[WARM_CACHE] Failed for user {user_id}: {e}", exc_info=True)
+
+
+@router.post("/warm-permissions-cache", response_model=WarmCacheResponse)
+@general_rate_limit("integration_validation")
+async def warm_permissions_cache(
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_active_user),
+) -> WarmCacheResponse:
+    """
+    Warm the permissions cache for all integrations in the background.
+
+    Called after login to pre-populate the permissions cache so that
+    subsequent operations (page loads, run analysis) are instant.
+    """
+    logger.info(f"[WARM_CACHE] Starting background cache warm for user {current_user.id}")
+
+    background_tasks.add_task(_warm_cache_background_task, current_user.id)
+
+    return WarmCacheResponse(
+        status="started",
+        message="Permission cache warming started in background"
+    )
+
+
 @router.get("/validate-integrations")
 @general_rate_limit("integration_validation")
 async def validate_integrations(
     request: Request,
+    force_refresh: bool = Query(False, description="Force fresh validation, bypassing cache"),
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
@@ -152,12 +199,18 @@ async def validate_integrations(
     Makes lightweight API calls to verify tokens are not expired/stale.
     Returns validation status for each enabled integration (GitHub, Linear, Jira).
 
+    Args:
+        force_refresh: If True, bypass cache and make fresh API calls
+
     Rate limited to prevent abuse of third-party APIs.
     """
-    from ...services.integration_validator import IntegrationValidator
+    from ...services.integration_validator import IntegrationValidator, invalidate_validation_cache
 
     try:
-        logger.info(f"Validating integrations for user {current_user.id}")
+        if force_refresh:
+            invalidate_validation_cache(current_user.id)
+
+        logger.info(f"Validating integrations for user {current_user.id} (force_refresh={force_refresh})")
 
         validator = IntegrationValidator(db)
         results = await validator.validate_all_integrations(

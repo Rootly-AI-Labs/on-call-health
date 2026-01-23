@@ -15,22 +15,19 @@ export default function AuthSuccessPage() {
     if (hasAttemptedAuth.current) return
     hasAttemptedAuth.current = true
 
-    // ✅ ENTERPRISE PATTERN: 2-Step Server-Side Token Exchange
     const authenticateUser = async () => {
       try {
         const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-        
-        
-        // Step 1: Extract authorization code from URL parameters
+
+        // Extract authorization code from URL parameters
         const urlParams = new URLSearchParams(window.location.search);
         const authCode = urlParams.get('code');
-        
-        
+
         if (!authCode) {
           throw new Error('No authorization code received from OAuth callback');
         }
         
-        // Step 2: Exchange authorization code for JWT token
+        // Exchange authorization code for JWT token
         const tokenResponse = await fetch(`${API_BASE}/auth/exchange-token?code=${authCode}`, {
           method: 'POST',
           headers: {
@@ -45,9 +42,8 @@ export default function AuthSuccessPage() {
         
         const tokenData = await tokenResponse.json();
         const jwtToken = tokenData.access_token;
-        
-        
-        // Step 3: Clear any existing user data and store new JWT token
+
+        // Clear any existing user data and store new JWT token
         // Clear all user-specific cached data to prevent cross-user data leakage
         const keysToRemove = []
         for (let i = 0; i < localStorage.length; i++) {
@@ -72,17 +68,13 @@ export default function AuthSuccessPage() {
         // Remove all cached user data
         keysToRemove.forEach(key => localStorage.removeItem(key))
         
-        // Additional explicit clearing of potential problematic keys
+        // Explicitly clear additional problematic keys
         const explicitKeysToRemove = [
           'user_name', 'user_email', 'user_avatar', 'user_id',
           'current_user', 'userInfo', 'userData', 'user_profile',
-          'last_integrations_refresh' // Force fresh integration load on next page
+          'last_integrations_refresh'
         ]
-        explicitKeysToRemove.forEach(key => {
-          if (localStorage.getItem(key)) {
-            localStorage.removeItem(key)
-          }
-        })
+        explicitKeysToRemove.forEach(key => localStorage.removeItem(key))
         
         // Store the new JWT token
         localStorage.setItem('auth_token', jwtToken);
@@ -90,7 +82,7 @@ export default function AuthSuccessPage() {
         // Clean up URL (remove auth code)
         window.history.replaceState(null, '', window.location.pathname);
         
-        // Step 4: Verify authentication with the JWT token
+        // Verify authentication with the JWT token
         const verifyResponse = await fetch(`${API_BASE}/auth/user/me`, {
           method: 'GET',
           headers: {
@@ -120,7 +112,18 @@ export default function AuthSuccessPage() {
             localStorage.setItem('user_organization_id', userData.organization_id.toString())
           }
         }
-        
+
+        // Warm permissions cache in background (non-blocking) for faster dashboard load
+        fetch(`${API_BASE}/analyses/warm-permissions-cache`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${jwtToken}`
+          }
+        }).catch(err => {
+          // Non-critical - just log and continue
+          console.warn('Background permission cache warm failed:', err)
+        })
+
         // Set success status
         setStatus('success')
 
@@ -130,7 +133,7 @@ export default function AuthSuccessPage() {
         }, 1500)
         
       } catch (err) {
-        console.error('🔍 Frontend Debug: Authentication failed:', err)
+        console.error('Authentication failed:', err)
         setStatus('error')
         setError(err instanceof Error ? err.message : 'Authentication failed. Please try logging in again.')
       }
