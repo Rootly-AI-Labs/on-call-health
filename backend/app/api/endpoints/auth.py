@@ -798,10 +798,9 @@ async def delete_current_user_account(
         logger.info(f"Cleared {slack_workspaces_count} Slack workspace ownerships and {jira_workspaces_count} Jira workspace ownerships for user {current_user.id}")
 
         # 5. Handle user_mappings_created (created_by foreign key)
-        # Set created_by to NULL for mappings created by this user
         db.query(UserMapping).filter(
             UserMapping.created_by == current_user.id
-        ).update({"created_by": None}, synchronize_session=False)
+        ).delete(synchronize_session=False)
 
         # 6. Finally, delete the user (cascades will handle remaining relationships)
         db.delete(current_user)
