@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Checkbox } from "@/components/ui/checkbox"
-import { CheckCircle, Users, Send, RefreshCw, Database, Users2, Loader2, Building, Clock, Mail } from "lucide-react"
+import { CheckCircle, Users, Send, RefreshCw, Database, Users2, Loader2, Building, Clock, Mail, ChevronDown, ChevronUp } from "lucide-react"
 
 interface SlackSurveyTabsProps {
   slackIntegration: any
@@ -70,6 +70,7 @@ export function SlackSurveyTabs({
   const [loadingSchedule, setLoadingSchedule] = useState(false)
   const [savingSchedule, setSavingSchedule] = useState(false)
   const [showSaveConfirmation, setShowSaveConfirmation] = useState(false)
+  const [scheduleAccordionOpen, setScheduleAccordionOpen] = useState(false)
 
   // Recipient selection state
   const [selectedRecipients, setSelectedRecipients] = useState<Set<number>>(new Set())
@@ -592,14 +593,9 @@ export function SlackSurveyTabs({
                 <p className="text-xs text-neutral-500 mt-1">
                   Send surveys every weekday at a specific time
                 </p>
-                {scheduleEnabled && savedScheduleTime && (
+                {scheduleEnabled && (
                   <p className="text-xs font-medium text-purple-600 mt-1.5">
-                    Set time: {(() => {
-                      const [hour, minute] = savedScheduleTime.split(':').map(Number)
-                      const period = hour >= 12 ? 'PM' : 'AM'
-                      const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour
-                      return `${displayHour}:${String(minute).padStart(2, '0')} ${period}`
-                    })()}
+                    {selectedRecipients.size} {selectedRecipients.size === 1 ? 'user' : 'users'} selected
                   </p>
                 )}
               </div>
@@ -654,181 +650,210 @@ export function SlackSurveyTabs({
             </div>
 
             {scheduleEnabled && (
-              <div className="space-y-3 mt-4 p-3 bg-neutral-100 rounded-md">
-                <div>
-                  <Label className="text-sm text-neutral-700">
-                    Delivery Time (Your Local Time)
-                  </Label>
-                  <div className="mt-2 flex items-center justify-center gap-2 p-3 bg-white rounded-lg border border-neutral-200">
-                    {/* Hour Scroller */}
-                    <div className="flex flex-col items-center">
-                      <button
-                        onClick={() => {
-                          const [hour, minute] = scheduleTime.split(':').map(Number)
-                          const newHour = hour === 23 ? 0 : hour + 1
-                          setScheduleTime(`${String(newHour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`)
-                          hasUnsavedScheduleChangesRef.current = true
-                        }}
-                        disabled={savingSchedule}
-                        className="text-neutral-500 hover:text-neutral-700 disabled:opacity-50"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                        </svg>
-                      </button>
-                      <div className="text-2xl font-semibold text-neutral-900 my-1 w-12 text-center">
-                        {(() => {
-                          const hour = parseInt(scheduleTime.split(':')[0])
-                          const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour
-                          return String(displayHour).padStart(2, '0')
-                        })()}
-                      </div>
-                      <button
-                        onClick={() => {
-                          const [hour, minute] = scheduleTime.split(':').map(Number)
-                          const newHour = hour === 0 ? 23 : hour - 1
-                          setScheduleTime(`${String(newHour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`)
-                          hasUnsavedScheduleChangesRef.current = true
-                        }}
-                        disabled={savingSchedule}
-                        className="text-neutral-500 hover:text-neutral-700 disabled:opacity-50"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </button>
-                    </div>
-
-                    <div className="text-2xl font-bold text-neutral-500">:</div>
-
-                    {/* Minute Scroller */}
-                    <div className="flex flex-col items-center">
-                      <button
-                        onClick={() => {
-                          const [hour, minute] = scheduleTime.split(':').map(Number)
-                          const newMinute = minute === 45 ? 0 : minute + 15
-                          setScheduleTime(`${String(hour).padStart(2, '0')}:${String(newMinute).padStart(2, '0')}`)
-                          hasUnsavedScheduleChangesRef.current = true
-                        }}
-                        disabled={savingSchedule}
-                        className="text-neutral-500 hover:text-neutral-700 disabled:opacity-50"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                        </svg>
-                      </button>
-                      <div className="text-2xl font-semibold text-neutral-900 my-1 w-12 text-center">
-                        {scheduleTime.split(':')[1]}
-                      </div>
-                      <button
-                        onClick={() => {
-                          const [hour, minute] = scheduleTime.split(':').map(Number)
-                          const newMinute = minute === 0 ? 45 : minute - 15
-                          setScheduleTime(`${String(hour).padStart(2, '0')}:${String(newMinute).padStart(2, '0')}`)
-                          hasUnsavedScheduleChangesRef.current = true
-                        }}
-                        disabled={savingSchedule}
-                        className="text-neutral-500 hover:text-neutral-700 disabled:opacity-50"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </button>
-                    </div>
-
-                    {/* AM/PM Toggle */}
-                    <button
-                      onClick={() => {
-                        const [hour, minute] = scheduleTime.split(':').map(Number)
-                        const newHour = hour >= 12 ? hour - 12 : hour + 12
-                        setScheduleTime(`${String(newHour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`)
-                        hasUnsavedScheduleChangesRef.current = true
-                      }}
-                      disabled={savingSchedule}
-                      className="ml-1 px-2 py-1 text-xs font-medium text-neutral-700 bg-neutral-200 hover:bg-neutral-300 rounded disabled:opacity-50"
-                    >
-                      {parseInt(scheduleTime.split(':')[0]) >= 12 ? 'PM' : 'AM'}
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <Label className="text-sm text-neutral-700">Frequency</Label>
-                  <select
-                    value={frequencyType}
-                    onChange={(e) => {
-                      setFrequencyType(e.target.value as 'daily' | 'weekday' | 'weekly')
-                      hasUnsavedScheduleChangesRef.current = true
-                    }}
-                    disabled={savingSchedule}
-                    className="mt-2 w-full px-3 py-2 border border-neutral-200 rounded-md text-sm"
-                  >
-                    <option value="daily">Every day</option>
-                    <option value="weekday">Weekdays (Mon-Fri)</option>
-                    <option value="weekly">Once per week</option>
-                  </select>
-                </div>
-
-                {frequencyType === 'weekly' && (
-                  <div>
-                    <Label className="text-sm text-neutral-700">Day of Week</Label>
-                    <select
-                      value={dayOfWeek}
-                      onChange={(e) => {
-                        setDayOfWeek(parseInt(e.target.value))
-                        hasUnsavedScheduleChangesRef.current = true
-                      }}
-                      disabled={savingSchedule}
-                      className="mt-2 w-full px-3 py-2 border border-neutral-200 rounded-md text-sm"
-                    >
-                      <option value={0}>Monday</option>
-                      <option value={1}>Tuesday</option>
-                      <option value={2}>Wednesday</option>
-                      <option value={3}>Thursday</option>
-                      <option value={4}>Friday</option>
-                      <option value={5}>Saturday</option>
-                      <option value={6}>Sunday</option>
-                    </select>
-                  </div>
-                )}
-
-                <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-neutral-200">
-                  <div>
-                    <Label className="text-sm font-medium text-neutral-900">
-                      Daily Follow-up Reminders
-                    </Label>
-                    <p className="text-xs text-neutral-500 mt-0.5">
-                      Send daily reminders until team members respond
-                    </p>
-                  </div>
-                  <Switch
-                    checked={followUpRemindersEnabled}
-                    onCheckedChange={setFollowUpRemindersEnabled}
-                    disabled={savingSchedule}
-                  />
-                </div>
-                {followUpRemindersEnabled && (
-                  <div className="text-xs text-neutral-700 bg-purple-50 border border-purple-100 rounded-md p-2">
-                    <p>Team members will receive daily reminders at the scheduled time until they complete the survey or the period ends.</p>
-                  </div>
-                )}
-
-                <div className="text-xs text-neutral-700 bg-blue-50 border border-blue-100 rounded-md p-2">
-                  <p className="font-medium text-blue-900 mb-1">Schedule Details:</p>
-                  <ul className="space-y-1 ml-2">
-                    <li>• {frequencyType === 'daily' ? 'Sends every day' : frequencyType === 'weekday' ? 'Sends Monday through Friday' : `Sends every ${['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][dayOfWeek]}`}</li>
-                    <li>• Time: {scheduleTime || '09:00'} in your local timezone</li>
-                  </ul>
-                </div>
-
-                <Button
-                  onClick={() => setShowSaveConfirmation(true)}
-                  disabled={savingSchedule}
-                  className="w-full"
-                  size="sm"
+              <div className="space-y-3 mt-4">
+                {/* Accordion Summary */}
+                <button
+                  onClick={() => setScheduleAccordionOpen(!scheduleAccordionOpen)}
+                  className="w-full p-4 bg-white border border-neutral-200 rounded-lg hover:bg-neutral-50 transition-colors"
                 >
-                  {savingSchedule ? 'Saving...' : 'Save Schedule'}
-                </Button>
+                  <div className="flex items-center justify-between">
+                    <div className="text-left">
+                      <div className="flex items-center gap-2">
+                        <Clock className="w-4 h-4 text-neutral-600" />
+                        <span className="font-medium text-sm text-neutral-900">
+                          {(() => {
+                            const hour = parseInt(scheduleTime.split(':')[0])
+                            const minute = scheduleTime.split(':')[1]
+                            const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour
+                            const ampm = hour >= 12 ? 'PM' : 'AM'
+                            return `${String(displayHour).padStart(2, '0')}:${minute} ${ampm}`
+                          })()}
+                        </span>
+                      </div>
+                      <div className="text-xs text-neutral-600 mt-1">
+                        {frequencyType === 'daily' ? 'Every day' : frequencyType === 'weekday' ? 'Weekdays (Mon-Fri)' : `${['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][dayOfWeek]}`}
+                      </div>
+                    </div>
+                    {scheduleAccordionOpen ? (
+                      <ChevronUp className="w-5 h-5 text-neutral-500" />
+                    ) : (
+                      <ChevronDown className="w-5 h-5 text-neutral-500" />
+                    )}
+                  </div>
+                </button>
+
+                {/* Accordion Content */}
+                {scheduleAccordionOpen && (
+                  <div className="space-y-3 p-3 bg-neutral-100 rounded-md">
+                    <div>
+                      <Label className="text-sm text-neutral-700">
+                        Delivery Time (Your Local Time)
+                      </Label>
+                      <div className="mt-2 flex items-center justify-center gap-2 p-3 bg-white rounded-lg border border-neutral-200">
+                        {/* Hour Scroller */}
+                        <div className="flex flex-col items-center">
+                          <button
+                            onClick={() => {
+                              const [hour, minute] = scheduleTime.split(':').map(Number)
+                              const newHour = hour === 23 ? 0 : hour + 1
+                              setScheduleTime(`${String(newHour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`)
+                              hasUnsavedScheduleChangesRef.current = true
+                            }}
+                            disabled={savingSchedule}
+                            className="text-neutral-500 hover:text-neutral-700 disabled:opacity-50"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                            </svg>
+                          </button>
+                          <div className="text-2xl font-semibold text-neutral-900 my-1 w-12 text-center">
+                            {(() => {
+                              const hour = parseInt(scheduleTime.split(':')[0])
+                              const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour
+                              return String(displayHour).padStart(2, '0')
+                            })()}
+                          </div>
+                          <button
+                            onClick={() => {
+                              const [hour, minute] = scheduleTime.split(':').map(Number)
+                              const newHour = hour === 0 ? 23 : hour - 1
+                              setScheduleTime(`${String(newHour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`)
+                              hasUnsavedScheduleChangesRef.current = true
+                            }}
+                            disabled={savingSchedule}
+                            className="text-neutral-500 hover:text-neutral-700 disabled:opacity-50"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </button>
+                        </div>
+
+                        <div className="text-2xl font-bold text-neutral-500">:</div>
+
+                        {/* Minute Scroller */}
+                        <div className="flex flex-col items-center">
+                          <button
+                            onClick={() => {
+                              const [hour, minute] = scheduleTime.split(':').map(Number)
+                              const newMinute = minute === 45 ? 0 : minute + 15
+                              setScheduleTime(`${String(hour).padStart(2, '0')}:${String(newMinute).padStart(2, '0')}`)
+                              hasUnsavedScheduleChangesRef.current = true
+                            }}
+                            disabled={savingSchedule}
+                            className="text-neutral-500 hover:text-neutral-700 disabled:opacity-50"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                            </svg>
+                          </button>
+                          <div className="text-2xl font-semibold text-neutral-900 my-1 w-12 text-center">
+                            {scheduleTime.split(':')[1]}
+                          </div>
+                          <button
+                            onClick={() => {
+                              const [hour, minute] = scheduleTime.split(':').map(Number)
+                              const newMinute = minute === 0 ? 45 : minute - 15
+                              setScheduleTime(`${String(hour).padStart(2, '0')}:${String(newMinute).padStart(2, '0')}`)
+                              hasUnsavedScheduleChangesRef.current = true
+                            }}
+                            disabled={savingSchedule}
+                            className="text-neutral-500 hover:text-neutral-700 disabled:opacity-50"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </button>
+                        </div>
+
+                        {/* AM/PM Toggle */}
+                        <button
+                          onClick={() => {
+                            const [hour, minute] = scheduleTime.split(':').map(Number)
+                            const newHour = hour >= 12 ? hour - 12 : hour + 12
+                            setScheduleTime(`${String(newHour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`)
+                            hasUnsavedScheduleChangesRef.current = true
+                          }}
+                          disabled={savingSchedule}
+                          className="ml-1 px-2 py-1 text-xs font-medium text-neutral-700 bg-neutral-200 hover:bg-neutral-300 rounded disabled:opacity-50"
+                        >
+                          {parseInt(scheduleTime.split(':')[0]) >= 12 ? 'PM' : 'AM'}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label className="text-sm text-neutral-700">Frequency</Label>
+                      <select
+                        value={frequencyType}
+                        onChange={(e) => {
+                          setFrequencyType(e.target.value as 'daily' | 'weekday' | 'weekly')
+                          hasUnsavedScheduleChangesRef.current = true
+                        }}
+                        disabled={savingSchedule}
+                        className="mt-2 w-full px-3 py-2 border border-neutral-200 rounded-md text-sm"
+                      >
+                        <option value="daily">Every day</option>
+                        <option value="weekday">Weekdays (Mon-Fri)</option>
+                        <option value="weekly">Once per week</option>
+                      </select>
+                    </div>
+
+                    {frequencyType === 'weekly' && (
+                      <div>
+                        <Label className="text-sm text-neutral-700">Day of Week</Label>
+                        <select
+                          value={dayOfWeek}
+                          onChange={(e) => {
+                            setDayOfWeek(parseInt(e.target.value))
+                            hasUnsavedScheduleChangesRef.current = true
+                          }}
+                          disabled={savingSchedule}
+                          className="mt-2 w-full px-3 py-2 border border-neutral-200 rounded-md text-sm"
+                        >
+                          <option value={0}>Monday</option>
+                          <option value={1}>Tuesday</option>
+                          <option value={2}>Wednesday</option>
+                          <option value={3}>Thursday</option>
+                          <option value={4}>Friday</option>
+                          <option value={5}>Saturday</option>
+                          <option value={6}>Sunday</option>
+                        </select>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-neutral-200">
+                      <div>
+                        <Label className="text-sm font-medium text-neutral-900">
+                          Daily Follow-up Reminders
+                        </Label>
+                        <p className="text-xs text-neutral-500 mt-0.5">
+                          Send daily reminders until team members respond
+                        </p>
+                      </div>
+                      <Switch
+                        checked={followUpRemindersEnabled}
+                        onCheckedChange={setFollowUpRemindersEnabled}
+                        disabled={savingSchedule}
+                      />
+                    </div>
+                    {followUpRemindersEnabled && (
+                      <div className="text-xs text-neutral-700 bg-purple-50 border border-purple-100 rounded-md p-2">
+                        <p>Team members will receive daily reminders at the scheduled time until they complete the survey or the period ends.</p>
+                      </div>
+                    )}
+
+
+                    <Button
+                      onClick={() => setShowSaveConfirmation(true)}
+                      disabled={savingSchedule}
+                      className="w-full"
+                      size="sm"
+                    >
+                      {savingSchedule ? 'Saving...' : 'Save Schedule'}
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
 
