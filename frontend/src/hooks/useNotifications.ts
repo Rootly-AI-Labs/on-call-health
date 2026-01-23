@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useToast } from '@/hooks/use-toast'
 import type { Notification, NotificationResponse } from '@/types/notifications'
 
@@ -9,9 +9,9 @@ export function useNotifications() {
   const [unreadCount, setUnreadCount] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
   const [hasMore, setHasMore] = useState(true)
-  const [offset, setOffset] = useState(0)
   const [invitationModalId, setInvitationModalId] = useState<number | null>(null)
   const { toast } = useToast()
+  const offsetRef = useRef(0)
 
   const LIMIT = 20
 
@@ -19,7 +19,7 @@ export function useNotifications() {
   const fetchNotifications = useCallback(async (loadMore = false) => {
     try {
       setIsLoading(true)
-      const currentOffset = loadMore ? offset : 0
+      const currentOffset = loadMore ? offsetRef.current : 0
       const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
       const response = await fetch(`${API_BASE}/api/notifications/?limit=${LIMIT}&offset=${currentOffset}`, {
         credentials: 'include',
@@ -34,11 +34,11 @@ export function useNotifications() {
           setNotifications(prev => [...prev, ...data.notifications])
         } else {
           setNotifications(data.notifications)
-          setOffset(0)
+          offsetRef.current = 0
         }
         setUnreadCount(data.unread_count)
         setHasMore(data.has_more || false)
-        setOffset(currentOffset + data.notifications.length)
+        offsetRef.current = currentOffset + data.notifications.length
       } else {
         // Silently fail - notifications are not critical
       }
@@ -47,7 +47,7 @@ export function useNotifications() {
     } finally {
       setIsLoading(false)
     }
-  }, [offset])
+  }, [])
 
   // Load more notifications for infinite scroll
   const loadMoreNotifications = async () => {
