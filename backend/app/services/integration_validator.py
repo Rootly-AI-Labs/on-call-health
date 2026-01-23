@@ -6,10 +6,13 @@ starting analysis to detect stale/expired tokens early.
 """
 import heapq
 import logging
+import os
 import threading
 from datetime import datetime, timedelta, timezone as dt_timezone
 from typing import Any, Dict, Optional
+from sqlalchemy import text
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import OperationalError
 from cryptography.fernet import Fernet
 import httpx
 
@@ -47,6 +50,65 @@ def needs_refresh(expires_at: Optional[datetime], skew_minutes: int = 60) -> boo
         return False
     now = datetime.now(dt_timezone.utc)
     return expires_at <= now + timedelta(minutes=skew_minutes)
+
+
+EXPIRES_IN_MIN_SECONDS = 60
+EXPIRES_IN_MAX_SECONDS = 86400 * 30
+EXPIRES_IN_DEFAULT_SECONDS = 86400
+
+LINEAR_LOCK_TIMEOUT_SECONDS_DEFAULT = 10
+LINEAR_LOCK_TIMEOUT_SECONDS_MIN = 1
+LINEAR_LOCK_TIMEOUT_SECONDS_MAX = 60
+
+
+def _parse_expires_in(raw_expires_in: Any) -> int:
+    """Parse and validate token expiration time.
+
+    Validates against min/max bounds and logs warnings for suspicious values
+    that may indicate misconfiguration or API changes.
+    """
+    if raw_expires_in is None or isinstance(raw_expires_in, bool):
+        return EXPIRES_IN_DEFAULT_SECONDS
+
+    try:
+        if isinstance(raw_expires_in, str):
+            candidate = raw_expires_in.strip()
+            if not candidate.isdigit():
+                raise ValueError("Invalid expires_in format")
+            value = int(candidate)
+        elif isinstance(raw_expires_in, float):
+            if not raw_expires_in.is_integer():
+                raise ValueError("Non-integer expires_in value")
+            value = int(raw_expires_in)
+        elif isinstance(raw_expires_in, int):
+            value = raw_expires_in
+        else:
+            raise ValueError("Invalid expires_in type")
+    except (ValueError, OverflowError):
+        logger.warning(f"Invalid expires_in value '{raw_expires_in}', using default")
+        return EXPIRES_IN_DEFAULT_SECONDS
+
+    if EXPIRES_IN_MIN_SECONDS <= value <= EXPIRES_IN_MAX_SECONDS:
+        # Warn if token lifetime is unusually short (< 5 minutes) - may indicate issue
+        if value < 300:
+            logger.warning(f"Unusually short token lifetime: {value}s (expected >= 300s)")
+        return value
+
+    logger.warning(f"expires_in {value} outside valid range [{EXPIRES_IN_MIN_SECONDS}, {EXPIRES_IN_MAX_SECONDS}], using default")
+    return EXPIRES_IN_DEFAULT_SECONDS
+
+
+def _get_linear_lock_timeout_seconds() -> int:
+    raw_timeout = os.getenv("LINEAR_TOKEN_REFRESH_LOCK_TIMEOUT_SECONDS")
+    if raw_timeout is None:
+        return LINEAR_LOCK_TIMEOUT_SECONDS_DEFAULT
+
+    try:
+        timeout_seconds = int(raw_timeout)
+    except (TypeError, ValueError):
+        return LINEAR_LOCK_TIMEOUT_SECONDS_DEFAULT
+
+    return max(LINEAR_LOCK_TIMEOUT_SECONDS_MIN, min(timeout_seconds, LINEAR_LOCK_TIMEOUT_SECONDS_MAX))
 
 
 # Module-level cache for validation results
@@ -216,65 +278,138 @@ class IntegrationValidator:
             return self._error_response("Unexpected error validating GitHub. Please try again later.")
 
     async def _get_valid_linear_token(self, integration: LinearIntegration) -> str:
-        """Get a valid Linear access token, refreshing if necessary."""
+        """Get a valid Linear access token, refreshing if necessary.
+
+        Uses database row locking to prevent race conditions when multiple
+        concurrent requests try to refresh the token simultaneously.
+        """
         if not integration.access_token:
             raise ValueError("No access token available for Linear integration")
 
-        if not needs_refresh(integration.token_expires_at) or not integration.refresh_token:
+        self.db.refresh(integration)
+
+        # Determine if refresh is needed and possible in a single logical block
+        token_needs_refresh = needs_refresh(integration.token_expires_at)
+        has_refresh_token = bool(integration.refresh_token)
+
+        # Return current token if still valid (most common path)
+        if not token_needs_refresh:
             return decrypt_token(integration.access_token)
 
-        logger.info(f"[Linear] Refreshing access token for user {integration.user_id}")
-        try:
-            refresh_token = decrypt_token(integration.refresh_token)
+        # Token needs refresh - verify we can refresh before proceeding
+        if not has_refresh_token:
+            raise ValueError("Authentication error. Please reconnect Linear.")
 
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.post(
-                    "https://api.linear.app/oauth/token",
-                    data={
-                        "grant_type": "refresh_token",
-                        "refresh_token": refresh_token,
-                        "client_id": settings.LINEAR_CLIENT_ID,
-                        "client_secret": settings.LINEAR_CLIENT_SECRET,
-                    }
+        # Proceed with refresh: token_needs_refresh=True, has_refresh_token=True
+        logger.info(f"[Linear] Token refresh initiated for user {integration.user_id}")
+
+        # Track transaction state to avoid rollback on non-existent transaction
+        transaction_started = False
+        try:
+            lock_timeout_seconds = _get_linear_lock_timeout_seconds()
+
+            refreshed_token = None
+            token_to_return = None
+            in_transaction = self.db.in_transaction()
+            transaction = self.db.begin_nested() if in_transaction else self.db.begin()
+            transaction_started = True
+
+            with transaction:
+                # Set explicit lock timeout scoped to this transaction (PostgreSQL)
+                self.db.execute(
+                    text("SET LOCAL lock_timeout = :lock_timeout"),
+                    {"lock_timeout": f"{lock_timeout_seconds}s"}
                 )
 
-            if response.status_code != 200:
-                logger.warning(f"[Linear] Token refresh failed with status {response.status_code}")
-                # Always raise error on refresh failure - if we needed to refresh,
-                # the token is expiring soon and silently returning it delays the problem
-                raise ValueError(f"Token refresh failed with status {response.status_code}")
+                # Re-query with FOR UPDATE to lock the row
+                locked_integration = self.db.query(LinearIntegration).filter(
+                    LinearIntegration.id == integration.id
+                ).with_for_update().first()
 
-            token_data = response.json()
-            new_access_token = token_data.get("access_token")
-            if not new_access_token:
-                logger.warning("[Linear] Token refresh response missing access_token")
-                raise ValueError("Token refresh response missing access_token")
+                if not locked_integration:
+                    raise ValueError("Authentication error. Please reconnect Linear.")
 
-            # Update the integration with new tokens
-            new_refresh_token = token_data.get("refresh_token") or refresh_token
-            # Validate expires_in to prevent datetime overflow (1 min to 30 days)
-            try:
-                raw_expires_in = token_data.get("expires_in")
-                expires_in = int(raw_expires_in) if raw_expires_in is not None else 86400
-                expires_in = max(60, min(expires_in, 86400 * 30))
-            except (ValueError, TypeError):
-                logger.warning(f"[Linear] Invalid expires_in value: {token_data.get('expires_in')}, using default")
-                expires_in = 86400
+                # Double-check pattern: use locked row's expiry (not original) since another
+                # request may have refreshed the token while we waited for the lock.
+                # This is the authoritative state after acquiring the row lock.
+                locked_token_expires_at = locked_integration.token_expires_at
+                if not needs_refresh(locked_token_expires_at):
+                    logger.info(f"[Linear] Token already refreshed for user {integration.user_id}")
+                    token_to_return = decrypt_token(locked_integration.access_token)
+                else:
+                    logger.info(f"[Linear] Refreshing access token for user {integration.user_id}")
+                    refresh_token = decrypt_token(locked_integration.refresh_token)
 
-            integration.access_token = encrypt_token(new_access_token)
-            integration.refresh_token = encrypt_token(new_refresh_token)
-            integration.token_expires_at = datetime.now(dt_timezone.utc) + timedelta(seconds=expires_in)
-            integration.updated_at = datetime.now(dt_timezone.utc)
-            self.db.commit()
+                    async with httpx.AsyncClient(timeout=10.0) as client:
+                        response = await client.post(
+                            "https://api.linear.app/oauth/token",
+                            data={
+                                "grant_type": "refresh_token",
+                                "refresh_token": refresh_token,
+                                "client_id": settings.LINEAR_CLIENT_ID,
+                                "client_secret": settings.LINEAR_CLIENT_SECRET,
+                            }
+                        )
 
-            logger.info(f"[Linear] Token refreshed successfully for user {integration.user_id}")
-            return new_access_token
+                    if response.status_code != 200:
+                        # Log user context for debugging; error message is generic for security
+                        logger.warning(f"[Linear] Token refresh failed for user {integration.user_id}")
+                        raise ValueError("Authentication error. Please reconnect Linear.")
+
+                    token_data = response.json()
+                    new_access_token = token_data.get("access_token")
+                    if not new_access_token:
+                        # Log user context for debugging; error message is generic for security
+                        logger.warning(f"[Linear] Token refresh failed for user {integration.user_id}")
+                        raise ValueError("Authentication error. Please reconnect Linear.")
+
+                    # Update the locked integration with new tokens
+                    new_refresh_token = token_data.get("refresh_token") or refresh_token
+                    expires_in = _parse_expires_in(token_data.get("expires_in"))
+
+                    locked_integration.access_token = encrypt_token(new_access_token)
+                    locked_integration.refresh_token = encrypt_token(new_refresh_token)
+                    locked_integration.token_expires_at = datetime.now(dt_timezone.utc) + timedelta(seconds=expires_in)
+                    locked_integration.updated_at = datetime.now(dt_timezone.utc)
+                    refreshed_token = new_access_token
+                    token_to_return = new_access_token
+
+            if refreshed_token:
+                logger.info(f"[Linear] Token refreshed successfully for user {integration.user_id}")
+
+            if token_to_return is None:
+                raise ValueError("Authentication error. Please reconnect Linear.")
+
+            return token_to_return
+
+        except OperationalError as db_error:
+            # Database lock timeout or deadlock - this is typically transient
+            # Note: Log includes user_id for debugging; error message is generic for security
+            logger.warning(
+                f"[Linear] Database contention for user {integration.user_id} "
+                f"(lock_timeout or deadlock - transient, retry should succeed)"
+            )
+            logger.debug(f"[Linear] Database error details: {db_error}")
+            if transaction_started:
+                self._safe_rollback(db_error)
+            # Re-raise as a retryable error type to preserve exception chain
+            raise RuntimeError("Temporary error. Please retry.") from db_error
 
         except Exception as e:
+            # Note: Log includes user context for debugging; error propagates without user info for security
             logger.warning(f"[Linear] Token refresh failed: {e}")
-            # Always re-raise on refresh failure - if we needed to refresh,
-            # the token is expiring soon and silently returning it delays the problem
+            if transaction_started:
+                self._safe_rollback(e)
             raise
+
+    def _safe_rollback(self, original_error: Optional[BaseException] = None):
+        """Safely rollback a transaction, handling potential rollback failures."""
+        try:
+            self.db.rollback()
+        except Exception as rollback_error:
+            context = f" after {original_error}" if original_error else ""
+            logger.error(f"Failed to rollback transaction{context}: {rollback_error}", exc_info=True)
+            self.db.close()
 
     async def _validate_linear(self, user_id: int) -> Optional[Dict[str, Any]]:
         """

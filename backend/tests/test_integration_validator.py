@@ -406,14 +406,24 @@ class TestLinearTokenRefresh(unittest.TestCase):
     @patch('app.services.integration_validator.encrypt_token')
     @patch('app.services.integration_validator.decrypt_token')
     def test_get_valid_linear_token_refresh_success(self, mock_decrypt, mock_encrypt):
-        """Test successful token refresh."""
+        """Test successful token refresh with row locking."""
         mock_integration = Mock(spec=LinearIntegration)
+        mock_integration.id = 1
         mock_integration.user_id = 1
         mock_integration.access_token = "old_encrypted_token"
         mock_integration.token_expires_at = datetime.now(dt_timezone.utc) - timedelta(minutes=10)
         mock_integration.refresh_token = "encrypted_refresh"
         mock_decrypt.return_value = "refresh_token_value"
         mock_encrypt.return_value = "new_encrypted_token"
+
+        # Mock the FOR UPDATE query chain - returns same integration (still needs refresh)
+        mock_query = Mock()
+        mock_filter = Mock()
+        mock_with_for_update = Mock()
+        mock_with_for_update.first.return_value = mock_integration
+        mock_filter.with_for_update.return_value = mock_with_for_update
+        mock_query.filter.return_value = mock_filter
+        self.mock_db.query.return_value = mock_query
 
         with patch('httpx.AsyncClient') as mock_client:
             mock_response = Mock()
@@ -430,28 +440,38 @@ class TestLinearTokenRefresh(unittest.TestCase):
         self.assertEqual(token, "new_access_token")
         self.mock_db.commit.assert_called_once()
 
-    @patch('app.services.integration_validator.decrypt_token')
-    def test_get_valid_linear_token_no_refresh_token(self, mock_decrypt):
-        """Test getting token when no refresh token is available."""
+    def test_get_valid_linear_token_no_refresh_token_raises_error(self):
+        """Test that expired token with no refresh token raises an error."""
         mock_integration = Mock(spec=LinearIntegration)
         mock_integration.access_token = "encrypted_token"
         mock_integration.token_expires_at = datetime.now(dt_timezone.utc) - timedelta(minutes=10)
         mock_integration.refresh_token = None
-        mock_decrypt.return_value = "valid_token"
 
-        token = self._run_async(self.validator._get_valid_linear_token(mock_integration))
+        with self.assertRaises(ValueError) as context:
+            self._run_async(self.validator._get_valid_linear_token(mock_integration))
 
-        self.assertEqual(token, "valid_token")
+        # Generic error message to avoid information disclosure
+        self.assertIn("Authentication error", str(context.exception))
 
     @patch('app.services.integration_validator.decrypt_token')
     def test_get_valid_linear_token_refresh_fails(self, mock_decrypt):
         """Test that refresh failure always raises exception."""
         mock_integration = Mock(spec=LinearIntegration)
+        mock_integration.id = 1
         mock_integration.user_id = 1
         mock_integration.access_token = "old_encrypted_token"
         mock_integration.token_expires_at = datetime.now(dt_timezone.utc) + timedelta(minutes=30)
         mock_integration.refresh_token = "encrypted_refresh"
         mock_decrypt.return_value = "refresh_token_value"
+
+        # Mock the FOR UPDATE query chain
+        mock_query = Mock()
+        mock_filter = Mock()
+        mock_with_for_update = Mock()
+        mock_with_for_update.first.return_value = mock_integration
+        mock_filter.with_for_update.return_value = mock_with_for_update
+        mock_query.filter.return_value = mock_filter
+        self.mock_db.query.return_value = mock_query
 
         with patch('httpx.AsyncClient') as mock_client:
             mock_response = Mock()
@@ -461,7 +481,45 @@ class TestLinearTokenRefresh(unittest.TestCase):
             with self.assertRaises(ValueError) as context:
                 self._run_async(self.validator._get_valid_linear_token(mock_integration))
 
-        self.assertIn("refresh failed", str(context.exception).lower())
+        self.assertIn("authentication error", str(context.exception).lower())
+        self.mock_db.rollback.assert_called()
+
+    @patch('app.services.integration_validator.decrypt_token')
+    def test_get_valid_linear_token_already_refreshed_by_another_request(self, mock_decrypt):
+        """Test that double-check pattern works - skip refresh if already done."""
+        mock_integration = Mock(spec=LinearIntegration)
+        mock_integration.id = 1
+        mock_integration.user_id = 1
+        mock_integration.access_token = "old_encrypted_token"
+        # Token needs refresh based on initial check
+        mock_integration.token_expires_at = datetime.now(dt_timezone.utc) + timedelta(minutes=30)
+        mock_integration.refresh_token = "encrypted_refresh"
+
+        # But after acquiring lock, another request already refreshed it
+        locked_integration = Mock(spec=LinearIntegration)
+        locked_integration.access_token = "already_refreshed_token"
+        # Token is now fresh (far future expiry)
+        locked_integration.token_expires_at = datetime.now(dt_timezone.utc) + timedelta(hours=12)
+
+        mock_decrypt.return_value = "already_refreshed_decrypted"
+
+        # Mock the FOR UPDATE query chain
+        mock_query = Mock()
+        mock_filter = Mock()
+        mock_with_for_update = Mock()
+        mock_with_for_update.first.return_value = locked_integration
+        mock_filter.with_for_update.return_value = mock_with_for_update
+        mock_query.filter.return_value = mock_filter
+        self.mock_db.query.return_value = mock_query
+
+        # Should return the already-refreshed token without calling Linear API
+        with patch('httpx.AsyncClient') as mock_client:
+            token = self._run_async(self.validator._get_valid_linear_token(mock_integration))
+
+            # HTTP client should NOT have been called since token was already refreshed
+            mock_client.return_value.__aenter__.return_value.post.assert_not_called()
+
+        self.assertEqual(token, "already_refreshed_decrypted")
 
     def test_get_valid_linear_token_no_access_token(self):
         """Test that missing access_token raises ValueError."""
@@ -474,6 +532,46 @@ class TestLinearTokenRefresh(unittest.TestCase):
             self._run_async(self.validator._get_valid_linear_token(mock_integration))
 
         self.assertIn("No access token available", str(context.exception))
+
+    @patch('app.services.integration_validator.decrypt_token')
+    def test_get_valid_linear_token_database_lock_error(self, mock_decrypt):
+        """Test that database lock errors are handled as transient/retryable."""
+        from sqlalchemy.exc import OperationalError
+
+        mock_integration = Mock(spec=LinearIntegration)
+        mock_integration.id = 1
+        mock_integration.user_id = 1
+        mock_integration.access_token = "encrypted_token"
+        mock_integration.token_expires_at = datetime.now(dt_timezone.utc) + timedelta(minutes=30)
+        mock_integration.refresh_token = "encrypted_refresh"
+        mock_decrypt.return_value = "token_value"
+
+        # Mock the query to raise OperationalError (database lock timeout)
+        mock_query = Mock()
+        mock_filter = Mock()
+        mock_filter.with_for_update.side_effect = OperationalError("statement", {}, "lock timeout")
+        mock_query.filter.return_value = mock_filter
+        self.mock_db.query.return_value = mock_query
+
+        # Raises RuntimeError (retryable) instead of ValueError (permanent)
+        with self.assertRaises(RuntimeError) as context:
+            self._run_async(self.validator._get_valid_linear_token(mock_integration))
+
+        self.assertIn("Temporary error", str(context.exception))
+        self.mock_db.rollback.assert_called_once()
+
+    def test_safe_rollback_success(self):
+        """Test _safe_rollback handles successful rollback."""
+        self.validator._safe_rollback()
+        self.mock_db.rollback.assert_called_once()
+
+    def test_safe_rollback_handles_failure(self):
+        """Test _safe_rollback handles rollback failure gracefully."""
+        self.mock_db.rollback.side_effect = Exception("Rollback failed")
+
+        # Should not raise - just logs the error
+        self.validator._safe_rollback()
+        self.mock_db.rollback.assert_called_once()
 
 
 class TestValidateAllIntegrations(unittest.TestCase):
