@@ -718,23 +718,25 @@ async def delete_analysis(
     db: Session = Depends(get_db)
 ):
     """Delete a specific analysis."""
+    # Filter by user_id to be consistent with list_analyses endpoint
+    # This ensures users can delete analyses they own, regardless of organization changes
     analysis = db.query(Analysis).filter(
         Analysis.id == analysis_id,
-        Analysis.organization_id == current_user.organization_id
+        Analysis.user_id == current_user.id
     ).first()
-    
+
     if not analysis:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Analysis not found"
         )
-    
+
     # Delete the analysis
     db.delete(analysis)
     db.commit()
-    
+
     logger.info(f"Analysis {analysis_id} deleted by user {current_user.id}")
-    
+
     return {"message": "Analysis deleted successfully"}
 
 
