@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Union
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel
-from sqlalchemy import func
+from sqlalchemy import func, over
 from sqlalchemy.orm import Session, load_only
 
 from ...models import get_db, User, Analysis, RootlyIntegration, SlackIntegration, GitHubIntegration, JiraIntegration, LinearIntegration, UserCorrelation
@@ -130,6 +130,55 @@ class HistoricalTrendsResponse(BaseModel):
     timeline_events: List[TimelineEvent]
     summary: Dict[str, Any]
     date_range: Dict[str, str]
+
+
+class IntegrationValidationResponse(BaseModel):
+    all_valid: bool
+    integrations: Dict[str, Dict[str, Any]]
+
+
+@router.get("/validate-integrations")
+@general_rate_limit("integration_validation")
+async def validate_integrations(
+    request: Request,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Validate all integration connections before starting analysis.
+
+    Makes lightweight API calls to verify tokens are not expired/stale.
+    Returns validation status for each enabled integration (GitHub, Linear, Jira).
+
+    Rate limited to prevent abuse of third-party APIs.
+    """
+    from ...services.integration_validator import IntegrationValidator
+
+    try:
+        logger.info(f"Validating integrations for user {current_user.id}")
+
+        validator = IntegrationValidator(db)
+        results = await validator.validate_all_integrations(
+            user_id=current_user.id
+        )
+
+        # If no integrations found, consider it invalid (user needs to set up integrations)
+        # Also handles empty dict case where all() would incorrectly return True
+        all_valid = bool(results) and all(result.get("valid", False) for result in results.values())
+
+        logger.info(
+            f"Validation complete for user {current_user.id}: "
+            f"all_valid={all_valid}, integrations={list(results.keys())}"
+        )
+
+        return IntegrationValidationResponse(all_valid=all_valid, integrations=results)
+
+    except Exception as e:
+        logger.error(f"Integration validation failed for user {current_user.id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to validate integrations. Please try again later."
+        )
 
 
 @router.post("/run", response_model=AnalysisResponse)
