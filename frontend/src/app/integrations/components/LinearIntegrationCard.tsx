@@ -29,7 +29,7 @@ export function LinearIntegrationCard({ onConnect, isConnecting }: LinearIntegra
               </>
             ) : (
               <>
-                <Image src="/images/linear-logo-light.png" alt="Linear" width={16} height={16} className="mr-2" />
+                <Image src="/images/linear-logo-light.png" alt="Linear" width={16} height={16} className="mr-2" quality={100} />
                 Connect with Linear
               </>
             )}
