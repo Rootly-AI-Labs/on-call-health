@@ -114,15 +114,16 @@ if redis_client:
     redis_url = os.getenv("REDIS_URL")
     if redis_url:
         storage_uri = redis_url
+        logger.info("✅ Rate limiting using Redis storage (via REDIS_URL)")
     else:
         redis_host = os.getenv("REDIS_HOST", "localhost")
-        redis_port = os.getenv("REDIS_PORT", "6379")
+        redis_port = int(os.getenv("REDIS_PORT", "6379"))
         storage_uri = f"redis://{redis_host}:{redis_port}/1"
+        logger.info(f"✅ Rate limiting using Redis storage: {redis_host}:{redis_port}")
     limiter = Limiter(
         key_func=get_rate_limit_key,
         storage_uri=storage_uri
     )
-    logger.info(f"✅ Rate limiting using Redis storage")
 else:
     # Use in-memory storage (development/fallback)
     limiter = Limiter(key_func=get_rate_limit_key)
