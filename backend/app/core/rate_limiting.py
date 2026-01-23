@@ -117,7 +117,11 @@ if redis_client:
         logger.info("✅ Rate limiting using Redis storage (via REDIS_URL)")
     else:
         redis_host = os.getenv("REDIS_HOST", "localhost")
-        redis_port = int(os.getenv("REDIS_PORT", "6379"))
+        try:
+            redis_port = int(os.getenv("REDIS_PORT", "6379"))
+        except ValueError:
+            logger.warning("Invalid REDIS_PORT value, using default 6379")
+            redis_port = 6379
         storage_uri = f"redis://{redis_host}:{redis_port}/1"
         logger.info(f"✅ Rate limiting using Redis storage: {redis_host}:{redis_port}")
     limiter = Limiter(
