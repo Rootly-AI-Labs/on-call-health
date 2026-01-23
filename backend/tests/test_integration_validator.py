@@ -450,7 +450,8 @@ class TestLinearTokenRefresh(unittest.TestCase):
         with self.assertRaises(ValueError) as context:
             self._run_async(self.validator._get_valid_linear_token(mock_integration))
 
-        self.assertIn("Token expired and no refresh token available", str(context.exception))
+        # Generic error message to avoid information disclosure
+        self.assertIn("Authentication error", str(context.exception))
 
     @patch('app.services.integration_validator.decrypt_token')
     def test_get_valid_linear_token_refresh_fails(self, mock_decrypt):
@@ -480,7 +481,7 @@ class TestLinearTokenRefresh(unittest.TestCase):
             with self.assertRaises(ValueError) as context:
                 self._run_async(self.validator._get_valid_linear_token(mock_integration))
 
-        self.assertIn("refresh failed", str(context.exception).lower())
+        self.assertIn("authentication error", str(context.exception).lower())
         self.mock_db.rollback.assert_called()
 
     @patch('app.services.integration_validator.decrypt_token')
@@ -534,7 +535,7 @@ class TestLinearTokenRefresh(unittest.TestCase):
 
     @patch('app.services.integration_validator.decrypt_token')
     def test_get_valid_linear_token_database_lock_error(self, mock_decrypt):
-        """Test that database lock errors are handled properly."""
+        """Test that database lock errors are handled as transient/retryable."""
         from sqlalchemy.exc import OperationalError
 
         mock_integration = Mock(spec=LinearIntegration)
@@ -552,10 +553,11 @@ class TestLinearTokenRefresh(unittest.TestCase):
         mock_query.filter.return_value = mock_filter
         self.mock_db.query.return_value = mock_query
 
-        with self.assertRaises(ValueError) as context:
+        # Raises RuntimeError (retryable) instead of ValueError (permanent)
+        with self.assertRaises(RuntimeError) as context:
             self._run_async(self.validator._get_valid_linear_token(mock_integration))
 
-        self.assertIn("Database busy", str(context.exception))
+        self.assertIn("Temporary error", str(context.exception))
         self.mock_db.rollback.assert_called_once()
 
     def test_safe_rollback_success(self):
