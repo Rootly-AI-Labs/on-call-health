@@ -20,7 +20,7 @@ def get_encryption_key() -> bytes:
     """Get the encryption key from settings."""
     from base64 import urlsafe_b64encode
 
-    key = settings.SECRET_KEY.encode()
+    key = settings.JWT_SECRET_KEY.encode()
     if len(key) < 32:
         key = key.ljust(32, b'0')
     else:
