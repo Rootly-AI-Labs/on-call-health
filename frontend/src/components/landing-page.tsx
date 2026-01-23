@@ -441,7 +441,7 @@ export default function LandingPage() {
               </a>
               <div className="mt-0 text-3xl lg:text-4xl font-medium">On-Call Health</div>
               <div className="mt-8 text-sm text-slate-300">
-                © Rootly {new Date().getFullYear()}. All rights reserved. Privacy policy · Terms of use · Cookie Settings
+                © Rootly {new Date().getFullYear()}. All rights reserved. Privacy policy · Terms of use · Cookie Settings · <a href="/disclaimer" className="hover:text-white transition-colors">Disclaimer</a>
               </div>
             </div>
 
