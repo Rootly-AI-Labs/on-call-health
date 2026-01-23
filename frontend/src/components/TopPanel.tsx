@@ -39,15 +39,22 @@ export function TopPanel() {
     const userName = localStorage.getItem("user_name")
     const userEmail = localStorage.getItem("user_email")
     const userRole = localStorage.getItem("user_role")
-    // Only set userInfo if auth_token exists along with user details
+    // Require auth_token to exist along with user details.
+    // Note: True token validation (signature, expiration) happens on the backend.
+    // This check prevents unnecessary UI rendering when there's clearly no session.
+    // Invalid tokens will result in 401 errors that redirect to login.
     if (authToken && userName && userEmail) {
       setUserInfo({ name: userName, email: userEmail, role: userRole || undefined })
     }
   }, [])
 
   const handleSignOut = () => {
-    // Clear auth token and redirect
+    // Clear all auth-related data and redirect
     localStorage.removeItem("auth_token")
+    localStorage.removeItem("user_name")
+    localStorage.removeItem("user_email")
+    localStorage.removeItem("user_role")
+    setUserInfo(null)
     router.push("/")
   }
 
