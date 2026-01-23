@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional, Union
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel
+from sqlalchemy import func, over
 from sqlalchemy.orm import Session, load_only
 
 from ...models import get_db, User, Analysis, RootlyIntegration, SlackIntegration, GitHubIntegration, JiraIntegration, LinearIntegration, UserCorrelation
@@ -139,6 +140,7 @@ class IntegrationValidationResponse(BaseModel):
 @router.get("/validate-integrations")
 @general_rate_limit("integration_validation")
 async def validate_integrations(
+    req: Request,
     integration_id: int = Query(..., description="Integration ID to analyze"),
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
@@ -348,19 +350,21 @@ async def list_analyses(
     integration_id: Optional[int] = Query(None, gt=0, description="Filter by integration ID"),
     limit: int = Query(20, gt=0, le=100, description="Results per page"),
     offset: int = Query(0, ge=0, description="Results offset"),
-    status: Optional[str] = Query(None, regex="^(pending|running|completed|failed)$", description="Filter by status"),
+    filter_status: Optional[str] = Query(None, alias="status", regex="^(pending|running|completed|failed)$", description="Filter by status"),
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """List all previous analyses for the current user."""
+    """List all previous analyses for the current user.
+
+    Optimized to use a single database query with window function for count,
+    avoiding separate COUNT(*) query overhead.
+    """
     import time
     start_time = time.time()
-    logger.info(f"📋 [LIST_ANALYSES] Request received - user_id={current_user.id}, limit={limit}, offset={offset}")
+    logger.info(f"📋 [LIST_ANALYSES] Request received - user_id={current_user.id}, limit={limit}, offset={offset}, status={filter_status}")
 
-    # Simplified: Filter by user_id only (no organization_id requirement)
-    # TODO: Re-enable organization_id filtering after multi-tenant migration is stable
-    query = db.query(Analysis).filter(Analysis.user_id == current_user.id)
-    logger.info(f"📋 [LIST_ANALYSES] Query built in {time.time() - start_time:.3f}s")
+    # Build base filter conditions
+    filters = [Analysis.user_id == current_user.id]
 
     # Filter by integration if specified
     if integration_id:
@@ -372,65 +376,67 @@ async def list_analyses(
 
         if not integration:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
+                status_code=404,
                 detail="Integration not found"
             )
+        filters.append(Analysis.rootly_integration_id == integration_id)
 
-        query = query.filter(Analysis.rootly_integration_id == integration_id)
+    # Filter by status if specified (was declared but not used before)
+    if filter_status:
+        filters.append(Analysis.status == filter_status)
 
-    # Fast check: if offset is 0, first check if any analyses exist
-    # This optimizes the common case of new users with no analyses
-    if offset == 0:
-        exists_start = time.time()
-        exists = db.query(query.exists()).scalar()
-        logger.info(f"📋 [LIST_ANALYSES] Exists check: {exists} in {time.time() - exists_start:.3f}s")
-        if not exists:
-            logger.info(f"📋 [LIST_ANALYSES] No analyses found, returning empty - total time: {time.time() - start_time:.3f}s")
-            return AnalysisListResponse(analyses=[], total=0)
-
-    # Get total count
-    count_start = time.time()
-    total = query.count()
-    logger.info(f"📋 [LIST_ANALYSES] Count: {total} in {time.time() - count_start:.3f}s")
-
-    # Apply pagination and ordering
-    # Use load_only to exclude heavy 'results' column (can be 30MB+) - not needed for list view
+    # Use a single query with window function to get both count and data
+    # This avoids two separate database round-trips (COUNT + SELECT)
     fetch_start = time.time()
-    analyses = query.options(
-        load_only(
-            Analysis.id, Analysis.uuid, Analysis.status,
-            Analysis.created_at, Analysis.completed_at,
-            Analysis.time_range, Analysis.config,
-            Analysis.integration_name, Analysis.platform,
-            Analysis.rootly_integration_id, Analysis.user_id,
-            Analysis.organization_id
-        )
-    ).order_by(Analysis.created_at.desc()).offset(offset).limit(limit).all()
-    logger.info(f"📋 [LIST_ANALYSES] Fetched {len(analyses)} analyses in {time.time() - fetch_start:.3f}s")
+
+    # Subquery with window function for total count
+    count_subq = func.count(Analysis.id).over().label('total_count')
+
+    # Single query: get rows + total count in one database round-trip
+    # Excludes heavy 'results' column (can be 30MB+) - not needed for list view
+    results = db.query(
+        Analysis.id,
+        Analysis.uuid,
+        Analysis.status,
+        Analysis.created_at,
+        Analysis.completed_at,
+        Analysis.time_range,
+        Analysis.config,
+        Analysis.integration_name,
+        Analysis.platform,
+        Analysis.rootly_integration_id,
+        count_subq
+    ).filter(
+        *filters
+    ).order_by(
+        Analysis.created_at.desc()
+    ).offset(offset).limit(limit).all()
+
+    logger.info(f"📋 [LIST_ANALYSES] Fetched {len(results)} analyses in {time.time() - fetch_start:.3f}s")
+
+    # Extract total from first row (window function provides it on every row)
+    total = results[0].total_count if results else 0
 
     # Convert to response format
     response_analyses = []
-    for analysis in analyses:
+    for row in results:
         response_analyses.append(
             AnalysisResponse(
-                id=analysis.id,
-                uuid=getattr(analysis, 'uuid', None),
-                integration_id=analysis.rootly_integration_id,
-
-                # Include new integration fields
-                integration_name=analysis.integration_name,
-                platform=analysis.platform,
-
-                status=analysis.status,
-                created_at=analysis.created_at,
-                completed_at=analysis.completed_at,
-                time_range=analysis.time_range or 30,
-                analysis_data=extract_analysis_summary(None),  # Don't access results - excluded via load_only()
-                config=analysis.config
+                id=row.id,
+                uuid=row.uuid,
+                integration_id=row.rootly_integration_id,
+                integration_name=row.integration_name,
+                platform=row.platform,
+                status=row.status,
+                created_at=row.created_at,
+                completed_at=row.completed_at,
+                time_range=row.time_range or 30,
+                analysis_data=extract_analysis_summary(None),  # Don't access results - excluded
+                config=row.config
             )
         )
 
-    logger.info(f"📋 [LIST_ANALYSES] COMPLETE - returning {len(response_analyses)} analyses, total time: {time.time() - start_time:.3f}s")
+    logger.info(f"📋 [LIST_ANALYSES] COMPLETE - returning {len(response_analyses)} analyses, total={total}, time: {time.time() - start_time:.3f}s")
     return AnalysisListResponse(
         analyses=response_analyses,
         total=total
