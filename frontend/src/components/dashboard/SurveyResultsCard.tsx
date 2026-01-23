@@ -120,7 +120,7 @@ export function SurveyResultsCard({ surveyData }: SurveyResultsCardProps): React
           {surveyData.trend && (
             <div className="flex items-center gap-2">
               {getTrendIcon(surveyData.trend)}
-              <span className="text-xs text-neutral-500 capitalize">{surveyData.trend}</span>
+              <span className="text-xs text-neutral-500 capitalize">Wellbeing {surveyData.trend}</span>
             </div>
           )}
         </div>
