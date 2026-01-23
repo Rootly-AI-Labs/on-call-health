@@ -241,9 +241,12 @@ class SurveyScheduler:
                         continue
 
                     # Check if user has already completed the survey in this period
-                    # Use timezone-aware boundaries for proper comparison with submitted_at
-                    period_start_utc = datetime.combine(period.period_start_date, time.min).replace(tzinfo=pytz.UTC)
-                    period_end_utc = datetime.combine(period.period_end_date, time.max).replace(tzinfo=pytz.UTC)
+                    # Use organization timezone to create proper date boundaries, then convert to UTC
+                    org_tz = pytz.timezone(org_timezone)
+                    period_start_local = org_tz.localize(datetime.combine(period.period_start_date, time.min))
+                    period_end_local = org_tz.localize(datetime.combine(period.period_end_date, time.max))
+                    period_start_utc = period_start_local.astimezone(pytz.UTC)
+                    period_end_utc = period_end_local.astimezone(pytz.UTC)
                     completed_report = db.query(UserBurnoutReport).filter(
                         UserBurnoutReport.email == period.email,
                         UserBurnoutReport.submitted_at >= period_start_utc,
