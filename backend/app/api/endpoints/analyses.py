@@ -140,7 +140,7 @@ class IntegrationValidationResponse(BaseModel):
 @router.get("/validate-integrations")
 @general_rate_limit("integration_validation")
 async def validate_integrations(
-    req: Request,
+    req: Request,  # Required by @general_rate_limit decorator
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
