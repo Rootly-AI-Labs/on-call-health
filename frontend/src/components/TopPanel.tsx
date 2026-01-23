@@ -16,7 +16,7 @@ import { NotificationDrawer } from "@/components/notifications"
 import { AccountSettingsDialog } from "@/components/AccountSettingsDialog"
 import { TeamManagementDialog } from "@/components/TeamManagementDialog"
 import { useGettingStarted } from "@/contexts/GettingStartedContext"
-import { LogOut, BookOpen, HelpCircle, Settings, Users } from "lucide-react"
+import { LogOut, BookOpen, HelpCircle, Settings, Users, FileText } from "lucide-react"
 
 interface UserInfo {
   name: string
@@ -158,6 +158,13 @@ export function TopPanel() {
                   >
                     <BookOpen className="w-4 h-4 mr-2" />
                     Methodology
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => router.push("/disclaimer")}
+                    className="cursor-pointer focus:bg-purple-200 focus:text-purple-900"
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    Disclaimer
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={() => {
