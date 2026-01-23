@@ -107,10 +107,11 @@ export function TopPanel() {
             </nav>
           </div>
 
-          {/* Right: notifications + user */}
+          {/* Right: notifications + user (only shown when authenticated) */}
           <div className="flex items-center gap-3">
-            <NotificationDrawer />
             {userInfo && (
+              <>
+                <NotificationDrawer />
               <DropdownMenu open={isDropdownOpen} onOpenChange={(open) => {
                 setIsDropdownOpen(open)
                 // Close dropdown when dialog opens
@@ -195,6 +196,7 @@ export function TopPanel() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              </>
             )}
           </div>
         </div>
