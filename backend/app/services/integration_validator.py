@@ -62,26 +62,15 @@ LINEAR_LOCK_TIMEOUT_SECONDS_MAX = 60
 
 
 def _is_ascii_digits(s: str) -> bool:
-    """Check if string contains only ASCII digits (0-9).
-
-    Uses explicit ASCII digit check instead of isdigit() which accepts Unicode
-    digit characters (like superscript ³) that would fail int() conversion.
-    """
+    """Check if string contains only ASCII digits 0-9 (rejects Unicode digits)."""
     return bool(s) and all(c in '0123456789' for c in s)
 
 
 def _parse_expires_in(raw_expires_in: Any) -> int:
-    """Parse and validate expires_in from OAuth response.
+    """Parse expires_in from OAuth response, returning bounded value or default.
 
-    Returns a bounded integer value between EXPIRES_IN_MIN_SECONDS (60) and
-    EXPIRES_IN_MAX_SECONDS (30 days). Values outside this range return the default.
-
-    Handles edge cases:
-    - Scientific notation floats (e.g., 1e9): Checked against bounds BEFORE conversion
-    - Unicode digit strings: Rejected by _is_ascii_digits()
-    - Non-integer floats: Rejected with warning
-
-    Logs warnings for suspicious values that may indicate API changes or misconfiguration.
+    Bounds: EXPIRES_IN_MIN_SECONDS (60) to EXPIRES_IN_MAX_SECONDS (30 days).
+    Floats are bounds-checked before conversion to prevent overflow.
     """
     if raw_expires_in is None or isinstance(raw_expires_in, bool):
         return EXPIRES_IN_DEFAULT_SECONDS
@@ -332,18 +321,10 @@ class IntegrationValidator:
             refreshed_token = None
             token_to_return = None
 
-            # Always use begin_nested() which:
-            # - Creates a SAVEPOINT if already in a transaction
-            # - Starts a new transaction if not
-            # This avoids any race condition concerns with checking in_transaction() state.
+            # begin_nested() creates a savepoint (or starts transaction if needed)
             with self.db.begin_nested():
-                # PostgreSQL SET LOCAL is TRANSACTION-scoped (not session-scoped).
-                # From PostgreSQL docs: "SET LOCAL sets the configuration parameter for
-                # the current transaction only. After COMMIT or ROLLBACK, the session-level
-                # value takes effect again."
-                # Reference: https://www.postgresql.org/docs/current/sql-set.html
-                # This setting automatically resets when the transaction ends, so it
-                # will NOT affect other requests that reuse the same pooled connection.
+                # SET LOCAL is transaction-scoped, resets after commit/rollback
+                # https://www.postgresql.org/docs/current/sql-set.html
                 self.db.execute(
                     text("SET LOCAL lock_timeout = :lock_timeout"),
                     {"lock_timeout": f"{lock_timeout_seconds}s"}
@@ -357,9 +338,7 @@ class IntegrationValidator:
                 if not locked_integration:
                     raise ValueError("Authentication error. Please reconnect Linear.")
 
-                # Double-check pattern: use locked row's expiry (not original) since another
-                # request may have refreshed the token while we waited for the lock.
-                # This is the authoritative state after acquiring the row lock.
+                # Double-check: another request may have refreshed while we waited for lock
                 locked_token_expires_at = locked_integration.token_expires_at
                 if not needs_refresh(locked_token_expires_at):
                     logger.info(f"[Linear] Token already refreshed for user {integration.user_id}")
@@ -411,13 +390,7 @@ class IntegrationValidator:
             return token_to_return
 
         except OperationalError as db_error:
-            # Database lock timeout or deadlock - transient error, retry should succeed.
-            # Note: Python except blocks are ALTERNATIVES - when we raise here, it does
-            # NOT fall through to the except Exception block below.
-            #
-            # We log detailed context at WARNING level for debugging, but the raised
-            # exception uses a generic message for security (no user IDs in exceptions).
-            # The original db_error is preserved in the exception chain via 'from'.
+            # Lock timeout or deadlock - transient error, retry should succeed
             error_type = "lock_timeout" if "lock" in str(db_error).lower() else "db_error"
             logger.warning(
                 f"[Linear] Database contention during token refresh: "
@@ -426,11 +399,9 @@ class IntegrationValidator:
             )
             logger.debug(f"[Linear] Full database error: {db_error}", exc_info=True)
             self._safe_rollback(db_error)
-            # RuntimeError with 'from db_error' preserves full exception chain for debugging
             raise RuntimeError("Temporary error. Please retry.") from db_error
 
         except Exception as e:
-            # Catches non-OperationalError exceptions (ValueError, httpx errors, etc.)
             logger.warning(
                 f"[Linear] Token refresh failed: user_id={integration.user_id}, "
                 f"error_type={type(e).__name__}, message={e}"
