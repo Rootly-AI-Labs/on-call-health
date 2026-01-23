@@ -28,11 +28,11 @@ function getOCBRiskInfo(score: number | undefined | null): { level: string; labe
 
 function getOCBBadgeColor(level: string): string {
   switch (level) {
-    case 'critical': return 'bg-red-100 text-red-800 border-red-300'
-    case 'poor': return 'bg-red-50 text-red-600 border-red-200'
-    case 'fair': return 'bg-yellow-50 text-yellow-600 border-yellow-200'
-    case 'healthy': return 'bg-green-50 text-green-600 border-green-200'
-    default: return 'bg-gray-50 text-gray-600 border-gray-200'
+    case 'critical': return 'bg-red-100 text-red-800'
+    case 'poor': return 'bg-red-50 text-red-600'
+    case 'fair': return 'bg-yellow-50 text-yellow-600'
+    case 'healthy': return 'bg-green-50 text-green-600'
+    default: return 'bg-gray-50 text-gray-600'
   }
 }
 
