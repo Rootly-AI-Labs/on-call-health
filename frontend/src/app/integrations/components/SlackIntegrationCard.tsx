@@ -29,6 +29,7 @@ export function SlackIntegrationCard({ onConnect, isConnecting }: SlackIntegrati
               width={40}
               height={40}
               className="h-10 w-10 object-contain"
+              quality={100}
             />
           </div>
           <div>

@@ -23,7 +23,7 @@ export function LinearConnectedCard({
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <Image src="/images/linear-logo.png" alt="Linear" width={40} height={40} />
+            <Image src="/images/linear-logo.png" alt="Linear" width={40} height={40} quality={100} />
             <div>
               <CardTitle className="text-lg flex items-center space-x-2">
                 <span>Linear</span>

@@ -3236,6 +3236,7 @@ export default function IntegrationsPage() {
                         width={32}
                         height={32}
                         className="h-8 w-8 object-contain"
+                        quality={100}
                       />
                     </div>
                     <span className="text-lg font-bold text-neutral-900">GitHub</span>
@@ -3281,6 +3282,7 @@ export default function IntegrationsPage() {
                         width={32}
                         height={32}
                         className="h-8 w-8 object-contain"
+                        quality={100}
                       />
                     </div>
                     <span className="text-lg font-bold text-neutral-900">Slack</span>
@@ -3371,7 +3373,7 @@ export default function IntegrationsPage() {
                   </div>
                 )}
                 <div className="flex items-center space-x-2">
-                  <Image src="/images/linear-logo.png" alt="Linear" width={28} height={28} />
+                  <Image src="/images/linear-logo.png" alt="Linear" width={28} height={28} quality={100} />
                   <span className="text-xl font-semibold text-neutral-900">Linear</span>
                 </div>
               </Card>
@@ -4751,6 +4753,7 @@ export default function IntegrationsPage() {
                                           width={14}
                                           height={14}
                                           className="object-contain"
+                                          quality={100}
                                         />
                                       </div>
                                     )

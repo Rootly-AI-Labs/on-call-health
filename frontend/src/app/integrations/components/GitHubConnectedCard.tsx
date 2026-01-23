@@ -54,13 +54,14 @@ export function GitHubConnectedCard({
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 rounded-lg flex items-center justify-center">
-              <Image
-                src="/images/github-logo.png"
-                alt="GitHub"
-                width={40}
-                height={40}
-                className="h-10 w-10 object-contain"
-              />
+                <Image
+                  src="/images/github-logo.png"
+                  alt="GitHub"
+                  width={40}
+                  height={40}
+                  className="h-10 w-10 object-contain"
+                  quality={100}
+                />
             </div>
             <div>
               <CardTitle className="text-lg flex items-center space-x-2">
