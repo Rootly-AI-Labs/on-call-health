@@ -10,19 +10,21 @@ import asyncio
 
 from app.services.integration_validator import (
     IntegrationValidator,
-    get_cached_validation,
-    set_validation_cache,
-    invalidate_validation_cache,
-    _validation_cache,
-    _cache_lock,
-    VALIDATION_CACHE_TTL_SECONDS,
-    MAX_CACHE_SIZE,
     needs_refresh,
     _is_ascii_digits,
     _parse_expires_in,
     EXPIRES_IN_DEFAULT_SECONDS,
     EXPIRES_IN_MIN_SECONDS,
     EXPIRES_IN_MAX_SECONDS,
+)
+from app.core.validation_cache import (
+    get_cached_validation,
+    set_cached_validation,
+    invalidate_validation_cache,
+    VALIDATION_CACHE_TTL_SECONDS,
+    _fallback_cache,
+    _fallback_lock,
+    _FALLBACK_MAX_SIZE,
 )
 from app.models import GitHubIntegration, LinearIntegration, JiraIntegration
 
@@ -264,11 +266,11 @@ class TestValidationCache(unittest.TestCase):
 
     def setUp(self):
         """Clear cache before each test."""
-        _validation_cache.clear()
+        _fallback_cache.clear()
 
     def tearDown(self):
         """Clear cache after each test."""
-        _validation_cache.clear()
+        _fallback_cache.clear()
 
     def test_set_and_get_cached_validation(self):
         """Test setting and retrieving cached validation results."""
@@ -278,7 +280,7 @@ class TestValidationCache(unittest.TestCase):
             "linear": {"valid": False, "error": "Token expired"}
         }
 
-        set_validation_cache(user_id, results)
+        set_cached_validation(user_id, results)
         cached = get_cached_validation(user_id)
 
         self.assertEqual(cached, results)
@@ -294,7 +296,7 @@ class TestValidationCache(unittest.TestCase):
         results = {"github": {"valid": True, "error": None}}
 
         # Set cache with old timestamp
-        _validation_cache[user_id] = {
+        _fallback_cache[user_id] = {
             "results": results,
             "timestamp": datetime.now(dt_timezone.utc) - timedelta(seconds=VALIDATION_CACHE_TTL_SECONDS + 10)
         }
@@ -307,7 +309,7 @@ class TestValidationCache(unittest.TestCase):
         user_id = 1
         results = {"github": {"valid": True, "error": None}}
 
-        set_validation_cache(user_id, results)
+        set_cached_validation(user_id, results)
         self.assertIsNotNone(get_cached_validation(user_id))
 
         invalidate_validation_cache(user_id)
@@ -323,8 +325,8 @@ class TestValidationCache(unittest.TestCase):
         results = {"github": {"valid": True, "error": None}}
 
         # Set cache with old timestamp directly
-        with _cache_lock:
-            _validation_cache[user_id] = {
+        with _fallback_lock:
+            _fallback_cache[user_id] = {
                 "results": results,
                 "timestamp": datetime.now(dt_timezone.utc) - timedelta(seconds=VALIDATION_CACHE_TTL_SECONDS + 10)
             }
@@ -334,29 +336,29 @@ class TestValidationCache(unittest.TestCase):
         self.assertIsNone(cached)
 
         # Entry should be removed
-        with _cache_lock:
-            self.assertNotIn(user_id, _validation_cache)
+        with _fallback_lock:
+            self.assertNotIn(user_id, _fallback_cache)
 
     def test_cache_eviction_when_full(self):
         """Test that oldest entries are evicted when cache is full."""
-        # Fill the cache to MAX_CACHE_SIZE
+        # Fill the cache to _FALLBACK_MAX_SIZE
         base_time = datetime.now(dt_timezone.utc) - timedelta(hours=1)
 
-        with _cache_lock:
-            for i in range(MAX_CACHE_SIZE):
-                _validation_cache[i] = {
+        with _fallback_lock:
+            for i in range(_FALLBACK_MAX_SIZE):
+                _fallback_cache[i] = {
                     "results": {"github": {"valid": True, "error": None}},
                     "timestamp": base_time + timedelta(seconds=i)
                 }
 
         # Adding a new entry should trigger eviction
-        set_validation_cache(MAX_CACHE_SIZE + 1, {"github": {"valid": True, "error": None}})
+        set_cached_validation(_FALLBACK_MAX_SIZE + 1, {"github": {"valid": True, "error": None}})
 
-        # Cache should now be smaller than MAX_CACHE_SIZE + 1
-        with _cache_lock:
-            self.assertLess(len(_validation_cache), MAX_CACHE_SIZE + 1)
+        # Cache should now be smaller than _FALLBACK_MAX_SIZE + 1
+        with _fallback_lock:
+            self.assertLess(len(_fallback_cache), _FALLBACK_MAX_SIZE + 1)
             # New entry should exist
-            self.assertIn(MAX_CACHE_SIZE + 1, _validation_cache)
+            self.assertIn(_FALLBACK_MAX_SIZE + 1, _fallback_cache)
 
 
 class TestNeedsRefresh(unittest.TestCase):
@@ -692,11 +694,11 @@ class TestValidateAllIntegrations(unittest.TestCase):
         """Set up test fixtures."""
         self.mock_db = Mock(spec=Session)
         self.validator = IntegrationValidator(self.mock_db)
-        _validation_cache.clear()
+        _fallback_cache.clear()
 
     def tearDown(self):
         """Clear cache after each test."""
-        _validation_cache.clear()
+        _fallback_cache.clear()
 
     def _run_async(self, coro):
         """Helper to run async functions in tests."""
@@ -708,7 +710,7 @@ class TestValidateAllIntegrations(unittest.TestCase):
         cached_results = {
             "github": {"valid": True, "error": None}
         }
-        set_validation_cache(user_id, cached_results)
+        set_cached_validation(user_id, cached_results)
 
         result = self._run_async(self.validator.validate_all_integrations(user_id, use_cache=True))
 
@@ -719,7 +721,7 @@ class TestValidateAllIntegrations(unittest.TestCase):
         """Test that validate_all_integrations bypasses cache when use_cache=False."""
         user_id = 1
         cached_results = {"github": {"valid": True, "error": None}}
-        set_validation_cache(user_id, cached_results)
+        set_cached_validation(user_id, cached_results)
 
         self.mock_db.query().filter().first.return_value = None
 
