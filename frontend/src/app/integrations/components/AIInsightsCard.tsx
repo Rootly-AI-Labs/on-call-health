@@ -419,12 +419,12 @@ export function AIInsightsCard({
                 </div>
                 <Button
                   size="sm"
-                  variant="ghost"
+                  variant="outline"
                   onClick={() => handleTokenSourceChange('system')}
                   disabled={isSwitching}
-                  className="text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 shrink-0 -mt-1 p-1 h-auto"
+                  className="shrink-0 border-purple-500 text-purple-700 hover:bg-purple-200"
                 >
-                  <X className="w-5 h-5" />
+                  ← Use System Token
                 </Button>
               </div>
             <div>
