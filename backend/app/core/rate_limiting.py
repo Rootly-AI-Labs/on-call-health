@@ -92,14 +92,17 @@ def get_redis_storage_uri() -> Optional[str]:
 
 def test_redis_connection(storage_uri: str) -> bool:
     """Test if Redis is reachable at the given URI."""
+    client = None
     try:
         client = redis.from_url(storage_uri, socket_timeout=5.0, socket_connect_timeout=5.0)
         client.ping()
-        client.close()
         return True
     except Exception as e:
         logger.warning(f"⚠️  Redis not available for rate limiting: {e}")
         return False
+    finally:
+        if client:
+            client.close()
 
 def get_rate_limit_key(request: Request) -> str:
     """
