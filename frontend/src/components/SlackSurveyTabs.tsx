@@ -607,6 +607,14 @@ export function SlackSurveyTabs({
 
                     if (response.ok) {
                       toast.success(`Automated surveys ${checked ? 'enabled' : 'disabled'}`)
+                      if (!checked) {
+                        // Clear schedule state when disabled
+                        setScheduleTime('09:00')
+                        setFrequencyType('weekday')
+                        setDayOfWeek(4)
+                        setFollowUpRemindersEnabled(true)
+                        setSavedScheduleTime(null)
+                      }
                       await loadSchedule(true) // Force reload after save
                     } else {
                       const error = await response.json()
