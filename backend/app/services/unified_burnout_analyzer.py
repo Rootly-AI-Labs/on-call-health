@@ -3698,7 +3698,17 @@ class UnifiedBurnoutAnalyzer:
                 logger.warning(f"Error extracting original_members: {e}")
                 original_members = []
 
+            total_members = len(original_members)
+            zero_incident_members = 0
+            total_incident_metrics = 0
+
             for member in original_members:
+                incident_count = member.get("incident_count", 0)
+                if incident_count:
+                    total_incident_metrics += incident_count
+                else:
+                    zero_incident_members += 1
+
                 # Prepare member data for AI analysis
                 member_data = {
                     "user_id": member.get("user_id"),
@@ -3716,6 +3726,13 @@ class UnifiedBurnoutAnalyzer:
                 )
                 
                 enhanced_members.append(enhanced_member)
+
+            if total_members:
+                logger.info(
+                    "DATA_INTEGRITY: Incident metrics summary - "
+                    f"members={total_members}, zero_incident_members={zero_incident_members}, "
+                    f"total_incident_metrics={total_incident_metrics}"
+                )
             
             # Update members list
             if "team_analysis" not in analysis_result:
@@ -3784,8 +3801,6 @@ class UnifiedBurnoutAnalyzer:
         # health scores to be consistently 7.8 (78%) instead of realistic variation
         
         # Return empty incidents list - AI analysis will work with metrics only
-        logger.info(f"DATA_INTEGRITY: Returning {incident_count} incident metrics without synthetic generation")
-        
         return incidents
 
     def _generate_daily_trends(self, incidents: List[Dict[str, Any]], team_analysis: List[Dict[str, Any]], metadata: Dict[str, Any], team_health: Dict[str, Any] = None, github_data_by_user: Optional[Dict[str, Dict[str, Any]]] = None) -> List[Dict[str, Any]]:
