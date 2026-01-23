@@ -243,7 +243,7 @@ export function AIInsightsCard({
                     await onDisconnect()
                     toast.success("AI Insights disabled")
                   }}
-                  className="text-green-700 hover:text-red-600 hover:bg-red-50 text-xs"
+                  className="text-green-700 hover:text-red-600 hover:bg-red-50 text-xs border border-green-400"
                 >
                   Disable
                 </Button>
