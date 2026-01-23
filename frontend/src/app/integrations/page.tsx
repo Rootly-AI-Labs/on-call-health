@@ -4815,7 +4815,7 @@ export default function IntegrationsPage() {
                                   <span className="text-neutral-500 italic">Clear mapping</span>
                                 </SelectItem>
                                 {githubOrgMembers.length > 0 ? (
-                                  githubOrgMembers.map(username => (
+                                  [...githubOrgMembers].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase())).map(username => (
                                     <SelectItem key={username} value={username}>
                                       {username}
                                     </SelectItem>
@@ -4905,7 +4905,7 @@ export default function IntegrationsPage() {
                                       <span className="text-neutral-500 italic">Clear mapping</span>
                                     </SelectItem>
                                     {jiraUsers.length > 0 ? (
-                                      jiraUsers.map((jiraUser) => (
+                                      [...jiraUsers].sort((a, b) => (a.display_name || '').toLowerCase().localeCompare((b.display_name || '').toLowerCase())).map((jiraUser) => (
                                         <SelectItem key={jiraUser.account_id} value={jiraUser.account_id}>
                                           <div className="space-y-0.5">
                                             <div className="font-medium">{jiraUser.display_name}</div>
@@ -5007,6 +5007,7 @@ export default function IntegrationsPage() {
                                     {linearUsers.length > 0 ? (
                                       linearUsers
                                         .filter(u => u.active !== false)
+                                        .sort((a, b) => (a.name || '').toLowerCase().localeCompare((b.name || '').toLowerCase()))
                                         .map((linearUser) => (
                                           <SelectItem key={linearUser.id} value={linearUser.id}>
                                             <div className="space-y-0.5">
