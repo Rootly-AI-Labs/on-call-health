@@ -68,7 +68,7 @@ def _parse_expires_in(raw_expires_in: Any) -> int:
     try:
         if isinstance(raw_expires_in, str):
             candidate = raw_expires_in.strip()
-            if not candidate.isdigit() or len(candidate) > len(str(EXPIRES_IN_MAX_SECONDS)):
+            if not candidate.isdigit():
                 raise ValueError("Invalid expires_in format")
             value = int(candidate)
         elif isinstance(raw_expires_in, float):
@@ -298,9 +298,11 @@ class IntegrationValidator:
 
             refreshed_token = None
             token_to_return = None
+            in_transaction = self.db.in_transaction()
+            transaction = self.db.begin_nested() if in_transaction else self.db.begin()
 
-            with self.db.begin_nested():
-                # Set explicit lock timeout to prevent indefinite waits (PostgreSQL)
+            with transaction:
+                # Set explicit lock timeout scoped to this transaction (PostgreSQL)
                 self.db.execute(
                     text("SET LOCAL lock_timeout = :lock_timeout"),
                     {"lock_timeout": f"{lock_timeout_seconds}s"}
@@ -357,8 +359,6 @@ class IntegrationValidator:
                     refreshed_token = new_access_token
                     token_to_return = new_access_token
 
-            self.db.commit()
-
             if refreshed_token:
                 logger.info(f"[Linear] Token refreshed successfully for user {integration.user_id}")
 
@@ -391,6 +391,7 @@ class IntegrationValidator:
         except Exception as rollback_error:
             context = f" after {original_error}" if original_error else ""
             logger.error(f"Failed to rollback transaction{context}: {rollback_error}", exc_info=True)
+            self.db.close()
 
     async def _validate_linear(self, user_id: int) -> Optional[Dict[str, Any]]:
         """
