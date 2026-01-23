@@ -349,91 +349,15 @@ export function SlackSurveyTabs({
 
   return (
     <>
-    <Tabs defaultValue="setup" className="w-full">
-      <TabsList className="grid w-full grid-cols-3 bg-purple-100/50">
-        <TabsTrigger value="setup" className="data-[state=active]:bg-white">Setup</TabsTrigger>
-        <TabsTrigger value="team" className="data-[state=active]:bg-white" disabled={!slackIntegration}>
+    <Tabs defaultValue="team" className="w-full">
+      <TabsList className="grid w-full grid-cols-2 bg-purple-100/50">
+        <TabsTrigger value="team" className="data-[state=active]:bg-white">
           Team Members
         </TabsTrigger>
-        <TabsTrigger value="actions" className="data-[state=active]:bg-white" disabled={!slackIntegration}>
-          Send Survey
+        <TabsTrigger value="actions" className="data-[state=active]:bg-white">
+          Survey
         </TabsTrigger>
       </TabsList>
-
-      {/* Setup Tab */}
-      <TabsContent value="setup" className="space-y-4 mt-4">
-        {(() => {
-          // Show warning banner if there are unsaved changes
-          const hasChanges = selectedRecipients.size !== savedRecipients.size ||
-            Array.from(selectedRecipients).some(id => !savedRecipients.has(id))
-          return hasChanges && (
-            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-              <p className="text-sm text-amber-900">
-                ⚠️ <strong>Unsaved changes:</strong> You have unsaved recipient changes in the <strong>Team Members</strong> tab.
-              </p>
-            </div>
-          )
-        })()}
-        <div className="bg-white rounded-lg border p-4 space-y-4">
-          {!slackIntegration && !process.env.NEXT_PUBLIC_SLACK_CLIENT_ID && (
-            <div className="text-center py-4">
-              <p className="text-sm text-neutral-700 mb-4">
-                The official Slack app is not currently configured. Use the "Add to Slack" button above to connect your workspace.
-              </p>
-            </div>
-          )}
-
-          <div className={!slackIntegration ? "" : "border-t pt-4"}>
-            <h4 className="font-medium text-neutral-900 mb-3">How it works:</h4>
-            <div className="space-y-3">
-              <div className="flex items-start space-x-3">
-                <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <span className="text-green-600 text-xs font-bold">1</span>
-                </div>
-                <div>
-                  <p className="text-sm text-neutral-700"><strong>Authorize the app</strong> to deliver 3-question wellness surveys via Slack</p>
-                </div>
-              </div>
-
-              <div className="flex items-start space-x-3">
-                <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <span className="text-green-600 text-xs font-bold">2</span>
-                </div>
-                <div>
-                  <p className="text-sm text-neutral-700"><strong>Team members receive surveys</strong> via automated DMs or by typing <code className="bg-neutral-200 px-1 rounded text-xs">/oncall-health</code></p>
-                  <div className="bg-slate-800 rounded p-3 font-mono text-sm text-green-400 mt-2">
-                    <div>/oncall-health</div>
-                    <div className="text-slate-400 mt-1">→ Opens interactive modal with 3 scored questions + optional text</div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-start space-x-3">
-                <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <span className="text-green-600 text-xs font-bold">3</span>
-                </div>
-                <div>
-                  <p className="text-sm text-neutral-700"><strong>Survey data automatically integrates</strong> with your health analysis to validate automated detection patterns</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-
-        <div className="flex items-center justify-between pt-2 text-sm text-neutral-500">
-          <div className="flex items-center space-x-2">
-            <Users className="w-4 h-4" />
-            <span>Available to all workspace members</span>
-          </div>
-          <div className="flex items-center space-x-2 text-xs">
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-            </svg>
-            <span>Secure OAuth authentication</span>
-          </div>
-        </div>
-      </TabsContent>
 
       {/* Team Members Tab */}
       <TabsContent value="team" className="space-y-4 mt-4">
@@ -620,7 +544,7 @@ export function SlackSurveyTabs({
         </div>
       </TabsContent>
 
-      {/* Actions Tab */}
+      {/* Survey Tab */}
       <TabsContent value="actions" className="space-y-4 mt-4">
         {(() => {
           // Show warning banner if there are unsaved changes
@@ -634,19 +558,16 @@ export function SlackSurveyTabs({
             </div>
           )
         })()}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-          <p className="text-sm text-blue-900">
-            ℹ️ <strong>Tip:</strong> Configure which team members receive automated surveys in the <strong>Team Members</strong> tab.
-            {savedRecipients.size > 0 && (
-              <span className="block mt-1">
-                Currently <strong>{savedRecipients.size} member{savedRecipients.size !== 1 ? 's' : ''}</strong> configured to receive automated surveys.
-              </span>
-            )}
+
+        {/* Slash Command Info */}
+        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+          <p className="text-sm text-purple-900">
+            <strong>Team members can check in anytime</strong> using the <code className="bg-purple-100 px-1.5 py-0.5 rounded text-xs font-mono">/oncall-health</code> command in Slack.
           </p>
         </div>
 
         <div className="bg-white rounded-lg border p-4">
-          <h4 className="font-medium text-neutral-900 mb-3">Survey Delivery</h4>
+          <h4 className="font-medium text-neutral-900 mb-3">Manual Survey Delivery</h4>
           <p className="text-sm text-neutral-700 mb-4">
             Send wellness surveys to your team members immediately via Slack DM.
           </p>
