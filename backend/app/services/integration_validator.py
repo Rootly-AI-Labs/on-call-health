@@ -5,6 +5,7 @@ Validates API tokens for GitHub, Linear, and Jira integrations before
 starting analysis to detect stale/expired tokens early.
 """
 import logging
+import threading
 from datetime import datetime, timedelta, timezone as dt_timezone
 from typing import Any, Dict, Optional
 from sqlalchemy.orm import Session
@@ -49,41 +50,72 @@ def needs_refresh(expires_at: Optional[datetime], skew_minutes: int = 60) -> boo
 
 # Module-level cache for validation results
 # Format: {user_id: {"results": {...}, "timestamp": datetime}}
-# Note: In production with multiple replicas, consider using Redis
+# Note: In production with multiple replicas, consider migrating to Redis
+# (already used for rate limiting in backend/app/core/rate_limiting.py)
 _validation_cache: Dict[int, Dict] = {}
+_cache_lock = threading.RLock()
 
 # Cache validation results for 5 minutes to avoid redundant API calls
 VALIDATION_CACHE_TTL_SECONDS = 300
 
+# Maximum number of users to cache (prevents unbounded memory growth)
+MAX_CACHE_SIZE = 1000
+
 
 def get_cached_validation(user_id: int) -> Optional[Dict[str, Dict[str, Any]]]:
-    """Get cached validation results if still fresh."""
-    if user_id not in _validation_cache:
+    """Get cached validation results if still fresh. Thread-safe."""
+    with _cache_lock:
+        if user_id not in _validation_cache:
+            return None
+
+        cached = _validation_cache[user_id]
+        cache_age = (datetime.now(dt_timezone.utc) - cached["timestamp"]).total_seconds()
+
+        if cache_age < VALIDATION_CACHE_TTL_SECONDS:
+            logger.info(f"Using cached validation results for user {user_id} (age: {cache_age:.1f}s)")
+            return cached["results"]
+
+        # Cache expired, remove it
+        del _validation_cache[user_id]
         return None
-
-    cached = _validation_cache[user_id]
-    cache_age = (datetime.now(dt_timezone.utc) - cached["timestamp"]).total_seconds()
-
-    if cache_age < VALIDATION_CACHE_TTL_SECONDS:
-        logger.info(f"Using cached validation results for user {user_id} (age: {cache_age:.1f}s)")
-        return cached["results"]
-
-    return None
 
 
 def set_validation_cache(user_id: int, results: Dict[str, Dict[str, Any]]):
-    """Cache validation results."""
-    _validation_cache[user_id] = {
-        "results": results,
-        "timestamp": datetime.now(dt_timezone.utc)
-    }
+    """Cache validation results. Thread-safe with size limit."""
+    with _cache_lock:
+        # Evict oldest entries if cache is full
+        if len(_validation_cache) >= MAX_CACHE_SIZE and user_id not in _validation_cache:
+            _evict_oldest_entries()
+
+        _validation_cache[user_id] = {
+            "results": results,
+            "timestamp": datetime.now(dt_timezone.utc)
+        }
+
+
+def _evict_oldest_entries():
+    """Remove oldest 10% of cache entries. Must be called with lock held."""
+    if not _validation_cache:
+        return
+
+    entries_to_remove = max(1, len(_validation_cache) // 10)
+    sorted_entries = sorted(
+        _validation_cache.items(),
+        key=lambda x: x[1]["timestamp"]
+    )
+
+    for user_id, _ in sorted_entries[:entries_to_remove]:
+        del _validation_cache[user_id]
+
+    logger.info(f"Evicted {entries_to_remove} oldest cache entries")
 
 
 def invalidate_validation_cache(user_id: int):
-    """Invalidate cache for a user (e.g., when integration is added/removed)."""
-    if user_id in _validation_cache:
-        del _validation_cache[user_id]
-        logger.info(f"Invalidated validation cache for user {user_id}")
+    """Invalidate cache for a user (e.g., when integration is added/removed). Thread-safe."""
+    with _cache_lock:
+        if user_id in _validation_cache:
+            del _validation_cache[user_id]
+            logger.info(f"Invalidated validation cache for user {user_id}")
 
 
 class IntegrationValidator:
@@ -179,6 +211,9 @@ class IntegrationValidator:
 
     async def _get_valid_linear_token(self, integration: LinearIntegration) -> str:
         """Get a valid Linear access token, refreshing if necessary."""
+        if not integration.access_token:
+            raise ValueError("No access token available for Linear integration")
+
         if not needs_refresh(integration.token_expires_at) or not integration.refresh_token:
             return decrypt_token(integration.access_token)
 

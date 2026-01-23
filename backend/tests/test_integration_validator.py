@@ -14,7 +14,9 @@ from app.services.integration_validator import (
     set_validation_cache,
     invalidate_validation_cache,
     _validation_cache,
+    _cache_lock,
     VALIDATION_CACHE_TTL_SECONDS,
+    MAX_CACHE_SIZE,
     needs_refresh,
 )
 from app.models import GitHubIntegration, LinearIntegration, JiraIntegration
@@ -310,6 +312,47 @@ class TestValidationCache(unittest.TestCase):
         """Test invalidating cache for non-existent user does not raise."""
         invalidate_validation_cache(999)
 
+    def test_cache_expired_entry_removed(self):
+        """Test that expired cache entry is removed on access."""
+        user_id = 1
+        results = {"github": {"valid": True, "error": None}}
+
+        # Set cache with old timestamp directly
+        with _cache_lock:
+            _validation_cache[user_id] = {
+                "results": results,
+                "timestamp": datetime.now(dt_timezone.utc) - timedelta(seconds=VALIDATION_CACHE_TTL_SECONDS + 10)
+            }
+
+        # Access should return None and remove the entry
+        cached = get_cached_validation(user_id)
+        self.assertIsNone(cached)
+
+        # Entry should be removed
+        with _cache_lock:
+            self.assertNotIn(user_id, _validation_cache)
+
+    def test_cache_eviction_when_full(self):
+        """Test that oldest entries are evicted when cache is full."""
+        # Fill the cache to MAX_CACHE_SIZE
+        base_time = datetime.now(dt_timezone.utc) - timedelta(hours=1)
+
+        with _cache_lock:
+            for i in range(MAX_CACHE_SIZE):
+                _validation_cache[i] = {
+                    "results": {"github": {"valid": True, "error": None}},
+                    "timestamp": base_time + timedelta(seconds=i)
+                }
+
+        # Adding a new entry should trigger eviction
+        set_validation_cache(MAX_CACHE_SIZE + 1, {"github": {"valid": True, "error": None}})
+
+        # Cache should now be smaller than MAX_CACHE_SIZE + 1
+        with _cache_lock:
+            self.assertLess(len(_validation_cache), MAX_CACHE_SIZE + 1)
+            # New entry should exist
+            self.assertIn(MAX_CACHE_SIZE + 1, _validation_cache)
+
 
 class TestNeedsRefresh(unittest.TestCase):
     """Test suite for needs_refresh function."""
@@ -418,6 +461,18 @@ class TestLinearTokenRefresh(unittest.TestCase):
             token = self._run_async(self.validator._get_valid_linear_token(mock_integration))
 
         self.assertEqual(token, "old_token")
+
+    def test_get_valid_linear_token_no_access_token(self):
+        """Test that missing access_token raises ValueError."""
+        mock_integration = Mock(spec=LinearIntegration)
+        mock_integration.access_token = None
+        mock_integration.token_expires_at = None
+        mock_integration.refresh_token = None
+
+        with self.assertRaises(ValueError) as context:
+            self._run_async(self.validator._get_valid_linear_token(mock_integration))
+
+        self.assertIn("No access token available", str(context.exception))
 
 
 class TestValidateAllIntegrations(unittest.TestCase):
