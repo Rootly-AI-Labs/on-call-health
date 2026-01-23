@@ -3,7 +3,7 @@ FastAPI main application for On-call Burnout Detector.
 """
 import os
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -198,7 +198,7 @@ async def cleanup_stuck_analyses():
 
     # Analyses running for more than 30 minutes are considered stuck
     stuck_threshold = timedelta(minutes=30)
-    cutoff_time = datetime.utcnow() - stuck_threshold
+    cutoff_time = datetime.now(timezone.utc) - stuck_threshold
 
     db = SessionLocal()
     try:
@@ -210,19 +210,30 @@ async def cleanup_stuck_analyses():
 
         if stuck_analyses:
             print(f"🔧 Found {len(stuck_analyses)} stuck analyses to clean up")
+            cleaned_count = 0
             for analysis in stuck_analyses:
-                analysis.status = "failed"
-                analysis.error_message = "Analysis was interrupted (server restart). Please run a new analysis."
-                analysis.completed_at = datetime.utcnow()
-                print(f"  - Marked analysis {analysis.id} as failed (was running since {analysis.created_at})")
+                try:
+                    # Re-check status to avoid race conditions
+                    db.refresh(analysis)
+                    if analysis.status != "running":
+                        print(f"  - Skipping analysis {analysis.id} (status changed to {analysis.status})")
+                        continue
 
-            db.commit()
-            print(f"✅ Cleaned up {len(stuck_analyses)} stuck analyses")
+                    analysis.status = "failed"
+                    analysis.error_message = "Analysis was interrupted (server restart). Please run a new analysis."
+                    analysis.completed_at = datetime.now(timezone.utc)
+                    db.commit()
+                    cleaned_count += 1
+                    print(f"  - Marked analysis {analysis.id} as failed (was running since {analysis.created_at})")
+                except Exception as e:
+                    print(f"  - Failed to clean up analysis {analysis.id}: {str(e)}")
+                    db.rollback()
+
+            print(f"✅ Cleaned up {cleaned_count} stuck analyses")
         else:
             print("✅ No stuck analyses found")
     except Exception as e:
         print(f"⚠️ Error cleaning up stuck analyses: {str(e)}")
-        db.rollback()
     finally:
         db.close()
 
