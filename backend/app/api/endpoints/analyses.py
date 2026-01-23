@@ -4,11 +4,13 @@ Burnout analysis API endpoints.
 import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Union
+from uuid import uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel
 from sqlalchemy import func, over
 from sqlalchemy.orm import Session, load_only
+from sqlalchemy.exc import OperationalError
 
 from ...models import get_db, User, Analysis, RootlyIntegration, SlackIntegration, GitHubIntegration, JiraIntegration, LinearIntegration, UserCorrelation
 from ...auth.dependencies import get_current_active_user
@@ -137,10 +139,58 @@ class IntegrationValidationResponse(BaseModel):
     integrations: Dict[str, Dict[str, Any]]
 
 
+class WarmCacheResponse(BaseModel):
+    status: str
+    message: str
+
+
+async def _warm_cache_background_task(user_id: int) -> None:
+    """Background task to warm all integration permission caches."""
+    from ...database import SessionLocal
+    from ...services.integration_validator import IntegrationValidator
+
+    try:
+        with SessionLocal() as db:
+            validator = IntegrationValidator(db)
+            results = await validator.validate_all_integrations(user_id=user_id)
+
+            valid_count = sum(1 for r in results.values() if r.get("valid", False))
+            logger.info(
+                f"[WARM_CACHE] Complete for user {user_id}: "
+                f"{valid_count}/{len(results)} integrations valid"
+            )
+    except Exception as e:
+        logger.error(f"[WARM_CACHE] Failed for user {user_id}: {e}", exc_info=True)
+
+
+@router.post("/warm-permissions-cache", response_model=WarmCacheResponse)
+@general_rate_limit("integration_validation")
+async def warm_permissions_cache(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_active_user),
+) -> WarmCacheResponse:
+    """
+    Warm the permissions cache for all integrations in the background.
+
+    Called after login to pre-populate the permissions cache so that
+    subsequent operations (page loads, run analysis) are instant.
+    """
+    logger.info(f"[WARM_CACHE] Starting background cache warm for user {current_user.id}")
+
+    background_tasks.add_task(_warm_cache_background_task, current_user.id)
+
+    return WarmCacheResponse(
+        status="started",
+        message="Permission cache warming started in background"
+    )
+
+
 @router.get("/validate-integrations")
 @general_rate_limit("integration_validation")
 async def validate_integrations(
     request: Request,
+    force_refresh: bool = Query(False, description="Force fresh validation, bypassing cache"),
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
@@ -150,12 +200,18 @@ async def validate_integrations(
     Makes lightweight API calls to verify tokens are not expired/stale.
     Returns validation status for each enabled integration (GitHub, Linear, Jira).
 
+    Args:
+        force_refresh: If True, bypass cache and make fresh API calls
+
     Rate limited to prevent abuse of third-party APIs.
     """
-    from ...services.integration_validator import IntegrationValidator
+    from ...services.integration_validator import IntegrationValidator, invalidate_validation_cache
 
     try:
-        logger.info(f"Validating integrations for user {current_user.id}")
+        if force_refresh:
+            invalidate_validation_cache(current_user.id)
+
+        logger.info(f"Validating integrations for user {current_user.id} (force_refresh={force_refresh})")
 
         validator = IntegrationValidator(db)
         results = await validator.validate_all_integrations(
@@ -2681,22 +2737,43 @@ async def run_analysis_task(
     
     # Get a fresh database session for the background task
     from ...models import SessionLocal
+
+    # Short ID to identify which worker/replica is processing this analysis in logs
+    node_id = str(uuid4())[:8]
+
     db = SessionLocal()
-    
+
     try:
         # Log database connection info
-        logger.info(f"BACKGROUND_TASK: Got new database session for analysis {analysis_ref}")
-        
-        # Update status to running
-        analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
+        logger.info(f"BACKGROUND_TASK [{node_id}]: Got new database session for analysis {analysis_ref}")
+
+        # Row-level locking prevents duplicate execution across replicas
+        try:
+            analysis = db.query(Analysis).filter(
+                Analysis.id == analysis_id
+            ).with_for_update(nowait=True).first()
+        except OperationalError as e:
+            error_msg = str(e).lower()
+            if "could not obtain lock" in error_msg or "lock not available" in error_msg:
+                logger.info(f"BACKGROUND_TASK [{node_id}]: Analysis {analysis_ref} locked by another worker, skipping")
+                db.rollback()
+                return
+            logger.error(f"BACKGROUND_TASK [{node_id}]: Database error for analysis {analysis_ref}: {e}")
+            raise
+
         if not analysis:
-            logger.error(f"BACKGROUND_TASK: Analysis {analysis_ref} not found in database")
+            logger.error(f"BACKGROUND_TASK [{node_id}]: Analysis {analysis_ref} not found in database")
             # Try to debug what analyses exist
             all_analyses = db.query(Analysis.id).order_by(Analysis.id.desc()).limit(5).all()
-            logger.error(f"BACKGROUND_TASK: Recent analysis IDs in database: {[a.id for a in all_analyses]}")
+            logger.error(f"BACKGROUND_TASK [{node_id}]: Recent analysis IDs in database: {[a.id for a in all_analyses]}")
             return  # Analysis doesn't exist
-            
-        logger.info(f"BACKGROUND_TASK: Setting analysis {analysis_ref} to running status")
+
+        # Skip if another worker already claimed this analysis
+        if analysis.status != "pending":
+            logger.info(f"BACKGROUND_TASK [{node_id}]: Analysis {analysis_ref} status is '{analysis.status}', skipping")
+            return
+
+        logger.info(f"BACKGROUND_TASK [{node_id}]: Setting analysis {analysis_ref} to running status")
         analysis.status = "running"
         db.commit()
         

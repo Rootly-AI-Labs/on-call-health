@@ -75,7 +75,7 @@ export function EnhancementCards({
               Connect GitHub
             </h3>
             <p className="text-neutral-500 text-center mb-6">
-              Track code activity, commits, and development patterns to identify burnout signals
+              Track code activity, commits, and development patterns to identify risk signals
             </p>
             <Button
               onClick={() => onConnect('github')}
@@ -188,7 +188,7 @@ export function EnhancementCards({
               Connect Slack
             </h3>
             <p className="text-neutral-500 text-center mb-6">
-              Analyze communication patterns and team interactions to detect burnout signals
+              Analyze communication patterns and team interactions to detect risk signals
             </p>
             <Button
               onClick={() => onConnect('slack')}
@@ -285,7 +285,7 @@ export function EnhancementCards({
           Team Enhancement Integrations
         </h2>
         <p className="text-neutral-500">
-          Connect additional tools to get deeper insights into team health and burnout patterns
+          Connect additional tools to get deeper insights into team health and risk patterns
         </p>
       </div>
 

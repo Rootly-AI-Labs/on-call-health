@@ -321,7 +321,7 @@ export function TeamMembersList({
                 {/* No members case */}
                 {membersWithIncidents.length === 0 && membersWithoutIncidents.length === 0 && (
                   <div className="text-center text-neutral-500 py-8">
-                    No team members with valid burnout data found
+                    No team members with valid health data found
                   </div>
                 )}
               </>

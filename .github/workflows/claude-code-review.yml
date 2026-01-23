@@ -48,7 +48,7 @@ jobs:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           model: claude-sonnet-4-20250514
           direct_prompt: |
-            Review this PR thoroughly. Check for:
+            Review this PR for issues only. Check for:
 
             **Bugs & Logic Errors:**
             - Off-by-one errors, null/undefined handling
@@ -67,6 +67,8 @@ jobs:
             - Missing error handling
             - Performance concerns
 
-            Be concise. Only comment on actual issues found, not style preferences.
-            If the code looks good, just say "LGTM - no issues found."
+            IMPORTANT: Only report issues found. Do not comment on what's good or working well.
+            Do not praise the code. Do not say "LGTM" or similar positive feedback.
+            If no issues are found, respond with exactly: "No issues found."
+            Be concise and actionable - focus only on problems that need fixing.
           timeout_minutes: 20

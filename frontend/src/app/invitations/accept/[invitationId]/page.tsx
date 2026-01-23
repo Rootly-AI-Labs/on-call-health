@@ -240,7 +240,7 @@ export default function AcceptInvitationPage() {
 
               <div className="text-center">
                 <p className="text-xs text-neutral-500">
-                  By accepting this invitation, you'll join the organization and gain access to team burnout analytics and integrations.
+                  By accepting this invitation, you'll join the organization and gain access to team health analytics and integrations.
                 </p>
               </div>
             </>
