@@ -4,10 +4,8 @@ Integration validation service for pre-flight connection checks.
 Validates API tokens for GitHub, Linear, and Jira integrations before
 starting analysis to detect stale/expired tokens early.
 """
-import heapq
 import logging
 import os
-import threading
 from datetime import datetime, timedelta, timezone as dt_timezone
 from typing import Any, Dict, Optional
 from sqlalchemy import text
@@ -17,6 +15,11 @@ from cryptography.fernet import Fernet
 import httpx
 
 from ..core.config import settings
+from ..core.validation_cache import (
+    get_cached_validation,
+    set_cached_validation,
+    invalidate_validation_cache,
+)
 from ..models import GitHubIntegration, LinearIntegration, JiraIntegration
 
 logger = logging.getLogger(__name__)
@@ -123,81 +126,6 @@ def _get_linear_lock_timeout_seconds() -> int:
     return max(LINEAR_LOCK_TIMEOUT_SECONDS_MIN, min(timeout_seconds, LINEAR_LOCK_TIMEOUT_SECONDS_MAX))
 
 
-# Module-level cache for validation results
-# Format: {user_id: {"results": {...}, "timestamp": datetime}}
-# Note: In production with multiple replicas, consider migrating to Redis
-# (already used for rate limiting in backend/app/core/rate_limiting.py)
-_validation_cache: Dict[int, Dict] = {}
-_cache_lock = threading.RLock()
-
-# Cache validation results for 5 minutes to avoid redundant API calls
-VALIDATION_CACHE_TTL_SECONDS = 300
-
-# Maximum number of users to cache (prevents unbounded memory growth)
-MAX_CACHE_SIZE = 1000
-
-
-def get_cached_validation(user_id: int) -> Optional[Dict[str, Dict[str, Any]]]:
-    """Get cached validation results if still fresh. Thread-safe."""
-    with _cache_lock:
-        if user_id not in _validation_cache:
-            return None
-
-        cached = _validation_cache[user_id]
-        cache_age = (datetime.now(dt_timezone.utc) - cached["timestamp"]).total_seconds()
-
-        if cache_age < VALIDATION_CACHE_TTL_SECONDS:
-            logger.info(f"Using cached validation results for user {user_id} (age: {cache_age:.1f}s)")
-            return cached["results"]
-
-        # Cache expired, remove it
-        del _validation_cache[user_id]
-        return None
-
-
-def set_validation_cache(user_id: int, results: Dict[str, Dict[str, Any]]):
-    """Cache validation results. Thread-safe with size limit."""
-    with _cache_lock:
-        # Evict oldest entries if cache is full
-        if len(_validation_cache) >= MAX_CACHE_SIZE and user_id not in _validation_cache:
-            _evict_oldest_entries()
-
-        _validation_cache[user_id] = {
-            "results": results,
-            "timestamp": datetime.now(dt_timezone.utc)
-        }
-
-
-def _evict_oldest_entries():
-    """Remove oldest 10% of cache entries. Must be called with lock held.
-
-    Uses heapq.nsmallest for O(n) performance instead of O(n log n) sorting.
-    """
-    if not _validation_cache:
-        return
-
-    entries_to_remove = max(1, len(_validation_cache) // 10)
-    # heapq.nsmallest is O(n) for small k, more efficient than full sort
-    oldest_entries = heapq.nsmallest(
-        entries_to_remove,
-        _validation_cache.items(),
-        key=lambda x: x[1]["timestamp"]
-    )
-
-    for user_id, _ in oldest_entries:
-        del _validation_cache[user_id]
-
-    logger.info(f"Evicted {entries_to_remove} oldest cache entries")
-
-
-def invalidate_validation_cache(user_id: int):
-    """Invalidate cache for a user (e.g., when integration is added/removed). Thread-safe."""
-    with _cache_lock:
-        if user_id in _validation_cache:
-            del _validation_cache[user_id]
-            logger.info(f"Invalidated validation cache for user {user_id}")
-
-
 class IntegrationValidator:
     """Service for validating integration connections."""
 
@@ -242,7 +170,7 @@ class IntegrationValidator:
                 results[name] = result
 
         # Cache the results
-        set_validation_cache(user_id, results)
+        set_cached_validation(user_id, results)
 
         return results
 
