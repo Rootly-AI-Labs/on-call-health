@@ -75,6 +75,7 @@ def _parse_expires_in(raw_expires_in: Any) -> int:
 
     Returns a bounded integer value. Scientific notation floats (e.g., 1e9)
     are handled via the float path and clamped by bounds checking.
+    Logs warnings for suspicious values that may indicate misconfiguration.
     """
     if raw_expires_in is None or isinstance(raw_expires_in, bool):
         return EXPIRES_IN_DEFAULT_SECONDS
@@ -94,11 +95,16 @@ def _parse_expires_in(raw_expires_in: Any) -> int:
         else:
             raise ValueError("Invalid expires_in type")
     except (ValueError, OverflowError):
+        logger.warning(f"Invalid expires_in value '{raw_expires_in}', using default")
         return EXPIRES_IN_DEFAULT_SECONDS
 
     if EXPIRES_IN_MIN_SECONDS <= value <= EXPIRES_IN_MAX_SECONDS:
+        # Warn if token lifetime is unusually short (< 5 minutes) - may indicate issue
+        if value < 300:
+            logger.warning(f"Unusually short token lifetime: {value}s (expected >= 300s)")
         return value
 
+    logger.warning(f"expires_in {value} outside valid range [{EXPIRES_IN_MIN_SECONDS}, {EXPIRES_IN_MAX_SECONDS}], using default")
     return EXPIRES_IN_DEFAULT_SECONDS
 
 
@@ -358,12 +364,14 @@ class IntegrationValidator:
                         )
 
                     if response.status_code != 200:
+                        # Log user context for debugging; error message is generic for security
                         logger.warning(f"[Linear] Token refresh failed for user {integration.user_id}")
                         raise ValueError("Authentication error. Please reconnect Linear.")
 
                     token_data = response.json()
                     new_access_token = token_data.get("access_token")
                     if not new_access_token:
+                        # Log user context for debugging; error message is generic for security
                         logger.warning(f"[Linear] Token refresh failed for user {integration.user_id}")
                         raise ValueError("Authentication error. Please reconnect Linear.")
 
@@ -390,6 +398,7 @@ class IntegrationValidator:
             # Database lock timeout or deadlock - this is typically transient.
             # Note: These except blocks are alternatives, not sequential - when we
             # raise RuntimeError here, it propagates up without hitting except Exception.
+            # Log includes user_id for debugging; error message is generic for security.
             logger.warning(
                 f"[Linear] Database contention for user {integration.user_id} "
                 f"(lock_timeout or deadlock - transient, retry should succeed)"

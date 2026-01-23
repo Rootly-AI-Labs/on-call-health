@@ -12,6 +12,15 @@ interface TicketingCardProps {
   memberData: any
 }
 
+// ADJUST THIS VALUE to change the character limit for ticket/issue titles
+const TITLE_CHARACTER_LIMIT = 210
+
+// Helper function to truncate text at character limit
+function truncateTitle(title: string, limit: number = TITLE_CHARACTER_LIMIT): string {
+  if (title.length <= limit) return title
+  return title.substring(0, limit) + "..."
+}
+
 // Helper function to determine priority badge color (matches burnout analysis colors exactly)
 function getPriorityColor(priority: string | number): { backgroundColor: string; color: string } {
   if (typeof priority === "string") {
@@ -219,22 +228,22 @@ function JiraTicketCardContent({ memberData }: TicketingCardProps) {
           Active Tickets ({sortedTickets.length})
         </button>
         {isTicketsExpanded && (
-          <div className="space-y-2 max-h-64 overflow-y-auto w-full mt-3">
+          <div className="space-y-2 max-h-64 overflow-y-auto overflow-x-hidden mt-3">
             {sortedTickets.map((ticket, index) => (
-              <div key={getItemKey(ticket) || `ticket-${index}`} className="flex items-center gap-2 p-2 bg-neutral-100 rounded-md hover:bg-neutral-200 transition overflow-hidden">
+              <div key={getItemKey(ticket) || `ticket-${index}`} className="flex items-center gap-2 p-2 bg-neutral-100 rounded-md hover:bg-neutral-200 transition">
                 <Badge
                   className="text-xs flex-shrink-0"
                   style={getPriorityColor(ticket.priority)}
                 >
                   {ticket.priority || "N/A"}
                 </Badge>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-neutral-900 truncate line-clamp-1">
+                <div className="flex-1 min-w-0 max-w-full overflow-hidden">
+                  <p className="text-sm font-medium text-neutral-900">
                     <span className="font-bold">{ticket.key}</span>
-                    {ticket.summary || ticket.title ? ` - ${ticket.summary || ticket.title}` : ""}
+                    {ticket.summary || ticket.title ? ` - ${truncateTitle(ticket.summary || ticket.title)}` : ""}
                   </p>
                 </div>
-                <div className="flex items-center gap-1 text-xs text-neutral-500 whitespace-nowrap flex-shrink-0">
+                <div className="flex items-center gap-1 text-xs text-neutral-500 whitespace-nowrap flex-shrink-0 ml-2">
                   <Clock className="w-3 h-3" />
                   <span>{formatDueDate(ticket.duedate)}</span>
                 </div>
@@ -320,22 +329,22 @@ function JiraTicketCard({ memberData }: TicketingCardProps): React.ReactElement 
             Active Tickets ({sortedTickets.length})
           </button>
           {isTicketsExpanded && (
-            <div className="space-y-2 max-h-64 overflow-y-auto w-full mt-3">
+            <div className="space-y-2 max-h-64 overflow-y-auto overflow-x-hidden mt-3">
               {sortedTickets.map((ticket, index) => (
-                <div key={getItemKey(ticket) || `ticket-${index}`} className="flex items-center gap-2 p-2 bg-neutral-100 rounded-md hover:bg-neutral-200 transition overflow-hidden">
+                <div key={getItemKey(ticket) || `ticket-${index}`} className="flex items-center gap-2 p-2 bg-neutral-100 rounded-md hover:bg-neutral-200 transition">
                   <Badge
                     className="text-xs flex-shrink-0"
                     style={getPriorityColor(ticket.priority)}
                   >
                     {ticket.priority || "N/A"}
                   </Badge>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-neutral-900 truncate line-clamp-1">
+                  <div className="flex-1 min-w-0 max-w-full overflow-hidden">
+                    <p className="text-sm font-medium text-neutral-900">
                       <span className="font-bold">{ticket.key}</span>
-                      {ticket.summary || ticket.title ? ` - ${ticket.summary || ticket.title}` : ""}
+                      {ticket.summary || ticket.title ? ` - ${truncateTitle(ticket.summary || ticket.title)}` : ""}
                     </p>
                   </div>
-                  <div className="flex items-center gap-1 text-xs text-neutral-500 whitespace-nowrap flex-shrink-0">
+                  <div className="flex items-center gap-1 text-xs text-neutral-500 whitespace-nowrap flex-shrink-0 ml-2">
                     <Clock className="w-3 h-3" />
                     <span>{formatDueDate(ticket.duedate)}</span>
                   </div>
@@ -392,7 +401,7 @@ function LinearIssueCardContent({ memberData }: TicketingCardProps) {
       <Separator />
 
       {/* Collapsible Issue List */}
-      <div>
+      <div className="w-full overflow-hidden">
         <button
           onClick={() => setIsIssuesExpanded(!isIssuesExpanded)}
           className="flex items-center gap-1 text-xs font-semibold text-neutral-700 hover:text-neutral-900 transition-colors"
@@ -405,7 +414,7 @@ function LinearIssueCardContent({ memberData }: TicketingCardProps) {
           Active Issues ({sortedIssues.length})
         </button>
         {isIssuesExpanded && (
-          <div className="space-y-2 max-h-64 overflow-y-auto mt-3">
+          <div className="space-y-2 max-h-64 overflow-y-auto overflow-x-hidden mt-3">
             {sortedIssues.map((issue, index) => (
               <div key={getItemKey(issue) || `issue-${index}`} className="flex items-center gap-2 p-2 bg-neutral-100 rounded-md hover:bg-neutral-200 transition">
                 <Badge
@@ -414,13 +423,13 @@ function LinearIssueCardContent({ memberData }: TicketingCardProps) {
                 >
                   {getLinearPriorityLabel(issue.priority)}
                 </Badge>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-neutral-900 truncate">
+                <div className="flex-1 min-w-0 max-w-full overflow-hidden">
+                  <p className="text-sm font-medium text-neutral-900">
                     <span className="font-bold">{issue.identifier}</span>
-                    {issue.title ? ` - ${issue.title}` : ""}
+                    {issue.title ? ` - ${truncateTitle(issue.title)}` : ""}
                   </p>
                 </div>
-                <div className="flex items-center gap-1 text-xs text-neutral-500 whitespace-nowrap flex-shrink-0">
+                <div className="flex items-center gap-1 text-xs text-neutral-500 whitespace-nowrap flex-shrink-0 ml-2">
                   <Clock className="w-3 h-3" />
                   <span>{formatDueDate(issue.dueDate)}</span>
                 </div>
@@ -506,22 +515,22 @@ function LinearIssueCard({ memberData }: TicketingCardProps): React.ReactElement
             Active Issues ({sortedIssues.length})
           </button>
           {isIssuesExpanded && (
-            <div className="space-y-2 max-h-64 overflow-y-auto w-full mt-3">
+            <div className="space-y-2 max-h-64 overflow-y-auto overflow-x-hidden mt-3">
               {sortedIssues.map((issue, index) => (
-                <div key={getItemKey(issue) || `issue-${index}`} className="flex items-center gap-2 p-2 bg-neutral-100 rounded-md hover:bg-neutral-200 transition overflow-hidden">
+                <div key={getItemKey(issue) || `issue-${index}`} className="flex items-center gap-2 p-2 bg-neutral-100 rounded-md hover:bg-neutral-200 transition">
                   <Badge
                     className="text-xs flex-shrink-0"
                     style={getPriorityColor(issue.priority)}
                   >
                     {getLinearPriorityLabel(issue.priority)}
                   </Badge>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-neutral-900 truncate line-clamp-1">
+                  <div className="flex-1 min-w-0 max-w-full overflow-hidden">
+                    <p className="text-sm font-medium text-neutral-900">
                       <span className="font-bold">{issue.identifier}</span>
-                      {issue.title ? ` - ${issue.title}` : ""}
+                      {issue.title ? ` - ${truncateTitle(issue.title)}` : ""}
                     </p>
                   </div>
-                  <div className="flex items-center gap-1 text-xs text-neutral-500 whitespace-nowrap flex-shrink-0">
+                  <div className="flex items-center gap-1 text-xs text-neutral-500 whitespace-nowrap flex-shrink-0 ml-2">
                     <Clock className="w-3 h-3" />
                     <span>{formatDueDate(issue.dueDate)}</span>
                   </div>

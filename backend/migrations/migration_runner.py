@@ -92,10 +92,25 @@ class MigrationRunner:
             logger.error(f"❌ Failed to mark migration as applied: {e}")
 
     def run_sql_migration(self, migration_name: str, sql_commands: List[str]) -> bool:
-        """Run a SQL-based migration"""
+        """Run a SQL-based migration.
+
+        IMPORTANT: This function includes a critical check for empty sql_commands.
+        Previously, if load_sql_file() returned [] (due to FileNotFoundError or other
+        issues), the for loop wouldn't execute but mark_migration_applied() would still
+        run, causing "phantom" migrations that appeared complete but applied no changes.
+        This caused recurring production issues where schema changes were missing.
+        See migration 041_repair_survey_periods_migration for an example fix.
+        """
         if self.is_migration_applied(migration_name):
             logger.info(f"⏭️  Skipping already applied migration: {migration_name}")
             return True
+
+        # CRITICAL: Don't mark migration as complete if no SQL commands to run
+        # This prevents silent failures when SQL files are missing or fail to load
+        # (fixes a bug that caused 040_add_survey_periods to be marked complete without running)
+        if not sql_commands:
+            logger.error(f"❌ Migration {migration_name} has no SQL commands - skipping to prevent false completion")
+            return False
 
         logger.info(f"🔧 Running migration: {migration_name}")
 
@@ -114,7 +129,11 @@ class MigrationRunner:
             return False
 
     def load_sql_file(self, filename: str) -> List[str]:
-        """Load SQL commands from a .sql file in the migrations directory"""
+        """Load SQL commands from a .sql file in the migrations directory.
+
+        Handles dollar-quoted strings (DO $$ ... END $$;) correctly by not
+        splitting on semicolons inside $$ blocks.
+        """
         import os
         filepath = os.path.join(os.path.dirname(__file__), filename)
         try:
@@ -124,19 +143,20 @@ class MigrationRunner:
                 # Remove comment lines starting with --
                 lines = []
                 for line in content.split('\n'):
-                    # Remove inline comments but preserve strings
-                    stripped = line.split('--')[0].strip() if not "'" in line else line.strip()
-                    if stripped and not line.strip().startswith('--'):
-                        lines.append(stripped)
+                    # Skip full-line comments
+                    if line.strip().startswith('--'):
+                        continue
+                    # Remove inline comments but preserve strings and dollar quotes
+                    if '--' in line and '$$' not in line and "'" not in line:
+                        line = line.split('--')[0]
+                    if line.strip():
+                        lines.append(line)
 
-                # Join all lines and split by semicolon
+                # Join all lines
                 full_content = '\n'.join(lines)
-                commands = []
 
-                for statement in full_content.split(';'):
-                    stmt = statement.strip()
-                    if stmt and stmt.upper() not in ('BEGIN', 'COMMIT', 'BEGIN;', 'COMMIT;'):
-                        commands.append(stmt + ';')
+                # Parse SQL statements handling dollar-quoted strings
+                commands = self._parse_sql_statements(full_content)
 
                 return commands
         except FileNotFoundError:
@@ -145,6 +165,47 @@ class MigrationRunner:
         except Exception as e:
             logger.error(f"❌ Failed to load SQL file {filename}: {e}")
             return []
+
+    def _parse_sql_statements(self, content: str) -> List[str]:
+        """Parse SQL content into individual statements, respecting dollar-quoted strings.
+
+        Dollar-quoted strings (e.g., DO $$ ... END $$;) contain semicolons that
+        should not be treated as statement terminators.
+        """
+        commands = []
+        current_statement = []
+        in_dollar_quote = False
+        i = 0
+
+        while i < len(content):
+            char = content[i]
+
+            # Check for dollar quote start/end
+            if content[i:i+2] == '$$':
+                current_statement.append('$$')
+                in_dollar_quote = not in_dollar_quote
+                i += 2
+                continue
+
+            # Check for semicolon (statement terminator)
+            if char == ';' and not in_dollar_quote:
+                current_statement.append(';')
+                stmt = ''.join(current_statement).strip()
+                if stmt and stmt.upper() not in ('BEGIN;', 'COMMIT;', 'BEGIN', 'COMMIT'):
+                    commands.append(stmt)
+                current_statement = []
+                i += 1
+                continue
+
+            current_statement.append(char)
+            i += 1
+
+        # Handle any remaining content (statement without trailing semicolon)
+        remaining = ''.join(current_statement).strip()
+        if remaining and remaining.upper() not in ('BEGIN', 'COMMIT'):
+            commands.append(remaining + ';')
+
+        return commands
 
     def run_all_migrations(self):
         """Run all pending migrations in order"""
@@ -1149,6 +1210,11 @@ class MigrationRunner:
                 "name": "040_add_survey_periods",
                 "description": "Add survey_periods table for daily follow-up reminders tracking",
                 "sql_file": "2026_01_22_add_survey_periods.sql"
+            },
+            {
+                "name": "041_repair_survey_periods_migration",
+                "description": "Repair false-positive migration 040 if columns don't exist (fixes migration runner bug)",
+                "sql_file": "2026_01_23_repair_survey_periods_migration.sql"
             },
             # Add future migrations here with incrementing numbers
         ]

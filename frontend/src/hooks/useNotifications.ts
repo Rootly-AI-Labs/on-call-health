@@ -1,31 +1,41 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { usePathname } from 'next/navigation'
+
 import { useToast } from '@/hooks/use-toast'
 import type { Notification, NotificationResponse } from '@/types/notifications'
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+const LIMIT = 20
+const POLLING_INTERVAL_MS = 300000 // 5 minutes
 
 export function useNotifications() {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
   const [hasMore, setHasMore] = useState(true)
-  const [offset, setOffset] = useState(0)
   const [invitationModalId, setInvitationModalId] = useState<number | null>(null)
   const { toast } = useToast()
+  const pathname = usePathname()
+  const previousPathnameRef = useRef<string | null>(null)
+  const abortControllerRef = useRef<AbortController | null>(null)
+  const offsetRef = useRef(0)
 
-  const LIMIT = 20
-
-  // Fetch notifications from API
   const fetchNotifications = useCallback(async (loadMore = false) => {
+    // Cancel any in-flight request
+    abortControllerRef.current?.abort()
+    abortControllerRef.current = new AbortController()
+
     try {
       setIsLoading(true)
-      const currentOffset = loadMore ? offset : 0
-      const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const currentOffset = loadMore ? offsetRef.current : 0
       const response = await fetch(`${API_BASE}/api/notifications/?limit=${LIMIT}&offset=${currentOffset}`, {
         credentials: 'include',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        }
+        },
+        signal: abortControllerRef.current.signal
       })
 
       if (response.ok) {
@@ -34,32 +44,31 @@ export function useNotifications() {
           setNotifications(prev => [...prev, ...data.notifications])
         } else {
           setNotifications(data.notifications)
-          setOffset(0)
+          offsetRef.current = 0
         }
         setUnreadCount(data.unread_count)
         setHasMore(data.has_more || false)
-        setOffset(currentOffset + data.notifications.length)
-      } else {
-        // Silently fail - notifications are not critical
+        offsetRef.current = currentOffset + data.notifications.length
       }
+      // Silently fail on non-ok responses - notifications are not critical
     } catch (error) {
-      // Silently fail - notifications are not critical
+      // Ignore abort errors, silently fail on others - notifications are not critical
+      if (error instanceof Error && error.name === 'AbortError') {
+        return
+      }
     } finally {
       setIsLoading(false)
     }
-  }, [offset])
+  }, [])
 
-  // Load more notifications for infinite scroll
-  const loadMoreNotifications = async () => {
+  async function loadMoreNotifications(): Promise<void> {
     if (!isLoading && hasMore) {
       await fetchNotifications(true)
     }
   }
 
-  // Mark notification as read
-  const markAsRead = async (notificationId: number) => {
+  async function markAsRead(notificationId: number): Promise<void> {
     try {
-      const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
       const response = await fetch(`${API_BASE}/api/notifications/${notificationId}/read`, {
         method: 'POST',
         credentials: 'include',
@@ -69,7 +78,7 @@ export function useNotifications() {
       })
 
       if (response.ok) {
-        await fetchNotifications() // Refresh notifications
+        await fetchNotifications()
         toast({
           title: "Notification marked as read",
           description: "The notification has been marked as read."
@@ -85,10 +94,8 @@ export function useNotifications() {
     }
   }
 
-  // Dismiss notification
-  const dismiss = async (notificationId: number) => {
+  async function dismiss(notificationId: number): Promise<void> {
     try {
-      const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
       const response = await fetch(`${API_BASE}/api/notifications/${notificationId}`, {
         method: 'DELETE',
         credentials: 'include',
@@ -98,7 +105,7 @@ export function useNotifications() {
       })
 
       if (response.ok) {
-        await fetchNotifications() // Refresh notifications
+        await fetchNotifications()
         toast({
           title: "Notification dismissed",
           description: "The notification has been dismissed."
@@ -114,10 +121,8 @@ export function useNotifications() {
     }
   }
 
-  // Mark all as read
-  const markAllAsRead = async () => {
+  async function markAllAsRead(): Promise<void> {
     try {
-      const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
       const response = await fetch(`${API_BASE}/api/notifications/mark-all-read`, {
         method: 'POST',
         credentials: 'include',
@@ -127,7 +132,7 @@ export function useNotifications() {
       })
 
       if (response.ok) {
-        await fetchNotifications() // Refresh notifications
+        await fetchNotifications()
         toast({
           title: "All notifications marked as read",
           description: "All notifications have been marked as read."
@@ -143,10 +148,8 @@ export function useNotifications() {
     }
   }
 
-  // Clear all notifications
-  const clearAll = async () => {
+  async function clearAll(): Promise<void> {
     try {
-      const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
       const response = await fetch(`${API_BASE}/api/notifications/clear-all`, {
         method: 'DELETE',
         credentials: 'include',
@@ -156,7 +159,7 @@ export function useNotifications() {
       })
 
       if (response.ok) {
-        await fetchNotifications() // Refresh notifications
+        await fetchNotifications()
         toast({
           title: "All notifications cleared",
           description: "All notifications have been dismissed."
@@ -172,8 +175,7 @@ export function useNotifications() {
     }
   }
 
-  // Handle notification action (Accept invitation, View results, etc.)
-  const handleAction = async (notification: Notification) => {
+  async function handleAction(notification: Notification): Promise<void> {
     if (!notification.action_url) return
 
     // Check if it's an invitation acceptance action
@@ -198,13 +200,42 @@ export function useNotifications() {
     await markAsRead(notification.id)
   }
 
-  // Auto-refresh notifications every 30 seconds
+  // Fetch on mount, when tab becomes visible, and poll as fallback
+  // fetchNotifications is stable (empty deps) so we use empty array for mount-only effect
   useEffect(() => {
     fetchNotifications()
 
-    const interval = setInterval(fetchNotifications, 30000)
-    return () => clearInterval(interval)
-  }, [fetchNotifications])
+    const interval = setInterval(fetchNotifications, POLLING_INTERVAL_MS)
+
+    function handleVisibilityChange(): void {
+      if (document.visibilityState === 'visible') {
+        fetchNotifications()
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      abortControllerRef.current?.abort()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Fetch when navigating between pages (skip initial render)
+  useEffect(() => {
+    if (previousPathnameRef.current === null) {
+      // First render - just record the pathname, don't fetch (already done by mount effect)
+      previousPathnameRef.current = pathname
+      return
+    }
+
+    if (pathname !== previousPathnameRef.current) {
+      previousPathnameRef.current = pathname
+      fetchNotifications()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname])
 
   return {
     notifications,

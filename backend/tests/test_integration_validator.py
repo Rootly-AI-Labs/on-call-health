@@ -591,6 +591,7 @@ class TestLinearTokenRefresh(unittest.TestCase):
         self.mock_db.rollback.assert_called_once()
 
 
+
 class TestIsAsciiDigits(unittest.TestCase):
     """Test suite for _is_ascii_digits helper function."""
 
@@ -670,6 +671,7 @@ class TestParseExpiresIn(unittest.TestCase):
     def test_non_integer_float_returns_default(self):
         """Test that non-integer floats return default."""
         self.assertEqual(_parse_expires_in(3600.5), EXPIRES_IN_DEFAULT_SECONDS)
+
 
 
 class TestValidateAllIntegrations(unittest.TestCase):
