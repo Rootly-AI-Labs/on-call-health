@@ -4,6 +4,7 @@ Integration validation service for pre-flight connection checks.
 Validates API tokens for GitHub, Linear, and Jira integrations before
 starting analysis to detect stale/expired tokens early.
 """
+import heapq
 import logging
 import threading
 from datetime import datetime, timedelta, timezone as dt_timezone
@@ -94,17 +95,22 @@ def set_validation_cache(user_id: int, results: Dict[str, Dict[str, Any]]):
 
 
 def _evict_oldest_entries():
-    """Remove oldest 10% of cache entries. Must be called with lock held."""
+    """Remove oldest 10% of cache entries. Must be called with lock held.
+
+    Uses heapq.nsmallest for O(n) performance instead of O(n log n) sorting.
+    """
     if not _validation_cache:
         return
 
     entries_to_remove = max(1, len(_validation_cache) // 10)
-    sorted_entries = sorted(
+    # heapq.nsmallest is O(n) for small k, more efficient than full sort
+    oldest_entries = heapq.nsmallest(
+        entries_to_remove,
         _validation_cache.items(),
         key=lambda x: x[1]["timestamp"]
     )
 
-    for user_id, _ in sorted_entries[:entries_to_remove]:
+    for user_id, _ in oldest_entries:
         del _validation_cache[user_id]
 
     logger.info(f"Evicted {entries_to_remove} oldest cache entries")
@@ -234,18 +240,15 @@ class IntegrationValidator:
 
             if response.status_code != 200:
                 logger.warning(f"[Linear] Token refresh failed with status {response.status_code}")
-                # If token is already past expiry, raise error instead of returning expired token
-                if integration.token_expires_at and integration.token_expires_at <= datetime.now(dt_timezone.utc):
-                    raise ValueError("Token refresh failed and current token is expired")
-                return decrypt_token(integration.access_token)
+                # Always raise error on refresh failure - if we needed to refresh,
+                # the token is expiring soon and silently returning it delays the problem
+                raise ValueError(f"Token refresh failed with status {response.status_code}")
 
             token_data = response.json()
             new_access_token = token_data.get("access_token")
             if not new_access_token:
                 logger.warning("[Linear] Token refresh response missing access_token")
-                if integration.token_expires_at and integration.token_expires_at <= datetime.now(dt_timezone.utc):
-                    raise ValueError("Token refresh failed and current token is expired")
-                return decrypt_token(integration.access_token)
+                raise ValueError("Token refresh response missing access_token")
 
             # Update the integration with new tokens
             new_refresh_token = token_data.get("refresh_token") or refresh_token
@@ -269,10 +272,9 @@ class IntegrationValidator:
 
         except Exception as e:
             logger.warning(f"[Linear] Token refresh failed: {e}")
-            # If token is already past expiry, re-raise instead of returning expired token
-            if integration.token_expires_at and integration.token_expires_at <= datetime.now(dt_timezone.utc):
-                raise
-            return decrypt_token(integration.access_token)
+            # Always re-raise on refresh failure - if we needed to refresh,
+            # the token is expiring soon and silently returning it delays the problem
+            raise
 
     async def _validate_linear(self, user_id: int) -> Optional[Dict[str, Any]]:
         """

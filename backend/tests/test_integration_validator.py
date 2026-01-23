@@ -444,33 +444,12 @@ class TestLinearTokenRefresh(unittest.TestCase):
         self.assertEqual(token, "valid_token")
 
     @patch('app.services.integration_validator.decrypt_token')
-    def test_get_valid_linear_token_refresh_fails_token_not_expired(self, mock_decrypt):
-        """Test fallback to existing token when refresh fails but token not yet expired."""
+    def test_get_valid_linear_token_refresh_fails(self, mock_decrypt):
+        """Test that refresh failure always raises exception."""
         mock_integration = Mock(spec=LinearIntegration)
         mock_integration.user_id = 1
         mock_integration.access_token = "old_encrypted_token"
-        # Token expires in 30 minutes (within refresh window but not yet expired)
         mock_integration.token_expires_at = datetime.now(dt_timezone.utc) + timedelta(minutes=30)
-        mock_integration.refresh_token = "encrypted_refresh"
-        mock_decrypt.side_effect = ["refresh_token_value", "old_token"]
-
-        with patch('httpx.AsyncClient') as mock_client:
-            mock_response = Mock()
-            mock_response.status_code = 400
-            mock_client.return_value.__aenter__.return_value.post = AsyncMock(return_value=mock_response)
-
-            token = self._run_async(self.validator._get_valid_linear_token(mock_integration))
-
-        self.assertEqual(token, "old_token")
-
-    @patch('app.services.integration_validator.decrypt_token')
-    def test_get_valid_linear_token_refresh_fails_token_expired(self, mock_decrypt):
-        """Test that refresh failure raises exception when token is already expired."""
-        mock_integration = Mock(spec=LinearIntegration)
-        mock_integration.user_id = 1
-        mock_integration.access_token = "old_encrypted_token"
-        # Token already expired 10 minutes ago
-        mock_integration.token_expires_at = datetime.now(dt_timezone.utc) - timedelta(minutes=10)
         mock_integration.refresh_token = "encrypted_refresh"
         mock_decrypt.return_value = "refresh_token_value"
 
@@ -482,7 +461,7 @@ class TestLinearTokenRefresh(unittest.TestCase):
             with self.assertRaises(ValueError) as context:
                 self._run_async(self.validator._get_valid_linear_token(mock_integration))
 
-        self.assertIn("expired", str(context.exception))
+        self.assertIn("refresh failed", str(context.exception).lower())
 
     def test_get_valid_linear_token_no_access_token(self):
         """Test that missing access_token raises ValueError."""

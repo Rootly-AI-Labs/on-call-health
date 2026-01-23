@@ -114,20 +114,22 @@ export default function AuthSuccessPage() {
         }
 
         // Warm permissions cache in background (non-blocking) for faster dashboard load
-        const cacheWarmController = new AbortController()
-        const cacheWarmTimeout = setTimeout(() => cacheWarmController.abort(), 30000)
-        fetch(`${API_BASE}/analyses/warm-permissions-cache`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${jwtToken}`
-          },
-          signal: cacheWarmController.signal
-        }).catch(err => {
-          // Non-critical - just log and continue
-          console.warn('Background permission cache warm failed:', err)
-        }).finally(() => {
-          clearTimeout(cacheWarmTimeout)
-        })
+        // Use IIFE to ensure proper cleanup of AbortController and timeout
+        ;(async () => {
+          const controller = new AbortController()
+          const timeoutId = setTimeout(() => controller.abort(), 30000)
+          try {
+            await fetch(`${API_BASE}/analyses/warm-permissions-cache`, {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${jwtToken}` },
+              signal: controller.signal
+            })
+          } catch {
+            // Non-critical background operation - silently ignore failures
+          } finally {
+            clearTimeout(timeoutId)
+          }
+        })()
 
         // Set success status
         setStatus('success')
