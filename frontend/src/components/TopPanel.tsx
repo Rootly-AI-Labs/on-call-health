@@ -35,15 +35,26 @@ export function TopPanel() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
 
   useEffect(() => {
+    const authToken = localStorage.getItem("auth_token")
     const userName = localStorage.getItem("user_name")
     const userEmail = localStorage.getItem("user_email")
     const userRole = localStorage.getItem("user_role")
-    if (userName && userEmail) setUserInfo({ name: userName, email: userEmail, role: userRole || undefined })
+    // Require auth_token to exist along with user details.
+    // Note: True token validation (signature, expiration) happens on the backend.
+    // This check prevents unnecessary UI rendering when there's clearly no session.
+    // Invalid tokens will result in 401 errors that redirect to login.
+    if (authToken && userName && userEmail) {
+      setUserInfo({ name: userName, email: userEmail, role: userRole || undefined })
+    }
   }, [])
 
   const handleSignOut = () => {
-    // Clear auth token and redirect
+    // Clear all auth-related data and redirect
     localStorage.removeItem("auth_token")
+    localStorage.removeItem("user_name")
+    localStorage.removeItem("user_email")
+    localStorage.removeItem("user_role")
+    setUserInfo(null)
     router.push("/")
   }
 
@@ -107,10 +118,11 @@ export function TopPanel() {
             </nav>
           </div>
 
-          {/* Right: notifications + user */}
+          {/* Right: notifications + user (only shown when authenticated) */}
           <div className="flex items-center gap-3">
-            <NotificationDrawer />
             {userInfo && (
+              <>
+                <NotificationDrawer />
               <DropdownMenu open={isDropdownOpen} onOpenChange={(open) => {
                 setIsDropdownOpen(open)
                 // Close dropdown when dialog opens
@@ -202,6 +214,7 @@ export function TopPanel() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              </>
             )}
           </div>
         </div>
