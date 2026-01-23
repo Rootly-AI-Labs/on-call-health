@@ -22,8 +22,8 @@ const integrationContent = {
     message: "Your Jira integration is now connected. To enable Jira data in your burnout analyses, you'll need to sync your team members."
   },
   linear: {
-    title: "Linear Connected Successfully!",
-    message: "Your Linear integration is now connected. To enable Linear data in your burnout analyses, you'll need to sync your team members."
+    title: "Sync up your team members",
+    message: "We need to match Linear users with your existing user base"
   }
 }
 
@@ -70,7 +70,7 @@ export function PostIntegrationSyncModal({
             onClick={onSyncNow}
             className="w-full bg-purple-700 hover:bg-purple-800 flex items-center justify-center"
           >
-            <span className="mx-auto">Sync Now (Recommended)</span>
+            <span className="mx-auto">Sync Now</span>
           </Button>
           <Button
             variant="outline"
