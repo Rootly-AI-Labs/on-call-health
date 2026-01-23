@@ -62,6 +62,11 @@ LINEAR_LOCK_TIMEOUT_SECONDS_MAX = 60
 
 
 def _parse_expires_in(raw_expires_in: Any) -> int:
+    """Parse and validate token expiration time.
+
+    Validates against min/max bounds and logs warnings for suspicious values
+    that may indicate misconfiguration or API changes.
+    """
     if raw_expires_in is None or isinstance(raw_expires_in, bool):
         return EXPIRES_IN_DEFAULT_SECONDS
 
@@ -80,11 +85,16 @@ def _parse_expires_in(raw_expires_in: Any) -> int:
         else:
             raise ValueError("Invalid expires_in type")
     except (ValueError, OverflowError):
+        logger.warning(f"Invalid expires_in value '{raw_expires_in}', using default")
         return EXPIRES_IN_DEFAULT_SECONDS
 
     if EXPIRES_IN_MIN_SECONDS <= value <= EXPIRES_IN_MAX_SECONDS:
+        # Warn if token lifetime is unusually short (< 5 minutes) - may indicate issue
+        if value < 300:
+            logger.warning(f"Unusually short token lifetime: {value}s (expected >= 300s)")
         return value
 
+    logger.warning(f"expires_in {value} outside valid range [{EXPIRES_IN_MIN_SECONDS}, {EXPIRES_IN_MAX_SECONDS}], using default")
     return EXPIRES_IN_DEFAULT_SECONDS
 
 
@@ -293,6 +303,8 @@ class IntegrationValidator:
         # Proceed with refresh: token_needs_refresh=True, has_refresh_token=True
         logger.info(f"[Linear] Token refresh initiated for user {integration.user_id}")
 
+        # Track transaction state to avoid rollback on non-existent transaction
+        transaction_started = False
         try:
             lock_timeout_seconds = _get_linear_lock_timeout_seconds()
 
@@ -300,6 +312,7 @@ class IntegrationValidator:
             token_to_return = None
             in_transaction = self.db.in_transaction()
             transaction = self.db.begin_nested() if in_transaction else self.db.begin()
+            transaction_started = True
 
             with transaction:
                 # Set explicit lock timeout scoped to this transaction (PostgreSQL)
@@ -339,12 +352,14 @@ class IntegrationValidator:
                         )
 
                     if response.status_code != 200:
+                        # Log user context for debugging; error message is generic for security
                         logger.warning(f"[Linear] Token refresh failed for user {integration.user_id}")
                         raise ValueError("Authentication error. Please reconnect Linear.")
 
                     token_data = response.json()
                     new_access_token = token_data.get("access_token")
                     if not new_access_token:
+                        # Log user context for debugging; error message is generic for security
                         logger.warning(f"[Linear] Token refresh failed for user {integration.user_id}")
                         raise ValueError("Authentication error. Please reconnect Linear.")
 
@@ -369,19 +384,22 @@ class IntegrationValidator:
 
         except OperationalError as db_error:
             # Database lock timeout or deadlock - this is typically transient
-            # Log the full error for debugging but keep user message generic
+            # Note: Log includes user_id for debugging; error message is generic for security
             logger.warning(
                 f"[Linear] Database contention for user {integration.user_id} "
                 f"(lock_timeout or deadlock - transient, retry should succeed)"
             )
             logger.debug(f"[Linear] Database error details: {db_error}")
-            self._safe_rollback(db_error)
+            if transaction_started:
+                self._safe_rollback(db_error)
             # Re-raise as a retryable error type to preserve exception chain
             raise RuntimeError("Temporary error. Please retry.") from db_error
 
         except Exception as e:
+            # Note: Log includes user context for debugging; error propagates without user info for security
             logger.warning(f"[Linear] Token refresh failed: {e}")
-            self._safe_rollback(e)
+            if transaction_started:
+                self._safe_rollback(e)
             raise
 
     def _safe_rollback(self, original_error: Optional[BaseException] = None):
