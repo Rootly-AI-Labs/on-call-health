@@ -6,6 +6,7 @@ starting analysis to detect stale/expired tokens early.
 """
 import heapq
 import logging
+import os
 import threading
 from datetime import datetime, timedelta, timezone as dt_timezone
 from typing import Any, Dict, Optional
@@ -49,6 +50,55 @@ def needs_refresh(expires_at: Optional[datetime], skew_minutes: int = 60) -> boo
         return False
     now = datetime.now(dt_timezone.utc)
     return expires_at <= now + timedelta(minutes=skew_minutes)
+
+
+EXPIRES_IN_MIN_SECONDS = 60
+EXPIRES_IN_MAX_SECONDS = 86400 * 30
+EXPIRES_IN_DEFAULT_SECONDS = 86400
+
+LINEAR_LOCK_TIMEOUT_SECONDS_DEFAULT = 10
+LINEAR_LOCK_TIMEOUT_SECONDS_MIN = 1
+LINEAR_LOCK_TIMEOUT_SECONDS_MAX = 60
+
+
+def _parse_expires_in(raw_expires_in: Any) -> int:
+    if raw_expires_in is None or isinstance(raw_expires_in, bool):
+        return EXPIRES_IN_DEFAULT_SECONDS
+
+    try:
+        if isinstance(raw_expires_in, str):
+            candidate = raw_expires_in.strip()
+            if not candidate.isdigit() or len(candidate) > len(str(EXPIRES_IN_MAX_SECONDS)):
+                raise ValueError("Invalid expires_in format")
+            value = int(candidate)
+        elif isinstance(raw_expires_in, float):
+            if not raw_expires_in.is_integer():
+                raise ValueError("Non-integer expires_in value")
+            value = int(raw_expires_in)
+        elif isinstance(raw_expires_in, int):
+            value = raw_expires_in
+        else:
+            raise ValueError("Invalid expires_in type")
+    except (ValueError, OverflowError):
+        return EXPIRES_IN_DEFAULT_SECONDS
+
+    if EXPIRES_IN_MIN_SECONDS <= value <= EXPIRES_IN_MAX_SECONDS:
+        return value
+
+    return EXPIRES_IN_DEFAULT_SECONDS
+
+
+def _get_linear_lock_timeout_seconds() -> int:
+    raw_timeout = os.getenv("LINEAR_TOKEN_REFRESH_LOCK_TIMEOUT_SECONDS")
+    if raw_timeout is None:
+        return LINEAR_LOCK_TIMEOUT_SECONDS_DEFAULT
+
+    try:
+        timeout_seconds = int(raw_timeout)
+    except (TypeError, ValueError):
+        return LINEAR_LOCK_TIMEOUT_SECONDS_DEFAULT
+
+    return max(LINEAR_LOCK_TIMEOUT_SECONDS_MIN, min(timeout_seconds, LINEAR_LOCK_TIMEOUT_SECONDS_MAX))
 
 
 # Module-level cache for validation results
@@ -242,86 +292,78 @@ class IntegrationValidator:
         logger.info(f"[Linear] Token refresh initiated for user {integration.user_id}")
 
         try:
-            # Set explicit lock timeout to prevent indefinite waits (PostgreSQL)
-            self.db.execute(text("SET LOCAL lock_timeout = '10s'"))
+            lock_timeout_seconds = _get_linear_lock_timeout_seconds()
 
-            # Re-query with FOR UPDATE to lock the row
-            locked_integration = self.db.query(LinearIntegration).filter(
-                LinearIntegration.id == integration.id
-            ).with_for_update().first()
+            refreshed_token = None
+            token_to_return = None
 
-            if not locked_integration:
-                raise ValueError("Authentication error. Please reconnect Linear.")
-
-            # Double-check pattern: use locked row's expiry (not original) since another
-            # request may have refreshed the token while we waited for the lock.
-            # This is the authoritative state after acquiring the row lock.
-            locked_token_expires_at = locked_integration.token_expires_at
-            if not needs_refresh(locked_token_expires_at):
-                logger.info(f"[Linear] Token already refreshed for user {integration.user_id}")
-                return decrypt_token(locked_integration.access_token)
-
-            logger.info(f"[Linear] Refreshing access token for user {integration.user_id}")
-            refresh_token = decrypt_token(locked_integration.refresh_token)
-
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.post(
-                    "https://api.linear.app/oauth/token",
-                    data={
-                        "grant_type": "refresh_token",
-                        "refresh_token": refresh_token,
-                        "client_id": settings.LINEAR_CLIENT_ID,
-                        "client_secret": settings.LINEAR_CLIENT_SECRET,
-                    }
+            with self.db.begin_nested():
+                # Set explicit lock timeout to prevent indefinite waits (PostgreSQL)
+                self.db.execute(
+                    text("SET LOCAL lock_timeout = :lock_timeout"),
+                    {"lock_timeout": f"{lock_timeout_seconds}s"}
                 )
 
-            if response.status_code != 200:
-                # Log details at debug level only; generic warning for security
-                logger.debug(f"[Linear] API response code: {response.status_code} for user {integration.user_id}")
-                logger.warning(f"[Linear] Authentication issue for user {integration.user_id}")
-                self._safe_rollback()
-                raise ValueError("Authentication error. Please reconnect Linear.")
+                # Re-query with FOR UPDATE to lock the row
+                locked_integration = self.db.query(LinearIntegration).filter(
+                    LinearIntegration.id == integration.id
+                ).with_for_update().first()
 
-            token_data = response.json()
-            new_access_token = token_data.get("access_token")
-            if not new_access_token:
-                logger.warning(f"[Linear] Authentication issue for user {integration.user_id}")
-                self._safe_rollback()
-                raise ValueError("Authentication error. Please reconnect Linear.")
+                if not locked_integration:
+                    raise ValueError("Authentication error. Please reconnect Linear.")
 
-            # Update the locked integration with new tokens
-            new_refresh_token = token_data.get("refresh_token") or refresh_token
+                # Double-check pattern: use locked row's expiry (not original) since another
+                # request may have refreshed the token while we waited for the lock.
+                # This is the authoritative state after acquiring the row lock.
+                locked_token_expires_at = locked_integration.token_expires_at
+                if not needs_refresh(locked_token_expires_at):
+                    logger.info(f"[Linear] Token already refreshed for user {integration.user_id}")
+                    token_to_return = decrypt_token(locked_integration.access_token)
+                else:
+                    logger.info(f"[Linear] Refreshing access token for user {integration.user_id}")
+                    refresh_token = decrypt_token(locked_integration.refresh_token)
 
-            # Validate expires_in with strict bounds to prevent overflow attacks
-            # Valid range: 60 seconds (1 min) to 2592000 seconds (30 days)
-            # Max valid value is 2592000 (7 digits), so reject strings > 7 chars
-            expires_in = 86400  # Default: 24 hours
-            raw_expires_in = token_data.get("expires_in")
-            if raw_expires_in is not None:
-                try:
-                    # Reject obviously invalid string inputs before conversion
-                    if isinstance(raw_expires_in, str):
-                        # Max valid value is 2592000 (7 digits)
-                        if len(raw_expires_in) > 7 or not raw_expires_in.isdigit():
-                            raise ValueError("Invalid format")
-                    elif not isinstance(raw_expires_in, (int, float)):
-                        raise TypeError("Invalid type")
+                    async with httpx.AsyncClient(timeout=10.0) as client:
+                        response = await client.post(
+                            "https://api.linear.app/oauth/token",
+                            data={
+                                "grant_type": "refresh_token",
+                                "refresh_token": refresh_token,
+                                "client_id": settings.LINEAR_CLIENT_ID,
+                                "client_secret": settings.LINEAR_CLIENT_SECRET,
+                            }
+                        )
 
-                    parsed_value = int(raw_expires_in)
-                    # Strict bounds check: must be positive and within 30 days
-                    if 60 <= parsed_value <= 2592000:
-                        expires_in = parsed_value
-                except (ValueError, TypeError, OverflowError):
-                    pass  # Use default, no logging needed for invalid external data
+                    if response.status_code != 200:
+                        logger.warning(f"[Linear] Authentication issue for user {integration.user_id}")
+                        raise ValueError("Authentication error. Please reconnect Linear.")
 
-            locked_integration.access_token = encrypt_token(new_access_token)
-            locked_integration.refresh_token = encrypt_token(new_refresh_token)
-            locked_integration.token_expires_at = datetime.now(dt_timezone.utc) + timedelta(seconds=expires_in)
-            locked_integration.updated_at = datetime.now(dt_timezone.utc)
+                    token_data = response.json()
+                    new_access_token = token_data.get("access_token")
+                    if not new_access_token:
+                        logger.warning(f"[Linear] Authentication issue for user {integration.user_id}")
+                        raise ValueError("Authentication error. Please reconnect Linear.")
+
+                    # Update the locked integration with new tokens
+                    new_refresh_token = token_data.get("refresh_token") or refresh_token
+                    expires_in = _parse_expires_in(token_data.get("expires_in"))
+
+                    locked_integration.access_token = encrypt_token(new_access_token)
+                    locked_integration.refresh_token = encrypt_token(new_refresh_token)
+                    locked_integration.token_expires_at = datetime.now(dt_timezone.utc) + timedelta(seconds=expires_in)
+                    locked_integration.updated_at = datetime.now(dt_timezone.utc)
+                    refreshed_token = new_access_token
+                    token_to_return = new_access_token
+
             self.db.commit()
 
-            logger.info(f"[Linear] Token refreshed successfully for user {integration.user_id}")
-            return new_access_token
+            if refreshed_token:
+                logger.info(f"[Linear] Token refreshed successfully for user {integration.user_id}")
+
+            if token_to_return is None:
+                raise ValueError("Authentication error. Please reconnect Linear.")
+
+            return token_to_return
 
         except OperationalError as db_error:
             # Database lock timeout or deadlock - this is typically transient
