@@ -270,6 +270,13 @@ export function TeamMembersList({
               return (b.ocb_score || 0) - (a.ocb_score || 0);
             })
 
+            // Sort members alphabetically by name
+            const sortMembersAlphabetically = (members: any[]) => members.sort((a, b) => {
+              const nameA = (a.user_name || '').toLowerCase();
+              const nameB = (b.user_name || '').toLowerCase();
+              return nameA.localeCompare(nameB);
+            })
+
             return (
               <>
                 {/* Members with incidents or burnout (from Jira, GitHub, etc.) */}
@@ -312,7 +319,7 @@ export function TeamMembersList({
 
                     {showMembersWithoutIncidents && !isLoading && (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {sortMembers(membersWithoutIncidents).map(renderMemberCard)}
+                        {sortMembersAlphabetically(membersWithoutIncidents).map(renderMemberCard)}
                       </div>
                     )}
                   </div>
