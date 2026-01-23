@@ -201,6 +201,7 @@ export function useNotifications() {
   }
 
   // Fetch on mount, when tab becomes visible, and poll as fallback
+  // fetchNotifications is stable (empty deps) so we use empty array for mount-only effect
   useEffect(() => {
     fetchNotifications()
 
@@ -218,7 +219,8 @@ export function useNotifications() {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
       abortControllerRef.current?.abort()
     }
-  }, [fetchNotifications])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Fetch when navigating between pages (skip initial render)
   useEffect(() => {
@@ -232,7 +234,8 @@ export function useNotifications() {
       previousPathnameRef.current = pathname
       fetchNotifications()
     }
-  }, [pathname, fetchNotifications])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname])
 
   return {
     notifications,
