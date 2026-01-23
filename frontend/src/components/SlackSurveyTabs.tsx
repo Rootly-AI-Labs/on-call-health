@@ -65,6 +65,7 @@ export function SlackSurveyTabs({
   const [scheduleTime, setScheduleTime] = useState('09:00')
   const [frequencyType, setFrequencyType] = useState<'daily' | 'weekday' | 'weekly'>('weekday')
   const [dayOfWeek, setDayOfWeek] = useState<number>(4) // Default: Friday
+  const [followUpRemindersEnabled, setFollowUpRemindersEnabled] = useState(true) // Daily reminders until answered
   const [savedScheduleTime, setSavedScheduleTime] = useState<string | null>(null) // Track saved time from DB
   const [loadingSchedule, setLoadingSchedule] = useState(false)
   const [savingSchedule, setSavingSchedule] = useState(false)
@@ -159,6 +160,7 @@ export function SlackSurveyTabs({
           if (data.day_of_week !== undefined && data.day_of_week !== null) {
             setDayOfWeek(data.day_of_week)
           }
+          setFollowUpRemindersEnabled(data.follow_up_reminders_enabled !== false)
         } else {
           // Handle case where no schedule is configured (shouldn't happen with new backend)
           setScheduleEnabled(false)
@@ -193,7 +195,8 @@ export function SlackSurveyTabs({
         frequency_type: frequencyType,
         day_of_week: frequencyType === 'weekly' ? dayOfWeek : null,
         send_reminder: false,
-        reminder_hours_after: 5
+        reminder_hours_after: 5,
+        follow_up_reminders_enabled: followUpRemindersEnabled
       }
 
       // Add 2 second delay for better UX feedback
@@ -696,7 +699,8 @@ export function SlackSurveyTabs({
                       frequency_type: frequencyType,
                       day_of_week: frequencyType === 'weekly' ? dayOfWeek : null,
                       send_reminder: false,
-                      reminder_hours_after: 5
+                      reminder_hours_after: 5,
+                      follow_up_reminders_enabled: followUpRemindersEnabled
                     }
 
                     const response = await fetch(`${API_BASE}/api/surveys/survey-schedule`, {
@@ -856,6 +860,27 @@ export function SlackSurveyTabs({
                   </div>
                 )}
 
+                <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-neutral-200">
+                  <div>
+                    <Label className="text-sm font-medium text-neutral-900">
+                      Daily Follow-up Reminders
+                    </Label>
+                    <p className="text-xs text-neutral-500 mt-0.5">
+                      Send daily reminders until team members respond
+                    </p>
+                  </div>
+                  <Switch
+                    checked={followUpRemindersEnabled}
+                    onCheckedChange={setFollowUpRemindersEnabled}
+                    disabled={savingSchedule}
+                  />
+                </div>
+                {followUpRemindersEnabled && (
+                  <div className="text-xs text-neutral-700 bg-purple-50 border border-purple-100 rounded-md p-2">
+                    <p>Team members will receive daily reminders at the scheduled time until they complete the survey or the period ends.</p>
+                  </div>
+                )}
+
                 <div className="text-xs text-neutral-700 bg-blue-50 border border-blue-100 rounded-md p-2">
                   <p className="font-medium text-blue-900 mb-1">Schedule Details:</p>
                   <ul className="space-y-1 ml-2">
@@ -900,6 +925,7 @@ export function SlackSurveyTabs({
                     })()} ({Intl.DateTimeFormat().resolvedOptions().timeZone})</div>
                     <div>• <strong>Frequency:</strong> {frequencyType === 'daily' ? 'Every day' : frequencyType === 'weekday' ? 'Weekdays (Mon-Fri)' : `Every ${['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][dayOfWeek]}`}</div>
                     <div>• <strong>Recipients:</strong> {savedRecipients.size > 0 ? `${savedRecipients.size} configured member${savedRecipients.size !== 1 ? 's' : ''}` : 'All team members with Slack (configure in Team Members tab)'}</div>
+                    <div>• <strong>Daily Reminders:</strong> {followUpRemindersEnabled ? 'Enabled (until answered)' : 'Disabled'}</div>
                   </div>
                 </div>
               </>

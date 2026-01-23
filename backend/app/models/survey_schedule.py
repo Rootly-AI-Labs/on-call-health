@@ -42,6 +42,13 @@ class SurveySchedule(Base):
         "Your wellbeing matters to us."
     ))
 
+    # Follow-up reminder settings (daily reminders until user responds)
+    follow_up_reminders_enabled = Column(Boolean, default=True)
+    follow_up_message_template = Column(String(500), default=(
+        "Hi! This is a reminder for your {frequency} check-in. "
+        "You just need to answer it once this {period_name}, or I'll remind you again tomorrow."
+    ))
+
     # Relationships
     organization = relationship("Organization", backref="survey_schedule")
 
