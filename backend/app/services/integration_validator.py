@@ -9,6 +9,7 @@ import logging
 import threading
 from datetime import datetime, timedelta, timezone as dt_timezone
 from typing import Any, Dict, Optional
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import OperationalError
 from cryptography.fernet import Fernet
@@ -225,22 +226,28 @@ class IntegrationValidator:
         if not integration.access_token:
             raise ValueError("No access token available for Linear integration")
 
-        # Check if token is still valid - no refresh needed
-        if not needs_refresh(integration.token_expires_at):
+        # Early return path: token is still valid, no refresh needed
+        token_needs_refresh = needs_refresh(integration.token_expires_at)
+        if not token_needs_refresh:
             return decrypt_token(integration.access_token)
 
-        # Token needs refresh - check if we have a refresh token
-        if not integration.refresh_token:
+        # Refresh path: token expired but we need a refresh token to proceed
+        has_refresh_token = bool(integration.refresh_token)
+        if not has_refresh_token:
             raise ValueError("Token expired and no refresh token available. Please reconnect Linear.")
 
-        # Token needs refresh - acquire row lock to prevent race condition
+        # At this point: token_needs_refresh=True AND has_refresh_token=True
+        # Acquire row lock to prevent race condition during refresh
         logger.info(f"[Linear] Token needs refresh for user {integration.user_id}, acquiring lock")
 
         try:
-            # Re-query with FOR UPDATE to lock the row (with 10s timeout to prevent deadlocks)
+            # Set explicit lock timeout to prevent indefinite waits (PostgreSQL)
+            self.db.execute(text("SET LOCAL lock_timeout = '10s'"))
+
+            # Re-query with FOR UPDATE to lock the row
             locked_integration = self.db.query(LinearIntegration).filter(
                 LinearIntegration.id == integration.id
-            ).with_for_update(nowait=False).first()
+            ).with_for_update().first()
 
             if not locked_integration:
                 raise ValueError("Linear integration not found during refresh")
@@ -265,27 +272,41 @@ class IntegrationValidator:
                 )
 
             if response.status_code != 200:
-                logger.warning(f"[Linear] Token refresh failed with status {response.status_code}")
+                # Log at debug level to avoid exposing OAuth details; use generic warning
+                logger.debug(f"[Linear] Token refresh response status: {response.status_code}")
+                logger.warning(f"[Linear] Token refresh failed for user {integration.user_id}")
                 self._safe_rollback()
-                raise ValueError(f"Token refresh failed with status {response.status_code}")
+                raise ValueError("Token refresh failed. Please try again or reconnect Linear.")
 
             token_data = response.json()
             new_access_token = token_data.get("access_token")
             if not new_access_token:
-                logger.warning("[Linear] Token refresh response missing access_token")
+                # Generic warning without exposing response details
+                logger.warning(f"[Linear] Token refresh incomplete for user {integration.user_id}")
                 self._safe_rollback()
-                raise ValueError("Token refresh response missing access_token")
+                raise ValueError("Token refresh incomplete. Please try again or reconnect Linear.")
 
             # Update the locked integration with new tokens
             new_refresh_token = token_data.get("refresh_token") or refresh_token
-            # Validate expires_in to prevent datetime overflow (1 min to 30 days)
-            try:
-                raw_expires_in = token_data.get("expires_in")
-                expires_in = int(raw_expires_in) if raw_expires_in is not None else 86400
-                expires_in = max(60, min(expires_in, 86400 * 30))
-            except (ValueError, TypeError):
-                logger.warning(f"[Linear] Invalid expires_in value: {token_data.get('expires_in')}, using default")
-                expires_in = 86400
+
+            # Validate expires_in to prevent integer overflow during timedelta calculation
+            # Bounds: 60 seconds (1 min) to 2592000 seconds (30 days)
+            expires_in = 86400  # Default: 24 hours
+            raw_expires_in = token_data.get("expires_in")
+            if raw_expires_in is not None:
+                try:
+                    # Check string length before conversion to prevent overflow attacks
+                    if isinstance(raw_expires_in, str) and len(raw_expires_in) > 10:
+                        logger.debug(f"[Linear] Rejecting oversized expires_in value")
+                    else:
+                        parsed_value = int(raw_expires_in)
+                        # Clamp to safe range after successful parsing
+                        if 0 < parsed_value <= 2592000:  # Max 30 days in seconds
+                            expires_in = max(60, parsed_value)
+                        else:
+                            logger.debug(f"[Linear] expires_in out of range, using default")
+                except (ValueError, TypeError, OverflowError):
+                    logger.debug(f"[Linear] Invalid expires_in type, using default")
 
             locked_integration.access_token = encrypt_token(new_access_token)
             locked_integration.refresh_token = encrypt_token(new_refresh_token)
