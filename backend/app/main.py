@@ -3,6 +3,7 @@ FastAPI main application for On-call Burnout Detector.
 """
 import os
 import logging
+from datetime import datetime, timedelta
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -181,6 +182,47 @@ async def startup_event():
         print("✅ Loaded survey schedules from database")
     except Exception as e:
         print(f"⚠️ Error loading survey schedules: {str(e)}")
+    finally:
+        db.close()
+
+    # Clean up stuck analyses (analyses that have been "running" for too long)
+    await cleanup_stuck_analyses()
+
+
+async def cleanup_stuck_analyses():
+    """
+    Mark analyses that have been stuck in 'running' status for too long as failed.
+    This handles cases where the server crashed/restarted while an analysis was running.
+    """
+    from app.models import SessionLocal, Analysis
+
+    # Analyses running for more than 30 minutes are considered stuck
+    stuck_threshold = timedelta(minutes=30)
+    cutoff_time = datetime.utcnow() - stuck_threshold
+
+    db = SessionLocal()
+    try:
+        # Find all analyses that have been running for too long
+        stuck_analyses = db.query(Analysis).filter(
+            Analysis.status == "running",
+            Analysis.created_at < cutoff_time
+        ).all()
+
+        if stuck_analyses:
+            print(f"🔧 Found {len(stuck_analyses)} stuck analyses to clean up")
+            for analysis in stuck_analyses:
+                analysis.status = "failed"
+                analysis.error_message = "Analysis was interrupted (server restart). Please run a new analysis."
+                analysis.completed_at = datetime.utcnow()
+                print(f"  - Marked analysis {analysis.id} as failed (was running since {analysis.created_at})")
+
+            db.commit()
+            print(f"✅ Cleaned up {len(stuck_analyses)} stuck analyses")
+        else:
+            print("✅ No stuck analyses found")
+    except Exception as e:
+        print(f"⚠️ Error cleaning up stuck analyses: {str(e)}")
+        db.rollback()
     finally:
         db.close()
 
