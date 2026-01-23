@@ -141,7 +141,6 @@ class IntegrationValidationResponse(BaseModel):
 @general_rate_limit("integration_validation")
 async def validate_integrations(
     req: Request,
-    integration_id: int = Query(..., description="Integration ID to analyze"),
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
@@ -156,12 +155,11 @@ async def validate_integrations(
     from ...services.integration_validator import IntegrationValidator
 
     try:
-        logger.info(f"Validating integrations for user {current_user.id}, integration {integration_id}")
+        logger.info(f"Validating integrations for user {current_user.id}")
 
         validator = IntegrationValidator(db)
         results = await validator.validate_all_integrations(
-            user_id=current_user.id,
-            integration_id=integration_id
+            user_id=current_user.id
         )
 
         all_valid = all(result.get("valid", False) for result in results.values())

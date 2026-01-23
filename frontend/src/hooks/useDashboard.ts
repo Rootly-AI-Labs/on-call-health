@@ -1575,7 +1575,7 @@ export default function useDashboard() {
 
       // Validate integration connections before starting analysis
       try {
-        const validationResponse = await fetch(`${API_BASE}/analyses/validate-integrations?integration_id=${integrationId}`, {
+        const validationResponse = await fetch(`${API_BASE}/analyses/validate-integrations`, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${authToken}`
