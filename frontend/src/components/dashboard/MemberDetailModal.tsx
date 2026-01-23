@@ -372,7 +372,7 @@ export function MemberDetailModal({
                   </div>
                 </DialogTitle>
                 <DialogDescription id="member-detail-description" className="sr-only">
-                  Detailed burnout analysis and daily health timeline for team member.
+                  Detailed health analysis and daily health timeline for team member.
                   Shows risk factors, incident response metrics, and daily health scores.
                 </DialogDescription>
               </DialogHeader>

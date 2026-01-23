@@ -391,7 +391,7 @@ export function SlackSurveyTabs({
                   <span className="text-green-600 text-xs font-bold">1</span>
                 </div>
                 <div>
-                  <p className="text-sm text-neutral-700"><strong>Authorize the app</strong> to deliver 3-question burnout surveys via Slack</p>
+                  <p className="text-sm text-neutral-700"><strong>Authorize the app</strong> to deliver 3-question wellness surveys via Slack</p>
                 </div>
               </div>
 
@@ -413,7 +413,7 @@ export function SlackSurveyTabs({
                   <span className="text-green-600 text-xs font-bold">3</span>
                 </div>
                 <div>
-                  <p className="text-sm text-neutral-700"><strong>Survey data automatically integrates</strong> with your burnout analysis to validate automated detection patterns</p>
+                  <p className="text-sm text-neutral-700"><strong>Survey data automatically integrates</strong> with your health analysis to validate automated detection patterns</p>
                 </div>
               </div>
             </div>
@@ -648,7 +648,7 @@ export function SlackSurveyTabs({
         <div className="bg-white rounded-lg border p-4">
           <h4 className="font-medium text-neutral-900 mb-3">Survey Delivery</h4>
           <p className="text-sm text-neutral-700 mb-4">
-            Send burnout surveys to your team members immediately via Slack DM.
+            Send wellness surveys to your team members immediately via Slack DM.
           </p>
 
           <div className="flex justify-center">
