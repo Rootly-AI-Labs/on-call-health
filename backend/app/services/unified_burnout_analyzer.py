@@ -1708,12 +1708,6 @@ class UnifiedBurnoutAnalyzer:
         time_impacts = self._calculate_time_impact_multipliers(incidents, metrics, user_tz)
         recovery_data = self._calculate_recovery_deficit(incidents, user_tz)
 
-        # Log research-based insights
-        logger.info(f"🕐 TIME IMPACT: {user_name} - After-hours: {time_impacts['after_hours_incidents']}, "
-                   f"Weekend: {time_impacts['weekend_incidents']}, Overnight: {time_impacts['overnight_incidents']}")
-        logger.info(f"🔄 RECOVERY: {user_name} - Violations: {recovery_data['recovery_violations']}, "
-                   f"Avg recovery: {recovery_data['avg_recovery_hours']:.1f}h, Score: {recovery_data['recovery_score']:.0f}/100")
-        
         # Calculate severity-weighted incident burden 
         # Handle both Rootly (sev0-sev4) and PagerDuty (sev1-sev5) severity mappings
         if self.platform == "pagerduty":
@@ -1808,9 +1802,7 @@ class UnifiedBurnoutAnalyzer:
             
         # Convert to per-week basis (assuming 30-day analysis period)
         severity_weighted_per_week = severity_weighted_total / 4.3  # 30 days ≈ 4.3 weeks
-        
-        logger.info(f"SEVERITY_WEIGHTED: User has {severity_weighted_total:.1f} severity-weighted incidents total ({severity_weighted_per_week:.1f}/week)")
-        
+
         # Apply Rootly's tiered scaling to all OCB metrics
         # CRITICAL: after_hours_pct is a decimal (0.0-1.0), must convert to percentage (0-100) for OCB scale_max
         after_hours_percentage = after_hours_pct * 100  # Convert 0.25 → 25%
@@ -1834,15 +1826,7 @@ class UnifiedBurnoutAnalyzer:
             'meeting_load': apply_rootly_incident_tiers(incidents_per_week) * 6,           # Tiered coordination overhead
             'oncall_burden': apply_rootly_incident_tiers(severity_weighted_per_week) * 10  # FIXED: Use severity-weighted incidents for proper SEV1 impact
         }
-        
-        # 🐛 DEBUG: Log OCB metrics for troubleshooting zero scores
-        logger.info(f"🐛 OCB METRICS DEBUG for {user_name}:")
-        logger.info(f"   - Incidents: {len(incidents)}")
-        logger.info(f"   - incidents_per_week: {incidents_per_week}")
-        logger.info(f"   - critical_incidents: {critical_incidents}, high_incidents: {high_incidents}")
-        logger.info(f"   - severity_dist: {severity_dist}")
-        logger.info(f"   - OCB metrics: {ocb_metrics}")
-        
+
         # Check if all OCB metrics are 0
         non_zero_metrics = {k: v for k, v in ocb_metrics.items() if v > 0}
         if not non_zero_metrics:
@@ -1920,19 +1904,9 @@ class UnifiedBurnoutAnalyzer:
             }
         }
 
-        # Debug: Log what github_data looks like
-        if github_data:
-            logger.info(f"Member {user_email} github_data keys: {list(github_data.keys())}")
-            logger.info(f"Member {user_email} has activity_data: {bool(github_data.get('activity_data'))}")
-            if github_data.get('activity_data'):
-                logger.info(f"Member {user_email} activity_data: commits={github_data['activity_data'].get('commits_count', 0)}, prs={github_data['activity_data'].get('pull_requests_count', 0)}")
-        else:
-            logger.info(f"Member {user_email} has NO github_data")
-
         # Add GitHub activity if available
         if github_data and github_data.get("activity_data"):
             result["github_activity"] = github_data["activity_data"]
-            logger.info(f"✅ Added github_activity to {user_email} result: {result['github_activity'].get('commits_count', 0)} commits, {result['github_activity'].get('pull_requests_count', 0)} PRs")
 
             # Check if GitHub activity indicates high risk
             github_indicators = github_data.get("activity_data", {}).get("burnout_indicators", {})
@@ -2698,9 +2672,7 @@ class UnifiedBurnoutAnalyzer:
             incident_frequency_score = 5 + ((ipw - 3) / 4) * 3  # 5-8 range (high)
         else:  # 7+ IPW = critical burnout risk
             incident_frequency_score = 8 + min(2.0, (ipw - 7) / 4)  # 8-10 range (critical)
-            
-        logger.info(f"Personal burnout OCB: {ipw} IPW → frequency_score={incident_frequency_score}")
-        
+
         # After hours score
         ahp = metrics.get("after_hours_percentage", 0)
         ahp = float(ahp) if ahp is not None else 0.0
@@ -2762,10 +2734,7 @@ class UnifiedBurnoutAnalyzer:
             escalation_score = 4.0 + ((total_severity_impact - 50) / 50) * 3
         else:  # Low severity load
             escalation_score = min(4.0, total_severity_impact / 12.5)
-            
-        logger.info(f"Work burnout OCB: {total_incidents} incidents, "
-                        f"severity_impact={total_severity_impact}, escalation_score={escalation_score}")
-        
+
         # Remove the old logic below and use the new severity-weighted calculation
         # high_severity_count = severity_dist.get("high", 0) + severity_dist.get("critical", 0)
         # total_incidents = sum(severity_dist.values()) if severity_dist else 1
@@ -4376,9 +4345,6 @@ class UnifiedBurnoutAnalyzer:
                     after_hours_percentage = (after_hours_count / total_activities) * 100
                 else:
                     after_hours_percentage = 0
-
-                logger.info(f"DAILY_SCORE_DEBUG for {date_str}: baseline=8.7, incidents={incident_count}, severity_weighted={severity_weighted:.1f}, after_hours={after_hours_count}, high_severity={high_severity_count}, users_involved={users_involved_count}, final_score={daily_score:.2f}")
-                logger.info(f"📊 AFTER_HOURS_BREAKDOWN for {date_str}: total={after_hours_count}, incidents={after_hours_incidents}, github_commits={github_after_hours}, total_activities={total_activities}, percentage={after_hours_percentage:.1f}%")
 
                 daily_trends.append({
                     "date": date_str,
