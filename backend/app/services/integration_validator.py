@@ -21,11 +21,9 @@ def get_encryption_key() -> bytes:
     from base64 import urlsafe_b64encode
 
     key = settings.JWT_SECRET_KEY.encode()
-    if len(key) < 32:
-        key = key.ljust(32, b'0')
-    else:
-        key = key[:32]
-    return urlsafe_b64encode(key)
+    # Ensure key is 32 bytes for Fernet (consistent with other integration files)
+    key = urlsafe_b64encode(key[:32].ljust(32, b'\0'))
+    return key
 
 
 def decrypt_token(encrypted_token: str) -> str:
@@ -109,7 +107,7 @@ class IntegrationValidator:
 
         except Exception as e:
             logger.error(f"GitHub validation unexpected error for user {user_id}: {e}", exc_info=True)
-            return self._error_response(f"Unexpected error validating GitHub: {str(e)}")
+            return self._error_response("Unexpected error validating GitHub. Please try again later.")
 
     async def _validate_linear(self, user_id: int) -> Optional[Dict[str, any]]:
         """
@@ -157,7 +155,7 @@ class IntegrationValidator:
 
         except Exception as e:
             logger.error(f"Linear validation unexpected error for user {user_id}: {e}", exc_info=True)
-            return self._error_response(f"Unexpected error validating Linear: {str(e)}")
+            return self._error_response("Unexpected error validating Linear. Please try again later.")
 
     async def _validate_jira(self, user_id: int) -> Optional[Dict[str, any]]:
         """
@@ -201,7 +199,7 @@ class IntegrationValidator:
 
         except Exception as e:
             logger.error(f"Jira validation unexpected error for user {user_id}: {e}", exc_info=True)
-            return self._error_response(f"Unexpected error validating Jira: {str(e)}")
+            return self._error_response("Unexpected error validating Jira. Please try again later.")
 
     def _error_response(self, error_msg: str) -> Dict[str, any]:
         """Create a standardized error response."""
@@ -231,14 +229,18 @@ class IntegrationValidator:
         if response.status_code == 200:
             result = response.json()
             if "errors" in result:
-                error_msg = result["errors"][0].get("message", "Unknown error")
-                if "Unauthorized" in error_msg or "Invalid token" in error_msg:
+                # Collect all error messages for logging
+                error_messages = [err.get("message", "Unknown error") for err in result["errors"]]
+                combined_errors = "; ".join(error_messages)
+
+                # Check if any error indicates auth failure
+                if any("Unauthorized" in msg or "Invalid token" in msg for msg in error_messages):
                     logger.warning(f"Linear token invalid/expired for user {user_id}")
                     return self._error_response(
                         "Linear token is expired or invalid. Please reconnect your Linear integration."
                     )
-                logger.warning(f"Linear GraphQL error for user {user_id}: {error_msg}")
-                return self._error_response(f"Linear API error: {error_msg}")
+                logger.warning(f"Linear GraphQL errors for user {user_id}: {combined_errors}")
+                return self._error_response("Linear API error. Please try again later.")
             logger.info(f"Linear validation successful for user {user_id}")
             return {"valid": True, "error": None}
         elif response.status_code == 401:

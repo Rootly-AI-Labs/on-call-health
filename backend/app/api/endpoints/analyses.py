@@ -162,7 +162,9 @@ async def validate_integrations(
             user_id=current_user.id
         )
 
-        all_valid = all(result.get("valid", False) for result in results.values())
+        # If no integrations found, consider it invalid (user needs to set up integrations)
+        # Also handles empty dict case where all() would incorrectly return True
+        all_valid = bool(results) and all(result.get("valid", False) for result in results.values())
 
         logger.info(
             f"Validation complete for user {current_user.id}: "
@@ -175,7 +177,7 @@ async def validate_integrations(
         logger.error(f"Integration validation failed for user {current_user.id}: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to validate integrations: {str(e)}"
+            detail="Failed to validate integrations. Please try again later."
         )
 
 
