@@ -16,7 +16,7 @@ import { NotificationDrawer } from "@/components/notifications"
 import { AccountSettingsDialog } from "@/components/AccountSettingsDialog"
 import { TeamManagementDialog } from "@/components/TeamManagementDialog"
 import { useGettingStarted } from "@/contexts/GettingStartedContext"
-import { LogOut, BookOpen, HelpCircle, Settings, Users, FileText } from "lucide-react"
+import { LogOut, BookOpen, HelpCircle, Settings, Users, FileText, MessageSquareMore } from "lucide-react"
 
 interface UserInfo {
   name: string
@@ -118,10 +118,19 @@ export function TopPanel() {
             </nav>
           </div>
 
-          {/* Right: notifications + user (only shown when authenticated) */}
+          {/* Right: feedback + notifications + user (only shown when authenticated) */}
           <div className="flex items-center gap-3">
             {userInfo && (
               <>
+                <a
+                  href="https://github.com/Rootly-AI-Labs/On-Call-Health/issues/new"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-purple-700 bg-purple-100 hover:bg-purple-200 rounded-lg transition-colors"
+                >
+                  <MessageSquareMore className="w-4 h-4" />
+                  <span className="hidden sm:inline">Feedback</span>
+                </a>
                 <NotificationDrawer />
               <DropdownMenu open={isDropdownOpen} onOpenChange={(open) => {
                 setIsDropdownOpen(open)
