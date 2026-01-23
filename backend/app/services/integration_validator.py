@@ -4,10 +4,8 @@ Integration validation service for pre-flight connection checks.
 Validates API tokens for GitHub, Linear, and Jira integrations before
 starting analysis to detect stale/expired tokens early.
 """
-import heapq
 import logging
 import os
-import threading
 from datetime import datetime, timedelta, timezone as dt_timezone
 from typing import Any, Dict, Optional
 from sqlalchemy import text
@@ -17,6 +15,11 @@ from cryptography.fernet import Fernet
 import httpx
 
 from ..core.config import settings
+from ..core.validation_cache import (
+    get_cached_validation,
+    set_cached_validation,
+    invalidate_validation_cache,
+)
 from ..models import GitHubIntegration, LinearIntegration, JiraIntegration
 
 logger = logging.getLogger(__name__)
@@ -61,11 +64,16 @@ LINEAR_LOCK_TIMEOUT_SECONDS_MIN = 1
 LINEAR_LOCK_TIMEOUT_SECONDS_MAX = 60
 
 
-def _parse_expires_in(raw_expires_in: Any) -> int:
-    """Parse and validate token expiration time.
+def _is_ascii_digits(s: str) -> bool:
+    """Check if string contains only ASCII digits 0-9 (rejects Unicode digits)."""
+    return bool(s) and all(c in '0123456789' for c in s)
 
-    Validates against min/max bounds and logs warnings for suspicious values
-    that may indicate misconfiguration or API changes.
+
+def _parse_expires_in(raw_expires_in: Any) -> int:
+    """Parse expires_in from OAuth response, returning bounded value or default.
+
+    Bounds: EXPIRES_IN_MIN_SECONDS (60) to EXPIRES_IN_MAX_SECONDS (30 days).
+    Floats are bounds-checked before conversion to prevent overflow.
     """
     if raw_expires_in is None or isinstance(raw_expires_in, bool):
         return EXPIRES_IN_DEFAULT_SECONDS
@@ -73,10 +81,17 @@ def _parse_expires_in(raw_expires_in: Any) -> int:
     try:
         if isinstance(raw_expires_in, str):
             candidate = raw_expires_in.strip()
-            if not candidate.isdigit():
+            if not _is_ascii_digits(candidate):
                 raise ValueError("Invalid expires_in format")
             value = int(candidate)
         elif isinstance(raw_expires_in, float):
+            # Check bounds BEFORE conversion to prevent overflow with large floats (e.g., 1e9)
+            if raw_expires_in > EXPIRES_IN_MAX_SECONDS or raw_expires_in < EXPIRES_IN_MIN_SECONDS:
+                logger.warning(
+                    f"Float expires_in {raw_expires_in} outside valid range, using default. "
+                    f"This may indicate an API change or malformed response."
+                )
+                return EXPIRES_IN_DEFAULT_SECONDS
             if not raw_expires_in.is_integer():
                 raise ValueError("Non-integer expires_in value")
             value = int(raw_expires_in)
@@ -109,81 +124,6 @@ def _get_linear_lock_timeout_seconds() -> int:
         return LINEAR_LOCK_TIMEOUT_SECONDS_DEFAULT
 
     return max(LINEAR_LOCK_TIMEOUT_SECONDS_MIN, min(timeout_seconds, LINEAR_LOCK_TIMEOUT_SECONDS_MAX))
-
-
-# Module-level cache for validation results
-# Format: {user_id: {"results": {...}, "timestamp": datetime}}
-# Note: In production with multiple replicas, consider migrating to Redis
-# (already used for rate limiting in backend/app/core/rate_limiting.py)
-_validation_cache: Dict[int, Dict] = {}
-_cache_lock = threading.RLock()
-
-# Cache validation results for 5 minutes to avoid redundant API calls
-VALIDATION_CACHE_TTL_SECONDS = 300
-
-# Maximum number of users to cache (prevents unbounded memory growth)
-MAX_CACHE_SIZE = 1000
-
-
-def get_cached_validation(user_id: int) -> Optional[Dict[str, Dict[str, Any]]]:
-    """Get cached validation results if still fresh. Thread-safe."""
-    with _cache_lock:
-        if user_id not in _validation_cache:
-            return None
-
-        cached = _validation_cache[user_id]
-        cache_age = (datetime.now(dt_timezone.utc) - cached["timestamp"]).total_seconds()
-
-        if cache_age < VALIDATION_CACHE_TTL_SECONDS:
-            logger.info(f"Using cached validation results for user {user_id} (age: {cache_age:.1f}s)")
-            return cached["results"]
-
-        # Cache expired, remove it
-        del _validation_cache[user_id]
-        return None
-
-
-def set_validation_cache(user_id: int, results: Dict[str, Dict[str, Any]]):
-    """Cache validation results. Thread-safe with size limit."""
-    with _cache_lock:
-        # Evict oldest entries if cache is full
-        if len(_validation_cache) >= MAX_CACHE_SIZE and user_id not in _validation_cache:
-            _evict_oldest_entries()
-
-        _validation_cache[user_id] = {
-            "results": results,
-            "timestamp": datetime.now(dt_timezone.utc)
-        }
-
-
-def _evict_oldest_entries():
-    """Remove oldest 10% of cache entries. Must be called with lock held.
-
-    Uses heapq.nsmallest for O(n) performance instead of O(n log n) sorting.
-    """
-    if not _validation_cache:
-        return
-
-    entries_to_remove = max(1, len(_validation_cache) // 10)
-    # heapq.nsmallest is O(n) for small k, more efficient than full sort
-    oldest_entries = heapq.nsmallest(
-        entries_to_remove,
-        _validation_cache.items(),
-        key=lambda x: x[1]["timestamp"]
-    )
-
-    for user_id, _ in oldest_entries:
-        del _validation_cache[user_id]
-
-    logger.info(f"Evicted {entries_to_remove} oldest cache entries")
-
-
-def invalidate_validation_cache(user_id: int):
-    """Invalidate cache for a user (e.g., when integration is added/removed). Thread-safe."""
-    with _cache_lock:
-        if user_id in _validation_cache:
-            del _validation_cache[user_id]
-            logger.info(f"Invalidated validation cache for user {user_id}")
 
 
 class IntegrationValidator:
@@ -230,7 +170,7 @@ class IntegrationValidator:
                 results[name] = result
 
         # Cache the results
-        set_validation_cache(user_id, results)
+        set_cached_validation(user_id, results)
 
         return results
 
@@ -303,19 +243,16 @@ class IntegrationValidator:
         # Proceed with refresh: token_needs_refresh=True, has_refresh_token=True
         logger.info(f"[Linear] Token refresh initiated for user {integration.user_id}")
 
-        # Track transaction state to avoid rollback on non-existent transaction
-        transaction_started = False
         try:
             lock_timeout_seconds = _get_linear_lock_timeout_seconds()
 
             refreshed_token = None
             token_to_return = None
-            in_transaction = self.db.in_transaction()
-            transaction = self.db.begin_nested() if in_transaction else self.db.begin()
-            transaction_started = True
 
-            with transaction:
-                # Set explicit lock timeout scoped to this transaction (PostgreSQL)
+            # begin_nested() creates a savepoint (or starts transaction if needed)
+            with self.db.begin_nested():
+                # SET LOCAL is transaction-scoped, resets after commit/rollback
+                # https://www.postgresql.org/docs/current/sql-set.html
                 self.db.execute(
                     text("SET LOCAL lock_timeout = :lock_timeout"),
                     {"lock_timeout": f"{lock_timeout_seconds}s"}
@@ -329,9 +266,7 @@ class IntegrationValidator:
                 if not locked_integration:
                     raise ValueError("Authentication error. Please reconnect Linear.")
 
-                # Double-check pattern: use locked row's expiry (not original) since another
-                # request may have refreshed the token while we waited for the lock.
-                # This is the authoritative state after acquiring the row lock.
+                # Double-check: another request may have refreshed while we waited for lock
                 locked_token_expires_at = locked_integration.token_expires_at
                 if not needs_refresh(locked_token_expires_at):
                     logger.info(f"[Linear] Token already refreshed for user {integration.user_id}")
@@ -383,23 +318,23 @@ class IntegrationValidator:
             return token_to_return
 
         except OperationalError as db_error:
-            # Database lock timeout or deadlock - this is typically transient
-            # Note: Log includes user_id for debugging; error message is generic for security
+            # Lock timeout or deadlock - transient error, retry should succeed
+            error_type = "lock_timeout" if "lock" in str(db_error).lower() else "db_error"
             logger.warning(
-                f"[Linear] Database contention for user {integration.user_id} "
-                f"(lock_timeout or deadlock - transient, retry should succeed)"
+                f"[Linear] Database contention during token refresh: "
+                f"user_id={integration.user_id}, error_type={error_type}, "
+                f"lock_timeout_setting={lock_timeout_seconds}s"
             )
-            logger.debug(f"[Linear] Database error details: {db_error}")
-            if transaction_started:
-                self._safe_rollback(db_error)
-            # Re-raise as a retryable error type to preserve exception chain
+            logger.debug(f"[Linear] Full database error: {db_error}", exc_info=True)
+            self._safe_rollback(db_error)
             raise RuntimeError("Temporary error. Please retry.") from db_error
 
         except Exception as e:
-            # Note: Log includes user context for debugging; error propagates without user info for security
-            logger.warning(f"[Linear] Token refresh failed: {e}")
-            if transaction_started:
-                self._safe_rollback(e)
+            logger.warning(
+                f"[Linear] Token refresh failed: user_id={integration.user_id}, "
+                f"error_type={type(e).__name__}, message={e}"
+            )
+            self._safe_rollback(e)
             raise
 
     def _safe_rollback(self, original_error: Optional[BaseException] = None):

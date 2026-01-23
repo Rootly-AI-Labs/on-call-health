@@ -16,7 +16,7 @@ import { NotificationDrawer } from "@/components/notifications"
 import { AccountSettingsDialog } from "@/components/AccountSettingsDialog"
 import { TeamManagementDialog } from "@/components/TeamManagementDialog"
 import { useGettingStarted } from "@/contexts/GettingStartedContext"
-import { LogOut, BookOpen, HelpCircle, Settings, Users } from "lucide-react"
+import { LogOut, BookOpen, HelpCircle, Settings, Users, FileText, MessageSquareMore } from "lucide-react"
 
 interface UserInfo {
   name: string
@@ -35,15 +35,26 @@ export function TopPanel() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
 
   useEffect(() => {
+    const authToken = localStorage.getItem("auth_token")
     const userName = localStorage.getItem("user_name")
     const userEmail = localStorage.getItem("user_email")
     const userRole = localStorage.getItem("user_role")
-    if (userName && userEmail) setUserInfo({ name: userName, email: userEmail, role: userRole || undefined })
+    // Require auth_token to exist along with user details.
+    // Note: True token validation (signature, expiration) happens on the backend.
+    // This check prevents unnecessary UI rendering when there's clearly no session.
+    // Invalid tokens will result in 401 errors that redirect to login.
+    if (authToken && userName && userEmail) {
+      setUserInfo({ name: userName, email: userEmail, role: userRole || undefined })
+    }
   }, [])
 
   const handleSignOut = () => {
-    // Clear auth token and redirect
+    // Clear all auth-related data and redirect
     localStorage.removeItem("auth_token")
+    localStorage.removeItem("user_name")
+    localStorage.removeItem("user_email")
+    localStorage.removeItem("user_role")
+    setUserInfo(null)
     router.push("/")
   }
 
@@ -107,10 +118,20 @@ export function TopPanel() {
             </nav>
           </div>
 
-          {/* Right: notifications + user */}
+          {/* Right: feedback + notifications + user (only shown when authenticated) */}
           <div className="flex items-center gap-3">
-            <NotificationDrawer />
             {userInfo && (
+              <>
+                <a
+                  href="https://github.com/Rootly-AI-Labs/On-Call-Health/issues/new"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-purple-700 bg-purple-100 hover:bg-purple-200 rounded-lg transition-colors"
+                >
+                  <MessageSquareMore className="w-4 h-4" />
+                  <span className="hidden sm:inline">Feedback</span>
+                </a>
+                <NotificationDrawer />
               <DropdownMenu open={isDropdownOpen} onOpenChange={(open) => {
                 setIsDropdownOpen(open)
                 // Close dropdown when dialog opens
@@ -160,6 +181,13 @@ export function TopPanel() {
                     Methodology
                   </DropdownMenuItem>
                   <DropdownMenuItem
+                    onClick={() => router.push("/disclaimer")}
+                    className="cursor-pointer focus:bg-purple-200 focus:text-purple-900"
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    Disclaimer
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
                     onClick={() => {
                       setShowAccountSettings(true)
                       setIsDropdownOpen(false)
@@ -195,6 +223,7 @@ export function TopPanel() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              </>
             )}
           </div>
         </div>

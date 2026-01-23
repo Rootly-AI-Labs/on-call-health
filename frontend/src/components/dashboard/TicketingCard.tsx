@@ -264,8 +264,8 @@ function JiraTicketCard({ memberData }: TicketingCardProps): React.ReactElement 
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <span className="text-blue-600">*</span> Jira Workload
+          <CardTitle>
+            Jira Workload
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -288,8 +288,8 @@ function JiraTicketCard({ memberData }: TicketingCardProps): React.ReactElement 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <span className="text-blue-600">●</span> Jira Workload
+        <CardTitle>
+          Jira Workload
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
