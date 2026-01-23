@@ -387,8 +387,8 @@ async def list_analyses(
     # This avoids two separate database round-trips (COUNT + SELECT)
     fetch_start = time.time()
 
-    # Subquery with window function for total count
-    count_subq = func.count(Analysis.id).over().label('total_count')
+    # Window function for total count across all matching rows
+    count_window = func.count(Analysis.id).over().label('total_count')
 
     # Single query: get rows + total count in one database round-trip
     # Excludes heavy 'results' column (can be 30MB+) - not needed for list view
@@ -403,7 +403,7 @@ async def list_analyses(
         Analysis.integration_name,
         Analysis.platform,
         Analysis.rootly_integration_id,
-        count_subq
+        count_window
     ).filter(
         *filters
     ).order_by(
