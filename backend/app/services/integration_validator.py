@@ -42,8 +42,7 @@ class IntegrationValidator:
 
     async def validate_all_integrations(
         self,
-        user_id: int,
-        integration_id: int
+        user_id: int
     ) -> Dict[str, Dict[str, any]]:
         """
         Validate all enabled integrations for a user.
