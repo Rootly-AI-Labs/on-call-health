@@ -30,7 +30,7 @@ export function IntegrationsHeader({
                 Manage Integrations
               </h1>
               <p className="text-sm text-neutral-500">
-                Connect your tools to track team burnout
+                Connect your tools to track team health
               </p>
             </div>
           </div>

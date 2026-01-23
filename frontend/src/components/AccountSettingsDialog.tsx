@@ -215,7 +215,7 @@ export function AccountSettingsDialog({
                       This will permanently delete:
                     </p>
                     <ul className="text-sm text-amber-800 space-y-1 ml-4 list-disc">
-                      <li>All burnout analyses and insights</li>
+                      <li>All health analyses and insights</li>
                       <li>Integration connections (Rootly, PagerDuty, GitHub, Slack, Jira)</li>
                       <li>Team member mappings</li>
                       <li>Account credentials</li>

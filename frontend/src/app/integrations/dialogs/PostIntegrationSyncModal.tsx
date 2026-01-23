@@ -10,20 +10,20 @@ interface PostIntegrationSyncModalProps {
 
 const integrationContent = {
   github: {
-    title: "GitHub Connected Successfully!",
-    message: "Your GitHub integration is now connected. To enable GitHub data in your burnout analyses, you'll need to sync your team members."
+    title: "Sync your team members",
+    message: "We need to match GitHub users with your existing team to include their data in your analyses."
   },
   slack: {
-    title: "Slack Connected Successfully!",
-    message: "Your Slack integration is now connected. To enable Slack data in your burnout analyses, you'll need to sync your team members."
+    title: "Sync your team members",
+    message: "We need to match Slack users with your existing team to include their data in your analyses."
   },
   jira: {
-    title: "Jira Connected Successfully!",
-    message: "Your Jira integration is now connected. To enable Jira data in your burnout analyses, you'll need to sync your team members."
+    title: "Sync your team members",
+    message: "We need to match Jira users with your existing team to include their data in your analyses."
   },
   linear: {
-    title: "Sync up your team members",
-    message: "We need to match Linear users with your existing user base"
+    title: "Sync your team members",
+    message: "We need to match Linear users with your existing team to include their data in your analyses."
   }
 }
 

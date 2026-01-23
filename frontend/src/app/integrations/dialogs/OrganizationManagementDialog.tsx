@@ -82,7 +82,7 @@ export function OrganizationManagementDialog({
             </div>
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-neutral-900 min-w-[80px]">Member</span>
-              <span className="text-neutral-700">Can view team burnout data, run analyses, and send surveys</span>
+              <span className="text-neutral-700">Can view team health data, run analyses, and send surveys</span>
             </div>
           </div>
         </div>

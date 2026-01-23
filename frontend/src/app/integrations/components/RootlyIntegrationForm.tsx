@@ -220,7 +220,7 @@ export function RootlyIntegrationForm({
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>
                       <p className="font-semibold mb-2">❌ Missing required permissions</p>
-                      <p className="text-sm mb-2">This token does not have the required permissions to analyze burnout data.</p>
+                      <p className="text-sm mb-2">This token does not have the required permissions to analyze health data.</p>
                       <div className="mt-2 text-sm space-y-1">
                         <p className="font-medium">Required permissions:</p>
                         {!previewData.permissions?.users?.access && (

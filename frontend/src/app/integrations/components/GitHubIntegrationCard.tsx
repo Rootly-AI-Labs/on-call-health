@@ -70,7 +70,7 @@ export function GitHubIntegrationCard({ onConnect, isConnecting }: GitHubIntegra
                       <h4 className="font-medium text-neutral-900 mb-2"><strong>Step 2:</strong> Generate New Token</h4>
                       <p className="text-sm text-neutral-700 mb-2">Click <strong>"Generate new token (classic)"</strong> and configure:</p>
                       <ul className="text-sm text-neutral-700 space-y-1 ml-4">
-                        <li>• <strong>Note:</strong> Give it a descriptive name (e.g., "Burnout Detector")</li>
+                        <li>• <strong>Note:</strong> Give it a descriptive name (e.g., "On-Call Health")</li>
                         <li>• <strong>Expiration:</strong> Set an appropriate expiration date</li>
                       </ul>
                     </div>
