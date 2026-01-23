@@ -78,7 +78,7 @@ class WorkloadAnalyzerTool(BaseTool):
         # Log detailed workload analysis results
         intensity_score = intensity_metrics.get('overall_intensity', 0)
         incident_count = len(user_data.get('incidents', []))
-        logger.info(f"Workload Analysis Complete - Status: {workload_status}, Intensity: {intensity_score:.2f}, Incidents: {incident_count}, Sustainability indicators: {len(sustainability_indicators)}")
+        logger.debug(f"Workload Analysis Complete - Status: {workload_status}, Intensity: {intensity_score:.2f}, Incidents: {incident_count}, Sustainability indicators: {len(sustainability_indicators)}")
         
         return {
             "workload_status": workload_status,
