@@ -3,6 +3,7 @@ Rate limiting configuration and middleware for API security.
 """
 import redis
 from typing import Optional
+from urllib.parse import urlparse, urlunparse
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -12,6 +13,9 @@ import os
 import logging
 
 logger = logging.getLogger(__name__)
+
+# Redis database for rate limiting (separate from main app data)
+RATE_LIMIT_REDIS_DB = 1
 
 # Rate limiting configuration
 RATE_LIMITS = {
@@ -44,35 +48,61 @@ RATE_LIMITS = {
     "api_heavy": "100/minute",           # Heavy operations
 }
 
-def get_redis_client() -> Optional[redis.Redis]:
-    """Get Redis client for rate limiting storage."""
+def _ensure_redis_db(url: str, db: int = RATE_LIMIT_REDIS_DB) -> str:
+    """
+    Ensure the Redis URL uses the specified database number.
+    Parses the URL and replaces the path with the desired database.
+    """
+    parsed = urlparse(url)
+    # Replace path with the database number (e.g., /1)
+    new_path = f"/{db}"
+    return urlunparse((
+        parsed.scheme,
+        parsed.netloc,
+        new_path,
+        parsed.params,
+        parsed.query,
+        parsed.fragment
+    ))
+
+
+def get_redis_storage_uri() -> Optional[str]:
+    """
+    Get Redis storage URI for rate limiting.
+    Returns URI with database 1 to separate rate limiting data from app data.
+    Returns None if Redis is not configured.
+    """
+    redis_url = os.getenv("REDIS_URL")
+    if redis_url:
+        # Ensure we use database 1 for rate limiting
+        return _ensure_redis_db(redis_url, RATE_LIMIT_REDIS_DB)
+
+    # Fallback to REDIS_HOST/REDIS_PORT
+    redis_host = os.getenv("REDIS_HOST")
+    if redis_host:
+        try:
+            redis_port = int(os.getenv("REDIS_PORT", "6379"))
+        except ValueError:
+            logger.warning("Invalid REDIS_PORT value, using default 6379")
+            redis_port = 6379
+        return f"redis://{redis_host}:{redis_port}/{RATE_LIMIT_REDIS_DB}"
+
+    return None
+
+
+def test_redis_connection(storage_uri: str) -> bool:
+    """Test if Redis is reachable at the given URI."""
+    client = None
     try:
-        redis_url = os.getenv("REDIS_URL")
-        if redis_url:
-            return redis.from_url(redis_url)
-        
-        # Fallback to localhost Redis
-        redis_host = os.getenv("REDIS_HOST", "localhost")
-        redis_port = int(os.getenv("REDIS_PORT", "6379"))
-        redis_db = int(os.getenv("REDIS_DB", "1"))  # Use DB 1 for rate limiting
-        
-        client = redis.Redis(
-            host=redis_host,
-            port=redis_port,
-            db=redis_db,
-            decode_responses=True,
-            socket_timeout=5.0,
-            socket_connect_timeout=5.0
-        )
-        
-        # Test connection
+        client = redis.from_url(storage_uri, socket_timeout=5.0, socket_connect_timeout=5.0)
         client.ping()
-        logger.info(f"✅ Connected to Redis for rate limiting: {redis_host}:{redis_port}")
-        return client
-        
+        return True
     except Exception as e:
-        logger.warning(f"⚠️  Redis not available for rate limiting, using in-memory: {e}")
-        return None
+        logger.warning(f"⚠️  Redis not available for rate limiting: {e}")
+        return False
+    finally:
+        if client:
+            client.close()
 
 def get_rate_limit_key(request: Request) -> str:
     """
@@ -107,17 +137,15 @@ def get_rate_limit_key(request: Request) -> str:
         return "unknown"
 
 # Initialize rate limiter
-redis_client = get_redis_client()
+_redis_storage_uri = get_redis_storage_uri()
 
-if redis_client:
+if _redis_storage_uri and test_redis_connection(_redis_storage_uri):
     # Use Redis for distributed rate limiting (production)
-    redis_host = os.getenv("REDIS_HOST", "localhost")
-    redis_port = os.getenv("REDIS_PORT", "6379")
     limiter = Limiter(
         key_func=get_rate_limit_key,
-        storage_uri=f"redis://{redis_host}:{redis_port}/1"
+        storage_uri=_redis_storage_uri
     )
-    logger.info(f"✅ Rate limiting using Redis storage: {redis_host}:{redis_port}")
+    logger.info(f"✅ Rate limiting using Redis storage (db={RATE_LIMIT_REDIS_DB})")
 else:
     # Use in-memory storage (development/fallback)
     limiter = Limiter(key_func=get_rate_limit_key)
