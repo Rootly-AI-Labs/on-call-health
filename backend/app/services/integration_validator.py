@@ -276,6 +276,8 @@ class IntegrationValidator:
         if not integration.access_token:
             raise ValueError("No access token available for Linear integration")
 
+        self.db.refresh(integration)
+
         # Determine if refresh is needed and possible in a single logical block
         token_needs_refresh = needs_refresh(integration.token_expires_at)
         has_refresh_token = bool(integration.refresh_token)
@@ -335,13 +337,13 @@ class IntegrationValidator:
                         )
 
                     if response.status_code != 200:
-                        logger.warning(f"[Linear] Authentication issue for user {integration.user_id}")
+                        logger.warning(f"[Linear] Token refresh failed for user {integration.user_id}")
                         raise ValueError("Authentication error. Please reconnect Linear.")
 
                     token_data = response.json()
                     new_access_token = token_data.get("access_token")
                     if not new_access_token:
-                        logger.warning(f"[Linear] Authentication issue for user {integration.user_id}")
+                        logger.warning(f"[Linear] Token refresh failed for user {integration.user_id}")
                         raise ValueError("Authentication error. Please reconnect Linear.")
 
                     # Update the locked integration with new tokens
@@ -373,21 +375,22 @@ class IntegrationValidator:
                 f"(lock_timeout or deadlock - transient, retry should succeed)"
             )
             logger.debug(f"[Linear] Database error details: {db_error}")
-            self._safe_rollback()
+            self._safe_rollback(db_error)
             # Re-raise as a retryable error type to preserve exception chain
             raise RuntimeError("Temporary error. Please retry.") from db_error
 
         except Exception as e:
             logger.warning(f"[Linear] Token refresh failed: {e}")
-            self._safe_rollback()
+            self._safe_rollback(e)
             raise
 
-    def _safe_rollback(self):
+    def _safe_rollback(self, original_error: Optional[BaseException] = None):
         """Safely rollback a transaction, handling potential rollback failures."""
         try:
             self.db.rollback()
         except Exception as rollback_error:
-            logger.error(f"Failed to rollback transaction: {rollback_error}")
+            context = f" after {original_error}" if original_error else ""
+            logger.error(f"Failed to rollback transaction{context}: {rollback_error}", exc_info=True)
 
     async def _validate_linear(self, user_id: int) -> Optional[Dict[str, Any]]:
         """
