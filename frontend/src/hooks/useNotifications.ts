@@ -15,12 +15,12 @@ export function useNotifications() {
   const [unreadCount, setUnreadCount] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
   const [hasMore, setHasMore] = useState(true)
-  const [offset, setOffset] = useState(0)
   const [invitationModalId, setInvitationModalId] = useState<number | null>(null)
   const { toast } = useToast()
   const pathname = usePathname()
   const previousPathnameRef = useRef<string | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
+  const offsetRef = useRef(0)
 
   const fetchNotifications = useCallback(async (loadMore = false) => {
     // Cancel any in-flight request
@@ -29,7 +29,7 @@ export function useNotifications() {
 
     try {
       setIsLoading(true)
-      const currentOffset = loadMore ? offset : 0
+      const currentOffset = loadMore ? offsetRef.current : 0
       const response = await fetch(`${API_BASE}/api/notifications/?limit=${LIMIT}&offset=${currentOffset}`, {
         credentials: 'include',
         headers: {
@@ -44,11 +44,11 @@ export function useNotifications() {
           setNotifications(prev => [...prev, ...data.notifications])
         } else {
           setNotifications(data.notifications)
-          setOffset(0)
+          offsetRef.current = 0
         }
         setUnreadCount(data.unread_count)
         setHasMore(data.has_more || false)
-        setOffset(currentOffset + data.notifications.length)
+        offsetRef.current = currentOffset + data.notifications.length
       }
       // Silently fail on non-ok responses - notifications are not critical
     } catch (error) {
@@ -59,7 +59,7 @@ export function useNotifications() {
     } finally {
       setIsLoading(false)
     }
-  }, [offset])
+  }, [])
 
   async function loadMoreNotifications(): Promise<void> {
     if (!isLoading && hasMore) {
