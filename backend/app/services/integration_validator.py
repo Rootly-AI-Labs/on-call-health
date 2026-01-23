@@ -216,16 +216,36 @@ class IntegrationValidator:
             return self._error_response("Unexpected error validating GitHub. Please try again later.")
 
     async def _get_valid_linear_token(self, integration: LinearIntegration) -> str:
-        """Get a valid Linear access token, refreshing if necessary."""
+        """Get a valid Linear access token, refreshing if necessary.
+
+        Uses database row locking to prevent race conditions when multiple
+        concurrent requests try to refresh the token simultaneously.
+        """
         if not integration.access_token:
             raise ValueError("No access token available for Linear integration")
 
         if not needs_refresh(integration.token_expires_at) or not integration.refresh_token:
             return decrypt_token(integration.access_token)
 
-        logger.info(f"[Linear] Refreshing access token for user {integration.user_id}")
+        # Token needs refresh - acquire row lock to prevent race condition
+        logger.info(f"[Linear] Token needs refresh for user {integration.user_id}, acquiring lock")
+
         try:
-            refresh_token = decrypt_token(integration.refresh_token)
+            # Re-query with FOR UPDATE to lock the row
+            locked_integration = self.db.query(LinearIntegration).filter(
+                LinearIntegration.id == integration.id
+            ).with_for_update().first()
+
+            if not locked_integration:
+                raise ValueError("Linear integration not found during refresh")
+
+            # Double-check: another request may have refreshed while we waited for lock
+            if not needs_refresh(locked_integration.token_expires_at):
+                logger.info(f"[Linear] Token already refreshed by another request for user {integration.user_id}")
+                return decrypt_token(locked_integration.access_token)
+
+            logger.info(f"[Linear] Refreshing access token for user {integration.user_id}")
+            refresh_token = decrypt_token(locked_integration.refresh_token)
 
             async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.post(
@@ -240,17 +260,17 @@ class IntegrationValidator:
 
             if response.status_code != 200:
                 logger.warning(f"[Linear] Token refresh failed with status {response.status_code}")
-                # Always raise error on refresh failure - if we needed to refresh,
-                # the token is expiring soon and silently returning it delays the problem
+                self.db.rollback()
                 raise ValueError(f"Token refresh failed with status {response.status_code}")
 
             token_data = response.json()
             new_access_token = token_data.get("access_token")
             if not new_access_token:
                 logger.warning("[Linear] Token refresh response missing access_token")
+                self.db.rollback()
                 raise ValueError("Token refresh response missing access_token")
 
-            # Update the integration with new tokens
+            # Update the locked integration with new tokens
             new_refresh_token = token_data.get("refresh_token") or refresh_token
             # Validate expires_in to prevent datetime overflow (1 min to 30 days)
             try:
@@ -261,10 +281,10 @@ class IntegrationValidator:
                 logger.warning(f"[Linear] Invalid expires_in value: {token_data.get('expires_in')}, using default")
                 expires_in = 86400
 
-            integration.access_token = encrypt_token(new_access_token)
-            integration.refresh_token = encrypt_token(new_refresh_token)
-            integration.token_expires_at = datetime.now(dt_timezone.utc) + timedelta(seconds=expires_in)
-            integration.updated_at = datetime.now(dt_timezone.utc)
+            locked_integration.access_token = encrypt_token(new_access_token)
+            locked_integration.refresh_token = encrypt_token(new_refresh_token)
+            locked_integration.token_expires_at = datetime.now(dt_timezone.utc) + timedelta(seconds=expires_in)
+            locked_integration.updated_at = datetime.now(dt_timezone.utc)
             self.db.commit()
 
             logger.info(f"[Linear] Token refreshed successfully for user {integration.user_id}")
@@ -272,8 +292,7 @@ class IntegrationValidator:
 
         except Exception as e:
             logger.warning(f"[Linear] Token refresh failed: {e}")
-            # Always re-raise on refresh failure - if we needed to refresh,
-            # the token is expiring soon and silently returning it delays the problem
+            self.db.rollback()
             raise
 
     async def _validate_linear(self, user_id: int) -> Optional[Dict[str, Any]]:

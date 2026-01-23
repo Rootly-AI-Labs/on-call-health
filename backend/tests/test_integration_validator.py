@@ -406,14 +406,24 @@ class TestLinearTokenRefresh(unittest.TestCase):
     @patch('app.services.integration_validator.encrypt_token')
     @patch('app.services.integration_validator.decrypt_token')
     def test_get_valid_linear_token_refresh_success(self, mock_decrypt, mock_encrypt):
-        """Test successful token refresh."""
+        """Test successful token refresh with row locking."""
         mock_integration = Mock(spec=LinearIntegration)
+        mock_integration.id = 1
         mock_integration.user_id = 1
         mock_integration.access_token = "old_encrypted_token"
         mock_integration.token_expires_at = datetime.now(dt_timezone.utc) - timedelta(minutes=10)
         mock_integration.refresh_token = "encrypted_refresh"
         mock_decrypt.return_value = "refresh_token_value"
         mock_encrypt.return_value = "new_encrypted_token"
+
+        # Mock the FOR UPDATE query chain - returns same integration (still needs refresh)
+        mock_query = Mock()
+        mock_filter = Mock()
+        mock_with_for_update = Mock()
+        mock_with_for_update.first.return_value = mock_integration
+        mock_filter.with_for_update.return_value = mock_with_for_update
+        mock_query.filter.return_value = mock_filter
+        self.mock_db.query.return_value = mock_query
 
         with patch('httpx.AsyncClient') as mock_client:
             mock_response = Mock()
@@ -447,11 +457,21 @@ class TestLinearTokenRefresh(unittest.TestCase):
     def test_get_valid_linear_token_refresh_fails(self, mock_decrypt):
         """Test that refresh failure always raises exception."""
         mock_integration = Mock(spec=LinearIntegration)
+        mock_integration.id = 1
         mock_integration.user_id = 1
         mock_integration.access_token = "old_encrypted_token"
         mock_integration.token_expires_at = datetime.now(dt_timezone.utc) + timedelta(minutes=30)
         mock_integration.refresh_token = "encrypted_refresh"
         mock_decrypt.return_value = "refresh_token_value"
+
+        # Mock the FOR UPDATE query chain
+        mock_query = Mock()
+        mock_filter = Mock()
+        mock_with_for_update = Mock()
+        mock_with_for_update.first.return_value = mock_integration
+        mock_filter.with_for_update.return_value = mock_with_for_update
+        mock_query.filter.return_value = mock_filter
+        self.mock_db.query.return_value = mock_query
 
         with patch('httpx.AsyncClient') as mock_client:
             mock_response = Mock()
@@ -462,6 +482,44 @@ class TestLinearTokenRefresh(unittest.TestCase):
                 self._run_async(self.validator._get_valid_linear_token(mock_integration))
 
         self.assertIn("refresh failed", str(context.exception).lower())
+        self.mock_db.rollback.assert_called()
+
+    @patch('app.services.integration_validator.decrypt_token')
+    def test_get_valid_linear_token_already_refreshed_by_another_request(self, mock_decrypt):
+        """Test that double-check pattern works - skip refresh if already done."""
+        mock_integration = Mock(spec=LinearIntegration)
+        mock_integration.id = 1
+        mock_integration.user_id = 1
+        mock_integration.access_token = "old_encrypted_token"
+        # Token needs refresh based on initial check
+        mock_integration.token_expires_at = datetime.now(dt_timezone.utc) + timedelta(minutes=30)
+        mock_integration.refresh_token = "encrypted_refresh"
+
+        # But after acquiring lock, another request already refreshed it
+        locked_integration = Mock(spec=LinearIntegration)
+        locked_integration.access_token = "already_refreshed_token"
+        # Token is now fresh (far future expiry)
+        locked_integration.token_expires_at = datetime.now(dt_timezone.utc) + timedelta(hours=12)
+
+        mock_decrypt.return_value = "already_refreshed_decrypted"
+
+        # Mock the FOR UPDATE query chain
+        mock_query = Mock()
+        mock_filter = Mock()
+        mock_with_for_update = Mock()
+        mock_with_for_update.first.return_value = locked_integration
+        mock_filter.with_for_update.return_value = mock_with_for_update
+        mock_query.filter.return_value = mock_filter
+        self.mock_db.query.return_value = mock_query
+
+        # Should return the already-refreshed token without calling Linear API
+        with patch('httpx.AsyncClient') as mock_client:
+            token = self._run_async(self.validator._get_valid_linear_token(mock_integration))
+
+            # HTTP client should NOT have been called since token was already refreshed
+            mock_client.return_value.__aenter__.return_value.post.assert_not_called()
+
+        self.assertEqual(token, "already_refreshed_decrypted")
 
     def test_get_valid_linear_token_no_access_token(self):
         """Test that missing access_token raises ValueError."""
