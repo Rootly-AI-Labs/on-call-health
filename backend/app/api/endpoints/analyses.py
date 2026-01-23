@@ -4,11 +4,13 @@ Burnout analysis API endpoints.
 import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Union
+from uuid import uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel
 from sqlalchemy import func, over
 from sqlalchemy.orm import Session, load_only
+from sqlalchemy.exc import OperationalError
 
 from ...models import get_db, User, Analysis, RootlyIntegration, SlackIntegration, GitHubIntegration, JiraIntegration, LinearIntegration, UserCorrelation
 from ...auth.dependencies import get_current_active_user
@@ -2681,22 +2683,43 @@ async def run_analysis_task(
     
     # Get a fresh database session for the background task
     from ...models import SessionLocal
+
+    # Short ID to identify which worker/replica is processing this analysis in logs
+    node_id = str(uuid4())[:8]
+
     db = SessionLocal()
-    
+
     try:
         # Log database connection info
-        logger.info(f"BACKGROUND_TASK: Got new database session for analysis {analysis_ref}")
-        
-        # Update status to running
-        analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
+        logger.info(f"BACKGROUND_TASK [{node_id}]: Got new database session for analysis {analysis_ref}")
+
+        # Row-level locking prevents duplicate execution across replicas
+        try:
+            analysis = db.query(Analysis).filter(
+                Analysis.id == analysis_id
+            ).with_for_update(nowait=True).first()
+        except OperationalError as e:
+            error_msg = str(e).lower()
+            if "could not obtain lock" in error_msg or "lock not available" in error_msg:
+                logger.info(f"BACKGROUND_TASK [{node_id}]: Analysis {analysis_ref} locked by another worker, skipping")
+                db.rollback()
+                return
+            logger.error(f"BACKGROUND_TASK [{node_id}]: Database error for analysis {analysis_ref}: {e}")
+            raise
+
         if not analysis:
-            logger.error(f"BACKGROUND_TASK: Analysis {analysis_ref} not found in database")
+            logger.error(f"BACKGROUND_TASK [{node_id}]: Analysis {analysis_ref} not found in database")
             # Try to debug what analyses exist
             all_analyses = db.query(Analysis.id).order_by(Analysis.id.desc()).limit(5).all()
-            logger.error(f"BACKGROUND_TASK: Recent analysis IDs in database: {[a.id for a in all_analyses]}")
+            logger.error(f"BACKGROUND_TASK [{node_id}]: Recent analysis IDs in database: {[a.id for a in all_analyses]}")
             return  # Analysis doesn't exist
-            
-        logger.info(f"BACKGROUND_TASK: Setting analysis {analysis_ref} to running status")
+
+        # Skip if another worker already claimed this analysis
+        if analysis.status != "pending":
+            logger.info(f"BACKGROUND_TASK [{node_id}]: Analysis {analysis_ref} status is '{analysis.status}', skipping")
+            return
+
+        logger.info(f"BACKGROUND_TASK [{node_id}]: Setting analysis {analysis_ref} to running status")
         analysis.status = "running"
         db.commit()
         
