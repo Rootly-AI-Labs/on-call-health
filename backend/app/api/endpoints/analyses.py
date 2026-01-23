@@ -3007,17 +3007,22 @@ async def run_analysis_task(
                 logger.error(f"❌ Analysis {analysis_ref} failed: {str(analyze_error)}")
                 raise
 
+            logger.info(f"🔍 DEBUG: Post-analysis checkpoint - results type: {type(results)}, has results: {results is not None}")
+
             # Check if analysis was deleted during execution
+            logger.info(f"🔍 DEBUG: Checking if analysis {analysis_ref} still exists in DB")
             analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
             if not analysis:
                 logger.info(f"BACKGROUND_TASK: Analysis {analysis_ref} was deleted during execution, stopping")
                 return
-            
+
+            logger.info(f"🔍 DEBUG: Analysis {analysis_ref} found in DB, validating results")
+
             # Validate results
             if not results:
                 logger.warning(f"BACKGROUND_TASK: Analysis {analysis_ref} returned empty results")
                 results = {"error": "Analysis completed but returned empty results"}
-            
+
             logger.info(f"BACKGROUND_TASK: Analysis {analysis_ref} completed successfully with {len(str(results))} characters of results")
             
             # A/B Testing: Log comparative metrics for monitoring
@@ -3041,7 +3046,9 @@ async def run_analysis_task(
                     
             except Exception as monitoring_error:
                 logger.warning(f"A/B testing monitoring failed: {monitoring_error}")
-            
+
+            logger.info(f"🔍 DEBUG: About to save results for analysis {analysis_ref}")
+
             # Update analysis with results
             logger.info(f"💾 Analysis {analysis_ref}: Saving results to database")
             analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
@@ -3076,6 +3083,7 @@ async def run_analysis_task(
         except Exception as analysis_error:
             # Handle analysis-specific errors
             logger.error(f"BACKGROUND_TASK: Analysis {analysis_ref} failed: {analysis_error}")
+            logger.error(f"🔍 DEBUG: Exception type: {type(analysis_error).__name__}, traceback:", exc_info=True)
 
             analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
             if not analysis:
