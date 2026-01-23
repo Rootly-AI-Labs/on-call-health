@@ -10,6 +10,7 @@ import threading
 from datetime import datetime, timedelta, timezone as dt_timezone
 from typing import Any, Dict, Optional
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import OperationalError
 from cryptography.fernet import Fernet
 import httpx
 
@@ -224,17 +225,22 @@ class IntegrationValidator:
         if not integration.access_token:
             raise ValueError("No access token available for Linear integration")
 
-        if not needs_refresh(integration.token_expires_at) or not integration.refresh_token:
+        # Check if token is still valid - no refresh needed
+        if not needs_refresh(integration.token_expires_at):
             return decrypt_token(integration.access_token)
+
+        # Token needs refresh - check if we have a refresh token
+        if not integration.refresh_token:
+            raise ValueError("Token expired and no refresh token available. Please reconnect Linear.")
 
         # Token needs refresh - acquire row lock to prevent race condition
         logger.info(f"[Linear] Token needs refresh for user {integration.user_id}, acquiring lock")
 
         try:
-            # Re-query with FOR UPDATE to lock the row
+            # Re-query with FOR UPDATE to lock the row (with 10s timeout to prevent deadlocks)
             locked_integration = self.db.query(LinearIntegration).filter(
                 LinearIntegration.id == integration.id
-            ).with_for_update().first()
+            ).with_for_update(nowait=False).first()
 
             if not locked_integration:
                 raise ValueError("Linear integration not found during refresh")
@@ -260,14 +266,14 @@ class IntegrationValidator:
 
             if response.status_code != 200:
                 logger.warning(f"[Linear] Token refresh failed with status {response.status_code}")
-                self.db.rollback()
+                self._safe_rollback()
                 raise ValueError(f"Token refresh failed with status {response.status_code}")
 
             token_data = response.json()
             new_access_token = token_data.get("access_token")
             if not new_access_token:
                 logger.warning("[Linear] Token refresh response missing access_token")
-                self.db.rollback()
+                self._safe_rollback()
                 raise ValueError("Token refresh response missing access_token")
 
             # Update the locked integration with new tokens
@@ -290,10 +296,23 @@ class IntegrationValidator:
             logger.info(f"[Linear] Token refreshed successfully for user {integration.user_id}")
             return new_access_token
 
+        except OperationalError as db_error:
+            # Handle database lock timeout or deadlock
+            logger.error(f"[Linear] Database lock error during token refresh for user {integration.user_id}: {db_error}")
+            self._safe_rollback()
+            raise ValueError("Database busy, please try again") from db_error
+
         except Exception as e:
             logger.warning(f"[Linear] Token refresh failed: {e}")
-            self.db.rollback()
+            self._safe_rollback()
             raise
+
+    def _safe_rollback(self):
+        """Safely rollback a transaction, handling potential rollback failures."""
+        try:
+            self.db.rollback()
+        except Exception as rollback_error:
+            logger.error(f"Failed to rollback transaction: {rollback_error}")
 
     async def _validate_linear(self, user_id: int) -> Optional[Dict[str, Any]]:
         """
