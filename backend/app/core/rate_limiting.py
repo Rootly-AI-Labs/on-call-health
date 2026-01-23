@@ -111,13 +111,18 @@ redis_client = get_redis_client()
 
 if redis_client:
     # Use Redis for distributed rate limiting (production)
-    redis_host = os.getenv("REDIS_HOST", "localhost")
-    redis_port = os.getenv("REDIS_PORT", "6379")
+    redis_url = os.getenv("REDIS_URL")
+    if redis_url:
+        storage_uri = redis_url
+    else:
+        redis_host = os.getenv("REDIS_HOST", "localhost")
+        redis_port = os.getenv("REDIS_PORT", "6379")
+        storage_uri = f"redis://{redis_host}:{redis_port}/1"
     limiter = Limiter(
         key_func=get_rate_limit_key,
-        storage_uri=f"redis://{redis_host}:{redis_port}/1"
+        storage_uri=storage_uri
     )
-    logger.info(f"✅ Rate limiting using Redis storage: {redis_host}:{redis_port}")
+    logger.info(f"✅ Rate limiting using Redis storage")
 else:
     # Use in-memory storage (development/fallback)
     limiter = Limiter(key_func=get_rate_limit_key)
