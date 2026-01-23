@@ -342,7 +342,7 @@ export function MemberDetailModal({
     <Dialog open={!!selectedMember} onOpenChange={() => setSelectedMember(null)}>
       <DialogContent
         ref={dialogContentRef}
-        className="max-w-5xl max-h-[80vh] overflow-y-auto"
+        className="max-w-6xl max-h-[80vh] overflow-y-auto"
         aria-describedby="member-detail-description"
       >
         {selectedMember && (() => {
