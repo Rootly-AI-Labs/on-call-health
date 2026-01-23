@@ -844,7 +844,7 @@ export default function useDashboard() {
     try {
       const authToken = checkAuthToken()
       if (!authToken) {
-        return
+        throw new Error('Authentication required')
       }
 
       const response = await fetch(`${API_BASE}/analyses/${analysisToDelete.id}`, {
