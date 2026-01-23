@@ -81,7 +81,7 @@ class AIBurnoutAnalyzerService:
             ai_member_data = self._prepare_ai_data(member_data, available_integrations)
 
             # Get AI analysis
-            ai_insights = self.agent.analyze_member_workload(
+            ai_insights = self.agent.analyze_member_burnout(
                 ai_member_data,
                 available_integrations
             )
