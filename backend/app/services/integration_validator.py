@@ -61,14 +61,28 @@ LINEAR_LOCK_TIMEOUT_SECONDS_MIN = 1
 LINEAR_LOCK_TIMEOUT_SECONDS_MAX = 60
 
 
+def _is_ascii_digits(s: str) -> bool:
+    """Check if string contains only ASCII digits (0-9).
+
+    Uses explicit ASCII digit check instead of isdigit() which accepts Unicode
+    digit characters (like superscript ³) that would fail int() conversion.
+    """
+    return bool(s) and all(c in '0123456789' for c in s)
+
+
 def _parse_expires_in(raw_expires_in: Any) -> int:
+    """Parse and validate expires_in from OAuth response.
+
+    Returns a bounded integer value. Scientific notation floats (e.g., 1e9)
+    are handled via the float path and clamped by bounds checking.
+    """
     if raw_expires_in is None or isinstance(raw_expires_in, bool):
         return EXPIRES_IN_DEFAULT_SECONDS
 
     try:
         if isinstance(raw_expires_in, str):
             candidate = raw_expires_in.strip()
-            if not candidate.isdigit():
+            if not _is_ascii_digits(candidate):
                 raise ValueError("Invalid expires_in format")
             value = int(candidate)
         elif isinstance(raw_expires_in, float):
@@ -298,11 +312,16 @@ class IntegrationValidator:
 
             refreshed_token = None
             token_to_return = None
+            # Use begin_nested() (savepoint) if already in a transaction, otherwise begin().
+            # This check is safe because FastAPI uses per-request sessions, so the
+            # transaction state is consistent within a single request lifecycle.
             in_transaction = self.db.in_transaction()
             transaction = self.db.begin_nested() if in_transaction else self.db.begin()
 
             with transaction:
-                # Set explicit lock timeout scoped to this transaction (PostgreSQL)
+                # SET LOCAL is transaction-scoped in PostgreSQL - the setting
+                # automatically resets when this transaction commits/rolls back,
+                # so it won't affect other queries on pooled connections.
                 self.db.execute(
                     text("SET LOCAL lock_timeout = :lock_timeout"),
                     {"lock_timeout": f"{lock_timeout_seconds}s"}
@@ -368,18 +387,19 @@ class IntegrationValidator:
             return token_to_return
 
         except OperationalError as db_error:
-            # Database lock timeout or deadlock - this is typically transient
-            # Log the full error for debugging but keep user message generic
+            # Database lock timeout or deadlock - this is typically transient.
+            # Note: These except blocks are alternatives, not sequential - when we
+            # raise RuntimeError here, it propagates up without hitting except Exception.
             logger.warning(
                 f"[Linear] Database contention for user {integration.user_id} "
                 f"(lock_timeout or deadlock - transient, retry should succeed)"
             )
             logger.debug(f"[Linear] Database error details: {db_error}")
             self._safe_rollback(db_error)
-            # Re-raise as a retryable error type to preserve exception chain
             raise RuntimeError("Temporary error. Please retry.") from db_error
 
         except Exception as e:
+            # Catches non-OperationalError exceptions (ValueError, httpx errors, etc.)
             logger.warning(f"[Linear] Token refresh failed: {e}")
             self._safe_rollback(e)
             raise
