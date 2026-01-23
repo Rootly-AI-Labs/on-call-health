@@ -455,24 +455,6 @@ export function UnifiedSlackCard({
                   />
                 </div>
               </div>
-
-              <div className="text-xs text-neutral-500 bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center justify-between">
-                <div>
-                  <strong>Note:</strong> Toggling features on/off does not require reconnecting. Your permissions remain the same.
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleWorkspaceCheck}
-                  className="text-xs ml-4 shrink-0"
-                  title="Test and fix workspace registration"
-                >
-                  <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  Test Registration
-                </Button>
-              </div>
             </div>
 
             {/* Survey Tabs - Only show if survey is enabled */}
