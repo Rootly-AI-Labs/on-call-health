@@ -667,6 +667,7 @@ export function SlackSurveyTabs({
                           const [hour, minute] = scheduleTime.split(':').map(Number)
                           const newHour = hour === 23 ? 0 : hour + 1
                           setScheduleTime(`${String(newHour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`)
+                          hasUnsavedScheduleChangesRef.current = true
                         }}
                         disabled={savingSchedule}
                         className="text-neutral-500 hover:text-neutral-700 disabled:opacity-50"
@@ -687,6 +688,7 @@ export function SlackSurveyTabs({
                           const [hour, minute] = scheduleTime.split(':').map(Number)
                           const newHour = hour === 0 ? 23 : hour - 1
                           setScheduleTime(`${String(newHour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`)
+                          hasUnsavedScheduleChangesRef.current = true
                         }}
                         disabled={savingSchedule}
                         className="text-neutral-500 hover:text-neutral-700 disabled:opacity-50"
@@ -706,6 +708,7 @@ export function SlackSurveyTabs({
                           const [hour, minute] = scheduleTime.split(':').map(Number)
                           const newMinute = minute === 45 ? 0 : minute + 15
                           setScheduleTime(`${String(hour).padStart(2, '0')}:${String(newMinute).padStart(2, '0')}`)
+                          hasUnsavedScheduleChangesRef.current = true
                         }}
                         disabled={savingSchedule}
                         className="text-neutral-500 hover:text-neutral-700 disabled:opacity-50"
@@ -722,6 +725,7 @@ export function SlackSurveyTabs({
                           const [hour, minute] = scheduleTime.split(':').map(Number)
                           const newMinute = minute === 0 ? 45 : minute - 15
                           setScheduleTime(`${String(hour).padStart(2, '0')}:${String(newMinute).padStart(2, '0')}`)
+                          hasUnsavedScheduleChangesRef.current = true
                         }}
                         disabled={savingSchedule}
                         className="text-neutral-500 hover:text-neutral-700 disabled:opacity-50"
@@ -738,6 +742,7 @@ export function SlackSurveyTabs({
                         const [hour, minute] = scheduleTime.split(':').map(Number)
                         const newHour = hour >= 12 ? hour - 12 : hour + 12
                         setScheduleTime(`${String(newHour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`)
+                        hasUnsavedScheduleChangesRef.current = true
                       }}
                       disabled={savingSchedule}
                       className="ml-1 px-2 py-1 text-xs font-medium text-neutral-700 bg-neutral-200 hover:bg-neutral-300 rounded disabled:opacity-50"
@@ -751,7 +756,10 @@ export function SlackSurveyTabs({
                   <Label className="text-sm text-neutral-700">Frequency</Label>
                   <select
                     value={frequencyType}
-                    onChange={(e) => setFrequencyType(e.target.value as 'daily' | 'weekday' | 'weekly')}
+                    onChange={(e) => {
+                      setFrequencyType(e.target.value as 'daily' | 'weekday' | 'weekly')
+                      hasUnsavedScheduleChangesRef.current = true
+                    }}
                     disabled={savingSchedule}
                     className="mt-2 w-full px-3 py-2 border border-neutral-200 rounded-md text-sm"
                   >
@@ -766,7 +774,10 @@ export function SlackSurveyTabs({
                     <Label className="text-sm text-neutral-700">Day of Week</Label>
                     <select
                       value={dayOfWeek}
-                      onChange={(e) => setDayOfWeek(parseInt(e.target.value))}
+                      onChange={(e) => {
+                        setDayOfWeek(parseInt(e.target.value))
+                        hasUnsavedScheduleChangesRef.current = true
+                      }}
                       disabled={savingSchedule}
                       className="mt-2 w-full px-3 py-2 border border-neutral-200 rounded-md text-sm"
                     >
