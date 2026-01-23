@@ -1541,18 +1541,18 @@ export default function useDashboard() {
   const runAnalysisWithTimeRange = async () => {
     // Check permissions before running - only for Rootly integrations
     const selectedIntegration = integrations.find(i => i.id.toString() === dialogSelectedIntegration);
-    
+
     // Only check permissions for Rootly integrations, not PagerDuty
     if (selectedIntegration?.platform === 'rootly') {
       const hasUserPermission = selectedIntegration?.permissions?.users?.access;
       const hasIncidentPermission = selectedIntegration?.permissions?.incidents?.access;
-      
+
       if (!hasUserPermission || !hasIncidentPermission) {
         toast.error("Missing required permissions - update API token")
         return;
       }
     }
-    
+
     setShowTimeRangeDialog(false)
     setTimeRange(selectedTimeRange)
     setAnalysisRunning(true)
@@ -1568,11 +1568,38 @@ export default function useDashboard() {
         return
       }
 
-      // Debug log the request data
       // Handle both string (beta) and numeric (regular) integration IDs
-      const integrationId = isNaN(parseInt(dialogSelectedIntegration)) 
+      const integrationId = isNaN(parseInt(dialogSelectedIntegration))
         ? dialogSelectedIntegration  // Keep as string for beta integrations
         : parseInt(dialogSelectedIntegration);  // Convert to number for regular integrations
+
+      // Validate integration connections before starting analysis
+      try {
+        const validationResponse = await fetch(`${API_BASE}/analyses/validate-integrations?integration_id=${integrationId}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${authToken}`
+          }
+        })
+
+        if (validationResponse.ok) {
+          const validationData = await validationResponse.json()
+
+          if (!validationData.all_valid) {
+            const errors = Object.entries(validationData.integrations)
+              .filter(([_, integration]: [string, any]) => !integration.valid)
+              .map(([name, integration]: [string, any]) => `${name.charAt(0).toUpperCase() + name.slice(1)}: ${integration.error}`)
+
+            if (errors.length > 0) {
+              toast.error(`Connection validation failed:\n\n${errors.join('\n')}`, { duration: 8000 })
+              setAnalysisRunning(false)
+              return
+            }
+          }
+        }
+      } catch (validationError) {
+        console.warn('Integration validation failed, continuing anyway:', validationError)
+      }
       
       const requestData = {
         integration_id: integrationId,

@@ -131,6 +131,54 @@ class HistoricalTrendsResponse(BaseModel):
     date_range: Dict[str, str]
 
 
+class IntegrationValidationResponse(BaseModel):
+    all_valid: bool
+    integrations: Dict[str, Dict[str, Any]]
+
+
+@router.get("/validate-integrations")
+@general_rate_limit("integration_validation")
+async def validate_integrations(
+    integration_id: int = Query(..., description="Integration ID to analyze"),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Validate all integration connections before starting analysis.
+
+    Makes lightweight API calls to verify tokens are not expired/stale.
+    Returns validation status for each enabled integration (GitHub, Linear, Jira).
+
+    Rate limited to prevent abuse of third-party APIs.
+    """
+    from ...services.integration_validator import IntegrationValidator
+
+    try:
+        logger.info(f"Validating integrations for user {current_user.id}, integration {integration_id}")
+
+        validator = IntegrationValidator(db)
+        results = await validator.validate_all_integrations(
+            user_id=current_user.id,
+            integration_id=integration_id
+        )
+
+        all_valid = all(result.get("valid", False) for result in results.values())
+
+        logger.info(
+            f"Validation complete for user {current_user.id}: "
+            f"all_valid={all_valid}, integrations={list(results.keys())}"
+        )
+
+        return IntegrationValidationResponse(all_valid=all_valid, integrations=results)
+
+    except Exception as e:
+        logger.error(f"Integration validation failed for user {current_user.id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to validate integrations: {str(e)}"
+        )
+
+
 @router.post("/run", response_model=AnalysisResponse)
 # @analysis_rate_limit("analysis_create")  # Disabled due to request type compatibility issues
 async def run_burnout_analysis(
