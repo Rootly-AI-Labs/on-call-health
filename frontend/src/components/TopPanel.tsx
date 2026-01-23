@@ -35,10 +35,14 @@ export function TopPanel() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
 
   useEffect(() => {
+    const authToken = localStorage.getItem("auth_token")
     const userName = localStorage.getItem("user_name")
     const userEmail = localStorage.getItem("user_email")
     const userRole = localStorage.getItem("user_role")
-    if (userName && userEmail) setUserInfo({ name: userName, email: userEmail, role: userRole || undefined })
+    // Only set userInfo if auth_token exists along with user details
+    if (authToken && userName && userEmail) {
+      setUserInfo({ name: userName, email: userEmail, role: userRole || undefined })
+    }
   }, [])
 
   const handleSignOut = () => {
