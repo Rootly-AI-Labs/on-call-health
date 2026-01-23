@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -77,6 +77,12 @@ export function SlackSurveyTabs({
   const [savedRecipients, setSavedRecipients] = useState<Set<number>>(new Set()) // Track what's actually saved
   const [savingRecipients, setSavingRecipients] = useState(false)
   const [loadingRecipients, setLoadingRecipients] = useState(false)
+
+  // Memoize recipient changes check to avoid repeated Set operations
+  const hasRecipientChanges = useMemo(() => {
+    if (selectedRecipients.size !== savedRecipients.size) return true
+    return Array.from(selectedRecipients).some(id => !savedRecipients.has(id))
+  }, [selectedRecipients, savedRecipients])
 
   // Load schedule on mount - backend uses auth token to determine org
   useEffect(() => {
@@ -200,18 +206,14 @@ export function SlackSurveyTabs({
         follow_up_reminders_enabled: followUpRemindersEnabled
       }
 
-      // Add 2 second delay for better UX feedback
-      const [response] = await Promise.all([
-        fetch(`${API_BASE}/api/surveys/survey-schedule`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`
-          },
-          body: JSON.stringify(payload)
-        }),
-        new Promise(resolve => setTimeout(resolve, 2000))
-      ])
+      const response = await fetch(`${API_BASE}/api/surveys/survey-schedule`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify(payload)
+      })
 
       if (response.ok) {
         const responseData = await response.json()
@@ -382,19 +384,14 @@ export function SlackSurveyTabs({
                 const slackUsers = syncedUsers.filter((u: any) => u.slack_user_id)
                 return slackUsers.length > 0 ? (
                   <div>
-                    {(() => {
-                      // Check if sets have different members
-                      const hasChanges = selectedRecipients.size !== savedRecipients.size ||
-                        Array.from(selectedRecipients).some(id => !savedRecipients.has(id))
-                      return hasChanges && (
+                    {hasRecipientChanges && (
                         <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg transition-all duration-200">
                           <p className="text-sm text-amber-900">
                             ⚠️ <strong>Unsaved changes:</strong> You have {selectedRecipients.size} member{selectedRecipients.size !== 1 ? 's' : ''} selected.
                             Click <strong>Save Recipients</strong> below to apply these changes.
                           </p>
                         </div>
-                      )
-                    })()}
+                      )}
                     <div className="flex items-center justify-between mb-3">
                       <h5 className="text-sm font-medium text-neutral-900">
                         Team Members ({slackUsers.length})
@@ -471,31 +468,20 @@ export function SlackSurveyTabs({
                       ))}
                     </div>
                     <div className="flex justify-end gap-2">
-                      {(() => {
-                        // Check if there are unsaved changes
-                        const hasChanges = selectedRecipients.size !== savedRecipients.size ||
-                          Array.from(selectedRecipients).some(id => !savedRecipients.has(id))
-
-                        return hasChanges && (
-                          <Button
-                            onClick={() => {
-                              setSelectedRecipients(new Set(savedRecipients))
-                            }}
-                            variant="outline"
-                            disabled={savingRecipients}
-                          >
-                            Revert Changes
-                          </Button>
-                        )
-                      })()}
+                      {hasRecipientChanges && (
+                        <Button
+                          onClick={() => {
+                            setSelectedRecipients(new Set(savedRecipients))
+                          }}
+                          variant="outline"
+                          disabled={savingRecipients}
+                        >
+                          Revert Changes
+                        </Button>
+                      )}
                       <Button
                         onClick={saveSurveyRecipients}
-                        disabled={savingRecipients || (() => {
-                          // Disable if no changes
-                          const hasChanges = selectedRecipients.size !== savedRecipients.size ||
-                            Array.from(selectedRecipients).some(id => !savedRecipients.has(id))
-                          return !hasChanges
-                        })()}
+                        disabled={savingRecipients || !hasRecipientChanges}
                         className="bg-purple-700 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {savingRecipients ? (
@@ -506,12 +492,7 @@ export function SlackSurveyTabs({
                         ) : (
                           <>
                             Save Recipients
-                            {(() => {
-                              // Show change count
-                              const hasChanges = selectedRecipients.size !== savedRecipients.size ||
-                                Array.from(selectedRecipients).some(id => !savedRecipients.has(id))
-                              if (!hasChanges) return null
-
+                            {hasRecipientChanges && (() => {
                               // Count added and removed
                               const added = Array.from(selectedRecipients).filter(id => !savedRecipients.has(id)).length
                               const removed = Array.from(savedRecipients).filter(id => !selectedRecipients.has(id)).length
@@ -547,18 +528,13 @@ export function SlackSurveyTabs({
 
       {/* Survey Tab */}
       <TabsContent value="actions" className="space-y-4 mt-4">
-        {(() => {
-          // Show warning banner if there are unsaved changes
-          const hasChanges = selectedRecipients.size !== savedRecipients.size ||
-            Array.from(selectedRecipients).some(id => !savedRecipients.has(id))
-          return hasChanges && (
-            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-              <p className="text-sm text-amber-900">
-                ⚠️ <strong>Unsaved changes:</strong> You have unsaved recipient changes in the <strong>Team Members</strong> tab.
-              </p>
-            </div>
-          )
-        })()}
+        {hasRecipientChanges && (
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <p className="text-sm text-amber-900">
+              ⚠️ <strong>Unsaved changes:</strong> You have unsaved recipient changes in the <strong>Team Members</strong> tab.
+            </p>
+          </div>
+        )}
 
         {/* Slash Command Info */}
         <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
@@ -595,7 +571,7 @@ export function SlackSurveyTabs({
                 </p>
                 {scheduleEnabled && (
                   <p className="text-xs font-medium text-purple-600 mt-1.5">
-                    {selectedRecipients.size} {selectedRecipients.size === 1 ? 'user' : 'users'} selected
+                    {Math.max(0, selectedRecipients.size)} {selectedRecipients.size === 1 ? 'user' : 'users'} selected
                   </p>
                 )}
               </div>
