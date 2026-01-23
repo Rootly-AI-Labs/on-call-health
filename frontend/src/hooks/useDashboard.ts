@@ -838,14 +838,15 @@ export default function useDashboard() {
   const confirmDeleteAnalysis = async () => {
     if (!analysisToDelete) return
 
+    const analysisId = String(analysisToDelete.id)
     setDeletingAnalysis(true)
+
     try {
       const authToken = checkAuthToken()
       if (!authToken) {
         return
       }
 
-      
       const response = await fetch(`${API_BASE}/analyses/${analysisToDelete.id}`, {
         method: 'DELETE',
         headers: {
@@ -853,52 +854,41 @@ export default function useDashboard() {
         }
       })
 
-      // Treat both 200 and 404 as success (404 means already deleted)
       if (response.ok || response.status === 404) {
+        // Remove from local state
+        setPreviousAnalyses(prev => prev.filter(a => String(a.id) !== analysisId))
 
-        // Immediately remove from local state - be more explicit about ID matching
-        setPreviousAnalyses(prev => {
-          const filtered = prev.filter(a => {
-            const match = a.id === analysisToDelete.id || String(a.id) === String(analysisToDelete.id)
-            return !match
-          })
-          return filtered
-        })
-
-        // Clear from cache to prevent stale data issues
+        // Clear from cache
         setAnalysisCache(prev => {
           const newCache = new Map(prev)
-          // Remove by both integer ID and string UUID
-          newCache.delete(String(analysisToDelete.id))
-          newCache.delete(analysisToDelete.id.toString())
+          newCache.delete(analysisId)
           return newCache
         })
 
-        // If the deleted analysis was currently selected, clear it
+        // Clear selection if this analysis was selected
         if (currentAnalysis?.id === analysisToDelete.id) {
           setCurrentAnalysis(null)
           updateURLWithAnalysis(null)
         }
 
-        toast.success("Analysis deleted")
+        // Show different message for 404 (stale data) vs 200 (actual delete)
+        const message = response.status === 404
+          ? "Analysis was already deleted"
+          : "Analysis deleted"
+        toast.success(message)
 
-        // Close dialog and reset state
-        setDeleteDialogOpen(false)
-        setAnalysisToDelete(null)
-
-        // Also reload from server to ensure consistency
+        // Reload from server to ensure consistency
         setTimeout(() => loadPreviousAnalyses(), 500)
-
       } else {
         const errorData = await response.json()
         throw new Error(errorData.detail || 'Failed to delete analysis')
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to delete analysis")
-      setDeleteDialogOpen(false)
-      setAnalysisToDelete(null)
     } finally {
       setDeletingAnalysis(false)
+      setDeleteDialogOpen(false)
+      setAnalysisToDelete(null)
     }
   }
 
