@@ -67,6 +67,8 @@ export function SlackSurveyTabs({
   const [dayOfWeek, setDayOfWeek] = useState<number>(4) // Default: Friday
   const [followUpRemindersEnabled, setFollowUpRemindersEnabled] = useState(true) // Daily reminders until answered
   const [savedScheduleTime, setSavedScheduleTime] = useState<string | null>(null) // Track saved time from DB
+  const [savedFrequencyType, setSavedFrequencyType] = useState<'daily' | 'weekday' | 'weekly'>('weekday')
+  const [savedDayOfWeek, setSavedDayOfWeek] = useState<number>(4)
   const [loadingSchedule, setLoadingSchedule] = useState(false)
   const [savingSchedule, setSavingSchedule] = useState(false)
   const [showSaveConfirmation, setShowSaveConfirmation] = useState(false)
@@ -163,9 +165,11 @@ export function SlackSurveyTabs({
           // Load frequency settings
           if (data.frequency_type) {
             setFrequencyType(data.frequency_type)
+            setSavedFrequencyType(data.frequency_type)
           }
           if (data.day_of_week !== undefined && data.day_of_week !== null) {
             setDayOfWeek(data.day_of_week)
+            setSavedDayOfWeek(data.day_of_week)
           }
           setFollowUpRemindersEnabled(data.follow_up_reminders_enabled !== false)
         } else {
@@ -218,6 +222,10 @@ export function SlackSurveyTabs({
       if (response.ok) {
         const responseData = await response.json()
         toast.success('Schedule saved successfully')
+        // Update saved state immediately
+        setSavedScheduleTime(scheduleTime)
+        setSavedFrequencyType(frequencyType)
+        setSavedDayOfWeek(dayOfWeek)
         // Reload schedule from DB to ensure we display exactly what's saved
         await loadSchedule(true) // Force reload after save
       } else {
@@ -646,8 +654,9 @@ export function SlackSurveyTabs({
                         <Clock className="w-4 h-4 text-neutral-600" />
                         <span className="font-medium text-sm text-neutral-900">
                           {(() => {
-                            const hour = parseInt(scheduleTime.split(':')[0])
-                            const minute = scheduleTime.split(':')[1]
+                            const timeToDisplay = savedScheduleTime || scheduleTime
+                            const hour = parseInt(timeToDisplay.split(':')[0])
+                            const minute = timeToDisplay.split(':')[1]
                             const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour
                             const ampm = hour >= 12 ? 'PM' : 'AM'
                             return `${String(displayHour).padStart(2, '0')}:${minute} ${ampm}`
@@ -655,7 +664,7 @@ export function SlackSurveyTabs({
                         </span>
                       </div>
                       <div className="text-xs text-neutral-600 mt-1">
-                        {frequencyType === 'daily' ? 'Every day' : frequencyType === 'weekday' ? 'Weekdays (Mon-Fri)' : `${['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][dayOfWeek]}`}
+                        {savedFrequencyType === 'daily' ? 'Every day' : savedFrequencyType === 'weekday' ? 'Weekdays (Mon-Fri)' : `${['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][savedDayOfWeek]}`}
                       </div>
                     </div>
                     {scheduleAccordionOpen ? (
