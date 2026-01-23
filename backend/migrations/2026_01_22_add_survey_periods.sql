@@ -98,3 +98,15 @@ BEGIN
 END $$;
 
 COMMENT ON TABLE survey_periods IS 'Tracks survey periods for follow-up reminders. Each period represents the timeframe a user has to respond (daily, weekday, or weekly).';
+
+-- ============================================================================
+-- ROLLBACK (run manually if needed to revert this migration)
+-- ============================================================================
+-- DROP INDEX IF EXISTS uq_survey_periods_pending_user_org;
+-- DROP INDEX IF EXISTS idx_survey_periods_user_correlation;
+-- DROP INDEX IF EXISTS idx_survey_periods_period_dates;
+-- DROP INDEX IF EXISTS idx_survey_periods_email_status;
+-- DROP INDEX IF EXISTS idx_survey_periods_org_status;
+-- DROP TABLE IF EXISTS survey_periods;
+-- ALTER TABLE survey_schedules DROP COLUMN IF EXISTS follow_up_message_template;
+-- ALTER TABLE survey_schedules DROP COLUMN IF EXISTS follow_up_reminders_enabled;

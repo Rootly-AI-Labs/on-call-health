@@ -3,7 +3,7 @@ Scheduled survey delivery service using APScheduler.
 Sends daily burnout check-in DMs to Slack users.
 """
 import logging
-from datetime import datetime, time, date, timedelta
+from datetime import datetime, time, date, timedelta, timezone
 from typing import List, Dict, Tuple, Optional
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -20,16 +20,7 @@ from ..models.survey_period import SurveyPeriod
 from .slack_dm_sender import SlackDMSender
 from .notification_service import NotificationService
 from .slack_token_service import get_slack_token_for_organization, SlackTokenService
-
-
-def _mask_email(email: str) -> str:
-    """Mask email for logging to protect PII. Shows first 2 chars and domain."""
-    if not email or '@' not in email:
-        return '***'
-    local, domain = email.split('@', 1)
-    if len(local) <= 2:
-        return f"{'*' * len(local)}@{domain}"
-    return f"{local[:2]}{'*' * (len(local) - 2)}@{domain}"
+from ..utils import mask_email
 
 logger = logging.getLogger(__name__)
 
@@ -509,8 +500,7 @@ class SurveyScheduler:
                     # If reminder, check if user already completed survey today
                     # Check is scoped by user only - one survey per user per day regardless of org
                     if is_reminder:
-                        from datetime import datetime
-                        today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+                        today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
 
                         already_completed = db.query(UserBurnoutReport).filter(
                             UserBurnoutReport.user_id == user['user_id'],
@@ -561,7 +551,7 @@ class SurveyScheduler:
                                 frequency_type=frequency_type,
                                 period_start=period_start,
                                 period_end=period_end,
-                                sent_at=datetime.utcnow()
+                                sent_at=datetime.now(timezone.utc)
                             )
                         except Exception as period_error:
                             logger.error(f"Failed to create survey period: {str(period_error)}")

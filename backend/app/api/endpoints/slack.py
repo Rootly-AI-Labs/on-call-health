@@ -18,19 +18,10 @@ from ...auth.dependencies import get_current_user
 from ...auth.integration_oauth import slack_integration_oauth
 from ...core.config import settings
 from ...services.notification_service import NotificationService
+from ...utils import mask_email
 
 # Set up logger
 logger = logging.getLogger(__name__)
-
-
-def _mask_email(email: str) -> str:
-    """Mask email for logging to protect PII. Shows first 2 chars and domain."""
-    if not email or '@' not in email:
-        return '***'
-    local, domain = email.split('@', 1)
-    if len(local) <= 2:
-        return f"{'*' * len(local)}@{domain}"
-    return f"{local[:2]}{'*' * (len(local) - 2)}@{domain}"
 
 
 router = APIRouter(prefix="/slack", tags=["slack-integration"])
@@ -169,7 +160,7 @@ async def slack_oauth_callback(
                 user_id = decoded_state.get("userId")
                 user_email = decoded_state.get("email")
                 enable_survey = decoded_state.get("enableSurvey", False)  # Default False
-                logger.debug(f"Decoded state - org_id: {organization_id}, user_id: {user_id}, email: {_mask_email(user_email)}, survey: {enable_survey}")
+                logger.debug(f"Decoded state - org_id: {organization_id}, user_id: {user_id}, email: {mask_email(user_email)}, survey: {enable_survey}")
             except Exception as state_error:
                 # If state parsing fails, continue without org mapping and use defaults
                 logger.warning(f"Failed to parse state parameter: {state_error}")
@@ -256,13 +247,13 @@ async def slack_oauth_callback(
         if user_id:
             owner_user = db.query(User).filter(User.id == user_id).first()
             if owner_user:
-                logger.info(f"Found owner by user_id: {owner_user.id} ({_mask_email(owner_user.email)})")
+                logger.info(f"Found owner by user_id: {owner_user.id} ({mask_email(owner_user.email)})")
 
         # Fallback: try to find by email from state
         if not owner_user and user_email:
             owner_user = db.query(User).filter(User.email == user_email).first()
             if owner_user:
-                logger.info(f"Found owner by email: {owner_user.id} ({_mask_email(owner_user.email)})")
+                logger.info(f"Found owner by email: {owner_user.id} ({mask_email(owner_user.email)})")
 
         # Fallback: find any admin in the organization
         if not owner_user and organization_id:
@@ -271,13 +262,13 @@ async def slack_oauth_callback(
                 User.role == 'admin'
             ).first()
             if owner_user:
-                logger.warning(f"Could not find user from state, using first admin in org: {owner_user.id} ({_mask_email(owner_user.email)})")
+                logger.warning(f"Could not find user from state, using first admin in org: {owner_user.id} ({mask_email(owner_user.email)})")
 
         # Last resort: find any user to be the owner
         if not owner_user:
             owner_user = db.query(User).first()
             if owner_user:
-                logger.warning(f"Could not find specific user, using first user in database: {owner_user.id} ({_mask_email(owner_user.email)})")
+                logger.warning(f"Could not find specific user, using first user in database: {owner_user.id} ({mask_email(owner_user.email)})")
 
         if not owner_user:
             # If absolutely no users exist, we can't create the mapping
@@ -857,7 +848,7 @@ async def sync_slack_user_ids(
                 if slack_id:
                     correlation.slack_user_id = slack_id
                     updated_count += 1
-                    logger.debug(f"Matched {_mask_email(correlation.email)} -> {slack_id}")
+                    logger.debug(f"Matched {mask_email(correlation.email)} -> {slack_id}")
 
             db.commit()
 
@@ -1145,7 +1136,7 @@ async def handle_oncall_health_command(
                                     if user_correlation:
                                         user_correlation.slack_user_id = user_id
                                         db.commit()
-                                        logging.info(f"Auto-populated Slack user ID for {_mask_email(user_email)}")
+                                        logging.info(f"Auto-populated Slack user ID for {mask_email(user_email)}")
             except Exception as e:
                 logging.error(f"Error fetching Slack user email: {str(e)}")
                 # Continue without Slack email lookup
