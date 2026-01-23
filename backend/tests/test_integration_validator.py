@@ -661,12 +661,23 @@ class TestParseExpiresIn(unittest.TestCase):
         self.assertEqual(_parse_expires_in("1.5"), EXPIRES_IN_DEFAULT_SECONDS)
 
     def test_float_within_bounds(self):
-        """Test that floats (including scientific notation) are handled."""
+        """Test that floats within valid range are accepted."""
         self.assertEqual(_parse_expires_in(3600.0), 3600)
-        # Scientific notation float 1e9 exceeds max, should return default
-        self.assertEqual(_parse_expires_in(1e9), EXPIRES_IN_DEFAULT_SECONDS)
         # 1e3 = 1000.0, within bounds
         self.assertEqual(_parse_expires_in(1e3), 1000)
+
+    def test_scientific_notation_float_rejected_early(self):
+        """Test that large scientific notation floats are rejected BEFORE int conversion.
+
+        This prevents potential integer overflow issues. The bounds check happens
+        on the raw float value, not after conversion to int.
+        """
+        # 1e9 = 1,000,000,000 which exceeds EXPIRES_IN_MAX_SECONDS (2,592,000)
+        self.assertEqual(_parse_expires_in(1e9), EXPIRES_IN_DEFAULT_SECONDS)
+        # Very large float that could cause overflow if converted first
+        self.assertEqual(_parse_expires_in(1e15), EXPIRES_IN_DEFAULT_SECONDS)
+        # Negative large float
+        self.assertEqual(_parse_expires_in(-1e9), EXPIRES_IN_DEFAULT_SECONDS)
 
     def test_non_integer_float_returns_default(self):
         """Test that non-integer floats return default."""

@@ -73,9 +73,15 @@ def _is_ascii_digits(s: str) -> bool:
 def _parse_expires_in(raw_expires_in: Any) -> int:
     """Parse and validate expires_in from OAuth response.
 
-    Returns a bounded integer value. Scientific notation floats (e.g., 1e9)
-    are handled via the float path and clamped by bounds checking.
-    Logs warnings for suspicious values that may indicate misconfiguration.
+    Returns a bounded integer value between EXPIRES_IN_MIN_SECONDS (60) and
+    EXPIRES_IN_MAX_SECONDS (30 days). Values outside this range return the default.
+
+    Handles edge cases:
+    - Scientific notation floats (e.g., 1e9): Checked against bounds BEFORE conversion
+    - Unicode digit strings: Rejected by _is_ascii_digits()
+    - Non-integer floats: Rejected with warning
+
+    Logs warnings for suspicious values that may indicate API changes or misconfiguration.
     """
     if raw_expires_in is None or isinstance(raw_expires_in, bool):
         return EXPIRES_IN_DEFAULT_SECONDS
@@ -87,6 +93,13 @@ def _parse_expires_in(raw_expires_in: Any) -> int:
                 raise ValueError("Invalid expires_in format")
             value = int(candidate)
         elif isinstance(raw_expires_in, float):
+            # Check bounds BEFORE conversion to prevent overflow with large floats (e.g., 1e9)
+            if raw_expires_in > EXPIRES_IN_MAX_SECONDS or raw_expires_in < EXPIRES_IN_MIN_SECONDS:
+                logger.warning(
+                    f"Float expires_in {raw_expires_in} outside valid range, using default. "
+                    f"This may indicate an API change or malformed response."
+                )
+                return EXPIRES_IN_DEFAULT_SECONDS
             if not raw_expires_in.is_integer():
                 raise ValueError("Non-integer expires_in value")
             value = int(raw_expires_in)
@@ -318,16 +331,19 @@ class IntegrationValidator:
 
             refreshed_token = None
             token_to_return = None
-            # Use begin_nested() (savepoint) if already in a transaction, otherwise begin().
-            # This check is safe because FastAPI uses per-request sessions, so the
-            # transaction state is consistent within a single request lifecycle.
-            in_transaction = self.db.in_transaction()
-            transaction = self.db.begin_nested() if in_transaction else self.db.begin()
 
-            with transaction:
-                # SET LOCAL is transaction-scoped in PostgreSQL - the setting
-                # automatically resets when this transaction commits/rolls back,
-                # so it won't affect other queries on pooled connections.
+            # Always use begin_nested() which:
+            # - Creates a SAVEPOINT if already in a transaction
+            # - Starts a new transaction if not
+            # This avoids any race condition concerns with checking in_transaction() state.
+            with self.db.begin_nested():
+                # PostgreSQL SET LOCAL is TRANSACTION-scoped (not session-scoped).
+                # From PostgreSQL docs: "SET LOCAL sets the configuration parameter for
+                # the current transaction only. After COMMIT or ROLLBACK, the session-level
+                # value takes effect again."
+                # Reference: https://www.postgresql.org/docs/current/sql-set.html
+                # This setting automatically resets when the transaction ends, so it
+                # will NOT affect other requests that reuse the same pooled connection.
                 self.db.execute(
                     text("SET LOCAL lock_timeout = :lock_timeout"),
                     {"lock_timeout": f"{lock_timeout_seconds}s"}
@@ -395,21 +411,30 @@ class IntegrationValidator:
             return token_to_return
 
         except OperationalError as db_error:
-            # Database lock timeout or deadlock - this is typically transient.
-            # Note: These except blocks are alternatives, not sequential - when we
-            # raise RuntimeError here, it propagates up without hitting except Exception.
-            # Log includes user_id for debugging; error message is generic for security.
+            # Database lock timeout or deadlock - transient error, retry should succeed.
+            # Note: Python except blocks are ALTERNATIVES - when we raise here, it does
+            # NOT fall through to the except Exception block below.
+            #
+            # We log detailed context at WARNING level for debugging, but the raised
+            # exception uses a generic message for security (no user IDs in exceptions).
+            # The original db_error is preserved in the exception chain via 'from'.
+            error_type = "lock_timeout" if "lock" in str(db_error).lower() else "db_error"
             logger.warning(
-                f"[Linear] Database contention for user {integration.user_id} "
-                f"(lock_timeout or deadlock - transient, retry should succeed)"
+                f"[Linear] Database contention during token refresh: "
+                f"user_id={integration.user_id}, error_type={error_type}, "
+                f"lock_timeout_setting={lock_timeout_seconds}s"
             )
-            logger.debug(f"[Linear] Database error details: {db_error}")
+            logger.debug(f"[Linear] Full database error: {db_error}", exc_info=True)
             self._safe_rollback(db_error)
+            # RuntimeError with 'from db_error' preserves full exception chain for debugging
             raise RuntimeError("Temporary error. Please retry.") from db_error
 
         except Exception as e:
             # Catches non-OperationalError exceptions (ValueError, httpx errors, etc.)
-            logger.warning(f"[Linear] Token refresh failed: {e}")
+            logger.warning(
+                f"[Linear] Token refresh failed: user_id={integration.user_id}, "
+                f"error_type={type(e).__name__}, message={e}"
+            )
             self._safe_rollback(e)
             raise
 
