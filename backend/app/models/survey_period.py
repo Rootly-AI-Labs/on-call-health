@@ -1,7 +1,7 @@
 """
 Survey period model for tracking survey delivery and follow-up reminders.
 """
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from sqlalchemy import Column, Integer, String, DateTime, Date, ForeignKey
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -55,16 +55,16 @@ class SurveyPeriod(Base):
         """Mark this period as completed with the given response."""
         self.status = 'completed'
         self.response_id = response_id
-        self.completed_at = datetime.utcnow()
+        self.completed_at = datetime.now(timezone.utc)
 
     def mark_expired(self) -> None:
         """Mark this period as expired (user didn't respond in time)."""
         self.status = 'expired'
-        self.expired_at = datetime.utcnow()
+        self.expired_at = datetime.now(timezone.utc)
 
     def record_reminder_sent(self) -> None:
         """Record that a follow-up reminder was sent."""
-        self.last_reminder_sent_at = datetime.utcnow()
+        self.last_reminder_sent_at = datetime.now(timezone.utc)
         self.reminder_count = (self.reminder_count or 0) + 1
 
     @property

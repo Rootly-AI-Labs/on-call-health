@@ -250,10 +250,13 @@ class SurveyScheduler:
                         continue
 
                     # Check if user has already completed the survey in this period
+                    # Use timezone-aware boundaries for proper comparison with submitted_at
+                    period_start_utc = datetime.combine(period.period_start_date, time.min).replace(tzinfo=pytz.UTC)
+                    period_end_utc = datetime.combine(period.period_end_date, time.max).replace(tzinfo=pytz.UTC)
                     completed_report = db.query(UserBurnoutReport).filter(
                         UserBurnoutReport.email == period.email,
-                        UserBurnoutReport.submitted_at >= datetime.combine(period.period_start_date, datetime.min.time()),
-                        UserBurnoutReport.submitted_at <= datetime.combine(period.period_end_date, datetime.max.time())
+                        UserBurnoutReport.submitted_at >= period_start_utc,
+                        UserBurnoutReport.submitted_at <= period_end_utc
                     ).first()
 
                     if completed_report:

@@ -6,7 +6,7 @@ Tests period calculation, completion, expiration, and idempotency checks.
 
 import unittest
 from unittest.mock import MagicMock, patch, PropertyMock
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 import sys
 import os
 
@@ -139,7 +139,7 @@ class TestSurveyPeriodModel(unittest.TestCase):
         def mark_completed(response_id):
             self.period.status = 'completed'
             self.period.response_id = response_id
-            self.period.completed_at = datetime.utcnow()
+            self.period.completed_at = datetime.now(timezone.utc)
 
         mark_completed(123)
 
@@ -151,7 +151,7 @@ class TestSurveyPeriodModel(unittest.TestCase):
         """Test mark_expired sets correct status."""
         def mark_expired():
             self.period.status = 'expired'
-            self.period.expired_at = datetime.utcnow()
+            self.period.expired_at = datetime.now(timezone.utc)
 
         mark_expired()
 
@@ -161,7 +161,7 @@ class TestSurveyPeriodModel(unittest.TestCase):
     def test_record_reminder_increments_count(self):
         """Test record_reminder_sent increments count."""
         def record_reminder_sent():
-            self.period.last_reminder_sent_at = datetime.utcnow()
+            self.period.last_reminder_sent_at = datetime.now(timezone.utc)
             self.period.reminder_count = (self.period.reminder_count or 0) + 1
 
         self.assertEqual(self.period.reminder_count, 0)
