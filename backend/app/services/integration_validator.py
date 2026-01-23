@@ -234,19 +234,29 @@ class IntegrationValidator:
 
             if response.status_code != 200:
                 logger.warning(f"[Linear] Token refresh failed with status {response.status_code}")
+                # If token is already past expiry, raise error instead of returning expired token
+                if integration.token_expires_at and integration.token_expires_at <= datetime.now(dt_timezone.utc):
+                    raise ValueError("Token refresh failed and current token is expired")
                 return decrypt_token(integration.access_token)
 
             token_data = response.json()
             new_access_token = token_data.get("access_token")
             if not new_access_token:
                 logger.warning("[Linear] Token refresh response missing access_token")
+                if integration.token_expires_at and integration.token_expires_at <= datetime.now(dt_timezone.utc):
+                    raise ValueError("Token refresh failed and current token is expired")
                 return decrypt_token(integration.access_token)
 
             # Update the integration with new tokens
             new_refresh_token = token_data.get("refresh_token") or refresh_token
             # Validate expires_in to prevent datetime overflow (1 min to 30 days)
-            raw_expires_in = token_data.get("expires_in", 86400)
-            expires_in = max(60, min(int(raw_expires_in) if raw_expires_in else 86400, 86400 * 30))
+            try:
+                raw_expires_in = token_data.get("expires_in")
+                expires_in = int(raw_expires_in) if raw_expires_in is not None else 86400
+                expires_in = max(60, min(expires_in, 86400 * 30))
+            except (ValueError, TypeError):
+                logger.warning(f"[Linear] Invalid expires_in value: {token_data.get('expires_in')}, using default")
+                expires_in = 86400
 
             integration.access_token = encrypt_token(new_access_token)
             integration.refresh_token = encrypt_token(new_refresh_token)
@@ -259,6 +269,9 @@ class IntegrationValidator:
 
         except Exception as e:
             logger.warning(f"[Linear] Token refresh failed: {e}")
+            # If token is already past expiry, re-raise instead of returning expired token
+            if integration.token_expires_at and integration.token_expires_at <= datetime.now(dt_timezone.utc):
+                raise
             return decrypt_token(integration.access_token)
 
     async def _validate_linear(self, user_id: int) -> Optional[Dict[str, Any]]:
