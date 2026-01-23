@@ -244,7 +244,9 @@ class IntegrationValidator:
 
             # Update the integration with new tokens
             new_refresh_token = token_data.get("refresh_token") or refresh_token
-            expires_in = token_data.get("expires_in", 86400)
+            # Validate expires_in to prevent datetime overflow (1 min to 30 days)
+            raw_expires_in = token_data.get("expires_in", 86400)
+            expires_in = max(60, min(int(raw_expires_in) if raw_expires_in else 86400, 86400 * 30))
 
             integration.access_token = encrypt_token(new_access_token)
             integration.refresh_token = encrypt_token(new_refresh_token)
