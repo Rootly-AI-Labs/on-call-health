@@ -350,7 +350,7 @@ export function UnifiedSlackCard({
                     <ul className="list-disc list-inside space-y-1 text-amber-800 ml-2 text-xs">
                       <li><strong>Read channel messages</strong> - Analyze communication patterns</li>
                       <li><strong>Read user info</strong> - Match team members with survey responses</li>
-                      <li><strong>Send DMs & slash commands</strong> - Deliver burnout surveys</li>
+                      <li><strong>Send DMs & slash commands</strong> - Deliver wellness surveys</li>
                     </ul>
                   </div>
                   <div className="mt-3 pt-3 border-t border-amber-300">
@@ -422,7 +422,7 @@ export function UnifiedSlackCard({
                       Slack Surveys
                     </Label>
                     <p className="text-sm text-neutral-700 mt-1">
-                      Enable burnout surveys via Slack command and automated DMs
+                      Enable wellness surveys via Slack command and automated DMs
                     </p>
                   </div>
                   <Switch
@@ -445,7 +445,7 @@ export function UnifiedSlackCard({
                       </Badge>
                     </div>
                     <p className="text-sm text-neutral-500 mt-1">
-                      Analyze team sentiment from Slack messages to detect early signs of burnout
+                      Analyze team sentiment from Slack messages to detect early signs of stress
                     </p>
                   </div>
                   <Switch

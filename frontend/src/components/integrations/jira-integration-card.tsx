@@ -364,7 +364,7 @@ export function JiraIntegrationCard({
             <div className="space-y-2">
               <h4 className="font-medium">Privacy & Security</h4>
               <p className="text-sm text-neutral-700">
-                All tokens are encrypted and stored securely. We only collect data necessary for burnout analysis and never share your data with third parties.
+                All tokens are encrypted and stored securely. We only collect data necessary for health analysis and never share your data with third parties.
               </p>
             </div>
           </div>

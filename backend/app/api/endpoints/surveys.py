@@ -28,6 +28,47 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def verify_survey_workspace_access(db: Session, user: User):
+    """
+    Verify user has access to configure/send surveys for their organization.
+    Returns (organization_id, workspace_mapping) if valid.
+    Raises HTTPException if validation fails.
+    """
+    if user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Only admins can manage surveys")
+
+    organization_id = user.organization_id
+    if not organization_id:
+        raise HTTPException(
+            status_code=400,
+            detail="You must belong to an organization to manage surveys."
+        )
+
+    from ...models.slack_workspace_mapping import SlackWorkspaceMapping
+    workspace_mapping = db.query(SlackWorkspaceMapping).filter(
+        SlackWorkspaceMapping.organization_id == organization_id,
+        SlackWorkspaceMapping.status == 'active',
+        SlackWorkspaceMapping.survey_enabled == True
+    ).order_by(SlackWorkspaceMapping.registered_at.desc()).first()
+
+    if not workspace_mapping:
+        raise HTTPException(
+            status_code=404,
+            detail="No active Slack workspace with surveys enabled found for your organization. Please connect Slack and enable surveys first."
+        )
+
+    # Verify workspace owner is in the same organization (prevent cross-org access)
+    if workspace_mapping.owner_user_id:
+        owner = db.query(User).filter(User.id == workspace_mapping.owner_user_id).first()
+        if owner and owner.organization_id is not None and owner.organization_id != organization_id:
+            raise HTTPException(
+                status_code=403,
+                detail="This Slack workspace was connected by a different organization."
+            )
+
+    return organization_id, workspace_mapping
+
+
 class SurveyScheduleCreate(BaseModel):
     """Schema for creating/updating survey schedule."""
     enabled: bool = True
@@ -41,6 +82,8 @@ class SurveyScheduleCreate(BaseModel):
     reminder_hours_after: int = 5
     message_template: Optional[str] = None
     reminder_message_template: Optional[str] = None
+    follow_up_reminders_enabled: bool = True
+    follow_up_message_template: Optional[str] = None
 
 
 class SurveyScheduleResponse(BaseModel):
@@ -58,6 +101,8 @@ class SurveyScheduleResponse(BaseModel):
     reminder_hours_after: int
     message_template: str
     reminder_message_template: str
+    follow_up_reminders_enabled: bool
+    follow_up_message_template: Optional[str]
 
 
 class UserPreferenceUpdate(BaseModel):
@@ -79,80 +124,35 @@ async def create_or_update_survey_schedule(
     Create or update survey schedule for an organization.
     Only admins in the organization that owns the Slack workspace can configure schedules.
     """
-    # Check if user is admin
-    if current_user.role != 'admin':
-        raise HTTPException(status_code=403, detail="Only admins can configure survey schedules")
-
-    # Ensure user belongs to an organization
-    organization_id = current_user.organization_id
-    if not organization_id:
-        raise HTTPException(
-            status_code=400,
-            detail="You must belong to an organization to configure surveys."
-        )
-
-    # Verify user's organization has an active Slack workspace
-    from ...models.slack_workspace_mapping import SlackWorkspaceMapping
-    workspace_mapping = db.query(SlackWorkspaceMapping).filter(
-        SlackWorkspaceMapping.organization_id == organization_id,
-        SlackWorkspaceMapping.status == 'active',
-        SlackWorkspaceMapping.survey_enabled == True
-    ).order_by(SlackWorkspaceMapping.registered_at.desc()).first()
-
-    if not workspace_mapping:
-        raise HTTPException(
-            status_code=404,
-            detail="No active Slack workspace with surveys enabled found for your organization. Please connect Slack and enable surveys first."
-        )
-
-    # Verify workspace owner is in the same organization (prevent cross-org access)
-    if workspace_mapping.owner_user_id:
-        owner = db.query(User).filter(User.id == workspace_mapping.owner_user_id).first()
-        # Only block if owner has an org_id AND it doesn't match (allow legacy NULL org_id workspaces)
-        if owner and owner.organization_id is not None and owner.organization_id != organization_id:
-            raise HTTPException(
-                status_code=403,
-                detail="This Slack workspace was connected by a different organization."
-            )
+    organization_id, _ = verify_survey_workspace_access(db, current_user)
 
     # Determine frequency_type (supports both old and new fields)
+    VALID_FREQUENCIES = ['daily', 'weekday', 'weekly']
     if schedule_data.frequency_type:
         frequency_type = schedule_data.frequency_type
-        # Validate frequency_type
-        VALID_FREQUENCIES = ['daily', 'weekday', 'weekly']
         if frequency_type not in VALID_FREQUENCIES:
             raise HTTPException(
                 status_code=400,
                 detail=f"frequency_type must be one of: {VALID_FREQUENCIES}"
             )
-        # Validate day_of_week for weekly
         if frequency_type == 'weekly':
             if schedule_data.day_of_week is None:
-                raise HTTPException(
-                    status_code=400,
-                    detail="day_of_week required for weekly schedules"
-                )
+                raise HTTPException(status_code=400, detail="day_of_week required for weekly schedules")
             if not 0 <= schedule_data.day_of_week <= 6:
-                raise HTTPException(
-                    status_code=400,
-                    detail="day_of_week must be 0-6 (Monday=0, Sunday=6)"
-                )
+                raise HTTPException(status_code=400, detail="day_of_week must be 0-6 (Monday=0, Sunday=6)")
     elif schedule_data.send_weekdays_only is not None:
-        # Backwards compatibility: convert old field to new
         frequency_type = 'weekday' if schedule_data.send_weekdays_only else 'daily'
     else:
-        # Default
         frequency_type = 'weekday'
 
     # Parse time strings
-    try:
-        hour, minute = map(int, schedule_data.send_time.split(":"))
-        send_time = time(hour=hour, minute=minute)
+    def parse_time_string(time_str: str) -> time:
+        hour, minute = map(int, time_str.split(":"))
+        return time(hour=hour, minute=minute)
 
-        reminder_time = None
-        if schedule_data.reminder_time:
-            r_hour, r_minute = map(int, schedule_data.reminder_time.split(":"))
-            reminder_time = time(hour=r_hour, minute=r_minute)
+    try:
+        send_time = parse_time_string(schedule_data.send_time)
+        reminder_time = parse_time_string(schedule_data.reminder_time) if schedule_data.reminder_time else None
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid time format. Use HH:MM (e.g., 09:00)")
 
@@ -178,6 +178,10 @@ async def create_or_update_survey_schedule(
         if schedule_data.reminder_message_template:
             existing_schedule.reminder_message_template = schedule_data.reminder_message_template
 
+        existing_schedule.follow_up_reminders_enabled = schedule_data.follow_up_reminders_enabled
+        if schedule_data.follow_up_message_template:
+            existing_schedule.follow_up_message_template = schedule_data.follow_up_message_template
+
         db.commit()
         db.refresh(existing_schedule)
         schedule = existing_schedule
@@ -194,13 +198,16 @@ async def create_or_update_survey_schedule(
             day_of_week=schedule_data.day_of_week if frequency_type == 'weekly' else None,
             send_reminder=schedule_data.send_reminder,
             reminder_time=reminder_time,
-            reminder_hours_after=schedule_data.reminder_hours_after
+            reminder_hours_after=schedule_data.reminder_hours_after,
+            follow_up_reminders_enabled=schedule_data.follow_up_reminders_enabled
         )
 
         if schedule_data.message_template:
             schedule.message_template = schedule_data.message_template
         if schedule_data.reminder_message_template:
             schedule.reminder_message_template = schedule_data.reminder_message_template
+        if schedule_data.follow_up_message_template:
+            schedule.follow_up_message_template = schedule_data.follow_up_message_template
 
         db.add(schedule)
         db.commit()
@@ -229,6 +236,8 @@ async def create_or_update_survey_schedule(
         "reminder_hours_after": schedule.reminder_hours_after,
         "message_template": schedule.message_template,
         "reminder_message_template": schedule.reminder_message_template,
+        "follow_up_reminders_enabled": schedule.follow_up_reminders_enabled,
+        "follow_up_message_template": schedule.follow_up_message_template,
         "message": "Survey schedule configured successfully"
     }
 
@@ -255,8 +264,13 @@ async def get_survey_schedule(
             "send_reminder": False,
             "reminder_time": None,
             "reminder_hours_after": 5,
+            "follow_up_reminders_enabled": True,
+            "follow_up_message_template": None,
             "message": "No survey schedule configured"
         }
+
+    # Derive frequency_type with fallback for legacy data
+    effective_frequency = schedule.frequency_type or ('weekday' if schedule.send_weekdays_only else 'daily')
 
     return {
         "id": schedule.id,
@@ -264,14 +278,16 @@ async def get_survey_schedule(
         "enabled": schedule.enabled,
         "send_time": str(schedule.send_time),
         "timezone": schedule.timezone,
-        "send_weekdays_only": (schedule.frequency_type == 'weekday') if schedule.frequency_type else schedule.send_weekdays_only,
-        "frequency_type": schedule.frequency_type or ('weekday' if schedule.send_weekdays_only else 'daily'),
+        "send_weekdays_only": effective_frequency == 'weekday',
+        "frequency_type": effective_frequency,
         "day_of_week": schedule.day_of_week,
         "send_reminder": schedule.send_reminder,
         "reminder_time": str(schedule.reminder_time) if schedule.reminder_time else None,
         "reminder_hours_after": schedule.reminder_hours_after,
         "message_template": schedule.message_template,
-        "reminder_message_template": schedule.reminder_message_template
+        "reminder_message_template": schedule.reminder_message_template,
+        "follow_up_reminders_enabled": schedule.follow_up_reminders_enabled if schedule.follow_up_reminders_enabled is not None else True,
+        "follow_up_message_template": schedule.follow_up_message_template
     }
 
 
@@ -371,65 +387,28 @@ async def manual_survey_delivery(
     Requires confirmation to prevent accidental sends.
     Only admins in the organization that owns the Slack workspace can send surveys.
     """
-    # Check if user is admin
-    if current_user.role != 'admin':
-        raise HTTPException(
-            status_code=403,
-            detail="Only admins can send surveys."
-        )
+    organization_id, workspace_mapping = verify_survey_workspace_access(db, current_user)
 
-    # Ensure user belongs to an organization
-    organization_id = current_user.organization_id
-    if not organization_id:
-        raise HTTPException(
-            status_code=400,
-            detail="You must belong to an organization to send surveys."
-        )
+    # Helper to filter recipients by email list
+    def filter_recipients(all_recipients, email_filter):
+        if not email_filter:
+            return all_recipients
+        email_set = {e.lower() for e in email_filter}
+        return [r for r in all_recipients if r['email'].lower() in email_set]
 
-    # Verify user's organization has an active Slack workspace
-    from ...models.slack_workspace_mapping import SlackWorkspaceMapping
-    workspace_mapping = db.query(SlackWorkspaceMapping).filter(
-        SlackWorkspaceMapping.organization_id == organization_id,
-        SlackWorkspaceMapping.status == 'active',
-        SlackWorkspaceMapping.survey_enabled == True
-    ).order_by(SlackWorkspaceMapping.registered_at.desc()).first()
-
-    if not workspace_mapping:
-        raise HTTPException(
-            status_code=404,
-            detail="No active Slack workspace with surveys enabled found for your organization. Please connect Slack and enable surveys first."
-        )
-
-    # Verify workspace owner is in the same organization (prevent cross-org access)
-    if workspace_mapping.owner_user_id:
-        owner = db.query(User).filter(User.id == workspace_mapping.owner_user_id).first()
-        # Only block if owner has an org_id AND it doesn't match (allow legacy NULL org_id workspaces)
-        if owner and owner.organization_id is not None and owner.organization_id != organization_id:
-            raise HTTPException(
-                status_code=403,
-                detail="This Slack workspace was connected by a different organization."
-            )
+    # Get all eligible recipients (manual sends skip saved recipient filter)
+    all_recipients = survey_scheduler._get_survey_recipients(
+        organization_id, db, is_reminder=False, apply_saved_recipients=False
+    )
 
     # First call without confirmation - return preview
     if not request.confirmed:
-        # Get recipients count - for manual sends, don't apply saved recipient filter
-        recipients = survey_scheduler._get_survey_recipients(organization_id, db, is_reminder=False, apply_saved_recipients=False)
-
-        # Filter by recipient_emails if provided (but not if empty array)
-        if request.recipient_emails is not None and len(request.recipient_emails) > 0:
-            recipient_emails_lower = [email.lower() for email in request.recipient_emails]
-            recipients = [r for r in recipients if r['email'].lower() in recipient_emails_lower]
-
+        recipients = filter_recipients(all_recipients, request.recipient_emails)
         return {
             "requires_confirmation": True,
             "message": f"This will send surveys to {len(recipients)} team members via Slack DM.",
             "recipient_count": len(recipients),
-            "recipients": [
-                {
-                    "name": r.get('name', 'Unknown'),
-                    "email": r['email']
-                } for r in recipients
-            ],
+            "recipients": [{"name": r.get('name', 'Unknown'), "email": r['email']} for r in recipients],
             "note": "To proceed, send this request again with 'confirmed': true"
         }
 
@@ -438,6 +417,7 @@ async def manual_survey_delivery(
         logger.info(f"Manual survey delivery triggered by {current_user.email} for org {organization_id}")
 
         # Re-verify workspace is still enabled (prevent TOCTOU race condition)
+        from ...models.slack_workspace_mapping import SlackWorkspaceMapping
         workspace_check = db.query(SlackWorkspaceMapping).filter(
             SlackWorkspaceMapping.id == workspace_mapping.id,
             SlackWorkspaceMapping.status == 'active',
@@ -450,26 +430,17 @@ async def manual_survey_delivery(
                 detail="Slack workspace surveys have been disabled. Please enable surveys and try again."
             )
 
-        # Get recipients before sending - for manual sends, don't apply saved recipient filter
-        all_recipients = survey_scheduler._get_survey_recipients(organization_id, db, is_reminder=False, apply_saved_recipients=False)
-
-        # CRITICAL: Must provide recipient_emails when confirmed (cannot send to all)
-        # This prevents accidental mass sends when empty array is provided
-        if request.recipient_emails is None or len(request.recipient_emails) == 0:
+        # Must provide recipient_emails when confirmed (prevents accidental mass sends)
+        if not request.recipient_emails:
             raise HTTPException(
                 status_code=400,
                 detail="No recipients selected. Please select at least one team member to send surveys to."
             )
 
-        # Filter to only selected recipients
-        recipient_emails_lower = [email.lower() for email in request.recipient_emails]
-        recipients = [r for r in all_recipients if r['email'].lower() in recipient_emails_lower]
+        recipients = filter_recipients(all_recipients, request.recipient_emails)
         logger.info(f"Filtered to {len(recipients)} selected recipients from {len(all_recipients)} total")
 
-        recipient_count = len(recipients)
-
-        # Validate that selected emails actually exist in recipient list
-        if recipient_count == 0:
+        if not recipients:
             raise HTTPException(
                 status_code=400,
                 detail="None of the selected emails were found in the available recipients. Please select valid team members."
@@ -527,18 +498,18 @@ async def manual_survey_delivery(
             is_manual=True
         )
 
-        # Build detailed response message
-        message_parts = [f"Sent surveys to {sent_count} recipient(s)"]
+        # Build response message
+        message = f"Sent surveys to {sent_count} recipient(s)"
         if failed_count > 0:
-            message_parts.append(f"{failed_count} failed")
+            message += f". {failed_count} failed"
 
         return {
             "success": True,
-            "message": ". ".join(message_parts),
-            "recipient_count": recipient_count,  # Total selected
-            "sent_count": sent_count,  # Actually sent
-            "failed_count": failed_count,  # Failed to send
-            "failed_recipients": failed_recipients,  # Detailed failure info
+            "message": message,
+            "recipient_count": len(recipients),
+            "sent_count": sent_count,
+            "failed_count": failed_count,
+            "failed_recipients": failed_recipients,
             "triggered_by": current_user.email
         }
 

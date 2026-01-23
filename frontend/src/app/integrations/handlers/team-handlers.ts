@@ -139,7 +139,7 @@ export async function syncUsersToCorrelation(
       if (stats.linear_error) {
         message += ` Linear sync failed.`
       }
-      message += ` All team members can now submit burnout surveys via Slack!`
+      message += ` All team members can now submit wellness surveys via Slack!`
 
       if (!suppressToast) {
         toast.success(message)

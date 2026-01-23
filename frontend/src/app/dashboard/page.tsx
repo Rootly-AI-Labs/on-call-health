@@ -747,12 +747,12 @@ function DashboardContent() {
                 </Card>
               )}
 
-              {/* Individual Burnout Scores and AI Insights Grid */}
+              {/* Individual Risk Scores and AI Insights Grid */}
               {(() => {
                 const hasAIInsights = currentAnalysis?.analysis_data?.ai_team_insights?.available;
                 return (
                   <div className={`grid grid-cols-1 ${hasAIInsights ? 'lg:grid-cols-3' : 'lg:grid-cols-1'} gap-6 mb-6`}>
-                    {/* Individual Burnout Scores - Takes 2/3 width on large screens, full width if no AI Insights */}
+                    {/* Individual Risk Scores - Takes 2/3 width on large screens, full width if no AI Insights */}
                     {/* <Card className={hasAIInsights ? "lg:col-span-2" : ""}>
                       <CardHeader>
                         <CardTitle>Individual Risk Levels</CardTitle>
@@ -778,10 +778,10 @@ function DashboardContent() {
                                     const data = props.payload;
                                     const getRiskLabel = (level: string) => {
                                       switch(level) {
-                                        case 'low': return 'Low/Minimal Burnout';
-                                        case 'mild': return 'Mild Burnout Symptoms';
-                                        case 'moderate': return 'Moderate/Significant Burnout';
-                                        case 'high': return 'High/Severe Burnout';
+                                        case 'low': return 'Low/Minimal Risk';
+                                        case 'mild': return 'Mild Risk Symptoms';
+                                        case 'moderate': return 'Moderate/Significant Risk';
+                                        case 'high': return 'High/Severe Risk';
                                         default: return level;
                                       }
                                     };
@@ -839,11 +839,11 @@ function DashboardContent() {
                   />
                 </div>
 
-                {/* Burnout Journey Map */}
+                {/* Health Journey Map */}
                 {false && (
                 <Card className="flex flex-col">
                   <CardHeader>
-                    <CardTitle>Burnout Timeline</CardTitle>
+                    <CardTitle>Health Timeline</CardTitle>
                     <CardDescription>
                       {(() => {
                         if (currentAnalysis?.analysis_data?.daily_trends?.length > 0) {
@@ -1109,7 +1109,7 @@ function DashboardContent() {
                 />} */}
               </div>
 
-              {/* Burnout Factors Section */}
+              {/* Risk Factors Section */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                 {/* Risk Factors Radar Chart */}
                 {burnoutFactors.length > 0 && (

@@ -92,10 +92,25 @@ class MigrationRunner:
             logger.error(f"❌ Failed to mark migration as applied: {e}")
 
     def run_sql_migration(self, migration_name: str, sql_commands: List[str]) -> bool:
-        """Run a SQL-based migration"""
+        """Run a SQL-based migration.
+
+        IMPORTANT: This function includes a critical check for empty sql_commands.
+        Previously, if load_sql_file() returned [] (due to FileNotFoundError or other
+        issues), the for loop wouldn't execute but mark_migration_applied() would still
+        run, causing "phantom" migrations that appeared complete but applied no changes.
+        This caused recurring production issues where schema changes were missing.
+        See migration 041_repair_survey_periods_migration for an example fix.
+        """
         if self.is_migration_applied(migration_name):
             logger.info(f"⏭️  Skipping already applied migration: {migration_name}")
             return True
+
+        # CRITICAL: Don't mark migration as complete if no SQL commands to run
+        # This prevents silent failures when SQL files are missing or fail to load
+        # (fixes a bug that caused 040_add_survey_periods to be marked complete without running)
+        if not sql_commands:
+            logger.error(f"❌ Migration {migration_name} has no SQL commands - skipping to prevent false completion")
+            return False
 
         logger.info(f"🔧 Running migration: {migration_name}")
 
@@ -1144,6 +1159,16 @@ class MigrationRunner:
                 "name": "039_add_performance_indexes",
                 "description": "Add missing indexes to analyses, integration_mappings, user_notifications, and rootly_integrations for query performance",
                 "sql_file": "2026_01_21_add_performance_indexes.sql"
+            },
+            {
+                "name": "040_add_survey_periods",
+                "description": "Add survey_periods table for daily follow-up reminders tracking",
+                "sql_file": "2026_01_22_add_survey_periods.sql"
+            },
+            {
+                "name": "041_repair_survey_periods_migration",
+                "description": "Repair false-positive migration 040 if columns don't exist (fixes migration runner bug)",
+                "sql_file": "2026_01_23_repair_survey_periods_migration.sql"
             },
             # Add future migrations here with incrementing numbers
         ]

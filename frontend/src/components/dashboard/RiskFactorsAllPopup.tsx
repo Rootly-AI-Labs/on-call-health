@@ -67,9 +67,9 @@ export default function RiskFactorsAllPopup({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto bg-neutral-100">
         <DialogHeader>
-          <DialogTitle className="text-2xl">Team Members at Risk - Burnout Factors</DialogTitle>
+          <DialogTitle className="text-2xl">Team Members at Risk - Health Factors</DialogTitle>
           <DialogDescription className="text-sm">
-            Showing all team members with medium to high risk and their corresponding burnout factor scores
+            Showing all team members with medium to high risk and their corresponding health factor scores
           </DialogDescription>
         </DialogHeader>
 

@@ -109,7 +109,7 @@ export function SlackIntegrationCard({ onConnect, isConnecting }: SlackIntegrati
                       <p className="text-sm text-purple-800 mb-2">After setup, add the bot to relevant channels:</p>
                       <ul className="text-sm text-purple-800 space-y-1 ml-4">
                         <li>• Go to each channel you want analyzed in Slack</li>
-                        <li>• Type <code className="bg-purple-200 px-1 rounded">@Burnout Detector</code> and invite the bot</li>
+                        <li>• Type <code className="bg-purple-200 px-1 rounded">@On-Call Health</code> and invite the bot</li>
                         <li>• The bot must be in channels to read message history</li>
                       </ul>
                       <div className="mt-2 p-2 bg-red-100 border border-red-300 rounded text-xs text-red-800">
