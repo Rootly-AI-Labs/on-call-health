@@ -89,7 +89,7 @@ class AIBurnoutAnalyzerService:
             # Log AI enhancement details before merging
             traditional_member_count = len(traditional_analysis.get('members', []))
             ai_enhanced_count = len([m for m in ai_insights.get('members', []) if m.get('ai_insights')])
-            self.logger.info(f"AI Enhancement Summary - Traditional members: {traditional_member_count}, AI enhanced: {ai_enhanced_count}")
+            self.logger.debug(f"AI Enhancement Summary - Traditional members: {traditional_member_count}, AI enhanced: {ai_enhanced_count}")
 
             # Merge AI insights with traditional analysis
             enhanced_analysis = self._merge_analyses(traditional_analysis, ai_insights)
@@ -97,7 +97,7 @@ class AIBurnoutAnalyzerService:
             # Log final enhancement results
             final_member_count = len(enhanced_analysis.get('members', []))
             ai_enabled_final = enhanced_analysis.get('ai_enhanced', False)
-            self.logger.info(f"AI Enhancement Complete - Final members: {final_member_count}, AI enabled: {ai_enabled_final}")
+            self.logger.debug(f"AI Enhancement Complete - Final members: {final_member_count}, AI enabled: {ai_enabled_final}")
 
             return enhanced_analysis
 

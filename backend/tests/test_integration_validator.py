@@ -10,14 +10,21 @@ import asyncio
 
 from app.services.integration_validator import (
     IntegrationValidator,
-    get_cached_validation,
-    set_validation_cache,
-    invalidate_validation_cache,
-    _validation_cache,
-    _cache_lock,
-    VALIDATION_CACHE_TTL_SECONDS,
-    MAX_CACHE_SIZE,
     needs_refresh,
+    _is_ascii_digits,
+    _parse_expires_in,
+    EXPIRES_IN_DEFAULT_SECONDS,
+    EXPIRES_IN_MIN_SECONDS,
+    EXPIRES_IN_MAX_SECONDS,
+)
+from app.core.validation_cache import (
+    get_cached_validation,
+    set_cached_validation,
+    invalidate_validation_cache,
+    VALIDATION_CACHE_TTL_SECONDS,
+    _fallback_cache,
+    _fallback_lock,
+    _FALLBACK_MAX_SIZE,
 )
 from app.models import GitHubIntegration, LinearIntegration, JiraIntegration
 
@@ -259,11 +266,11 @@ class TestValidationCache(unittest.TestCase):
 
     def setUp(self):
         """Clear cache before each test."""
-        _validation_cache.clear()
+        _fallback_cache.clear()
 
     def tearDown(self):
         """Clear cache after each test."""
-        _validation_cache.clear()
+        _fallback_cache.clear()
 
     def test_set_and_get_cached_validation(self):
         """Test setting and retrieving cached validation results."""
@@ -273,7 +280,7 @@ class TestValidationCache(unittest.TestCase):
             "linear": {"valid": False, "error": "Token expired"}
         }
 
-        set_validation_cache(user_id, results)
+        set_cached_validation(user_id, results)
         cached = get_cached_validation(user_id)
 
         self.assertEqual(cached, results)
@@ -289,7 +296,7 @@ class TestValidationCache(unittest.TestCase):
         results = {"github": {"valid": True, "error": None}}
 
         # Set cache with old timestamp
-        _validation_cache[user_id] = {
+        _fallback_cache[user_id] = {
             "results": results,
             "timestamp": datetime.now(dt_timezone.utc) - timedelta(seconds=VALIDATION_CACHE_TTL_SECONDS + 10)
         }
@@ -302,7 +309,7 @@ class TestValidationCache(unittest.TestCase):
         user_id = 1
         results = {"github": {"valid": True, "error": None}}
 
-        set_validation_cache(user_id, results)
+        set_cached_validation(user_id, results)
         self.assertIsNotNone(get_cached_validation(user_id))
 
         invalidate_validation_cache(user_id)
@@ -318,8 +325,8 @@ class TestValidationCache(unittest.TestCase):
         results = {"github": {"valid": True, "error": None}}
 
         # Set cache with old timestamp directly
-        with _cache_lock:
-            _validation_cache[user_id] = {
+        with _fallback_lock:
+            _fallback_cache[user_id] = {
                 "results": results,
                 "timestamp": datetime.now(dt_timezone.utc) - timedelta(seconds=VALIDATION_CACHE_TTL_SECONDS + 10)
             }
@@ -329,29 +336,29 @@ class TestValidationCache(unittest.TestCase):
         self.assertIsNone(cached)
 
         # Entry should be removed
-        with _cache_lock:
-            self.assertNotIn(user_id, _validation_cache)
+        with _fallback_lock:
+            self.assertNotIn(user_id, _fallback_cache)
 
     def test_cache_eviction_when_full(self):
         """Test that oldest entries are evicted when cache is full."""
-        # Fill the cache to MAX_CACHE_SIZE
+        # Fill the cache to _FALLBACK_MAX_SIZE
         base_time = datetime.now(dt_timezone.utc) - timedelta(hours=1)
 
-        with _cache_lock:
-            for i in range(MAX_CACHE_SIZE):
-                _validation_cache[i] = {
+        with _fallback_lock:
+            for i in range(_FALLBACK_MAX_SIZE):
+                _fallback_cache[i] = {
                     "results": {"github": {"valid": True, "error": None}},
                     "timestamp": base_time + timedelta(seconds=i)
                 }
 
         # Adding a new entry should trigger eviction
-        set_validation_cache(MAX_CACHE_SIZE + 1, {"github": {"valid": True, "error": None}})
+        set_cached_validation(_FALLBACK_MAX_SIZE + 1, {"github": {"valid": True, "error": None}})
 
-        # Cache should now be smaller than MAX_CACHE_SIZE + 1
-        with _cache_lock:
-            self.assertLess(len(_validation_cache), MAX_CACHE_SIZE + 1)
+        # Cache should now be smaller than _FALLBACK_MAX_SIZE + 1
+        with _fallback_lock:
+            self.assertLess(len(_fallback_cache), _FALLBACK_MAX_SIZE + 1)
             # New entry should exist
-            self.assertIn(MAX_CACHE_SIZE + 1, _validation_cache)
+            self.assertIn(_FALLBACK_MAX_SIZE + 1, _fallback_cache)
 
 
 class TestNeedsRefresh(unittest.TestCase):
@@ -384,6 +391,17 @@ class TestLinearTokenRefresh(unittest.TestCase):
         """Set up test fixtures."""
         self.mock_db = Mock(spec=Session)
         self.validator = IntegrationValidator(self.mock_db)
+        # Setup transaction context manager mock
+        self._setup_transaction_mock()
+
+    def _setup_transaction_mock(self):
+        """Configure mock db to handle transaction context managers."""
+        self.mock_db.in_transaction.return_value = False
+        mock_transaction = Mock()
+        mock_transaction.__enter__ = Mock(return_value=None)
+        mock_transaction.__exit__ = Mock(return_value=False)
+        self.mock_db.begin.return_value = mock_transaction
+        self.mock_db.begin_nested.return_value = mock_transaction
 
     def _run_async(self, coro):
         """Helper to run async functions in tests."""
@@ -438,7 +456,8 @@ class TestLinearTokenRefresh(unittest.TestCase):
             token = self._run_async(self.validator._get_valid_linear_token(mock_integration))
 
         self.assertEqual(token, "new_access_token")
-        self.mock_db.commit.assert_called_once()
+        # Transaction commit is handled by context manager __exit__
+        self.mock_db.begin.return_value.__exit__.assert_called()
 
     def test_get_valid_linear_token_no_refresh_token_raises_error(self):
         """Test that expired token with no refresh token raises an error."""
@@ -574,6 +593,100 @@ class TestLinearTokenRefresh(unittest.TestCase):
         self.mock_db.rollback.assert_called_once()
 
 
+
+class TestIsAsciiDigits(unittest.TestCase):
+    """Test suite for _is_ascii_digits helper function."""
+
+    def test_valid_ascii_digits(self):
+        """Test that valid ASCII digit strings return True."""
+        self.assertTrue(_is_ascii_digits("123"))
+        self.assertTrue(_is_ascii_digits("0"))
+        self.assertTrue(_is_ascii_digits("9876543210"))
+
+    def test_empty_string_returns_false(self):
+        """Test that empty string returns False."""
+        self.assertFalse(_is_ascii_digits(""))
+
+    def test_non_digit_characters_return_false(self):
+        """Test that strings with non-digit characters return False."""
+        self.assertFalse(_is_ascii_digits("12a3"))
+        self.assertFalse(_is_ascii_digits("-123"))
+        self.assertFalse(_is_ascii_digits("1.5"))
+        self.assertFalse(_is_ascii_digits("1e9"))
+
+    def test_unicode_digits_return_false(self):
+        """Test that Unicode digits (like superscript) return False."""
+        self.assertFalse(_is_ascii_digits("³"))
+        self.assertFalse(_is_ascii_digits("²³"))
+        self.assertFalse(_is_ascii_digits("12³"))
+
+
+class TestParseExpiresIn(unittest.TestCase):
+    """Test suite for _parse_expires_in function."""
+
+    def test_none_returns_default(self):
+        """Test that None returns the default value."""
+        self.assertEqual(_parse_expires_in(None), EXPIRES_IN_DEFAULT_SECONDS)
+
+    def test_bool_returns_default(self):
+        """Test that boolean values return the default."""
+        self.assertEqual(_parse_expires_in(True), EXPIRES_IN_DEFAULT_SECONDS)
+        self.assertEqual(_parse_expires_in(False), EXPIRES_IN_DEFAULT_SECONDS)
+
+    def test_valid_int_within_bounds(self):
+        """Test that valid integers within bounds are returned."""
+        self.assertEqual(_parse_expires_in(3600), 3600)
+        self.assertEqual(_parse_expires_in(EXPIRES_IN_MIN_SECONDS), EXPIRES_IN_MIN_SECONDS)
+        self.assertEqual(_parse_expires_in(EXPIRES_IN_MAX_SECONDS), EXPIRES_IN_MAX_SECONDS)
+
+    def test_int_below_min_returns_default(self):
+        """Test that integers below minimum return default."""
+        self.assertEqual(_parse_expires_in(1), EXPIRES_IN_DEFAULT_SECONDS)
+        self.assertEqual(_parse_expires_in(0), EXPIRES_IN_DEFAULT_SECONDS)
+        self.assertEqual(_parse_expires_in(-100), EXPIRES_IN_DEFAULT_SECONDS)
+
+    def test_int_above_max_returns_default(self):
+        """Test that integers above maximum return default."""
+        self.assertEqual(_parse_expires_in(EXPIRES_IN_MAX_SECONDS + 1), EXPIRES_IN_DEFAULT_SECONDS)
+        self.assertEqual(_parse_expires_in(10**10), EXPIRES_IN_DEFAULT_SECONDS)
+
+    def test_valid_string_within_bounds(self):
+        """Test that valid string numbers within bounds are returned."""
+        self.assertEqual(_parse_expires_in("3600"), 3600)
+        self.assertEqual(_parse_expires_in(" 3600 "), 3600)
+
+    def test_invalid_string_returns_default(self):
+        """Test that invalid string formats return default."""
+        self.assertEqual(_parse_expires_in("abc"), EXPIRES_IN_DEFAULT_SECONDS)
+        self.assertEqual(_parse_expires_in("1e9"), EXPIRES_IN_DEFAULT_SECONDS)
+        self.assertEqual(_parse_expires_in("-100"), EXPIRES_IN_DEFAULT_SECONDS)
+        self.assertEqual(_parse_expires_in("1.5"), EXPIRES_IN_DEFAULT_SECONDS)
+
+    def test_float_within_bounds(self):
+        """Test that floats within valid range are accepted."""
+        self.assertEqual(_parse_expires_in(3600.0), 3600)
+        # 1e3 = 1000.0, within bounds
+        self.assertEqual(_parse_expires_in(1e3), 1000)
+
+    def test_scientific_notation_float_rejected_early(self):
+        """Test that large scientific notation floats are rejected BEFORE int conversion.
+
+        This prevents potential integer overflow issues. The bounds check happens
+        on the raw float value, not after conversion to int.
+        """
+        # 1e9 = 1,000,000,000 which exceeds EXPIRES_IN_MAX_SECONDS (2,592,000)
+        self.assertEqual(_parse_expires_in(1e9), EXPIRES_IN_DEFAULT_SECONDS)
+        # Very large float that could cause overflow if converted first
+        self.assertEqual(_parse_expires_in(1e15), EXPIRES_IN_DEFAULT_SECONDS)
+        # Negative large float
+        self.assertEqual(_parse_expires_in(-1e9), EXPIRES_IN_DEFAULT_SECONDS)
+
+    def test_non_integer_float_returns_default(self):
+        """Test that non-integer floats return default."""
+        self.assertEqual(_parse_expires_in(3600.5), EXPIRES_IN_DEFAULT_SECONDS)
+
+
+
 class TestValidateAllIntegrations(unittest.TestCase):
     """Test suite for validate_all_integrations with caching."""
 
@@ -581,11 +694,11 @@ class TestValidateAllIntegrations(unittest.TestCase):
         """Set up test fixtures."""
         self.mock_db = Mock(spec=Session)
         self.validator = IntegrationValidator(self.mock_db)
-        _validation_cache.clear()
+        _fallback_cache.clear()
 
     def tearDown(self):
         """Clear cache after each test."""
-        _validation_cache.clear()
+        _fallback_cache.clear()
 
     def _run_async(self, coro):
         """Helper to run async functions in tests."""
@@ -597,7 +710,7 @@ class TestValidateAllIntegrations(unittest.TestCase):
         cached_results = {
             "github": {"valid": True, "error": None}
         }
-        set_validation_cache(user_id, cached_results)
+        set_cached_validation(user_id, cached_results)
 
         result = self._run_async(self.validator.validate_all_integrations(user_id, use_cache=True))
 
@@ -608,7 +721,7 @@ class TestValidateAllIntegrations(unittest.TestCase):
         """Test that validate_all_integrations bypasses cache when use_cache=False."""
         user_id = 1
         cached_results = {"github": {"valid": True, "error": None}}
-        set_validation_cache(user_id, cached_results)
+        set_cached_validation(user_id, cached_results)
 
         self.mock_db.query().filter().first.return_value = None
 

@@ -139,7 +139,7 @@ class MappingRecorder:
         self.db.commit()
         self.db.refresh(mapping)
         
-        logger.info(f"Recorded mapping: {mapping}")
+        logger.debug(f"Recorded mapping: {mapping}")
         return mapping
     
     def record_successful_mapping(

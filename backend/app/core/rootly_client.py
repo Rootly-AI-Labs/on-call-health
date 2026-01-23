@@ -18,8 +18,12 @@ from typing import Dict, List, Any, Optional, Callable
 from urllib.parse import urlencode
 
 from .config import settings
+from .api_cache import get_cached_api_response, set_cached_api_response
 
 logger = logging.getLogger(__name__)
+
+# Cache TTL for Rootly data (1 hour - users rarely change)
+ROOTLY_CACHE_TTL_SECONDS = 3600
 
 # Timeout settings based on API benchmark
 DEFAULT_TIMEOUT = httpx.Timeout(30.0, connect=10.0)
@@ -293,17 +297,32 @@ class RootlyAPIClient:
                 "error_code": "UNKNOWN_ERROR"
             }
     
-    async def get_users(self, limit: int = 100, include_role: bool = False):
-        """Fetch users from Rootly API.
+    async def get_users(self, limit: int = 100, include_role: bool = False, force_refresh: bool = False):
+        """Fetch users from Rootly API with Redis caching.
 
         Args:
             limit: Maximum number of users to fetch
             include_role: If True, includes role relationship to identify incident responders
+            force_refresh: If True, bypass cache and fetch fresh data
 
         Returns:
             If include_role is True: Tuple of (users, included_data)
             Otherwise: List of users
         """
+        cache_params = {"limit": limit, "include_role": include_role}
+
+        # Check cache first (unless force_refresh)
+        # Note: We cache the full response including included data when include_role is True
+        if not force_refresh:
+            cached = get_cached_api_response("rootly", "users", self.api_token, cache_params)
+            if cached is not None:
+                if include_role:
+                    logger.info(f"ROOTLY GET_USERS: Using cached data ({len(cached.get('users', []))} users with roles)")
+                    return cached.get("users", []), cached.get("included", [])
+                else:
+                    logger.info(f"ROOTLY GET_USERS: Using cached data ({len(cached)} users)")
+                    return cached
+
         all_users = []
         all_included = []
         page = 1
@@ -361,11 +380,18 @@ class RootlyAPIClient:
 
                     page += 1
 
-                # Return users and included data if role was requested
+                final_users = all_users[:limit]
+
+                # Cache the results
                 if include_role:
-                    return all_users[:limit], all_included
+                    cache_data = {"users": final_users, "included": all_included}
+                    set_cached_api_response("rootly", "users", self.api_token, cache_data, ROOTLY_CACHE_TTL_SECONDS, cache_params)
+                    logger.info(f"ROOTLY GET_USERS: Fetched {len(final_users)} users with roles")
+                    return final_users, all_included
                 else:
-                    return all_users[:limit]
+                    set_cached_api_response("rootly", "users", self.api_token, final_users, ROOTLY_CACHE_TTL_SECONDS, cache_params)
+                    logger.info(f"ROOTLY GET_USERS: Fetched {len(final_users)} users")
+                    return final_users
 
         except Exception as e:
             logger.error(f"Error fetching users: {e}")
