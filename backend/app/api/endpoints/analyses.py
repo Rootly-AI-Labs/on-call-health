@@ -146,7 +146,7 @@ class WarmCacheResponse(BaseModel):
 
 async def _warm_cache_background_task(user_id: int) -> None:
     """Background task to warm all integration permission caches."""
-    from ...models import SessionLocal
+    from ...database import SessionLocal
     from ...services.integration_validator import IntegrationValidator
 
     try:
