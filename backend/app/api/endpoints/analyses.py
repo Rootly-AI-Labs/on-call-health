@@ -166,6 +166,7 @@ async def _warm_cache_background_task(user_id: int) -> None:
 @router.post("/warm-permissions-cache", response_model=WarmCacheResponse)
 @general_rate_limit("integration_validation")
 async def warm_permissions_cache(
+    request: Request,
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_active_user),
 ) -> WarmCacheResponse:
