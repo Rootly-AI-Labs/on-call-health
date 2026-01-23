@@ -18,9 +18,11 @@ from ...auth.dependencies import get_current_user
 from ...auth.integration_oauth import slack_integration_oauth
 from ...core.config import settings
 from ...services.notification_service import NotificationService
+from ...utils import mask_email
 
 # Set up logger
 logger = logging.getLogger(__name__)
+
 
 router = APIRouter(prefix="/slack", tags=["slack-integration"])
 
@@ -32,9 +34,29 @@ def get_user_isolation_key(user: User) -> tuple:
     """
     if user.organization_id:
         return ("organization_id", user.organization_id)
-    else:
-        # Beta mode: isolate by user_id
-        return ("user_id", user.id)
+    return ("user_id", user.id)
+
+
+def get_active_workspace_mapping(db: Session, user: User) -> SlackWorkspaceMapping:
+    """
+    Find the active workspace mapping for a user.
+    Checks organization first, then falls back to owner lookup for legacy workspaces.
+    Returns None if no active workspace mapping is found.
+    """
+    workspace_mapping = None
+    if user.organization_id:
+        workspace_mapping = db.query(SlackWorkspaceMapping).filter(
+            SlackWorkspaceMapping.organization_id == user.organization_id,
+            SlackWorkspaceMapping.status == 'active'
+        ).first()
+
+    if not workspace_mapping:
+        workspace_mapping = db.query(SlackWorkspaceMapping).filter(
+            SlackWorkspaceMapping.owner_user_id == user.id,
+            SlackWorkspaceMapping.status == 'active'
+        ).first()
+
+    return workspace_mapping
 
 # Simple encryption for tokens (in production, use proper key management)
 def get_encryption_key():
@@ -138,7 +160,7 @@ async def slack_oauth_callback(
                 user_id = decoded_state.get("userId")
                 user_email = decoded_state.get("email")
                 enable_survey = decoded_state.get("enableSurvey", False)  # Default False
-                logger.debug(f"Decoded state - org_id: {organization_id}, user_id: {user_id}, email: {user_email}, survey: {enable_survey}")
+                logger.debug(f"Decoded state - org_id: {organization_id}, user_id: {user_id}, email: {mask_email(user_email)}, survey: {enable_survey}")
             except Exception as state_error:
                 # If state parsing fails, continue without org mapping and use defaults
                 logger.warning(f"Failed to parse state parameter: {state_error}")
@@ -225,13 +247,13 @@ async def slack_oauth_callback(
         if user_id:
             owner_user = db.query(User).filter(User.id == user_id).first()
             if owner_user:
-                logger.info(f"Found owner by user_id: {owner_user.id} ({owner_user.email})")
+                logger.info(f"Found owner by user_id: {owner_user.id} ({mask_email(owner_user.email)})")
 
         # Fallback: try to find by email from state
         if not owner_user and user_email:
             owner_user = db.query(User).filter(User.email == user_email).first()
             if owner_user:
-                logger.info(f"Found owner by email: {owner_user.id} ({owner_user.email})")
+                logger.info(f"Found owner by email: {owner_user.id} ({mask_email(owner_user.email)})")
 
         # Fallback: find any admin in the organization
         if not owner_user and organization_id:
@@ -240,13 +262,13 @@ async def slack_oauth_callback(
                 User.role == 'admin'
             ).first()
             if owner_user:
-                logger.warning(f"Could not find user from state, using first admin in org: {owner_user.id} ({owner_user.email})")
+                logger.warning(f"Could not find user from state, using first admin in org: {owner_user.id} ({mask_email(owner_user.email)})")
 
         # Last resort: find any user to be the owner
         if not owner_user:
             owner_user = db.query(User).first()
             if owner_user:
-                logger.warning(f"Could not find specific user, using first user in database: {owner_user.id} ({owner_user.email})")
+                logger.warning(f"Could not find specific user, using first user in database: {owner_user.id} ({mask_email(owner_user.email)})")
 
         if not owner_user:
             # If absolutely no users exist, we can't create the mapping
@@ -542,23 +564,7 @@ async def get_slack_status(
     """
     logger.debug(f"Checking Slack status for user {current_user.id} (org: {current_user.organization_id})")
 
-    # Check for OAuth workspace mapping
-    workspace_mapping = None
-
-    # Check if there's a workspace mapping for this user's organization
-    if current_user.organization_id:
-        workspace_mapping = db.query(SlackWorkspaceMapping).filter(
-            SlackWorkspaceMapping.organization_id == current_user.organization_id,
-            SlackWorkspaceMapping.status == 'active'
-        ).first()
-
-    # Also check if user is the owner of any workspace mapping
-    if not workspace_mapping:
-        workspace_mapping = db.query(SlackWorkspaceMapping).filter(
-            SlackWorkspaceMapping.owner_user_id == current_user.id,
-            SlackWorkspaceMapping.status == 'active'
-        ).first()
-
+    workspace_mapping = get_active_workspace_mapping(db, current_user)
     if not workspace_mapping:
         return {
             "connected": False,
@@ -625,7 +631,6 @@ async def toggle_slack_feature(
     Only works for OAuth-based integrations.
     Requires: admin role.
     """
-    # Check if user is admin
     if current_user.role != 'admin':
         raise HTTPException(
             status_code=403,
@@ -633,41 +638,21 @@ async def toggle_slack_feature(
         )
 
     try:
-        # Find workspace mapping by organization
-        # Handle both org-based and user-based (legacy) workspaces
-        workspace_mapping = None
-
-        if current_user.organization_id:
-            # Look for org's workspace
-            workspace_mapping = db.query(SlackWorkspaceMapping).filter(
-                SlackWorkspaceMapping.organization_id == current_user.organization_id,
-                SlackWorkspaceMapping.status == 'active'
-            ).first()
-
-        # Fallback: Look for workspace by owner (for legacy workspaces without org_id)
-        if not workspace_mapping:
-            workspace_mapping = db.query(SlackWorkspaceMapping).filter(
-                SlackWorkspaceMapping.owner_user_id == current_user.id,
-                SlackWorkspaceMapping.status == 'active'
-            ).first()
-
+        workspace_mapping = get_active_workspace_mapping(db, current_user)
         if not workspace_mapping:
             raise HTTPException(
                 status_code=404,
                 detail="No OAuth Slack workspace found for your account"
             )
 
-        # Validate feature name
         if request.feature not in ['survey']:
             raise HTTPException(
                 status_code=400,
                 detail="Invalid feature name. Must be 'survey'"
             )
 
-        # Update the appropriate feature flag
-        if request.feature == 'survey':
-            workspace_mapping.survey_enabled = request.enabled
-            logger.info(f"User {current_user.id} toggled survey to {request.enabled} for workspace {workspace_mapping.workspace_id}")
+        workspace_mapping.survey_enabled = request.enabled
+        logger.info(f"User {current_user.id} toggled survey to {request.enabled} for workspace {workspace_mapping.workspace_id}")
 
         db.commit()
 
@@ -708,7 +693,6 @@ async def disconnect_slack(
     This keeps the data but marks the workspace as inactive.
     Requires: admin role.
     """
-    # Check if user is admin
     if current_user.role != 'admin':
         raise HTTPException(
             status_code=403,
@@ -716,24 +700,7 @@ async def disconnect_slack(
         )
 
     try:
-        # Find the organization's OAuth workspace mapping
-        # Handle both org-based and user-based (legacy) workspaces
-        workspace_mapping = None
-
-        if current_user.organization_id:
-            # Look for org's workspace
-            workspace_mapping = db.query(SlackWorkspaceMapping).filter(
-                SlackWorkspaceMapping.organization_id == current_user.organization_id,
-                SlackWorkspaceMapping.status == 'active'
-            ).first()
-
-        # Fallback: Look for workspace by owner (for legacy workspaces without org_id)
-        if not workspace_mapping:
-            workspace_mapping = db.query(SlackWorkspaceMapping).filter(
-                SlackWorkspaceMapping.owner_user_id == current_user.id,
-                SlackWorkspaceMapping.status == 'active'
-            ).first()
-
+        workspace_mapping = get_active_workspace_mapping(db, current_user)
         if not workspace_mapping:
             raise HTTPException(
                 status_code=404,
@@ -801,23 +768,7 @@ async def sync_slack_user_ids(
     """
     logger.debug(f"Sync Slack user IDs request from user {current_user.id}")
 
-    # Get the workspace mapping for this user's organization
-    workspace_mapping = None
-
-    # Check by organization first
-    if current_user.organization_id:
-        workspace_mapping = db.query(SlackWorkspaceMapping).filter(
-            SlackWorkspaceMapping.organization_id == current_user.organization_id,
-            SlackWorkspaceMapping.status == 'active'
-        ).first()
-
-    # Fallback to owner check if no org
-    if not workspace_mapping:
-        workspace_mapping = db.query(SlackWorkspaceMapping).filter(
-            SlackWorkspaceMapping.owner_user_id == current_user.id,
-            SlackWorkspaceMapping.status == 'active'
-        ).first()
-
+    workspace_mapping = get_active_workspace_mapping(db, current_user)
     if not workspace_mapping:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -872,16 +823,15 @@ async def sync_slack_user_ids(
             members = data.get("members", [])
             logger.debug(f"Fetched {len(members)} Slack workspace members")
 
-            # Build email -> slack_user_id mapping
-            email_to_slack_id = {}
-            for member in members:
-                if member.get("deleted") or member.get("is_bot"):
-                    continue
-                profile = member.get("profile", {})
-                email = profile.get("email")
-                slack_id = member.get("id")
-                if email and slack_id:
-                    email_to_slack_id[email.lower()] = slack_id
+            # Build email -> slack_user_id mapping (exclude deleted/bots, require email)
+            email_to_slack_id = {
+                member.get("profile", {}).get("email", "").lower(): member.get("id")
+                for member in members
+                if not member.get("deleted")
+                and not member.get("is_bot")
+                and member.get("profile", {}).get("email")
+                and member.get("id")
+            }
 
             logger.debug(f"Built mapping for {len(email_to_slack_id)} Slack users with emails")
 
@@ -893,19 +843,12 @@ async def sync_slack_user_ids(
             ).all()
 
             updated_count = 0
-            skipped_count = 0
-
             for correlation in correlations:
-                user_email = correlation.email.lower()
-                slack_id = email_to_slack_id.get(user_email)
-
+                slack_id = email_to_slack_id.get(correlation.email.lower())
                 if slack_id:
                     correlation.slack_user_id = slack_id
                     updated_count += 1
-                    logger.debug(f"Matched {user_email} -> {slack_id}")
-                else:
-                    skipped_count += 1
-                    logger.debug(f"No Slack match found for {user_email}")
+                    logger.debug(f"Matched {mask_email(correlation.email)} -> {slack_id}")
 
             db.commit()
 
@@ -917,7 +860,7 @@ async def sync_slack_user_ids(
                     "members_with_email": len(email_to_slack_id),
                     "user_correlations": len(correlations),
                     "updated": updated_count,
-                    "skipped": skipped_count
+                    "skipped": len(correlations) - updated_count
                 }
             }
 
@@ -1193,7 +1136,7 @@ async def handle_oncall_health_command(
                                     if user_correlation:
                                         user_correlation.slack_user_id = user_id
                                         db.commit()
-                                        logging.info(f"Auto-populated Slack user ID for {user_email}")
+                                        logging.info(f"Auto-populated Slack user ID for {mask_email(user_email)}")
             except Exception as e:
                 logging.error(f"Error fetching Slack user email: {str(e)}")
                 # Continue without Slack email lookup

@@ -1145,6 +1145,11 @@ class MigrationRunner:
                 "description": "Add missing indexes to analyses, integration_mappings, user_notifications, and rootly_integrations for query performance",
                 "sql_file": "2026_01_21_add_performance_indexes.sql"
             },
+            {
+                "name": "040_add_survey_periods",
+                "description": "Add survey_periods table for daily follow-up reminders tracking",
+                "sql_file": "2026_01_22_add_survey_periods.sql"
+            },
             # Add future migrations here with incrementing numbers
         ]
 
