@@ -3440,6 +3440,7 @@ export default function IntegrationsPage() {
                 integration={githubIntegration}
                 onDisconnect={() => setGithubDisconnectDialogOpen(true)}
                 onTest={handleGitHubTest}
+                isLoading={isDisconnectingGithub}
               />
             )}
             {/* Jira Integration Card - Not Connected */}

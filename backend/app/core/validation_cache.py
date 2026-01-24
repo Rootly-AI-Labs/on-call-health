@@ -118,7 +118,11 @@ def set_cached_validation(user_id: int, results: Dict[str, Dict[str, Any]]) -> b
     with _fallback_lock:
         # Evict oldest entries if at capacity
         if len(_fallback_cache) >= _FALLBACK_MAX_SIZE and user_id not in _fallback_cache:
-            oldest_user = min(_fallback_cache.keys(), key=lambda k: _fallback_cache[k]["timestamp"])
+            # Defensive: use .get() in case entry is malformed
+            oldest_user = min(
+                _fallback_cache.keys(),
+                key=lambda k: _fallback_cache[k].get("timestamp", datetime.min.replace(tzinfo=timezone.utc))
+            )
             del _fallback_cache[oldest_user]
             logger.info(f"Evicted oldest validation cache entry for user {oldest_user}")
 
@@ -178,10 +182,16 @@ def get_cache_stats() -> Dict[str, Any]:
     client = _get_redis_client()
     if client:
         try:
-            # Count validation keys
-            keys = client.keys("validation:*")
+            # Count validation keys using SCAN (non-blocking)
+            key_count = 0
+            cursor = 0
+            while True:
+                cursor, keys = client.scan(cursor, match="validation:*", count=100)
+                key_count += len(keys)
+                if cursor == 0:
+                    break
             stats["redis_available"] = True
-            stats["redis_key_count"] = len(keys)
+            stats["redis_key_count"] = key_count
         except Exception:
             pass
 

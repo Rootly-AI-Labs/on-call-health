@@ -1,0 +1,7 @@
+{
+  "last_failure": "2026-01-23T17:59:29.509726-08:00",
+  "failure_count": 1,
+  "backoff_until": "2026-01-23T17:59:59.509727-08:00",
+  "needs_manual_sync": false,
+  "failure_reason": "git pull failed: exit status 1\nfatal: couldn't find remote ref integration-card-ui-refinements\n"
+}

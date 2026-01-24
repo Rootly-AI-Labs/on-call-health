@@ -58,8 +58,9 @@ def _build_cache_key(provider: str, endpoint: str, token: str, params: Optional[
 
     if params:
         # Include params in key for pagination/filter differentiation
+        # Use SHA256 for consistency (truncated to 8 chars for readability)
         params_str = json.dumps(params, sort_keys=True)
-        params_hash = hashlib.md5(params_str.encode()).hexdigest()[:8]
+        params_hash = hashlib.sha256(params_str.encode()).hexdigest()[:8]
         return f"{base_key}:{params_hash}"
 
     return base_key
@@ -221,16 +222,31 @@ def invalidate_provider_cache(provider: str, token: str) -> int:
     client = _get_redis_client()
     if client:
         try:
-            keys = client.keys(pattern)
-            if keys:
-                count = client.delete(*keys)
+            # Use SCAN instead of KEYS to avoid blocking Redis with large keyspaces
+            keys_to_delete = []
+            cursor = 0
+            while True:
+                cursor, keys = client.scan(cursor, match=pattern, count=100)
+                keys_to_delete.extend(keys)
+                if cursor == 0:
+                    break
+            if keys_to_delete:
+                count = client.delete(*keys_to_delete)
                 logger.info(f"Invalidated {count} cache entries for {provider}")
         except Exception as e:
             logger.warning(f"Redis pattern delete error for {provider}: {e}")
 
     # Also clear matching fallback entries
+    # Key format: api:{provider}:{endpoint}:{token_hash}[:param_hash]
+    # Check that token_hash is at the correct position (index 3 when split by :)
     with _fallback_lock:
-        keys_to_delete = [k for k in _fallback_cache.keys() if k.startswith(f"api:{provider}:") and token_hash in k]
+        keys_to_delete = []
+        for k in _fallback_cache.keys():
+            if k.startswith(f"api:{provider}:"):
+                parts = k.split(":")
+                # parts[0]=api, parts[1]=provider, parts[2]=endpoint, parts[3]=token_hash
+                if len(parts) >= 4 and parts[3] == token_hash:
+                    keys_to_delete.append(k)
         for k in keys_to_delete:
             del _fallback_cache[k]
             count += 1
