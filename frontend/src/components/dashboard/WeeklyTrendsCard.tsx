@@ -116,19 +116,18 @@ function TrendIndicator({ trend, metric }: { trend: { direction: string, percent
   )
 }
 
-function WeekOverWeekComparison({ weeklyData, metric }: { weeklyData: any[], metric: string }) {
+function WeekOverWeekComparison({ weeklyData, metric, mean }: { weeklyData: any[], metric: string, mean: number }) {
   if (weeklyData.length < 2) return null
 
   const current = weeklyData[weeklyData.length - 1]
   const previous = weeklyData[weeklyData.length - 2]
-  const fourWeeksAgo = weeklyData.length >= 4 ? weeklyData[weeklyData.length - 4] : null
 
   const metricKey = metric === 'health_score' ? 'riskLevel' :
                     metric === 'incident_load' ? 'incidentCount' :
                     metric === 'after_hours' ? 'afterHoursPercentage' : 'severityWeighted'
 
   const vsLastWeek = calculateTrend(current[metricKey], previous[metricKey])
-  const vs4WeeksAgo = fourWeeksAgo ? calculateTrend(current[metricKey], fourWeeksAgo[metricKey]) : null
+  const vsMean = calculateTrend(current[metricKey], mean)
 
   return (
     <div className="mt-4 flex items-center justify-center gap-6 text-sm">
@@ -142,14 +141,12 @@ function WeekOverWeekComparison({ weeklyData, metric }: { weeklyData: any[], met
           {vsLastWeek.direction === 'stable' ? '—' : `${vsLastWeek.direction === 'down' ? '↓' : '↑'}${vsLastWeek.percentage}%`}
         </span>
       </div>
-      {vs4WeeksAgo && (
-        <div className="flex items-center gap-2">
-          <span className="text-neutral-500">vs 4 wks ago:</span>
-          <span className={`font-medium ${vs4WeeksAgo.direction === 'down' ? 'text-green-600' : vs4WeeksAgo.direction === 'up' ? 'text-red-600' : 'text-neutral-500'}`}>
-            {vs4WeeksAgo.direction === 'stable' ? '—' : `${vs4WeeksAgo.direction === 'down' ? '↓' : '↑'}${vs4WeeksAgo.percentage}%`}
-          </span>
-        </div>
-      )}
+      <div className="flex items-center gap-2">
+        <span className="text-neutral-500">vs mean:</span>
+        <span className={`font-medium ${vsMean.direction === 'down' ? 'text-green-600' : vsMean.direction === 'up' ? 'text-red-600' : 'text-neutral-500'}`}>
+          {vsMean.direction === 'stable' ? '—' : `${vsMean.direction === 'down' ? '↓' : '↑'}${vsMean.percentage}%`}
+        </span>
+      </div>
     </div>
   )
 }
@@ -395,7 +392,7 @@ export function WeeklyTrendsCard({
             </div>
 
             {/* Week-over-Week Comparison */}
-            <WeekOverWeekComparison weeklyData={weeklyData} metric={selectedMetric} />
+            <WeekOverWeekComparison weeklyData={weeklyData} metric={selectedMetric} mean={mean} />
           </>
         )}
       </CardContent>
