@@ -1707,6 +1707,15 @@ class UnifiedBurnoutAnalyzer:
         # Calculate research-based impact factors
         time_impacts = self._calculate_time_impact_multipliers(incidents, metrics, user_tz)
         recovery_data = self._calculate_recovery_deficit(incidents, user_tz)
+        consecutive_days_data = self._calculate_consecutive_incident_days(incidents, user_tz)
+
+        # Log research-based insights
+        logger.info(f"🕐 TIME IMPACT: {user_name} - After-hours: {time_impacts['after_hours_incidents']}, "
+                   f"Weekend: {time_impacts['weekend_incidents']}, Overnight: {time_impacts['overnight_incidents']}")
+        logger.info(f"🔄 RECOVERY: {user_name} - Violations: {recovery_data['recovery_violations']}, "
+                   f"Avg recovery: {recovery_data['avg_recovery_hours']:.1f}h, Score: {recovery_data['recovery_score']:.0f}/100")
+        logger.info(f"📅 CONSECUTIVE DAYS: {user_name} - Max streak: {consecutive_days_data['max_consecutive_days']} days, "
+                   f"Score: {consecutive_days_data['consecutive_days_score']:.0f}/100")
 
         # Calculate severity-weighted incident burden 
         # Handle both Rootly (sev0-sev4) and PagerDuty (sev1-sev5) severity mappings
@@ -1811,20 +1820,27 @@ class UnifiedBurnoutAnalyzer:
         # Research shows off-hours incidents have 1.4-1.8x psychological impact
         time_weighted_after_hours = after_hours_percentage * time_impacts.get('after_hours_multiplier', 1.4)
 
+        # Calculate JIRA/Linear task load if available
+        task_load_score = 0
+        if jira_data:
+            # Use existing JIRA burnout indicators calculation
+            jira_burnout = jira_data.get('jira_burnout_indicators', 0)
+            task_load_score = jira_burnout  # Already on 0-100 scale
+            logger.info(f"📋 JIRA TASK LOAD: {user_name} has jira_burnout_indicators={jira_burnout:.1f}")
+        else:
+            # Fallback: use incident frequency as proxy (legacy behavior)
+            task_load_score = apply_incident_tiers(incidents_per_week) * 10
+            logger.debug(f"📋 TASK LOAD FALLBACK: {user_name} using incident frequency ({incidents_per_week:.1f}/week) as proxy")
+
         ocb_metrics = {
-            # Personal burnout factors - using Rootly's tiered approach
-            'work_hours_trend': apply_incident_tiers(incidents_per_week) * 10,      # Scale to 0-100
-            'weekend_work': after_hours_percentage * 2,                             # NO CAP: Extreme after-hours can exceed 100%
-            'after_hours_activity': time_weighted_after_hours,                      # Time-multiplied for research-based impact
-            'sleep_quality_proxy': apply_rootly_incident_tiers(severity_weighted_per_week) * 8,  # NO CAP: SEV1s can destroy sleep
-            
-            # Work-related burnout factors - using Rootly's response time tiers  
-            'sprint_completion': apply_rootly_response_tiers(avg_response_minutes) * 10,   # Tiered response pressure
-            'code_review_speed': apply_rootly_response_tiers(avg_response_minutes) * 8,    # Slightly less weight
-            'pr_frequency': apply_rootly_incident_tiers(incidents_per_week) * 8,           # Tiered workload frequency
-            'deployment_frequency': critical_incidents * 8,                                # NO CAP: Extreme critical incidents can exceed 100%
-            'meeting_load': apply_rootly_incident_tiers(incidents_per_week) * 6,           # Tiered coordination overhead
-            'oncall_burden': apply_rootly_incident_tiers(severity_weighted_per_week) * 10  # FIXED: Use severity-weighted incidents for proper SEV1 impact
+            # Personal burnout factors (65% of total)
+            'work_hours_trend': task_load_score,                                    # Task load: 10% (JIRA/Linear workload)
+            'after_hours_activity': time_weighted_after_hours,                      # After-hours: 30% (includes weekends)
+            'sleep_quality_proxy': apply_rootly_incident_tiers(severity_weighted_per_week) * 8,  # High-severity: 25%
+
+            # Work-related burnout factors (35% of total)
+            'sprint_completion': consecutive_days_data['consecutive_days_score'],   # Consecutive days: 15%
+            'oncall_burden': apply_rootly_incident_tiers(severity_weighted_per_week) * 10  # On-call load: 20%
         }
 
         # Check if all OCB metrics are 0
@@ -2115,9 +2131,13 @@ class UnifiedBurnoutAnalyzer:
         total_activities = safe_incidents_len + total_commits
 
         incidents_per_week = (safe_incidents_len / safe_days) * 7 if safe_days > 0 else 0
-        # Calculate after-hours percentage including both incidents and GitHub commits
-        after_hours_percentage = total_after_hours_activities / total_activities if total_activities > 0 else 0
-        # Calculate weekend percentage including both incidents and GitHub commits
+
+        # Calculate after-hours percentage INCLUDING weekends
+        # Research shows weekends are a critical component of work-life boundary erosion
+        total_non_business_hours = total_after_hours_activities + total_weekend_activities
+        after_hours_percentage = total_non_business_hours / total_activities if total_activities > 0 else 0
+
+        # Calculate weekend percentage separately for additional analysis
         weekend_percentage = total_weekend_activities / total_activities if total_activities > 0 else 0
         avg_response_time = sum(response_times) / len(response_times) if response_times and len(response_times) > 0 else 0
         
@@ -3011,6 +3031,74 @@ class UnifiedBurnoutAnalyzer:
             recovery_data['recovery_score'] = min(100, max(0, (avg_hours - 24) / (168 - 24) * 100))
 
         return recovery_data
+
+    def _calculate_consecutive_incident_days(self, incidents: List[Dict], user_tz: str) -> Dict[str, Any]:
+        """
+        Calculate consecutive days with incidents to detect sustained stress periods.
+
+        Research shows that consecutive days without breaks prevent psychological recovery
+        and significantly increase burnout risk.
+
+        Returns:
+            Dict with max consecutive days and score (0-100 scale)
+        """
+        consecutive_data = {
+            'max_consecutive_days': 0,
+            'current_streak': 0,
+            'total_incident_days': 0,
+            'consecutive_days_score': 0  # 0-100, higher = more stress from consecutive days
+        }
+
+        if not incidents:
+            return consecutive_data
+
+        # Get all unique dates with incidents
+        incident_dates = set()
+        for incident in incidents:
+            incident_time = self._parse_incident_time(incident, user_tz)
+            if incident_time:
+                # Get just the date part (ignore time)
+                incident_date = incident_time.date()
+                incident_dates.add(incident_date)
+
+        if not incident_dates:
+            return consecutive_data
+
+        # Sort dates
+        sorted_dates = sorted(incident_dates)
+        consecutive_data['total_incident_days'] = len(sorted_dates)
+
+        # Calculate max consecutive streak
+        max_streak = 1
+        current_streak = 1
+
+        for i in range(1, len(sorted_dates)):
+            # Check if dates are consecutive (1 day apart)
+            days_diff = (sorted_dates[i] - sorted_dates[i-1]).days
+            if days_diff == 1:
+                current_streak += 1
+                max_streak = max(max_streak, current_streak)
+            else:
+                current_streak = 1
+
+        consecutive_data['max_consecutive_days'] = max_streak
+        consecutive_data['current_streak'] = current_streak
+
+        # Calculate score (0-100 scale)
+        # 7+ consecutive days = 100 (critical sustained stress)
+        # 5-6 days = 70-85
+        # 3-4 days = 40-55
+        # 1-2 days = 0-20
+        if max_streak >= 7:
+            consecutive_data['consecutive_days_score'] = 100
+        elif max_streak >= 5:
+            consecutive_data['consecutive_days_score'] = 70 + ((max_streak - 5) / 2) * 15
+        elif max_streak >= 3:
+            consecutive_data['consecutive_days_score'] = 40 + ((max_streak - 3) / 2) * 15
+        else:
+            consecutive_data['consecutive_days_score'] = max_streak * 10
+
+        return consecutive_data
 
     def _parse_incident_time(self, incident: Dict, user_tz: str) -> datetime:
         """Parse incident timestamp from platform-specific format."""

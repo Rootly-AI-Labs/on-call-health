@@ -27,73 +27,53 @@ class OCBConfig:
     """Copenhagen Burnout Inventory Configuration"""
     
     # OCB Dimension Weights (must sum to 1.0)
-    # Based on OCB research - equal weighting for software engineers
+    # Research-informed: Personal factors (work-life balance) contribute more to burnout
     DIMENSION_WEIGHTS = {
-        OCBDimension.PERSONAL: 0.50,        # Physical/psychological fatigue
-        OCBDimension.WORK_RELATED: 0.50     # Work-specific fatigue
+        OCBDimension.PERSONAL: 0.65,        # Physical/psychological fatigue (65%)
+        OCBDimension.WORK_RELATED: 0.35     # Work-specific fatigue (35%)
     }
     
     # Personal Burnout Factor Mappings
     # Maps current metrics to OCB Personal Burnout items (0-100 scale)
+    # Research-informed weighting: Work-life balance factors (after-hours, severity, task load)
+    # Weights must sum to 1.0 within this dimension
     PERSONAL_BURNOUT_FACTORS = {
-        'work_hours_trend': {
-            'weight': 0.15,
-            'description': 'Physical fatigue from excessive work hours',
-            'calculation': 'hours_over_45_per_week',
-            'scale_max': 100
-        },
         'after_hours_activity': {
-            'weight': 0.50,  # INCREASED: Off-hours work is a critical burnout indicator
+            'weight': 0.462,  # 0.462 * 0.65 = 30% of total (strongest burnout predictor)
             'description': 'Recovery time interference and work-life boundary erosion (includes weekend work)',
             'calculation': 'after_hours_percentage_with_time_multiplier',
-            'scale_max': 30  # LOWERED: >30% after hours (with multiplier) = 100 burnout - more sensitive threshold
+            'scale_max': 30  # >30% after hours = 100 burnout
         },
         'sleep_quality_proxy': {
-            'weight': 0.35,  # Increased from 0.25 after removing vacation_usage
-            'description': 'Energy level estimation from late night activity and incident stress',
-            'calculation': 'late_night_commits_frequency_and_incident_stress',
-            'scale_max': 30
+            'weight': 0.385,  # 0.385 * 0.65 = 25% of total (high-severity incident stress)
+            'description': 'Psychological impact from high-severity incidents',
+            'calculation': 'high_severity_incident_impact',
+            'scale_max': 30  # Severity-weighted incidents
+        },
+        'work_hours_trend': {
+            'weight': 0.154,  # 0.154 * 0.65 = 10% of total (task load from JIRA/Linear)
+            'description': 'Physical fatigue from task workload',
+            'calculation': 'jira_linear_task_load',
+            'scale_max': 100
         }
     }
     
     # Work-Related Burnout Factor Mappings
     # Maps current metrics to OCB Work-Related Burnout items (0-100 scale)
+    # Research-informed weighting: On-call burden and sustained stress
+    # Weights must sum to 1.0 within this dimension
     WORK_RELATED_BURNOUT_FACTORS = {
-        'sprint_completion': {
-            'weight': 0.15,  # Restored to reasonable level
-            'description': 'Work pressure from missed deadlines',
-            'calculation': 'missed_deadline_percentage',
-            'scale_max': 50  # >50% missed deadlines = 100 burnout
-        },
-        'code_review_speed': {
-            'weight': 0.15,  # Restored to reasonable level
-            'description': 'Workload sustainability pressure',
-            'calculation': 'review_turnaround_stress',
-            'scale_max': 120  # >120 hour avg turnaround = 100 burnout
-        },
-        'pr_frequency': {
-            'weight': 0.10,  # Restored to reasonable level
-            'description': 'Work intensity from PR volume',
-            'calculation': 'pr_volume_stress_score',
-            'scale_max': 100  # Excessive or insufficient PRs = stress
-        },
-        'deployment_frequency': {
-            'weight': 0.15,  # Restored to reasonable level
-            'description': 'Delivery pressure from deployment stress',
-            'calculation': 'deployment_pressure_score',
-            'scale_max': 100  # Failed deploys + high frequency = stress
-        },
-        'meeting_load': {
-            'weight': 0.10,  # Restored to reasonable level
-            'description': 'Context switching burden',
-            'calculation': 'meeting_density_impact',
-            'scale_max': 80  # >80% day in meetings = 100 burnout
-        },
         'oncall_burden': {
-            'weight': 0.35,  # BALANCED: Important but not overwhelming
-            'description': 'Work-related stress from incident response (severity-weighted)',
+            'weight': 0.571,  # 0.571 * 0.35 = 20% of total (on-call responsibility load)
+            'description': 'Work-related stress from on-call incident response (severity-weighted)',
             'calculation': 'incident_response_frequency_with_severity',
-            'scale_max': 100  # >100 severity-weighted incidents/week = 100% baseline (handles extreme loads)
+            'scale_max': 100  # >100 severity-weighted incidents/week = 100% baseline
+        },
+        'sprint_completion': {
+            'weight': 0.429,  # 0.429 * 0.35 = 15% of total (consecutive incident days)
+            'description': 'Sustained stress from consecutive incident days without recovery',
+            'calculation': 'consecutive_incident_days',
+            'scale_max': 7  # 7+ consecutive days = 100 burnout
         }
     }
     
