@@ -3,7 +3,8 @@ import Image from "next/image"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Key, Calendar, Building, Clock, Users, TestTube, Trash2, Loader2, CheckCircle } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Key, Calendar, Building, Clock, Users, TestTube, Trash2, Loader2, CheckCircle, AlertTriangle } from "lucide-react"
 import { GitHubIntegration, API_BASE } from "../types"
 
 interface GitHubConnectedCardProps {
@@ -48,8 +49,11 @@ export function GitHubConnectedCard({
     fetchOrgMembers()
   }, [])
 
+  // Check if token is invalid
+  const hasTokenError = integration.token_valid === false
+
   return (
-    <Card className="border-2 border-green-200 bg-green-50/50 max-w-2xl mx-auto">
+    <Card className={`border-2 ${hasTokenError ? 'border-red-200 bg-red-50/50' : 'border-green-200 bg-green-50/50'} max-w-2xl mx-auto`}>
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
@@ -66,10 +70,17 @@ export function GitHubConnectedCard({
             <div>
               <CardTitle className="text-lg flex items-center space-x-2">
                 <span>GitHub</span>
-                <Badge variant="secondary" className="bg-green-100 text-green-700">
-                  <CheckCircle className="w-3 h-3 mr-1" />
-                  Connected
-                </Badge>
+                {hasTokenError ? (
+                  <Badge variant="secondary" className="bg-red-100 text-red-700">
+                    <AlertTriangle className="w-3 h-3 mr-1" />
+                    Token Invalid
+                  </Badge>
+                ) : (
+                  <Badge variant="secondary" className="bg-green-100 text-green-700">
+                    <CheckCircle className="w-3 h-3 mr-1" />
+                    Connected
+                  </Badge>
+                )}
               </CardTitle>
               <p className="text-sm text-slate-600">Repository collaboration and code management</p>
             </div>
@@ -78,6 +89,15 @@ export function GitHubConnectedCard({
       </CardHeader>
 
       <CardContent className="space-y-4">
+        {/* Token Error Alert */}
+        {hasTokenError && integration.token_error && (
+          <Alert className="border-red-200 bg-red-50">
+            <AlertTriangle className="w-4 h-4 text-red-600" />
+            <AlertDescription className="text-red-800 text-sm">
+              <strong>Authentication Error:</strong> {integration.token_error}
+            </AlertDescription>
+          </Alert>
+        )}
         {/* Integration Details */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
           <div className="flex items-center space-x-2">

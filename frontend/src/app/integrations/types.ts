@@ -110,6 +110,8 @@ export interface GitHubIntegration {
   connected_at: string
   last_updated: string
   token_preview?: string // Token preview for display
+  token_valid?: boolean // Token validation status
+  token_error?: string | null // Token validation error message
 }
 
 export interface SlackIntegration {
@@ -150,6 +152,8 @@ export interface JiraIntegration {
   updated_at: string
   accessible_sites_count?: number
   token_preview?: string
+  token_valid?: boolean // Token validation status
+  token_error?: string | null // Token validation error message
 }
 
 export interface JiraWorkspace {
@@ -180,6 +184,8 @@ export interface LinearIntegration {
   is_oauth: boolean
   supports_refresh: boolean
   token_expires_at?: string
+  token_valid?: boolean // Token validation status
+  token_error?: string | null // Token validation error message
   updated_at: string
   token_preview?: string
 }
