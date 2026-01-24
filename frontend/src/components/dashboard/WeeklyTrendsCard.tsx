@@ -127,55 +127,29 @@ function WeekOverWeekComparison({ weeklyData, metric }: { weeklyData: any[], met
                     metric === 'incident_load' ? 'incidentCount' :
                     metric === 'after_hours' ? 'afterHoursPercentage' : 'severityWeighted'
 
-  const getBarWidth = (value: number, max: number) => Math.max(10, (value / max) * 100)
-  const maxValue = Math.max(
-    current[metricKey],
-    previous[metricKey],
-    fourWeeksAgo?.[metricKey] || 0
-  ) || 1
+  const vsLastWeek = calculateTrend(current[metricKey], previous[metricKey])
+  const vs4WeeksAgo = fourWeeksAgo ? calculateTrend(current[metricKey], fourWeeksAgo[metricKey]) : null
 
   return (
-    <div className="mt-4 p-4 bg-neutral-50 rounded-lg">
-      <h4 className="text-sm font-semibold text-neutral-700 mb-3">Week-over-Week</h4>
-      <div className="space-y-2">
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-neutral-500 w-20">This week</span>
-          <div
-            className="h-5 bg-purple-600 rounded-r flex items-center justify-end pr-2"
-            style={{ width: `${getBarWidth(current[metricKey], maxValue)}%` }}
-          >
-            <span className="text-xs text-white font-medium">{current[metricKey]}</span>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-neutral-500 w-20">Last week</span>
-          <div
-            className="h-5 bg-purple-400 rounded-r flex items-center justify-end pr-2"
-            style={{ width: `${getBarWidth(previous[metricKey], maxValue)}%` }}
-          >
-            <span className="text-xs text-white font-medium">{previous[metricKey]}</span>
-          </div>
-          <TrendIndicator
-            trend={calculateTrend(current[metricKey], previous[metricKey])}
-            metric={metric}
-          />
-        </div>
-        {fourWeeksAgo && (
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-neutral-500 w-20">4 weeks ago</span>
-            <div
-              className="h-5 bg-purple-300 rounded-r flex items-center justify-end pr-2"
-              style={{ width: `${getBarWidth(fourWeeksAgo[metricKey], maxValue)}%` }}
-            >
-              <span className="text-xs text-purple-800 font-medium">{fourWeeksAgo[metricKey]}</span>
-            </div>
-            <TrendIndicator
-              trend={calculateTrend(current[metricKey], fourWeeksAgo[metricKey])}
-              metric={metric}
-            />
-          </div>
-        )}
+    <div className="mt-4 flex items-center justify-center gap-6 text-sm">
+      <div className="flex items-center gap-2">
+        <span className="text-neutral-500">This week:</span>
+        <span className="font-semibold text-neutral-900">{current[metricKey]}</span>
       </div>
+      <div className="flex items-center gap-2">
+        <span className="text-neutral-500">vs last week:</span>
+        <span className={`font-medium ${vsLastWeek.direction === 'down' ? 'text-green-600' : vsLastWeek.direction === 'up' ? 'text-red-600' : 'text-neutral-500'}`}>
+          {vsLastWeek.direction === 'stable' ? '—' : `${vsLastWeek.direction === 'down' ? '↓' : '↑'}${vsLastWeek.percentage}%`}
+        </span>
+      </div>
+      {vs4WeeksAgo && (
+        <div className="flex items-center gap-2">
+          <span className="text-neutral-500">vs 4 wks ago:</span>
+          <span className={`font-medium ${vs4WeeksAgo.direction === 'down' ? 'text-green-600' : vs4WeeksAgo.direction === 'up' ? 'text-red-600' : 'text-neutral-500'}`}>
+            {vs4WeeksAgo.direction === 'stable' ? '—' : `${vs4WeeksAgo.direction === 'down' ? '↓' : '↑'}${vs4WeeksAgo.percentage}%`}
+          </span>
+        </div>
+      )}
     </div>
   )
 }
