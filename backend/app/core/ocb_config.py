@@ -39,19 +39,19 @@ class OCBConfig:
     # Weights must sum to 1.0 within this dimension
     PERSONAL_BURNOUT_FACTORS = {
         'after_hours_activity': {
-            'weight': 0.462,  # 0.462 * 0.5 = 23.1%, scaled to 30% of total (strongest burnout predictor)
+            'weight': 0.462,  # 0.462 * 0.65 = 30% of total (strongest burnout predictor)
             'description': 'Recovery time interference and work-life boundary erosion (includes weekend work)',
             'calculation': 'after_hours_percentage_with_time_multiplier',
             'scale_max': 30  # >30% after hours = 100 burnout
         },
         'sleep_quality_proxy': {
-            'weight': 0.385,  # 0.385 * 0.5 = 19.25%, scaled to 25% of total (high-severity incident stress)
+            'weight': 0.385,  # 0.385 * 0.65 = 25% of total (high-severity incident stress)
             'description': 'Psychological impact from high-severity incidents',
             'calculation': 'high_severity_incident_impact',
             'scale_max': 30  # Severity-weighted incidents
         },
         'work_hours_trend': {
-            'weight': 0.154,  # 0.154 * 0.5 = 7.7%, scaled to 10% of total (task load from JIRA/Linear)
+            'weight': 0.154,  # 0.154 * 0.65 = 10% of total (task load from JIRA/Linear)
             'description': 'Physical fatigue from task workload',
             'calculation': 'jira_linear_task_load',
             'scale_max': 100
