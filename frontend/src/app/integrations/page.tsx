@@ -2652,23 +2652,35 @@ export default function IntegrationsPage() {
                       return (
                         <>
                           {/* Rootly Integrations */}
-                          {rootlyIntegrations.map((integration) => (
-                            <SelectItem
-                              key={integration.id}
-                              value={integration.id.toString()}
-                              className="cursor-pointer"
-                            >
-                              <div className="flex items-center justify-between w-full gap-2">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
-                                  <span className="font-medium text-base">{integration.name}</span>
+                          {rootlyIntegrations.map((integration) => {
+                            // Check if integration has permission issues
+                            const hasPermissionIssues = integration.permissions?.users?.access !== null &&
+                                                       integration.permissions?.incidents?.access !== null &&
+                                                       (!integration.permissions?.users?.access || !integration.permissions?.incidents?.access)
+
+                            return (
+                              <SelectItem
+                                key={integration.id}
+                                value={integration.id.toString()}
+                                className="cursor-pointer"
+                              >
+                                <div className="flex items-center justify-between w-full gap-2">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
+                                    <span className="font-medium text-base">{integration.name}</span>
+                                    {hasPermissionIssues && (
+                                      <span className="px-2 py-0.5 text-xs font-medium rounded bg-red-100 text-red-700">
+                                        Missing Permissions
+                                      </span>
+                                    )}
+                                  </div>
+                                  {selectedOrganization === integration.id.toString() && (
+                                    <Star className="w-5 h-5 text-yellow-500 fill-yellow-500 flex-shrink-0 ml-2" />
+                                  )}
                                 </div>
-                                {selectedOrganization === integration.id.toString() && (
-                                  <Star className="w-5 h-5 text-yellow-500 fill-yellow-500 flex-shrink-0 ml-2" />
-                                )}
-                              </div>
-                            </SelectItem>
-                          ))}
+                              </SelectItem>
+                            )
+                          })}
 
                           {/* Separator between platforms */}
                           {rootlyIntegrations.length > 0 && pagerdutyIntegrations.length > 0 && (
@@ -2676,23 +2688,35 @@ export default function IntegrationsPage() {
                           )}
 
                           {/* PagerDuty Integrations */}
-                          {pagerdutyIntegrations.map((integration) => (
-                            <SelectItem
-                              key={integration.id}
-                              value={integration.id.toString()}
-                              className="cursor-pointer"
-                            >
-                              <div className="flex items-center justify-between w-full gap-2">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                                  <span className="font-medium text-base">{integration.name}</span>
+                          {pagerdutyIntegrations.map((integration) => {
+                            // Check if integration has permission issues
+                            const hasPermissionIssues = integration.permissions?.users?.access !== null &&
+                                                       integration.permissions?.incidents?.access !== null &&
+                                                       (!integration.permissions?.users?.access || !integration.permissions?.incidents?.access)
+
+                            return (
+                              <SelectItem
+                                key={integration.id}
+                                value={integration.id.toString()}
+                                className="cursor-pointer"
+                              >
+                                <div className="flex items-center justify-between w-full gap-2">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                                    <span className="font-medium text-base">{integration.name}</span>
+                                    {hasPermissionIssues && (
+                                      <span className="px-2 py-0.5 text-xs font-medium rounded bg-red-100 text-red-700">
+                                        Missing Permissions
+                                      </span>
+                                    )}
+                                  </div>
+                                  {selectedOrganization === integration.id.toString() && (
+                                    <Star className="w-5 h-5 text-yellow-500 fill-yellow-500 flex-shrink-0 ml-2" />
+                                  )}
                                 </div>
-                                {selectedOrganization === integration.id.toString() && (
-                                  <Star className="w-5 h-5 text-yellow-500 fill-yellow-500 flex-shrink-0 ml-2" />
-                                )}
-                              </div>
-                            </SelectItem>
-                          ))}
+                              </SelectItem>
+                            )
+                          })}
                         </>
                       )
                     })()}
