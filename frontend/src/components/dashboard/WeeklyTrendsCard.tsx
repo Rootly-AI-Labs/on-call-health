@@ -56,6 +56,26 @@ function aggregateToWeekly(dailyData: any[]): any[] {
       const totalIncidents = days.reduce((sum, d) => sum + (d.incident_count || 0), 0)
       const avgAfterHours = days.reduce((sum, d) => sum + (d.after_hours_percentage || 0), 0) / days.length
       const avgSeverityWeighted = days.reduce((sum, d) => sum + (d.severity_weighted_count || 0), 0) / days.length
+      const totalAfterHoursCount = days.reduce((sum, d) => sum + (d.after_hours_count || 0), 0)
+      const totalHighSeverity = days.reduce((sum, d) => sum + (d.high_severity_count || 0), 0)
+
+      // Calculate risk factor contributions (based on backend scoring algorithm)
+      // Max penalties: incidents=2.0, severity=3.0, after_hours=1.5, high_severity=2.0 (total=8.5)
+      const teamSize = days[0]?.total_members || 1
+      const incidentPenalty = Math.min((totalIncidents / days.length / teamSize) * 0.8, 2.0)
+      const severityPenalty = Math.min((avgSeverityWeighted / teamSize) * 1.2, 3.0)
+      const afterHoursPenalty = Math.min((totalAfterHoursCount / days.length) * 0.5, 1.5)
+      const highSeverityPenalty = Math.min((totalHighSeverity / days.length) * 0.8, 2.0)
+
+      const totalPenalty = incidentPenalty + severityPenalty + afterHoursPenalty + highSeverityPenalty
+
+      // Calculate percentage contribution of each factor
+      const factors = totalPenalty > 0 ? {
+        incidents: Math.round((incidentPenalty / totalPenalty) * 100),
+        severity: Math.round((severityPenalty / totalPenalty) * 100),
+        afterHours: Math.round((afterHoursPenalty / totalPenalty) * 100),
+        highSeverity: Math.round((highSeverityPenalty / totalPenalty) * 100),
+      } : { incidents: 0, severity: 0, afterHours: 0, highSeverity: 0 }
 
       const weekDate = new Date(weekStart)
       const weekEnd = new Date(weekStart)
@@ -69,6 +89,9 @@ function aggregateToWeekly(dailyData: any[]): any[] {
         incidentCount: totalIncidents,
         afterHoursPercentage: Math.round(avgAfterHours),
         severityWeighted: Math.round(avgSeverityWeighted),
+        highSeverityCount: totalHighSeverity,
+        afterHoursCount: totalAfterHoursCount,
+        factors,
         daysInWeek: days.length
       }
     })
@@ -333,18 +356,52 @@ export function WeeklyTrendsCard({
                     content={({ payload }) => {
                       if (!payload || payload.length === 0) return null
                       const data = payload[0]?.payload
+                      const factors = data?.factors || {}
+                      const hasFactors = factors.incidents > 0 || factors.severity > 0 || factors.afterHours > 0 || factors.highSeverity > 0
+
                       return (
-                        <div className="bg-neutral-900/95 p-3 border border-neutral-700 rounded-lg shadow-lg">
+                        <div className="bg-neutral-900/95 p-3 border border-neutral-700 rounded-lg shadow-lg min-w-[200px]">
                           <p className="text-sm font-medium text-neutral-300 mb-2">{data?.weekRange}</p>
                           <p className="text-lg font-bold text-white mb-1">
                             {data?.[config.dataKey]} {config.label}
                           </p>
-                          {showIncidentOverlay && selectedMetric === 'health_score' && (
-                            <p className="text-sm text-amber-400">
+                          {selectedMetric === 'health_score' && (
+                            <p className="text-sm text-amber-400 mb-2">
                               {data?.incidentCount} incidents this week
                             </p>
                           )}
-                          <p className="text-xs text-neutral-400 mt-1">
+                          {selectedMetric === 'health_score' && hasFactors && (
+                            <div className="border-t border-neutral-700 pt-2 mt-2">
+                              <p className="text-xs text-neutral-400 mb-1.5">Risk breakdown:</p>
+                              <div className="space-y-1">
+                                {factors.severity > 0 && (
+                                  <div className="flex justify-between text-xs">
+                                    <span className="text-neutral-400">Severity impact</span>
+                                    <span className="text-white font-medium">{factors.severity}%</span>
+                                  </div>
+                                )}
+                                {factors.incidents > 0 && (
+                                  <div className="flex justify-between text-xs">
+                                    <span className="text-neutral-400">Incident volume</span>
+                                    <span className="text-white font-medium">{factors.incidents}%</span>
+                                  </div>
+                                )}
+                                {factors.highSeverity > 0 && (
+                                  <div className="flex justify-between text-xs">
+                                    <span className="text-neutral-400">High severity</span>
+                                    <span className="text-white font-medium">{factors.highSeverity}%</span>
+                                  </div>
+                                )}
+                                {factors.afterHours > 0 && (
+                                  <div className="flex justify-between text-xs">
+                                    <span className="text-neutral-400">After hours</span>
+                                    <span className="text-white font-medium">{factors.afterHours}%</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                          <p className="text-xs text-neutral-500 mt-2">
                             Based on {data?.daysInWeek} days of data
                           </p>
                         </div>
