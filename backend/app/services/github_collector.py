@@ -43,10 +43,8 @@ class GitHubCollector:
         2. Enhanced matching algorithm with multiple strategies
         3. Legacy discovered email mappings from organization members
         """
-        logger.info(f"🔗 [CORRELATION] GitHub correlation attempt for {email}, token={'present' if token else 'missing'}, user_id={user_id}")
-
         if not token:
-            logger.warning("❌ [CORRELATION] No GitHub token provided for correlation")
+            logger.debug("No GitHub token provided for correlation")
             return None
 
         try:
@@ -54,7 +52,6 @@ class GitHubCollector:
             logger.debug(f"🔍 [CORRELATION] Checking user_correlations for {email}")
             synced_username = await self._check_synced_members(email, user_id)
             if synced_username:
-                logger.info(f"✅ [CORRELATION_SYNCED] {email} -> {synced_username}")
                 return synced_username
 
             # SECOND: Check manual mappings from user_mappings table (mapping drawer)
@@ -62,13 +59,9 @@ class GitHubCollector:
                 logger.debug(f"🔍 [CORRELATION] Checking user_mappings for {email}")
                 manual_username = await self._check_manual_mappings(email, user_id)
                 if manual_username:
-                    logger.info(f"✅ [CORRELATION_MANUAL] {email} -> {manual_username}")
                     return manual_username
 
-            # IMPORTANT: No fallback matching during analysis!
-            # All GitHub username correlations should be done via "Sync Members" on integrations page.
-            # This keeps analysis fast and predictable.
-            logger.warning(f"❌ [CORRELATION_FAILED] No synced GitHub username found for {email}. Use 'Sync Members' to add GitHub usernames.")
+            # No fallback matching during analysis - use "Sync Members" on integrations page
             return None
 
         except Exception as e:
@@ -161,12 +154,8 @@ class GitHubCollector:
                 ).first()
 
                 if user_correlation and user_correlation.github_username:
-                    username = user_correlation.github_username
-                    logger.info(f"✅ [SYNCED_CHECK_SUCCESS] Found synced GitHub member: {email} -> {username}")
-                    return username
-                else:
-                    logger.warning(f"⚠️ [SYNCED_CHECK_MISS] No GitHub username in user_correlations for: {email}")
-                    return None
+                    return user_correlation.github_username
+                return None
             finally:
                 db.close()
 
@@ -629,17 +618,11 @@ class GitHubCollector:
         Returns:
             GitHub activity data or None if no correlation found
         """
-        logger.info(f"📊 [GITHUB_COLLECTION] Starting collection for email: {user_email}, user_id: {user_id}, days: {days}")
-        logger.info(f"📊 [GITHUB_COLLECTION] Token present: {bool(github_token)}, Full name: {full_name}")
-
         # Use email-based correlation to find GitHub username
         github_username = await self._correlate_email_to_github(user_email, github_token, user_id, full_name)
 
         if not github_username:
-            logger.warning(f"❌ [GITHUB_COLLECTION] No GitHub username found for {user_email}")
             return None
-
-        logger.info(f"✅ [GITHUB_COLLECTION] Matched {user_email} -> {github_username}")
 
         # Set up date range
         end_date = datetime.now()
@@ -647,15 +630,13 @@ class GitHubCollector:
 
         # Use real GitHub API if token provided
         if github_token:
-            logger.info(f"🔄 [GITHUB_COLLECTION] Fetching data from GitHub API for {github_username}")
             result = await self._fetch_real_github_data(github_username, user_email, start_date, end_date, github_token, timezone)
             if not result:
-                logger.error(f"❌ [GITHUB_COLLECTION] Failed to fetch GitHub data for {github_username}")
+                logger.error(f"Failed to fetch GitHub data for {github_username}")
                 return None
-            logger.info(f"✅ [GITHUB_COLLECTION] Successfully fetched data for {github_username}: {result.get('metrics', {}).get('total_commits', 0)} commits, {result.get('metrics', {}).get('total_pull_requests', 0)} PRs")
             return result
         else:
-            logger.warning(f"⚠️ [GITHUB_COLLECTION] No token provided, generating mock data for {github_username}")
+            logger.warning(f"No GitHub token provided, generating mock data for {github_username}")
             return self._generate_mock_github_data(github_username, user_email, start_date, end_date)
     
     def _generate_mock_github_data(self, username: str, email: str, start_date: datetime, end_date: datetime) -> Dict:
