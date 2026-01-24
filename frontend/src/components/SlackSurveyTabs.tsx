@@ -622,6 +622,8 @@ export function SlackSurveyTabs({
                         setDayOfWeek(4)
                         setFollowUpRemindersEnabled(true)
                         setSavedScheduleTime(null)
+                        setSavedFrequencyType('weekday')
+                        setSavedDayOfWeek(4)
                       }
                       await loadSchedule(true) // Force reload after save
                     } else {
@@ -826,7 +828,10 @@ export function SlackSurveyTabs({
                       </div>
                       <Switch
                         checked={followUpRemindersEnabled}
-                        onCheckedChange={setFollowUpRemindersEnabled}
+                        onCheckedChange={(checked) => {
+                          setFollowUpRemindersEnabled(checked)
+                          hasUnsavedScheduleChangesRef.current = true
+                        }}
                         disabled={savingSchedule}
                       />
                     </div>
