@@ -581,7 +581,6 @@ export default function useDashboard() {
               const isStillRunning = ['pending', 'running', 'started'].includes(mostRecentAnalysis.status)
               if (isStillRunning) {
                 // Analysis is in progress, don't show error - just wait
-                console.log('Most recent analysis is still running, waiting for completion...')
                 setLoadingAnalyses(false)
                 return false
               }
