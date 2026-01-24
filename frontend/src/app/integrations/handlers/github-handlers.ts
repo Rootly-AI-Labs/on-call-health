@@ -126,6 +126,7 @@ export async function handleGitHubDisconnect(
  * Test GitHub connection and permissions
  */
 export async function handleGitHubTest(): Promise<void> {
+  let loadingToast: string | number | undefined
   try {
     const authToken = localStorage.getItem('auth_token')
     if (!authToken) {
@@ -133,7 +134,8 @@ export async function handleGitHubTest(): Promise<void> {
       return
     }
 
-    toast.info("Testing GitHub connection...")
+    // Show loading toast that can be dismissed
+    loadingToast = toast.loading("Testing GitHub connection...")
 
     const response = await fetch(`${API_BASE}/integrations/github/test`, {
       method: 'POST',
@@ -144,6 +146,9 @@ export async function handleGitHubTest(): Promise<void> {
 
     if (response.ok) {
       const data = await response.json()
+
+      // Dismiss loading toast
+      toast.dismiss(loadingToast)
 
       // Build the success message with data summary
       let successMessage = `✅ Connected as ${data.user_info?.username || 'GitHub user'}`
@@ -188,6 +193,7 @@ export async function handleGitHubTest(): Promise<void> {
     }
   } catch (error) {
     console.error('Error testing GitHub connection:', error)
+    if (loadingToast) toast.dismiss(loadingToast)
     toast.error(`❌ GitHub test failed: ${error instanceof Error ? error.message : "Unable to test GitHub connection."}`)
   }
 }

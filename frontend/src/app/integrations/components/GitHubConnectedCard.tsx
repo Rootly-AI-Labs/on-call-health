@@ -3,7 +3,14 @@ import Image from "next/image"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Key, Calendar, Building, Clock, Users, TestTube, Trash2, Loader2, CheckCircle } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Key, Calendar, Building, Clock, Users, Zap, Trash2, Loader2, CheckCircle, AlertTriangle, ChevronDown } from "lucide-react"
 import { GitHubIntegration, API_BASE } from "../types"
 
 interface GitHubConnectedCardProps {
@@ -22,34 +29,53 @@ export function GitHubConnectedCard({
   const [orgMemberCount, setOrgMemberCount] = useState<number | null>(null)
   const [loadingMembers, setLoadingMembers] = useState(false)
 
-  const fetchOrgMembers = async () => {
-    setLoadingMembers(true)
-    try {
-      const authToken = localStorage.getItem('auth_token')
-      if (!authToken) return
-
-      const response = await fetch(`${API_BASE}/integrations/github/org-members`, {
-        headers: { 'Authorization': `Bearer ${authToken}` }
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        setOrgMemberCount(data.total_members)
-      }
-    } catch (error) {
-      console.error('Failed to fetch org members:', error)
-    } finally {
-      setLoadingMembers(false)
-    }
-  }
-
-  // Fetch org members on mount
+  // Fetch org members on mount with proper cleanup
   useEffect(() => {
+    const controller = new AbortController()
+    let isMounted = true
+
+    const fetchOrgMembers = async () => {
+      if (!isMounted) return
+      setLoadingMembers(true)
+      try {
+        const authToken = localStorage.getItem('auth_token')
+        if (!authToken) return
+
+        const response = await fetch(`${API_BASE}/integrations/github/org-members`, {
+          headers: { 'Authorization': `Bearer ${authToken}` },
+          signal: controller.signal
+        })
+
+        if (response.ok && isMounted) {
+          const data = await response.json()
+          setOrgMemberCount(data.total_members)
+        }
+      } catch (error) {
+        // Ignore abort errors
+        if (error instanceof Error && error.name !== 'AbortError') {
+          console.error('Failed to fetch org members:', error)
+        }
+      } finally {
+        if (isMounted) {
+          setLoadingMembers(false)
+        }
+      }
+    }
+
     fetchOrgMembers()
-  }, [])
+
+    // Cleanup function
+    return () => {
+      isMounted = false
+      controller.abort()
+    }
+  }, [integration.github_username])
+
+  // Check if token is invalid
+  const hasTokenError = integration.token_valid === false
 
   return (
-    <Card className="border-2 border-green-200 bg-green-50/50 max-w-2xl mx-auto">
+    <Card className={`border-2 ${hasTokenError ? 'border-red-200 bg-red-50/50' : 'border-green-200 bg-green-50/50'} max-w-2xl mx-auto`}>
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
@@ -66,18 +92,61 @@ export function GitHubConnectedCard({
             <div>
               <CardTitle className="text-lg flex items-center space-x-2">
                 <span>GitHub</span>
-                <Badge variant="secondary" className="bg-green-100 text-green-700">
-                  <CheckCircle className="w-3 h-3 mr-1" />
-                  Connected
-                </Badge>
+                {hasTokenError ? (
+                  <Badge variant="secondary" className="bg-red-100 text-red-700">
+                    <AlertTriangle className="w-3 h-3 mr-1" />
+                    Token Invalid
+                  </Badge>
+                ) : (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Badge
+                        variant="secondary"
+                        className="bg-green-100 text-green-700 cursor-pointer hover:bg-green-200 transition-colors"
+                      >
+                        <CheckCircle className="w-3 h-3 mr-1" />
+                        Connected
+                        <ChevronDown className="w-3 h-3 ml-1" />
+                      </Badge>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start">
+                      <DropdownMenuItem onClick={onTest} disabled={isLoading}>
+                        {isLoading ? (
+                          <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                        ) : (
+                          <Zap className="w-3 h-3 mr-2" />
+                        )}
+                        Test Connection
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
               </CardTitle>
               <p className="text-sm text-slate-600">Repository collaboration and code management</p>
             </div>
           </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onDisconnect}
+            disabled={isLoading}
+            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+          >
+            <Trash2 className="w-5 h-5" />
+          </Button>
         </div>
       </CardHeader>
 
       <CardContent className="space-y-4">
+        {/* Token Error Alert */}
+        {hasTokenError && integration.token_error && (
+          <Alert className="border-red-200 bg-red-50">
+            <AlertTriangle className="w-4 h-4 text-red-600" />
+            <AlertDescription className="text-red-800 text-sm">
+              <strong>Authentication Error:</strong> {integration.token_error}
+            </AlertDescription>
+          </Alert>
+        )}
         {/* Integration Details */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
           <div className="flex items-center space-x-2">
@@ -157,32 +226,6 @@ export function GitHubConnectedCard({
               <div className="text-slate-600">{new Date(integration.last_updated).toLocaleDateString()}</div>
             </div>
           </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex items-center flex-wrap gap-2 pt-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={onTest}
-            disabled={loadingMembers}
-          >
-            {loadingMembers ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            ) : (
-              <TestTube className="w-4 h-4 mr-2" />
-            )}
-            Test Connection
-          </Button>
-          <Button
-            size="sm"
-            variant="destructive"
-            onClick={onDisconnect}
-            disabled={loadingMembers}
-          >
-            <Trash2 className="w-4 h-4 mr-2" />
-            Disconnect
-          </Button>
         </div>
 
         {/* Info Note */}

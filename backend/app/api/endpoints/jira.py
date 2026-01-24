@@ -338,6 +338,14 @@ async def get_jira_status(
     except Exception:
         pass
 
+    # Validate token
+    from app.services.integration_validator import IntegrationValidator
+    validator = IntegrationValidator(db)
+    validation_result = await validator._validate_jira(current_user.id)
+
+    token_valid = validation_result.get("valid", False) if validation_result else False
+    token_error = validation_result.get("error") if validation_result and not token_valid else None
+
     workspace_mapping = None
     if current_user.organization_id:
         workspace_mapping = db.query(JiraWorkspaceMapping).filter(
@@ -362,6 +370,8 @@ async def get_jira_status(
             "updated_at": integration.updated_at.isoformat() if integration.updated_at else None,
             "accessible_sites_count": len(getattr(integration, "accessible_resources", []) or []),
             "token_preview": token_preview,
+            "token_valid": token_valid,
+            "token_error": token_error
         },
     }
 

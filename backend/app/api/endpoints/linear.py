@@ -358,7 +358,7 @@ async def get_linear_status(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Get Linear integration status."""
+    """Get Linear integration status, including token validation."""
     integration = db.query(LinearIntegration).filter(
         LinearIntegration.user_id == current_user.id
     ).first()
@@ -373,6 +373,14 @@ async def get_linear_status(
             token_preview = f"...{dec[-4:]}" if dec else None
     except Exception:
         pass
+
+    # Validate token
+    from app.services.integration_validator import IntegrationValidator
+    validator = IntegrationValidator(db)
+    validation_result = await validator._validate_linear(current_user.id)
+
+    token_valid = validation_result.get("valid", False) if validation_result else False
+    token_error = validation_result.get("error") if validation_result and not token_valid else None
 
     workspace_mapping = None
     if current_user.organization_id:
@@ -397,6 +405,8 @@ async def get_linear_status(
             "token_expires_at": integration.token_expires_at.isoformat() if integration.token_expires_at else None,
             "updated_at": integration.updated_at.isoformat() if integration.updated_at else None,
             "token_preview": token_preview,
+            "token_valid": token_valid,
+            "token_error": token_error
         },
     }
 
