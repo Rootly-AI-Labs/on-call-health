@@ -4,7 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Key, Calendar, Building, Clock, Users, TestTube, Trash2, Loader2, CheckCircle, AlertTriangle } from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Key, Calendar, Building, Clock, Users, Zap, Trash2, Loader2, CheckCircle, AlertTriangle, ChevronDown } from "lucide-react"
 import { GitHubIntegration, API_BASE } from "../types"
 
 interface GitHubConnectedCardProps {
@@ -76,15 +82,42 @@ export function GitHubConnectedCard({
                     Token Invalid
                   </Badge>
                 ) : (
-                  <Badge variant="secondary" className="bg-green-100 text-green-700">
-                    <CheckCircle className="w-3 h-3 mr-1" />
-                    Connected
-                  </Badge>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Badge
+                        variant="secondary"
+                        className="bg-green-100 text-green-700 cursor-pointer hover:bg-green-200 transition-colors"
+                      >
+                        <CheckCircle className="w-3 h-3 mr-1" />
+                        Connected
+                        <ChevronDown className="w-3 h-3 ml-1" />
+                      </Badge>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start">
+                      <DropdownMenuItem onClick={onTest} disabled={loadingMembers}>
+                        {loadingMembers ? (
+                          <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                        ) : (
+                          <Zap className="w-3 h-3 mr-2" />
+                        )}
+                        Test Connection
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 )}
               </CardTitle>
               <p className="text-sm text-slate-600">Repository collaboration and code management</p>
             </div>
           </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onDisconnect}
+            disabled={loadingMembers}
+            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+          >
+            <Trash2 className="w-5 h-5" />
+          </Button>
         </div>
       </CardHeader>
 
@@ -177,32 +210,6 @@ export function GitHubConnectedCard({
               <div className="text-slate-600">{new Date(integration.last_updated).toLocaleDateString()}</div>
             </div>
           </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex items-center flex-wrap gap-2 pt-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={onTest}
-            disabled={loadingMembers}
-          >
-            {loadingMembers ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            ) : (
-              <TestTube className="w-4 h-4 mr-2" />
-            )}
-            Test Connection
-          </Button>
-          <Button
-            size="sm"
-            variant="destructive"
-            onClick={onDisconnect}
-            disabled={loadingMembers}
-          >
-            <Trash2 className="w-4 h-4 mr-2" />
-            Disconnect
-          </Button>
         </div>
 
         {/* Info Note */}

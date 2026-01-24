@@ -2,7 +2,13 @@ import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { AlertCircle, CheckCircle, Calendar, Globe, Key, Trash2, TestTube, Loader2 } from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { AlertCircle, CheckCircle, Calendar, Globe, Key, Trash2, Zap, Loader2, ChevronDown } from "lucide-react"
 import type { LinearIntegration } from "../types"
 
 interface LinearConnectedCardProps {
@@ -27,14 +33,41 @@ export function LinearConnectedCard({
             <div>
               <CardTitle className="text-lg flex items-center space-x-2">
                 <span>Linear</span>
-                <Badge variant="secondary" className="bg-green-100 text-green-700">
-                  <CheckCircle className="w-3 h-3 mr-1" />
-                  Connected
-                </Badge>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Badge
+                      variant="secondary"
+                      className="bg-green-100 text-green-700 cursor-pointer hover:bg-green-200 transition-colors"
+                    >
+                      <CheckCircle className="w-3 h-3 mr-1" />
+                      Connected
+                      <ChevronDown className="w-3 h-3 ml-1" />
+                    </Badge>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    <DropdownMenuItem onClick={onTest} disabled={isLoading}>
+                      {isLoading ? (
+                        <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                      ) : (
+                        <Zap className="w-3 h-3 mr-2" />
+                      )}
+                      Test Connection
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </CardTitle>
               <p className="text-sm text-slate-600">Project management and issue tracking</p>
             </div>
           </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onDisconnect}
+            disabled={isLoading}
+            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+          >
+            <Trash2 className="w-5 h-5" />
+          </Button>
         </div>
       </CardHeader>
 
@@ -112,33 +145,6 @@ export function LinearConnectedCard({
             </div>
           </div>
         )}
-
-        {/* Action Buttons */}
-        <div className="flex items-center flex-wrap gap-2 pt-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={onTest}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            ) : (
-              <TestTube className="w-4 h-4 mr-2" />
-            )}
-            Test Connection
-          </Button>
-
-          <Button
-            size="sm"
-            variant="destructive"
-            onClick={onDisconnect}
-            disabled={isLoading}
-          >
-            <Trash2 className="w-4 h-4 mr-2" />
-            Disconnect
-          </Button>
-        </div>
 
         {/* Info Note */}
         <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs text-slate-600">
