@@ -490,43 +490,43 @@ export function MemberDetailModal({
 
                         return (
                           <Tabs key="githubSlack" defaultValue={defaultTab} className="w-full">
-                            <TabsList className={`grid w-full ${getGridColsClass(tabCount)}`}>
-                              {hasGitHubData && <TabsTrigger value="github">GitHub</TabsTrigger>}
-                              {hasSlackData && <TabsTrigger value="communication">Communication</TabsTrigger>}
-                            </TabsList>
+                            {tabCount > 1 && (
+                              <TabsList className={`grid w-full ${getGridColsClass(tabCount)}`}>
+                                {hasGitHubData && <TabsTrigger value="github">GitHub</TabsTrigger>}
+                                {hasSlackData && <TabsTrigger value="communication">Communication</TabsTrigger>}
+                              </TabsList>
+                            )}
 
                             <TabsContent value="github" className="space-y-4">
-                              {selectedMember.github_activity ? (
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                  <Card>
-                                    <CardHeader>
-                                      <CardTitle className="text-sm">Development Activity</CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="space-y-3">
-                                      <div className="flex justify-between">
-                                        <span className="text-sm">Commits</span>
-                                        <span className="font-medium">{selectedMember.github_activity?.commits_count || 0}</span>
+                              {/* COMMENTED OUT - GitHub Activity Card */}
+                              {/* {selectedMember.github_activity ? (
+                                <Card>
+                                  <CardHeader>
+                                    <CardTitle>GitHub Activity</CardTitle>
+                                  </CardHeader>
+                                  <CardContent className="space-y-4">
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                      <div className="bg-neutral-100 p-3 rounded-md">
+                                        <p className="text-xs text-neutral-700">Commits</p>
+                                        <p className="text-lg font-semibold text-neutral-900">{selectedMember.github_activity?.commits_count || 0}</p>
                                       </div>
-                                      <div className="flex justify-between">
-                                        <span className="text-sm">Commits/Week</span>
-                                        <span className="font-medium">{selectedMember.github_activity?.commits_per_week?.toFixed(1) || '0.0'}</span>
+                                      <div className="bg-neutral-100 p-3 rounded-md">
+                                        <p className="text-xs text-neutral-700">Commits/Week</p>
+                                        <p className="text-lg font-semibold text-neutral-900">{selectedMember.github_activity?.commits_per_week?.toFixed(1) || '0.0'}</p>
                                       </div>
-                                      <div className="flex justify-between">
-                                        <span className="text-sm">After Hours Commits</span>
-                                        <span className="font-medium">{selectedMember.github_activity?.after_hours_commits || 0}</span>
+                                      <div className="bg-neutral-100 p-3 rounded-md">
+                                        <p className="text-xs text-neutral-700">After Hours</p>
+                                        <p className="text-lg font-semibold text-neutral-900">{selectedMember.github_activity?.after_hours_commits || 0}</p>
                                       </div>
-                                      <div className="flex justify-between">
-                                        <span className="text-sm">Weekend Activity</span>
-                                        <span className="font-medium">{selectedMember.github_activity?.weekend_commits || 0}</span>
+                                      <div className="bg-neutral-100 p-3 rounded-md">
+                                        <p className="text-xs text-neutral-700">Weekend</p>
+                                        <p className="text-lg font-semibold text-neutral-900">{selectedMember.github_activity?.weekend_commits || 0}</p>
                                       </div>
-                                    </CardContent>
-                                  </Card>
+                                    </div>
 
-                                  <Card>
-                                    <CardHeader>
-                                      <CardTitle className="text-sm">Commit Pattern</CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
+                                    <Separator />
+
+                                    <div>
                                       {loadingCommits ? (
                                         <div className="text-center py-8">
                                           <RefreshCw className="w-4 h-4 animate-spin text-neutral-500 mx-auto mb-2" />
@@ -598,57 +598,53 @@ export function MemberDetailModal({
                                           </p>
                                         </div>
                                       )}
-                                    </CardContent>
-                                  </Card>
+                                    </div>
 
-                                  {/* GitHub Activity Timeline */}
-                                  <Card>
-                                    <CardHeader>
-                                      <CardTitle className="text-sm">GitHub Activity Timeline</CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="space-y-3">
-                                      <div className="flex justify-between">
-                                        <span className="text-sm">Pull Requests</span>
-                                        <span className="font-medium">{selectedMember.github_activity?.pull_requests_count || 0}</span>
+                                    <Separator />
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                      <div className="space-y-3">
+                                        <div className="bg-neutral-100 p-3 rounded-md">
+                                          <p className="text-xs text-neutral-700">Pull Requests</p>
+                                          <p className="text-lg font-semibold text-neutral-900">{selectedMember.github_activity?.pull_requests_count || 0}</p>
+                                        </div>
+                                        <div className="bg-neutral-100 p-3 rounded-md">
+                                          <p className="text-xs text-neutral-700">Code Reviews</p>
+                                          <p className="text-lg font-semibold text-neutral-900">{selectedMember.github_activity?.reviews_count || 0}</p>
+                                        </div>
+                                        <div className="bg-neutral-100 p-3 rounded-md">
+                                          <p className="text-xs text-neutral-700">Avg PR Size</p>
+                                          <p className="text-lg font-semibold text-neutral-900">{selectedMember.github_activity?.avg_pr_size || 0} lines</p>
+                                        </div>
                                       </div>
-                                      <div className="flex justify-between">
-                                        <span className="text-sm">Code Reviews</span>
-                                        <span className="font-medium">{selectedMember.github_activity?.reviews_count || 0}</span>
-                                      </div>
-                                      <div className="flex justify-between">
-                                        <span className="text-sm">Avg PR Size</span>
-                                        <span className="font-medium">{selectedMember.github_activity?.avg_pr_size || 0} lines</span>
-                                      </div>
-                                      <Separator className="my-2" />
-                                      <div className="space-y-2">
-                                        <p className="text-xs font-semibold text-neutral-700">Work-life Balance</p>
-                                        <div className="flex items-center justify-between text-xs">
-                                          <span className="text-neutral-700">After-Hours</span>
-                                          <span className="font-medium text-orange-600">
+                                      <div className="space-y-3">
+                                        <div className="bg-neutral-100 p-3 rounded-md">
+                                          <p className="text-xs text-neutral-700">After-Hours</p>
+                                          <p className="text-lg font-semibold text-orange-600">
                                             {selectedMember.github_activity?.commits_count > 0
                                               ? ((selectedMember.github_activity.after_hours_commits / selectedMember.github_activity.commits_count) * 100).toFixed(1)
                                               : 0}%
-                                          </span>
+                                          </p>
                                         </div>
-                                        <div className="flex items-center justify-between text-xs">
-                                          <span className="text-neutral-700">Weekend</span>
-                                          <span className="font-medium text-purple-600">
+                                        <div className="bg-neutral-100 p-3 rounded-md">
+                                          <p className="text-xs text-neutral-700">Weekend</p>
+                                          <p className="text-lg font-semibold text-purple-600">
                                             {selectedMember.github_activity?.commits_count > 0
                                               ? ((selectedMember.github_activity.weekend_commits / selectedMember.github_activity.commits_count) * 100).toFixed(1)
                                               : 0}%
-                                          </span>
+                                          </p>
                                         </div>
                                       </div>
-                                    </CardContent>
-                                  </Card>
-                                </div>
+                                    </div>
+                                  </CardContent>
+                                </Card>
                               ) : (
                                 <Card>
                                   <CardContent className="p-6 text-center">
                                     <p className="text-neutral-500">No GitHub activity data available</p>
                                   </CardContent>
                                 </Card>
-                              )}
+                              )} */}
                             </TabsContent>
 
                             <TabsContent value="communication" className="space-y-4">

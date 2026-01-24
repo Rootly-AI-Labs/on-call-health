@@ -9,7 +9,12 @@ from typing import Any, Dict, List, Optional
 import aiohttp
 import pytz
 
+from .api_cache import get_cached_api_response, set_cached_api_response
+
 logger = logging.getLogger(__name__)
+
+# Cache TTL for PagerDuty data (1 hour - users/services rarely change)
+PAGERDUTY_CACHE_TTL_SECONDS = 3600
 
 class PagerDutyAPIClient:
     """Client for interacting with PagerDuty API."""
@@ -162,14 +167,30 @@ class PagerDutyAPIClient:
         except:
             return 0
     
-    async def get_users(self, limit: int = 100, offset: int = 0) -> List[Dict[str, Any]]:
-        """Fetch users from PagerDuty."""
+    async def get_users(self, limit: int = 100, offset: int = 0, force_refresh: bool = False) -> List[Dict[str, Any]]:
+        """Fetch users from PagerDuty with Redis caching.
+
+        Args:
+            limit: Maximum number of users to fetch
+            offset: Pagination offset
+            force_refresh: If True, bypass cache and fetch fresh data
+        """
+        cache_params = {"limit": limit, "offset": offset}
+
+        # Check cache first (unless force_refresh)
+        if not force_refresh:
+            cached = get_cached_api_response("pagerduty", "users", self.api_token, cache_params)
+            if cached is not None:
+                logger.info(f"PD GET_USERS: Using cached data ({len(cached)} users)")
+                return cached
+
         try:
             # Set 30 second timeout to prevent hanging on slow API responses
             timeout = aiohttp.ClientTimeout(total=30)
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 all_users = []
                 request_count = 0
+                current_offset = offset
 
                 while True:
                     request_count += 1
@@ -179,7 +200,7 @@ class PagerDutyAPIClient:
                         headers=self.headers,
                         params={
                             "limit": min(limit, 100),
-                            "offset": offset
+                            "offset": current_offset
                             # Removed include[]=contact_methods,teams - causes 40s+ response time
                             # Only need basic user data (id, email, name) for sync
                         }
@@ -197,15 +218,18 @@ class PagerDutyAPIClient:
                         if not data.get("more", False) or len(all_users) >= limit:
                             break
 
-                        offset += len(users)
+                        current_offset += len(users)
 
                 final_users = all_users[:limit]
                 user_emails = sum(1 for u in final_users if u.get("email"))
 
                 logger.info(f"PD GET_USERS: Fetched {len(final_users)} users in {request_count} requests ({user_emails} with emails)")
-                
+
+                # Cache the results
+                set_cached_api_response("pagerduty", "users", self.api_token, final_users, PAGERDUTY_CACHE_TTL_SECONDS, cache_params)
+
                 return final_users
-                
+
         except Exception as e:
             logger.error(f"PD GET_USERS: ERROR - {e}")
             return []
@@ -405,8 +429,22 @@ class PagerDutyAPIClient:
         
         return permissions
     
-    async def get_services(self, limit: int = 100) -> List[Dict[str, Any]]:
-        """Fetch services from PagerDuty."""
+    async def get_services(self, limit: int = 100, force_refresh: bool = False) -> List[Dict[str, Any]]:
+        """Fetch services from PagerDuty with Redis caching.
+
+        Args:
+            limit: Maximum number of services to fetch
+            force_refresh: If True, bypass cache and fetch fresh data
+        """
+        cache_params = {"limit": limit}
+
+        # Check cache first (unless force_refresh)
+        if not force_refresh:
+            cached = get_cached_api_response("pagerduty", "services", self.api_token, cache_params)
+            if cached is not None:
+                logger.info(f"PD GET_SERVICES: Using cached data ({len(cached)} services)")
+                return cached
+
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.get(
@@ -417,10 +455,15 @@ class PagerDutyAPIClient:
                     if response.status != 200:
                         logger.error(f"Failed to fetch services: HTTP {response.status}")
                         return []
-                        
+
                     data = await response.json()
-                    return data.get("services", [])
-                    
+                    services = data.get("services", [])
+
+                    # Cache the results
+                    set_cached_api_response("pagerduty", "services", self.api_token, services, PAGERDUTY_CACHE_TTL_SECONDS, cache_params)
+
+                    return services
+
         except Exception as e:
             logger.error(f"Error fetching PagerDuty services: {e}")
             return []
