@@ -29,31 +29,47 @@ export function GitHubConnectedCard({
   const [orgMemberCount, setOrgMemberCount] = useState<number | null>(null)
   const [loadingMembers, setLoadingMembers] = useState(false)
 
-  const fetchOrgMembers = async () => {
-    setLoadingMembers(true)
-    try {
-      const authToken = localStorage.getItem('auth_token')
-      if (!authToken) return
-
-      const response = await fetch(`${API_BASE}/integrations/github/org-members`, {
-        headers: { 'Authorization': `Bearer ${authToken}` }
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        setOrgMemberCount(data.total_members)
-      }
-    } catch (error) {
-      console.error('Failed to fetch org members:', error)
-    } finally {
-      setLoadingMembers(false)
-    }
-  }
-
-  // Fetch org members on mount
+  // Fetch org members on mount with proper cleanup
   useEffect(() => {
+    const controller = new AbortController()
+    let isMounted = true
+
+    const fetchOrgMembers = async () => {
+      if (!isMounted) return
+      setLoadingMembers(true)
+      try {
+        const authToken = localStorage.getItem('auth_token')
+        if (!authToken) return
+
+        const response = await fetch(`${API_BASE}/integrations/github/org-members`, {
+          headers: { 'Authorization': `Bearer ${authToken}` },
+          signal: controller.signal
+        })
+
+        if (response.ok && isMounted) {
+          const data = await response.json()
+          setOrgMemberCount(data.total_members)
+        }
+      } catch (error) {
+        // Ignore abort errors
+        if (error instanceof Error && error.name !== 'AbortError') {
+          console.error('Failed to fetch org members:', error)
+        }
+      } finally {
+        if (isMounted) {
+          setLoadingMembers(false)
+        }
+      }
+    }
+
     fetchOrgMembers()
-  }, [])
+
+    // Cleanup function
+    return () => {
+      isMounted = false
+      controller.abort()
+    }
+  }, [integration.github_username])
 
   // Check if token is invalid
   const hasTokenError = integration.token_valid === false
@@ -94,8 +110,8 @@ export function GitHubConnectedCard({
                       </Badge>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="start">
-                      <DropdownMenuItem onClick={onTest} disabled={loadingMembers}>
-                        {loadingMembers ? (
+                      <DropdownMenuItem onClick={onTest} disabled={isLoading}>
+                        {isLoading ? (
                           <Loader2 className="w-3 h-3 mr-2 animate-spin" />
                         ) : (
                           <Zap className="w-3 h-3 mr-2" />
@@ -113,7 +129,7 @@ export function GitHubConnectedCard({
             variant="ghost"
             size="icon"
             onClick={onDisconnect}
-            disabled={loadingMembers}
+            disabled={isLoading}
             className="text-red-600 hover:text-red-700 hover:bg-red-50"
           >
             <Trash2 className="w-5 h-5" />

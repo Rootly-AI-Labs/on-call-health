@@ -1,13 +1,14 @@
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { AlertCircle, CheckCircle, Calendar, Globe, Key, Trash2, Zap, Loader2, ChevronDown } from "lucide-react"
+import { AlertCircle, CheckCircle, Calendar, Globe, Key, Trash2, Zap, Loader2, ChevronDown, AlertTriangle } from "lucide-react"
 import type { JiraIntegration } from "../types"
 
 interface JiraConnectedCardProps {
@@ -23,8 +24,11 @@ export function JiraConnectedCard({
   onTest,
   isLoading = false
 }: JiraConnectedCardProps) {
+  // Check if token is invalid
+  const hasTokenError = integration.token_valid === false
+
   return (
-    <Card className="border-2 border-green-200 bg-green-50/50 max-w-2xl mx-auto">
+    <Card className={`border-2 ${hasTokenError ? 'border-red-200 bg-red-50/50' : 'border-green-200 bg-green-50/50'} max-w-2xl mx-auto`}>
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
@@ -79,6 +83,15 @@ export function JiraConnectedCard({
       </CardHeader>
 
       <CardContent className="space-y-4">
+        {/* Token Validation Error Alert */}
+        {hasTokenError && integration.token_error && (
+          <Alert className="border-red-200 bg-red-50">
+            <AlertTriangle className="w-4 h-4 text-red-600" />
+            <AlertDescription className="text-red-800 text-sm">
+              <strong>Authentication Error:</strong> {integration.token_error}
+            </AlertDescription>
+          </Alert>
+        )}
         {/* Integration Details */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
           <div className="flex items-center space-x-2">
