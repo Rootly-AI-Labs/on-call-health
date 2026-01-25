@@ -109,7 +109,6 @@ export function ObjectiveDataCard({
 }: ObjectiveDataCardProps) {
   const [selectedMetric, setSelectedMetric] = useState<string>("health_score")
   const [viewMode, setViewMode] = useState<'weekly' | 'daily'>('weekly')
-  const [showIncidentOverlay, setShowIncidentOverlay] = useState(true)
 
   const METRIC_CONFIG: any = {
     health_score: {
@@ -287,19 +286,6 @@ export function ObjectiveDataCard({
             </button>
           </div>
 
-          {/* Incident overlay toggle (weekly view only) */}
-          {viewMode === 'weekly' && selectedMetric === 'health_score' && (
-            <label className="flex items-center gap-2 text-xs text-neutral-600 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={showIncidentOverlay}
-                onChange={(e) => setShowIncidentOverlay(e.target.checked)}
-                className="rounded border-neutral-300 w-3 h-3"
-              />
-              Incidents
-            </label>
-          )}
-
           {/* Info tooltip */}
           <div className="relative group">
             <Info className="w-4 h-4 text-neutral-500 cursor-help hover:text-neutral-700 transition-colors" />
@@ -359,7 +345,7 @@ export function ObjectiveDataCard({
                     axisLine={false}
                     tickLine={false}
                   />
-                  {showIncidentOverlay && selectedMetric === 'health_score' && (
+                  {selectedMetric === 'health_score' && (
                     <YAxis
                       yAxisId="right"
                       orientation="right"
@@ -396,30 +382,21 @@ export function ObjectiveDataCard({
                             <div className="border-t border-neutral-700 pt-2 mt-2">
                               <p className="text-xs text-neutral-400 mb-1.5">Risk breakdown:</p>
                               <div className="space-y-1">
-                                {factors.severity > 0 && (
-                                  <div className="flex justify-between text-xs">
-                                    <span className="text-neutral-400">Severity impact</span>
-                                    <span className="text-white font-medium">{factors.severity}%</span>
-                                  </div>
-                                )}
-                                {factors.incidents > 0 && (
-                                  <div className="flex justify-between text-xs">
-                                    <span className="text-neutral-400">Incident volume</span>
-                                    <span className="text-white font-medium">{factors.incidents}%</span>
-                                  </div>
-                                )}
-                                {factors.highSeverity > 0 && (
-                                  <div className="flex justify-between text-xs">
-                                    <span className="text-neutral-400">High severity</span>
-                                    <span className="text-white font-medium">{factors.highSeverity}%</span>
-                                  </div>
-                                )}
-                                {factors.afterHours > 0 && (
-                                  <div className="flex justify-between text-xs">
-                                    <span className="text-neutral-400">After hours</span>
-                                    <span className="text-white font-medium">{factors.afterHours}%</span>
-                                  </div>
-                                )}
+                                {[
+                                  { key: 'severity', label: 'Severity impact', value: factors.severity },
+                                  { key: 'incidents', label: 'Incident volume', value: factors.incidents },
+                                  { key: 'highSeverity', label: 'High severity', value: factors.highSeverity },
+                                  { key: 'afterHours', label: 'After hours', value: factors.afterHours },
+                                ]
+                                  .filter(f => f.value > 0)
+                                  .sort((a, b) => b.value - a.value)
+                                  .map(factor => (
+                                    <div key={factor.key} className="flex justify-between text-xs">
+                                      <span className="text-neutral-400">{factor.label}</span>
+                                      <span className="text-white font-medium">{factor.value}%</span>
+                                    </div>
+                                  ))
+                                }
                               </div>
                             </div>
                           )}
@@ -437,7 +414,7 @@ export function ObjectiveDataCard({
                     radius={[4, 4, 0, 0]}
                     maxBarSize={50}
                   />
-                  {showIncidentOverlay && selectedMetric === 'health_score' && (
+                  {selectedMetric === 'health_score' && (
                     <Line
                       yAxisId="right"
                       type="monotone"
@@ -457,7 +434,7 @@ export function ObjectiveDataCard({
                 <div className="w-3 h-3 rounded bg-purple-600"></div>
                 <span>{config.label}</span>
               </div>
-              {showIncidentOverlay && selectedMetric === 'health_score' && (
+              {selectedMetric === 'health_score' && (
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-0.5 bg-amber-500"></div>
                   <span>Incidents</span>
