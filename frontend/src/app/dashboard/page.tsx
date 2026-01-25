@@ -1753,7 +1753,7 @@ function DashboardContent() {
           )}
 
           {/* Export Button and Footer */}
-          {!shouldShowInsufficientDataCard() && currentAnalysis && currentAnalysis.analysis_data && (
+          {!shouldShowInsufficientDataCard() && currentAnalysis && currentAnalysis.analysis_data && !analysisRunning && (
             <div className="flex justify-end mt-6">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
