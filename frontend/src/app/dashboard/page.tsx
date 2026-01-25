@@ -51,7 +51,6 @@ import { TeamHealthOverview } from "@/components/dashboard/TeamHealthOverview"
 import { AnalysisProgressSection } from "@/components/dashboard/AnalysisProgressSection"
 import { TeamMembersList } from "@/components/dashboard/TeamMembersList"
 import { ObjectiveDataCard } from "@/components/dashboard/ObjectiveDataCard"
-import { WeeklyTrendsCard } from "@/components/dashboard/WeeklyTrendsCard"
 import { TeamRiskFactorsCard, FACTOR_DESCRIPTIONS } from "@/components/dashboard/TeamRiskFactorsCard"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
 import { MemberDetailModal } from "@/components/dashboard/MemberDetailModal"
@@ -837,15 +836,6 @@ function DashboardContent() {
                   <ObjectiveDataCard
                     currentAnalysis={currentAnalysis}
                     loadingTrends={loadingTrends}
-                  />
-                </div>
-
-                {/* Team Trends - Weekly View (Prototype) */}
-                <div className="lg:col-span-2">
-                  <WeeklyTrendsCard
-                    dailyTrends={currentAnalysis?.analysis_data?.daily_trends || []}
-                    loading={loadingTrends}
-                    timeRange={currentAnalysis?.time_range || 30}
                   />
                 </div>
 
