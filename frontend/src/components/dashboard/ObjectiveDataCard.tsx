@@ -380,7 +380,7 @@ export function ObjectiveDataCard({
                           )}
                           {selectedMetric === 'health_score' && hasFactors && (
                             <div className="border-t border-neutral-700 pt-2 mt-2">
-                              <p className="text-xs text-neutral-400 mb-1.5">Risk breakdown:</p>
+                              <p className="text-xs font-semibold text-neutral-300 mb-2 uppercase tracking-wide">Risk breakdown</p>
                               <div className="space-y-1">
                                 {[
                                   { key: 'severity', label: 'Severity impact', value: factors.severity },
