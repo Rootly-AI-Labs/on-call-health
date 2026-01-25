@@ -400,9 +400,6 @@ export function ObjectiveDataCard({
                               </div>
                             </div>
                           )}
-                          <p className="text-xs text-neutral-500 mt-2">
-                            Based on {data?.daysInWeek} days of data
-                          </p>
                         </div>
                       )
                     }}
