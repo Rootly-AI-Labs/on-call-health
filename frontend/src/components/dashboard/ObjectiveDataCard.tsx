@@ -438,7 +438,7 @@ export function ObjectiveDataCard({
                 </div>
               )}
               <div className="flex items-center gap-2">
-                <div className="w-4 h-0.5 bg-purple-400 border-dashed"></div>
+                <div className="w-4 border-t-2 border-dashed border-purple-400"></div>
                 <span>Mean</span>
               </div>
             </div>
@@ -548,7 +548,7 @@ export function ObjectiveDataCard({
               </div>
               {config.showMeanLine && (
                 <div className="flex items-center space-x-2">
-                  <div className="w-3 h-0.5 bg-purple-500 border-dashed"></div>
+                  <div className="w-4 border-t-2 border-dashed border-purple-500"></div>
                   <span>Mean</span>
                 </div>
               )}
