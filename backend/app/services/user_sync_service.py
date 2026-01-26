@@ -98,6 +98,13 @@ class UserSyncService:
                 f"from {integration.platform} integration {integration_id}"
             )
 
+            # Create User records for any UserCorrelations that don't have matching User records
+            # This ensures the Slack survey button works for all synced members
+            user_records_created = self._ensure_user_records_exist(current_user)
+            stats['user_records_created'] = user_records_created
+            if user_records_created > 0:
+                logger.info(f"Created {user_records_created} User records for orphan correlations")
+
             # After syncing Rootly/PagerDuty users, try to match GitHub usernames
             # Wrap in try-except to ensure GitHub failures don't block Jira/Slack matching
             try:
@@ -402,6 +409,85 @@ class UserSyncService:
             "skipped": skipped,
             "total": len(users)
         }
+
+    def _ensure_user_records_exist(self, current_user: User) -> int:
+        """
+        Create User records for any UserCorrelations that don't have matching User records.
+
+        This is necessary because:
+        - UserCorrelation records are created when syncing from Rootly/PagerDuty
+        - User records are normally only created when someone logs in via OAuth
+        - The Slack survey button requires a User record to function properly
+
+        Args:
+            current_user: The user performing the sync (used to get organization_id)
+
+        Returns:
+            Number of User records created
+        """
+        from sqlalchemy import func
+
+        organization_id = current_user.organization_id
+        if not organization_id:
+            logger.warning("Cannot create User records without organization_id")
+            return 0
+
+        # Find all UserCorrelations in this org that don't have matching User records
+        orphan_correlations = self.db.query(UserCorrelation).outerjoin(
+            User, func.lower(User.email) == func.lower(UserCorrelation.email)
+        ).filter(
+            UserCorrelation.organization_id == organization_id,
+            UserCorrelation.email.isnot(None),
+            User.id.is_(None)  # No matching User record
+        ).all()
+
+        if not orphan_correlations:
+            logger.debug("No orphan correlations found - all users have User records")
+            return 0
+
+        logger.info(f"Found {len(orphan_correlations)} UserCorrelations without User records")
+
+        created_count = 0
+        for correlation in orphan_correlations:
+            try:
+                # Check one more time that no User exists (in case of race condition)
+                existing_user = self.db.query(User).filter(
+                    func.lower(User.email) == func.lower(correlation.email)
+                ).first()
+
+                if existing_user:
+                    logger.debug(f"User already exists for {correlation.email} - skipping")
+                    continue
+
+                # Create new User record
+                new_user = User(
+                    email=correlation.email.lower(),
+                    name=correlation.name or correlation.email.split('@')[0],
+                    organization_id=organization_id,
+                    is_verified=False,  # Not verified since they haven't logged in
+                    # Don't set provider/provider_id - they haven't authenticated
+                )
+                new_user.update_email_domain()
+                self.db.add(new_user)
+                self.db.flush()  # Get the user ID
+
+                logger.info(f"Created User record for {correlation.email} (id={new_user.id})")
+                created_count += 1
+
+            except Exception as e:
+                logger.error(f"Failed to create User record for {correlation.email}: {e}")
+                continue
+
+        # Commit all new User records
+        try:
+            self.db.commit()
+            logger.info(f"Successfully created {created_count} User records")
+        except Exception as e:
+            self.db.rollback()
+            logger.error(f"Failed to commit new User records: {e}")
+            return 0
+
+        return created_count
 
     def _update_correlation(
         self,
