@@ -40,8 +40,7 @@ services:
     ports:
       - "8000:8000"
     env_file:
-      - path: backend/.env
-        required: false
+      - backend/.env
     environment:
       - DATABASE_URL=postgresql://postgres:password@postgres:5432/burnout_detector
       - REDIS_HOST=redis
