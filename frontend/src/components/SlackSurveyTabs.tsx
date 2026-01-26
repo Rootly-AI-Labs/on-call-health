@@ -583,14 +583,14 @@ export function SlackSurveyTabs({
                 <p className="text-xs text-neutral-500 mt-1">
                   Send surveys every weekday at a specific time
                 </p>
+                {lastModifiedByName && lastModifiedAt && (
+                  <p className="text-xs text-neutral-400 mt-1.5">
+                    Last schedule change: {lastModifiedByName} on {new Date(lastModifiedAt).toLocaleDateString()} at {new Date(lastModifiedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                )}
                 {scheduleEnabled && (
                   <p className="text-xs font-medium text-purple-600 mt-1.5">
                     {Math.max(0, selectedRecipients.size)} {selectedRecipients.size === 1 ? 'user' : 'users'} selected
-                  </p>
-                )}
-                {lastModifiedByName && lastModifiedAt && (
-                  <p className="text-xs text-neutral-400 mt-1.5">
-                    Last updated by {lastModifiedByName} on {new Date(lastModifiedAt).toLocaleDateString()} at {new Date(lastModifiedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </p>
                 )}
               </div>
