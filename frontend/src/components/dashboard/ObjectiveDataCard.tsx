@@ -1,11 +1,305 @@
 "use client"
 
 import { useState } from "react"
-import { TrendsCard } from "@/components/dashboard/TrendsCard"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Area,
+  AreaChart,
+  Bar,
+  ComposedChart,
+  XAxis,
+  YAxis,
+  Line,
+  Tooltip,
+  ResponsiveContainer,
+  ReferenceLine
+} from "recharts"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Info, TrendingUp, TrendingDown, Minus } from "lucide-react"
 
 interface ObjectiveDataCardProps {
   currentAnalysis: any
   loadingTrends: boolean
+}
+
+interface TrendDirection {
+  direction: 'up' | 'down' | 'stable'
+  percentage: number
+}
+
+interface MetricConfig {
+  label: string
+  color: string
+  yAxisLabel: string
+  dataKey: string
+  weeklyDataKey: string
+  showMeanLine: boolean
+  transformer: (trend: any) => number
+}
+
+interface MetricDescription {
+  title: string
+  description: string
+}
+
+const METRIC_CONFIG: Record<string, MetricConfig> = {
+  health_score: {
+    label: "Risk Level",
+    color: "#7C63D6",
+    yAxisLabel: "Risk Level",
+    dataKey: "dailyScore",
+    weeklyDataKey: "riskLevel",
+    showMeanLine: true,
+    transformer: (trend: any) => Math.max(0, Math.min(100, 100 - Math.round(trend.overall_score * 10)))
+  },
+  incident_load: {
+    label: "Incident Count",
+    color: "#7C63D6",
+    yAxisLabel: "Incident Count",
+    dataKey: "incidentCount",
+    weeklyDataKey: "incidentCount",
+    showMeanLine: true,
+    transformer: (trend: any) => trend.incident_count || 0
+  },
+  after_hours: {
+    label: "After Hours Activity",
+    color: "#7C63D6",
+    yAxisLabel: "After Hours Activity %",
+    dataKey: "afterHoursPercentage",
+    weeklyDataKey: "afterHoursPercentage",
+    showMeanLine: true,
+    transformer: (trend: any) => trend.after_hours_percentage || 0
+  },
+  severity_weighted: {
+    label: "Workload Intensity",
+    color: "#7C63D6",
+    yAxisLabel: "Severity-Weighted Load",
+    dataKey: "severityWeightedCount",
+    weeklyDataKey: "severityWeighted",
+    showMeanLine: true,
+    transformer: (trend: any) => Math.round(trend.severity_weighted_count || 0)
+  }
+}
+
+const METRIC_DESCRIPTIONS: Record<string, MetricDescription> = {
+  health_score: {
+    title: "Risk Level",
+    description: "Measures the team's overall on-call health based on factors such as incident frequency, after-hours work and severity. Higher scores indicate higher risk of overwork."
+  },
+  incident_load: {
+    title: "Incident Count",
+    description: "Total count of incidents handled per day. Counts all incidents regardless of severity or timing."
+  },
+  after_hours: {
+    title: "After Hours Activity",
+    description: "Incidents occurring outside business hours (before 9 AM or after 5 PM) or on weekends. Timezone-aware based on each team member's local time."
+  },
+  severity_weighted: {
+    title: "Workload Intensity",
+    description: "Measures workload stress by weighting incidents based on their severity level. Higher values indicate more stressful workload."
+  }
+}
+
+function getWeekStartDate(date: Date): string {
+  const dayOfWeek = date.getDay()
+  const monday = new Date(date)
+  monday.setDate(date.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1))
+  return monday.toISOString().split('T')[0]
+}
+
+function formatDateShort(date: Date): string {
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+function calculateRiskLevel(overallScore: number): number {
+  return Math.max(0, Math.min(100, 100 - Math.round((overallScore || 0) * 10)))
+}
+
+function aggregateToWeekly(dailyData: any[]): any[] {
+  if (!dailyData || dailyData.length === 0) return []
+
+  const weeklyBuckets = new Map<string, any[]>()
+
+  for (const day of dailyData) {
+    const weekKey = getWeekStartDate(new Date(day.date))
+    const bucket = weeklyBuckets.get(weekKey) || []
+    bucket.push(day)
+    weeklyBuckets.set(weekKey, bucket)
+  }
+
+  return Array.from(weeklyBuckets.entries())
+    .map(([weekStart, days]) => {
+      const dayCount = days.length
+      const teamSize = days[0]?.total_members || 1
+
+      const avgRiskLevel = days.reduce((sum, d) => sum + calculateRiskLevel(d.overall_score), 0) / dayCount
+      const totalIncidents = days.reduce((sum, d) => sum + (d.incident_count || 0), 0)
+      const avgAfterHours = days.reduce((sum, d) => sum + (d.after_hours_percentage || 0), 0) / dayCount
+      const avgSeverityWeighted = days.reduce((sum, d) => sum + (d.severity_weighted_count || 0), 0) / dayCount
+      const totalAfterHoursCount = days.reduce((sum, d) => sum + (d.after_hours_count || 0), 0)
+      const totalHighSeverity = days.reduce((sum, d) => sum + (d.high_severity_count || 0), 0)
+
+      const rawBreakdown = days.reduce((acc, d) => {
+        const breakdown = d.severity_breakdown || { sev0: 0, sev1: 0, sev2: 0, sev3: 0, low: 0 }
+        return {
+          sev0: acc.sev0 + (breakdown.sev0 || 0),
+          sev1: acc.sev1 + (breakdown.sev1 || 0),
+          sev2: acc.sev2 + (breakdown.sev2 || 0),
+          sev3: acc.sev3 + (breakdown.sev3 || 0),
+          low: acc.low + (breakdown.low || 0),
+        }
+      }, { sev0: 0, sev1: 0, sev2: 0, sev3: 0, low: 0 })
+
+      const incidentPenalty = Math.min((totalIncidents / dayCount / teamSize) * 0.8, 2.0)
+      const severityPenalty = Math.min((avgSeverityWeighted / teamSize) * 1.2, 3.0)
+      const afterHoursPenalty = Math.min((totalAfterHoursCount / dayCount) * 0.5, 1.5)
+      const highSeverityPenalty = Math.min((totalHighSeverity / dayCount) * 0.8, 2.0)
+      const totalPenalty = incidentPenalty + severityPenalty + afterHoursPenalty + highSeverityPenalty
+
+      const factors = totalPenalty > 0
+        ? {
+            incidents: Math.round((incidentPenalty / totalPenalty) * 100),
+            severity: Math.round((severityPenalty / totalPenalty) * 100),
+            afterHours: Math.round((afterHoursPenalty / totalPenalty) * 100),
+            highSeverity: Math.round((highSeverityPenalty / totalPenalty) * 100),
+          }
+        : { incidents: 0, severity: 0, afterHours: 0, highSeverity: 0 }
+
+      const weekDate = new Date(weekStart)
+      const weekEnd = new Date(weekStart)
+      weekEnd.setDate(weekEnd.getDate() + 6)
+
+      return {
+        weekStart,
+        weekLabel: formatDateShort(weekDate),
+        weekRange: `${formatDateShort(weekDate)} - ${formatDateShort(weekEnd)}`,
+        riskLevel: Math.round(avgRiskLevel),
+        incidentCount: totalIncidents,
+        afterHoursPercentage: Math.round(avgAfterHours),
+        severityWeighted: Math.round(avgSeverityWeighted),
+        factors,
+        daysInWeek: dayCount,
+        severityBreakdown: {
+          critical: rawBreakdown.sev0 + rawBreakdown.sev1,
+          high: rawBreakdown.sev2,
+          mediumLow: rawBreakdown.sev3 + rawBreakdown.low,
+        }
+      }
+    })
+    .sort((a, b) => a.weekStart.localeCompare(b.weekStart))
+}
+
+function calculateTrend(current: number, previous: number): TrendDirection {
+  if (previous === 0) return { direction: 'stable', percentage: 0 }
+
+  const change = ((current - previous) / previous) * 100
+  if (Math.abs(change) < 5) return { direction: 'stable', percentage: Math.round(change) }
+
+  return {
+    direction: change > 0 ? 'up' : 'down',
+    percentage: Math.round(Math.abs(change))
+  }
+}
+
+function getTrendStatusClass(direction: 'up' | 'down' | 'stable'): string {
+  switch (direction) {
+    case 'down':
+      return 'bg-green-100 text-green-700'
+    case 'up':
+      return 'bg-red-100 text-red-700'
+    default:
+      return 'bg-neutral-100 text-neutral-600'
+  }
+}
+
+function getTrendLabel(direction: 'up' | 'down' | 'stable'): string {
+  switch (direction) {
+    case 'down':
+      return 'Improving'
+    case 'up':
+      return 'Needs Attention'
+    default:
+      return 'Stable'
+  }
+}
+
+function getTrendIcon(direction: 'up' | 'down' | 'stable') {
+  switch (direction) {
+    case 'down':
+      return <TrendingDown className="w-3 h-3" />
+    case 'up':
+      return <TrendingUp className="w-3 h-3" />
+    default:
+      return <Minus className="w-3 h-3" />
+  }
+}
+
+function getComparisonClass(direction: 'up' | 'down' | 'stable'): string {
+  switch (direction) {
+    case 'down':
+      return 'text-green-600'
+    case 'up':
+      return 'text-red-600'
+    default:
+      return 'text-neutral-500'
+  }
+}
+
+function formatComparison(trend: TrendDirection): string {
+  if (trend.direction === 'stable') return '—'
+  const arrow = trend.direction === 'down' ? '↓' : '↑'
+  return `${arrow}${trend.percentage}%`
+}
+
+function buildDailyChartData(dailyTrends: any[], config: MetricConfig): any[] {
+  if (!dailyTrends || dailyTrends.length === 0) return []
+
+  const chartData = dailyTrends.map((trend: any) => ({
+    date: formatDateShort(new Date(trend.date)),
+    [config.dataKey]: config.transformer(trend),
+    incidentCount: trend.incident_count || 0,
+    afterHours: trend.after_hours_count || 0,
+  }))
+
+  const values = chartData.map((d: any) => d[config.dataKey])
+  const mean = values.length > 0 ? values.reduce((a: number, b: number) => a + b, 0) / values.length : 0
+
+  return chartData.map((d: any) => ({ ...d, meanScore: Math.round(mean) }))
+}
+
+function calculateWeeklyStats(weeklyData: any[], config: MetricConfig) {
+  const weeklyMean = weeklyData.length > 0
+    ? weeklyData.reduce((sum, w) => sum + w[config.weeklyDataKey], 0) / weeklyData.length
+    : 0
+
+  const halfIndex = Math.floor(weeklyData.length / 2)
+  const firstHalfAvg = halfIndex > 0
+    ? weeklyData.slice(0, halfIndex).reduce((sum, w) => sum + w[config.weeklyDataKey], 0) / halfIndex
+    : 0
+  const secondHalfAvg = weeklyData.length - halfIndex > 0
+    ? weeklyData.slice(halfIndex).reduce((sum, w) => sum + w[config.weeklyDataKey], 0) / (weeklyData.length - halfIndex)
+    : 0
+
+  const currentWeek = weeklyData[weeklyData.length - 1]
+  const previousWeek = weeklyData[weeklyData.length - 2]
+
+  return {
+    weeklyMean,
+    overallTrend: calculateTrend(secondHalfAvg, firstHalfAvg),
+    currentWeek,
+    vsLastWeek: currentWeek && previousWeek
+      ? calculateTrend(currentWeek[config.weeklyDataKey], previousWeek[config.weeklyDataKey])
+      : null,
+    vsMean: currentWeek
+      ? calculateTrend(currentWeek[config.weeklyDataKey], weeklyMean)
+      : null,
+  }
 }
 
 export function ObjectiveDataCard({
@@ -13,221 +307,423 @@ export function ObjectiveDataCard({
   loadingTrends
 }: ObjectiveDataCardProps) {
   const [selectedMetric, setSelectedMetric] = useState<string>("health_score")
+  const [viewMode, setViewMode] = useState<'weekly' | 'daily'>('weekly')
 
-  // Metric configuration
-  const METRIC_CONFIG: any = {
-    health_score: {
-      label: "Risk Level",
-      color: "#7C63D6",
-      yAxisLabel: "Risk Level",
-      dataKey: "dailyScore",
-      showMeanLine: true,
-      transformer: (trend: any) => Math.max(0, Math.min(100, 100 - Math.round(trend.overall_score * 10)))
-    },
-    incident_load: {
-      label: "Incident Count",
-      color: "#7C63D6",
-      yAxisLabel: "Incident Count",
-      dataKey: "incidentCount",
-      showMeanLine: true,
-      transformer: (trend: any) => trend.incident_count || 0
-    },
-    after_hours: {
-      label: "After Hours Activity",
-      color: "#7C63D6",
-      yAxisLabel: "After Hours Activity %",
-      dataKey: "afterHoursPercentage",
-      showMeanLine: true,
-      transformer: (trend: any) => trend.after_hours_percentage || 0
-    },
-    severity_weighted: {
-      label: "Workload Intensity",
-      color: "#7C63D6",
-      yAxisLabel: "Severity-Weighted Load",
-      dataKey: "severityWeightedCount",
-      showMeanLine: true,
-      transformer: (trend: any) => Math.round(trend.severity_weighted_count || 0)
-    }
-  }
+  const dailyTrends = currentAnalysis?.analysis_data?.daily_trends || []
+  const timeRange = currentAnalysis?.time_range || currentAnalysis?.analysis_data?.metadata?.days_analyzed || 30
+  const config = METRIC_CONFIG[selectedMetric]
 
-  // Metric descriptions for the info tooltip
-  const METRIC_DESCRIPTIONS: any = {
-    health_score: {
-      title: "Risk Level",
-      description: "Measures the team's overall on-call health based on factors such as incident frequency, after-hours work and severity. Higher scores indicate higher risk of overwork."
-    },
-    incident_load: {
-      title: "Incident Count",
-      description: "Total count of incidents handled per day. Counts all incidents regardless of severity or timing."
-    },
-    after_hours: {
-      title: "After Hours Activity",
-      description: "Incidents occurring outside business hours (before 9 AM or after 5 PM) or on weekends. Timezone-aware based on each team member's local time."
-    },
-    severity_weighted: {
-      title: "Workload Intensity",
-      description: "Measures workload stress by weighting incidents based on their severity level. Higher values indicate more stressful workload."
-    }
-  }
+  const weeklyData = aggregateToWeekly(dailyTrends)
+  const dailyChartData = buildDailyChartData(dailyTrends, config)
+  const { weeklyMean, overallTrend, currentWeek, vsLastWeek, vsMean } = calculateWeeklyStats(weeklyData, config)
 
-  // Calculate statistics from daily trends
-  const calculateStats = (dailyTrends: any[], metric: string, individualData?: any) => {
-    if (!dailyTrends || dailyTrends.length === 0) {
-      return { mean: 0, min: 0, max: 0, trend: 'neutral' };
-    }
+  const hasData = viewMode === 'weekly' ? weeklyData.length > 0 : dailyChartData.length > 0
+  const dailyMean = dailyChartData.length > 0 ? dailyChartData[0]?.meanScore : 0
 
-    const config = METRIC_CONFIG[metric];
-
-    const values = dailyTrends.map(d => config.transformer(d));
-
-    const mean = values.reduce((a, b) => a + b, 0) / values.length;
-    const min = Math.min(...values);
-    const max = Math.max(...values);
-
-    // Determine trend: compare first third vs last third
-    const third = Math.floor(values.length / 3);
-    const firstThirdAvg = values.slice(0, third).reduce((a, b) => a + b, 0) / third;
-    const lastThirdAvg = values.slice(-third).reduce((a, b) => a + b, 0) / third;
-
-    // For health score, lower is better; for other metrics, higher is worse
-    let trend: string;
-    if (metric === 'health_score') {
-      trend = lastThirdAvg < firstThirdAvg ? 'improving' : lastThirdAvg > firstThirdAvg ? 'declining' : 'stable';
-    } else {
-      trend = lastThirdAvg > firstThirdAvg ? 'declining' : lastThirdAvg < firstThirdAvg ? 'improving' : 'stable';
-    }
-
-    return { mean, min, max, trend };
-  };
-
-  // Calculate 7-day running average
-  const calculate7DayRunningAverage = (scores: number[]) => {
-    return scores.map((score, index) => {
-      // For points with < 7 previous data points, use average up to that point (inclusive)
-      // edit running average here
-      const windowSize = Math.min(7, index + 1);
-      const start = Math.max(0, index - windowSize + 1);
-      const window = scores.slice(start, index + 1);
-      const average = window.reduce((a, b) => a + b, 0) / window.length;
-      return Math.round(average);
-    });
-  };
-
-  // Aggregate weekend work from individual user data
-  const aggregateWeekendWork = (date: string, individualData: any): number => {
-    if (!individualData || typeof individualData !== 'object') {
-      return 0
-    }
-
-    let totalWeekendCount = 0
-
-    try {
-      Object.keys(individualData).forEach((userEmail) => {
-        const userData = individualData[userEmail]
-        if (userData && userData[date]) {
-          totalWeekendCount += userData[date].weekend_count || 0
-        }
-      })
-    } catch (error) {
-      console.warn('Error aggregating weekend work:', error)
-      return 0
-    }
-
-    return totalWeekendCount
-  };
-
-  // Get chart mode from backend analysis data (default to 'normal')
-  const chartMode = currentAnalysis?.analysis_data?.chart_mode || 'normal';
-
-  // Get the chart data
-  const getChartData = (metric: string) => {
-    const dailyTrends = currentAnalysis?.analysis_data?.daily_trends;
-    const individualData = currentAnalysis?.analysis_data?.individual_daily_data;
-    const config = METRIC_CONFIG[metric];
-
-    if (!dailyTrends || !Array.isArray(dailyTrends) || dailyTrends.length === 0) {
-      return [];
-    }
-
-    // Convert daily trends to chart format
-    const chartData = dailyTrends.map((trend: any) => {
-      let metricValue: number;
-
-      // Special handling for weekend work
-      if (metric === 'weekend_work') {
-        metricValue = aggregateWeekendWork(trend.date, individualData);
-      } else {
-        metricValue = config.transformer(trend);
-      }
-
-      // Use actual after-hours breakdown from backend
-      const afterHoursIncidents = trend.after_hours_incidents_count || 0;
-      const afterHoursCommits = trend.github_after_hours_count || 0;
-      const totalActivities = trend.total_activities || 0;
-      const afterHoursPercentage = trend.after_hours_percentage || 0;
-
-      return {
-        date: new Date(trend.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        originalDate: trend.date,
-        [config.dataKey]: metricValue,
-        // Keep these for tooltip
-        incidentCount: trend.incident_count || 0,
-        afterHours: trend.after_hours_count || 0,
-        afterHoursIncidents: afterHoursIncidents,
-        afterHoursCommits: afterHoursCommits,
-        totalActivities: totalActivities,
-        afterHoursPercentage: afterHoursPercentage,
-        membersAtRisk: trend.members_at_risk || 0,
-        totalMembers: trend.total_members || 0,
-        hasData: trend.incident_count > 0
-      };
-    });
-
-    // Calculate mean
-    const values = chartData.map(d => d[config.dataKey]);
-    const mean = values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : 0;
-
-    // Apply running average only for health_score
-    let displayValues = values;
-    if (chartMode === 'running_average' && metric === 'health_score') {
-      displayValues = calculate7DayRunningAverage(values);
-    }
-
-    // Add mean and display value
-    const dataWithMean = chartData.map((d, index) => ({
-      ...d,
-      [config.dataKey]: displayValues[index],
-      meanScore: Math.round(mean)
-    }));
-
-    return dataWithMean;
-  };
-
-  const chartData = getChartData(selectedMetric);
-  const individualData = currentAnalysis?.analysis_data?.individual_daily_data;
-  const stats = calculateStats(
-    currentAnalysis?.analysis_data?.daily_trends || [],
-    selectedMetric,
-    individualData
-  );
-  const timeRange = currentAnalysis?.time_range || currentAnalysis?.analysis_data?.metadata?.days_analyzed || 30;
-
-  const hasData = chartData.length > 0;
   const description = hasData
-    ? `Over the last ${timeRange} days, the average ${METRIC_CONFIG[selectedMetric].yAxisLabel.toLowerCase()} was ${Math.round(stats.mean)}${selectedMetric === 'health_score' ? ' points' : ''}.`
-    : "No daily trend data available for this analysis";
+    ? viewMode === 'weekly'
+      ? `Weekly averages over ${timeRange} days. Mean: ${Math.round(weeklyMean)} ${config.label.toLowerCase()}.`
+      : `Over the last ${timeRange} days, the average ${config.yAxisLabel.toLowerCase()} was ${Math.round(dailyMean)} points.`
+    : "No trend data available for this analysis"
+
+  if (loadingTrends) {
+    return (
+      <Card className="mb-6">
+        <CardContent className="flex items-center justify-center h-[400px]">
+          <div className="text-center">
+            <div className="animate-spin w-6 h-6 border-2 border-purple-600 border-t-transparent rounded-full mx-auto mb-2" />
+            <p className="text-sm text-neutral-500">Loading trends...</p>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
 
   return (
-    <TrendsCard
-      title="Team Trends"
-      description={description}
-      chartData={chartData}
-      loading={loadingTrends}
-      selectedMetric={selectedMetric}
-      onMetricChange={setSelectedMetric}
-      metricConfig={METRIC_CONFIG}
-      metricDescriptions={METRIC_DESCRIPTIONS}
-      timeRange={timeRange}
-    />
+    <Card className="mb-6">
+      <CardHeader className="flex flex-row items-center justify-between">
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-3">
+            <CardTitle>Team Trends</CardTitle>
+            {viewMode === 'weekly' && hasData && (
+              <div className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${getTrendStatusClass(overallTrend.direction)}`}>
+                {getTrendIcon(overallTrend.direction)}
+                {getTrendLabel(overallTrend.direction)}
+              </div>
+            )}
+          </div>
+          <CardDescription>{description}</CardDescription>
+        </div>
+
+        <div className="flex items-center space-x-2">
+          {/* View Toggle */}
+          <div className="flex items-center bg-neutral-100 rounded-lg p-0.5">
+            <button
+              onClick={() => setViewMode('weekly')}
+              className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                viewMode === 'weekly'
+                  ? 'bg-white text-neutral-900 shadow-sm'
+                  : 'text-neutral-500 hover:text-neutral-700'
+              }`}
+            >
+              Weekly
+            </button>
+            <button
+              onClick={() => setViewMode('daily')}
+              className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                viewMode === 'daily'
+                  ? 'bg-white text-neutral-900 shadow-sm'
+                  : 'text-neutral-500 hover:text-neutral-700'
+              }`}
+            >
+              Daily
+            </button>
+          </div>
+
+          {/* Info tooltip */}
+          <div className="relative group">
+            <Info className="w-4 h-4 text-neutral-500 cursor-help hover:text-neutral-700 transition-colors" />
+            <div className="absolute top-full right-0 mt-2 px-3 py-2 bg-neutral-900/95 text-white text-xs rounded-lg w-64 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+              <div className="font-semibold mb-1">{METRIC_DESCRIPTIONS[selectedMetric].title}</div>
+              <div>{METRIC_DESCRIPTIONS[selectedMetric].description}</div>
+            </div>
+          </div>
+
+          {/* Metric selector */}
+          <Select value={selectedMetric} onValueChange={setSelectedMetric}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {Object.entries(METRIC_CONFIG).map(([key, value]: [string, any]) => (
+                <SelectItem key={key} value={key}>
+                  {value.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </CardHeader>
+
+      <CardContent className="pb-6">
+        {!hasData ? (
+          <div className="flex items-center justify-center h-[300px]">
+            <div className="text-center">
+              <div className="w-12 h-12 bg-neutral-200 rounded-full flex items-center justify-center mx-auto mb-3">
+                <svg className="w-6 h-6 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+              </div>
+              <p className="text-sm text-neutral-500 font-medium">No Data Available</p>
+              <p className="text-xs text-neutral-500 mt-1">Run an analysis to view trends</p>
+            </div>
+          </div>
+        ) : viewMode === 'weekly' ? (
+          <>
+            {/* Weekly Bar Chart */}
+            <div className="h-[280px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart
+                  data={weeklyData}
+                  margin={{ top: 20, right: 30, left: 0, bottom: 5 }}
+                >
+                  <XAxis
+                    dataKey="weekLabel"
+                    tick={{ fontSize: 11, fill: '#6B7280' }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    yAxisId="left"
+                    tick={{ fontSize: 11, fill: '#6B7280' }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  {(selectedMetric === 'health_score' || selectedMetric === 'incident_load') && (
+                    <YAxis
+                      yAxisId="right"
+                      orientation="right"
+                      tick={{ fontSize: 11, fill: selectedMetric === 'incident_load' ? '#7C63D6' : '#F59E0B' }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                  )}
+                  <ReferenceLine
+                    yAxisId="left"
+                    y={weeklyMean}
+                    stroke="#9C84E8"
+                    strokeDasharray="5 5"
+                  />
+                  <Tooltip
+                    content={({ payload }) => {
+                      if (!payload || payload.length === 0) return null
+                      const data = payload[0]?.payload
+                      const factors = data?.factors || {}
+                      const hasFactors = factors.incidents > 0 || factors.severity > 0 || factors.afterHours > 0 || factors.highSeverity > 0
+                      const sevBreakdown = data?.severityBreakdown || {}
+
+                      return (
+                        <div className="bg-neutral-900/95 p-3 border border-neutral-700 rounded-lg shadow-lg min-w-[200px]">
+                          <p className="text-sm font-medium text-neutral-300 mb-2">{data?.weekRange}</p>
+                          <p className="text-lg font-bold text-white mb-1">
+                            {data?.[config.weeklyDataKey]} {config.label}
+                          </p>
+                          {selectedMetric === 'health_score' && (
+                            <p className="text-sm text-amber-400 mb-2">
+                              {data?.incidentCount} incidents this week
+                            </p>
+                          )}
+                          {selectedMetric === 'incident_load' && (
+                            <>
+                              <p className="text-sm text-purple-400 mb-2">
+                                Risk Level: {data?.riskLevel}
+                              </p>
+                              <div className="border-t border-neutral-700 pt-2 mt-2">
+                                <p className="text-xs font-semibold text-neutral-300 mb-2 uppercase tracking-wide">By Severity</p>
+                                <div className="space-y-1">
+                                  {sevBreakdown.critical > 0 && (
+                                    <div className="flex justify-between text-xs">
+                                      <span className="text-red-400">Critical (SEV0-1)</span>
+                                      <span className="text-white font-medium">{sevBreakdown.critical}</span>
+                                    </div>
+                                  )}
+                                  {sevBreakdown.high > 0 && (
+                                    <div className="flex justify-between text-xs">
+                                      <span className="text-orange-400">High (SEV2)</span>
+                                      <span className="text-white font-medium">{sevBreakdown.high}</span>
+                                    </div>
+                                  )}
+                                  {sevBreakdown.mediumLow > 0 && (
+                                    <div className="flex justify-between text-xs">
+                                      <span className="text-neutral-400">Medium/Low (SEV3+)</span>
+                                      <span className="text-white font-medium">{sevBreakdown.mediumLow}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </>
+                          )}
+                          {selectedMetric === 'health_score' && hasFactors && (
+                            <div className="border-t border-neutral-700 pt-2 mt-2">
+                              <p className="text-xs font-semibold text-neutral-300 mb-2 uppercase tracking-wide">Risk breakdown</p>
+                              <div className="space-y-1">
+                                {[
+                                  { key: 'severity', label: 'Severity impact', value: factors.severity },
+                                  { key: 'incidents', label: 'Incident volume', value: factors.incidents },
+                                  { key: 'highSeverity', label: 'High severity', value: factors.highSeverity },
+                                  { key: 'afterHours', label: 'After hours', value: factors.afterHours },
+                                ]
+                                  .filter(f => f.value > 0)
+                                  .sort((a, b) => b.value - a.value)
+                                  .map(factor => (
+                                    <div key={factor.key} className="flex justify-between text-xs">
+                                      <span className="text-neutral-400">{factor.label}</span>
+                                      <span className="text-white font-medium">{factor.value}%</span>
+                                    </div>
+                                  ))
+                                }
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    }}
+                  />
+                  {selectedMetric === 'incident_load' ? (
+                    <>
+                      {/* Stacked bars for incident severity breakdown */}
+                      <Bar yAxisId="left" dataKey="severityBreakdown.mediumLow" stackId="incidents" fill="#9CA3AF" maxBarSize={50} name="Medium/Low" />
+                      <Bar yAxisId="left" dataKey="severityBreakdown.high" stackId="incidents" fill="#F97316" maxBarSize={50} name="High" />
+                      <Bar yAxisId="left" dataKey="severityBreakdown.critical" stackId="incidents" fill="#EF4444" radius={[4, 4, 0, 0]} maxBarSize={50} name="Critical" />
+                      {/* Risk level overlay line */}
+                      <Line
+                        yAxisId="right"
+                        type="monotone"
+                        dataKey="riskLevel"
+                        stroke="#7C63D6"
+                        strokeWidth={2}
+                        dot={{ fill: '#7C63D6', r: 4 }}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <Bar
+                        yAxisId="left"
+                        dataKey={config.weeklyDataKey}
+                        fill="#7C63D6"
+                        radius={[4, 4, 0, 0]}
+                        maxBarSize={50}
+                      />
+                      {selectedMetric === 'health_score' && (
+                        <Line
+                          yAxisId="right"
+                          type="monotone"
+                          dataKey="incidentCount"
+                          stroke="#F59E0B"
+                          strokeWidth={2}
+                          dot={{ fill: '#F59E0B', r: 4 }}
+                        />
+                      )}
+                    </>
+                  )}
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Legend */}
+            <div className="flex items-center justify-center gap-6 mt-2 text-sm text-neutral-600">
+              {selectedMetric === 'incident_load' ? (
+                <>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded bg-red-500"></div>
+                    <span>Critical</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded bg-orange-500"></div>
+                    <span>High</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded bg-neutral-400"></div>
+                    <span>Medium/Low</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-0.5 bg-purple-600"></div>
+                    <span>Risk Level</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded bg-purple-600"></div>
+                    <span>{config.label}</span>
+                  </div>
+                  {selectedMetric === 'health_score' && (
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-0.5 bg-amber-500"></div>
+                      <span>Incidents</span>
+                    </div>
+                  )}
+                </>
+              )}
+              <div className="flex items-center gap-2">
+                <div className="w-4 border-t-2 border-dashed border-purple-400"></div>
+                <span>Mean</span>
+              </div>
+            </div>
+
+            {/* Week-over-Week Comparison */}
+            {currentWeek && (
+              <div className="mt-4 flex items-center justify-center gap-6 text-sm">
+                <div className="flex items-center gap-2">
+                  <span className="text-neutral-500">This week:</span>
+                  <span className="font-semibold text-neutral-900">{currentWeek[config.weeklyDataKey]}</span>
+                </div>
+                {vsLastWeek && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-neutral-500">vs last week:</span>
+                    <span className={`font-medium ${getComparisonClass(vsLastWeek.direction)}`}>
+                      {formatComparison(vsLastWeek)}
+                    </span>
+                  </div>
+                )}
+                {vsMean && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-neutral-500">vs mean:</span>
+                    <span className={`font-medium ${getComparisonClass(vsMean.direction)}`}>
+                      {formatComparison(vsMean)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            {/* Daily Area Chart */}
+            <div className="h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart
+                  data={dailyChartData}
+                  margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                >
+                  <defs>
+                    <linearGradient id="purpleGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#7C63D6" stopOpacity={0.4} />
+                      <stop offset="100%" stopColor="#7C63D6" stopOpacity={0.01} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis
+                    dataKey="date"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 10, fill: '#6B7280' }}
+                    angle={-45}
+                    textAnchor="end"
+                    height={50}
+                    interval={Math.floor(dailyChartData.length / 7) || 0}
+                  />
+                  <YAxis hide={selectedMetric === 'health_score'} />
+                  <Tooltip
+                    content={({ payload }) => {
+                      if (!payload || payload.length === 0) return null
+                      const data = payload[0]?.payload
+                      const metricValue = data?.[config.dataKey] || 0
+                      const meanScore = data?.meanScore || 0
+                      const percentageChange = meanScore !== 0 ? ((metricValue - meanScore) / meanScore) * 100 : 0
+                      const isPositive = percentageChange <= 0
+
+                      return (
+                        <div className="bg-neutral-900/95 p-3 border border-neutral-700 rounded-lg shadow-lg">
+                          <p className="text-sm font-medium text-neutral-300 mb-2">{data?.date}</p>
+                          <p className={`text-base font-bold mb-2 ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
+                            {percentageChange >= 0 ? '↑' : '↓'} {Math.abs(percentageChange).toFixed(1)}%
+                          </p>
+                          <p className="text-sm text-neutral-300">
+                            {config.label}: <span className="font-semibold">{metricValue}</span>
+                          </p>
+                          <p className="text-xs text-neutral-400 mt-1">Mean: {meanScore}</p>
+                        </div>
+                      )
+                    }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey={config.dataKey}
+                    stroke={config.color}
+                    strokeWidth={2}
+                    fill="url(#purpleGradient)"
+                    dot={false}
+                  />
+                  {config.showMeanLine && (
+                    <Line
+                      type="monotone"
+                      dataKey="meanScore"
+                      stroke="#9C84E8"
+                      strokeWidth={2}
+                      strokeDasharray="5 5"
+                      dot={false}
+                    />
+                  )}
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Legend */}
+            <div className="mt-4 flex items-center justify-start space-x-6 text-sm text-neutral-700">
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 rounded" style={{ backgroundColor: config.color }}></div>
+                <span>{config.label}</span>
+              </div>
+              {config.showMeanLine && (
+                <div className="flex items-center space-x-2">
+                  <div className="w-4 border-t-2 border-dashed border-purple-500"></div>
+                  <span>Mean</span>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
   )
 }

@@ -178,7 +178,7 @@ export default function LandingPage() {
               className="rounded-2xl bg-[#7b6db1] px-5 py-2 text-sm font-semibold font-display text-[color:var(--text-text-primary,_#100F12)] hover:bg-[#6f62a5] flex items-center gap-2"
             >
               <Image src="/images/github-logo.png" alt="GitHub" width={20} height={20} className="h-4 w-4 lg:h-5 lg:w-5" />
-              GitHub
+              <span className="relative top-[2px]">GitHub</span>
             </a>
           </div>
         </div>
@@ -273,7 +273,7 @@ export default function LandingPage() {
         {/* Features Banner */}
         <div className="container mx-auto px-4 pt-12 pb-0 mt-6 lg:mt-40 lg:py-20 relative z-10">
           <Image
-            src="/images/landing/upstart-asset.png"
+            src="/images/landing/wandb_testimonial.png"
             alt="Rootly customer story"
             width={1784}
             height={602}

@@ -174,7 +174,7 @@ async def collect_team_github_data_with_mapping(
                         mapping_method=mapping_method,
                         data_points_count=data_points
                     )
-                    logger.info(f"💻 GitHub: {email} -> {github_username} ({data_points} data points)")
+                    logger.debug(f"GitHub: {email} -> {github_username} ({data_points} data points)")
                 else:
                     # Data collected but no clear username
                     recorder.record_successful_mapping(

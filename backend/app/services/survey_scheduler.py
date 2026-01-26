@@ -501,6 +501,12 @@ class SurveyScheduler:
 
             for user in users:
                 try:
+                    # Skip users without a valid user_id (UserCorrelation without matching User record)
+                    if user['user_id'] is None:
+                        skipped_count += 1
+                        logger.warning(f"Skipping DM for {user.get('email')} - no User record found (user_id is None)")
+                        continue
+
                     # If reminder, check if user already completed survey today
                     # Check is scoped by user only - one survey per user per day regardless of org
                     if is_reminder:
