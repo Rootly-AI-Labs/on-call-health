@@ -448,54 +448,34 @@ class UnifiedBurnoutAnalyzer:
                 
                 for i, user in enumerate(users):
                     if not isinstance(user, dict):
-                        logger.warning(f"EMAIL EXTRACTION: User #{i+1} is not a dict: {type(user)}")
+                        logger.debug(f"User #{i+1} is not a dict: {type(user)}")
                         continue
-                    
+
                     email = None
                     name = None
-                    
-                    # Log first few users for structure analysis
-                    if i < 3:
-                        logger.info(f"EMAIL EXTRACTION: User #{i+1} structure:")
-                        logger.info(f"   - Keys: {list(user.keys())}")
-                        logger.info(f"   - Has 'attributes': {'attributes' in user}")
-                        logger.info(f"   - Direct email: {user.get('email')}")
-                        logger.info(f"   - Direct name: {user.get('name')}")
-                    
+
                     if "attributes" in user:
                         # JSONAPI format (Rootly style)
                         attrs = user["attributes"]
                         email = attrs.get("email")
                         name = attrs.get("full_name") or attrs.get("name")
-                        if i < 3:
-                            logger.info(f"   - JSONAPI format: email={email}, name={name}")
                     else:
                         # Direct format (PagerDuty normalized format)
                         email = user.get("email")
                         name = user.get("name") or user.get("full_name")
-                        if i < 3:
-                            logger.info(f"   - Direct format: email={email}, name={name}")
-                    
+
                     if email:
                         team_emails.append(email)
                         if name:
                             email_to_name[email] = name
                     if name:
                         team_names.append(name)
-                
-                # COMPREHENSIVE EMAIL EXTRACTION ANALYSIS
-                logger.info(f"EMAIL EXTRACTION: RESULTS for {self.platform.upper()}:")
-                logger.info(f"   - Total users processed: {len(users)}")
-                logger.info(f"   - Emails extracted: {len(team_emails)}")
-                logger.info(f"   - Names extracted: {len(team_names)}")
-                logger.info(f"   - Email-to-name mappings: {len(email_to_name)}")
-                
-                if team_emails:
-                    logger.info(f"   - Sample emails: {team_emails[:5]}")
-                else:
-                    logger.warning(f"EMAIL EXTRACTION: ❌ NO EMAILS EXTRACTED!")
-                    logger.warning(f"   - This will prevent GitHub and Slack data collection")
-                    logger.warning(f"   - Root cause: User data structure mismatch for {self.platform}")
+
+                # Log summary stats only (no PII)
+                logger.info(f"Email extraction for {self.platform.upper()}: {len(team_emails)} emails, {len(team_names)} names from {len(users)} users")
+
+                if not team_emails:
+                    logger.warning(f"No emails extracted from {self.platform} - this will prevent GitHub and Slack data collection")
                 
                 if len(team_emails) < len(users) * 0.5:  # Less than 50% success rate
                     logger.warning(f"EMAIL EXTRACTION: ⚠️ LOW EXTRACTION RATE!")
@@ -955,12 +935,6 @@ class UnifiedBurnoutAnalyzer:
                     "total_days_with_data": len([d for d in daily_trends if d.get("incident_count", 0) > 0])
                 }
             }
-            
-            # DEBUG: Log final team_analysis members before saving
-            logger.info(f"🔍 FINAL_DATA_CHECK: About to return results with {len(team_analysis.get('members', []))} members")
-            for member in team_analysis.get('members', [])[:3]:  # Log first 3 members
-                github_activity = member.get('github_activity', {})
-                logger.info(f"🔍 FINAL_DATA_CHECK: Member {member.get('user_email')} - github_activity: commits={github_activity.get('commits_count', 0)}, prs={github_activity.get('pull_requests_count', 0)}")
 
             # Add GitHub insights if enabled
             if github_insights:
@@ -1076,7 +1050,6 @@ class UnifiedBurnoutAnalyzer:
                             risk = member.get('risk_level', 'N/A')
                             has_github = 'github_insights' in member
                             has_slack = 'slack_insights' in member
-                            logger.info(f"     - {name}: Score={score}, Risk={risk}, GitHub={has_github}, Slack={has_slack}")
                     else:
                         logger.error(f"ERROR: No members in final result!")
                     logger.info("="*80)
@@ -1580,8 +1553,6 @@ class UnifiedBurnoutAnalyzer:
             logger.info(f"🔍 JIRA MAPPING FOUND: User {user_name} has jira_account_id={jira_account_id}")
         if github_username:
             logger.info(f"🔍 GITHUB MAPPING FOUND: User {user_name} has github_username={github_username}")
-        if linear_user_id:
-            logger.info(f"🔍 LINEAR MAPPING FOUND: User {user_name} has linear_user_id={linear_user_id}")
         if not any([jira_account_id, github_username, linear_user_id, slack_user_id]):
             logger.debug(f"⚠️ NO INTEGRATION MAPPINGS: User {user_name} (email: {user_email}) has no integration mappings. User object keys: {list(user.keys())}")
 
@@ -1709,13 +1680,6 @@ class UnifiedBurnoutAnalyzer:
         recovery_data = self._calculate_recovery_deficit(incidents, user_tz)
         consecutive_days_data = self._calculate_consecutive_incident_days(incidents, user_tz)
 
-        # Log research-based insights
-        logger.info(f"🕐 TIME IMPACT: {user_name} - After-hours: {time_impacts['after_hours_incidents']}, "
-                   f"Weekend: {time_impacts['weekend_incidents']}, Overnight: {time_impacts['overnight_incidents']}")
-        logger.info(f"🔄 RECOVERY: {user_name} - Violations: {recovery_data['recovery_violations']}, "
-                   f"Avg recovery: {recovery_data['avg_recovery_hours']:.1f}h, Score: {recovery_data['recovery_score']:.0f}/100")
-        logger.info(f"📅 CONSECUTIVE DAYS: {user_name} - Max streak: {consecutive_days_data['max_consecutive_days']} days, "
-                   f"Score: {consecutive_days_data['consecutive_days_score']:.0f}/100")
 
         # Calculate severity-weighted incident burden 
         # Handle both Rootly (sev0-sev4) and PagerDuty (sev1-sev5) severity mappings
@@ -1826,7 +1790,6 @@ class UnifiedBurnoutAnalyzer:
             # Use existing JIRA burnout indicators calculation
             jira_burnout = jira_data.get('jira_burnout_indicators', 0)
             task_load_score = jira_burnout  # Already on 0-100 scale
-            logger.info(f"📋 JIRA TASK LOAD: {user_name} has jira_burnout_indicators={jira_burnout:.1f}")
         else:
             # Fallback: use incident frequency as proxy (legacy behavior)
             task_load_score = apply_incident_tiers(incidents_per_week) * 10
@@ -3872,13 +3835,11 @@ class UnifiedBurnoutAnalyzer:
             # Map GitHub data by user email for easy lookup
             github_commits_by_user = {}
             if github_data_by_user:
-                logger.info(f"Processing GitHub data for {len(github_data_by_user)} users")
                 for user_email, gh_data in github_data_by_user.items():
                     commits = gh_data.get("commits", [])
-                    logger.info(f"User {user_email}: {len(commits)} commits found")
                     if commits:
                         github_commits_by_user[user_email.lower()] = commits
-                logger.info(f"Total users with GitHub commits: {len(github_commits_by_user)}")
+                logger.info(f"GitHub data: {len(github_data_by_user)} users, {len(github_commits_by_user)} with commits")
             else:
                 logger.warning("No GitHub data provided to _generate_daily_trends")
             
@@ -4244,9 +4205,7 @@ class UnifiedBurnoutAnalyzer:
 
             # Process GitHub commits to populate daily data with after-hours activity
             if github_commits_by_user:
-                logger.info(f"📊 Processing GitHub commits for daily trends: {len(github_commits_by_user)} users with commits")
                 for user_email_lower, commits in github_commits_by_user.items():
-                    logger.info(f"📊 Processing {len(commits)} commits for user {user_email_lower}")
                     # Find user timezone
                     user_tz = "UTC"
                     user_id = None
@@ -4977,13 +4936,10 @@ class UnifiedBurnoutAnalyzer:
 
                         if tickets:
                             members_with_jira += 1
-                            logger.info(f"✅ JIRA CONNECTED: {member_name} has {len(tickets)} active Jira tickets (account_id: {jira_account_id})")
                         else:
                             members_with_mapping_no_tickets.append(member_name)
-                            logger.info(f"⚠️ JIRA MAPPED BUT NO TICKETS: {member_name} is mapped to Jira (account_id: {jira_account_id}) but has no active tickets")
                     else:
                         members_with_mapping_no_tickets.append(member_name)
-                        logger.info(f"⚠️ JIRA MAPPED BUT NOT FOUND: {member_name} is mapped to Jira account_id ({jira_account_id}) but account not found in Jira workload")
                 else:
                     members_without_jira_mapping.append(member_name)
                     logger.debug(f"❌ JIRA NOT MAPPED: {member_name} has no Jira account ID mapping")
@@ -5378,17 +5334,8 @@ class UnifiedBurnoutAnalyzer:
                         issues = workload_data.get("issues", [])
                         updated_member["linear_issues"] = issues
                         members_with_linear += 1
-
-                        logger.info(
-                            f"LINEAR CORRELATE: ✅ {member_name} → {len(issues)} issues "
-                            f"(linear_user_id={linear_user_id[:8]}...)"
-                        )
                     else:
                         updated_member["linear_issues"] = []
-                        logger.debug(
-                            f"LINEAR CORRELATE: {member_name} has mapping but no issues "
-                            f"(linear_user_id={linear_user_id[:8]}...)"
-                        )
                 else:
                     updated_member["linear_issues"] = []
 
@@ -5439,15 +5386,6 @@ class UnifiedBurnoutAnalyzer:
 
                     linear_added_risk = final_ocb - original_ocb
                     updated_member["ocb_score"] = round(final_ocb, 2)
-
-                    logger.info(
-                        f"🔍 LINEAR OCB {member_name}: "
-                        f"issues={len(linear_issues)}, "
-                        f"original_ocb={original_ocb:.2f}, "
-                        f"linear_ocb={linear_ocb_contribution:.2f}, "
-                        f"linear_added_risk={linear_added_risk:.2f}, "
-                        f"final_ocb={final_ocb:.2f}"
-                    )
 
                     issue_count = len(linear_issues)
                     # Linear priorities: 1=Urgent, 2=High, 3=Medium, 4=Low, 0=None

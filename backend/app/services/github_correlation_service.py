@@ -169,8 +169,6 @@ class GitHubCorrelationService:
                     data_points = mapping.data_points_count or 0
                     email_lower = email.lower()
 
-                    self.logger.info(f"📊 [MAPPING_FETCH] {email} → {username}: data_points_count={mapping.data_points_count} (analysis_id={mapping.analysis_id})")
-
                     if email_lower not in seen_emails:
                         mappings.append({
                             'email': email,
