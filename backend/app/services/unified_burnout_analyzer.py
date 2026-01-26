@@ -1834,13 +1834,15 @@ class UnifiedBurnoutAnalyzer:
 
         ocb_metrics = {
             # Personal burnout factors (65% of total)
-            'work_hours_trend': task_load_score,                                    # Task load: 10% (JIRA/Linear workload)
-            'after_hours_activity': time_weighted_after_hours,                      # After-hours: 30% (includes weekends)
-            'sleep_quality_proxy': apply_rootly_incident_tiers(severity_weighted_per_week) * 8,  # High-severity: 25%
+            # OCB scale_max values: work_hours_trend=100, after_hours_activity=30, sleep_quality_proxy=30
+            'work_hours_trend': task_load_score,                                    # Task load: 10% (0-100 scale)
+            'after_hours_activity': after_hours_percentage,                         # After-hours: 30% (0-100 %, scale_max=30 means 30%=100% burnout)
+            'sleep_quality_proxy': severity_weighted_per_week,                      # High-severity: 25% (raw weekly rate, scale_max=30)
 
             # Work-related burnout factors (35% of total)
-            'sprint_completion': consecutive_days_data['max_consecutive_days'],   # Consecutive days: 15% (raw days, not score)
-            'oncall_burden': apply_rootly_incident_tiers(severity_weighted_per_week) * 10  # On-call load: 20%
+            # OCB scale_max values: sprint_completion=7, oncall_burden=100
+            'sprint_completion': consecutive_days_data['max_consecutive_days'],     # Consecutive days: 15% (raw days 0-7+)
+            'oncall_burden': apply_rootly_incident_tiers(severity_weighted_per_week) * 10  # On-call load: 20% (0-100 scale)
         }
 
         # Check if all OCB metrics are 0
