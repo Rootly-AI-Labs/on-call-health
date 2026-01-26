@@ -85,7 +85,7 @@ import { TopPanel } from "@/components/TopPanel"
 import { useOnboarding } from "@/hooks/useOnboarding"
 import IntroGuide from "@/components/IntroGuide"
 
-function DashboardContent(): JSX.Element {
+function DashboardContent() {
   const {
   API_BASE,
   router,
