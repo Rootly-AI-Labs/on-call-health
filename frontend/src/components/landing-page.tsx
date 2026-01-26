@@ -155,7 +155,7 @@ export default function LandingPage() {
                   alt="On-Call Health"
                   width={32}
                   height={32}
-                  className="w-7 h-7 lg:w-10 lg:h-10"
+                  className="w-7 h-7 lg:w-10 lg:h-10 -mt-1"
                 />
               </div>
               <div className="text-[10px] lg:text-xs text-black/70 font-light flex items-center gap-1.5">
@@ -436,10 +436,19 @@ export default function LandingPage() {
                   alt="Rootly AI"
                   width={820}
                   height={328}
-                  className="w-[420px] lg:w-[600px] brightness-0 invert"
+                  className="w-[280px] lg:w-[600px] brightness-0 invert"
                 />
               </a>
-              <div className="mt-0 text-3xl lg:text-4xl font-medium">On-Call Health</div>
+              <div className="mt-0 flex items-end gap-2">
+                <div className="text-2xl lg:text-4xl font-medium">On-Call Health</div>
+                <Image
+                  src="/images/on-call-health-logo.svg"
+                  alt="On-Call Health"
+                  width={40}
+                  height={40}
+                  className="w-6 h-6 lg:w-10 lg:h-10 brightness-0 invert mb-1"
+                />
+              </div>
               <div className="mt-8 text-sm text-slate-300">
                 © Rootly {new Date().getFullYear()}. Licensed under <a href="https://github.com/Rootly-AI-Labs/On-Call-Health/blob/main/LICENSE" target="_blank" rel="noreferrer" className="hover:text-white transition-colors">Apache 2.0</a> · <a href="/disclaimer" className="hover:text-white transition-colors">Disclaimer</a>
               </div>
