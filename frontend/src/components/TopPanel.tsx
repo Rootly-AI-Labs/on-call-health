@@ -70,7 +70,7 @@ export function TopPanel() {
           {/* Left: brand + nav */}
           <div className="flex items-center gap-10">
             {/* On-Call Health logo */}
-            <div className="flex flex-col items-start -space-y-0.5">
+            <Link href="/dashboard" className="flex flex-col items-start -space-y-0.5 hover:opacity-80 transition-opacity">
               <div className="flex items-center gap-1.5">
                 <span className="text-lg font-normal text-black">On-Call Health</span>
                 <Image
@@ -92,7 +92,7 @@ export function TopPanel() {
                   priority
                 />
               </div>
-            </div>
+            </Link>
 
             <nav className="hidden md:flex items-center gap-1">
               <Link

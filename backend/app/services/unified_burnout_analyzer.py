@@ -3983,17 +3983,20 @@ class UnifiedBurnoutAnalyzer:
                                     "github_after_hours_count": 0,
                                     "github_commits_count": 0,
                                     "users_involved": set(),
-                                    "high_severity_count": 0
+                                    "high_severity_count": 0,
+                                    "severity_breakdown": {"sev0": 0, "sev1": 0, "sev2": 0, "sev3": 0, "low": 0}
                                 }
                             
                             daily_data[date_str]["incident_count"] += 1
                             
                             # Add severity weight - handle both platforms (research-based psychological impact)
                             severity_weight = 1.5  # Updated baseline for low severity
+                            severity_level = "low"  # Track severity level for breakdown
                             if self.platform == "pagerduty":
                                 urgency = incident.get("urgency", "low")
                                 if urgency == "high":
                                     severity_weight = 12.0  # Life-defining events, executive involvement
+                                    severity_level = "sev1"
                                     daily_data[date_str]["high_severity_count"] += 1
                             else:  # Rootly
                                 attrs = incident.get("attributes", {})
@@ -4005,17 +4008,22 @@ class UnifiedBurnoutAnalyzer:
                                         severity_name = severity_attrs.get("name", "medium").lower()
                                         if "sev0" in severity_name:
                                             severity_weight = 15.0  # Life-defining events, PTSD risk, press attention
+                                            severity_level = "sev0"
                                             daily_data[date_str]["high_severity_count"] += 1
                                         elif "critical" in severity_name or "sev1" in severity_name:
                                             severity_weight = 12.0  # Critical business impact, executive involvement
+                                            severity_level = "sev1"
                                             daily_data[date_str]["high_severity_count"] += 1
                                         elif "high" in severity_name or "sev2" in severity_name:
                                             severity_weight = 6.0   # Significant user impact, team-wide response
+                                            severity_level = "sev2"
                                             daily_data[date_str]["high_severity_count"] += 1
                                         elif "medium" in severity_name or "sev3" in severity_name:
                                             severity_weight = 3.0   # Moderate impact, standard response
-                            
+                                            severity_level = "sev3"
+
                             daily_data[date_str]["severity_weighted_count"] += severity_weight
+                            daily_data[date_str]["severity_breakdown"][severity_level] += 1
 
                             # Check if after hours (using standard constants)
                             incident_hour = incident_date.hour
@@ -4273,7 +4281,8 @@ class UnifiedBurnoutAnalyzer:
                                     "users_involved": set(),
                                     "high_severity_count": 0,
                                     "github_after_hours_count": 0,
-                                    "github_commits_count": 0
+                                    "github_commits_count": 0,
+                                    "severity_breakdown": {"sev0": 0, "sev1": 0, "sev2": 0, "sev3": 0, "low": 0}
                                 }
 
                             # Count all commits for this day
@@ -4331,7 +4340,8 @@ class UnifiedBurnoutAnalyzer:
                         "github_after_hours_count": 0,
                         "github_commits_count": 0,
                         "users_involved": set(),
-                        "high_severity_count": 0
+                        "high_severity_count": 0,
+                        "severity_breakdown": {"sev0": 0, "sev1": 0, "sev2": 0, "sev3": 0, "low": 0}
                     }
             
             # Convert to list and calculate daily scores
@@ -4446,6 +4456,7 @@ class UnifiedBurnoutAnalyzer:
                     "total_activities": total_activities,
                     "after_hours_percentage": round(after_hours_percentage, 1),
                     "high_severity_count": high_severity_count,
+                    "severity_breakdown": day_data["severity_breakdown"],
                     "users_involved": users_involved_count,  # Match SimpleBurnoutAnalyzer field name
                     "members_at_risk": members_at_risk,
                     "total_members": total_members,

@@ -923,5 +923,143 @@ class TestOffHoursContribution:
             f"High off-hours should push to high/critical risk, got {composite['risk_level']}"
 
 
+class TestSeverityBreakdownInDailyTrends:
+    """Tests for severity_breakdown tracking in daily trends"""
+
+    def test_severity_breakdown_in_daily_trends_rootly(self, mock_rootly_client):
+        """Test that severity_breakdown is included in daily_trends output for Rootly"""
+        analyzer = UnifiedBurnoutAnalyzer(api_token="test_token", platform="rootly")
+        analyzer.user_tz_by_id = {"1": "UTC"}
+
+        base_time = datetime.now(pytz.UTC)
+        users = [{"id": "1", "attributes": {"full_name": "John Doe", "email": "john@example.com", "time_zone": "UTC"}}]
+
+        incidents = [
+            {
+                "id": "inc1",
+                "attributes": {
+                    "title": "Critical outage",
+                    "created_at": (base_time - timedelta(days=1)).isoformat(),
+                    "severity": {
+                        "data": {
+                            "attributes": {"name": "SEV0 - Critical"}
+                        }
+                    }
+                }
+            },
+            {
+                "id": "inc2",
+                "attributes": {
+                    "title": "High severity issue",
+                    "created_at": (base_time - timedelta(days=1)).isoformat(),
+                    "severity": {
+                        "data": {
+                            "attributes": {"name": "SEV1 - High"}
+                        }
+                    }
+                }
+            },
+            {
+                "id": "inc3",
+                "attributes": {
+                    "title": "Medium issue",
+                    "created_at": (base_time - timedelta(days=1)).isoformat(),
+                    "severity": {
+                        "data": {
+                            "attributes": {"name": "SEV3 - Medium"}
+                        }
+                    }
+                }
+            }
+        ]
+
+        team_analysis = [{"user_id": "1", "user_email": "john@example.com"}]
+        metadata = {"days_analyzed": 7}
+        team_health = {}
+
+        daily_trends = analyzer._generate_daily_trends(incidents, team_analysis, metadata, team_health, None)
+
+        # Find the day with incidents
+        day_with_incidents = next((d for d in daily_trends if d.get("incident_count", 0) > 0), None)
+        assert day_with_incidents is not None, "Should have at least one day with incidents"
+
+        # Verify severity_breakdown exists and has correct structure
+        assert "severity_breakdown" in day_with_incidents, "severity_breakdown should be in daily_trends"
+        breakdown = day_with_incidents["severity_breakdown"]
+        assert "sev0" in breakdown, "severity_breakdown should have sev0 key"
+        assert "sev1" in breakdown, "severity_breakdown should have sev1 key"
+        assert "sev2" in breakdown, "severity_breakdown should have sev2 key"
+        assert "sev3" in breakdown, "severity_breakdown should have sev3 key"
+        assert "low" in breakdown, "severity_breakdown should have low key"
+
+        # Verify counts match incidents
+        assert breakdown["sev0"] == 1, "Should have 1 SEV0 incident"
+        assert breakdown["sev1"] == 1, "Should have 1 SEV1 incident"
+        assert breakdown["sev3"] == 1, "Should have 1 SEV3 incident"
+
+    def test_severity_breakdown_pagerduty(self, mock_pagerduty_client):
+        """Test that severity_breakdown tracks high urgency as sev1 for PagerDuty"""
+        analyzer = UnifiedBurnoutAnalyzer(api_token="test_token", platform="pagerduty")
+        analyzer.user_tz_by_id = {"P1": "UTC"}
+
+        base_time = datetime.now(pytz.UTC)
+        users = [{"id": "P1", "name": "John Doe", "email": "john@example.com", "time_zone": "UTC"}]
+
+        incidents = [
+            {
+                "id": "PD1",
+                "created_at": (base_time - timedelta(days=1)).isoformat(),
+                "urgency": "high",
+                "assigned_to": {"id": "P1"}
+            },
+            {
+                "id": "PD2",
+                "created_at": (base_time - timedelta(days=1)).isoformat(),
+                "urgency": "low",
+                "assigned_to": {"id": "P1"}
+            }
+        ]
+
+        team_analysis = [{"user_id": "P1", "user_email": "john@example.com"}]
+        metadata = {"days_analyzed": 7}
+        team_health = {}
+
+        daily_trends = analyzer._generate_daily_trends(incidents, team_analysis, metadata, team_health, None)
+
+        # Find the day with incidents
+        day_with_incidents = next((d for d in daily_trends if d.get("incident_count", 0) > 0), None)
+        assert day_with_incidents is not None, "Should have at least one day with incidents"
+
+        # Verify severity_breakdown exists
+        assert "severity_breakdown" in day_with_incidents, "severity_breakdown should be in daily_trends"
+        breakdown = day_with_incidents["severity_breakdown"]
+
+        # PagerDuty high urgency maps to sev1, low to low
+        assert breakdown["sev1"] == 1, "High urgency should map to sev1"
+        assert breakdown["low"] == 1, "Low urgency should map to low"
+
+    def test_severity_breakdown_defaults_when_no_incidents(self, mock_rootly_client):
+        """Test that days without incidents still have severity_breakdown with zeros"""
+        analyzer = UnifiedBurnoutAnalyzer(api_token="test_token", platform="rootly")
+        analyzer.user_tz_by_id = {}
+
+        team_analysis = [{"user_id": "1", "user_email": "john@example.com"}]
+        metadata = {"days_analyzed": 7}
+        team_health = {}
+
+        daily_trends = analyzer._generate_daily_trends([], team_analysis, metadata, team_health, None)
+
+        # All days should have severity_breakdown
+        for day in daily_trends:
+            assert "severity_breakdown" in day, "All days should have severity_breakdown"
+            breakdown = day["severity_breakdown"]
+            # Default breakdown should have all zeros
+            assert breakdown.get("sev0", 0) == 0
+            assert breakdown.get("sev1", 0) == 0
+            assert breakdown.get("sev2", 0) == 0
+            assert breakdown.get("sev3", 0) == 0
+            assert breakdown.get("low", 0) == 0
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
