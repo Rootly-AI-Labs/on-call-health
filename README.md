@@ -24,17 +24,9 @@ Two ways to get started:
 * Host it [locally](#Installation)
 
 ## Installation
-Use our Docker Compose file.
-```
-# Clone the repo
-git clone https://github.com/Rootly-AI-Labs/on-call-health
-cd on-call-health
 
-# Launch with Docker Compose
-docker compose up -d
-```
 
-### Environment Variables
+### 1) Environment Variables
 ⚠️ For login purposes, you **must** configure OAuth tokens for Google OR GitHub OAuth:
 ```
 # Create a copy of the .env file
@@ -71,6 +63,18 @@ cp backend/.env.example backend/.env
 3. **Add to `backend/.env:`**
 4. **Restart backend:**
 </details>
+
+
+### 2) Docker Setup
+Use our Docker Compose file.
+```
+# Clone the repo
+git clone https://github.com/Rootly-AI-Labs/on-call-health
+cd on-call-health
+
+# Launch with Docker Compose
+docker compose up -d
+```
 
 ### Manual setup
 <details><summary>You can also set it up manually, but this method isn't actively supported.</summary>
