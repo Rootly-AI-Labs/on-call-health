@@ -1266,11 +1266,22 @@ async def handle_slack_interactions(
             actions = data.get("actions", [])
             for action in actions:
                 if action.get("action_id") == "open_burnout_survey":
-                    # Extract user and org IDs from button value
+                    # Extract data from button value
+                    # Format: "user_id|organization_id|email" or "None|organization_id|email"
                     value = action.get("value", "")
                     try:
-                        user_id, organization_id = map(int, value.split("|"))
-                    except:
+                        parts = value.split("|")
+                        if len(parts) == 3:
+                            # New format with email
+                            user_id_str, organization_id_str, user_email = parts
+                            user_id = int(user_id_str) if user_id_str != 'None' else None
+                            organization_id = int(organization_id_str)
+                        else:
+                            # Old format (backwards compatibility)
+                            user_id, organization_id = map(int, parts)
+                            user_email = None
+                    except Exception as e:
+                        logging.error(f"Failed to parse button value '{value}': {e}")
                         return {"text": "Invalid survey data"}
 
                     # Get user's Slack ID
@@ -1278,24 +1289,37 @@ async def handle_slack_interactions(
                     slack_user_id = slack_user.get("id")
                     trigger_id = data.get("trigger_id")
 
-                    # Check for existing report today (match by user's email)
+                    # Check for existing report today (match by email)
                     from datetime import datetime
                     today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
 
-                    user = db.query(User).filter(User.id == user_id).first()
+                    # Try to get user account if user_id is available
+                    user = None
+                    if user_id:
+                        user = db.query(User).filter(User.id == user_id).first()
+
+                    # If no user account but we have email, check for existing report by email
                     existing_report = None
-                    if user:
+                    if user and user.email:
                         existing_report = db.query(UserBurnoutReport).filter(
                             UserBurnoutReport.email == user.email,
                             UserBurnoutReport.submitted_at >= today_start
                         ).first()
+                    elif user_email:
+                        # Synced member without user account - check by email
+                        existing_report = db.query(UserBurnoutReport).filter(
+                            UserBurnoutReport.email == user_email,
+                            UserBurnoutReport.submitted_at >= today_start
+                        ).first()
 
-                    # Open modal (organization_id kept for backwards compatibility with old buttons)
+                    # Open modal
+                    # For synced members without accounts, pass user_email in metadata
                     modal_view = create_burnout_survey_modal(
-                        organization_id=organization_id,  # Still passed but ignored in logic
-                        user_id=user_id,
-                        analysis_id=None,  # No specific analysis for daily check-ins
-                        is_update=bool(existing_report)
+                        organization_id=organization_id,
+                        user_id=user_id,  # Can be None for synced members
+                        analysis_id=None,
+                        is_update=bool(existing_report),
+                        user_email=user_email  # Pass email for synced members
                     )
 
                     # Get Slack token to open modal
@@ -1376,14 +1400,16 @@ async def handle_slack_interactions(
                     comments_input = comments_block.get("comments_input")
                     comments = comments_input.get("value", "") if comments_input else ""
 
-                    # Extract user and organization IDs from private_metadata
+                    # Extract data from private_metadata
                     metadata = json.loads(view.get("private_metadata", "{}"))
                     user_id = metadata.get("user_id")
                     organization_id = metadata.get("organization_id")  # Optional now
                     analysis_id = metadata.get("analysis_id")  # Optional - may be None
+                    user_email = metadata.get("user_email")  # For synced members without accounts
 
-                    if not user_id:
-                        return {"response_action": "errors", "errors": {"comments_block": "Invalid survey data"}}
+                    # Need either user_id or user_email
+                    if not user_id and not user_email:
+                        return {"response_action": "errors", "errors": {"comments_block": "Invalid survey data: missing user identification"}}
                 except Exception as e:
                     logging.error(f"Error parsing survey values: {str(e)}", exc_info=True)
                     return {"response_action": "errors", "errors": {"comments_block": "Error submitting survey. Please try again."}}
@@ -1392,17 +1418,30 @@ async def handle_slack_interactions(
                 from datetime import datetime, timedelta
                 today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
 
-                # Get user info once for both report creation and notifications
-                user = db.query(User).filter(User.id == user_id).first()
-                if not user:
-                    return {"response_action": "errors", "errors": {"comments_block": "User not found"}}
+                # Try to get user account if user_id is available
+                user = None
+                if user_id:
+                    user = db.query(User).filter(User.id == user_id).first()
+
+                # Determine email to use for report
+                report_email = None
+                if user and user.email:
+                    report_email = user.email
+                elif user_email:
+                    # Synced member without user account
+                    report_email = user_email
+                else:
+                    return {"response_action": "errors", "errors": {"comments_block": "Unable to identify user email"}}
 
                 # Check if user already submitted today (match by email)
                 # This allows only 1 survey per user per day, regardless of organization
                 existing_report = db.query(UserBurnoutReport).filter(
-                    UserBurnoutReport.email == user.email,
+                    UserBurnoutReport.email == report_email,
                     UserBurnoutReport.submitted_at >= today_start
                 ).order_by(UserBurnoutReport.submitted_at.desc()).first()
+
+                # Extract email_domain from report_email
+                email_domain = report_email.split('@')[1] if '@' in report_email else None
 
                 is_update = False
                 if existing_report:
@@ -1414,18 +1453,19 @@ async def handle_slack_interactions(
                     existing_report.additional_comments = comments
                     existing_report.submitted_via = 'slack'
                     existing_report.analysis_id = analysis_id  # Update linked analysis if provided
-                    existing_report.email = user.email  # Refresh email in case it changed
-                    existing_report.email_domain = user.email_domain  # Refresh email_domain in case it changed
+                    existing_report.email = report_email  # Refresh email in case it changed
+                    existing_report.email_domain = email_domain  # Refresh email_domain
+                    existing_report.user_id = user_id  # Update user_id if they created an account
                     existing_report.updated_at = datetime.utcnow()
-                    logging.info(f"Updated existing report ID {existing_report.id} for user {user_id}")
+                    logging.info(f"Updated existing report ID {existing_report.id} for email {report_email}")
                     is_update = True
                 else:
-                    # Create new burnout report with email_domain for domain-based sharing
+                    # Create new burnout report
                     new_report = UserBurnoutReport(
-                        user_id=user_id,
-                        email=user.email,  # Save email for team member identification
+                        user_id=user_id,  # Can be None for synced members
+                        email=report_email,
                         organization_id=organization_id,
-                        email_domain=user.email_domain,
+                        email_domain=email_domain,
                         analysis_id=analysis_id,  # Optional - may be None
                         feeling_score=feeling_score,
                         workload_score=workload_score,
@@ -1436,7 +1476,7 @@ async def handle_slack_interactions(
                         submitted_at=datetime.utcnow()
                     )
                     db.add(new_report)
-                    logging.info(f"Created new report for user {user_id} with email_domain {user.email_domain}")
+                    logging.info(f"Created new report for email {report_email} (user_id={user_id})")
 
                 db.commit()
 
@@ -1659,15 +1699,16 @@ async def get_team_survey_status(
         )
 
 
-def create_burnout_survey_modal(organization_id: int, user_id: int, analysis_id: int = None, is_update: bool = False) -> dict:
+def create_burnout_survey_modal(organization_id: int, user_id: int, analysis_id: int = None, is_update: bool = False, user_email: str = None) -> dict:
     """
     Create Slack modal view for burnout survey.
 
     Args:
         organization_id: Organization ID (required)
-        user_id: User ID (required)
+        user_id: User ID (can be None for synced members without accounts)
         analysis_id: Analysis ID (optional - for linking survey to specific analysis)
         is_update: Whether this is updating an existing survey today
+        user_email: User email (required if user_id is None)
     """
     import json
 
@@ -1675,6 +1716,7 @@ def create_burnout_survey_modal(organization_id: int, user_id: int, analysis_id:
     metadata = {
         "user_id": user_id,
         "organization_id": organization_id,
+        "user_email": user_email,  # Store email for synced members
         "analysis_id": analysis_id
     }
 

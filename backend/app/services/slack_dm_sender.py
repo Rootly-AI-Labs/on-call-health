@@ -19,7 +19,8 @@ class SlackDMSender:
         slack_user_id: str,
         user_id: int,
         organization_id: int,
-        message: Optional[str] = None
+        message: Optional[str] = None,
+        user_email: Optional[str] = None
     ):
         """
         Send a DM to a user with a button to open the burnout survey.
@@ -27,9 +28,10 @@ class SlackDMSender:
         Args:
             slack_token: Decrypted Slack bot token (ready to use)
             slack_user_id: Slack user ID (e.g., U01234567)
-            user_id: Internal user ID
+            user_id: Internal user ID (can be None for synced members without accounts)
             organization_id: Organization ID
             message: Custom message (uses default if None)
+            user_email: User's email (required for synced members without user_id)
         """
         try:
             # Token is already decrypted by SlackTokenService
@@ -44,6 +46,10 @@ class SlackDMSender:
                 )
 
             # Create message with button
+            # For synced members without accounts, store email in button value
+            # Format: "user_id|organization_id|email" or "None|organization_id|email"
+            button_value = f"{user_id or 'None'}|{organization_id}|{user_email or ''}"
+
             blocks = [
                 {
                     "type": "section",
@@ -63,7 +69,7 @@ class SlackDMSender:
                             },
                             "style": "primary",
                             "action_id": "open_burnout_survey",
-                            "value": f"{user_id}|{organization_id}"
+                            "value": button_value
                         }
                     ]
                 }
