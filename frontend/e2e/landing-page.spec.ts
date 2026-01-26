@@ -8,22 +8,41 @@ test.describe('Landing Page', () => {
     await page.waitForLoadState('networkidle');
 
     // Check that the main heading is visible
-    await expect(page.locator('h1')).toBeVisible();
+    const heading = page.locator('h1').first();
+    await expect(heading, 'Main heading should be visible on landing page').toBeVisible();
+
+    // Verify heading has content
+    const headingText = await heading.textContent();
+    expect(headingText, 'Main heading should contain text').toBeTruthy();
   });
 
   test('should have working navigation', async ({ page }) => {
     await page.goto('/');
 
-    // Check for navigation elements (adjust selectors based on your actual nav)
-    const nav = page.locator('nav');
-    await expect(nav).toBeVisible();
+    // Check for navigation elements with more specific selector
+    const nav = page.locator('nav, [role="navigation"]').first();
+    await expect(nav, 'Navigation should be visible on landing page').toBeVisible();
+
+    // Verify nav has links
+    const navLinks = nav.locator('a');
+    const linkCount = await navLinks.count();
+    expect(linkCount, 'Navigation should contain at least one link').toBeGreaterThan(0);
   });
 
   test('should display call-to-action buttons', async ({ page }) => {
     await page.goto('/');
 
-    // Look for CTA buttons (adjust text based on your actual buttons)
-    const buttons = page.locator('button, a[role="button"]');
-    await expect(buttons.first()).toBeVisible();
+    // Look for CTA buttons with better selectors
+    const buttons = page.locator('button, a[role="button"], a.btn, button.btn');
+    const buttonCount = await buttons.count();
+
+    expect(buttonCount, 'Landing page should have at least one CTA button').toBeGreaterThan(0);
+
+    // Check first button is visible and has content
+    const firstButton = buttons.first();
+    await expect(firstButton, 'First CTA button should be visible').toBeVisible();
+
+    const buttonText = await firstButton.textContent();
+    expect(buttonText?.trim(), 'CTA button should have text content').toBeTruthy();
   });
 });
