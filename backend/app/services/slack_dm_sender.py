@@ -45,6 +45,12 @@ class SlackDMSender:
                     "Your feedback helps us support team well-being and workload balance."
                 )
 
+            # Validate required parameters
+            if organization_id is None:
+                raise ValueError("organization_id cannot be None")
+            if not user_id and not user_email:
+                raise ValueError("Either user_id or user_email must be provided")
+
             # Create message with button
             # For synced members without accounts, store email in button value
             # Format: "user_id|organization_id|email" or "None|organization_id|email"

@@ -8,6 +8,7 @@ import secrets
 import json
 import logging
 import os
+import urllib.parse
 from cryptography.fernet import Fernet
 import base64
 from datetime import datetime
@@ -1274,12 +1275,27 @@ async def handle_slack_interactions(
                         if len(parts) == 3:
                             # New format with email
                             user_id_str, organization_id_str, user_email = parts
-                            user_id = int(user_id_str) if user_id_str != 'None' else None
-                            organization_id = int(organization_id_str)
+                            try:
+                                user_id = None if user_id_str == 'None' or not user_id_str else int(user_id_str)
+                            except ValueError:
+                                logging.error(f"Invalid user_id in button value: '{user_id_str}'")
+                                return {"text": "Invalid survey data: malformed user ID"}
+
+                            try:
+                                organization_id = int(organization_id_str)
+                            except ValueError:
+                                logging.error(f"Invalid organization_id in button value: '{organization_id_str}'")
+                                return {"text": "Invalid survey data: malformed organization ID"}
                         else:
                             # Old format (backwards compatibility)
-                            user_id, organization_id = map(int, parts)
-                            user_email = None
+                            # Note: This only works for old buttons that had valid integer user_ids
+                            # Old broken buttons with "None" would have already failed, so no need to handle that case
+                            try:
+                                user_id, organization_id = map(int, parts)
+                                user_email = None
+                            except ValueError as e:
+                                logging.error(f"Failed to parse old format button value '{value}': {e}")
+                                return {"text": "Invalid survey data: button format not recognized. Please contact your manager for a new survey link."}
                     except Exception as e:
                         logging.error(f"Failed to parse button value '{value}': {e}")
                         return {"text": "Invalid survey data"}
@@ -1429,6 +1445,10 @@ async def handle_slack_interactions(
                     report_email = user.email
                 elif user_email:
                     # Synced member without user account
+                    # Validate email format
+                    if '@' not in user_email or len(user_email) < 3:
+                        logging.error(f"Invalid email format: '{user_email}'")
+                        return {"response_action": "errors", "errors": {"comments_block": "Invalid email format"}}
                     report_email = user_email
                 else:
                     return {"response_action": "errors", "errors": {"comments_block": "Unable to identify user email"}}
