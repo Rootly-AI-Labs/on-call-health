@@ -4652,17 +4652,21 @@ class UnifiedBurnoutAnalyzer:
         """
         
         try:
-            # Calculate baseline health from team incident load (no hardcoded values)
-            team_avg_incidents = sum(m.get("incident_count", 0) for m in team_analysis) / len(team_analysis) if team_analysis else 0
-            # Higher team incident load = lower baseline health for everyone
-            base_health = max(70, 100 - (team_avg_incidents * 2))  # Dynamic baseline
-            
             # Extract metrics from daily data
             incident_count = daily_data.get("incident_count", 0)
             severity_weighted = daily_data.get("severity_weighted_count", 0.0)
             after_hours_count = daily_data.get("after_hours_count", 0)
             weekend_count = daily_data.get("weekend_count", 0)
             high_severity_count = daily_data.get("high_severity_count", 0)
+
+            # If there's no activity at all, risk is 0
+            if incident_count == 0 and after_hours_count == 0 and weekend_count == 0:
+                return 0
+
+            # Calculate baseline health from team incident load (no hardcoded values)
+            team_avg_incidents = sum(m.get("incident_count", 0) for m in team_analysis) / len(team_analysis) if team_analysis else 0
+            # Higher team incident load = lower baseline health for everyone
+            base_health = max(70, 100 - (team_avg_incidents * 2))  # Dynamic baseline
             
             # 1. INCIDENT LOAD HEALTH PENALTIES (Primary Impact)
             # Research: Each incident reduces health by 8-15 points depending on context

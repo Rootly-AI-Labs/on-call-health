@@ -1276,5 +1276,213 @@ class TestSeverityBreakdownInDailyTrends:
             assert breakdown.get("low", 0) == 0
 
 
+class TestIndividualDailyHealthScore:
+    """Tests for _calculate_individual_daily_health_score function.
+
+    This function calculates daily OCB burnout risk scores (0-100, higher = worse).
+    Critical test coverage to prevent regression of risk calculation bugs.
+    """
+
+    def test_zero_activity_returns_zero_risk(self, mock_rootly_client):
+        """Zero incidents, zero after-hours, zero weekend = 0 risk (not 10!)"""
+        analyzer = UnifiedBurnoutAnalyzer(api_token="test_token", platform="rootly")
+
+        daily_data = {
+            "incident_count": 0,
+            "severity_weighted_count": 0.0,
+            "after_hours_count": 0,
+            "weekend_count": 0,
+            "high_severity_count": 0
+        }
+        date_obj = datetime.now(pytz.UTC)
+        team_analysis = []
+
+        risk_score = analyzer._calculate_individual_daily_health_score(
+            daily_data, date_obj, "test@example.com", team_analysis
+        )
+
+        assert risk_score == 0, "Zero activity should result in 0 risk, not a baseline floor"
+
+    def test_single_incident_creates_risk(self, mock_rootly_client):
+        """A single incident should create non-zero risk"""
+        analyzer = UnifiedBurnoutAnalyzer(api_token="test_token", platform="rootly")
+
+        daily_data = {
+            "incident_count": 1,
+            "severity_weighted_count": 1.0,
+            "after_hours_count": 0,
+            "weekend_count": 0,
+            "high_severity_count": 0
+        }
+        date_obj = datetime.now(pytz.UTC)
+        team_analysis = []
+
+        risk_score = analyzer._calculate_individual_daily_health_score(
+            daily_data, date_obj, "test@example.com", team_analysis
+        )
+
+        assert risk_score > 0, "Single incident should create risk > 0"
+        assert risk_score <= 100, "Risk should not exceed 100"
+
+    def test_after_hours_only_creates_risk(self, mock_rootly_client):
+        """After-hours activity alone (without incident_count) should create risk"""
+        analyzer = UnifiedBurnoutAnalyzer(api_token="test_token", platform="rootly")
+
+        daily_data = {
+            "incident_count": 0,
+            "severity_weighted_count": 0.0,
+            "after_hours_count": 2,
+            "weekend_count": 0,
+            "high_severity_count": 0
+        }
+        date_obj = datetime.now(pytz.UTC)
+        team_analysis = []
+
+        risk_score = analyzer._calculate_individual_daily_health_score(
+            daily_data, date_obj, "test@example.com", team_analysis
+        )
+
+        assert risk_score > 0, "After-hours activity should create risk > 0"
+
+    def test_weekend_only_creates_risk(self, mock_rootly_client):
+        """Weekend activity alone should create risk"""
+        analyzer = UnifiedBurnoutAnalyzer(api_token="test_token", platform="rootly")
+
+        daily_data = {
+            "incident_count": 0,
+            "severity_weighted_count": 0.0,
+            "after_hours_count": 0,
+            "weekend_count": 1,
+            "high_severity_count": 0
+        }
+        date_obj = datetime.now(pytz.UTC)
+        team_analysis = []
+
+        risk_score = analyzer._calculate_individual_daily_health_score(
+            daily_data, date_obj, "test@example.com", team_analysis
+        )
+
+        assert risk_score > 0, "Weekend activity should create risk > 0"
+
+    def test_high_severity_increases_risk(self, mock_rootly_client):
+        """High severity incidents should increase risk more than regular incidents"""
+        analyzer = UnifiedBurnoutAnalyzer(api_token="test_token", platform="rootly")
+
+        # Regular incident
+        regular_data = {
+            "incident_count": 1,
+            "severity_weighted_count": 1.0,
+            "after_hours_count": 0,
+            "weekend_count": 0,
+            "high_severity_count": 0
+        }
+
+        # High severity incident
+        high_sev_data = {
+            "incident_count": 1,
+            "severity_weighted_count": 15.0,  # High severity weight
+            "after_hours_count": 0,
+            "weekend_count": 0,
+            "high_severity_count": 1
+        }
+
+        date_obj = datetime.now(pytz.UTC)
+        team_analysis = []
+
+        regular_risk = analyzer._calculate_individual_daily_health_score(
+            regular_data, date_obj, "test@example.com", team_analysis
+        )
+        high_sev_risk = analyzer._calculate_individual_daily_health_score(
+            high_sev_data, date_obj, "test@example.com", team_analysis
+        )
+
+        assert high_sev_risk > regular_risk, "High severity should result in higher risk"
+
+    def test_multiple_incidents_increase_risk(self, mock_rootly_client):
+        """More incidents should mean higher risk"""
+        analyzer = UnifiedBurnoutAnalyzer(api_token="test_token", platform="rootly")
+
+        one_incident = {
+            "incident_count": 1,
+            "severity_weighted_count": 1.0,
+            "after_hours_count": 0,
+            "weekend_count": 0,
+            "high_severity_count": 0
+        }
+
+        three_incidents = {
+            "incident_count": 3,
+            "severity_weighted_count": 3.0,
+            "after_hours_count": 0,
+            "weekend_count": 0,
+            "high_severity_count": 0
+        }
+
+        date_obj = datetime.now(pytz.UTC)
+        team_analysis = []
+
+        one_risk = analyzer._calculate_individual_daily_health_score(
+            one_incident, date_obj, "test@example.com", team_analysis
+        )
+        three_risk = analyzer._calculate_individual_daily_health_score(
+            three_incidents, date_obj, "test@example.com", team_analysis
+        )
+
+        assert three_risk > one_risk, "More incidents should result in higher risk"
+
+    def test_risk_score_bounded_0_to_100(self, mock_rootly_client):
+        """Risk score should always be between 0 and 100"""
+        analyzer = UnifiedBurnoutAnalyzer(api_token="test_token", platform="rootly")
+
+        # Extreme case: many incidents, high severity, after hours, weekend
+        extreme_data = {
+            "incident_count": 20,
+            "severity_weighted_count": 100.0,
+            "after_hours_count": 10,
+            "weekend_count": 5,
+            "high_severity_count": 5
+        }
+
+        date_obj = datetime.now(pytz.UTC)
+        team_analysis = []
+
+        risk_score = analyzer._calculate_individual_daily_health_score(
+            extreme_data, date_obj, "test@example.com", team_analysis
+        )
+
+        assert 0 <= risk_score <= 100, f"Risk score {risk_score} should be between 0 and 100"
+
+    def test_missing_fields_handled_gracefully(self, mock_rootly_client):
+        """Missing fields in daily_data should not cause errors"""
+        analyzer = UnifiedBurnoutAnalyzer(api_token="test_token", platform="rootly")
+
+        # Minimal data - only incident_count
+        minimal_data = {"incident_count": 1}
+
+        date_obj = datetime.now(pytz.UTC)
+        team_analysis = []
+
+        # Should not raise an exception
+        risk_score = analyzer._calculate_individual_daily_health_score(
+            minimal_data, date_obj, "test@example.com", team_analysis
+        )
+
+        assert isinstance(risk_score, int), "Should return an integer risk score"
+
+    def test_empty_daily_data_returns_zero(self, mock_rootly_client):
+        """Empty daily data should return 0 risk"""
+        analyzer = UnifiedBurnoutAnalyzer(api_token="test_token", platform="rootly")
+
+        empty_data = {}
+        date_obj = datetime.now(pytz.UTC)
+        team_analysis = []
+
+        risk_score = analyzer._calculate_individual_daily_health_score(
+            empty_data, date_obj, "test@example.com", team_analysis
+        )
+
+        assert risk_score == 0, "Empty data should result in 0 risk"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
