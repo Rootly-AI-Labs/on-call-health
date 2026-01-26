@@ -158,14 +158,25 @@ async def slack_oauth_callback(
                 if not isinstance(state, str) or len(state) < 4 or len(state) > 2048:
                     raise ValueError(f"Invalid state parameter length: {len(state) if state else 0}")
 
-                # Sanitize state: only allow base64 characters
+                # Sanitize state: only allow base64url characters
                 import re
                 if not re.match(r'^[A-Za-z0-9_-]+$', state):
                     raise ValueError("State parameter contains invalid characters")
 
-                # Add padding and decode
+                # Add padding for base64 decode
                 padded_state = state + '=' * (4 - len(state) % 4) if len(state) % 4 else state
-                decoded_state = json.loads(base64.urlsafe_b64decode(padded_state))
+
+                # Validate base64 can be decoded before JSON parsing
+                try:
+                    decoded_bytes = base64.urlsafe_b64decode(padded_state)
+                except Exception as b64_error:
+                    raise ValueError(f"Invalid base64 encoding: {b64_error}")
+
+                # Parse JSON from decoded bytes
+                try:
+                    decoded_state = json.loads(decoded_bytes)
+                except json.JSONDecodeError as json_error:
+                    raise ValueError(f"Invalid JSON in state: {json_error}")
 
                 if not isinstance(decoded_state, dict):
                     raise ValueError("Decoded state is not a dictionary")
@@ -1461,37 +1472,44 @@ async def handle_slack_interactions(
                     return {"response_action": "errors", "errors": {"comments_block": "User not found"}}
 
                 # Check if user already submitted today (match by email)
-                # Use row-level locking to prevent race conditions with concurrent submissions
                 # This allows only 1 survey per user per day, regardless of organization
-                existing_report = db.query(UserBurnoutReport).filter(
-                    UserBurnoutReport.email == user.email,
-                    UserBurnoutReport.submitted_at >= today_start
-                ).order_by(UserBurnoutReport.submitted_at.desc()).with_for_update().first()
-
+                # Use optimistic approach: try insert first, handle conflict
                 is_update = False
+
+                def update_existing_report(report):
+                    """Helper to update an existing report with new values."""
+                    report.feeling_score = feeling_score
+                    report.workload_score = workload_score
+                    report.stress_factors = stress_factors
+                    report.personal_circumstances = personal_circumstances
+                    report.additional_comments = comments
+                    report.submitted_via = 'slack'
+                    report.analysis_id = analysis_id
+                    report.email = user.email
+                    report.email_domain = user.email_domain
+                    report.updated_at = datetime.utcnow()
+
                 try:
+                    # First check if report exists today
+                    existing_report = db.query(UserBurnoutReport).filter(
+                        UserBurnoutReport.email == user.email,
+                        UserBurnoutReport.submitted_at >= today_start
+                    ).order_by(UserBurnoutReport.submitted_at.desc()).first()
+
                     if existing_report:
                         # Update existing report
-                        existing_report.feeling_score = feeling_score
-                        existing_report.workload_score = workload_score
-                        existing_report.stress_factors = stress_factors
-                        existing_report.personal_circumstances = personal_circumstances
-                        existing_report.additional_comments = comments
-                        existing_report.submitted_via = 'slack'
-                        existing_report.analysis_id = analysis_id  # Update linked analysis if provided
-                        existing_report.email = user.email  # Refresh email in case it changed
-                        existing_report.email_domain = user.email_domain  # Refresh email_domain in case it changed
-                        existing_report.updated_at = datetime.utcnow()
+                        update_existing_report(existing_report)
                         logging.info(f"Updated existing report ID {existing_report.id} for user {user_id}")
                         is_update = True
+                        db.commit()
                     else:
-                        # Create new burnout report with email_domain for domain-based sharing
+                        # Try to create new report
                         new_report = UserBurnoutReport(
                             user_id=user_id,
-                            email=user.email,  # Save email for team member identification
+                            email=user.email,
                             organization_id=organization_id,
                             email_domain=user.email_domain,
-                            analysis_id=analysis_id,  # Optional - may be None
+                            analysis_id=analysis_id,
                             feeling_score=feeling_score,
                             workload_score=workload_score,
                             stress_factors=stress_factors,
@@ -1501,13 +1519,34 @@ async def handle_slack_interactions(
                             submitted_at=datetime.utcnow()
                         )
                         db.add(new_report)
+                        db.commit()
                         logging.info(f"Created new report for user {user_id} with email_domain {user.email_domain}")
 
-                    db.commit()
                 except Exception as db_error:
                     db.rollback()
-                    logging.error(f"Database error saving survey: {db_error}")
-                    return {"response_action": "errors", "errors": {"comments_block": "Error saving survey. Please try again."}}
+                    # Check if this was a race condition (duplicate insert)
+                    # If so, find the existing report and update it
+                    if "duplicate" in str(db_error).lower() or "unique" in str(db_error).lower():
+                        logging.warning(f"Race condition detected for user {user_id}, retrying as update")
+                        try:
+                            existing_report = db.query(UserBurnoutReport).filter(
+                                UserBurnoutReport.email == user.email,
+                                UserBurnoutReport.submitted_at >= today_start
+                            ).first()
+                            if existing_report:
+                                update_existing_report(existing_report)
+                                db.commit()
+                                is_update = True
+                                logging.info(f"Updated report after race condition for user {user_id}")
+                            else:
+                                raise db_error
+                        except Exception as retry_error:
+                            db.rollback()
+                            logging.error(f"Failed to recover from race condition: {retry_error}")
+                            return {"response_action": "errors", "errors": {"comments_block": "Error saving survey. Please try again."}}
+                    else:
+                        logging.error(f"Database error saving survey: {db_error}")
+                        return {"response_action": "errors", "errors": {"comments_block": "Error saving survey. Please try again."}}
 
                 # Notify org admins about survey submission (only for new submissions, not updates)
                 if not is_update:
