@@ -808,16 +808,20 @@ class PagerDutyDataCollector:
         # 🎯 STEP 4: Calculate success statistics
         total_incidents = len(incidents)
         assigned_incidents = total_incidents - assignment_stats["no_assignment"]
-        
+
+        # Calculate percentages safely (avoid division by zero)
+        assignment_pct = (assigned_incidents/total_incidents*100) if total_incidents > 0 else 0.0
+        email_pct = (incidents_with_emails/total_incidents*100) if total_incidents > 0 else 0.0
+
         logger.info(f"🚀 PD NORMALIZE: ASSIGNMENT EXTRACTION RESULTS:")
         logger.info(f"   - Total incidents processed: {total_incidents}")
-        logger.info(f"   - Incidents with assignments: {assigned_incidents} ({assigned_incidents/total_incidents*100:.1f}%)")
-        logger.info(f"   - Incidents with valid emails: {incidents_with_emails} ({incidents_with_emails/total_incidents*100:.1f}%)")
+        logger.info(f"   - Incidents with assignments: {assigned_incidents} ({assignment_pct:.1f}%)")
+        logger.info(f"   - Incidents with valid emails: {incidents_with_emails} ({email_pct:.1f}%)")
         logger.info(f"   - Assignment sources:")
         for method, count in assignment_stats.items():
             if method.startswith("from_") and count > 0:
                 logger.info(f"     • {method.replace('from_', '').title()}: {count}")
-        
+
         # 🎯 STEP 5: Build final normalized data structure
         normalized_data = {
             "users": normalized_users,
@@ -829,7 +833,7 @@ class PagerDutyDataCollector:
                 "enhancement_applied": True,
                 "enhancement_timestamp": datetime.utcnow().isoformat(),
                 "assignment_extraction_stats": assignment_stats,
-                "email_success_rate": f"{incidents_with_emails}/{total_incidents} ({incidents_with_emails/total_incidents*100:.1f}%)"
+                "email_success_rate": f"{incidents_with_emails}/{total_incidents} ({email_pct:.1f}%)"
             }
         }
         
