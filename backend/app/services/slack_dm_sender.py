@@ -30,7 +30,16 @@ class SlackDMSender:
             user_id: Internal user ID
             organization_id: Organization ID
             message: Custom message (uses default if None)
+
+        Raises:
+            ValueError: If user_id or organization_id is None/invalid
         """
+        # Validate required IDs to prevent invalid button values
+        if user_id is None:
+            raise ValueError(f"user_id cannot be None - cannot send survey DM to slack_user_id={slack_user_id}")
+        if organization_id is None:
+            raise ValueError(f"organization_id cannot be None - cannot send survey DM to user_id={user_id}")
+
         try:
             # Token is already decrypted by SlackTokenService
             decrypted_token = slack_token
