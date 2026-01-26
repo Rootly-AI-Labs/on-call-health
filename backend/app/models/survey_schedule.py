@@ -1,7 +1,8 @@
 """
 Survey schedule configuration for automated daily burnout check-ins.
 """
-from sqlalchemy import Column, Integer, String, Boolean, Time, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, Time, ForeignKey, DateTime
+from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from .base import Base
 
@@ -49,8 +50,13 @@ class SurveySchedule(Base):
         "You just need to answer it once this {period_name}, or I'll remind you again tomorrow."
     ))
 
+    # Audit tracking
+    last_modified_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    last_modified_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
     # Relationships
     organization = relationship("Organization", backref="survey_schedule")
+    last_modified_by = relationship("User", foreign_keys=[last_modified_by_user_id])
 
 
 class UserSurveyPreference(Base):
