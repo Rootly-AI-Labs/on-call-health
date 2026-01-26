@@ -74,6 +74,7 @@ export function SlackSurveyTabs({
   const [showSaveConfirmation, setShowSaveConfirmation] = useState(false)
   const [scheduleAccordionOpen, setScheduleAccordionOpen] = useState(false)
   const [lastModifiedByName, setLastModifiedByName] = useState<string | null>(null)
+  const [lastModifiedByUserId, setLastModifiedByUserId] = useState<number | null>(null)
   const [lastModifiedAt, setLastModifiedAt] = useState<string | null>(null)
 
   // Recipient selection state
@@ -177,6 +178,7 @@ export function SlackSurveyTabs({
 
           // Load last modified info
           setLastModifiedByName(data.last_modified_by_name || null)
+          setLastModifiedByUserId(data.last_modified_by_user_id || null)
           setLastModifiedAt(data.last_modified_at || null)
         } else {
           // Handle case where no schedule is configured (shouldn't happen with new backend)
@@ -588,9 +590,9 @@ export function SlackSurveyTabs({
                     {Math.max(0, selectedRecipients.size)} {selectedRecipients.size === 1 ? 'user' : 'users'} selected
                   </p>
                 )}
-                {lastModifiedByName && lastModifiedAt && (
+                {lastModifiedAt && lastModifiedByUserId && (
                   <p className="text-xs text-neutral-400 mt-1.5">
-                    Last updated by {lastModifiedByName} on {new Date(lastModifiedAt).toLocaleDateString()} at {new Date(lastModifiedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    Last schedule change: {lastModifiedByName || '[deleted user]'} on {new Date(lastModifiedAt).toLocaleDateString()} at {new Date(lastModifiedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </p>
                 )}
               </div>

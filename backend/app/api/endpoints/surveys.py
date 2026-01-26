@@ -5,7 +5,7 @@ import logging
 from datetime import time, datetime, timedelta
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from pydantic import BaseModel
 
 from ...models import get_db, User
@@ -160,7 +160,9 @@ async def create_or_update_survey_schedule(
         raise HTTPException(status_code=400, detail="Invalid time format. Use HH:MM (e.g., 09:00)")
 
     # Check if schedule exists (order by id desc for deterministic results)
-    existing_schedule = db.query(SurveySchedule).filter(
+    existing_schedule = db.query(SurveySchedule).options(
+        joinedload(SurveySchedule.last_modified_by)
+    ).filter(
         SurveySchedule.organization_id == organization_id
     ).order_by(SurveySchedule.id.desc()).first()
 
@@ -263,7 +265,9 @@ async def get_survey_schedule(
     db: Session = Depends(get_db)
 ):
     """Get current survey schedule for user's organization."""
-    schedule = db.query(SurveySchedule).filter(
+    schedule = db.query(SurveySchedule).options(
+        joinedload(SurveySchedule.last_modified_by)
+    ).filter(
         SurveySchedule.organization_id == current_user.organization_id
     ).first()
 

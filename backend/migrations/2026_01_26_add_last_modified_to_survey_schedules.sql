@@ -15,8 +15,9 @@ FOREIGN KEY (last_modified_by_user_id) REFERENCES users(id) ON DELETE SET NULL;
 ALTER TABLE survey_schedules
 ADD COLUMN last_modified_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
 
--- Create index on last_modified_by_user_id for faster lookups
+-- Create indexes for faster lookups
 CREATE INDEX idx_survey_schedules_last_modified_by ON survey_schedules(last_modified_by_user_id);
+CREATE INDEX idx_survey_schedules_last_modified_at ON survey_schedules(last_modified_at);
 
 -- Backfill existing records: Set last_modified_at to current time
 -- Note: last_modified_by_user_id will remain NULL for existing records since we can't determine who created them
