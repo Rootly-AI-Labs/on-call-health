@@ -8,6 +8,7 @@ import secrets
 import json
 import logging
 import os
+import urllib.parse
 from cryptography.fernet import Fernet
 import base64
 from datetime import datetime
@@ -151,38 +152,61 @@ async def slack_oauth_callback(
         enable_survey = False  # Default to False - admin must explicitly enable
 
         if state:
-            import base64
             try:
                 logger.debug(f"Raw state parameter: {state}")
-                decoded_state = json.loads(base64.b64decode(state + '=='))  # Add padding
+                # Validate state parameter format before decoding
+                if not isinstance(state, str) or len(state) < 4 or len(state) > 2048:
+                    raise ValueError(f"Invalid state parameter length: {len(state) if state else 0}")
+
+                # Sanitize state: only allow base64 characters
+                import re
+                if not re.match(r'^[A-Za-z0-9_-]+$', state):
+                    raise ValueError("State parameter contains invalid characters")
+
+                # Add padding and decode
+                padded_state = state + '=' * (4 - len(state) % 4) if len(state) % 4 else state
+                decoded_state = json.loads(base64.urlsafe_b64decode(padded_state))
+
+                if not isinstance(decoded_state, dict):
+                    raise ValueError("Decoded state is not a dictionary")
+
                 logger.debug(f"Full decoded state: {decoded_state}")
                 organization_id = decoded_state.get("orgId")
                 user_id = decoded_state.get("userId")
                 user_email = decoded_state.get("email")
                 enable_survey = decoded_state.get("enableSurvey", False)  # Default False
                 logger.debug(f"Decoded state - org_id: {organization_id}, user_id: {user_id}, email: {mask_email(user_email)}, survey: {enable_survey}")
-            except Exception as state_error:
+            except (ValueError, json.JSONDecodeError, base64.binascii.Error) as state_error:
                 # If state parsing fails, continue without org mapping and use defaults
                 logger.warning(f"Failed to parse state parameter: {state_error}")
-                pass
+            except Exception as state_error:
+                # Catch any other unexpected errors
+                logger.warning(f"Unexpected error parsing state parameter: {state_error}")
 
         # Exchange code for token using Slack's OAuth API
         import httpx
         async with httpx.AsyncClient() as client:
             # Construct the same redirect_uri that was used in the OAuth request
             frontend_url = settings.FRONTEND_URL or "http://localhost:3000"
-            backend_base = settings.DATABASE_URL.replace("postgresql://", "https://").split("@")[1].split("/")[0] if settings.DATABASE_URL else "localhost:8000"
 
-            # Get backend URL from environment variable (preferred) or construct it
-            backend_url = os.getenv("BACKEND_URL")
+            # Get backend URL from environment variable (strongly preferred)
+            backend_url = os.getenv("BACKEND_URL") or getattr(settings, 'BACKEND_URL', None)
 
             if not backend_url:
-                # Fallback: detect environment from DATABASE_URL
-                if "railway" in str(settings.DATABASE_URL):
-                    if "production" in str(settings.DATABASE_URL):
-                        backend_url = "https://rootly-burnout-detector-web-production.up.railway.app"
+                # Fallback for local development only - log warning for production
+                if os.getenv("RAILWAY_ENVIRONMENT") or "railway" in str(settings.DATABASE_URL or ""):
+                    logger.warning(
+                        "BACKEND_URL environment variable not set in Railway deployment. "
+                        "Please configure BACKEND_URL for reliable OAuth redirects."
+                    )
+                    # Use Railway's automatic URL detection if available
+                    railway_public_domain = os.getenv("RAILWAY_PUBLIC_DOMAIN")
+                    if railway_public_domain:
+                        backend_url = f"https://{railway_public_domain}"
                     else:
-                        backend_url = "https://rootly-burnout-detector-web-development.up.railway.app"
+                        # Last resort fallback - this should be avoided
+                        logger.error("Neither BACKEND_URL nor RAILWAY_PUBLIC_DOMAIN set. OAuth may fail.")
+                        backend_url = "http://localhost:8000"
                 else:
                     # Local development
                     backend_url = "http://localhost:8000"
@@ -366,7 +390,6 @@ async def slack_oauth_callback(
 
         # Redirect to frontend with success message
         frontend_url = settings.FRONTEND_URL or "http://localhost:3000"
-        import urllib.parse
         encoded_workspace = urllib.parse.quote(workspace_name) if workspace_name else "unknown"
         redirect_url = f"{frontend_url}/integrations?slack_connected=true&workspace={encoded_workspace}"
 
@@ -380,7 +403,6 @@ async def slack_oauth_callback(
         # Redirect to frontend with error
         frontend_url = settings.FRONTEND_URL or "http://localhost:3000"
         from fastapi.responses import RedirectResponse
-        import urllib.parse
         error_msg = urllib.parse.quote(str(he.detail))
         redirect_url = f"{frontend_url}/integrations?slack_connected=false&error={error_msg}"
         return RedirectResponse(url=redirect_url, status_code=302)
@@ -391,7 +413,6 @@ async def slack_oauth_callback(
         # Redirect to frontend with error
         frontend_url = settings.FRONTEND_URL or "http://localhost:3000"
         from fastapi.responses import RedirectResponse
-        import urllib.parse
         error_msg = urllib.parse.quote(f"Unexpected error: {str(e)}")
         redirect_url = f"{frontend_url}/integrations?slack_connected=false&error={error_msg}"
         return RedirectResponse(url=redirect_url, status_code=302)
