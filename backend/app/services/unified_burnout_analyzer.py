@@ -1839,7 +1839,7 @@ class UnifiedBurnoutAnalyzer:
             'sleep_quality_proxy': apply_rootly_incident_tiers(severity_weighted_per_week) * 8,  # High-severity: 25%
 
             # Work-related burnout factors (35% of total)
-            'sprint_completion': consecutive_days_data['consecutive_days_score'],   # Consecutive days: 15%
+            'sprint_completion': consecutive_days_data['max_consecutive_days'],   # Consecutive days: 15% (raw days, not score)
             'oncall_burden': apply_rootly_incident_tiers(severity_weighted_per_week) * 10  # On-call load: 20%
         }
 
