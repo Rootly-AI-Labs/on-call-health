@@ -73,6 +73,8 @@ export function SlackSurveyTabs({
   const [savingSchedule, setSavingSchedule] = useState(false)
   const [showSaveConfirmation, setShowSaveConfirmation] = useState(false)
   const [scheduleAccordionOpen, setScheduleAccordionOpen] = useState(false)
+  const [lastModifiedByName, setLastModifiedByName] = useState<string | null>(null)
+  const [lastModifiedAt, setLastModifiedAt] = useState<string | null>(null)
 
   // Recipient selection state
   const [selectedRecipients, setSelectedRecipients] = useState<Set<number>>(new Set())
@@ -172,6 +174,10 @@ export function SlackSurveyTabs({
             setSavedDayOfWeek(data.day_of_week)
           }
           setFollowUpRemindersEnabled(data.follow_up_reminders_enabled !== false)
+
+          // Load last modified info
+          setLastModifiedByName(data.last_modified_by_name || null)
+          setLastModifiedAt(data.last_modified_at || null)
         } else {
           // Handle case where no schedule is configured (shouldn't happen with new backend)
           setScheduleEnabled(false)
@@ -580,6 +586,11 @@ export function SlackSurveyTabs({
                 {scheduleEnabled && (
                   <p className="text-xs font-medium text-purple-600 mt-1.5">
                     {Math.max(0, selectedRecipients.size)} {selectedRecipients.size === 1 ? 'user' : 'users'} selected
+                  </p>
+                )}
+                {lastModifiedByName && lastModifiedAt && (
+                  <p className="text-xs text-neutral-400 mt-1.5">
+                    Last updated by {lastModifiedByName} on {new Date(lastModifiedAt).toLocaleDateString()} at {new Date(lastModifiedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </p>
                 )}
               </div>
