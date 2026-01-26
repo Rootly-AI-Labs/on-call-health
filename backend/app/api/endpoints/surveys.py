@@ -5,7 +5,7 @@ import logging
 from datetime import time, datetime, timedelta
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from pydantic import BaseModel
 
 from ...models import get_db, User
@@ -160,7 +160,10 @@ async def create_or_update_survey_schedule(
         raise HTTPException(status_code=400, detail="Invalid time format. Use HH:MM (e.g., 09:00)")
 
     # Check if schedule exists (order by id desc for deterministic results)
-    existing_schedule = db.query(SurveySchedule).filter(
+    # Eager load last_modified_by relationship to avoid N+1 query
+    existing_schedule = db.query(SurveySchedule).options(
+        joinedload(SurveySchedule.last_modified_by)
+    ).filter(
         SurveySchedule.organization_id == organization_id
     ).order_by(SurveySchedule.id.desc()).first()
 
@@ -231,8 +234,13 @@ async def create_or_update_survey_schedule(
 
     # Get last modified by user info
     last_modified_by_name = None
-    if schedule.last_modified_by_user_id and schedule.last_modified_by:
-        last_modified_by_name = schedule.last_modified_by.name
+    if schedule.last_modified_by_user_id:
+        try:
+            if schedule.last_modified_by and hasattr(schedule.last_modified_by, 'name'):
+                last_modified_by_name = schedule.last_modified_by.name
+        except Exception as e:
+            # Handle case where user was deleted or relationship loading fails
+            logger.warning(f"Failed to load last_modified_by user for schedule {schedule.id}: {e}")
 
     return {
         "id": schedule.id,
@@ -263,7 +271,10 @@ async def get_survey_schedule(
     db: Session = Depends(get_db)
 ):
     """Get current survey schedule for user's organization."""
-    schedule = db.query(SurveySchedule).filter(
+    # Eager load last_modified_by relationship to avoid N+1 query
+    schedule = db.query(SurveySchedule).options(
+        joinedload(SurveySchedule.last_modified_by)
+    ).filter(
         SurveySchedule.organization_id == current_user.organization_id
     ).first()
 
@@ -292,8 +303,13 @@ async def get_survey_schedule(
 
     # Get last modified by user info
     last_modified_by_name = None
-    if schedule.last_modified_by_user_id and schedule.last_modified_by:
-        last_modified_by_name = schedule.last_modified_by.name
+    if schedule.last_modified_by_user_id:
+        try:
+            if schedule.last_modified_by and hasattr(schedule.last_modified_by, 'name'):
+                last_modified_by_name = schedule.last_modified_by.name
+        except Exception as e:
+            # Handle case where user was deleted or relationship loading fails
+            logger.warning(f"Failed to load last_modified_by user for schedule {schedule.id}: {e}")
 
     return {
         "id": schedule.id,
