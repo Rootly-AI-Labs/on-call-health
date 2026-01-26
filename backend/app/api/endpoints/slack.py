@@ -1501,22 +1501,33 @@ async def handle_slack_interactions(
                 db.commit()
 
                 # Notify org admins about survey submission (only for new submissions, not updates)
-                if not is_update:
+                # Only send notifications if the submitter has a User account
+                if not is_update and user:
                     try:
                         notification_service = NotificationService(db)
                         if analysis_id:
                             # Get analysis for notification context
                             analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
                             if analysis:
-                                notification_service.create_survey_submission_notification(
+                                notification_service.create_survey_submitted_notification(
                                     user=user,
                                     organization_id=organization_id,
                                     analysis=analysis
                                 )
                                 logging.info(f"Created survey submission notifications for org {organization_id}")
+                        else:
+                            # No analysis_id - still notify admins
+                            notification_service.create_survey_submitted_notification(
+                                user=user,
+                                organization_id=organization_id,
+                                analysis=None
+                            )
+                            logging.info(f"Created survey submission notifications for org {organization_id} (no analysis)")
                     except Exception as e:
                         logging.error(f"Failed to create survey submission notifications: {str(e)}")
                         # Don't fail the survey submission if notification fails
+                elif not is_update and not user:
+                    logging.info(f"Skipping notification for synced member without User account (email={report_email})")
 
                 # Return success response with different message for updates
                 if is_update:
