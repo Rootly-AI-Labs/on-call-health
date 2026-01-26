@@ -17,6 +17,7 @@ from ...services.github_only_burnout_analyzer import GitHubOnlyBurnoutAnalyzer
 from ...services.slack_token_service import get_slack_token_for_user, SlackTokenService
 from ...core.rate_limiting import analysis_rate_limit
 from ...core.input_validation import AnalysisRequest as ValidatedAnalysisRequest
+from ...middleware.logging_context import set_analysis_context, clear_analysis_context
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -321,11 +322,15 @@ async def run_analysis_task(analysis_id: int, integration_id: int, days_back: in
 async def _run_analysis_task_impl(db, analysis_id: int, integration_id: int, days_back: int, user_id: int):
     """Implementation of the analysis task."""
     try:
-        # Get analysis with UUID for logging
+        # Get analysis with UUID for logging and set context
         analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
         analysis_ref = f"{analysis_id} ({analysis.uuid})" if analysis else str(analysis_id)
 
-        logger.info(f"🔍 ANALYSIS TASK: Starting analysis {analysis_ref} for user {user_id}")
+        # Set analysis context for all logs during this analysis
+        if analysis:
+            set_analysis_context(analysis.uuid)
+
+        logger.info(f"Starting analysis for user {user_id}")
 
         # Update status to running
         analysis.status = "running"
