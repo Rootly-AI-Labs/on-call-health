@@ -189,37 +189,50 @@ async def slack_oauth_callback(
             # Construct the same redirect_uri that was used in the OAuth request
             frontend_url = settings.FRONTEND_URL or "http://localhost:3000"
 
-            # Get backend URL from environment variable (strongly preferred)
+            # Get backend URL from environment variable (required in production)
             backend_url = os.getenv("BACKEND_URL") or getattr(settings, 'BACKEND_URL', None)
 
             if not backend_url:
-                # Fallback for local development only - log warning for production
-                if os.getenv("RAILWAY_ENVIRONMENT") or "railway" in str(settings.DATABASE_URL or ""):
-                    logger.warning(
-                        "BACKEND_URL environment variable not set in Railway deployment. "
-                        "Please configure BACKEND_URL for reliable OAuth redirects."
-                    )
-                    # Use Railway's automatic URL detection if available
+                # Check if we're in a production environment (Railway sets this)
+                is_production = os.getenv("RAILWAY_ENVIRONMENT") is not None
+
+                if is_production:
+                    # Try Railway's automatic URL detection
                     railway_public_domain = os.getenv("RAILWAY_PUBLIC_DOMAIN")
                     if railway_public_domain:
+                        # Validate the domain format
+                        if not railway_public_domain.replace('.', '').replace('-', '').isalnum():
+                            logger.error(f"Invalid RAILWAY_PUBLIC_DOMAIN format: {railway_public_domain}")
+                            raise HTTPException(
+                                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                                detail="Server configuration error: Invalid backend URL"
+                            )
                         backend_url = f"https://{railway_public_domain}"
+                        logger.warning("Using RAILWAY_PUBLIC_DOMAIN as BACKEND_URL is not set")
                     else:
-                        # Last resort fallback - this should be avoided
-                        logger.error("Neither BACKEND_URL nor RAILWAY_PUBLIC_DOMAIN set. OAuth may fail.")
-                        backend_url = "http://localhost:8000"
+                        # Fail hard in production - don't fall back to localhost
+                        logger.error("BACKEND_URL not configured in production environment")
+                        raise HTTPException(
+                            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail="Server configuration error: BACKEND_URL not set"
+                        )
                 else:
-                    # Local development
+                    # Local development only
                     backend_url = "http://localhost:8000"
+
+            # Validate backend_url format
+            if not backend_url.startswith(('http://', 'https://')):
+                logger.error(f"Invalid backend URL format: {backend_url}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Server configuration error: Invalid backend URL format"
+                )
 
             redirect_uri = f"{backend_url}/integrations/slack/oauth/callback"
 
-            # Enhanced debugging for OAuth configuration
-            logger.info(f"🔍 OAuth Debug Info:")
-            logger.info(f"  - Backend URL: {backend_url}")
-            logger.info(f"  - Redirect URI: {redirect_uri}")
-            logger.info(f"  - Client ID: {settings.SLACK_CLIENT_ID[:10]}...{settings.SLACK_CLIENT_ID[-4:]}")
-            logger.info(f"  - Authorization code: {code[:10]}...{code[-4:]}")
-            logger.info(f"  - Database URL contains: {'production' if 'production' in str(settings.DATABASE_URL) else 'staging' if 'staging' in str(settings.DATABASE_URL) else 'unknown'}")
+            # Log OAuth configuration (without sensitive details)
+            logger.info(f"OAuth redirect URI: {redirect_uri}")
+            logger.debug(f"Client ID: {settings.SLACK_CLIENT_ID[:10]}...{settings.SLACK_CLIENT_ID[-4:]}")
 
             token_response = await client.post(
                 "https://slack.com/api/oauth.v2.access",
@@ -319,13 +332,14 @@ async def slack_oauth_callback(
             )
             from fastapi.responses import RedirectResponse
             frontend_url = settings.FRONTEND_URL or "http://localhost:3000"
+            # Use generic error message to avoid revealing authorization structure
             error_message = urllib.parse.quote(
-                "Only organization admins can connect Slack. Please ask your admin to set up the integration."
+                "You don't have permission to perform this action. Please contact your administrator."
             )
             redirect_url = (
                 f"{frontend_url}/integrations?"
                 f"slack_connected=false&"
-                f"error=admin_required&"
+                f"error=permission_denied&"
                 f"message={error_message}"
             )
             return RedirectResponse(url=redirect_url, status_code=302)
@@ -1414,12 +1428,24 @@ async def handle_slack_interactions(
                     comments = comments_input.get("value", "") if comments_input else ""
 
                     # Extract user and organization IDs from private_metadata
-                    metadata = json.loads(view.get("private_metadata", "{}"))
+                    try:
+                        raw_metadata = view.get("private_metadata", "{}")
+                        if not isinstance(raw_metadata, str):
+                            raise ValueError("private_metadata must be a string")
+                        metadata = json.loads(raw_metadata)
+                        if not isinstance(metadata, dict):
+                            raise ValueError("private_metadata must be a JSON object")
+                    except (json.JSONDecodeError, ValueError) as metadata_error:
+                        logging.error(f"Invalid private_metadata format: {metadata_error}")
+                        return {"response_action": "errors", "errors": {"comments_block": "Invalid survey data format"}}
+
                     user_id = metadata.get("user_id")
                     organization_id = metadata.get("organization_id")  # Optional now
                     analysis_id = metadata.get("analysis_id")  # Optional - may be None
 
-                    if not user_id:
+                    # Validate user_id is a valid integer
+                    if not user_id or not isinstance(user_id, int):
+                        logging.error(f"Invalid user_id in metadata: {user_id}")
                         return {"response_action": "errors", "errors": {"comments_block": "Invalid survey data"}}
                 except Exception as e:
                     logging.error(f"Error parsing survey values: {str(e)}", exc_info=True)
@@ -1435,47 +1461,53 @@ async def handle_slack_interactions(
                     return {"response_action": "errors", "errors": {"comments_block": "User not found"}}
 
                 # Check if user already submitted today (match by email)
+                # Use row-level locking to prevent race conditions with concurrent submissions
                 # This allows only 1 survey per user per day, regardless of organization
                 existing_report = db.query(UserBurnoutReport).filter(
                     UserBurnoutReport.email == user.email,
                     UserBurnoutReport.submitted_at >= today_start
-                ).order_by(UserBurnoutReport.submitted_at.desc()).first()
+                ).order_by(UserBurnoutReport.submitted_at.desc()).with_for_update().first()
 
                 is_update = False
-                if existing_report:
-                    # Update existing report
-                    existing_report.feeling_score = feeling_score
-                    existing_report.workload_score = workload_score
-                    existing_report.stress_factors = stress_factors
-                    existing_report.personal_circumstances = personal_circumstances
-                    existing_report.additional_comments = comments
-                    existing_report.submitted_via = 'slack'
-                    existing_report.analysis_id = analysis_id  # Update linked analysis if provided
-                    existing_report.email = user.email  # Refresh email in case it changed
-                    existing_report.email_domain = user.email_domain  # Refresh email_domain in case it changed
-                    existing_report.updated_at = datetime.utcnow()
-                    logging.info(f"Updated existing report ID {existing_report.id} for user {user_id}")
-                    is_update = True
-                else:
-                    # Create new burnout report with email_domain for domain-based sharing
-                    new_report = UserBurnoutReport(
-                        user_id=user_id,
-                        email=user.email,  # Save email for team member identification
-                        organization_id=organization_id,
-                        email_domain=user.email_domain,
-                        analysis_id=analysis_id,  # Optional - may be None
-                        feeling_score=feeling_score,
-                        workload_score=workload_score,
-                        stress_factors=stress_factors,
-                        personal_circumstances=personal_circumstances,
-                        additional_comments=comments,
-                        submitted_via='slack',
-                        submitted_at=datetime.utcnow()
-                    )
-                    db.add(new_report)
-                    logging.info(f"Created new report for user {user_id} with email_domain {user.email_domain}")
+                try:
+                    if existing_report:
+                        # Update existing report
+                        existing_report.feeling_score = feeling_score
+                        existing_report.workload_score = workload_score
+                        existing_report.stress_factors = stress_factors
+                        existing_report.personal_circumstances = personal_circumstances
+                        existing_report.additional_comments = comments
+                        existing_report.submitted_via = 'slack'
+                        existing_report.analysis_id = analysis_id  # Update linked analysis if provided
+                        existing_report.email = user.email  # Refresh email in case it changed
+                        existing_report.email_domain = user.email_domain  # Refresh email_domain in case it changed
+                        existing_report.updated_at = datetime.utcnow()
+                        logging.info(f"Updated existing report ID {existing_report.id} for user {user_id}")
+                        is_update = True
+                    else:
+                        # Create new burnout report with email_domain for domain-based sharing
+                        new_report = UserBurnoutReport(
+                            user_id=user_id,
+                            email=user.email,  # Save email for team member identification
+                            organization_id=organization_id,
+                            email_domain=user.email_domain,
+                            analysis_id=analysis_id,  # Optional - may be None
+                            feeling_score=feeling_score,
+                            workload_score=workload_score,
+                            stress_factors=stress_factors,
+                            personal_circumstances=personal_circumstances,
+                            additional_comments=comments,
+                            submitted_via='slack',
+                            submitted_at=datetime.utcnow()
+                        )
+                        db.add(new_report)
+                        logging.info(f"Created new report for user {user_id} with email_domain {user.email_domain}")
 
-                db.commit()
+                    db.commit()
+                except Exception as db_error:
+                    db.rollback()
+                    logging.error(f"Database error saving survey: {db_error}")
+                    return {"response_action": "errors", "errors": {"comments_block": "Error saving survey. Please try again."}}
 
                 # Notify org admins about survey submission (only for new submissions, not updates)
                 if not is_update:
