@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import type { ReactElement } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Area,
@@ -29,48 +28,148 @@ interface ObjectiveDataCardProps {
   loadingTrends: boolean
 }
 
-// Aggregate daily data into weekly buckets
+interface TrendDirection {
+  direction: 'up' | 'down' | 'stable'
+  percentage: number
+}
+
+interface MetricConfig {
+  label: string
+  color: string
+  yAxisLabel: string
+  dataKey: string
+  weeklyDataKey: string
+  showMeanLine: boolean
+  transformer: (trend: any) => number
+}
+
+interface MetricDescription {
+  title: string
+  description: string
+}
+
+const METRIC_CONFIG: Record<string, MetricConfig> = {
+  health_score: {
+    label: "Risk Level",
+    color: "#7C63D6",
+    yAxisLabel: "Risk Level",
+    dataKey: "dailyScore",
+    weeklyDataKey: "riskLevel",
+    showMeanLine: true,
+    transformer: (trend: any) => Math.max(0, Math.min(100, 100 - Math.round(trend.overall_score * 10)))
+  },
+  incident_load: {
+    label: "Incident Count",
+    color: "#7C63D6",
+    yAxisLabel: "Incident Count",
+    dataKey: "incidentCount",
+    weeklyDataKey: "incidentCount",
+    showMeanLine: true,
+    transformer: (trend: any) => trend.incident_count || 0
+  },
+  after_hours: {
+    label: "After Hours Activity",
+    color: "#7C63D6",
+    yAxisLabel: "After Hours Activity %",
+    dataKey: "afterHoursPercentage",
+    weeklyDataKey: "afterHoursPercentage",
+    showMeanLine: true,
+    transformer: (trend: any) => trend.after_hours_percentage || 0
+  },
+  severity_weighted: {
+    label: "Workload Intensity",
+    color: "#7C63D6",
+    yAxisLabel: "Severity-Weighted Load",
+    dataKey: "severityWeightedCount",
+    weeklyDataKey: "severityWeighted",
+    showMeanLine: true,
+    transformer: (trend: any) => Math.round(trend.severity_weighted_count || 0)
+  }
+}
+
+const METRIC_DESCRIPTIONS: Record<string, MetricDescription> = {
+  health_score: {
+    title: "Risk Level",
+    description: "Measures the team's overall on-call health based on factors such as incident frequency, after-hours work and severity. Higher scores indicate higher risk of overwork."
+  },
+  incident_load: {
+    title: "Incident Count",
+    description: "Total count of incidents handled per day. Counts all incidents regardless of severity or timing."
+  },
+  after_hours: {
+    title: "After Hours Activity",
+    description: "Incidents occurring outside business hours (before 9 AM or after 5 PM) or on weekends. Timezone-aware based on each team member's local time."
+  },
+  severity_weighted: {
+    title: "Workload Intensity",
+    description: "Measures workload stress by weighting incidents based on their severity level. Higher values indicate more stressful workload."
+  }
+}
+
+function getWeekStartDate(date: Date): string {
+  const dayOfWeek = date.getDay()
+  const monday = new Date(date)
+  monday.setDate(date.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1))
+  return monday.toISOString().split('T')[0]
+}
+
+function formatDateShort(date: Date): string {
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+function calculateRiskLevel(overallScore: number): number {
+  return Math.max(0, Math.min(100, 100 - Math.round((overallScore || 0) * 10)))
+}
+
 function aggregateToWeekly(dailyData: any[]): any[] {
   if (!dailyData || dailyData.length === 0) return []
 
-  const weeklyBuckets: Map<string, any[]> = new Map()
+  const weeklyBuckets = new Map<string, any[]>()
 
-  dailyData.forEach((day) => {
-    const date = new Date(day.date)
-    const dayOfWeek = date.getDay()
-    const monday = new Date(date)
-    monday.setDate(date.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1))
-    const weekKey = monday.toISOString().split('T')[0]
+  for (const day of dailyData) {
+    const weekKey = getWeekStartDate(new Date(day.date))
+    const bucket = weeklyBuckets.get(weekKey) || []
+    bucket.push(day)
+    weeklyBuckets.set(weekKey, bucket)
+  }
 
-    if (!weeklyBuckets.has(weekKey)) {
-      weeklyBuckets.set(weekKey, [])
-    }
-    weeklyBuckets.get(weekKey)!.push(day)
-  })
-
-  const weeklyData = Array.from(weeklyBuckets.entries())
+  return Array.from(weeklyBuckets.entries())
     .map(([weekStart, days]) => {
-      const avgRiskLevel = days.reduce((sum, d) => sum + Math.max(0, Math.min(100, 100 - Math.round((d.overall_score || 0) * 10))), 0) / days.length
+      const dayCount = days.length
+      const teamSize = days[0]?.total_members || 1
+
+      const avgRiskLevel = days.reduce((sum, d) => sum + calculateRiskLevel(d.overall_score), 0) / dayCount
       const totalIncidents = days.reduce((sum, d) => sum + (d.incident_count || 0), 0)
-      const avgAfterHours = days.reduce((sum, d) => sum + (d.after_hours_percentage || 0), 0) / days.length
-      const avgSeverityWeighted = days.reduce((sum, d) => sum + (d.severity_weighted_count || 0), 0) / days.length
+      const avgAfterHours = days.reduce((sum, d) => sum + (d.after_hours_percentage || 0), 0) / dayCount
+      const avgSeverityWeighted = days.reduce((sum, d) => sum + (d.severity_weighted_count || 0), 0) / dayCount
       const totalAfterHoursCount = days.reduce((sum, d) => sum + (d.after_hours_count || 0), 0)
       const totalHighSeverity = days.reduce((sum, d) => sum + (d.high_severity_count || 0), 0)
 
-      const teamSize = days[0]?.total_members || 1
-      const incidentPenalty = Math.min((totalIncidents / days.length / teamSize) * 0.8, 2.0)
-      const severityPenalty = Math.min((avgSeverityWeighted / teamSize) * 1.2, 3.0)
-      const afterHoursPenalty = Math.min((totalAfterHoursCount / days.length) * 0.5, 1.5)
-      const highSeverityPenalty = Math.min((totalHighSeverity / days.length) * 0.8, 2.0)
+      const rawBreakdown = days.reduce((acc, d) => {
+        const breakdown = d.severity_breakdown || { sev0: 0, sev1: 0, sev2: 0, sev3: 0, low: 0 }
+        return {
+          sev0: acc.sev0 + (breakdown.sev0 || 0),
+          sev1: acc.sev1 + (breakdown.sev1 || 0),
+          sev2: acc.sev2 + (breakdown.sev2 || 0),
+          sev3: acc.sev3 + (breakdown.sev3 || 0),
+          low: acc.low + (breakdown.low || 0),
+        }
+      }, { sev0: 0, sev1: 0, sev2: 0, sev3: 0, low: 0 })
 
+      const incidentPenalty = Math.min((totalIncidents / dayCount / teamSize) * 0.8, 2.0)
+      const severityPenalty = Math.min((avgSeverityWeighted / teamSize) * 1.2, 3.0)
+      const afterHoursPenalty = Math.min((totalAfterHoursCount / dayCount) * 0.5, 1.5)
+      const highSeverityPenalty = Math.min((totalHighSeverity / dayCount) * 0.8, 2.0)
       const totalPenalty = incidentPenalty + severityPenalty + afterHoursPenalty + highSeverityPenalty
 
-      const factors = totalPenalty > 0 ? {
-        incidents: Math.round((incidentPenalty / totalPenalty) * 100),
-        severity: Math.round((severityPenalty / totalPenalty) * 100),
-        afterHours: Math.round((afterHoursPenalty / totalPenalty) * 100),
-        highSeverity: Math.round((highSeverityPenalty / totalPenalty) * 100),
-      } : { incidents: 0, severity: 0, afterHours: 0, highSeverity: 0 }
+      const factors = totalPenalty > 0
+        ? {
+            incidents: Math.round((incidentPenalty / totalPenalty) * 100),
+            severity: Math.round((severityPenalty / totalPenalty) * 100),
+            afterHours: Math.round((afterHoursPenalty / totalPenalty) * 100),
+            highSeverity: Math.round((highSeverityPenalty / totalPenalty) * 100),
+          }
+        : { incidents: 0, severity: 0, afterHours: 0, highSeverity: 0 }
 
       const weekDate = new Date(weekStart)
       const weekEnd = new Date(weekStart)
@@ -78,28 +177,128 @@ function aggregateToWeekly(dailyData: any[]): any[] {
 
       return {
         weekStart,
-        weekLabel: `${weekDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
-        weekRange: `${weekDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
+        weekLabel: formatDateShort(weekDate),
+        weekRange: `${formatDateShort(weekDate)} - ${formatDateShort(weekEnd)}`,
         riskLevel: Math.round(avgRiskLevel),
         incidentCount: totalIncidents,
         afterHoursPercentage: Math.round(avgAfterHours),
         severityWeighted: Math.round(avgSeverityWeighted),
         factors,
-        daysInWeek: days.length
+        daysInWeek: dayCount,
+        severityBreakdown: {
+          critical: rawBreakdown.sev0 + rawBreakdown.sev1,
+          high: rawBreakdown.sev2,
+          mediumLow: rawBreakdown.sev3 + rawBreakdown.low,
+        }
       }
     })
     .sort((a, b) => a.weekStart.localeCompare(b.weekStart))
-
-  return weeklyData
 }
 
-function calculateTrend(current: number, previous: number): { direction: 'up' | 'down' | 'stable', percentage: number } {
+function calculateTrend(current: number, previous: number): TrendDirection {
   if (previous === 0) return { direction: 'stable', percentage: 0 }
+
   const change = ((current - previous) / previous) * 100
   if (Math.abs(change) < 5) return { direction: 'stable', percentage: Math.round(change) }
+
   return {
     direction: change > 0 ? 'up' : 'down',
     percentage: Math.round(Math.abs(change))
+  }
+}
+
+function getTrendStatusClass(direction: 'up' | 'down' | 'stable'): string {
+  switch (direction) {
+    case 'down':
+      return 'bg-green-100 text-green-700'
+    case 'up':
+      return 'bg-red-100 text-red-700'
+    default:
+      return 'bg-neutral-100 text-neutral-600'
+  }
+}
+
+function getTrendLabel(direction: 'up' | 'down' | 'stable'): string {
+  switch (direction) {
+    case 'down':
+      return 'Improving'
+    case 'up':
+      return 'Needs Attention'
+    default:
+      return 'Stable'
+  }
+}
+
+function getTrendIcon(direction: 'up' | 'down' | 'stable') {
+  switch (direction) {
+    case 'down':
+      return <TrendingDown className="w-3 h-3" />
+    case 'up':
+      return <TrendingUp className="w-3 h-3" />
+    default:
+      return <Minus className="w-3 h-3" />
+  }
+}
+
+function getComparisonClass(direction: 'up' | 'down' | 'stable'): string {
+  switch (direction) {
+    case 'down':
+      return 'text-green-600'
+    case 'up':
+      return 'text-red-600'
+    default:
+      return 'text-neutral-500'
+  }
+}
+
+function formatComparison(trend: TrendDirection): string {
+  if (trend.direction === 'stable') return '—'
+  const arrow = trend.direction === 'down' ? '↓' : '↑'
+  return `${arrow}${trend.percentage}%`
+}
+
+function buildDailyChartData(dailyTrends: any[], config: MetricConfig): any[] {
+  if (!dailyTrends || dailyTrends.length === 0) return []
+
+  const chartData = dailyTrends.map((trend: any) => ({
+    date: formatDateShort(new Date(trend.date)),
+    [config.dataKey]: config.transformer(trend),
+    incidentCount: trend.incident_count || 0,
+    afterHours: trend.after_hours_count || 0,
+  }))
+
+  const values = chartData.map((d: any) => d[config.dataKey])
+  const mean = values.length > 0 ? values.reduce((a: number, b: number) => a + b, 0) / values.length : 0
+
+  return chartData.map((d: any) => ({ ...d, meanScore: Math.round(mean) }))
+}
+
+function calculateWeeklyStats(weeklyData: any[], config: MetricConfig) {
+  const weeklyMean = weeklyData.length > 0
+    ? weeklyData.reduce((sum, w) => sum + w[config.weeklyDataKey], 0) / weeklyData.length
+    : 0
+
+  const halfIndex = Math.floor(weeklyData.length / 2)
+  const firstHalfAvg = halfIndex > 0
+    ? weeklyData.slice(0, halfIndex).reduce((sum, w) => sum + w[config.weeklyDataKey], 0) / halfIndex
+    : 0
+  const secondHalfAvg = weeklyData.length - halfIndex > 0
+    ? weeklyData.slice(halfIndex).reduce((sum, w) => sum + w[config.weeklyDataKey], 0) / (weeklyData.length - halfIndex)
+    : 0
+
+  const currentWeek = weeklyData[weeklyData.length - 1]
+  const previousWeek = weeklyData[weeklyData.length - 2]
+
+  return {
+    weeklyMean,
+    overallTrend: calculateTrend(secondHalfAvg, firstHalfAvg),
+    currentWeek,
+    vsLastWeek: currentWeek && previousWeek
+      ? calculateTrend(currentWeek[config.weeklyDataKey], previousWeek[config.weeklyDataKey])
+      : null,
+    vsMean: currentWeek
+      ? calculateTrend(currentWeek[config.weeklyDataKey], weeklyMean)
+      : null,
   }
 }
 
@@ -110,111 +309,17 @@ export function ObjectiveDataCard({
   const [selectedMetric, setSelectedMetric] = useState<string>("health_score")
   const [viewMode, setViewMode] = useState<'weekly' | 'daily'>('weekly')
 
-  const METRIC_CONFIG: any = {
-    health_score: {
-      label: "Risk Level",
-      color: "#7C63D6",
-      yAxisLabel: "Risk Level",
-      dataKey: "dailyScore",
-      weeklyDataKey: "riskLevel",
-      showMeanLine: true,
-      transformer: (trend: any) => Math.max(0, Math.min(100, 100 - Math.round(trend.overall_score * 10)))
-    },
-    incident_load: {
-      label: "Incident Count",
-      color: "#7C63D6",
-      yAxisLabel: "Incident Count",
-      dataKey: "incidentCount",
-      weeklyDataKey: "incidentCount",
-      showMeanLine: true,
-      transformer: (trend: any) => trend.incident_count || 0
-    },
-    after_hours: {
-      label: "After Hours Activity",
-      color: "#7C63D6",
-      yAxisLabel: "After Hours Activity %",
-      dataKey: "afterHoursPercentage",
-      weeklyDataKey: "afterHoursPercentage",
-      showMeanLine: true,
-      transformer: (trend: any) => trend.after_hours_percentage || 0
-    },
-    severity_weighted: {
-      label: "Workload Intensity",
-      color: "#7C63D6",
-      yAxisLabel: "Severity-Weighted Load",
-      dataKey: "severityWeightedCount",
-      weeklyDataKey: "severityWeighted",
-      showMeanLine: true,
-      transformer: (trend: any) => Math.round(trend.severity_weighted_count || 0)
-    }
-  }
-
-  const METRIC_DESCRIPTIONS: any = {
-    health_score: {
-      title: "Risk Level",
-      description: "Measures the team's overall on-call health based on factors such as incident frequency, after-hours work and severity. Higher scores indicate higher risk of overwork."
-    },
-    incident_load: {
-      title: "Incident Count",
-      description: "Total count of incidents handled per day. Counts all incidents regardless of severity or timing."
-    },
-    after_hours: {
-      title: "After Hours Activity",
-      description: "Incidents occurring outside business hours (before 9 AM or after 5 PM) or on weekends. Timezone-aware based on each team member's local time."
-    },
-    severity_weighted: {
-      title: "Workload Intensity",
-      description: "Measures workload stress by weighting incidents based on their severity level. Higher values indicate more stressful workload."
-    }
-  }
-
   const dailyTrends = currentAnalysis?.analysis_data?.daily_trends || []
   const timeRange = currentAnalysis?.time_range || currentAnalysis?.analysis_data?.metadata?.days_analyzed || 30
   const config = METRIC_CONFIG[selectedMetric]
 
-  // Daily chart data
-  const getDailyChartData = () => {
-    if (!dailyTrends || dailyTrends.length === 0) return []
-
-    const chartData = dailyTrends.map((trend: any) => ({
-      date: new Date(trend.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      [config.dataKey]: config.transformer(trend),
-      incidentCount: trend.incident_count || 0,
-      afterHours: trend.after_hours_count || 0,
-    }))
-
-    const values = chartData.map((d: any) => d[config.dataKey])
-    const mean = values.length > 0 ? values.reduce((a: number, b: number) => a + b, 0) / values.length : 0
-
-    return chartData.map((d: any) => ({ ...d, meanScore: Math.round(mean) }))
-  }
-
-  // Weekly chart data
   const weeklyData = aggregateToWeekly(dailyTrends)
-  const weeklyMean = weeklyData.length > 0
-    ? weeklyData.reduce((sum, w) => sum + w[config.weeklyDataKey], 0) / weeklyData.length
-    : 0
+  const dailyChartData = buildDailyChartData(dailyTrends, config)
+  const { weeklyMean, overallTrend, currentWeek, vsLastWeek, vsMean } = calculateWeeklyStats(weeklyData, config)
 
-  // Calculate overall trend for weekly view
-  const halfIndex = Math.floor(weeklyData.length / 2)
-  const firstHalfAvg = weeklyData.slice(0, halfIndex).reduce((sum, w) => sum + w[config.weeklyDataKey], 0) / halfIndex || 0
-  const secondHalfAvg = weeklyData.slice(halfIndex).reduce((sum, w) => sum + w[config.weeklyDataKey], 0) / (weeklyData.length - halfIndex) || 0
-  const overallTrend = calculateTrend(secondHalfAvg, firstHalfAvg)
-
-  // Week-over-week comparison
-  const currentWeek = weeklyData[weeklyData.length - 1]
-  const previousWeek = weeklyData[weeklyData.length - 2]
-  const vsLastWeek = currentWeek && previousWeek
-    ? calculateTrend(currentWeek[config.weeklyDataKey], previousWeek[config.weeklyDataKey])
-    : null
-  const vsMean = currentWeek
-    ? calculateTrend(currentWeek[config.weeklyDataKey], weeklyMean)
-    : null
-
-  const dailyChartData = getDailyChartData()
   const hasData = viewMode === 'weekly' ? weeklyData.length > 0 : dailyChartData.length > 0
-
   const dailyMean = dailyChartData.length > 0 ? dailyChartData[0]?.meanScore : 0
+
   const description = hasData
     ? viewMode === 'weekly'
       ? `Weekly averages over ${weeklyData.length} weeks. Mean: ${Math.round(weeklyMean)} ${config.label.toLowerCase()}.`
@@ -241,20 +346,9 @@ export function ObjectiveDataCard({
           <div className="flex items-center gap-3">
             <CardTitle>Team Trends</CardTitle>
             {viewMode === 'weekly' && hasData && (
-              <div className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${
-                overallTrend.direction === 'down' ? 'bg-green-100 text-green-700' :
-                overallTrend.direction === 'up' ? 'bg-red-100 text-red-700' :
-                'bg-neutral-100 text-neutral-600'
-              }`}>
-                {overallTrend.direction === 'down' ? (
-                  <TrendingDown className="w-3 h-3" />
-                ) : overallTrend.direction === 'up' ? (
-                  <TrendingUp className="w-3 h-3" />
-                ) : (
-                  <Minus className="w-3 h-3" />
-                )}
-                {overallTrend.direction === 'stable' ? 'Stable' :
-                 overallTrend.direction === 'down' ? 'Improving' : 'Needs Attention'}
+              <div className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${getTrendStatusClass(overallTrend.direction)}`}>
+                {getTrendIcon(overallTrend.direction)}
+                {getTrendLabel(overallTrend.direction)}
               </div>
             )}
           </div>
@@ -345,11 +439,11 @@ export function ObjectiveDataCard({
                     axisLine={false}
                     tickLine={false}
                   />
-                  {selectedMetric === 'health_score' && (
+                  {(selectedMetric === 'health_score' || selectedMetric === 'incident_load') && (
                     <YAxis
                       yAxisId="right"
                       orientation="right"
-                      tick={{ fontSize: 11, fill: '#F59E0B' }}
+                      tick={{ fontSize: 11, fill: selectedMetric === 'incident_load' ? '#7C63D6' : '#F59E0B' }}
                       axisLine={false}
                       tickLine={false}
                     />
@@ -366,6 +460,7 @@ export function ObjectiveDataCard({
                       const data = payload[0]?.payload
                       const factors = data?.factors || {}
                       const hasFactors = factors.incidents > 0 || factors.severity > 0 || factors.afterHours > 0 || factors.highSeverity > 0
+                      const sevBreakdown = data?.severityBreakdown || {}
 
                       return (
                         <div className="bg-neutral-900/95 p-3 border border-neutral-700 rounded-lg shadow-lg min-w-[200px]">
@@ -377,6 +472,36 @@ export function ObjectiveDataCard({
                             <p className="text-sm text-amber-400 mb-2">
                               {data?.incidentCount} incidents this week
                             </p>
+                          )}
+                          {selectedMetric === 'incident_load' && (
+                            <>
+                              <p className="text-sm text-purple-400 mb-2">
+                                Risk Level: {data?.riskLevel}
+                              </p>
+                              <div className="border-t border-neutral-700 pt-2 mt-2">
+                                <p className="text-xs font-semibold text-neutral-300 mb-2 uppercase tracking-wide">By Severity</p>
+                                <div className="space-y-1">
+                                  {sevBreakdown.critical > 0 && (
+                                    <div className="flex justify-between text-xs">
+                                      <span className="text-red-400">Critical (SEV0-1)</span>
+                                      <span className="text-white font-medium">{sevBreakdown.critical}</span>
+                                    </div>
+                                  )}
+                                  {sevBreakdown.high > 0 && (
+                                    <div className="flex justify-between text-xs">
+                                      <span className="text-orange-400">High (SEV2)</span>
+                                      <span className="text-white font-medium">{sevBreakdown.high}</span>
+                                    </div>
+                                  )}
+                                  {sevBreakdown.mediumLow > 0 && (
+                                    <div className="flex justify-between text-xs">
+                                      <span className="text-neutral-400">Medium/Low (SEV3+)</span>
+                                      <span className="text-white font-medium">{sevBreakdown.mediumLow}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </>
                           )}
                           {selectedMetric === 'health_score' && hasFactors && (
                             <div className="border-t border-neutral-700 pt-2 mt-2">
@@ -404,22 +529,42 @@ export function ObjectiveDataCard({
                       )
                     }}
                   />
-                  <Bar
-                    yAxisId="left"
-                    dataKey={config.weeklyDataKey}
-                    fill="#7C63D6"
-                    radius={[4, 4, 0, 0]}
-                    maxBarSize={50}
-                  />
-                  {selectedMetric === 'health_score' && (
-                    <Line
-                      yAxisId="right"
-                      type="monotone"
-                      dataKey="incidentCount"
-                      stroke="#F59E0B"
-                      strokeWidth={2}
-                      dot={{ fill: '#F59E0B', r: 4 }}
-                    />
+                  {selectedMetric === 'incident_load' ? (
+                    <>
+                      {/* Stacked bars for incident severity breakdown */}
+                      <Bar yAxisId="left" dataKey="severityBreakdown.mediumLow" stackId="incidents" fill="#9CA3AF" maxBarSize={50} name="Medium/Low" />
+                      <Bar yAxisId="left" dataKey="severityBreakdown.high" stackId="incidents" fill="#F97316" maxBarSize={50} name="High" />
+                      <Bar yAxisId="left" dataKey="severityBreakdown.critical" stackId="incidents" fill="#EF4444" radius={[4, 4, 0, 0]} maxBarSize={50} name="Critical" />
+                      {/* Risk level overlay line */}
+                      <Line
+                        yAxisId="right"
+                        type="monotone"
+                        dataKey="riskLevel"
+                        stroke="#7C63D6"
+                        strokeWidth={2}
+                        dot={{ fill: '#7C63D6', r: 4 }}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <Bar
+                        yAxisId="left"
+                        dataKey={config.weeklyDataKey}
+                        fill="#7C63D6"
+                        radius={[4, 4, 0, 0]}
+                        maxBarSize={50}
+                      />
+                      {selectedMetric === 'health_score' && (
+                        <Line
+                          yAxisId="right"
+                          type="monotone"
+                          dataKey="incidentCount"
+                          stroke="#F59E0B"
+                          strokeWidth={2}
+                          dot={{ fill: '#F59E0B', r: 4 }}
+                        />
+                      )}
+                    </>
                   )}
                 </ComposedChart>
               </ResponsiveContainer>
@@ -427,15 +572,38 @@ export function ObjectiveDataCard({
 
             {/* Legend */}
             <div className="flex items-center justify-center gap-6 mt-2 text-sm text-neutral-600">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded bg-purple-600"></div>
-                <span>{config.label}</span>
-              </div>
-              {selectedMetric === 'health_score' && (
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-0.5 bg-amber-500"></div>
-                  <span>Incidents</span>
-                </div>
+              {selectedMetric === 'incident_load' ? (
+                <>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded bg-red-500"></div>
+                    <span>Critical</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded bg-orange-500"></div>
+                    <span>High</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded bg-neutral-400"></div>
+                    <span>Medium/Low</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-0.5 bg-purple-600"></div>
+                    <span>Risk Level</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded bg-purple-600"></div>
+                    <span>{config.label}</span>
+                  </div>
+                  {selectedMetric === 'health_score' && (
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-0.5 bg-amber-500"></div>
+                      <span>Incidents</span>
+                    </div>
+                  )}
+                </>
               )}
               <div className="flex items-center gap-2">
                 <div className="w-4 border-t-2 border-dashed border-purple-400"></div>
@@ -453,16 +621,16 @@ export function ObjectiveDataCard({
                 {vsLastWeek && (
                   <div className="flex items-center gap-2">
                     <span className="text-neutral-500">vs last week:</span>
-                    <span className={`font-medium ${vsLastWeek.direction === 'down' ? 'text-green-600' : vsLastWeek.direction === 'up' ? 'text-red-600' : 'text-neutral-500'}`}>
-                      {vsLastWeek.direction === 'stable' ? '—' : `${vsLastWeek.direction === 'down' ? '↓' : '↑'}${vsLastWeek.percentage}%`}
+                    <span className={`font-medium ${getComparisonClass(vsLastWeek.direction)}`}>
+                      {formatComparison(vsLastWeek)}
                     </span>
                   </div>
                 )}
                 {vsMean && (
                   <div className="flex items-center gap-2">
                     <span className="text-neutral-500">vs mean:</span>
-                    <span className={`font-medium ${vsMean.direction === 'down' ? 'text-green-600' : vsMean.direction === 'up' ? 'text-red-600' : 'text-neutral-500'}`}>
-                      {vsMean.direction === 'stable' ? '—' : `${vsMean.direction === 'down' ? '↓' : '↑'}${vsMean.percentage}%`}
+                    <span className={`font-medium ${getComparisonClass(vsMean.direction)}`}>
+                      {formatComparison(vsMean)}
                     </span>
                   </div>
                 )}
