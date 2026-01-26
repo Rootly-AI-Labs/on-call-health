@@ -1268,21 +1268,31 @@ async def handle_slack_interactions(
                 if action.get("action_id") == "open_burnout_survey":
                     # Extract user and org IDs from button value
                     value = action.get("value", "")
+                    logging.info(f"Button click - value: {value}")
                     try:
                         user_id, organization_id = map(int, value.split("|"))
-                    except:
-                        return {"text": "Invalid survey data"}
+                        logging.info(f"Parsed user_id={user_id}, organization_id={organization_id}")
+                    except Exception as e:
+                        logging.error(f"Failed to parse button value '{value}': {e}")
+                        return {"text": "Invalid survey data. Please contact your admin."}
 
-                    # Get user's Slack ID
+                    # Get user's Slack ID and team info
                     slack_user = data.get("user", {})
                     slack_user_id = slack_user.get("id")
                     trigger_id = data.get("trigger_id")
+                    team_id = data.get("team", {}).get("id")
+                    logging.info(f"Slack user_id={slack_user_id}, team_id={team_id}, trigger_id={trigger_id[:20] if trigger_id else 'None'}...")
 
                     # Check for existing report today (match by user's email)
                     from datetime import datetime
                     today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
 
                     user = db.query(User).filter(User.id == user_id).first()
+                    if not user:
+                        logging.warning(f"User not found in database for user_id={user_id}")
+                    else:
+                        logging.info(f"Found user: {user.email}")
+
                     existing_report = None
                     if user:
                         existing_report = db.query(UserBurnoutReport).filter(
@@ -1299,26 +1309,32 @@ async def handle_slack_interactions(
                     )
 
                     # Get Slack token to open modal
-                    team_id = data.get("team", {}).get("id")
                     slack_integration = db.query(SlackIntegration).filter(
                         SlackIntegration.workspace_id == team_id
                     ).first()
+                    logging.info(f"SlackIntegration lookup for workspace_id={team_id}: found={slack_integration is not None}")
 
-                    if slack_integration and slack_integration.slack_token:
-                        import httpx
-                        slack_token = decrypt_token(slack_integration.slack_token)
+                    if not slack_integration or not slack_integration.slack_token:
+                        logging.error(f"Slack integration not found for team_id: {team_id}")
+                        return {
+                            "text": "⚠️ Slack integration not configured. Please ask your admin to set up the Slack integration in On-Call Health settings.",
+                            "response_type": "ephemeral"
+                        }
 
-                        async with httpx.AsyncClient() as client:
-                            response = await client.post(
-                                "https://slack.com/api/views.open",
-                                headers={"Authorization": f"Bearer {slack_token}"},
-                                json={"trigger_id": trigger_id, "view": modal_view}
-                            )
+                    import httpx
+                    slack_token = decrypt_token(slack_integration.slack_token)
 
-                            result = response.json()
-                            if not result.get("ok"):
-                                logging.error(f"Failed to open modal: {result.get('error')}")
-                                return {"text": "Sorry, couldn't open the survey. Please try again."}
+                    async with httpx.AsyncClient() as client:
+                        response = await client.post(
+                            "https://slack.com/api/views.open",
+                            headers={"Authorization": f"Bearer {slack_token}"},
+                            json={"trigger_id": trigger_id, "view": modal_view}
+                        )
+
+                        result = response.json()
+                        if not result.get("ok"):
+                            logging.error(f"Failed to open modal: {result.get('error')}")
+                            return {"text": "Sorry, couldn't open the survey. Please try again."}
 
                     # Acknowledge the button click
                     return {"response_action": "clear"}
