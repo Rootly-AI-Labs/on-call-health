@@ -454,6 +454,221 @@ class TestCalculationMethods:
         result_very_high = analyzer._calculate_compound_trauma_factor(15)
         assert result_very_high > 1.1
 
+    def test_calculate_compound_trauma_factor_rate(self, mock_rootly_client):
+        """Test _calculate_compound_trauma_factor_rate method (rate-based, CBI/sRPE methodology)"""
+        analyzer = UnifiedBurnoutAnalyzer(api_token="test_token", platform="rootly")
+
+        # Below threshold (< 1.5/week) - no compound effect
+        result_low = analyzer._calculate_compound_trauma_factor_rate(1.0)
+        assert result_low == 1.0  # Baseline multiplier
+
+        # At threshold (1.5/week) - start of compound effect
+        result_threshold = analyzer._calculate_compound_trauma_factor_rate(1.5)
+        assert result_threshold == 1.0  # Just at threshold, minimal effect
+
+        # Moderate rate (3.0/week) - 10% compound effect
+        result_moderate = analyzer._calculate_compound_trauma_factor_rate(3.0)
+        assert result_moderate == pytest.approx(1.1, rel=0.01)
+
+        # High rate (5.0/week) - higher compound effect
+        result_high = analyzer._calculate_compound_trauma_factor_rate(5.0)
+        assert result_high > 1.1
+        assert result_high == pytest.approx(1.3, rel=0.01)
+
+        # Very high rate (12.0/week) - capped at 2.0x
+        result_very_high = analyzer._calculate_compound_trauma_factor_rate(12.0)
+        assert result_very_high == 2.0  # Maximum cap
+
+    def test_work_burnout_ocb_rate_normalization_consistency(self, mock_rootly_client):
+        """
+        Test that same workload RATE produces same score across different time periods.
+
+        This is the core fix for the scoring issue where 90-day analyses were producing
+        inflated CRITICAL scores compared to 7-day analyses for the same workload rate.
+
+        CBI/sRPE methodology: Use rates (per-week) instead of raw counts.
+        """
+        analyzer = UnifiedBurnoutAnalyzer(api_token="test_token", platform="rootly")
+
+        # Same rate: 4 SEV1 incidents per week
+        # 7 days = 4 incidents, 30 days = ~17 incidents, 90 days = ~52 incidents
+
+        metrics_7day = {
+            'severity_distribution': {'sev1': 4},
+            'days_analyzed': 7,
+            'incidents_per_week': 4.0,
+            'avg_response_time_minutes': 15
+        }
+
+        metrics_30day = {
+            'severity_distribution': {'sev1': 17},
+            'days_analyzed': 30,
+            'incidents_per_week': 4.0,
+            'avg_response_time_minutes': 15
+        }
+
+        metrics_90day = {
+            'severity_distribution': {'sev1': 52},
+            'days_analyzed': 90,
+            'incidents_per_week': 4.0,
+            'avg_response_time_minutes': 15
+        }
+
+        score_7day = analyzer._calculate_work_burnout_ocb(metrics_7day)
+        score_30day = analyzer._calculate_work_burnout_ocb(metrics_30day)
+        score_90day = analyzer._calculate_work_burnout_ocb(metrics_90day)
+
+        # All scores should be within 0.5 of each other (allowing for minor rounding)
+        assert abs(score_7day - score_30day) < 0.5, f"7-day ({score_7day}) vs 30-day ({score_30day}) differ too much"
+        assert abs(score_30day - score_90day) < 0.5, f"30-day ({score_30day}) vs 90-day ({score_90day}) differ too much"
+        assert abs(score_7day - score_90day) < 0.5, f"7-day ({score_7day}) vs 90-day ({score_90day}) differ too much"
+
+    def test_work_burnout_ocb_with_severity_distribution(self, mock_rootly_client):
+        """Test _calculate_work_burnout_ocb with severity_distribution and days_analyzed"""
+        analyzer = UnifiedBurnoutAnalyzer(api_token="test_token", platform="rootly")
+
+        # Low workload: 1 SEV1/week over 30 days
+        metrics_low = {
+            'severity_distribution': {'sev1': 4, 'sev2': 2},
+            'days_analyzed': 30,
+            'incidents_per_week': 1.5,
+            'avg_response_time_minutes': 10
+        }
+        score_low = analyzer._calculate_work_burnout_ocb(metrics_low)
+        assert score_low < 4.0  # Should be LOW range
+
+        # Moderate workload: 3 SEV1/week over 30 days
+        metrics_moderate = {
+            'severity_distribution': {'sev1': 13, 'sev2': 4},
+            'days_analyzed': 30,
+            'incidents_per_week': 4.0,
+            'avg_response_time_minutes': 20
+        }
+        score_moderate = analyzer._calculate_work_burnout_ocb(metrics_moderate)
+        assert 4.0 <= score_moderate < 7.0  # Should be MODERATE range
+
+        # High workload: 7 SEV1/week over 30 days
+        metrics_high = {
+            'severity_distribution': {'sev1': 30, 'sev0': 5},
+            'days_analyzed': 30,
+            'incidents_per_week': 8.0,
+            'avg_response_time_minutes': 25
+        }
+        score_high = analyzer._calculate_work_burnout_ocb(metrics_high)
+        assert score_high >= 6.0  # Should be HIGH range
+
+    def test_work_burnout_ocb_missing_days_analyzed_defaults(self, mock_rootly_client):
+        """Test that missing days_analyzed defaults to 30 days"""
+        analyzer = UnifiedBurnoutAnalyzer(api_token="test_token", platform="rootly")
+
+        # No days_analyzed provided - should default to 30
+        metrics_no_days = {
+            'severity_distribution': {'sev1': 12},
+            'incidents_per_week': 3.0,
+            'avg_response_time_minutes': 15
+        }
+
+        metrics_with_days = {
+            'severity_distribution': {'sev1': 12},
+            'days_analyzed': 30,
+            'incidents_per_week': 3.0,
+            'avg_response_time_minutes': 15
+        }
+
+        score_no_days = analyzer._calculate_work_burnout_ocb(metrics_no_days)
+        score_with_days = analyzer._calculate_work_burnout_ocb(metrics_with_days)
+
+        # Should produce same result
+        assert score_no_days == score_with_days
+
+    def test_work_burnout_ocb_empty_severity_distribution(self, mock_rootly_client):
+        """Test handling of empty or missing severity_distribution"""
+        analyzer = UnifiedBurnoutAnalyzer(api_token="test_token", platform="rootly")
+
+        metrics_empty = {
+            'severity_distribution': {},
+            'days_analyzed': 30,
+            'incidents_per_week': 0,
+            'avg_response_time_minutes': 0
+        }
+
+        metrics_none = {
+            'severity_distribution': None,
+            'days_analyzed': 30,
+            'incidents_per_week': 0,
+            'avg_response_time_minutes': 0
+        }
+
+        score_empty = analyzer._calculate_work_burnout_ocb(metrics_empty)
+        score_none = analyzer._calculate_work_burnout_ocb(metrics_none)
+
+        assert score_empty >= 0
+        assert score_none >= 0
+        assert score_empty < 2.0  # Should be very low
+        assert score_none < 2.0
+
+    def test_work_burnout_ocb_pagerduty_severity_weights(self, mock_pagerduty_client):
+        """Test that PagerDuty uses correct severity weights (sev1-sev5 instead of sev0-sev4)"""
+        analyzer = UnifiedBurnoutAnalyzer(api_token="test_token", platform="pagerduty")
+
+        metrics = {
+            'severity_distribution': {'sev1': 10, 'sev2': 5},  # PagerDuty uses sev1 as highest
+            'days_analyzed': 30,
+            'incidents_per_week': 3.5,
+            'avg_response_time_minutes': 15
+        }
+
+        score = analyzer._calculate_work_burnout_ocb(metrics)
+
+        assert isinstance(score, (int, float))
+        assert 0 <= score <= 10
+
+    def test_work_burnout_ocb_very_short_period(self, mock_rootly_client):
+        """Test scoring for very short analysis periods (edge case)"""
+        analyzer = UnifiedBurnoutAnalyzer(api_token="test_token", platform="rootly")
+
+        # 1-day period with 2 SEV1 incidents = 14/week rate (very high)
+        metrics_1day = {
+            'severity_distribution': {'sev1': 2},
+            'days_analyzed': 1,
+            'incidents_per_week': 14.0,
+            'avg_response_time_minutes': 10
+        }
+
+        score = analyzer._calculate_work_burnout_ocb(metrics_1day)
+
+        # Should produce a high score due to high rate
+        assert score >= 6.0
+        assert score <= 10.0
+
+    def test_compound_trauma_triggers_on_high_weekly_rate(self, mock_rootly_client):
+        """Test that compound trauma is triggered based on weekly rate, not raw count"""
+        analyzer = UnifiedBurnoutAnalyzer(api_token="test_token", platform="rootly")
+
+        # 90-day period with 10 SEV1 incidents = ~0.78/week (below 1.5 threshold)
+        # Should NOT trigger compound trauma despite raw count being >= 5
+        metrics_low_rate = {
+            'severity_distribution': {'sev1': 10},
+            'days_analyzed': 90,
+            'incidents_per_week': 0.78,
+            'avg_response_time_minutes': 15
+        }
+
+        # 30-day period with 10 SEV1 incidents = ~2.33/week (above 1.5 threshold)
+        # SHOULD trigger compound trauma
+        metrics_high_rate = {
+            'severity_distribution': {'sev1': 10},
+            'days_analyzed': 30,
+            'incidents_per_week': 2.33,
+            'avg_response_time_minutes': 15
+        }
+
+        score_low_rate = analyzer._calculate_work_burnout_ocb(metrics_low_rate)
+        score_high_rate = analyzer._calculate_work_burnout_ocb(metrics_high_rate)
+
+        # High rate should produce higher score due to compound trauma
+        assert score_high_rate > score_low_rate
+
 
 class TestTimezoneHandling:
     """Tests for timezone-related methods"""
