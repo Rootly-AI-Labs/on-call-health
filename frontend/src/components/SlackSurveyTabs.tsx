@@ -74,6 +74,7 @@ export function SlackSurveyTabs({
   const [showSaveConfirmation, setShowSaveConfirmation] = useState(false)
   const [scheduleAccordionOpen, setScheduleAccordionOpen] = useState(false)
   const [lastModifiedByName, setLastModifiedByName] = useState<string | null>(null)
+  const [lastModifiedByUserId, setLastModifiedByUserId] = useState<number | null>(null)
   const [lastModifiedAt, setLastModifiedAt] = useState<string | null>(null)
 
   // Recipient selection state
@@ -177,6 +178,7 @@ export function SlackSurveyTabs({
 
           // Load last modified info
           setLastModifiedByName(data.last_modified_by_name || null)
+          setLastModifiedByUserId(data.last_modified_by_user_id || null)
           setLastModifiedAt(data.last_modified_at || null)
         } else {
           // Handle case where no schedule is configured (shouldn't happen with new backend)
@@ -583,14 +585,14 @@ export function SlackSurveyTabs({
                 <p className="text-xs text-neutral-500 mt-1">
                   Send surveys every weekday at a specific time
                 </p>
-                {lastModifiedByName && lastModifiedAt && (
-                  <p className="text-xs text-neutral-400 mt-1.5">
-                    Last schedule change: {lastModifiedByName} on {new Date(lastModifiedAt).toLocaleDateString()} at {new Date(lastModifiedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </p>
-                )}
                 {scheduleEnabled && (
                   <p className="text-xs font-medium text-purple-600 mt-1.5">
                     {Math.max(0, selectedRecipients.size)} {selectedRecipients.size === 1 ? 'user' : 'users'} selected
+                  </p>
+                )}
+                {lastModifiedAt && lastModifiedByUserId && (
+                  <p className="text-xs text-neutral-400 mt-1.5">
+                    Last schedule change: {lastModifiedByName || '[deleted user]'} on {new Date(lastModifiedAt).toLocaleDateString()} at {new Date(lastModifiedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </p>
                 )}
               </div>

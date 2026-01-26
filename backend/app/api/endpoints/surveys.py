@@ -160,7 +160,6 @@ async def create_or_update_survey_schedule(
         raise HTTPException(status_code=400, detail="Invalid time format. Use HH:MM (e.g., 09:00)")
 
     # Check if schedule exists (order by id desc for deterministic results)
-    # Eager load last_modified_by relationship to avoid N+1 query
     existing_schedule = db.query(SurveySchedule).options(
         joinedload(SurveySchedule.last_modified_by)
     ).filter(
@@ -239,7 +238,6 @@ async def create_or_update_survey_schedule(
             if schedule.last_modified_by and hasattr(schedule.last_modified_by, 'name'):
                 last_modified_by_name = schedule.last_modified_by.name
         except Exception as e:
-            # Handle case where user was deleted or relationship loading fails
             logger.warning(f"Failed to load last_modified_by user for schedule {schedule.id}: {e}")
 
     return {
@@ -271,7 +269,6 @@ async def get_survey_schedule(
     db: Session = Depends(get_db)
 ):
     """Get current survey schedule for user's organization."""
-    # Eager load last_modified_by relationship to avoid N+1 query
     schedule = db.query(SurveySchedule).options(
         joinedload(SurveySchedule.last_modified_by)
     ).filter(
@@ -308,7 +305,6 @@ async def get_survey_schedule(
             if schedule.last_modified_by and hasattr(schedule.last_modified_by, 'name'):
                 last_modified_by_name = schedule.last_modified_by.name
         except Exception as e:
-            # Handle case where user was deleted or relationship loading fails
             logger.warning(f"Failed to load last_modified_by user for schedule {schedule.id}: {e}")
 
     return {
