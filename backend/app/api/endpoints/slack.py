@@ -152,98 +152,51 @@ async def slack_oauth_callback(
         enable_survey = False  # Default to False - admin must explicitly enable
 
         if state:
+            import base64
             try:
                 logger.debug(f"Raw state parameter: {state}")
-                # Validate state parameter format before decoding
-                if not isinstance(state, str) or len(state) < 4 or len(state) > 2048:
-                    raise ValueError(f"Invalid state parameter length: {len(state) if state else 0}")
-
-                # Sanitize state: only allow base64url characters
-                import re
-                if not re.match(r'^[A-Za-z0-9_-]+$', state):
-                    raise ValueError("State parameter contains invalid characters")
-
-                # Add padding for base64 decode
-                padded_state = state + '=' * (4 - len(state) % 4) if len(state) % 4 else state
-
-                # Validate base64 can be decoded before JSON parsing
-                try:
-                    decoded_bytes = base64.urlsafe_b64decode(padded_state)
-                except Exception as b64_error:
-                    raise ValueError(f"Invalid base64 encoding: {b64_error}")
-
-                # Parse JSON from decoded bytes
-                try:
-                    decoded_state = json.loads(decoded_bytes)
-                except json.JSONDecodeError as json_error:
-                    raise ValueError(f"Invalid JSON in state: {json_error}")
-
-                if not isinstance(decoded_state, dict):
-                    raise ValueError("Decoded state is not a dictionary")
-
+                decoded_state = json.loads(base64.b64decode(state + '=='))  # Add padding
                 logger.debug(f"Full decoded state: {decoded_state}")
                 organization_id = decoded_state.get("orgId")
                 user_id = decoded_state.get("userId")
                 user_email = decoded_state.get("email")
                 enable_survey = decoded_state.get("enableSurvey", False)  # Default False
                 logger.debug(f"Decoded state - org_id: {organization_id}, user_id: {user_id}, email: {mask_email(user_email)}, survey: {enable_survey}")
-            except (ValueError, json.JSONDecodeError, base64.binascii.Error) as state_error:
+            except Exception as state_error:
                 # If state parsing fails, continue without org mapping and use defaults
                 logger.warning(f"Failed to parse state parameter: {state_error}")
-            except Exception as state_error:
-                # Catch any other unexpected errors
-                logger.warning(f"Unexpected error parsing state parameter: {state_error}")
+                pass
 
         # Exchange code for token using Slack's OAuth API
         import httpx
         async with httpx.AsyncClient() as client:
             # Construct the same redirect_uri that was used in the OAuth request
             frontend_url = settings.FRONTEND_URL or "http://localhost:3000"
+            backend_base = settings.DATABASE_URL.replace("postgresql://", "https://").split("@")[1].split("/")[0] if settings.DATABASE_URL else "localhost:8000"
 
-            # Get backend URL from environment variable (required in production)
-            backend_url = os.getenv("BACKEND_URL") or getattr(settings, 'BACKEND_URL', None)
+            # Get backend URL from environment variable (preferred) or construct it
+            backend_url = os.getenv("BACKEND_URL")
 
             if not backend_url:
-                # Check if we're in a production environment (Railway sets this)
-                is_production = os.getenv("RAILWAY_ENVIRONMENT") is not None
-
-                if is_production:
-                    # Try Railway's automatic URL detection
-                    railway_public_domain = os.getenv("RAILWAY_PUBLIC_DOMAIN")
-                    if railway_public_domain:
-                        # Validate the domain format
-                        if not railway_public_domain.replace('.', '').replace('-', '').isalnum():
-                            logger.error(f"Invalid RAILWAY_PUBLIC_DOMAIN format: {railway_public_domain}")
-                            raise HTTPException(
-                                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                                detail="Server configuration error: Invalid backend URL"
-                            )
-                        backend_url = f"https://{railway_public_domain}"
-                        logger.warning("Using RAILWAY_PUBLIC_DOMAIN as BACKEND_URL is not set")
+                # Fallback: detect environment from DATABASE_URL
+                if "railway" in str(settings.DATABASE_URL):
+                    if "production" in str(settings.DATABASE_URL):
+                        backend_url = "https://rootly-burnout-detector-web-production.up.railway.app"
                     else:
-                        # Fail hard in production - don't fall back to localhost
-                        logger.error("BACKEND_URL not configured in production environment")
-                        raise HTTPException(
-                            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                            detail="Server configuration error: BACKEND_URL not set"
-                        )
+                        backend_url = "https://rootly-burnout-detector-web-development.up.railway.app"
                 else:
-                    # Local development only
+                    # Local development
                     backend_url = "http://localhost:8000"
-
-            # Validate backend_url format
-            if not backend_url.startswith(('http://', 'https://')):
-                logger.error(f"Invalid backend URL format: {backend_url}")
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Server configuration error: Invalid backend URL format"
-                )
 
             redirect_uri = f"{backend_url}/integrations/slack/oauth/callback"
 
-            # Log OAuth configuration (without sensitive details)
-            logger.info(f"OAuth redirect URI: {redirect_uri}")
-            logger.debug(f"Client ID: {settings.SLACK_CLIENT_ID[:10]}...{settings.SLACK_CLIENT_ID[-4:]}")
+            # Enhanced debugging for OAuth configuration
+            logger.info(f"🔍 OAuth Debug Info:")
+            logger.info(f"  - Backend URL: {backend_url}")
+            logger.info(f"  - Redirect URI: {redirect_uri}")
+            logger.info(f"  - Client ID: {settings.SLACK_CLIENT_ID[:10]}...{settings.SLACK_CLIENT_ID[-4:]}")
+            logger.info(f"  - Authorization code: {code[:10]}...{code[-4:]}")
+            logger.info(f"  - Database URL contains: {'production' if 'production' in str(settings.DATABASE_URL) else 'staging' if 'staging' in str(settings.DATABASE_URL) else 'unknown'}")
 
             token_response = await client.post(
                 "https://slack.com/api/oauth.v2.access",
@@ -343,14 +296,13 @@ async def slack_oauth_callback(
             )
             from fastapi.responses import RedirectResponse
             frontend_url = settings.FRONTEND_URL or "http://localhost:3000"
-            # Use generic error message to avoid revealing authorization structure
             error_message = urllib.parse.quote(
-                "You don't have permission to perform this action. Please contact your administrator."
+                "Only organization admins can connect Slack. Please ask your admin to set up the integration."
             )
             redirect_url = (
                 f"{frontend_url}/integrations?"
                 f"slack_connected=false&"
-                f"error=permission_denied&"
+                f"error=admin_required&"
                 f"message={error_message}"
             )
             return RedirectResponse(url=redirect_url, status_code=302)
@@ -415,6 +367,7 @@ async def slack_oauth_callback(
 
         # Redirect to frontend with success message
         frontend_url = settings.FRONTEND_URL or "http://localhost:3000"
+        import urllib.parse
         encoded_workspace = urllib.parse.quote(workspace_name) if workspace_name else "unknown"
         redirect_url = f"{frontend_url}/integrations?slack_connected=true&workspace={encoded_workspace}"
 
@@ -428,6 +381,7 @@ async def slack_oauth_callback(
         # Redirect to frontend with error
         frontend_url = settings.FRONTEND_URL or "http://localhost:3000"
         from fastapi.responses import RedirectResponse
+        import urllib.parse
         error_msg = urllib.parse.quote(str(he.detail))
         redirect_url = f"{frontend_url}/integrations?slack_connected=false&error={error_msg}"
         return RedirectResponse(url=redirect_url, status_code=302)
@@ -438,6 +392,7 @@ async def slack_oauth_callback(
         # Redirect to frontend with error
         frontend_url = settings.FRONTEND_URL or "http://localhost:3000"
         from fastapi.responses import RedirectResponse
+        import urllib.parse
         error_msg = urllib.parse.quote(f"Unexpected error: {str(e)}")
         redirect_url = f"{frontend_url}/integrations?slack_connected=false&error={error_msg}"
         return RedirectResponse(url=redirect_url, status_code=302)
@@ -1312,75 +1267,98 @@ async def handle_slack_interactions(
             actions = data.get("actions", [])
             for action in actions:
                 if action.get("action_id") == "open_burnout_survey":
-                    # Extract user and org IDs from button value
+                    # Extract data from button value
+                    # Format: "user_id|organization_id|email" or "None|organization_id|email"
                     value = action.get("value", "")
-                    logging.info(f"Button click - value: {value}")
                     try:
-                        user_id, organization_id = map(int, value.split("|"))
-                        logging.info(f"Parsed user_id={user_id}, organization_id={organization_id}")
+                        parts = value.split("|")
+                        if len(parts) == 3:
+                            # New format with email
+                            user_id_str, organization_id_str, user_email = parts
+                            try:
+                                user_id = None if user_id_str == 'None' or not user_id_str else int(user_id_str)
+                            except ValueError:
+                                logging.error(f"Invalid user_id in button value: '{user_id_str}'")
+                                return {"text": "Invalid survey data: malformed user ID"}
+
+                            try:
+                                organization_id = int(organization_id_str)
+                            except ValueError:
+                                logging.error(f"Invalid organization_id in button value: '{organization_id_str}'")
+                                return {"text": "Invalid survey data: malformed organization ID"}
+                        else:
+                            # Old format (backwards compatibility)
+                            # Note: This only works for old buttons that had valid integer user_ids
+                            # Old broken buttons with "None" would have already failed, so no need to handle that case
+                            try:
+                                user_id, organization_id = map(int, parts)
+                                user_email = None
+                            except ValueError as e:
+                                logging.error(f"Failed to parse old format button value '{value}': {e}")
+                                return {"text": "Invalid survey data: button format not recognized. Please contact your manager for a new survey link."}
                     except Exception as e:
                         logging.error(f"Failed to parse button value '{value}': {e}")
-                        return {"text": "Invalid survey data. Please contact your admin."}
+                        return {"text": "Invalid survey data"}
 
-                    # Get user's Slack ID and team info
+                    # Get user's Slack ID
                     slack_user = data.get("user", {})
                     slack_user_id = slack_user.get("id")
                     trigger_id = data.get("trigger_id")
-                    team_id = data.get("team", {}).get("id")
-                    logging.info(f"Slack user_id={slack_user_id}, team_id={team_id}, trigger_id={trigger_id[:20] if trigger_id else 'None'}...")
 
-                    # Check for existing report today (match by user's email)
+                    # Check for existing report today (match by email)
                     from datetime import datetime
                     today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
 
-                    user = db.query(User).filter(User.id == user_id).first()
-                    if not user:
-                        logging.warning(f"User not found in database for user_id={user_id}")
-                    else:
-                        logging.info(f"Found user: {user.email}")
+                    # Try to get user account if user_id is available
+                    user = None
+                    if user_id:
+                        user = db.query(User).filter(User.id == user_id).first()
 
+                    # If no user account but we have email, check for existing report by email
                     existing_report = None
-                    if user:
+                    if user and user.email:
                         existing_report = db.query(UserBurnoutReport).filter(
                             UserBurnoutReport.email == user.email,
                             UserBurnoutReport.submitted_at >= today_start
                         ).first()
+                    elif user_email:
+                        # Synced member without user account - check by email
+                        existing_report = db.query(UserBurnoutReport).filter(
+                            UserBurnoutReport.email == user_email,
+                            UserBurnoutReport.submitted_at >= today_start
+                        ).first()
 
-                    # Open modal (organization_id kept for backwards compatibility with old buttons)
+                    # Open modal
+                    # For synced members without accounts, pass user_email in metadata
                     modal_view = create_burnout_survey_modal(
-                        organization_id=organization_id,  # Still passed but ignored in logic
-                        user_id=user_id,
-                        analysis_id=None,  # No specific analysis for daily check-ins
-                        is_update=bool(existing_report)
+                        organization_id=organization_id,
+                        user_id=user_id,  # Can be None for synced members
+                        analysis_id=None,
+                        is_update=bool(existing_report),
+                        user_email=user_email  # Pass email for synced members
                     )
 
                     # Get Slack token to open modal
+                    team_id = data.get("team", {}).get("id")
                     slack_integration = db.query(SlackIntegration).filter(
                         SlackIntegration.workspace_id == team_id
                     ).first()
-                    logging.info(f"SlackIntegration lookup for workspace_id={team_id}: found={slack_integration is not None}")
 
-                    if not slack_integration or not slack_integration.slack_token:
-                        logging.error(f"Slack integration not found for team_id: {team_id}")
-                        return {
-                            "text": "⚠️ Slack integration not configured. Please ask your admin to set up the Slack integration in On-Call Health settings.",
-                            "response_type": "ephemeral"
-                        }
+                    if slack_integration and slack_integration.slack_token:
+                        import httpx
+                        slack_token = decrypt_token(slack_integration.slack_token)
 
-                    import httpx
-                    slack_token = decrypt_token(slack_integration.slack_token)
+                        async with httpx.AsyncClient() as client:
+                            response = await client.post(
+                                "https://slack.com/api/views.open",
+                                headers={"Authorization": f"Bearer {slack_token}"},
+                                json={"trigger_id": trigger_id, "view": modal_view}
+                            )
 
-                    async with httpx.AsyncClient() as client:
-                        response = await client.post(
-                            "https://slack.com/api/views.open",
-                            headers={"Authorization": f"Bearer {slack_token}"},
-                            json={"trigger_id": trigger_id, "view": modal_view}
-                        )
-
-                        result = response.json()
-                        if not result.get("ok"):
-                            logging.error(f"Failed to open modal: {result.get('error')}")
-                            return {"text": "Sorry, couldn't open the survey. Please try again."}
+                            result = response.json()
+                            if not result.get("ok"):
+                                logging.error(f"Failed to open modal: {result.get('error')}")
+                                return {"text": "Sorry, couldn't open the survey. Please try again."}
 
                     # Acknowledge the button click
                     return {"response_action": "clear"}
@@ -1438,26 +1416,16 @@ async def handle_slack_interactions(
                     comments_input = comments_block.get("comments_input")
                     comments = comments_input.get("value", "") if comments_input else ""
 
-                    # Extract user and organization IDs from private_metadata
-                    try:
-                        raw_metadata = view.get("private_metadata", "{}")
-                        if not isinstance(raw_metadata, str):
-                            raise ValueError("private_metadata must be a string")
-                        metadata = json.loads(raw_metadata)
-                        if not isinstance(metadata, dict):
-                            raise ValueError("private_metadata must be a JSON object")
-                    except (json.JSONDecodeError, ValueError) as metadata_error:
-                        logging.error(f"Invalid private_metadata format: {metadata_error}")
-                        return {"response_action": "errors", "errors": {"comments_block": "Invalid survey data format"}}
-
+                    # Extract data from private_metadata
+                    metadata = json.loads(view.get("private_metadata", "{}"))
                     user_id = metadata.get("user_id")
                     organization_id = metadata.get("organization_id")  # Optional now
                     analysis_id = metadata.get("analysis_id")  # Optional - may be None
+                    user_email = metadata.get("user_email")  # For synced members without accounts
 
-                    # Validate user_id is a valid integer
-                    if not user_id or not isinstance(user_id, int):
-                        logging.error(f"Invalid user_id in metadata: {user_id}")
-                        return {"response_action": "errors", "errors": {"comments_block": "Invalid survey data"}}
+                    # Need either user_id or user_email
+                    if not user_id and not user_email:
+                        return {"response_action": "errors", "errors": {"comments_block": "Invalid survey data: missing user identification"}}
                 except Exception as e:
                     logging.error(f"Error parsing survey values: {str(e)}", exc_info=True)
                     return {"response_action": "errors", "errors": {"comments_block": "Error submitting survey. Please try again."}}
@@ -1466,105 +1434,100 @@ async def handle_slack_interactions(
                 from datetime import datetime, timedelta
                 today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
 
-                # Get user info once for both report creation and notifications
-                user = db.query(User).filter(User.id == user_id).first()
-                if not user:
-                    return {"response_action": "errors", "errors": {"comments_block": "User not found"}}
+                # Try to get user account if user_id is available
+                user = None
+                if user_id:
+                    user = db.query(User).filter(User.id == user_id).first()
+
+                # Determine email to use for report
+                report_email = None
+                if user and user.email:
+                    report_email = user.email
+                elif user_email:
+                    # Synced member without user account
+                    # Validate email format
+                    if '@' not in user_email or len(user_email) < 3:
+                        logging.error(f"Invalid email format: '{user_email}'")
+                        return {"response_action": "errors", "errors": {"comments_block": "Invalid email format"}}
+                    report_email = user_email
+                else:
+                    return {"response_action": "errors", "errors": {"comments_block": "Unable to identify user email"}}
 
                 # Check if user already submitted today (match by email)
                 # This allows only 1 survey per user per day, regardless of organization
-                # Use optimistic approach: try insert first, handle conflict
+                existing_report = db.query(UserBurnoutReport).filter(
+                    UserBurnoutReport.email == report_email,
+                    UserBurnoutReport.submitted_at >= today_start
+                ).order_by(UserBurnoutReport.submitted_at.desc()).first()
+
+                # Extract email_domain from report_email
+                email_domain = report_email.split('@')[1] if '@' in report_email else None
+
                 is_update = False
+                if existing_report:
+                    # Update existing report
+                    existing_report.feeling_score = feeling_score
+                    existing_report.workload_score = workload_score
+                    existing_report.stress_factors = stress_factors
+                    existing_report.personal_circumstances = personal_circumstances
+                    existing_report.additional_comments = comments
+                    existing_report.submitted_via = 'slack'
+                    existing_report.analysis_id = analysis_id  # Update linked analysis if provided
+                    existing_report.email = report_email  # Refresh email in case it changed
+                    existing_report.email_domain = email_domain  # Refresh email_domain
+                    existing_report.user_id = user_id  # Update user_id if they created an account
+                    existing_report.updated_at = datetime.utcnow()
+                    logging.info(f"Updated existing report ID {existing_report.id} for email {report_email}")
+                    is_update = True
+                else:
+                    # Create new burnout report
+                    new_report = UserBurnoutReport(
+                        user_id=user_id,  # Can be None for synced members
+                        email=report_email,
+                        organization_id=organization_id,
+                        email_domain=email_domain,
+                        analysis_id=analysis_id,  # Optional - may be None
+                        feeling_score=feeling_score,
+                        workload_score=workload_score,
+                        stress_factors=stress_factors,
+                        personal_circumstances=personal_circumstances,
+                        additional_comments=comments,
+                        submitted_via='slack',
+                        submitted_at=datetime.utcnow()
+                    )
+                    db.add(new_report)
+                    logging.info(f"Created new report for email {report_email} (user_id={user_id})")
 
-                def update_existing_report(report):
-                    """Helper to update an existing report with new values."""
-                    report.feeling_score = feeling_score
-                    report.workload_score = workload_score
-                    report.stress_factors = stress_factors
-                    report.personal_circumstances = personal_circumstances
-                    report.additional_comments = comments
-                    report.submitted_via = 'slack'
-                    report.analysis_id = analysis_id
-                    report.email = user.email
-                    report.email_domain = user.email_domain
-                    report.updated_at = datetime.utcnow()
-
-                try:
-                    # First check if report exists today
-                    existing_report = db.query(UserBurnoutReport).filter(
-                        UserBurnoutReport.email == user.email,
-                        UserBurnoutReport.submitted_at >= today_start
-                    ).order_by(UserBurnoutReport.submitted_at.desc()).first()
-
-                    if existing_report:
-                        # Update existing report
-                        update_existing_report(existing_report)
-                        logging.info(f"Updated existing report ID {existing_report.id} for user {user_id}")
-                        is_update = True
-                        db.commit()
-                    else:
-                        # Try to create new report
-                        new_report = UserBurnoutReport(
-                            user_id=user_id,
-                            email=user.email,
-                            organization_id=organization_id,
-                            email_domain=user.email_domain,
-                            analysis_id=analysis_id,
-                            feeling_score=feeling_score,
-                            workload_score=workload_score,
-                            stress_factors=stress_factors,
-                            personal_circumstances=personal_circumstances,
-                            additional_comments=comments,
-                            submitted_via='slack',
-                            submitted_at=datetime.utcnow()
-                        )
-                        db.add(new_report)
-                        db.commit()
-                        logging.info(f"Created new report for user {user_id} with email_domain {user.email_domain}")
-
-                except Exception as db_error:
-                    db.rollback()
-                    # Check if this was a race condition (duplicate insert)
-                    # If so, find the existing report and update it
-                    if "duplicate" in str(db_error).lower() or "unique" in str(db_error).lower():
-                        logging.warning(f"Race condition detected for user {user_id}, retrying as update")
-                        try:
-                            existing_report = db.query(UserBurnoutReport).filter(
-                                UserBurnoutReport.email == user.email,
-                                UserBurnoutReport.submitted_at >= today_start
-                            ).first()
-                            if existing_report:
-                                update_existing_report(existing_report)
-                                db.commit()
-                                is_update = True
-                                logging.info(f"Updated report after race condition for user {user_id}")
-                            else:
-                                raise db_error
-                        except Exception as retry_error:
-                            db.rollback()
-                            logging.error(f"Failed to recover from race condition: {retry_error}")
-                            return {"response_action": "errors", "errors": {"comments_block": "Error saving survey. Please try again."}}
-                    else:
-                        logging.error(f"Database error saving survey: {db_error}")
-                        return {"response_action": "errors", "errors": {"comments_block": "Error saving survey. Please try again."}}
+                db.commit()
 
                 # Notify org admins about survey submission (only for new submissions, not updates)
-                if not is_update:
+                # Only send notifications if the submitter has a User account
+                if not is_update and user:
                     try:
                         notification_service = NotificationService(db)
                         if analysis_id:
                             # Get analysis for notification context
                             analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
                             if analysis:
-                                notification_service.create_survey_submission_notification(
+                                notification_service.create_survey_submitted_notification(
                                     user=user,
                                     organization_id=organization_id,
                                     analysis=analysis
                                 )
                                 logging.info(f"Created survey submission notifications for org {organization_id}")
+                        else:
+                            # No analysis_id - still notify admins
+                            notification_service.create_survey_submitted_notification(
+                                user=user,
+                                organization_id=organization_id,
+                                analysis=None
+                            )
+                            logging.info(f"Created survey submission notifications for org {organization_id} (no analysis)")
                     except Exception as e:
                         logging.error(f"Failed to create survey submission notifications: {str(e)}")
                         # Don't fail the survey submission if notification fails
+                elif not is_update and not user:
+                    logging.info(f"Skipping notification for synced member without User account (email={report_email})")
 
                 # Return success response with different message for updates
                 if is_update:
@@ -1767,15 +1730,16 @@ async def get_team_survey_status(
         )
 
 
-def create_burnout_survey_modal(organization_id: int, user_id: int, analysis_id: int = None, is_update: bool = False) -> dict:
+def create_burnout_survey_modal(organization_id: int, user_id: int, analysis_id: int = None, is_update: bool = False, user_email: str = None) -> dict:
     """
     Create Slack modal view for burnout survey.
 
     Args:
         organization_id: Organization ID (required)
-        user_id: User ID (required)
+        user_id: User ID (can be None for synced members without accounts)
         analysis_id: Analysis ID (optional - for linking survey to specific analysis)
         is_update: Whether this is updating an existing survey today
+        user_email: User email (required if user_id is None)
     """
     import json
 
@@ -1783,6 +1747,7 @@ def create_burnout_survey_modal(organization_id: int, user_id: int, analysis_id:
     metadata = {
         "user_id": user_id,
         "organization_id": organization_id,
+        "user_email": user_email,  # Store email for synced members
         "analysis_id": analysis_id
     }
 

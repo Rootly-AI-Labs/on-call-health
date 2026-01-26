@@ -477,7 +477,8 @@ async def manual_survey_delivery(
                     slack_user_id=user['slack_user_id'],
                     user_id=user['user_id'],
                     organization_id=organization_id,
-                    message=message_template
+                    message=message_template,
+                    user_email=user['email']
                 )
                 sent_count += 1
             except Exception as e:

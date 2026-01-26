@@ -290,7 +290,8 @@ class SurveyScheduler:
                         slack_user_id=correlation.slack_user_id,
                         user_id=period.user_id,
                         organization_id=organization_id,
-                        message=message
+                        message=message,
+                        user_email=correlation.email
                     )
 
                     # Lock and update the period
@@ -526,7 +527,8 @@ class SurveyScheduler:
                         slack_user_id=user['slack_user_id'],
                         user_id=user['user_id'],
                         organization_id=organization_id,
-                        message=message_template
+                        message=message_template,
+                        user_email=user['email']
                     )
                     sent_count += 1
 
