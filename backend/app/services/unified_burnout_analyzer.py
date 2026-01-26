@@ -1832,17 +1832,31 @@ class UnifiedBurnoutAnalyzer:
             task_load_score = apply_incident_tiers(incidents_per_week) * 10
             logger.debug(f"📋 TASK LOAD FALLBACK: {user_name} using incident frequency ({incidents_per_week:.1f}/week) as proxy")
 
+        # Volume scaling: Don't penalize low-volume users based on percentages alone
+        # Someone with 7 incidents over 90 days (0.54/week) shouldn't get Critical just because 71% were after-hours
+        # Scale penalties based on actual workload volume
+        volume_threshold = 2.0  # incidents per week threshold for full penalty
+        volume_scale = min(incidents_per_week / volume_threshold, 1.0)  # 0.0-1.0 scale
+
+        # Apply volume scaling to percentage-based metrics
+        scaled_after_hours = after_hours_percentage * volume_scale
+        scaled_oncall_burden = apply_rootly_incident_tiers(severity_weighted_per_week) * 10 * volume_scale
+
+        logger.debug(f"🔢 VOLUME SCALING: {user_name} incidents_per_week={incidents_per_week:.2f}, volume_scale={volume_scale:.2f}")
+        logger.debug(f"   after_hours: {after_hours_percentage:.1f}% → {scaled_after_hours:.1f}% (scaled)")
+        logger.debug(f"   oncall_burden: {apply_rootly_incident_tiers(severity_weighted_per_week) * 10:.1f} → {scaled_oncall_burden:.1f} (scaled)")
+
         ocb_metrics = {
             # Personal burnout factors (65% of total)
             # OCB scale_max values: work_hours_trend=100, after_hours_activity=30, sleep_quality_proxy=30
             'work_hours_trend': task_load_score,                                    # Task load: 10% (0-100 scale)
-            'after_hours_activity': after_hours_percentage,                         # After-hours: 30% (0-100 %, scale_max=30 means 30%=100% burnout)
+            'after_hours_activity': scaled_after_hours,                             # After-hours: 30% (volume-scaled %)
             'sleep_quality_proxy': severity_weighted_per_week,                      # High-severity: 25% (raw weekly rate, scale_max=30)
 
             # Work-related burnout factors (35% of total)
             # OCB scale_max values: sprint_completion=7, oncall_burden=100
             'sprint_completion': consecutive_days_data['max_consecutive_days'],     # Consecutive days: 15% (raw days 0-7+)
-            'oncall_burden': apply_rootly_incident_tiers(severity_weighted_per_week) * 10  # On-call load: 20% (0-100 scale)
+            'oncall_burden': scaled_oncall_burden  # On-call load: 20% (volume-scaled)
         }
 
         # Check if all OCB metrics are 0
