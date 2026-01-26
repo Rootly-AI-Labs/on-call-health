@@ -289,23 +289,27 @@ async def start_github_only_analysis(
 async def run_analysis_task(analysis_id: int, integration_id: int, days_back: int, user_id: int):
     """Background task to run the actual analysis."""
     db = next(get_db())
-    
+
+    # Get analysis UUID for logging
+    analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
+    analysis_ref = f"{analysis_id} ({analysis.uuid})" if analysis else str(analysis_id)
+
     try:
         # Set a timeout for the entire analysis (5 minutes)
         async def run_with_timeout():
             return await asyncio.wait_for(_run_analysis_task_impl(db, analysis_id, integration_id, days_back, user_id), timeout=300)
-        
+
         await run_with_timeout()
-        
+
     except asyncio.TimeoutError:
-        logger.error(f"Analysis {analysis_id} timed out after 5 minutes")
+        logger.error(f"Analysis {analysis_ref} timed out after 5 minutes")
         analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
         if analysis:
             analysis.status = "failed"
             analysis.error_message = "Analysis timed out after 5 minutes. This may be due to too much data or API rate limits."
             db.commit()
     except Exception as e:
-        logger.error(f"Analysis {analysis_id} failed: {str(e)}", exc_info=True)
+        logger.error(f"Analysis {analysis_ref} failed: {str(e)}", exc_info=True)
         analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
         if analysis:
             analysis.status = "failed"
@@ -317,10 +321,13 @@ async def run_analysis_task(analysis_id: int, integration_id: int, days_back: in
 async def _run_analysis_task_impl(db, analysis_id: int, integration_id: int, days_back: int, user_id: int):
     """Implementation of the analysis task."""
     try:
-        logger.info(f"🔍 ANALYSIS TASK: Starting analysis {analysis_id} for user {user_id} with updated Jira correlation code")
+        # Get analysis with UUID for logging
+        analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
+        analysis_ref = f"{analysis_id} ({analysis.uuid})" if analysis else str(analysis_id)
+
+        logger.info(f"🔍 ANALYSIS TASK: Starting analysis {analysis_ref} for user {user_id}")
 
         # Update status to running
-        analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
         analysis.status = "running"
         db.commit()
         
@@ -393,7 +400,7 @@ async def _run_analysis_task_impl(db, analysis_id: int, integration_id: int, day
                 not metadata.get("incidents_api_failed", False)
             )
             
-            logger.info(f"Incident data test: {len(incidents)} incidents, {len(users)} users, available: {incident_data_available}")
+            logger.info(f"[Analysis {analysis_ref}] Incident data test: {len(incidents)} incidents, {len(users)} users, available: {incident_data_available}")
             
         except Exception as e:
             logger.warning(f"Failed to test incident data availability: {e}")
@@ -401,7 +408,7 @@ async def _run_analysis_task_impl(db, analysis_id: int, integration_id: int, day
         
         # Determine analysis strategy
         if not incident_data_available and has_github:
-            logger.info("No incident data available but GitHub integration found - using GitHub-only analysis")
+            logger.info(f"[Analysis {analysis_ref}] No incident data available but GitHub integration found - using GitHub-only analysis")
             
             # Collect GitHub data for the team
             from ...services.github_collector import collect_team_github_data
@@ -425,7 +432,7 @@ async def _run_analysis_task_impl(db, analysis_id: int, integration_id: int, day
                     else:
                         raise Exception("No team member emails found for GitHub analysis")
                 
-                logger.info(f"Collecting GitHub data for {len(team_emails)} team members")
+                logger.info(f"[Analysis {analysis_ref}] Collecting GitHub data for {len(team_emails)} team members")
                 
                 # Decrypt GitHub token
                 from ...api.endpoints.github import decrypt_token
@@ -451,17 +458,17 @@ async def _run_analysis_task_impl(db, analysis_id: int, integration_id: int, day
                 results["confidence_note"] = "Analysis based on GitHub activity patterns only"
                 
             except Exception as e:
-                logger.error(f"GitHub-only analysis failed: {e}")
+                logger.error(f"[Analysis {analysis_ref}] GitHub-only analysis failed: {e}")
                 raise Exception(f"GitHub-only analysis failed: {str(e)}")
                 
         else:
-            logger.info(f"Using UnifiedBurnoutAnalyzer (AI={has_llm_token})")
+            logger.info(f"[Analysis {analysis_ref}] Using UnifiedBurnoutAnalyzer (AI={has_llm_token})")
             
             # Set user context for AI analysis if needed
             if has_llm_token:
                 from ...services.ai_burnout_analyzer import set_user_context
                 set_user_context(user)
-                logger.info(f"Set user context for AI analysis (LLM provider: {user.llm_provider})")
+                logger.info(f"[Analysis {analysis_ref}] Set user context for AI analysis (LLM provider: {user.llm_provider})")
             
             # Get GitHub token if available
             github_token = None
@@ -507,7 +514,7 @@ async def _run_analysis_task_impl(db, analysis_id: int, integration_id: int, day
                     for uc in user_correlations
                 ]
 
-                logger.info(f"✅ Fetched {len(synced_users)} user correlations for analysis")
+                logger.info(f"[Analysis {analysis_ref}] ✅ Fetched {len(synced_users)} user correlations")
                 users_with_jira = [u for u in synced_users if u.get("jira_account_id")]
                 if users_with_jira:
                     logger.info(f"  ✅ {len(users_with_jira)} users have Jira mapping")
@@ -547,10 +554,10 @@ async def _run_analysis_task_impl(db, analysis_id: int, integration_id: int, day
         analysis.completed_at = datetime.now()
         db.commit()
         
-        logger.info(f"Analysis {analysis_id} completed successfully")
-        
+        logger.info(f"Analysis {analysis_ref} completed successfully")
+
     except Exception as e:
-        logger.error(f"Analysis {analysis_id} failed: {str(e)}", exc_info=True)
+        logger.error(f"Analysis {analysis_ref} failed: {str(e)}", exc_info=True)
         analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
         if analysis:
             analysis.status = "failed"
@@ -561,10 +568,13 @@ async def _run_analysis_task_impl(db, analysis_id: int, integration_id: int, day
 async def run_github_only_analysis_task(analysis_id: int, days_back: int, team_emails: Optional[list], user_id: int):
     """Background task to run GitHub-only burnout analysis."""
     db = next(get_db())
-    
+
+    # Get analysis with UUID for logging
+    analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
+    analysis_ref = f"{analysis_id} ({analysis.uuid})" if analysis else str(analysis_id)
+
     try:
         # Update status to running
-        analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
         analysis.status = "running"
         db.commit()
         
@@ -597,7 +607,7 @@ async def run_github_only_analysis_task(analysis_id: int, days_back: int, team_e
                 else:
                     raise Exception("No team member emails found for GitHub analysis")
         
-        logger.info(f"Running GitHub-only analysis for {len(team_emails)} team members")
+        logger.info(f"Running GitHub-only analysis {analysis_ref} for {len(team_emails)} team members")
         
         # Decrypt GitHub token
         from ...api.endpoints.github import decrypt_token
@@ -631,10 +641,10 @@ async def run_github_only_analysis_task(analysis_id: int, days_back: int, team_e
         analysis.completed_at = datetime.now()
         db.commit()
         
-        logger.info(f"GitHub-only analysis {analysis_id} completed successfully")
-        
+        logger.info(f"GitHub-only analysis {analysis_ref} completed successfully")
+
     except Exception as e:
-        logger.error(f"GitHub-only analysis {analysis_id} failed: {str(e)}", exc_info=True)
+        logger.error(f"GitHub-only analysis {analysis_ref} failed: {str(e)}", exc_info=True)
         # Update analysis with error
         analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
         if analysis:
