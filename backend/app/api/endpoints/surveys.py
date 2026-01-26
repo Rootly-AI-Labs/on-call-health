@@ -233,8 +233,12 @@ async def create_or_update_survey_schedule(
 
     # Get last modified by user info
     last_modified_by_name = None
-    if schedule.last_modified_by_user_id and schedule.last_modified_by:
-        last_modified_by_name = schedule.last_modified_by.name
+    if schedule.last_modified_by_user_id:
+        try:
+            if schedule.last_modified_by and hasattr(schedule.last_modified_by, 'name'):
+                last_modified_by_name = schedule.last_modified_by.name
+        except Exception as e:
+            logger.warning(f"Failed to load last_modified_by user for schedule {schedule.id}: {e}")
 
     return {
         "id": schedule.id,
@@ -296,8 +300,12 @@ async def get_survey_schedule(
 
     # Get last modified by user info
     last_modified_by_name = None
-    if schedule.last_modified_by_user_id and schedule.last_modified_by:
-        last_modified_by_name = schedule.last_modified_by.name
+    if schedule.last_modified_by_user_id:
+        try:
+            if schedule.last_modified_by and hasattr(schedule.last_modified_by, 'name'):
+                last_modified_by_name = schedule.last_modified_by.name
+        except Exception as e:
+            logger.warning(f"Failed to load last_modified_by user for schedule {schedule.id}: {e}")
 
     return {
         "id": schedule.id,
