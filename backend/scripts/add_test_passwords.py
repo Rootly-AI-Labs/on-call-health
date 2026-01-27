@@ -1,0 +1,65 @@
+"""
+Add password authentication to test accounts for E2E testing.
+Run this script to set passwords for test users.
+"""
+import sys
+from pathlib import Path
+
+# Add parent directory to path to import app modules
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from passlib.context import CryptContext
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from app.models.user import User
+import os
+
+# Password hashing
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# Database connection
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:XkRpuHyZTQOHiShHIwcowwocCebgwmGb@caboose.proxy.rlwy.net:53337/railway")
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+# Test accounts
+TEST_ACCOUNTS = [
+    "avery.kim@oncallhealth.ai",
+    "sam.rodriguez@oncallhealth.ai",
+    "ethan.hart@oncallhealth.ai",
+    "anika.shah@oncallhealth.ai",
+]
+
+TEST_PASSWORD = "Rootly100!"  # Shorter password to fit bcrypt 72 byte limit
+
+def hash_password(password: str) -> str:
+    """Hash a password using bcrypt."""
+    # Ensure password fits in bcrypt's 72 byte limit
+    if len(password.encode('utf-8')) > 72:
+        password = password[:72]
+    return pwd_context.hash(password)
+
+def main():
+    db = SessionLocal()
+    try:
+        password_hash = hash_password(TEST_PASSWORD)
+
+        for email in TEST_ACCOUNTS:
+            user = db.query(User).filter(User.email == email).first()
+            if user:
+                user.password_hash = password_hash
+                print(f"✓ Added password to {email}")
+            else:
+                print(f"✗ User not found: {email}")
+
+        db.commit()
+        print(f"\n✓ Successfully added passwords to {len(TEST_ACCOUNTS)} test accounts")
+
+    except Exception as e:
+        db.rollback()
+        print(f"✗ Error: {e}")
+    finally:
+        db.close()
+
+if __name__ == "__main__":
+    main()
