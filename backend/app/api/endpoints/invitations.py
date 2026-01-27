@@ -162,8 +162,10 @@ async def list_organization_members(
 
     try:
         # Get all users in this organization
+        # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
         members = db.query(User).filter(
-            User.organization_id == current_user.organization_id
+            User.organization_id == current_user.organization_id,
+            User.organization_id.isnot(None)
         ).order_by(User.name.asc()).all()
 
         member_list = []
