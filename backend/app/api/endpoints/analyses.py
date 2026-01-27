@@ -17,6 +17,7 @@ from ...auth.dependencies import get_current_active_user
 from ...services.unified_burnout_analyzer import UnifiedBurnoutAnalyzer
 from ...core.rate_limiting import analysis_rate_limit, general_rate_limit
 from ...core.input_validation import AnalysisRequest as ValidatedAnalysisRequest, AnalysisFilterRequest
+from ...utils.visual_logger import log_task_start, log_task_complete
 
 logger = logging.getLogger(__name__)
 
@@ -2721,27 +2722,26 @@ async def run_analysis_task(
 
     # Helper to format analysis ID with UUID for consistent logging
     analysis_ref = f"{analysis_id} ({analysis_uuid})"
-
-    # Force output to stderr to ensure we see it
-    sys.stderr.write(f"\n🔥🔥🔥 BACKGROUND TASK STARTED: Analysis {analysis_ref} 🔥🔥🔥\n")
-    sys.stderr.flush()
+    node_id = str(uuid4())[:8]
 
     logger = logging.getLogger(__name__)
-    logger.info(f"BACKGROUND_TASK: Starting analysis {analysis_ref} with timeout mechanism")
-    logger.info(f"BACKGROUND_TASK: Integration params - GitHub: {include_github}, Slack: {include_slack}, Jira: {include_jira}, Linear: {include_linear}")
-    logger.info(f"BACKGROUND_TASK: User ID received: {user_id}")
-    logger.info(f"BACKGROUND_TASK: AI params - enable_ai: {enable_ai}")
-    print(f"BACKGROUND_TASK: Integration params - GitHub: {include_github}, Slack: {include_slack}, Jira: {include_jira}, Linear: {include_linear}")
-    print(f"BACKGROUND_TASK: User ID received: {user_id}")
-    print(f"BACKGROUND_TASK: AI params - enable_ai: {enable_ai}")
+
+    # Log task start with visual markers
+    log_task_start(
+        analysis_id=analysis_id,
+        node_id=node_id,
+        user_id=user_id or 0,
+        integration_name=f"{platform.title()} Analysis"
+    )
+
+    logger.info(f"Integration params - GitHub: {include_github}, Slack: {include_slack}, Jira: {include_jira}, Linear: {include_linear}")
+    logger.info(f"User ID: {user_id}, AI Enabled: {enable_ai}")
     
     # Get a fresh database session for the background task
     from ...models import SessionLocal
 
-    # Short ID to identify which worker/replica is processing this analysis in logs
-    node_id = str(uuid4())[:8]
-
     db = SessionLocal()
+    task_start_time = datetime.now()
 
     try:
         # Log database connection info
@@ -3192,6 +3192,15 @@ async def run_analysis_task(
                 logger.info(f"💾 Analysis {analysis_ref}: Committing to database")
                 db.commit()
                 logger.info(f"✅ Analysis {analysis_ref}: Successfully saved and committed")
+
+                # Log task completion with visual markers
+                total_duration = (datetime.now() - task_start_time).total_seconds()
+                log_task_complete(
+                    analysis_id=analysis_id,
+                    duration=total_duration,
+                    status="completed",
+                    result_size=len(str(results)) if results else 0
+                )
             else:
                 logger.error(f"❌ Analysis {analysis_ref}: Not found when trying to save results")
                 
