@@ -832,8 +832,10 @@ async def get_organization_members(
     """
     Get all members and pending invitations for the current user's organization.
     """
+    # If user has no organization (Gmail user without invitation), return empty list
+    # This allows them to use the app, but they don't see any other members
     if not current_user.organization_id:
-        raise HTTPException(status_code=400, detail="You must be part of an organization")
+        return []
 
     # Get all users in the organization
     # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching

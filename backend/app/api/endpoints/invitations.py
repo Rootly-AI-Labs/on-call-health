@@ -157,8 +157,17 @@ async def list_organization_members(
     """
     List all members of current user's organization with their roles.
     """
+    # If user has no organization (Gmail user without invitation), return empty list
+    # This allows them to use the app, but they don't see any other members
     if not current_user.organization_id:
-        raise HTTPException(status_code=400, detail="You must be part of an organization")
+        return {
+            "members": [],
+            "total": 0,
+            "organization": {
+                "id": None,
+                "name": "Personal Account"
+            }
+        }
 
     try:
         # Get all users in this organization
