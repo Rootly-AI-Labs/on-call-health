@@ -167,14 +167,12 @@ async def list_organization_members(
         raise HTTPException(status_code=400, detail="You must be part of an organization")
 
     try:
-        # Get all users in this organization who have actually logged in (have OAuth providers)
+        # Get all users in this organization (including synced team members)
         # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
-        members = db.query(User).join(
-            OAuthProvider, User.id == OAuthProvider.user_id
-        ).filter(
+        members = db.query(User).filter(
             User.organization_id == current_user.organization_id,
             User.organization_id.isnot(None)
-        ).distinct().order_by(User.name.asc()).all()
+        ).order_by(User.name.asc()).all()
 
         member_list = []
         for member in members:

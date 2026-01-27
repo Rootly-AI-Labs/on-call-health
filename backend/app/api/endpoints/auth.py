@@ -839,15 +839,13 @@ async def get_organization_members(
     if not current_user.organization_id:
         raise HTTPException(status_code=400, detail="You must be part of an organization")
 
-    # Get all users in the organization who have actually logged in (have OAuth providers)
+    # Get all users in the organization (including synced team members)
     # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
-    users = db.query(User).join(
-        OAuthProvider, User.id == OAuthProvider.user_id
-    ).filter(
+    users = db.query(User).filter(
         User.organization_id == current_user.organization_id,
         User.organization_id.isnot(None),
         User.status == 'active'
-    ).distinct().order_by(User.name).all()
+    ).order_by(User.name).all()
 
     # Get pending invitations for the organization
     # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
