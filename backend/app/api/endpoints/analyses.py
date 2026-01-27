@@ -670,8 +670,10 @@ def get_member_surveys(analysis: Analysis, db: Session) -> dict:
     analysis_start_date = analysis.created_at - timedelta(days=analysis.time_range or 30)
 
     # Query 1: Get all team member emails
+    # SECURITY: Explicitly check IS NOT NULL for defense-in-depth
     correlations = db.query(UserCorrelation).filter(
-        UserCorrelation.organization_id == analysis.organization_id
+        UserCorrelation.organization_id == analysis.organization_id,
+        UserCorrelation.organization_id.isnot(None)
     ).all()
 
     member_emails = [c.email for c in correlations if c.email]
