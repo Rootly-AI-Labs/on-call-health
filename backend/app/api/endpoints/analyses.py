@@ -17,6 +17,7 @@ from ...auth.dependencies import get_current_active_user
 from ...services.unified_burnout_analyzer import UnifiedBurnoutAnalyzer
 from ...core.rate_limiting import analysis_rate_limit, general_rate_limit
 from ...core.input_validation import AnalysisRequest as ValidatedAnalysisRequest, AnalysisFilterRequest
+from ...workers.arq_worker import get_arq_pool
 
 logger = logging.getLogger(__name__)
 
@@ -242,11 +243,10 @@ async def validate_integrations(
 async def run_burnout_analysis(
     req: Request,
     request: ValidatedAnalysisRequest,
-    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Run a new burnout analysis for a specific integration and time range."""
+    """Run a new burnout analysis using ARQ worker with checkpoint support."""
     try:
         logger.info(f"Starting analysis for integration {request.integration_id}, user {current_user.id}")
         logger.info(f"Analysis request: integration={request.integration_id}, github={request.include_github}, slack={request.include_slack}")
@@ -347,30 +347,39 @@ async def run_burnout_analysis(
                 detail="Failed to create analysis record"
             )
         
-        # Start analysis in background
-        logger.info(f"ENDPOINT: About to add background task for analysis {analysis.id}")
+        # Enqueue analysis job in ARQ
+        logger.info(f"ENDPOINT: About to enqueue ARQ job for analysis {analysis.id}")
         try:
-            background_tasks.add_task(
-                run_analysis_task,
-                analysis_id=analysis.id,
-                analysis_uuid=analysis.uuid,
-                integration_id=integration.id,
-                api_token=integration.api_token,
-                platform=integration.platform,
-                organization_name=integration.organization_name,
-                time_range=request.time_range,
-                include_weekends=request.include_weekends,
-                include_github=request.include_github,
-                include_slack=request.include_slack,
-                include_jira=request.include_jira,
-                include_linear=request.include_linear,
-                user_id=current_user.id,
-                enable_ai=request.enable_ai
+            arq_pool = await get_arq_pool()
+
+            # Generate unique job ID to prevent duplicates
+            job_id = f"analysis_{analysis.id}_{int(datetime.now().timestamp())}"
+
+            # Enqueue job
+            job = await arq_pool.enqueue_job(
+                "run_analysis_with_checkpoints",
+                analysis.id,
+                integration.id,
+                request.time_range,  # days_back
+                current_user.id,
+                _job_id=job_id
             )
-            logger.info(f"ENDPOINT: Successfully added background task for analysis {analysis.id}")
+
+            # Store job ID in analysis record
+            analysis.arq_job_id = job_id
+            db.commit()
+
+            logger.info(f"ENDPOINT: Successfully enqueued ARQ job {job_id} for analysis {analysis.id}")
         except Exception as e:
-            logger.error(f"ENDPOINT: Failed to add background task for analysis {analysis.id}: {e}")
-            raise
+            logger.error(f"ENDPOINT: Failed to enqueue ARQ job for analysis {analysis.id}: {e}")
+            # Mark analysis as failed
+            analysis.status = "failed"
+            analysis.error_message = f"Failed to enqueue job: {str(e)}"
+            db.commit()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to start analysis. Please try again."
+            )
         
         return AnalysisResponse(
             id=analysis.id,

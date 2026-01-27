@@ -66,4 +66,17 @@ class Settings:
     LATE_NIGHT_START: int = int(os.getenv("LATE_NIGHT_START", "22"))          # 10 PM
     LATE_NIGHT_END: int = int(os.getenv("LATE_NIGHT_END", "6"))               # 6 AM
 
+    # ARQ (Async Redis Queue) Configuration
+    # Use separate Redis database for ARQ to avoid key collisions
+    REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379")
+    # Construct ARQ Redis URL with db=1 (separate database from main app)
+    _redis_base = REDIS_URL.rstrip('/').split('?')[0]  # Remove trailing slash and query params
+    if '/' in _redis_base.split('://')[-1]:  # Check if db number already specified
+        _redis_base = '/'.join(_redis_base.split('/')[:-1])  # Remove existing db number
+    ARQ_REDIS_URL: str = os.getenv("ARQ_REDIS_URL", f"{_redis_base}/1")  # Use db=1 for ARQ
+    ARQ_MAX_CONNECTIONS: int = int(os.getenv("ARQ_MAX_CONNECTIONS", "10"))
+    ARQ_TIMEOUT: int = int(os.getenv("ARQ_TIMEOUT", "30"))  # seconds
+    ARQ_RETRY_JOBS: bool = os.getenv("ARQ_RETRY_JOBS", "true").lower() == "true"
+    ARQ_KEEP_RESULT: int = int(os.getenv("ARQ_KEEP_RESULT", "3600"))  # 1 hour in seconds
+
 settings = Settings()

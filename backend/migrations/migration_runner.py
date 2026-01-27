@@ -1216,6 +1216,11 @@ class MigrationRunner:
                 "description": "Repair false-positive migration 040 if columns don't exist (fixes migration runner bug)",
                 "sql_file": "2026_01_23_repair_survey_periods_migration.sql"
             },
+            {
+                "name": "042_add_checkpoint_fields",
+                "description": "Add checkpoint/resume fields to analyses table for deployment resilience",
+                "sql_file": "2026_01_27_add_checkpoint_fields.sql"
+            },
             # Add future migrations here with incrementing numbers
         ]
 
