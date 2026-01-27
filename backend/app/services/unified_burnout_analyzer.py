@@ -365,9 +365,9 @@ class UnifiedBurnoutAnalyzer:
                 matching_user_ids = user_ids_from_users.intersection(incident_user_ids)
                 
                 logger.info(f"UNIFIED ANALYZER: User ID Cross-Reference:")
-                logger.info(f"   - User IDs from users list: {len(user_ids_from_users)} ({list(user_ids_from_users)[:5]})")
-                logger.info(f"   - User IDs from incident assignments: {len(incident_user_ids)} ({list(incident_user_ids)[:5]})")
-                logger.info(f"   - Matching user IDs: {len(matching_user_ids)} ({list(matching_user_ids)[:5]})")
+                logger.info(f"   - User IDs from users list: {len(user_ids_from_users)} users")
+                logger.info(f"   - User IDs from incident assignments: {len(incident_user_ids)} unique users")
+                logger.info(f"   - Matching user IDs: {len(matching_user_ids)} users ({len(matching_user_ids)/max(len(user_ids_from_users), 1)*100:.1f}% match rate)")
                 
                 if len(matching_user_ids) == 0:
                     logger.warning(f"UNIFIED ANALYZER: ❌ CRITICAL ISSUE - NO MATCHING USER IDs!")
@@ -425,11 +425,11 @@ class UnifiedBurnoutAnalyzer:
                     if self.features['github']:
                         github_data = loader.get_github_data(mock_scenario)
                         logger.info(f"GitHub mock data loaded: {len(github_data)} users")
-                        logger.info(f"   - GitHub users: {list(github_data.keys())}")
+                        logger.info(f"   - GitHub data retrieved for {len(github_data)} unique users")
                     if self.features['slack']:
                         slack_data = loader.get_slack_data(mock_scenario)
                         logger.info(f"Slack mock data loaded: {len(slack_data)} users")
-                        logger.info(f"   - Slack users: {list(slack_data.keys())}")
+                        logger.info(f"   - Slack data retrieved for {len(slack_data)} unique users")
                     logger.info("="*80)
                 except Exception as mock_error:
                     logger.error(f"MOCK DATA ERROR: Failed to load GitHub/Slack: {mock_error}")
@@ -485,7 +485,6 @@ class UnifiedBurnoutAnalyzer:
                 if self.features['github']:
                     logger.info(f"⏳ CHECKPOINT 2a: Starting GitHub data collection for {len(team_emails)} users")
                     logger.info(f"UNIFIED ANALYZER: Collecting GitHub data for {len(team_emails)} team members")
-                    logger.info(f"Team emails: {team_emails[:5]}...")  # Log first 5 emails
                     try:
                         logger.info(f"GitHub config - token: {'present' if self.github_token else 'missing'}")
                         
@@ -495,16 +494,12 @@ class UnifiedBurnoutAnalyzer:
                             email_to_name=email_to_name
                         )
                         logger.info(f"UNIFIED ANALYZER: Collected GitHub data for {len(github_data)} users")
-                        logger.info(f"GitHub data keys: {list(github_data.keys())[:5]}")  # Log first 5 keys
 
-                        # Log detailed GitHub data for debugging
-                        for email, data in list(github_data.items())[:3]:  # Log first 3 users
-                            if data:
-                                commits_count = len(data.get('commits', []))
-                                prs_count = len(data.get('pull_requests', []))
-                                logger.info(f"GitHub data for {email}: {commits_count} commits, {prs_count} PRs")
-                            else:
-                                logger.info(f"GitHub data for {email}: No data")
+                        # Log aggregate GitHub data stats
+                        total_commits = sum(len(data.get('commits', [])) for data in github_data.values() if data)
+                        total_prs = sum(len(data.get('pull_requests', [])) for data in github_data.values() if data)
+                        users_with_data = sum(1 for data in github_data.values() if data and (data.get('commits') or data.get('pull_requests')))
+                        logger.info(f"GitHub data summary: {users_with_data}/{len(github_data)} users with activity, {total_commits} total commits, {total_prs} total PRs")
 
                         # # Write raw GitHub data to file
                         # try:
@@ -554,7 +549,6 @@ class UnifiedBurnoutAnalyzer:
                 if self.features['jira']:
                     logger.info(f"⏳ CHECKPOINT 2c: Starting Jira data collection")
                     logger.info(f"UNIFIED ANALYZER: Collecting Jira data for {len(team_emails)} team members")
-                    logger.info(f"Team emails: {team_emails[:5]}...")  # Log first 5 emails
                     try:
                         logger.info(f"Jira config - token: {'present' if self.jira_token else 'missing'}")
 
@@ -648,7 +642,10 @@ class UnifiedBurnoutAnalyzer:
                                             }
 
                                     logger.info(f"UNIFIED ANALYZER: Collected Jira data for {len(jira_data)} users")
-                                    logger.info(f"Jira data keys: {list(jira_data.keys())[:5]}")
+                                    # Log aggregate stats instead of user keys
+                                    total_issues = sum(user_data.get('jira', {}).get('total_tickets', 0) for user_data in jira_data.values())
+                                    users_with_issues = sum(1 for user_data in jira_data.values() if user_data.get('jira', {}).get('total_tickets', 0) > 0)
+                                    logger.info(f"Jira data summary: {users_with_issues}/{len(jira_data)} users with issues, {total_issues} total tickets")
                                 else:
                                     logger.warning(f"No Jira integration or cloud_id found for user {user_id}")
                             except Exception as e:

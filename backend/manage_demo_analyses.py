@@ -119,7 +119,7 @@ def create_demo_analysis(db, user: User, mock_data: dict, dry_run: bool = True) 
     """Create a demo analysis for a user who doesn't have one."""
     existing = get_demo_analysis(db, user.id)
     if existing:
-        print(f"  [SKIP] User {user.id} ({user.email}) already has demo analysis #{existing.id}")
+        print(f"  [SKIP] User {user.id} already has demo analysis #{existing.id}")
         return False
 
     original_analysis = mock_data['analysis']
@@ -131,7 +131,7 @@ def create_demo_analysis(db, user: User, mock_data: dict, dry_run: bool = True) 
     if dry_run:
         # Count what would be loaded
         reports_count = len(mock_data.get('user_burnout_reports', []))
-        print(f"  [DRY-RUN] Would create demo analysis for user {user.id} ({user.email})")
+        print(f"  [DRY-RUN] Would create demo analysis for user {user.id}")
         if reports_count > 0:
             print(f"            Would load {reports_count} health check-in records")
         return True
@@ -154,7 +154,7 @@ def create_demo_analysis(db, user: User, mock_data: dict, dry_run: bool = True) 
         db.add(analysis)
         db.flush()
 
-        print(f"  [OK] Created demo analysis #{analysis.id} for user {user.id} ({user.email})")
+        print(f"  [OK] Created demo analysis #{analysis.id} for user {user.id}")
 
         # Load burnout reports (health check-ins) for this user
         # Pass the analysis object for safety verification
