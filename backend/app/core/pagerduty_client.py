@@ -631,16 +631,17 @@ class PagerDutyDataCollector:
         # 🎯 RAILWAY DEBUG: Pre-normalization data check
         if users:
             sample_user = users[0]
-            logger.info(f"PAGERDUTY COLLECTION: Sample user keys: {list(sample_user.keys())}")
-            logger.info(f"PAGERDUTY COLLECTION: Sample user email: {sample_user.get('email', 'NO_EMAIL')}")
-        
+            has_email = bool(sample_user.get('email'))
+            logger.info(f"PAGERDUTY COLLECTION: Sample user structure - Keys: {list(sample_user.keys())}, Has email: {has_email}")
+
         if incidents:
             sample_incident = incidents[0]
             assignments = sample_incident.get("assignments", [])
             logger.info(f"PAGERDUTY COLLECTION: Sample incident has {len(assignments)} assignments")
             if assignments:
                 assignee = assignments[0].get("assignee", {})
-                logger.info(f"PAGERDUTY COLLECTION: Sample assignee: {assignee.get('id', 'NO_ID')} - {assignee.get('summary', 'NO_NAME')}")
+                has_assignee_id = bool(assignee.get('id'))
+                logger.info(f"PAGERDUTY COLLECTION: Sample assignee structure - Has ID: {has_assignee_id}, Type: {assignee.get('type', 'NO_TYPE')}")
         
         # 🚀 ENHANCED NORMALIZATION
         logger.info(f"🚀 PAGERDUTY COLLECTION: Starting ENHANCED normalization process...")
@@ -651,9 +652,10 @@ class PagerDutyDataCollector:
         if normalized_incidents:
             sample_normalized = normalized_incidents[0]
             assigned_to = sample_normalized.get("assigned_to")
-            logger.info(f"🚀 PAGERDUTY COLLECTION: Sample normalized incident assigned_to: {assigned_to}")
-            if assigned_to:
-                logger.info(f"🚀 PAGERDUTY COLLECTION: Assigned user email: {assigned_to.get('email', 'NO_EMAIL')}")
+            has_assignment = bool(assigned_to)
+            has_email = bool(assigned_to.get('email')) if assigned_to else False
+            assignment_method = assigned_to.get('assignment_method', 'unknown') if assigned_to else 'none'
+            logger.info(f"🚀 PAGERDUTY COLLECTION: Sample normalized incident - Has assignment: {has_assignment}, Has email: {has_email}, Method: {assignment_method}")
         
         incidents_with_emails = len([i for i in normalized_incidents if i.get("assigned_to") and i.get("assigned_to", {}).get("email")])
         logger.info(f"🚀 PAGERDUTY COLLECTION: {incidents_with_emails}/{len(normalized_incidents)} incidents have emails")
@@ -715,9 +717,11 @@ class PagerDutyDataCollector:
                 user_id_to_name[user_id] = user.get("name") or user.get("summary", "Unknown")
                 user_id_to_full_data[user_id] = user
         
+        users_with_emails = len([e for e in user_id_to_email.values() if e])
+        email_coverage_pct = (users_with_emails / len(user_id_to_email) * 100) if user_id_to_email else 0
         logger.info(f"🚀 PD NORMALIZE: Lookup maps created:")
-        logger.info(f"   - Users with emails: {len([e for e in user_id_to_email.values() if e])}/{len(user_id_to_email)}")
-        logger.info(f"   - Sample email mapping: {dict(list(user_id_to_email.items())[:3])}")
+        logger.info(f"   - Users with emails: {users_with_emails}/{len(user_id_to_email)} ({email_coverage_pct:.1f}%)")
+        logger.info(f"   - Email mapping coverage: {users_with_emails} users have email addresses")
         
         # 🎯 STEP 2: Normalize users with enhanced data
         normalized_users = []
@@ -795,15 +799,16 @@ class PagerDutyDataCollector:
 
             normalized_incidents.append(normalized_incident)
 
-            # Log progress for first few incidents with full structure
+            # Log progress for first few incidents with structure info (no PII)
             if i < 2:
-                user_email = assigned_user_info.get("email", "None") if assigned_user_info else "None"
-                logger.info(f"🚀 PD INCIDENT #{i}: '{normalized_incident['title'][:50]}' -> {user_email}")
+                has_assignment = bool(assigned_user_info)
+                has_email = bool(assigned_user_info.get("email")) if assigned_user_info else False
+                logger.info(f"🚀 PD INCIDENT #{i}: '{normalized_incident['title'][:50]}' - Assigned: {has_assignment}, Has email: {has_email}")
                 logger.info(f"   Available fields: {list(incident.keys())}")
                 logger.info(f"   Priority: {incident.get('priority')}")
                 logger.info(f"   Urgency: {incident.get('urgency')}")
-                logger.info(f"   Custom fields: {incident.get('custom_fields', 'None')}")
-                logger.info(f"   Body: {incident.get('body', {})}")
+                logger.info(f"   Custom fields present: {bool(incident.get('custom_fields'))}")
+                logger.info(f"   Body structure: {list(incident.get('body', {}).keys()) if incident.get('body') else 'None'}")
         
         # 🎯 STEP 4: Calculate success statistics
         total_incidents = len(incidents)
