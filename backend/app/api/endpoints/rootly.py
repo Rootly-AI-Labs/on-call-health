@@ -1449,7 +1449,9 @@ async def get_synced_users(
 
         # Fetch all user correlations for this organization
         # Organization-scoped: show all team members in the org, not just current user's personal data
+        # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
         query = db.query(UserCorrelation).filter(
+            UserCorrelation.organization_id.isnot(None),
             UserCorrelation.organization_id == current_user.organization_id
         )
 
@@ -1563,12 +1565,16 @@ async def get_synced_users(
                 survey_counts[corr.id] = count
 
         # Check if automated surveys are enabled for this organization
+        # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
         survey_schedule = db.query(SurveySchedule).filter(
+            SurveySchedule.organization_id.isnot(None),
             SurveySchedule.organization_id == current_user.organization_id,
             SurveySchedule.enabled == True
         ).first()
 
+        # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
         workspace_mapping = db.query(SlackWorkspaceMapping).filter(
+            SlackWorkspaceMapping.organization_id.isnot(None),
             SlackWorkspaceMapping.organization_id == current_user.organization_id,
             SlackWorkspaceMapping.status == 'active'
         ).first()
@@ -1745,7 +1751,9 @@ async def update_survey_recipients(
 
         # Validate that all recipient IDs belong to this user's organization
         # Use organization_id instead of user_id to support org-scoped users (user_id=NULL)
+        # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
         valid_ids = db.query(UserCorrelation.id).filter(
+            UserCorrelation.organization_id.isnot(None),
             UserCorrelation.organization_id == current_user.organization_id,
             UserCorrelation.id.in_(recipient_ids)
         ).all()
@@ -1864,8 +1872,10 @@ async def update_user_correlation_github_username(
     try:
         from sqlalchemy import func, cast, String
         # Fetch the correlation - ensure it belongs to current user's organization
+        # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
         correlation = db.query(UserCorrelation).filter(
             UserCorrelation.id == correlation_id,
+            UserCorrelation.organization_id.isnot(None),
             UserCorrelation.organization_id == current_user.organization_id
         ).first()
 
@@ -2017,12 +2027,14 @@ async def update_user_correlation_jira_mapping(
         from sqlalchemy import or_, and_
 
         # Fetch the correlation - handle both personal and org-scoped correlations
+        # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
         correlation = db.query(UserCorrelation).filter(
             UserCorrelation.id == correlation_id,
             or_(
                 UserCorrelation.user_id == current_user.id,
                 and_(
                     UserCorrelation.user_id.is_(None),
+                    UserCorrelation.organization_id.isnot(None),
                     UserCorrelation.organization_id == current_user.organization_id
                 )
             )
@@ -2126,12 +2138,14 @@ async def update_user_correlation_linear_mapping(
         from sqlalchemy import or_, and_
 
         # Fetch the correlation - handle both personal and org-scoped correlations
+        # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
         correlation = db.query(UserCorrelation).filter(
             UserCorrelation.id == correlation_id,
             or_(
                 UserCorrelation.user_id == current_user.id,
                 and_(
                     UserCorrelation.user_id.is_(None),
+                    UserCorrelation.organization_id.isnot(None),
                     UserCorrelation.organization_id == current_user.organization_id
                 )
             )

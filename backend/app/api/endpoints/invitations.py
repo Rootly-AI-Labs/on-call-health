@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
 
-from ...models import get_db, User, OrganizationInvitation, Organization, UserNotification
+from ...models import get_db, User, OrganizationInvitation, Organization, UserNotification, OAuthProvider
 from ...auth.dependencies import get_current_active_user, get_current_user_optional
 from ...services.notification_service import NotificationService
 
@@ -43,9 +43,11 @@ async def create_invitation(
         raise HTTPException(status_code=400, detail="User with this email already belongs to an organization")
 
     # Check for pending invitation with same email to same org
+    # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
     existing_invitation = db.query(OrganizationInvitation).filter(
         OrganizationInvitation.email.ilike(request.email),
         OrganizationInvitation.organization_id == current_user.organization_id,
+        OrganizationInvitation.organization_id.isnot(None),
         OrganizationInvitation.status == "pending"
     ).first()
 
@@ -110,7 +112,11 @@ async def list_pending_invitations(
 
         # Filter by organization_id if user has one, otherwise by email domain
         if current_user.organization_id:
-            query = query.filter(OrganizationInvitation.organization_id == current_user.organization_id)
+            # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
+            query = query.filter(
+                OrganizationInvitation.organization_id == current_user.organization_id,
+                OrganizationInvitation.organization_id.isnot(None)
+            )
         else:
             query = query.filter(OrganizationInvitation.email.like(f'%@{email_domain}'))
 
@@ -161,10 +167,14 @@ async def list_organization_members(
         raise HTTPException(status_code=400, detail="You must be part of an organization")
 
     try:
-        # Get all users in this organization
-        members = db.query(User).filter(
-            User.organization_id == current_user.organization_id
-        ).order_by(User.name.asc()).all()
+        # Get all users in this organization who have actually logged in (have OAuth providers)
+        # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
+        members = db.query(User).join(
+            OAuthProvider, User.id == OAuthProvider.user_id
+        ).filter(
+            User.organization_id == current_user.organization_id,
+            User.organization_id.isnot(None)
+        ).distinct().order_by(User.name.asc()).all()
 
         member_list = []
         for member in members:
@@ -393,7 +403,11 @@ async def resend_invitation(
         raise HTTPException(status_code=404, detail="Invitation not found")
 
     # Check if current user can resend (admin or super admin)
-    if not current_user.organization_id == invitation.organization_id or current_user.role != 'admin':
+    # SECURITY: Check both values are not NULL AND equal to prevent NULL == NULL matching
+    if (not current_user.organization_id or
+        not invitation.organization_id or
+        current_user.organization_id != invitation.organization_id or
+        current_user.role != 'admin'):
         raise HTTPException(status_code=403, detail="Not authorized to resend this invitation")
 
     if invitation.status == "accepted":
@@ -504,8 +518,11 @@ async def revoke_invitation(
         raise HTTPException(status_code=404, detail="Invitation not found")
 
     # Check if current user can revoke (org admin of same org, or person who sent it)
+    # SECURITY: Check both values are not NULL AND equal to prevent NULL == NULL matching
     if not (
-        (current_user.organization_id == invitation.organization_id and
+        (current_user.organization_id and
+         invitation.organization_id and
+         current_user.organization_id == invitation.organization_id and
          current_user.role == 'admin') or
         current_user.id == invitation.invited_by
     ):
