@@ -560,6 +560,7 @@ async def update_user_role(
     if target_user.role == 'admin' and new_role != 'admin':
         admin_count = db.query(User).filter(
             User.organization_id == current_user.organization_id,
+            User.organization_id.isnot(None),
             User.role == 'admin',
             User.status == 'active',
             User.id != target_user.id
@@ -621,6 +622,7 @@ async def get_promotable_users(
     # Get all active users in the organization who are not admins
     promotable_users = db.query(User).filter(
         User.organization_id == current_user.organization_id,
+        User.organization_id.isnot(None),
         User.role != 'admin',
         User.status == 'active',
         User.id != current_user.id
@@ -694,6 +696,7 @@ async def delete_current_user_account(
         # Check if there are other admins
         other_admins = db.query(User).filter(
             User.organization_id == current_user.organization_id,
+            User.organization_id.isnot(None),
             User.role == 'admin',
             User.id != current_user.id,
             User.status == 'active'
@@ -704,6 +707,7 @@ async def delete_current_user_account(
             from ...models.user_correlation import UserCorrelation
             other_members = db.query(UserCorrelation).filter(
                 UserCorrelation.organization_id == current_user.organization_id,
+                UserCorrelation.organization_id.isnot(None),
                 UserCorrelation.email != current_user.email
             ).count()
 
