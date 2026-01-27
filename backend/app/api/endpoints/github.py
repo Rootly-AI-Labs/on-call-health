@@ -286,8 +286,10 @@ async def test_github_integration(
             from ...services.github_collector import GitHubCollector
 
             # Get all synced team members from user correlations
+            # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
             synced_members = db.query(UserCorrelation).filter(
                 UserCorrelation.organization_id == current_user.organization_id,
+                UserCorrelation.organization_id.isnot(None),
                 UserCorrelation.github_username.isnot(None)
             ).all()
 
@@ -627,8 +629,10 @@ async def disconnect_github(
 
     try:
         # Remove GitHub data from user correlations (organization-scoped)
+        # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
         correlations = db.query(UserCorrelation).filter(
-            UserCorrelation.organization_id == current_user.organization_id
+            UserCorrelation.organization_id == current_user.organization_id,
+            UserCorrelation.organization_id.isnot(None)
         ).all()
 
         for correlation in correlations:

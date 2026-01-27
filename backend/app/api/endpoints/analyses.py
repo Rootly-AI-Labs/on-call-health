@@ -513,9 +513,11 @@ async def get_analysis_by_uuid(
                 detail="User must be part of an organization to view analyses"
             )
 
+        # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
         analysis = db.query(Analysis).filter(
             Analysis.uuid == analysis_uuid,
-            Analysis.organization_id == current_user.organization_id
+            Analysis.organization_id == current_user.organization_id,
+            Analysis.organization_id.isnot(None)
         ).first()
     except Exception:
         # UUID column doesn't exist yet
@@ -523,11 +525,13 @@ async def get_analysis_by_uuid(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="UUID lookup not available until migration is complete"
         )
-    
+
     if not analysis:
         # Get the most recent analysis for this user to suggest as alternative
+        # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
         most_recent = db.query(Analysis).filter(
             Analysis.organization_id == current_user.organization_id,
+            Analysis.organization_id.isnot(None),
             Analysis.status == "completed"
         ).order_by(Analysis.created_at.desc()).first()
         
@@ -753,9 +757,11 @@ async def get_analysis_by_identifier(
     # Try UUID first if it looks like a UUID
     if is_uuid(analysis_identifier):
         try:
+            # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
             analysis = db.query(Analysis).filter(
                 Analysis.uuid == analysis_identifier,
-                Analysis.organization_id == current_user.organization_id
+                Analysis.organization_id == current_user.organization_id,
+                Analysis.organization_id.isnot(None)
             ).first()
         except Exception:
             # UUID column might not exist yet, fall back to integer
@@ -765,18 +771,22 @@ async def get_analysis_by_identifier(
     if not analysis:
         try:
             analysis_id = int(analysis_identifier)
+            # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
             analysis = db.query(Analysis).filter(
                 Analysis.id == analysis_id,
-                Analysis.organization_id == current_user.organization_id
+                Analysis.organization_id == current_user.organization_id,
+                Analysis.organization_id.isnot(None)
             ).first()
         except ValueError:
             # Not a valid integer either
             pass
-    
+
     if not analysis:
         # Get the most recent analysis for this user to suggest as alternative
+        # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
         most_recent = db.query(Analysis).filter(
             Analysis.organization_id == current_user.organization_id,
+            Analysis.organization_id.isnot(None),
             Analysis.status == "completed"
         ).order_by(Analysis.created_at.desc()).first()
         
@@ -852,9 +862,11 @@ async def regenerate_analysis_trends(
     db: Session = Depends(get_db)
 ):
     """Regenerate daily trends data for an existing analysis."""
+    # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
     analysis = db.query(Analysis).filter(
         Analysis.id == analysis_id,
-        Analysis.organization_id == current_user.organization_id
+        Analysis.organization_id == current_user.organization_id,
+        Analysis.organization_id.isnot(None)
     ).first()
     
     if not analysis:
@@ -999,9 +1011,11 @@ async def verify_analysis_consistency(
     db: Session = Depends(get_db)
 ):
     """Verify data consistency for an analysis across all components."""
+    # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
     analysis = db.query(Analysis).filter(
         Analysis.id == analysis_id,
-        Analysis.organization_id == current_user.organization_id
+        Analysis.organization_id == current_user.organization_id,
+        Analysis.organization_id.isnot(None)
     ).first()
     
     if not analysis:
@@ -1192,8 +1206,10 @@ async def get_historical_trends(
         )
 
     # Find the most recent completed analysis
+    # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
     query = db.query(Analysis).filter(
         Analysis.organization_id == current_user.organization_id,
+        Analysis.organization_id.isnot(None),
         Analysis.status == "completed",
         Analysis.results.isnot(None)
     )
@@ -1574,11 +1590,13 @@ async def get_analysis_daily_trends(
     db: Session = Depends(get_db)
 ):
     """Get daily incident trends from a specific analysis."""
-    
+
     # Get the analysis
+    # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
     analysis = db.query(Analysis).filter(
         Analysis.id == analysis_id,
-        Analysis.organization_id == current_user.organization_id
+        Analysis.organization_id == current_user.organization_id,
+        Analysis.organization_id.isnot(None)
     ).first()
     
     if not analysis:
@@ -1687,13 +1705,15 @@ async def get_user_github_daily_commits(
 ):
     """
     Get daily GitHub commit data for a specific user during an analysis period.
-    
+
     This endpoint fetches real-time GitHub commit data aggregated by day.
     """
     # Get the analysis to determine the date range
+    # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
     analysis = db.query(Analysis).filter(
         Analysis.id == analysis_id,
-        Analysis.organization_id == current_user.organization_id
+        Analysis.organization_id == current_user.organization_id,
+        Analysis.organization_id.isnot(None)
     ).first()
     
     if not analysis:
@@ -1814,14 +1834,16 @@ async def get_analysis_github_commits_timeline(
 ):
     """
     Get aggregated daily GitHub commit data for all team members in an analysis.
-    
+
     This endpoint returns commit data suitable for displaying a timeline chart,
     similar to the incidents health trends chart.
     """
     # Get the analysis
+    # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
     analysis = db.query(Analysis).filter(
         Analysis.id == analysis_id,
-        Analysis.organization_id == current_user.organization_id
+        Analysis.organization_id == current_user.organization_id,
+        Analysis.organization_id.isnot(None)
     ).first()
     
     if not analysis:
@@ -2128,11 +2150,13 @@ async def get_member_daily_health(
     """
     print(f"🚨 DAILY_HEALTH_API_CALLED: analysis_id={analysis_id}, member_email={member_email}")
     logger.error(f"🚨 DAILY_HEALTH_API_CALLED: analysis_id={analysis_id}, member_email={member_email}")
-    
+
     # Get the analysis
+    # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
     analysis = db.query(Analysis).filter(
         Analysis.id == analysis_id,
-        Analysis.organization_id == current_user.organization_id
+        Analysis.organization_id == current_user.organization_id,
+        Analysis.organization_id.isnot(None)
     ).first()
     
     if not analysis:
