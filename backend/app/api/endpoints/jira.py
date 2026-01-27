@@ -348,9 +348,11 @@ async def get_jira_status(
 
     workspace_mapping = None
     if current_user.organization_id:
+        # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
         workspace_mapping = db.query(JiraWorkspaceMapping).filter(
             JiraWorkspaceMapping.jira_cloud_id == integration.jira_cloud_id,
             JiraWorkspaceMapping.organization_id == current_user.organization_id,
+            JiraWorkspaceMapping.organization_id.isnot(None),
         ).first()
 
     response = {
@@ -512,9 +514,11 @@ async def select_jira_workspace(
 
         # Update workspace mapping if organization exists
         if current_user.organization_id:
+            # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
             mapping = db.query(JiraWorkspaceMapping).filter(
                 JiraWorkspaceMapping.jira_cloud_id == cloud_id,
                 JiraWorkspaceMapping.organization_id == current_user.organization_id,
+                JiraWorkspaceMapping.organization_id.isnot(None),
             ).first()
 
             if not mapping:
@@ -545,8 +549,10 @@ async def select_jira_workspace(
                 integration.jira_account_id
             )
 
+            # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
             corr = db.query(UserCorrelation).filter(
                 UserCorrelation.organization_id == current_user.organization_id,
+                UserCorrelation.organization_id.isnot(None),
                 UserCorrelation.email == integration.jira_email,
             ).first()
             if corr:
@@ -1012,8 +1018,10 @@ async def disconnect_jira(
 
     try:
         if integration.jira_account_id and current_user.organization_id:
+            # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
             correlations = db.query(UserCorrelation).filter(
                 UserCorrelation.organization_id == current_user.organization_id,
+                UserCorrelation.organization_id.isnot(None),
                 UserCorrelation.jira_account_id == integration.jira_account_id,
             ).all()
             for c in correlations:

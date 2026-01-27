@@ -272,7 +272,9 @@ async def get_survey_schedule(
     schedule = db.query(SurveySchedule).options(
         joinedload(SurveySchedule.last_modified_by)
     ).filter(
-        SurveySchedule.organization_id == current_user.organization_id
+        # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
+        SurveySchedule.organization_id == current_user.organization_id,
+        SurveySchedule.organization_id.isnot(None)
     ).first()
 
     if not schedule:

@@ -583,8 +583,10 @@ async def get_slack_status(
 
     # Count synced users (those with slack_user_id in this organization)
     from ...models.user_correlation import UserCorrelation
+    # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
     synced_users_count = db.query(UserCorrelation).filter(
         UserCorrelation.organization_id == current_user.organization_id,
+        UserCorrelation.organization_id.isnot(None),
         UserCorrelation.slack_user_id.isnot(None)
     ).count()
 
@@ -838,8 +840,10 @@ async def sync_slack_user_ids(
 
             # Update correlations for all users in the organization
             # Match by organization + email to support team roster (user_id=NULL)
+            # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
             correlations = db.query(UserCorrelation).filter(
                 UserCorrelation.organization_id == current_user.organization_id,
+                UserCorrelation.organization_id.isnot(None),
                 UserCorrelation.email.in_(list(email_to_slack_id.keys()))
             ).all()
 
@@ -936,8 +940,10 @@ async def debug_user_correlation(
                 }
         else:
             # Show all correlations for current user's organization
+            # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
             correlations = db.query(UserCorrelation).filter(
-                UserCorrelation.organization_id == current_user.organization_id
+                UserCorrelation.organization_id == current_user.organization_id,
+                UserCorrelation.organization_id.isnot(None)
             ).all()
 
             return {
@@ -1881,8 +1887,10 @@ async def get_workspace_status(
         # Check for organization-level mappings
         org_mappings = []
         if current_user.organization_id:
+            # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
             org_mappings = db.query(SlackWorkspaceMapping).filter(
-                SlackWorkspaceMapping.organization_id == current_user.organization_id
+                SlackWorkspaceMapping.organization_id == current_user.organization_id,
+                SlackWorkspaceMapping.organization_id.isnot(None)
             ).all()
 
         # Check organization status

@@ -560,6 +560,7 @@ async def update_user_role(
     if target_user.role == 'admin' and new_role != 'admin':
         admin_count = db.query(User).filter(
             User.organization_id == current_user.organization_id,
+            User.organization_id.isnot(None),
             User.role == 'admin',
             User.status == 'active',
             User.id != target_user.id
@@ -621,6 +622,7 @@ async def get_promotable_users(
     # Get all active users in the organization who are not admins
     promotable_users = db.query(User).filter(
         User.organization_id == current_user.organization_id,
+        User.organization_id.isnot(None),
         User.role != 'admin',
         User.status == 'active',
         User.id != current_user.id
@@ -694,6 +696,7 @@ async def delete_current_user_account(
         # Check if there are other admins
         other_admins = db.query(User).filter(
             User.organization_id == current_user.organization_id,
+            User.organization_id.isnot(None),
             User.role == 'admin',
             User.id != current_user.id,
             User.status == 'active'
@@ -704,6 +707,7 @@ async def delete_current_user_account(
             from ...models.user_correlation import UserCorrelation
             other_members = db.query(UserCorrelation).filter(
                 UserCorrelation.organization_id == current_user.organization_id,
+                UserCorrelation.organization_id.isnot(None),
                 UserCorrelation.email != current_user.email
             ).count()
 
@@ -835,15 +839,21 @@ async def get_organization_members(
     if not current_user.organization_id:
         raise HTTPException(status_code=400, detail="You must be part of an organization")
 
-    # Get all users in the organization
-    users = db.query(User).filter(
+    # Get all users in the organization who have actually logged in (have OAuth providers)
+    # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
+    users = db.query(User).join(
+        OAuthProvider, User.id == OAuthProvider.user_id
+    ).filter(
         User.organization_id == current_user.organization_id,
+        User.organization_id.isnot(None),
         User.status == 'active'
-    ).order_by(User.name).all()
+    ).distinct().order_by(User.name).all()
 
     # Get pending invitations for the organization
+    # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
     pending_invitations = db.query(OrganizationInvitation).filter(
         OrganizationInvitation.organization_id == current_user.organization_id,
+        OrganizationInvitation.organization_id.isnot(None),
         OrganizationInvitation.status == 'pending'
     ).all()
 
