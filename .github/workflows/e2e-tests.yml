@@ -88,6 +88,9 @@ jobs:
         run: npm run test:e2e -- --project=${{ matrix.browser }}
         env:
           PLAYWRIGHT_BASE_URL: http://localhost:3000
+          PLAYWRIGHT_API_URL: ${{ secrets.PLAYWRIGHT_API_URL }}
+          E2E_TEST_EMAIL_AVERY: ${{ secrets.E2E_TEST_EMAIL_AVERY }}
+          E2E_TEST_PASSWORD_AVERY: ${{ secrets.E2E_TEST_PASSWORD_AVERY }}
 
       - name: Upload test results
         if: always()

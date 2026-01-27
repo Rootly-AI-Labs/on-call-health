@@ -4,12 +4,15 @@ import * as path from 'path';
 const authFile = path.join(__dirname, '.auth/user.json');
 
 // Load credentials from environment variables (supports both local .env and GitHub Actions secrets)
-const TEST_EMAIL = process.env.E2E_TEST_EMAIL || 'avery.kim@oncallhealth.ai';
-const TEST_PASSWORD = process.env.E2E_TEST_PASSWORD || 'Rootlydemo100!!';
+// GitHub Secrets use per-user naming: E2E_TEST_EMAIL_AVERY, E2E_TEST_PASSWORD_AVERY
+const TEST_EMAIL = process.env.E2E_TEST_EMAIL_AVERY || process.env.E2E_TEST_EMAIL || 'avery.kim@oncallhealth.ai';
+const TEST_PASSWORD = process.env.E2E_TEST_PASSWORD_AVERY || process.env.E2E_TEST_PASSWORD || 'Rootlydemo100!!';
 const API_URL = process.env.PLAYWRIGHT_API_URL || 'http://localhost:8000';
 
 setup('authenticate with password', async ({ page, request }) => {
-  // Use API-based authentication (faster and more reliable than UI login)
+  // Use real API authentication (works locally and in CI against production)
+  console.log(`✓ Authenticating against backend: ${API_URL}`);
+
   const response = await request.post(`${API_URL}/auth/login/password`, {
     data: {
       email: TEST_EMAIL,

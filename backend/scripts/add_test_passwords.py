@@ -17,8 +17,13 @@ import os
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# Database connection
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:XkRpuHyZTQOHiShHIwcowwocCebgwmGb@caboose.proxy.rlwy.net:53337/railway")
+# Database connection - MUST be provided via environment variable
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise ValueError(
+        "DATABASE_URL environment variable is required.\n"
+        "Example: DATABASE_URL='postgresql://user:pass@host:port/db' python scripts/add_test_passwords.py"
+    )
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -30,7 +35,7 @@ TEST_ACCOUNTS = [
     "anika.shah@oncallhealth.ai",
 ]
 
-TEST_PASSWORD = "Rootly100!"  # Shorter password to fit bcrypt 72 byte limit
+TEST_PASSWORD = "Rootlydemo100!!"  # This must match E2E_TEST_PASSWORD in GitHub Secrets
 
 def hash_password(password: str) -> str:
     """Hash a password using bcrypt."""

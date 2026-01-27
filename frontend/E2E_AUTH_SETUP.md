@@ -10,12 +10,11 @@ This project uses **API-based authentication** for E2E tests, which is the recom
 
 ## Test Credentials
 
-### Test Account
-- **Email:** `avery.kim@oncallhealth.ai`
-- **Password:** `Rootlydemo100!!`
-- **Alternative accounts:** `ethan.hart@oncallhealth.ai`, `anika.shah@oncallhealth.ai` (same password)
+⚠️ **Important:** Test credentials are stored in environment variables and GitHub Secrets. Never hardcode them in test files.
 
-⚠️ **Important:** These are dedicated test accounts with access to test data only.
+- Test accounts are configured in your environment (`.env.test` locally, GitHub Secrets in CI)
+- Multiple test accounts are available: Avery, Sam, Ethan, and Anika
+- These are dedicated test accounts with access to test data only
 
 ## Local Development Setup
 
@@ -25,11 +24,11 @@ This project uses **API-based authentication** for E2E tests, which is the recom
    cp .env.test.example .env.test
    ```
 
-2. **Edit `.env.test` (optional):**
+2. **Edit `.env.test`:**
    ```bash
-   # The defaults work out of the box, but you can customize:
-   E2E_TEST_EMAIL=avery.kim@oncallhealth.ai
-   E2E_TEST_PASSWORD=Rootlydemo100!!
+   # Add your test credentials (obtain from your team)
+   E2E_TEST_EMAIL=<your-test-email>
+   E2E_TEST_PASSWORD=<your-test-password>
    PLAYWRIGHT_API_URL=http://localhost:8000
    PLAYWRIGHT_BASE_URL=http://localhost:3000
    ```
@@ -45,8 +44,8 @@ This project uses **API-based authentication** for E2E tests, which is the recom
 
 1. Go to: **Settings** → **Secrets and variables** → **Actions**
 2. Add the following **Repository secrets**:
-   - `E2E_TEST_EMAIL` = `avery.kim@oncallhealth.ai`
-   - `E2E_TEST_PASSWORD` = `Rootlydemo100!!`
+   - `E2E_TEST_EMAIL` = (obtain from team)
+   - `E2E_TEST_PASSWORD` = (obtain from team)
 
 ### Example GitHub Actions Workflow
 
@@ -137,10 +136,10 @@ If you need to change the test password:
 1. **Update the database:**
    ```bash
    # Generate new hash
-   python3 -c "import bcrypt; print(bcrypt.hashpw(b'NewPassword123', bcrypt.gensalt()).decode())"
+   python3 -c "import bcrypt; print(bcrypt.hashpw(b'YourNewPassword', bcrypt.gensalt()).decode())"
 
-   # Update database
-   psql -d your_database -c "UPDATE users SET password_hash = '<new_hash>' WHERE email = 'avery.kim@oncallhealth.ai';"
+   # Update database (use appropriate DATABASE_URL)
+   psql -d your_database -c "UPDATE users SET password_hash = '<new_hash>' WHERE email = '<test-account-email>';"
    ```
 
 2. **Update secrets:**
