@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
 
-from ...models import get_db, User, OrganizationInvitation, Organization, UserNotification
+from ...models import get_db, User, OrganizationInvitation, Organization, UserNotification, OAuthProvider
 from ...auth.dependencies import get_current_active_user, get_current_user_optional
 from ...services.notification_service import NotificationService
 
@@ -169,8 +169,6 @@ async def list_organization_members(
     try:
         # Get all users in this organization who have actually logged in (have OAuth providers)
         # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
-        from ..models.oauth_provider import OAuthProvider
-
         members = db.query(User).join(
             OAuthProvider, User.id == OAuthProvider.user_id
         ).filter(

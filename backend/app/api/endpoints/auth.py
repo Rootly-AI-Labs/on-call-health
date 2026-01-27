@@ -841,8 +841,6 @@ async def get_organization_members(
 
     # Get all users in the organization who have actually logged in (have OAuth providers)
     # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
-    from ..models.oauth_provider import OAuthProvider
-
     users = db.query(User).join(
         OAuthProvider, User.id == OAuthProvider.user_id
     ).filter(
