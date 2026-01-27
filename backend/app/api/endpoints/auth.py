@@ -836,14 +836,18 @@ async def get_organization_members(
         raise HTTPException(status_code=400, detail="You must be part of an organization")
 
     # Get all users in the organization
+    # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
     users = db.query(User).filter(
         User.organization_id == current_user.organization_id,
+        User.organization_id.isnot(None),
         User.status == 'active'
     ).order_by(User.name).all()
 
     # Get pending invitations for the organization
+    # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
     pending_invitations = db.query(OrganizationInvitation).filter(
         OrganizationInvitation.organization_id == current_user.organization_id,
+        OrganizationInvitation.organization_id.isnot(None),
         OrganizationInvitation.status == 'pending'
     ).all()
 
