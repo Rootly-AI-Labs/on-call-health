@@ -111,14 +111,12 @@ test.describe('Integrations Page', () => {
     // Check that integration cards are laid out properly
     const cards = page.locator('[data-testid*="integration"], [class*="card"]').first();
 
-    if (await cards.count() > 0) {
-      await expect(cards).toBeVisible();
+    await expect(cards).toBeVisible();
 
-      // Check that cards have proper sizing
-      const boundingBox = await cards.boundingBox();
-      expect(boundingBox?.width).toBeGreaterThan(100);
-      expect(boundingBox?.height).toBeGreaterThan(50);
-    }
+    // Check that cards have proper sizing
+    const boundingBox = await cards.boundingBox();
+    expect(boundingBox?.width).toBeGreaterThan(100);
+    expect(boundingBox?.height).toBeGreaterThan(50);
   });
 
   test.skip('should not have critical console errors', async ({ page }) => {
@@ -159,13 +157,11 @@ test.describe('Integrations Page', () => {
       // Find first clickable card or button
       const clickableElement = page.locator('button, a[href], [role="button"]').first();
 
-      if (await clickableElement.count() > 0) {
-        await expect(clickableElement).toBeVisible();
+      await expect(clickableElement).toBeVisible();
 
-        // Verify element is clickable (not disabled)
-        const isDisabled = await clickableElement.getAttribute('disabled');
-        expect(isDisabled).toBeNull();
-      }
+      // Verify element is clickable (not disabled)
+      const isDisabled = await clickableElement.getAttribute('disabled');
+      expect(isDisabled).toBeNull();
     });
 
     test('should display integration descriptions', async ({ page }) => {
