@@ -268,8 +268,7 @@ class GitHubCollector:
     async def _fetch_real_github_data(self, username: str, email: str, start_date: datetime, end_date: datetime, token: str, timezone: str = 'UTC') -> Dict:
         """Fetch real GitHub data using the GitHub API with enterprise resilience."""
 
-        logger.info(f"🔍 [GITHUB_API] Starting data fetch for {username} ({email}): {start_date.date()} to {end_date.date()}")
-        logger.debug(f"Fetching GitHub data for {username} ({email}): {start_date.date()} to {end_date.date()}")
+        logger.debug(f"🔍 [GITHUB_API] Starting data fetch for {username} ({email}): {start_date.date()} to {end_date.date()}")
 
         headers = {
             'Authorization': f'token {token}',
@@ -294,8 +293,8 @@ class GitHubCollector:
             # Get pull requests count
             prs_url = f"https://api.github.com/search/issues?q=author:{username}+type:pr+created:{start_date.strftime('%Y-%m-%d')}..{end_date.strftime('%Y-%m-%d')}&per_page=1"
 
-            logger.info(f"🔍 [GITHUB_API_URL] Commits query: {commits_url}")
-            logger.info(f"🔍 [GITHUB_API_URL] PRs query: {prs_url}")
+            logger.debug(f"🔍 [GITHUB_API_URL] Commits query: {commits_url}")
+            logger.debug(f"🔍 [GITHUB_API_URL] PRs query: {prs_url}")
 
             # Make resilient API calls with rate limiting and circuit breaker
             async def fetch_commits():
@@ -328,14 +327,14 @@ class GitHubCollector:
             logger.debug(f"🌐 [GITHUB_API] Fetching commits for {username}")
             commits_data = await github_api_manager.safe_api_call(fetch_commits, max_retries=3)
             total_commits = commits_data.get('total_count', 0) if commits_data else 0
-            logger.info(f"📊 [GITHUB_API_RESPONSE] {username} commits response: total_count={total_commits}, incomplete_results={commits_data.get('incomplete_results', 'N/A') if commits_data else 'N/A'}")
+            logger.debug(f"📊 [GITHUB_API_RESPONSE] {username} commits response: total_count={total_commits}, incomplete_results={commits_data.get('incomplete_results', 'N/A') if commits_data else 'N/A'}")
 
             logger.debug(f"🌐 [GITHUB_API] Fetching PRs for {username}")
             prs_data = await github_api_manager.safe_api_call(fetch_prs, max_retries=3)
             total_prs = prs_data.get('total_count', 0) if prs_data else 0
-            logger.info(f"📊 [GITHUB_API_RESPONSE] {username} PRs response: total_count={total_prs}, incomplete_results={prs_data.get('incomplete_results', 'N/A') if prs_data else 'N/A'}")
+            logger.debug(f"📊 [GITHUB_API_RESPONSE] {username} PRs response: total_count={total_prs}, incomplete_results={prs_data.get('incomplete_results', 'N/A') if prs_data else 'N/A'}")
 
-            logger.info(f"✅ [GITHUB_API_SUCCESS] {username} ({email}): {total_commits} commits, {total_prs} PRs")
+            logger.debug(f"✅ [GITHUB_API_SUCCESS] {username} ({email}): {total_commits} commits, {total_prs} PRs")
 
             # Fetch detailed daily commit data with timestamps
             logger.debug(f"🔄 Fetching detailed daily commit data for {username}")
@@ -485,7 +484,7 @@ class GitHubCollector:
                         rate_data = await resp.json()
                         remaining = rate_data['rate']['remaining']
                         reset_time = rate_data['rate']['reset']
-                        logger.info(f"GITHUB API: Rate limit remaining: {remaining}, resets at {datetime.fromtimestamp(reset_time)}")
+                        logger.debug(f"GITHUB API: Rate limit remaining: {remaining}, resets at {datetime.fromtimestamp(reset_time)}")
 
                         if remaining < 100:
                             logger.warning(f"GITHUB API: ⚠️ Rate limit low! Remaining: {remaining}, Reset: {reset_time}")
@@ -596,7 +595,7 @@ class GitHubCollector:
                 # Convert to list sorted by date
                 daily_data = sorted(daily_commits.values(), key=lambda x: x['date'])
                 
-                logger.info(f"Fetched {total_fetched} commits for {username} from {start_date} to {end_date}")
+                logger.debug(f"Fetched {total_fetched} commits for {username} from {start_date} to {end_date}")
                 return daily_data
                 
         except Exception as e:

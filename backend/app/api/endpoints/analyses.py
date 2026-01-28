@@ -2935,12 +2935,8 @@ async def run_analysis_task(
                     UserCorrelation.organization_id == user.organization_id
                 ).all()
 
-                logger.info(f"🔍 TEAM SYNC: Found {len(correlations)} total user correlations for user_id={user_id}")
                 jira_mapped = [c for c in correlations if c.jira_account_id]
-                logger.info(f"🔍 TEAM SYNC: {len(jira_mapped)} correlations have jira_account_id")
-                if jira_mapped:
-                    for c in jira_mapped[:3]:
-                        logger.info(f"   - {c.name} → jira_account_id={c.jira_account_id}, integration_ids={c.integration_ids}")
+                logger.info(f"🔍 TEAM SYNC: Found {len(correlations)} correlations ({len(jira_mapped)} with Jira)")
 
                 # Fetch on-call status for all users (Rootly only - PagerDuty doesn't have this endpoint)
                 oncall_emails = {}

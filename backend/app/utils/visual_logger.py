@@ -103,7 +103,7 @@ def log_step_header(
         logger.info(f"Features: {feature_badges}")
 
     logger.info(f"Progress: [{bar}] {percentage}%")
-    logger.info("─" * 60)
+    logger.info("═" * 60)
 
 
 def log_step_complete(
@@ -130,8 +130,6 @@ def log_step_complete(
             else:
                 logger.info(f"   {key}: {value}")
 
-    logger.info("═" * 60)
-
 
 def log_substep(
     substep_name: str,
@@ -147,16 +145,9 @@ def log_substep(
         operation: Description of the operation
         status: Status indicator (pending, complete, skipped)
     """
-    status_icon = {
-        "pending": "⏳",
-        "complete": "✅",
-        "skipped": "⏭️",
-        "failed": "❌"
-    }.get(status, "⏳")
-
-    logger.info(f"├─ {status_icon} {substep_name}")
-    logger.info(f"│  File: {file_name}")
-    logger.info(f"│  Operation: {operation}")
+    logger.info(f"{substep_name}")
+    logger.info(f"File: {file_name}")
+    logger.info(f"Operation: {operation}")
 
 
 def log_substep_complete(
@@ -171,7 +162,7 @@ def log_substep_complete(
         duration: Duration in seconds
         stats: Optional dictionary of statistics
     """
-    logger.info(f"✅ {substep_name} COMPLETE ({duration:.2f}s)")
+    logger.info(f"{substep_name} COMPLETE ({duration:.2f}s)")
 
     if stats:
         for key, value in stats.items():
@@ -188,7 +179,7 @@ def log_substep_skipped(substep_name: str, reason: str) -> None:
         substep_name: Name of the substep
         reason: Reason for skipping
     """
-    logger.info(f"⏭️ {substep_name} SKIPPED: {reason}")
+    logger.info(f"{substep_name} SKIPPED: {reason}")
 
 
 def log_analysis_complete(

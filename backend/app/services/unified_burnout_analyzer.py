@@ -130,10 +130,8 @@ class UnifiedBurnoutAnalyzer:
             logger.info(f"Using {len(synced_users)} pre-synced users from Team Sync - will skip user API fetch")
             # Check if jira_account_id is in synced users
             users_with_jira = [u for u in synced_users if u.get('jira_account_id')]
-            logger.info(f"🔍 CONSTRUCTOR: {len(users_with_jira)} synced users have jira_account_id at initialization")
-            if users_with_jira and len(users_with_jira) > 0:
-                sample = users_with_jira[0]
-                logger.info(f"   Sample: {sample.get('name')} → jira_account_id={sample.get('jira_account_id')}")
+            if users_with_jira:
+                logger.info(f"🔍 CONSTRUCTOR: {len(users_with_jira)} synced users have jira_account_id at initialization")
         else:
             logger.info("No synced users provided - will fetch users from API (slower)")
 
@@ -272,18 +270,11 @@ class UnifiedBurnoutAnalyzer:
             
             # Extract users and incidents (with additional safety checks)
             extraction_start = datetime.now()
-            logger.info(f"BURNOUT ANALYSIS: Step 2 - Extracting users and incidents from {time_range_days}-day data")
             users = data.get("users", []) if data else []
 
             # create map with user time zones
             self.user_tz_by_id = self._build_user_tz_map(users)
             # print(self.user_tz_by_id)
-
-            # optional: calculate 
-            if self.user_tz_by_id:
-                sample = list(self.user_tz_by_id.items())[:3]
-                print(f"🕒 TZ MAP sample: {sample}")
-
 
             incidents = data.get("incidents", []) if data else []
             metadata = data.get("collection_metadata", {}) if data else {}
@@ -301,21 +292,13 @@ class UnifiedBurnoutAnalyzer:
             # Validate user data structure
             if users:
                 sample_user = users[0]
-                logger.info(f"UNIFIED ANALYZER: Sample user structure:")
-                logger.info(f"   - Keys: {list(sample_user.keys()) if isinstance(sample_user, dict) else 'Not a dict'}")
-                logger.info(f"   - Sample: ID={sample_user.get('id')}, Name={sample_user.get('name')}, Email={sample_user.get('email')}")
+                if isinstance(sample_user, dict):
+                    logger.info(f"UNIFIED ANALYZER: User structure validated - {len(sample_user.keys())} fields per user")
             
             # Validate incident data structure and assignments
             if incidents:
                 logger.info(f"UNIFIED ANALYZER: Incident assignment analysis:")
                 incidents_with_assignments = 0
-                sample_incident = incidents[0]
-                
-                logger.info(f"   - Sample incident structure:")
-                logger.info(f"     - Keys: {list(sample_incident.keys()) if isinstance(sample_incident, dict) else 'Not a dict'}")
-                logger.info(f"     - ID: {sample_incident.get('id')}")
-                logger.info(f"     - Title: {sample_incident.get('title', 'No title')[:50]}")
-                logger.info(f"     - Assigned_to: {sample_incident.get('assigned_to')}")
                 
                 # Count incidents with assignments across all incidents (use platform-specific logic)
                 for i, incident in enumerate(incidents[:10]):  # Check first 10
@@ -340,8 +323,6 @@ class UnifiedBurnoutAnalyzer:
                     
                     if user_id:
                         incidents_with_assignments += 1
-                        if i < 3:  # Log first 3 assignments
-                            logger.info(f"     - Incident #{i+1} assigned to: {user_name} (ID: {user_id})")
                 
                 logger.info(f"   - Incidents with assignments: {incidents_with_assignments}/{min(len(incidents), 10)} (first 10 checked)")
                 
@@ -404,7 +385,6 @@ class UnifiedBurnoutAnalyzer:
                     # Continue with analysis - this might be a quiet period
             
             extraction_duration = (datetime.now() - extraction_start).total_seconds()
-            logger.info(f"BURNOUT ANALYSIS: Step 2 completed in {extraction_duration:.3f}s - {len(users)} users, {len(incidents)} incidents")
             logger.info(f"BURNOUT ANALYSIS: Analyzing all {len(users)} synced users (on-call filtering disabled)")
             
             # Log potential issues based on data patterns
@@ -732,20 +712,13 @@ class UnifiedBurnoutAnalyzer:
                 )
                 team_analysis_duration = (datetime.now() - team_analysis_start).total_seconds()
 
-                members_analyzed = len(team_analysis.get("members", [])) if team_analysis else 0
-                log_step_complete(
-                    step_num=3,
-                    step_name="TEAM ANALYSIS",
-                    duration=team_analysis_duration,
-                    stats={
-                        "members_analyzed": members_analyzed,
-                        "members_with_incidents": len([m for m in team_analysis.get("members", []) if m.get('incidents_count', 0) > 0])
-                    }
-                )
-                
             except Exception as e:
                 team_analysis_duration = (datetime.now() - team_analysis_start).total_seconds() if 'team_analysis_start' in locals() else 0
-                logger.error(f"BURNOUT ANALYSIS: Step 3 FAILED after {team_analysis_duration:.2f}s: {e}")
+                log_analysis_failed(
+                    duration=team_analysis_duration,
+                    error=str(e),
+                    step_num=3
+                )
                 logger.error(f"BURNOUT ANALYSIS: Users data - type: {type(users)}, length: {len(users) if users else 'N/A'}")
                 logger.error(f"BURNOUT ANALYSIS: Incidents data - type: {type(incidents)}, length: {len(incidents) if incidents else 'N/A'}")
                 logger.error(f"BURNOUT ANALYSIS: Metadata type: {type(metadata)}")
@@ -753,9 +726,8 @@ class UnifiedBurnoutAnalyzer:
             
             # Placeholder for team_health - will be calculated after GitHub correlation
             team_health = None
-            
+
             # Create data sources structure
-            logger.info(f"BURNOUT ANALYSIS: Step 6 - Creating data source structure")
             data_sources = {
                 "incident_data": True,
                 "github_data": self.features['github'],
@@ -812,18 +784,18 @@ class UnifiedBurnoutAnalyzer:
             # JIRA OCB ADJUSTMENT: Update OCB scores using Jira ticket workload
             if self.features['jira'] and self.current_user_id:
                 try:
-                    logger.info(f"\n{'='*80}")
-                    logger.info(f"JIRA BURNOUT ANALYSIS: Starting Jira integration for current_user_id={self.current_user_id}")
-                    logger.info(f"{'='*80}")
-                    logger.info(f"JIRA BURNOUT: Fetching Jira ticket data for burnout analysis")
+                    jira_substep_start = datetime.now()
+                    log_substep(
+                        substep_name="STEP 3d: Jira Workload Analysis",
+                        file_name="unified_burnout_analyzer.py",
+                        operation="Analyzing Jira ticket workload and updating burnout scores"
+                    )
 
                     # Fetch Jira workload data using current_user_id (the person running the analysis)
                     # NOT the variable user_id (which changes during incident processing)
                     jira_workload = await self._fetch_jira_workload_data(self.current_user_id)
 
                     if jira_workload:
-                        logger.info(f"JIRA BURNOUT: ✅ Successfully fetched Jira workload for {len(jira_workload)} assignees")
-                        logger.info(f"JIRA BURNOUT: Correlating Jira data with team members")
                         # Correlate Jira data with team members
                         team_analysis["members"] = self._correlate_jira_data(
                             team_analysis["members"],
@@ -831,60 +803,75 @@ class UnifiedBurnoutAnalyzer:
                         )
 
                         # Recalculate burnout scores using Jira data
-                        logger.info(f"JIRA BURNOUT: Recalculating scores with Jira ticket workload")
                         team_analysis["members"] = self._recalculate_burnout_with_jira(team_analysis["members"], metadata)
-                    else:
-                        logger.info(f"❌ JIRA BURNOUT: No Jira workload data found - Jira integration may not be configured or user has no Jira access")
-                        logger.info(f"{'='*80}\n")
+
+                    jira_substep_duration = (datetime.now() - jira_substep_start).total_seconds()
+                    log_substep_complete(
+                        substep_name="STEP 3d: Jira Workload Analysis",
+                        duration=jira_substep_duration,
+                        stats={
+                            "assignees_found": len(jira_workload) if jira_workload else 0,
+                            "members_with_jira": len([m for m in team_analysis["members"] if m.get('jira_workload', {}).get('active_tickets', 0) > 0])
+                        }
+                    )
 
                 except Exception as e:
                     logger.warning(f"❌ JIRA BURNOUT: Could not integrate Jira data: {e}")
-                    logger.warning(f"{'='*80}\n")
                     # Continue without Jira data - it's optional
             else:
-                if not self.features['jira']:
-                    logger.info(f"⚠️ JIRA BURNOUT: Skipping Jira data - Jira feature disabled (no jira_token provided)")
-                if not self.current_user_id:
-                    logger.info(f"⚠️ JIRA BURNOUT: Skipping Jira data - no current_user_id provided to analyzer")
+                reason = "Jira integration disabled" if not self.features['jira'] else "No current_user_id provided"
+                log_substep_skipped("STEP 3d: Jira Workload Analysis", reason)
 
             # --- LINEAR INTEGRATION (similar to Jira) ---
             if self.features.get('linear') and self.current_user_id:
                 try:
-                    logger.info(f"\n{'='*80}")
-                    logger.info(f"LINEAR BURNOUT ANALYSIS: Starting Linear integration for current_user_id={self.current_user_id}")
-                    logger.info(f"{'='*80}")
-                    logger.info(f"LINEAR BURNOUT: Fetching Linear issue data for burnout analysis")
+                    linear_substep_start = datetime.now()
+                    log_substep(
+                        substep_name="STEP 3e: Linear Workload Analysis",
+                        file_name="unified_burnout_analyzer.py",
+                        operation="Analyzing Linear issue workload and updating burnout scores"
+                    )
 
                     linear_workload = await self._fetch_linear_workload_data(self.current_user_id)
 
                     if linear_workload:
-                        logger.info(f"LINEAR BURNOUT: ✅ Successfully fetched Linear workload for {len(linear_workload)} assignees")
-                        logger.info(f"LINEAR BURNOUT: Correlating Linear data with team members")
                         team_analysis["members"] = self._correlate_linear_data(
                             team_analysis["members"],
                             linear_workload
                         )
 
-                        logger.info(f"LINEAR BURNOUT: Recalculating scores with Linear issue workload")
                         team_analysis["members"] = self._recalculate_burnout_with_linear(team_analysis["members"], metadata)
-                    else:
-                        logger.info(f"❌ LINEAR BURNOUT: No Linear workload data found - Linear integration may not be configured")
-                        logger.info(f"{'='*80}\n")
+
+                    linear_substep_duration = (datetime.now() - linear_substep_start).total_seconds()
+                    log_substep_complete(
+                        substep_name="STEP 3e: Linear Workload Analysis",
+                        duration=linear_substep_duration,
+                        stats={
+                            "assignees_found": len(linear_workload) if linear_workload else 0,
+                            "members_with_linear": len([m for m in team_analysis["members"] if m.get('linear_workload', {}).get('active_issues', 0) > 0])
+                        }
+                    )
 
                 except Exception as e:
                     logger.warning(f"❌ LINEAR BURNOUT: Could not integrate Linear data: {e}")
-                    logger.warning(f"{'='*80}\n")
             else:
-                if not self.features.get('linear'):
-                    logger.info(f"⚠️ LINEAR BURNOUT: Skipping Linear data - Linear feature disabled (no linear_token provided)")
-                if not self.current_user_id:
-                    logger.info(f"⚠️ LINEAR BURNOUT: Skipping Linear data - no current_user_id provided to analyzer")
+                reason = "Linear integration disabled" if not self.features.get('linear') else "No current_user_id provided"
+                log_substep_skipped("STEP 3e: Linear Workload Analysis", reason)
 
-            # DEBUG: Check GitHub data AFTER Jira processing
-            logger.info(f"🔍 POST_JIRA_CHECK: Checking GitHub data after Jira processing")
-            for member in team_analysis["members"][:3]:
-                github_activity = member.get('github_activity', {})
-                logger.info(f"🔍 POST_JIRA_CHECK: Member {member.get('user_email')} - github_activity: commits={github_activity.get('commits_count', 0)}, prs={github_activity.get('pull_requests_count', 0)}")
+            # ========== STEP 3 COMPLETION: Team Analysis (including Jira/Linear correlations) ==========
+            team_analysis_duration = (datetime.now() - team_analysis_start).total_seconds()
+            log_step_complete(
+                step_num=3,
+                step_name="TEAM ANALYSIS",
+                duration=team_analysis_duration,
+                stats={
+                    "members_analyzed": len(team_analysis.get("members", [])) if team_analysis else 0,
+                    "members_with_incidents": len([m for m in team_analysis.get("members", []) if m.get('incidents_count', 0) > 0]),
+                    "github_correlated": len([m for m in team_analysis["members"] if m.get('github_activity', {}).get('commits', 0) > 0]),
+                    "jira_correlated": len([m for m in team_analysis["members"] if m.get('jira_workload', {}).get('active_tickets', 0) > 0]),
+                    "linear_correlated": len([m for m in team_analysis["members"] if m.get('linear_workload', {}).get('active_issues', 0) > 0])
+                }
+            )
 
             # ========== CHECKPOINT 4: Health Calculation ==========
             health_calc_start = datetime.now()
@@ -949,11 +936,8 @@ class UnifiedBurnoutAnalyzer:
             
             # Generate daily trends from incident data and GitHub activity
             if github_data:
-                logger.info(f"📊 Passing GitHub data to _generate_daily_trends: {len(github_data)} users")
-                for email, data in list(github_data.items())[:3]:
-                    if data:
-                        commits = data.get('commits', [])
-                        logger.info(f"📊 {email}: {len(commits)} commits in data")
+                total_commits_data = sum(len(data.get('commits', [])) for data in github_data.values() if data)
+                logger.info(f"📊 Passing GitHub data to _generate_daily_trends: {len(github_data)} users with {total_commits_data} total commits")
             else:
                 logger.warning("📊 No GitHub data to pass to _generate_daily_trends")
             daily_trends = self._generate_daily_trends(incidents, team_analysis["members"], metadata, team_health, github_data)
@@ -1196,9 +1180,7 @@ class UnifiedBurnoutAnalyzer:
                 # DEBUG: Check if jira_account_id is present in synced users
                 users_with_jira = [u for u in self.synced_users if u.get('jira_account_id')]
                 if users_with_jira:
-                    logger.info(f"🔍 JIRA MAPPING IN SYNCED USERS: {len(users_with_jira)} users have jira_account_id")
-                    for u in users_with_jira[:3]:  # Log first 3
-                        logger.info(f"   - {u.get('name')} → jira_account_id={u.get('jira_account_id')}")
+                    logger.info(f"🔍 JIRA MAPPING: {len(users_with_jira)} users have jira_account_id")
                 else:
                     logger.warning(f"⚠️ NO JIRA MAPPINGS in synced_users! Sample user keys: {list(self.synced_users[0].keys()) if self.synced_users else 'empty'}")
 
@@ -3236,13 +3218,7 @@ class UnifiedBurnoutAnalyzer:
         
         # Log member details for debugging
         if member_analyses:
-            member_names = []
-            for member in member_analyses[:10]:  # Log first 10 members
-                if member and isinstance(member, dict):
-                    name = member.get("name", "Unknown")
-                    email = member.get("email", "no-email")
-                    member_names.append(f"{name} ({email})")
-            logger.info(f"🏥 TEAM_HEALTH: Members being analyzed: {', '.join(member_names)}{'...' if len(member_analyses) > 10 else ''}")
+            logger.info(f"🏥 TEAM_HEALTH: Calculating health for {len(member_analyses)} team members")
         
         if not member_analyses:
             logger.warning(f"🏥 TEAM_HEALTH: No member analyses provided, returning neutral baseline")
@@ -5058,27 +5034,26 @@ class UnifiedBurnoutAnalyzer:
                 updated_members.append(updated_member)
 
             # Log summary
-            logger.info(f"\n{'='*80}")
             logger.info(f"JIRA ANALYSIS SUMMARY")
-            logger.info(f"{'='*80}")
             logger.info(f"Total team members: {len(members)}")
             logger.info(f"Members with Jira mapping: {members_with_jira_mapping}")
             logger.info(f"Members with active Jira tickets: {members_with_jira}")
             logger.info(f"Members without Jira mapping: {len(members_without_jira_mapping)}")
 
             if members_with_jira > 0:
-                logger.info(f"✅ JIRA USERS WITH TICKETS (will contribute to burnout score):")
+                logger.info(f"JIRA USERS WITH TICKETS (will contribute to burnout score):")
                 for member in updated_members:
                     if member.get("jira_tickets") and len(member.get("jira_tickets", [])) > 0:
                         member_name = member.get("user_name") or member.get("name") or "Unknown"
                         logger.info(f"   • {member_name} - {len(member.get('jira_tickets'))} tickets")
             else:
-                logger.info(f"❌ NO USERS WITH ACTIVE JIRA TICKETS - Jira will NOT contribute to burnout scores")
+                logger.info(f"NO USERS WITH ACTIVE JIRA TICKETS - Jira will NOT contribute to burnout scores")
 
             if members_without_jira_mapping:
-                logger.info(f"⚠️ Members without Jira mapping: {', '.join(members_without_jira_mapping)}")
-
-            logger.info(f"{'='*80}\n")
+                if len(members_without_jira_mapping) <= 5:
+                    logger.info(f"Members without Jira mapping: {', '.join(members_without_jira_mapping)}")
+                else:
+                    logger.info(f"{len(members_without_jira_mapping)} members without Jira mapping (showing first 5): {', '.join(members_without_jira_mapping[:5])}")
 
             return updated_members
 
