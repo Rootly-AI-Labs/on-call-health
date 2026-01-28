@@ -134,6 +134,10 @@ async def startup(ctx: dict) -> None:
     """
     logger.info("ARQ worker starting up")
 
+    # Suppress verbose ARQ internal logs
+    arq_logger = logging.getLogger("arq.worker")
+    arq_logger.setLevel(logging.WARNING)  # Only show warnings and errors from ARQ internals
+
     # Register SIGTERM handler for graceful shutdown
     from .signal_handler import register_signal_handlers
     register_signal_handlers()
