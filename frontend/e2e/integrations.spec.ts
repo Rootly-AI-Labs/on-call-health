@@ -72,8 +72,8 @@ test.describe('Integrations Page', () => {
   });
 
   test('should have interactive elements on integration cards', async ({ page }) => {
-    // Wait for page to load
-    await page.waitForTimeout(2000);
+    // Wait for page to fully load
+    await page.waitForLoadState('networkidle');
 
     // Look for any interactive elements (buttons or links)
     const interactiveElements = page.locator('button, a[href]');
@@ -145,7 +145,8 @@ test.describe('Integrations Page', () => {
 
   test.describe('Integration Interactions', () => {
     test('should be able to click on integration cards', async ({ page }) => {
-      await page.waitForTimeout(2000);
+      // Wait for page to fully load
+      await page.waitForLoadState('networkidle');
 
       // Find first clickable card or button
       const clickableElement = page.locator('button, a[href], [role="button"]').first();
