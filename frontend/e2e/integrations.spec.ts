@@ -19,9 +19,9 @@ test.describe('Integrations Page', () => {
     const response = await page.goto('/integrations');
     expect(response?.status()).toBe(200);
 
-    // Verify page has content
+    // Verify page has integration-specific content
     const bodyText = await page.textContent('body');
-    expect(bodyText?.length).toBeGreaterThan(0);
+    expect(bodyText).toContain('Integration');
   });
 
   test('should display page heading', async ({ page }) => {
@@ -37,7 +37,10 @@ test.describe('Integrations Page', () => {
     // Use consistent selector for both waiting and counting
     const cardSelector = '[data-testid*="integration"], [class*="card"]';
 
-    // Wait for loading to complete
+    // Wait for page to fully load to avoid race conditions
+    await page.waitForLoadState('networkidle');
+
+    // Wait for at least one card to be visible
     await page.waitForSelector(cardSelector, {
       state: 'visible',
       timeout: 10000
