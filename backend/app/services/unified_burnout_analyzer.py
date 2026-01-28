@@ -1795,15 +1795,31 @@ class UnifiedBurnoutAnalyzer:
             task_load_score = apply_incident_tiers(incidents_per_week) * 10
             logger.debug(f"📋 TASK LOAD FALLBACK: {user_name} using incident frequency ({incidents_per_week:.1f}/week) as proxy")
 
+        # Volume scaling: Don't penalize low-volume users based on percentages alone
+        # Someone with 7 incidents over 90 days (0.54/week) shouldn't get Critical just because 71% were after-hours
+        # Scale penalties based on actual workload volume
+        volume_threshold = 2.0  # incidents per week threshold for full penalty
+        volume_scale = min(incidents_per_week / volume_threshold, 1.0)  # 0.0-1.0 scale
+
+        # Apply volume scaling to percentage-based metrics
+        scaled_after_hours = after_hours_percentage * volume_scale
+        scaled_oncall_burden = apply_rootly_incident_tiers(severity_weighted_per_week) * 10 * volume_scale
+
+        logger.debug(f"🔢 VOLUME SCALING: {user_name} incidents_per_week={incidents_per_week:.2f}, volume_scale={volume_scale:.2f}")
+        logger.debug(f"   after_hours: {after_hours_percentage:.1f}% → {scaled_after_hours:.1f}% (scaled)")
+        logger.debug(f"   oncall_burden: {apply_rootly_incident_tiers(severity_weighted_per_week) * 10:.1f} → {scaled_oncall_burden:.1f} (scaled)")
+
         ocb_metrics = {
             # Personal burnout factors (65% of total)
-            'work_hours_trend': task_load_score,                                    # Task load: 10% (JIRA/Linear workload)
-            'after_hours_activity': time_weighted_after_hours,                      # After-hours: 30% (includes weekends)
-            'sleep_quality_proxy': apply_rootly_incident_tiers(severity_weighted_per_week) * 8,  # High-severity: 25%
+            # OCB scale_max values: work_hours_trend=100, after_hours_activity=30, sleep_quality_proxy=30
+            'work_hours_trend': task_load_score,                                    # Task load: 10% (0-100 scale)
+            'after_hours_activity': scaled_after_hours,                             # After-hours: 30% (volume-scaled %)
+            'sleep_quality_proxy': severity_weighted_per_week,                      # High-severity: 25% (raw weekly rate, scale_max=30)
 
             # Work-related burnout factors (35% of total)
-            'sprint_completion': consecutive_days_data['consecutive_days_score'],   # Consecutive days: 15%
-            'oncall_burden': apply_rootly_incident_tiers(severity_weighted_per_week) * 10  # On-call load: 20%
+            # OCB scale_max values: sprint_completion=7, oncall_burden=100
+            'sprint_completion': consecutive_days_data['max_consecutive_days'],     # Consecutive days: 15% (raw days 0-7+)
+            'oncall_burden': scaled_oncall_burden  # On-call load: 20% (volume-scaled)
         }
 
         # Check if all OCB metrics are 0
@@ -1817,13 +1833,20 @@ class UnifiedBurnoutAnalyzer:
         composite_ocb = calculate_composite_ocb_score(personal_ocb['score'], work_ocb['score'])
         
         # Prepare enhanced metrics with research insights for OCB reasoning
+        # Use rate-based compound trauma calculation (CBI/sRPE methodology)
+        days_analyzed = metrics.get("days_analyzed", 30) or 30
+        weeks_analyzed = max(1, days_analyzed / 7)
+        critical_incidents_raw = severity_dist.get('sev0', 0) + severity_dist.get('sev1', 0)
+        critical_per_week = critical_incidents_raw / weeks_analyzed
+
         enhanced_metrics = metrics.copy()
         enhanced_metrics['time_impact_analysis'] = time_impacts
         enhanced_metrics['recovery_analysis'] = recovery_data
         enhanced_metrics['trauma_analysis'] = {
-            "critical_incidents": severity_dist.get('sev0', 0) + severity_dist.get('sev1', 0),
-            "compound_trauma_detected": (severity_dist.get('sev0', 0) + severity_dist.get('sev1', 0)) >= 5,
-            "compound_factor": self._calculate_compound_trauma_factor(severity_dist.get('sev0', 0) + severity_dist.get('sev1', 0))
+            "critical_incidents": critical_incidents_raw,
+            "critical_per_week": round(critical_per_week, 2),
+            "compound_trauma_detected": critical_per_week >= 1.5,  # Rate-based threshold
+            "compound_factor": self._calculate_compound_trauma_factor_rate(critical_per_week)
         }
 
         # Generate reasoning for the OCB scores
@@ -1877,9 +1900,10 @@ class UnifiedBurnoutAnalyzer:
                 "recovery_score": round(recovery_data['recovery_score'], 0)
             },
             "trauma_analysis": {
-                "critical_incidents": severity_dist.get('sev0', 0) + severity_dist.get('sev1', 0),
-                "compound_trauma_detected": (severity_dist.get('sev0', 0) + severity_dist.get('sev1', 0)) >= 5,
-                "compound_factor": self._calculate_compound_trauma_factor(severity_dist.get('sev0', 0) + severity_dist.get('sev1', 0))
+                "critical_incidents": critical_incidents_raw,
+                "critical_per_week": round(critical_per_week, 2),
+                "compound_trauma_detected": critical_per_week >= 1.5,  # Rate-based threshold
+                "compound_factor": self._calculate_compound_trauma_factor_rate(critical_per_week)
             }
         }
 
@@ -2122,7 +2146,10 @@ class UnifiedBurnoutAnalyzer:
             "github_after_hours_commits": github_after_hours_commits,
             "github_weekend_commits": github_weekend_commits,
             "total_commits": total_commits,
-            "total_activities": total_activities
+            "total_activities": total_activities,
+            # Time period for rate normalization (CBI/sRPE methodology)
+            "days_analyzed": safe_days,
+            "total_incidents": safe_incidents_len
         }
 
         # Add severity-weighted incident calculation for better load assessment
@@ -2674,68 +2701,74 @@ class UnifiedBurnoutAnalyzer:
         return weighted_score
     
     def _calculate_work_burnout_ocb(self, metrics: Dict[str, Any]) -> float:
-        """Calculate Work-Related Burnout from incident data using OCB methodology (0-10 scale)."""
-        # Use the NEW research-based severity weights
+        """
+        Calculate Work-Related Burnout using CBI/sRPE-inspired methodology (0-10 scale).
+
+        Key principle: Use WEEKLY RATES instead of raw counts to ensure consistent
+        scoring across different analysis periods (7, 30, 90 days).
+
+        Based on Copenhagen Burnout Inventory (averaged scores) and sRPE (rate-based load).
+        """
         severity_dist = metrics.get("severity_distribution", {}) or {}
-        
+
+        # Get time period for rate normalization
+        days_analyzed = metrics.get("days_analyzed", 30) or 30
+        weeks_analyzed = max(1, days_analyzed / 7)
+
         # Apply research-based severity weights (SEV0=15.0, SEV1=12.0, etc.)
         if self.platform == "pagerduty":
             severity_weights = {'sev1': 15.0, 'sev2': 12.0, 'sev3': 6.0, 'sev4': 3.0, 'sev5': 1.5}
         else:
             severity_weights = {'sev0': 15.0, 'sev1': 12.0, 'sev2': 6.0, 'sev3': 3.0, 'sev4': 1.5, 'unknown': 1.5}
-        
-        # Calculate weighted severity impact using NEW weights with compound trauma
-        total_severity_impact = 0.0
-        total_incidents = 0
-        critical_incidents_count = 0
+
+        # Calculate WEEKLY severity impact (rate-based, not raw counts)
+        # This ensures 7-day and 90-day analyses produce comparable scores for same workload rate
+        total_weekly_severity_impact = 0.0
+        critical_per_week = 0.0
 
         for severity, count in severity_dist.items():
             if count > 0:
+                # Normalize to per-week rate
+                weekly_count = count / weeks_analyzed
                 weight = severity_weights.get(severity.lower(), 1.5)
 
-                # Track critical incidents for compound trauma calculation
+                # Track critical incidents rate for compound trauma
                 if severity.lower() in ['sev0', 'sev1'] and weight >= 12.0:
-                    critical_incidents_count += count
+                    critical_per_week += weekly_count
 
-                # Apply compound trauma factor for critical incidents
-                if severity.lower() in ['sev0', 'sev1'] and count >= 5:
-                    compound_factor = self._calculate_compound_trauma_factor(count)
-                    weight *= compound_factor
-                    logger.info(f"COMPOUND TRAUMA: {severity} incidents: {count}, compound factor: {compound_factor:.2f}")
+                total_weekly_severity_impact += weekly_count * weight
 
-                total_severity_impact += count * weight
-                total_incidents += count
-        
-        # Scale to 0-10 range - high-volume severe incident cases should hit near max
-        # Example: 46 SEV1 incidents × 12.0 weight = 552 severity impact points
-        # Scale: 100+ points should be near maximum (8-10)
-        if total_severity_impact >= 200:  # Very high severity load
-            escalation_score = 9.0 + min(1.0, (total_severity_impact - 200) / 300)
-        elif total_severity_impact >= 100:  # High severity load  
-            escalation_score = 7.0 + ((total_severity_impact - 100) / 100) * 2
-        elif total_severity_impact >= 50:   # Moderate severity load
-            escalation_score = 4.0 + ((total_severity_impact - 50) / 50) * 3
-        else:  # Low severity load
-            escalation_score = min(4.0, total_severity_impact / 12.5)
+        # Apply compound trauma based on RATE (critical incidents per week)
+        # Threshold: 1.5+ critical incidents per week triggers compound effect
+        if critical_per_week >= 1.5:
+            compound_factor = self._calculate_compound_trauma_factor_rate(critical_per_week)
+            total_weekly_severity_impact *= compound_factor
 
-        # Remove the old logic below and use the new severity-weighted calculation
-        # high_severity_count = severity_dist.get("high", 0) + severity_dist.get("critical", 0)
-        # total_incidents = sum(severity_dist.values()) if severity_dist else 1
-        # escalation_rate = high_severity_count / max(total_incidents, 1)
-        # escalation_score = min(10, escalation_rate * 10)
-        
-        # Use only REAL data - calculate based on actual incident patterns
-        # Response time variability (higher = more stress)
+        # Scale to 0-10 range based on WEEKLY severity load
+        # Thresholds calibrated for weekly rates:
+        # - 30+ weekly impact = critical (e.g., 2.5 SEV1/week × 12 = 30)
+        # - 20+ = high
+        # - 10+ = moderate
+        if total_weekly_severity_impact >= 30:  # Very high weekly severity load
+            escalation_score = 9.0 + min(1.0, (total_weekly_severity_impact - 30) / 20)
+        elif total_weekly_severity_impact >= 20:  # High weekly severity load
+            escalation_score = 7.0 + ((total_weekly_severity_impact - 20) / 10) * 2
+        elif total_weekly_severity_impact >= 10:   # Moderate weekly severity load
+            escalation_score = 4.0 + ((total_weekly_severity_impact - 10) / 10) * 3
+        else:  # Low weekly severity load
+            escalation_score = min(4.0, total_weekly_severity_impact / 2.5)
+
+        # Response time stress (already time-independent)
         art = metrics.get("avg_response_time_minutes", 0)
         art = float(art) if art is not None else 0.0
         response_stress = min(10, art / 30) if art > 0 else 0  # Scale based on 30min target
-        
-        # Incident volume stress 
+
+        # Incident volume stress (already normalized to per-week)
         incidents_per_week = metrics.get("incidents_per_week", 0)
         incidents_per_week = float(incidents_per_week) if incidents_per_week is not None else 0.0
-        volume_stress = min(10, incidents_per_week * 1.5)  # More incidents = more work stress
-        
-        # Use real metrics only
+        volume_stress = min(10, incidents_per_week * 1.5)
+
+        # Combined score using real metrics only
         return (escalation_score * 0.4 + response_stress * 0.3 + volume_stress * 0.3)
     
     def _calculate_accomplishment_burnout_ocb(self, metrics: Dict[str, Any]) -> float:
@@ -2888,6 +2921,9 @@ class UnifiedBurnoutAnalyzer:
 
         Returns:
             Compound factor (1.0-2.0)
+
+        Note: This method uses raw counts. For rate-based calculation (recommended),
+        use _calculate_compound_trauma_factor_rate() instead.
         """
         if critical_incident_count < 5:
             return 1.0  # No compound effect for low counts
@@ -2898,6 +2934,34 @@ class UnifiedBurnoutAnalyzer:
             # High compound effect: 15% per additional incident, capped at 2.0x
             base_compound = 1.1  # 10% for first 10 incidents
             additional_compound = (critical_incident_count - 10) * 0.15
+            return min(2.0, base_compound + additional_compound)
+
+    def _calculate_compound_trauma_factor_rate(self, critical_per_week: float) -> float:
+        """
+        Calculate compound trauma factor based on WEEKLY RATE of critical incidents.
+
+        This rate-based approach ensures consistent scoring across different analysis
+        periods (7, 30, 90 days), following CBI/sRPE methodology principles.
+
+        Research basis: Sustained high-frequency critical incidents create compound trauma.
+        - 1.5-3 critical/week: 10% compound effect (sustained moderate stress)
+        - 3+ critical/week: Additional 10% per 1.0 critical/week above 3 (capped at 2.0x)
+
+        Args:
+            critical_per_week: Average critical incidents (SEV0/SEV1) per week
+
+        Returns:
+            Compound factor (1.0-2.0)
+        """
+        if critical_per_week < 1.5:
+            return 1.0  # No compound effect for low rates
+        elif critical_per_week <= 3.0:
+            # Moderate compound effect: up to 10% increase
+            return 1.0 + (critical_per_week - 1.5) * 0.067  # ~10% over 1.5 range
+        else:
+            # High compound effect: 10% per additional 1.0 critical/week, capped at 2.0x
+            base_compound = 1.1  # 10% for first 3 critical/week
+            additional_compound = (critical_per_week - 3.0) * 0.1
             return min(2.0, base_compound + additional_compound)
 
     def _calculate_time_impact_multipliers(self, incidents: List[Dict], metrics: Dict, user_tz: str) -> Dict[str, float]:
@@ -4561,17 +4625,21 @@ class UnifiedBurnoutAnalyzer:
         """
         
         try:
-            # Calculate baseline health from team incident load (no hardcoded values)
-            team_avg_incidents = sum(m.get("incident_count", 0) for m in team_analysis) / len(team_analysis) if team_analysis else 0
-            # Higher team incident load = lower baseline health for everyone
-            base_health = max(70, 100 - (team_avg_incidents * 2))  # Dynamic baseline
-            
             # Extract metrics from daily data
             incident_count = daily_data.get("incident_count", 0)
             severity_weighted = daily_data.get("severity_weighted_count", 0.0)
             after_hours_count = daily_data.get("after_hours_count", 0)
             weekend_count = daily_data.get("weekend_count", 0)
             high_severity_count = daily_data.get("high_severity_count", 0)
+
+            # If there's no activity at all, risk is 0
+            if incident_count == 0 and after_hours_count == 0 and weekend_count == 0:
+                return 0
+
+            # Calculate baseline health from team incident load (no hardcoded values)
+            team_avg_incidents = sum(m.get("incident_count", 0) for m in team_analysis) / len(team_analysis) if team_analysis else 0
+            # Higher team incident load = lower baseline health for everyone
+            base_health = max(70, 100 - (team_avg_incidents * 2))  # Dynamic baseline
             
             # 1. INCIDENT LOAD HEALTH PENALTIES (Primary Impact)
             # Research: Each incident reduces health by 8-15 points depending on context

@@ -14,6 +14,7 @@ from sqlalchemy.orm import sessionmaker
 from app.models.user import User
 import os
 
+
 # Database connection - MUST be provided via environment variable
 DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
