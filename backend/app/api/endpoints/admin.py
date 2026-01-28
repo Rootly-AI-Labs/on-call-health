@@ -162,7 +162,7 @@ async def refresh_demo_analyses(
     try:
         # Load mock data
         backend_dir = Path(__file__).parent.parent.parent.parent
-        mock_data_path = backend_dir / "mock_analysis_data.json"
+        mock_data_path = backend_dir / "mock_data_helpers" / "mock_analysis_data.json"
 
         if not mock_data_path.exists():
             raise HTTPException(
