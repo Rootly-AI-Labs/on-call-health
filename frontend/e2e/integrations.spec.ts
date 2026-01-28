@@ -39,10 +39,7 @@ test.describe('Integrations Page', () => {
     const cardSelector = '[data-testid*="integration"], [class*="card"]';
     const cards = page.locator(cardSelector);
 
-    // Wait for page to fully load to avoid race conditions
-    await page.waitForLoadState('networkidle');
-
-    // Wait for first card to be visible
+    // Playwright's auto-waiting will retry until card appears or timeout
     await expect(cards.first()).toBeVisible({ timeout: DEFAULT_TIMEOUT });
   });
 
@@ -71,9 +68,6 @@ test.describe('Integrations Page', () => {
   });
 
   test('should have interactive elements on integration cards', async ({ page }) => {
-    // Wait for page to fully load
-    await page.waitForLoadState('networkidle');
-
     // Look for interactive elements specifically within integration cards
     const cardSelector = '[data-testid*="integration"], [class*="card"]';
     const interactiveElements = page.locator(`${cardSelector} button, ${cardSelector} a[href]`);
@@ -83,9 +77,6 @@ test.describe('Integrations Page', () => {
   });
 
   test('should have integration content loaded', async ({ page }) => {
-    // Wait for page to fully load
-    await page.waitForLoadState('networkidle');
-
     // Verify page has integration-specific UI elements (cards or content area)
     const cardSelector = '[data-testid*="integration"], [class*="card"], [class*="integration"]';
     await expect(page.locator(cardSelector).first()).toBeVisible({ timeout: DEFAULT_TIMEOUT });
@@ -100,9 +91,9 @@ test.describe('Integrations Page', () => {
 
     await pagePromise;
 
-    // After loading, page should be interactive
-    await page.waitForLoadState('networkidle');
+    // After loading, page should be interactive - wait for at least one interactive element
     const interactiveElements = page.locator('button, a[href]');
+    await expect(interactiveElements.first()).toBeVisible({ timeout: DEFAULT_TIMEOUT });
     const elementCount = await interactiveElements.count();
     expect(elementCount).toBeGreaterThan(0);
   });
@@ -151,13 +142,10 @@ test.describe('Integrations Page', () => {
 
   test.describe('Integration Interactions', () => {
     test('should be able to click on integration cards', async ({ page }) => {
-      // Wait for page to fully load
-      await page.waitForLoadState('networkidle');
-
       // Find first clickable card or button
       const clickableElement = page.locator('button, a[href], [role="button"]').first();
 
-      await expect(clickableElement).toBeVisible();
+      await expect(clickableElement).toBeVisible({ timeout: DEFAULT_TIMEOUT });
 
       // Verify element is clickable (not disabled)
       const isDisabled = await clickableElement.getAttribute('disabled');
