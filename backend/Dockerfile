@@ -7,6 +7,9 @@ WORKDIR /app
 # Copy application code
 COPY . .
 
+# Install any new dependencies (like arq) not in base image
+RUN pip install --no-cache-dir -r requirements.txt
+
 # Expose port
 EXPOSE 8000
 
