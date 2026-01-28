@@ -86,16 +86,23 @@ test.describe('Integrations Page', () => {
     expect(elementCount).toBeGreaterThan(0);
   });
 
-  test('should have integration status elements', async ({ page }) => {
+  test('should have integration content loaded', async ({ page }) => {
     // Wait for page to fully load
     await page.waitForLoadState('networkidle');
 
-    // Verify page has loaded with content
+    // Verify page has loaded with integration-specific content
     const bodyText = await page.textContent('body');
-    expect(bodyText).toBeTruthy();
 
-    // Page should have meaningful content (at least the heading text)
+    // Page should have meaningful integration-related content
     expect(bodyText).toContain('Integration');
+
+    // Should have at least one integration name visible
+    const hasIntegrationName =
+      bodyText?.includes('Slack') ||
+      bodyText?.includes('PagerDuty') ||
+      bodyText?.includes('Jira') ||
+      bodyText?.includes('GitHub');
+    expect(hasIntegrationName).toBe(true);
   });
 
   test('should display loading state initially', async ({ page }) => {
@@ -196,12 +203,18 @@ test.describe('Integrations Page', () => {
     test('should have Rootly API key configured in environment', async () => {
       test.skip(!ROOTLY_API_KEY, 'Rootly API key not configured');
 
-      // Verify API key is available for tests
+      // Verify API key is available and valid format
       expect(ROOTLY_API_KEY).toBeTruthy();
-
-      // Verify it looks like a string (not empty)
       expect(typeof ROOTLY_API_KEY).toBe('string');
-      expect(ROOTLY_API_KEY.trim().length).toBeGreaterThan(0);
+
+      // Rootly API keys typically start with 'rootly_'
+      // But don't enforce this as format may change
+      const trimmedKey = ROOTLY_API_KEY.trim();
+      expect(trimmedKey.length).toBeGreaterThan(0);
+
+      // Verify it doesn't contain obvious placeholder text
+      expect(trimmedKey.toLowerCase()).not.toContain('placeholder');
+      expect(trimmedKey.toLowerCase()).not.toContain('example');
     });
 
     test('should be able to connect to Rootly API', async ({ request }) => {
