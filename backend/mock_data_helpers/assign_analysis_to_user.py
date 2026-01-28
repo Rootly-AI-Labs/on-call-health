@@ -50,7 +50,7 @@ def fetch_user(db, user_id: int) -> User:
         print(f"[ERROR] User with ID {user_id} not found")
         sys.exit(1)
 
-    print(f"[OK] Found user: {user.email}")
+    print(f"[OK] Found user with ID: {user.id}")
     return user
 
 
@@ -79,11 +79,11 @@ def assign_analysis_to_user(db, source_analysis: Analysis, target_user: User, dr
     """
     # Check if user already has this analysis
     if user_already_has_analysis(db, target_user.id, source_analysis.id):
-        print(f"  [SKIP] User {target_user.id} ({target_user.email}) already has analysis {source_analysis.id}")
+        print(f"  [SKIP] User {target_user.id} already has analysis {source_analysis.id}")
         return False
 
     if dry_run:
-        print(f"  [DRY-RUN] Would assign analysis {source_analysis.id} to user {target_user.id} ({target_user.email})")
+        print(f"  [DRY-RUN] Would assign analysis {source_analysis.id} to user {target_user.id}")
         print(f"    - Integration: {source_analysis.integration_name}")
         print(f"    - Platform: {source_analysis.platform}")
         print(f"    - Status: {source_analysis.status}")
@@ -109,7 +109,7 @@ def assign_analysis_to_user(db, source_analysis: Analysis, target_user: User, dr
         db.add(new_analysis)
         db.flush()  # Flush to get the ID without committing
 
-        print(f"  [OK] Assigned analysis {source_analysis.id} -> {new_analysis.id} to user {target_user.id} ({target_user.email})")
+        print(f"  [OK] Assigned analysis {source_analysis.id} -> {new_analysis.id} to user {target_user.id}")
         return True
 
     except Exception as e:
