@@ -272,15 +272,39 @@ export default function LandingPage() {
         </div>
         {/* Features Banner */}
         <div className="container mx-auto px-4 pt-12 pb-0 mt-6 lg:mt-40 lg:py-20 relative z-10">
-          <Image
-            src="/images/landing/wandb_testimonial.png"
-            alt="Rootly customer story"
-            width={1784}
-            height={602}
-            className="w-11/12 sm:w-4/5 lg:w-2/3 h-auto mx-auto mt-2 lg:mt-0"
-            priority
-            quality={90}
-          />
+          <div className="w-full mx-auto -mt-8 lg:-mt-16 text-center">
+            {/* Company badge */}
+            <div className="flex items-center justify-center gap-2 mb-6">
+              <div className="w-8 h-8 bg-yellow-400 rounded-lg flex items-center justify-center">
+                <span className="text-lg">⚖️</span>
+              </div>
+              <span className="text-black font-medium">Weights & Biases</span>
+            </div>
+
+            {/* Quote */}
+            <blockquote className="text-2xl lg:text-3xl text-black mb-8 leading-relaxed font-semibold">
+              "This is the on-call visibility
+              <br />
+              I wish I'd had on day one."
+            </blockquote>
+
+            {/* Profile */}
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-12 h-12 rounded-full bg-slate-300 overflow-hidden flex-shrink-0">
+                <Image
+                  src="/images/casey-brown-avatar.jpg"
+                  alt="Casey Brown"
+                  width={48}
+                  height={48}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <div>
+                <div className="text-black font-semibold">Casey Brown</div>
+                <div className="text-black text-sm">Head of Infrastructure Engineering</div>
+              </div>
+            </div>
+          </div>
         </div>
     <div className="w-full mb-[-1px] absolute h-[240px] bottom-0 left-0 z-0 lg:h-[250px] bg-gradient-to-b from-transparent via-white/60 to-white pointer-events-none">                               
     </div> 
