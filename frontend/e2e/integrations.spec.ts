@@ -91,10 +91,12 @@ test.describe('Integrations Page', () => {
 
     await pagePromise;
 
-    // After loading, page should be interactive - wait for at least one interactive element
-    const interactiveElements = page.locator('button, a[href]');
-    await expect(interactiveElements.first()).toBeVisible({ timeout: DEFAULT_TIMEOUT });
-    const elementCount = await interactiveElements.count();
+    // Verify integration-specific content becomes interactive after loading
+    const cardSelector = '[data-testid*="integration"], [class*="card"]';
+    const cardInteractiveElements = page.locator(`${cardSelector} button, ${cardSelector} a[href]`);
+    await expect(cardInteractiveElements.first()).toBeVisible({ timeout: DEFAULT_TIMEOUT });
+
+    const elementCount = await cardInteractiveElements.count();
     expect(elementCount).toBeGreaterThan(0);
   });
 
@@ -179,24 +181,25 @@ test.describe('Integrations Page', () => {
 
       const trimmedKey = ROOTLY_API_KEY.trim();
 
-      // Basic validation - just verify it's a non-empty string
-      // Avoid hardcoded format assumptions as API key formats may change
-      expect(trimmedKey.length).toBeGreaterThan(0);
+      // Basic validation without assuming specific format
+      expect(trimmedKey.length).toBeGreaterThan(10); // API keys are typically longer than 10 chars
+      expect(trimmedKey).not.toContain(' '); // Should not contain spaces
+      expect(trimmedKey).toBe(ROOTLY_API_KEY); // Should not have leading/trailing whitespace
     });
 
     test('should be able to connect to Rootly API', async ({ request }) => {
       test.skip(!ROOTLY_API_KEY, 'Rootly API key not configured');
 
-      // Test API connectivity
+      // Test API connectivity with valid authentication
       const response = await request.get('https://api.rootly.com/v1/services', {
         headers: {
           'Authorization': `Bearer ${ROOTLY_API_KEY}`,
         },
-        timeout: 10000,
+        timeout: DEFAULT_TIMEOUT,
       });
 
-      // Should get a valid response (200 or 401 means API is reachable)
-      expect([200, 401, 403]).toContain(response.status());
+      // API key must be valid and authorized - only 200 is acceptable
+      expect(response.status()).toBe(200);
     });
 
     test.skip('should connect Rootly integration with valid API key', async ({ page }) => {
