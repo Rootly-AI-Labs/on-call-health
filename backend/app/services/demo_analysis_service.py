@@ -41,7 +41,7 @@ def _load_mock_data() -> dict:
 
     # Navigate to backend directory from services directory
     backend_dir = Path(__file__).parent.parent.parent
-    mock_data_path = backend_dir / "mock_analysis_data.json"
+    mock_data_path = backend_dir / "mock_data_helpers" / "mock_analysis_data.json"
 
     current_time = time.time()
     cache_age = current_time - _MOCK_DATA_CACHE_TIME
