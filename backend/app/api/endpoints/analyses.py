@@ -362,7 +362,8 @@ async def run_burnout_analysis(
                 integration.id,
                 request.time_range,  # days_back
                 current_user.id,
-                _job_id=job_id
+                _job_id=job_id,
+                _queue_name="analysis_queue"
             )
 
             # Store job ID in analysis record

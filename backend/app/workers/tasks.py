@@ -151,6 +151,7 @@ async def resume_interrupted_analyses() -> None:
                     days_back,
                     user_id,
                     _job_id=job_id,
+                    _queue_name="analysis_queue"
                 )
 
                 logger.info(f"Analysis {analysis.id} re-enqueued with job_id={job_id}")
