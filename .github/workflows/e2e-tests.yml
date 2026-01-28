@@ -91,6 +91,7 @@ jobs:
           PLAYWRIGHT_API_URL: ${{ secrets.PLAYWRIGHT_API_URL }}
           E2E_TEST_EMAIL_AVERY: ${{ secrets.E2E_TEST_EMAIL_AVERY }}
           E2E_TEST_PASSWORD_AVERY: ${{ secrets.E2E_TEST_PASSWORD_AVERY }}
+          E2E_ROOTLY_API_KEY: ${{ secrets.E2E_ROOTLY_API_KEY }}
 
       - name: Upload test results
         if: always()

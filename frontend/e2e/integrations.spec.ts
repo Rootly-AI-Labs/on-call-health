@@ -5,6 +5,8 @@ import { test, expect } from '@playwright/test';
  * Tests integration cards, connection flows, and UI interactions
  */
 
+const ROOTLY_API_KEY = process.env.E2E_ROOTLY_API_KEY;
+
 test.describe('Integrations Page', () => {
   test.beforeEach(async ({ page }) => {
     // Navigate to integrations page before each test
@@ -165,6 +167,58 @@ test.describe('Integrations Page', () => {
 
       const descCount = await descriptions.count();
       expect(descCount).toBeGreaterThan(0);
+    });
+  });
+
+  test.describe('Rootly Integration', () => {
+    test('should display Rootly integration card', async ({ page }) => {
+      // Look for Rootly-related content
+      const rootlyCard = page.locator('text=/rootly/i').first();
+      await expect(rootlyCard).toBeVisible({ timeout: 10000 });
+    });
+
+    test('should have Rootly API key configured in environment', async () => {
+      // Verify API key is available for tests
+      expect(ROOTLY_API_KEY).toBeTruthy();
+      expect(ROOTLY_API_KEY).toContain('rootly_');
+    });
+
+    test('should be able to connect to Rootly API', async ({ request }) => {
+      test.skip(!ROOTLY_API_KEY, 'Rootly API key not configured');
+
+      // Test API connectivity
+      const response = await request.get('https://api.rootly.com/v1/services', {
+        headers: {
+          'Authorization': `Bearer ${ROOTLY_API_KEY}`,
+        },
+        timeout: 10000,
+      });
+
+      // Should get a valid response (200 or 401 means API is reachable)
+      expect([200, 401, 403]).toContain(response.status());
+    });
+
+    test.skip('should connect Rootly integration with valid API key', async ({ page }) => {
+      test.skip(!ROOTLY_API_KEY, 'Rootly API key not configured');
+
+      // This test is skipped by default - enable when Rootly integration form is ready
+      // Look for Rootly connect button or form
+      const connectButton = page.locator('button:has-text("Connect"), a:has-text("Connect")').filter({
+        has: page.locator('text=/rootly/i')
+      }).first();
+
+      if (await connectButton.count() > 0) {
+        await connectButton.click();
+
+        // Wait for form or connection dialog
+        await page.waitForTimeout(1000);
+
+        // Fill in API key if input exists
+        const apiKeyInput = page.locator('input[placeholder*="API"], input[name*="api"]').first();
+        if (await apiKeyInput.count() > 0) {
+          await apiKeyInput.fill(ROOTLY_API_KEY);
+        }
+      }
     });
   });
 });
