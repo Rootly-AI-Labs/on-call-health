@@ -10,10 +10,10 @@ cd frontend
 cp .env.test.example .env.test
 ```
 
-2. Edit `.env.test` with test credentials:
+2. Edit `.env.test` with test credentials (get from team or GitHub Secrets):
 ```bash
-E2E_TEST_EMAIL_AVERY=avery.kim@oncallhealth.ai
-E2E_TEST_PASSWORD_AVERY=Rootlydemo100!!
+E2E_TEST_EMAIL_AVERY=your-test-email@example.com
+E2E_TEST_PASSWORD_AVERY=your-test-password
 PLAYWRIGHT_API_URL=http://localhost:8000
 PLAYWRIGHT_BASE_URL=http://localhost:3000
 ```
