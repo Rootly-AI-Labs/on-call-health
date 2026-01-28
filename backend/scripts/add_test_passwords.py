@@ -8,14 +8,12 @@ from pathlib import Path
 # Add parent directory to path to import app modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from passlib.context import CryptContext
+import bcrypt
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from app.models.user import User
 import os
 
-# Password hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # Database connection - MUST be provided via environment variable
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -35,14 +33,24 @@ TEST_ACCOUNTS = [
     "anika.shah@oncallhealth.ai",
 ]
 
-TEST_PASSWORD = "Rootlydemo100!!"  # This must match E2E_TEST_PASSWORD in GitHub Secrets
+TEST_PASSWORD = os.getenv("TEST_PASSWORD")
+if not TEST_PASSWORD:
+    raise ValueError(
+        "TEST_PASSWORD environment variable is required.\n"
+        "Example: TEST_PASSWORD='YourPassword' DATABASE_URL='...' python scripts/add_test_passwords.py"
+    )
 
 def hash_password(password: str) -> str:
-    """Hash a password using bcrypt."""
+    """Hash a password using bcrypt (matching auth.py implementation)."""
     # Ensure password fits in bcrypt's 72 byte limit
-    if len(password.encode('utf-8')) > 72:
-        password = password[:72]
-    return pwd_context.hash(password)
+    password_bytes = password.encode('utf-8')
+    if len(password_bytes) > 72:
+        password_bytes = password_bytes[:72]
+
+    # Use bcrypt directly to match backend/app/api/endpoints/auth.py:937
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(password_bytes, salt)
+    return hashed.decode('utf-8')
 
 def main():
     db = SessionLocal()
