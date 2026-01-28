@@ -2,6 +2,29 @@
 
 End-to-end tests using Playwright.
 
+## Setup
+
+1. Copy the example environment file:
+```bash
+cd frontend
+cp .env.test.example .env.test
+```
+
+2. Edit `.env.test` with test credentials:
+```bash
+E2E_TEST_EMAIL_AVERY=avery.kim@oncallhealth.ai
+E2E_TEST_PASSWORD_AVERY=Rootlydemo100!!
+PLAYWRIGHT_API_URL=http://localhost:8000
+PLAYWRIGHT_BASE_URL=http://localhost:3000
+```
+
+3. Start the backend server:
+```bash
+cd backend
+source venv/bin/activate
+DATABASE_URL="<get from team>" uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
 ## Quick Start
 
 ```bash
