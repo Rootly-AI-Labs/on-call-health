@@ -5,6 +5,9 @@
 [[services]]
 name = "rootly-burnout-detector-web"
 
+[services.source]
+root_directory = "/backend"
+
 [services.build]
 builder = "DOCKERFILE"
 dockerfile_path = "Dockerfile"
@@ -21,6 +24,7 @@ name = "arq-worker"
 
 [services.source]
 branch = "testing"
+root_directory = "/backend"
 
 [services.build]
 builder = "DOCKERFILE"
