@@ -3,7 +3,6 @@ import { test, expect } from '@playwright/test';
 test.describe('Landing Page', () => {
   test('should load and display main heading', async ({ page }) => {
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
 
     // Check that the main heading is visible
     const heading = page.locator('h1').first();
@@ -27,10 +26,10 @@ test.describe('Landing Page', () => {
 
   test('should have interactive elements', async ({ page }) => {
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
 
     // Look for any interactive elements (buttons or links)
     const interactiveElements = page.locator('button, a[href], input, select, textarea');
+    await expect(interactiveElements.first()).toBeVisible();
     const elementCount = await interactiveElements.count();
 
     expect(elementCount, 'Landing page should have at least one interactive element').toBeGreaterThan(0);

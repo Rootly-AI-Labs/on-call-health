@@ -12,7 +12,6 @@ test.describe('Integrations Page', () => {
   test.beforeEach(async ({ page }) => {
     // Navigate to integrations page before each test
     await page.goto('/integrations');
-    await page.waitForLoadState('networkidle');
   });
 
   test('should load integrations page successfully', async ({ page }) => {
@@ -123,7 +122,6 @@ test.describe('Integrations Page', () => {
     });
 
     await page.goto('/integrations');
-    await page.waitForLoadState('networkidle');
 
     // Filter out known/acceptable errors
     const significantErrors = consoleErrors.filter(error =>
@@ -215,10 +213,10 @@ test.describe('Integrations Page', () => {
         await connectButton.click();
 
         // Wait for form or connection dialog to appear
-        await page.waitForLoadState('networkidle');
+        const apiKeyInput = page.locator('input[placeholder*="API"], input[name*="api"]').first();
+        await expect(apiKeyInput).toBeVisible({ timeout: DEFAULT_TIMEOUT });
 
         // Fill in API key if input exists
-        const apiKeyInput = page.locator('input[placeholder*="API"], input[name*="api"]').first();
         if (await apiKeyInput.count() > 0) {
           await apiKeyInput.fill(ROOTLY_API_KEY);
         }

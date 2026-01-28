@@ -5,7 +5,6 @@ test.describe('Authentication Flow', () => {
     // TODO: Enable this test once login UI is implemented
     // This test expects a form element on /auth/login
     await page.goto('/auth/login');
-    await page.waitForLoadState('networkidle');
 
     const form = page.locator('form').first();
     await expect(form, 'Login form should be visible on /auth/login page').toBeVisible();
@@ -18,7 +17,6 @@ test.describe('Authentication Flow', () => {
   test.skip('should validate required fields', async ({ page }) => {
     // TODO: Enable this test once login validation is implemented
     await page.goto('/auth/login');
-    await page.waitForLoadState('networkidle');
 
     const submitButton = page.locator('button[type="submit"], button:has-text("Sign in"), button:has-text("Login")').first();
     await expect(submitButton, 'Submit button should exist on login form').toBeVisible();
