@@ -9,8 +9,6 @@ function isValidEmail(email: string): boolean {
 }
 
 test.describe('Organization Management', () => {
-  test.use({ storageState: '.auth/user.json' });
-
   // Setup function to navigate and open team management
   async function openTeamManagement(page: any) {
     await page.goto('/integrations');
