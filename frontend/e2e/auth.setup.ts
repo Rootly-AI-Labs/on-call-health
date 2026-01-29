@@ -67,7 +67,7 @@ setup('authenticate with password', async ({ page, request }) => {
       const testData = await testResponse.json();
       console.log('✓ Rootly token validated:', testData.preview?.suggested_name || 'Unknown Org');
 
-      // Step 2: Add the integration
+      // Step 2: Add the integration (with 60s timeout for API call)
       const addResponse = await request.post(`${API_URL}/rootly/token/add`, {
         headers: {
           'Authorization': `Bearer ${access_token}`,
@@ -76,7 +76,8 @@ setup('authenticate with password', async ({ page, request }) => {
         data: {
           token: ROOTLY_TEST_TOKEN,
           name: testData.preview?.suggested_name || 'E2E Test Integration'
-        }
+        },
+        timeout: 60000
       });
 
       if (addResponse.status() === 200) {
