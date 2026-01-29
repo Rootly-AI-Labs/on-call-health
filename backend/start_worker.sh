@@ -1,41 +1,65 @@
 #!/bin/bash
-# ARQ Worker Startup Script
-#
-# Starts the ARQ worker process for background task processing.
-# This should run alongside the FastAPI web server.
-#
-# Usage:
-#   ./start_worker.sh
-#
-# Environment Variables:
-#   ARQ_MAX_JOBS - Max concurrent jobs per worker (default: 10)
-
 set -e
 
-echo "Starting ARQ worker..."
+echo "🔧 Starting Worker Process..."
 
-ARQ_MAX_JOBS=${ARQ_MAX_JOBS:-10}
+# Wait for database to be available
+echo "⏳ Waiting for database connection..."
+python -c "
+import sys
+import time
+import os
+sys.path.insert(0, 'app')
+from app.models import get_db
+from sqlalchemy import text
 
-echo "Configuration:"
-echo "  Max jobs per worker: $ARQ_MAX_JOBS"
-echo "  Queue: analysis_queue"
+max_attempts = 30
+for attempt in range(max_attempts):
+    try:
+        db = next(get_db())
+        db.execute(text('SELECT 1'))
+        db.close()
+        print('✅ Database connection successful')
+        break
+    except Exception as e:
+        if attempt == max_attempts - 1:
+            print(f'❌ Database connection failed after {max_attempts} attempts: {e}')
+            sys.exit(1)
+        print(f'⏳ Attempt {attempt + 1}/{max_attempts} - waiting for database...')
+        time.sleep(2)
+"
 
-# Activate virtual environment if it exists
-if [ -d "venv" ]; then
-    echo "Activating virtual environment..."
-    source venv/bin/activate
+# Wait for Redis to be available (if configured)
+if [ -n "$REDIS_URL" ] || [ -n "$ARQ_REDIS_URL" ]; then
+    echo "⏳ Waiting for Redis connection..."
+    python -c "
+import sys
+import time
+import os
+import redis
+
+redis_url = os.getenv('ARQ_REDIS_URL') or os.getenv('REDIS_URL')
+if redis_url:
+    max_attempts = 30
+    for attempt in range(max_attempts):
+        try:
+            r = redis.from_url(redis_url)
+            r.ping()
+            print('✅ Redis connection successful')
+            break
+        except Exception as e:
+            if attempt == max_attempts - 1:
+                print(f'⚠️  Redis connection failed after {max_attempts} attempts: {e}')
+                print('   Continuing without Redis...')
+            else:
+                print(f'⏳ Attempt {attempt + 1}/{max_attempts} - waiting for Redis...')
+                time.sleep(2)
+"
 fi
 
-# Check if arq is installed
-if ! command -v arq &> /dev/null; then
-    echo "Error: ARQ not found. Install with: pip install arq"
-    exit 1
-fi
+echo "✅ Worker pre-checks completed!"
+echo "🚀 Starting worker with APScheduler..."
 
-echo "Starting ARQ worker process..."
-
-# Run ARQ worker with the WorkerSettings class
-# Worker runs continuously (default behavior, no --burst flag)
-# Worker handles SIGTERM gracefully for deployment resilience
-# Note: max_jobs is configured in WorkerSettings class, not via CLI
-exec arq app.workers.arq_worker.WorkerSettings --verbose
+# Start the FastAPI application (APScheduler starts automatically)
+# The worker runs the same app but typically doesn't expose HTTP endpoints
+exec uvicorn app.main:app --host 0.0.0.0 --port 8001

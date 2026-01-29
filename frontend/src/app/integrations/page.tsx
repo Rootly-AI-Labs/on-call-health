@@ -1712,7 +1712,7 @@ export default function IntegrationsPage() {
       const authToken = localStorage.getItem('auth_token')
       if (!authToken) {
         isLoadingRef.current = false
-        router.push('/auth/success')
+        router.push('/auth/login')
         return
       }
 
@@ -2722,6 +2722,14 @@ export default function IntegrationsPage() {
                     })()}
                   </SelectContent>
                 </Select>
+                <Button
+                  onClick={() => setShowInviteModal(true)}
+                  variant="outline"
+                  className="flex-shrink-0 h-10"
+                >
+                  <Users className="w-4 h-4 mr-2" />
+                  Team
+                </Button>
               </div>
             </div>
           </div>
@@ -3440,6 +3448,7 @@ export default function IntegrationsPage() {
                 integration={githubIntegration}
                 onDisconnect={() => setGithubDisconnectDialogOpen(true)}
                 onTest={handleGitHubTest}
+                isLoading={isDisconnectingGithub}
               />
             )}
             {/* Jira Integration Card - Not Connected */}

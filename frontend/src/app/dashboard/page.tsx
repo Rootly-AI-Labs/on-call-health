@@ -85,7 +85,7 @@ import { TopPanel } from "@/components/TopPanel"
 import { useOnboarding } from "@/hooks/useOnboarding"
 import IntroGuide from "@/components/IntroGuide"
 
-function DashboardContent(): JSX.Element {
+function DashboardContent() {
   const {
   API_BASE,
   router,
@@ -1039,7 +1039,7 @@ function DashboardContent(): JSX.Element {
           )}
 
           {/* Export Button and Footer */}
-          {!shouldShowInsufficientDataCard() && currentAnalysis && currentAnalysis.analysis_data && (
+          {!shouldShowInsufficientDataCard() && currentAnalysis && currentAnalysis.analysis_data && !analysisRunning && (
             <div className="flex justify-end mt-6">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

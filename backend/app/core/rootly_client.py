@@ -879,6 +879,8 @@ class RootlyAPIClient:
 
         except Exception as e:
             logger.error(f"Data collection failed: {e}")
+            # Calculate duration even on failure
+            total_duration = (datetime.now() - start_time).total_seconds()
             # Return minimal data structure instead of failing completely
             return {
                 "users": [],

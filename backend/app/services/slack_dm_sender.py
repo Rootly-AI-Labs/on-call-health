@@ -19,7 +19,8 @@ class SlackDMSender:
         slack_user_id: str,
         user_id: int,
         organization_id: int,
-        message: Optional[str] = None
+        message: Optional[str] = None,
+        user_email: Optional[str] = None
     ):
         """
         Send a DM to a user with a button to open the burnout survey.
@@ -27,19 +28,11 @@ class SlackDMSender:
         Args:
             slack_token: Decrypted Slack bot token (ready to use)
             slack_user_id: Slack user ID (e.g., U01234567)
-            user_id: Internal user ID
+            user_id: Internal user ID (can be None for synced members without accounts)
             organization_id: Organization ID
             message: Custom message (uses default if None)
-
-        Raises:
-            ValueError: If user_id or organization_id is None/invalid
+            user_email: User's email (required for synced members without user_id)
         """
-        # Validate required IDs to prevent invalid button values
-        if user_id is None:
-            raise ValueError(f"user_id cannot be None - cannot send survey DM to slack_user_id={slack_user_id}")
-        if organization_id is None:
-            raise ValueError(f"organization_id cannot be None - cannot send survey DM to user_id={user_id}")
-
         try:
             # Token is already decrypted by SlackTokenService
             decrypted_token = slack_token
@@ -52,7 +45,17 @@ class SlackDMSender:
                     "Your feedback helps us support team well-being and workload balance."
                 )
 
+            # Validate required parameters
+            if organization_id is None:
+                raise ValueError("organization_id cannot be None")
+            if not user_id and not user_email:
+                raise ValueError("Either user_id or user_email must be provided")
+
             # Create message with button
+            # For synced members without accounts, store email in button value
+            # Format: "user_id|organization_id|email" or "None|organization_id|email"
+            button_value = f"{user_id or 'None'}|{organization_id}|{user_email or ''}"
+
             blocks = [
                 {
                     "type": "section",
@@ -72,7 +75,7 @@ class SlackDMSender:
                             },
                             "style": "primary",
                             "action_id": "open_burnout_survey",
-                            "value": f"{user_id}|{organization_id}"
+                            "value": button_value
                         }
                     ]
                 }

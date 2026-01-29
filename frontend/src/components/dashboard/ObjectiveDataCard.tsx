@@ -322,7 +322,7 @@ export function ObjectiveDataCard({
 
   const description = hasData
     ? viewMode === 'weekly'
-      ? `Weekly averages over ${weeklyData.length} weeks. Mean: ${Math.round(weeklyMean)} ${config.label.toLowerCase()}.`
+      ? `Weekly averages over ${timeRange} days. Mean: ${Math.round(weeklyMean)} ${config.label.toLowerCase()}.`
       : `Over the last ${timeRange} days, the average ${config.yAxisLabel.toLowerCase()} was ${Math.round(dailyMean)} points.`
     : "No trend data available for this analysis"
 

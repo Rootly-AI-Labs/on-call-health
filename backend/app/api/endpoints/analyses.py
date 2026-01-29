@@ -18,6 +18,7 @@ from ...services.unified_burnout_analyzer import UnifiedBurnoutAnalyzer
 from ...core.rate_limiting import analysis_rate_limit, general_rate_limit
 from ...core.input_validation import AnalysisRequest as ValidatedAnalysisRequest, AnalysisFilterRequest
 from ...workers.arq_worker import get_arq_pool
+from ...utils.visual_logger import log_task_start, log_task_complete
 
 logger = logging.getLogger(__name__)
 
@@ -523,9 +524,11 @@ async def get_analysis_by_uuid(
                 detail="User must be part of an organization to view analyses"
             )
 
+        # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
         analysis = db.query(Analysis).filter(
             Analysis.uuid == analysis_uuid,
-            Analysis.organization_id == current_user.organization_id
+            Analysis.organization_id == current_user.organization_id,
+            Analysis.organization_id.isnot(None)
         ).first()
     except Exception:
         # UUID column doesn't exist yet
@@ -533,11 +536,13 @@ async def get_analysis_by_uuid(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="UUID lookup not available until migration is complete"
         )
-    
+
     if not analysis:
         # Get the most recent analysis for this user to suggest as alternative
+        # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
         most_recent = db.query(Analysis).filter(
             Analysis.organization_id == current_user.organization_id,
+            Analysis.organization_id.isnot(None),
             Analysis.status == "completed"
         ).order_by(Analysis.created_at.desc()).first()
         
@@ -676,8 +681,10 @@ def get_member_surveys(analysis: Analysis, db: Session) -> dict:
     analysis_start_date = analysis.created_at - timedelta(days=analysis.time_range or 30)
 
     # Query 1: Get all team member emails
+    # SECURITY: Explicitly check IS NOT NULL for defense-in-depth
     correlations = db.query(UserCorrelation).filter(
-        UserCorrelation.organization_id == analysis.organization_id
+        UserCorrelation.organization_id == analysis.organization_id,
+        UserCorrelation.organization_id.isnot(None)
     ).all()
 
     member_emails = [c.email for c in correlations if c.email]
@@ -763,9 +770,11 @@ async def get_analysis_by_identifier(
     # Try UUID first if it looks like a UUID
     if is_uuid(analysis_identifier):
         try:
+            # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
             analysis = db.query(Analysis).filter(
                 Analysis.uuid == analysis_identifier,
-                Analysis.organization_id == current_user.organization_id
+                Analysis.organization_id == current_user.organization_id,
+                Analysis.organization_id.isnot(None)
             ).first()
         except Exception:
             # UUID column might not exist yet, fall back to integer
@@ -775,18 +784,22 @@ async def get_analysis_by_identifier(
     if not analysis:
         try:
             analysis_id = int(analysis_identifier)
+            # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
             analysis = db.query(Analysis).filter(
                 Analysis.id == analysis_id,
-                Analysis.organization_id == current_user.organization_id
+                Analysis.organization_id == current_user.organization_id,
+                Analysis.organization_id.isnot(None)
             ).first()
         except ValueError:
             # Not a valid integer either
             pass
-    
+
     if not analysis:
         # Get the most recent analysis for this user to suggest as alternative
+        # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
         most_recent = db.query(Analysis).filter(
             Analysis.organization_id == current_user.organization_id,
+            Analysis.organization_id.isnot(None),
             Analysis.status == "completed"
         ).order_by(Analysis.created_at.desc()).first()
         
@@ -862,9 +875,11 @@ async def regenerate_analysis_trends(
     db: Session = Depends(get_db)
 ):
     """Regenerate daily trends data for an existing analysis."""
+    # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
     analysis = db.query(Analysis).filter(
         Analysis.id == analysis_id,
-        Analysis.organization_id == current_user.organization_id
+        Analysis.organization_id == current_user.organization_id,
+        Analysis.organization_id.isnot(None)
     ).first()
     
     if not analysis:
@@ -1009,9 +1024,11 @@ async def verify_analysis_consistency(
     db: Session = Depends(get_db)
 ):
     """Verify data consistency for an analysis across all components."""
+    # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
     analysis = db.query(Analysis).filter(
         Analysis.id == analysis_id,
-        Analysis.organization_id == current_user.organization_id
+        Analysis.organization_id == current_user.organization_id,
+        Analysis.organization_id.isnot(None)
     ).first()
     
     if not analysis:
@@ -1202,8 +1219,10 @@ async def get_historical_trends(
         )
 
     # Find the most recent completed analysis
+    # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
     query = db.query(Analysis).filter(
         Analysis.organization_id == current_user.organization_id,
+        Analysis.organization_id.isnot(None),
         Analysis.status == "completed",
         Analysis.results.isnot(None)
     )
@@ -1584,11 +1603,13 @@ async def get_analysis_daily_trends(
     db: Session = Depends(get_db)
 ):
     """Get daily incident trends from a specific analysis."""
-    
+
     # Get the analysis
+    # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
     analysis = db.query(Analysis).filter(
         Analysis.id == analysis_id,
-        Analysis.organization_id == current_user.organization_id
+        Analysis.organization_id == current_user.organization_id,
+        Analysis.organization_id.isnot(None)
     ).first()
     
     if not analysis:
@@ -1697,13 +1718,15 @@ async def get_user_github_daily_commits(
 ):
     """
     Get daily GitHub commit data for a specific user during an analysis period.
-    
+
     This endpoint fetches real-time GitHub commit data aggregated by day.
     """
     # Get the analysis to determine the date range
+    # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
     analysis = db.query(Analysis).filter(
         Analysis.id == analysis_id,
-        Analysis.organization_id == current_user.organization_id
+        Analysis.organization_id == current_user.organization_id,
+        Analysis.organization_id.isnot(None)
     ).first()
     
     if not analysis:
@@ -1824,14 +1847,16 @@ async def get_analysis_github_commits_timeline(
 ):
     """
     Get aggregated daily GitHub commit data for all team members in an analysis.
-    
+
     This endpoint returns commit data suitable for displaying a timeline chart,
     similar to the incidents health trends chart.
     """
     # Get the analysis
+    # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
     analysis = db.query(Analysis).filter(
         Analysis.id == analysis_id,
-        Analysis.organization_id == current_user.organization_id
+        Analysis.organization_id == current_user.organization_id,
+        Analysis.organization_id.isnot(None)
     ).first()
     
     if not analysis:
@@ -2138,11 +2163,13 @@ async def get_member_daily_health(
     """
     print(f"🚨 DAILY_HEALTH_API_CALLED: analysis_id={analysis_id}, member_email={member_email}")
     logger.error(f"🚨 DAILY_HEALTH_API_CALLED: analysis_id={analysis_id}, member_email={member_email}")
-    
+
     # Get the analysis
+    # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
     analysis = db.query(Analysis).filter(
         Analysis.id == analysis_id,
-        Analysis.organization_id == current_user.organization_id
+        Analysis.organization_id == current_user.organization_id,
+        Analysis.organization_id.isnot(None)
     ).first()
     
     if not analysis:
@@ -2731,27 +2758,26 @@ async def run_analysis_task(
 
     # Helper to format analysis ID with UUID for consistent logging
     analysis_ref = f"{analysis_id} ({analysis_uuid})"
-
-    # Force output to stderr to ensure we see it
-    sys.stderr.write(f"\n🔥🔥🔥 BACKGROUND TASK STARTED: Analysis {analysis_ref} 🔥🔥🔥\n")
-    sys.stderr.flush()
+    node_id = str(uuid4())[:8]
 
     logger = logging.getLogger(__name__)
-    logger.info(f"BACKGROUND_TASK: Starting analysis {analysis_ref} with timeout mechanism")
-    logger.info(f"BACKGROUND_TASK: Integration params - GitHub: {include_github}, Slack: {include_slack}, Jira: {include_jira}, Linear: {include_linear}")
-    logger.info(f"BACKGROUND_TASK: User ID received: {user_id}")
-    logger.info(f"BACKGROUND_TASK: AI params - enable_ai: {enable_ai}")
-    print(f"BACKGROUND_TASK: Integration params - GitHub: {include_github}, Slack: {include_slack}, Jira: {include_jira}, Linear: {include_linear}")
-    print(f"BACKGROUND_TASK: User ID received: {user_id}")
-    print(f"BACKGROUND_TASK: AI params - enable_ai: {enable_ai}")
+
+    # Log task start with visual markers
+    log_task_start(
+        analysis_id=analysis_id,
+        node_id=node_id,
+        user_id=user_id or 0,
+        integration_name=f"{platform.title()} Analysis"
+    )
+
+    logger.info(f"Integration params - GitHub: {include_github}, Slack: {include_slack}, Jira: {include_jira}, Linear: {include_linear}")
+    logger.info(f"User ID: {user_id}, AI Enabled: {enable_ai}")
     
     # Get a fresh database session for the background task
     from ...models import SessionLocal
 
-    # Short ID to identify which worker/replica is processing this analysis in logs
-    node_id = str(uuid4())[:8]
-
     db = SessionLocal()
+    task_start_time = datetime.now()
 
     try:
         # Log database connection info
@@ -2945,12 +2971,8 @@ async def run_analysis_task(
                     UserCorrelation.organization_id == user.organization_id
                 ).all()
 
-                logger.info(f"🔍 TEAM SYNC: Found {len(correlations)} total user correlations for user_id={user_id}")
                 jira_mapped = [c for c in correlations if c.jira_account_id]
-                logger.info(f"🔍 TEAM SYNC: {len(jira_mapped)} correlations have jira_account_id")
-                if jira_mapped:
-                    for c in jira_mapped[:3]:
-                        logger.info(f"   - {c.name} → jira_account_id={c.jira_account_id}, integration_ids={c.integration_ids}")
+                logger.info(f"🔍 TEAM SYNC: Found {len(correlations)} correlations ({len(jira_mapped)} with Jira)")
 
                 # Fetch on-call status for all users (Rootly only - PagerDuty doesn't have this endpoint)
                 oncall_emails = {}
@@ -3202,6 +3224,15 @@ async def run_analysis_task(
                 logger.info(f"💾 Analysis {analysis_ref}: Committing to database")
                 db.commit()
                 logger.info(f"✅ Analysis {analysis_ref}: Successfully saved and committed")
+
+                # Log task completion with visual markers
+                total_duration = (datetime.now() - task_start_time).total_seconds()
+                log_task_complete(
+                    analysis_id=analysis_id,
+                    duration=total_duration,
+                    status="completed",
+                    result_size=len(str(results)) if results else 0
+                )
             else:
                 logger.error(f"❌ Analysis {analysis_ref}: Not found when trying to save results")
                 

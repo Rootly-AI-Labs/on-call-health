@@ -35,7 +35,7 @@ def require_organization(user: User) -> None:
 # Simple encryption for tokens (in production, use proper key management)
 def get_encryption_key():
     """Get or create encryption key for tokens."""
-    key = settings.JWT_SECRET_KEY.encode()
+    key = settings.ENCRYPTION_KEY.encode()
     # Ensure key is 32 bytes for Fernet
     key = base64.urlsafe_b64encode(key[:32].ljust(32, b'\0'))
     return key
@@ -286,8 +286,10 @@ async def test_github_integration(
             from ...services.github_collector import GitHubCollector
 
             # Get all synced team members from user correlations
+            # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
             synced_members = db.query(UserCorrelation).filter(
                 UserCorrelation.organization_id == current_user.organization_id,
+                UserCorrelation.organization_id.isnot(None),
                 UserCorrelation.github_username.isnot(None)
             ).all()
 
@@ -403,7 +405,7 @@ async def get_github_status(
     db: Session = Depends(get_db)
 ):
     """
-    Get GitHub integration status for current user.
+    Get GitHub integration status for current user, including token validation.
     """
     # Check for user's personal integration
     integration = db.query(GitHubIntegration).filter(
@@ -419,7 +421,15 @@ async def get_github_status(
                 token_preview = f"...{decrypted_token[-6:]}" if decrypted_token else None
         except Exception:
             pass  # Token preview is optional
-        
+
+        # Validate token by checking if it's still valid
+        from app.services.integration_validator import IntegrationValidator
+        validator = IntegrationValidator(db)
+        validation_result = await validator._validate_github(current_user.id)
+
+        token_valid = validation_result.get("valid", False) if validation_result else False
+        token_error = validation_result.get("error") if validation_result and not token_valid else None
+
         return {
             "connected": True,
             "integration": {
@@ -432,7 +442,9 @@ async def get_github_status(
                 "connected_at": integration.created_at.isoformat(),
                 "last_updated": integration.updated_at.isoformat(),
                 "token_preview": token_preview,
-                "is_beta": False
+                "is_beta": False,
+                "token_valid": token_valid,
+                "token_error": token_error
             }
         }
     else:
@@ -617,8 +629,10 @@ async def disconnect_github(
 
     try:
         # Remove GitHub data from user correlations (organization-scoped)
+        # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
         correlations = db.query(UserCorrelation).filter(
-            UserCorrelation.organization_id == current_user.organization_id
+            UserCorrelation.organization_id == current_user.organization_id,
+            UserCorrelation.organization_id.isnot(None)
         ).all()
 
         for correlation in correlations:
@@ -627,6 +641,10 @@ async def disconnect_github(
         # Delete the integration
         db.delete(integration)
         db.commit()
+
+        # Invalidate validation cache so error doesn't persist
+        from ...services.integration_validator import invalidate_validation_cache
+        invalidate_validation_cache(current_user.id)
 
         return {
             "success": True,
