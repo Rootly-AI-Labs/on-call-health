@@ -2722,6 +2722,14 @@ export default function IntegrationsPage() {
                     })()}
                   </SelectContent>
                 </Select>
+                <Button
+                  onClick={() => setShowInviteModal(true)}
+                  variant="outline"
+                  className="flex-shrink-0 h-10"
+                >
+                  <Users className="w-4 h-4 mr-2" />
+                  Team
+                </Button>
               </div>
             </div>
           </div>
