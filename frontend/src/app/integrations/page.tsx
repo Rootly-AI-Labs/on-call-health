@@ -1712,7 +1712,7 @@ export default function IntegrationsPage() {
       const authToken = localStorage.getItem('auth_token')
       if (!authToken) {
         isLoadingRef.current = false
-        router.push('/auth/success')
+        router.push('/auth/login')
         return
       }
 
