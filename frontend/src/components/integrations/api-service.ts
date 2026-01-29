@@ -50,6 +50,14 @@ export class IntegrationsAPIService {
     }
   }
 
+  private static handle401Unauthorized() {
+    // Clear auth data and redirect to login
+    localStorage.clear()
+    if (typeof window !== 'undefined') {
+      window.location.href = '/'
+    }
+  }
+
   // Cache management
   static loadFromCacheSync(): boolean {
     try {
@@ -85,6 +93,11 @@ export class IntegrationsAPIService {
         headers: this.getAuthHeaders()
       })
 
+      if (response.status === 401) {
+        this.handle401Unauthorized()
+        return []
+      }
+
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`)
       }
@@ -103,6 +116,11 @@ export class IntegrationsAPIService {
       const response = await fetch(`${API_BASE}/pagerduty/integrations`, {
         headers: this.getAuthHeaders()
       })
+
+      if (response.status === 401) {
+        this.handle401Unauthorized()
+        return []
+      }
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`)
@@ -238,6 +256,11 @@ export class IntegrationsAPIService {
       const response = await fetch(`${API_BASE}/auth/user/me`, {
         headers: this.getAuthHeaders()
       })
+
+      if (response.status === 401) {
+        this.handle401Unauthorized()
+        return null
+      }
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`)
