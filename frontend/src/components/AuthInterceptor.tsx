@@ -16,10 +16,10 @@ export default function AuthInterceptor() {
         localStorage.clear()
         // Use window.location for hard redirect (more reliable than Next.js router)
         window.location.href = '/auth/login'
-        // Return response even though we're redirecting (prevents errors)
       }
 
-      return response
+      // Clone response to prevent "body already consumed" errors
+      return response.clone()
     }
 
     // Cleanup: restore original fetch on unmount
