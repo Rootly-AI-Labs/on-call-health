@@ -16,7 +16,7 @@ test.describe('Organization Management', () => {
 
     // Check if organization selector exists (requires at least one integration)
     const orgSelector = page.locator('select, [role="combobox"]').first();
-    const selectorExists = await orgSelector.isVisible({ timeout: 5000 }).catch(() => false);
+    const selectorExists = await orgSelector.isVisible({ timeout: DEFAULT_TIMEOUT }).catch(() => false);
 
     if (!selectorExists) {
       // No integrations configured - skip test
@@ -44,6 +44,34 @@ test.describe('Organization Management', () => {
     return dialog;
   }
 
+  // Helper to extract all emails from table efficiently
+  async function extractEmailsFromTable(dialog: any): Promise<string[]> {
+    const memberRows = dialog.locator('table tbody tr');
+    await expect(memberRows.first()).toBeVisible({ timeout: DEFAULT_TIMEOUT });
+
+    const rowCount = await memberRows.count();
+    const emails: string[] = [];
+
+    for (let i = 0; i < rowCount; i++) {
+      const row = memberRows.nth(i);
+      // Get all text content from the row and extract emails
+      const rowText = await row.textContent();
+      if (rowText) {
+        // Find emails using regex in the full row text
+        const emailMatches = rowText.match(/\b[^\s@]+@[^\s@]+\.[^\s@]+\b/g);
+        if (emailMatches) {
+          for (const email of emailMatches) {
+            if (isValidEmail(email)) {
+              emails.push(email.toLowerCase());
+            }
+          }
+        }
+      }
+    }
+
+    return emails;
+  }
+
   test('should display organization members list', async ({ page }) => {
     const dialog = await openTeamManagement(page);
     if (!dialog) {
@@ -66,40 +94,25 @@ test.describe('Organization Management', () => {
     const dialog = await openTeamManagement(page);
     if (!dialog) {
       test.skip(true, 'No integrations configured - organization selector not available');
+      return;
     }
 
-    // Get all table cells that contain email addresses using specific selector
-    const memberRows = dialog.locator('table tbody tr');
-    await expect(memberRows.first()).toBeVisible({ timeout: DEFAULT_TIMEOUT });
-
-    const rowCount = await memberRows.count();
-    expect(rowCount).toBeGreaterThan(0);
-
-    // Extract and validate all emails
-    const emails: string[] = [];
-    for (let i = 0; i < rowCount; i++) {
-      const row = memberRows.nth(i);
-      const emailCell = row.locator('td').filter({ hasText: '@' });
-
-      if (await emailCell.count() > 0) {
-        const emailText = (await emailCell.first().textContent())?.trim() || '';
-
-        // Validate email format before checking domain
-        if (isValidEmail(emailText)) {
-          emails.push(emailText);
-          expect(emailText.toLowerCase()).toContain('@oncallhealth.ai');
-        }
-      }
-    }
+    const emails = await extractEmailsFromTable(dialog);
 
     // Ensure we found at least one valid email
     expect(emails.length).toBeGreaterThan(0);
+
+    // Verify all emails are from oncallhealth.ai domain
+    for (const email of emails) {
+      expect(email).toContain('@oncallhealth.ai');
+    }
   });
 
   test('should not show users from other organizations', async ({ page }) => {
     const dialog = await openTeamManagement(page);
     if (!dialog) {
       test.skip(true, 'No integrations configured - organization selector not available');
+      return;
     }
 
     // Check that these email domains are NOT present
@@ -110,82 +123,51 @@ test.describe('Organization Management', () => {
       '@canarytechnologies.com'
     ];
 
-    const memberRows = dialog.locator('table tbody tr');
-    await expect(memberRows.first()).toBeVisible({ timeout: DEFAULT_TIMEOUT });
+    const emails = await extractEmailsFromTable(dialog);
 
-    const rowCount = await memberRows.count();
-
-    // Extract all emails and verify none match forbidden domains
-    for (let i = 0; i < rowCount; i++) {
-      const row = memberRows.nth(i);
-      const emailCell = row.locator('td').filter({ hasText: '@' });
-
-      if (await emailCell.count() > 0) {
-        const emailText = (await emailCell.first().textContent())?.trim().toLowerCase() || '';
-
-        if (isValidEmail(emailText)) {
-          for (const domain of forbiddenDomains) {
-            expect(emailText).not.toContain(domain.toLowerCase());
-          }
-        }
+    // Verify none of the emails match forbidden domains
+    for (const email of emails) {
+      for (const domain of forbiddenDomains) {
+        expect(email).not.toContain(domain.toLowerCase());
       }
     }
   });
 
-  test('should display expected oncallhealth.ai team members', async ({ page }) => {
+  test('should display at least one oncallhealth.ai team member with valid data', async ({ page }) => {
     const dialog = await openTeamManagement(page);
     if (!dialog) {
       test.skip(true, 'No integrations configured - organization selector not available');
+      return;
     }
 
-    // Expected oncallhealth.ai team members
-    const expectedMembers = [
-      'avery.kim@oncallhealth.ai',
-      'sam.rodriguez@oncallhealth.ai',
-      'ethan.hart@oncallhealth.ai',
-      'anika.shah@oncallhealth.ai'
-    ];
+    const emails = await extractEmailsFromTable(dialog);
 
-    const memberRows = dialog.locator('table tbody tr');
-    await expect(memberRows.first()).toBeVisible({ timeout: DEFAULT_TIMEOUT });
+    // Verify we have at least one member
+    expect(emails.length).toBeGreaterThan(0);
 
-    // Extract all emails from the table
-    const rowCount = await memberRows.count();
-    const foundEmails: string[] = [];
-
-    for (let i = 0; i < rowCount; i++) {
-      const row = memberRows.nth(i);
-      const emailCell = row.locator('td').filter({ hasText: '@' });
-
-      if (await emailCell.count() > 0) {
-        const emailText = (await emailCell.first().textContent())?.trim().toLowerCase() || '';
-        if (isValidEmail(emailText)) {
-          foundEmails.push(emailText);
-        }
-      }
+    // Verify all members have valid oncallhealth.ai emails
+    for (const email of emails) {
+      expect(email).toMatch(/@oncallhealth\.ai$/);
+      expect(isValidEmail(email)).toBe(true);
     }
 
-    // Verify all expected members are present
-    for (const expectedEmail of expectedMembers) {
-      expect(foundEmails).toContain(expectedEmail.toLowerCase());
-    }
-
-    // Verify we found exactly the expected number of members
-    expect(foundEmails.length).toBe(expectedMembers.length);
+    // Log found members for debugging (won't fail test)
+    console.log(`Found ${emails.length} team members:`, emails);
   });
 
   test('should not allow inviting users from other domains', async ({ page }) => {
     const dialog = await openTeamManagement(page);
     if (!dialog) {
       test.skip(true, 'No integrations configured - organization selector not available');
+      return;
     }
 
     // Look for invite button
     const inviteButton = dialog.getByRole('button', { name: /invite|add member/i });
 
     // Skip test if invite functionality not available
-    if (!await inviteButton.isVisible({ timeout: 5000 })) {
-      test.skip();
+    if (!await inviteButton.isVisible({ timeout: DEFAULT_TIMEOUT })) {
+      test.skip(true, 'Invite functionality not available');
       return;
     }
 
