@@ -26,10 +26,14 @@ logger = logging.getLogger(__name__)
 
 
 def get_encryption_key() -> bytes:
-    """Get the encryption key from settings."""
+    """Get the encryption key from settings.
+
+    Uses ENCRYPTION_KEY if set, otherwise falls back to JWT_SECRET_KEY
+    for backward compatibility.
+    """
     from base64 import urlsafe_b64encode
 
-    key = settings.JWT_SECRET_KEY.encode()
+    key = settings.ENCRYPTION_KEY.encode()
     # Ensure key is 32 bytes for Fernet (consistent with other integration files)
     key = urlsafe_b64encode(key[:32].ljust(32, b'\0'))
     return key

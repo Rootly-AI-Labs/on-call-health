@@ -42,7 +42,7 @@ REQUESTED_SCOPES = ["read"]
 # Encryption helpers (same as Jira)
 # -------------------------------
 def get_encryption_key() -> bytes:
-    key = settings.JWT_SECRET_KEY.encode()
+    key = settings.ENCRYPTION_KEY.encode()
     return base64.urlsafe_b64encode(key[:32].ljust(32, b"\0"))
 
 
