@@ -6,6 +6,22 @@ import { useEffect } from 'react'
 let isInterceptorInstalled = false
 let originalFetch: typeof window.fetch | null = null
 
+// Helper to clear only auth-related localStorage items
+function clearAuthData() {
+  try {
+    const keysToRemove = ['auth_token', 'user_id', 'user_email', 'user_name', 'user_role', 'user_avatar', 'user_organization_id']
+    keysToRemove.forEach(key => {
+      try {
+        localStorage.removeItem(key)
+      } catch (e) {
+        console.error(`Failed to remove ${key}:`, e)
+      }
+    })
+  } catch (error) {
+    console.error('Failed to clear auth data:', error)
+  }
+}
+
 export default function AuthInterceptor() {
   useEffect(() => {
     // Prevent multiple instances from overriding fetch
@@ -18,23 +34,30 @@ export default function AuthInterceptor() {
       originalFetch = window.fetch
     }
 
+    // Validate originalFetch exists
+    if (!originalFetch) {
+      console.error('Original fetch is not available')
+      return
+    }
+
     isInterceptorInstalled = true
 
     // Intercept all fetch requests and handle 401 errors globally
     window.fetch = async (...args) => {
-      try {
-        const response = await originalFetch!(...args)
+      // Ensure originalFetch is available
+      if (!originalFetch) {
+        throw new Error('Original fetch is not available')
+      }
 
-        // If 401 Unauthorized, clear auth and redirect to login
+      try {
+        const response = await originalFetch(...args)
+
+        // Check for 401 BEFORE consuming the response
         if (response.status === 401) {
           console.log('🔒 401 Unauthorized - redirecting to login')
 
-          // Clear localStorage with error handling
-          try {
-            localStorage.clear()
-          } catch (error) {
-            console.error('Failed to clear localStorage:', error)
-          }
+          // Clear only auth-related data (not all localStorage)
+          clearAuthData()
 
           // Redirect to login with error handling
           try {
@@ -42,14 +65,19 @@ export default function AuthInterceptor() {
           } catch (error) {
             console.error('Failed to redirect:', error)
             // Fallback: try using window.location.replace
-            window.location.replace('/auth/login')
+            try {
+              window.location.replace('/auth/login')
+            } catch (replaceError) {
+              console.error('Failed to replace location:', replaceError)
+            }
           }
 
-          // Return a rejected promise to prevent further processing
-          return Promise.reject(new Error('Unauthorized - redirecting to login'))
+          // Return cloned response so calling code can handle it if needed
+          // (e.g., display error message before redirect completes)
+          return response.clone()
         }
 
-        // Clone response to prevent "body already consumed" errors
+        // Clone response for non-401 responses to prevent "body already consumed" errors
         return response.clone()
       } catch (error) {
         // Re-throw errors to maintain normal error handling
