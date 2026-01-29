@@ -5,10 +5,14 @@ const authFile = path.join(__dirname, '.auth/user.json');
 
 // Load credentials from environment variables (supports both local .env and GitHub Actions secrets)
 // GitHub Secrets use per-user naming: E2E_TEST_EMAIL_AVERY, E2E_TEST_PASSWORD_AVERY
-const TEST_EMAIL = process.env.E2E_TEST_EMAIL_AVERY || process.env.E2E_TEST_EMAIL || 'avery.kim@oncallhealth.ai';
-const TEST_PASSWORD = process.env.E2E_TEST_PASSWORD_AVERY || process.env.E2E_TEST_PASSWORD || 'Rootlydemo100!!';
+const TEST_EMAIL = process.env.E2E_TEST_EMAIL_AVERY || process.env.E2E_TEST_EMAIL;
+const TEST_PASSWORD = process.env.E2E_TEST_PASSWORD_AVERY || process.env.E2E_TEST_PASSWORD;
 const API_URL = process.env.PLAYWRIGHT_API_URL || 'http://localhost:8000';
 const ROOTLY_TEST_TOKEN = process.env.E2E_ROOTLY_API_KEY || process.env.ROOTLY_API_TOKEN;
+
+if (!TEST_EMAIL || !TEST_PASSWORD) {
+  throw new Error('E2E_TEST_EMAIL and E2E_TEST_PASSWORD environment variables are required');
+}
 
 setup('authenticate with password', async ({ page, request }) => {
   // Use real API authentication (works locally and in CI against production)
