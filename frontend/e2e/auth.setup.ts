@@ -8,7 +8,7 @@ const authFile = path.join(__dirname, '.auth/user.json');
 const TEST_EMAIL = process.env.E2E_TEST_EMAIL_AVERY || process.env.E2E_TEST_EMAIL || 'avery.kim@oncallhealth.ai';
 const TEST_PASSWORD = process.env.E2E_TEST_PASSWORD_AVERY || process.env.E2E_TEST_PASSWORD || 'Rootlydemo100!!';
 const API_URL = process.env.PLAYWRIGHT_API_URL || 'http://localhost:8000';
-const ROOTLY_TEST_TOKEN = process.env.E2E_ROOTLY_TOKEN || process.env.ROOTLY_API_TOKEN;
+const ROOTLY_TEST_TOKEN = process.env.E2E_ROOTLY_API_KEY || process.env.ROOTLY_API_TOKEN;
 
 setup('authenticate with password', async ({ page, request }) => {
   // Use real API authentication (works locally and in CI against production)
@@ -87,7 +87,7 @@ setup('authenticate with password', async ({ page, request }) => {
       console.log('⚠ Failed to validate Rootly token:', testResponse.status(), errorText);
     }
   } else {
-    console.log('⚠ No Rootly token configured (E2E_ROOTLY_TOKEN or ROOTLY_API_TOKEN)');
+    console.log('⚠ No Rootly token configured (E2E_ROOTLY_API_KEY or ROOTLY_API_TOKEN)');
     console.log('  Organization selector will not be available for E2E tests');
   }
 
