@@ -1,11 +1,8 @@
 'use client'
 
 import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 
 export default function AuthInterceptor() {
-  const router = useRouter()
-
   useEffect(() => {
     // Intercept all fetch requests and handle 401 errors globally
     const originalFetch = window.fetch
@@ -17,7 +14,9 @@ export default function AuthInterceptor() {
       if (response.status === 401) {
         console.log('🔒 401 Unauthorized - redirecting to login')
         localStorage.clear()
-        router.push('/')
+        // Use window.location for hard redirect (more reliable than Next.js router)
+        window.location.href = '/'
+        // Return response even though we're redirecting (prevents errors)
       }
 
       return response
@@ -27,7 +26,7 @@ export default function AuthInterceptor() {
     return () => {
       window.fetch = originalFetch
     }
-  }, [router])
+  }, [])
 
   return null // This component doesn't render anything
 }
