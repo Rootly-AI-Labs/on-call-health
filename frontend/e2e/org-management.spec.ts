@@ -14,8 +14,22 @@ test.describe('Organization Management', () => {
     await page.goto('/integrations');
     await page.waitForLoadState('networkidle');
 
-    const teamManagementButton = page.getByRole('button', { name: /team|members|organization/i });
-    await expect(teamManagementButton).toBeVisible({ timeout: DEFAULT_TIMEOUT });
+    // Wait for the organization selector to be visible
+    const orgSelector = page.locator('select, [role="combobox"]').first();
+    await expect(orgSelector).toBeVisible({ timeout: DEFAULT_TIMEOUT });
+
+    // Select the first available organization if none is selected
+    const selectTrigger = page.locator('[role="combobox"]').first();
+    await selectTrigger.click();
+
+    // Wait for dropdown options and select first one
+    const firstOption = page.locator('[role="option"]').first();
+    await expect(firstOption).toBeVisible({ timeout: DEFAULT_TIMEOUT });
+    await firstOption.click();
+
+    // Now click the Team button (should be enabled after org selection)
+    const teamManagementButton = page.getByRole('button', { name: /team/i });
+    await expect(teamManagementButton).toBeEnabled({ timeout: DEFAULT_TIMEOUT });
     await teamManagementButton.click();
 
     // Wait for dialog to be visible instead of arbitrary timeout
