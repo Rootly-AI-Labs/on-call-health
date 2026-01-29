@@ -79,4 +79,8 @@ class Settings:
     ARQ_RETRY_JOBS: bool = os.getenv("ARQ_RETRY_JOBS", "true").lower() == "true"
     ARQ_KEEP_RESULT: int = int(os.getenv("ARQ_KEEP_RESULT", "3600"))  # 1 hour in seconds
 
+    # Token Refresh Distributed Lock Configuration
+    TOKEN_REFRESH_LOCK_TTL: int = int(os.getenv("TOKEN_REFRESH_LOCK_TTL", "30"))  # seconds
+    TOKEN_REFRESH_LOCK_TIMEOUT: float = float(os.getenv("TOKEN_REFRESH_LOCK_TIMEOUT", "10"))  # seconds
+
 settings = Settings()
