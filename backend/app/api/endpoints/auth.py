@@ -8,6 +8,8 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 import logging
+import bcrypt
+from pydantic import EmailStr, field_validator, Field, BaseModel
 
 from ...models import get_db, User, OAuthProvider, UserEmail, OrganizationInvitation
 from ...auth.oauth import google_oauth, github_oauth
@@ -19,7 +21,6 @@ from ...core.config import settings
 from ...core.rate_limiting import auth_rate_limit
 from ...core.input_validation import BaseValidatedModel
 from urllib.parse import quote
-from pydantic import field_validator, Field
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -36,6 +37,12 @@ ALLOWED_OAUTH_ORIGINS = [
     "https://www.oncallburnout.com",
     "https://oncallburnout.com"
 ]
+
+# Pydantic models
+class PasswordLoginRequest(BaseModel):
+    """Request model for password-based login (E2E testing only)."""
+    email: EmailStr
+    password: str
 
 def build_error_redirect(frontend_url: str, error_msg: str) -> str:
     """Build error redirect URL with properly encoded error message."""
@@ -900,3 +907,61 @@ async def get_organization_members(
     members.extend(other_members)
 
     return members
+
+# Password Login Endpoint (for E2E testing only)
+@router.post("/login/password")
+@auth_rate_limit("password_login")
+async def password_login(
+    login_request: PasswordLoginRequest,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Password-based login for E2E testing.
+    NOT intended for production use - OAuth is the primary authentication method.
+
+    Security: Uses constant-time operations to prevent timing attacks.
+    """
+    # Find user by email
+    user = db.query(User).filter(User.email == login_request.email).first()
+
+    # Always perform password verification to prevent timing attacks
+    # Use a dummy hash if user doesn't exist to maintain constant time
+    password_is_valid = False
+
+    try:
+        password_bytes = login_request.password.encode('utf-8')
+
+        if user and user.password_hash:
+            hash_bytes = user.password_hash.encode('utf-8') if isinstance(user.password_hash, str) else user.password_hash
+            password_is_valid = bcrypt.checkpw(password_bytes, hash_bytes)
+        else:
+            # Perform dummy hash check to maintain constant time
+            # This prevents timing attacks that could reveal if a user exists
+            dummy_hash = b'$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5NU7qwKgR6Hqm'
+            bcrypt.checkpw(password_bytes, dummy_hash)
+
+    except Exception as e:
+        # Log error but don't expose details to client
+        logger.error(f"Password verification error for {login_request.email}: {e}", exc_info=True)
+        # Still return generic error after logging
+
+    # Always return the same error message regardless of whether user exists or password is wrong
+    if not password_is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password"
+        )
+
+    # Create JWT token
+    access_token = create_access_token(data={"sub": str(user.id)})
+
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": {
+            "id": user.id,
+            "email": user.email,
+            "name": user.name
+        }
+    }

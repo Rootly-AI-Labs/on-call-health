@@ -41,8 +41,6 @@ class MappingRecorder:
         if correlation:
             return (correlation.user_id, organization_id)  # user_id may be NULL
         else:
-            # Email not in user_correlations - shouldn't happen but handle gracefully
-            logger.warning(f"Email {email} not found in user_correlations for org {organization_id}")
             return (None, organization_id)
     
     def record_mapping_attempt(

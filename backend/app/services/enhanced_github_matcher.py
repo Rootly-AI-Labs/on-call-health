@@ -280,9 +280,9 @@ class EnhancedGitHubMatcher:
                 if best_score > 0.7:  # Only return if good enough score
                     return best_match[0]
             
-            # If we have multiple similar candidates, log them for debugging
-            for username, score, name in candidates[:3]:  # Show top 3
-                logger.info(f"   - {username}: '{name}' (score: {score:.2f})")
+            # If we have multiple similar candidates, log summary stats for debugging
+            if len(candidates) > 1:
+                logger.info(f"   - Found {len(candidates)} potential matches with scores ranging from {candidates[-1][1]:.2f} to {candidates[0][1]:.2f}")
                 
             # Return the best one if it's above threshold
             if best_score > 0.8:  # Higher threshold for ambiguous cases

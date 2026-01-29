@@ -299,12 +299,12 @@ class GitHubAPIManager:
                 }
                 
                 url = f'https://api.github.com/users/{username}'
-                logger.info(f"🔍 Validating GitHub user: {username}")
-                
+                logger.debug(f"🔍 Validating GitHub user: {username}")
+
                 async with session.get(url, headers=headers) as response:
                     if response.status == 200:
                         user_data = await response.json()
-                        logger.info(f"✅ Found GitHub user: {user_data.get('login')} ({user_data.get('name', 'No name')})")
+                        logger.debug(f"✅ Found GitHub user: {user_data.get('login')} ({user_data.get('name', 'No name')})")
                         return user_data
                     elif response.status == 404:
                         logger.warning(f"❌ GitHub user not found: {username}")
