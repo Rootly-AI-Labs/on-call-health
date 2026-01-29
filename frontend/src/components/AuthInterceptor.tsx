@@ -42,7 +42,7 @@ export default function AuthInterceptor() {
 
     isInterceptorInstalled = true
 
-    // Intercept all fetch requests and handle 401 errors globally
+    // Intercept all fetch requests and handle 401 errors for AUTH endpoints only
     window.fetch = async (...args) => {
       // Ensure originalFetch is available
       if (!originalFetch) {
@@ -52,9 +52,14 @@ export default function AuthInterceptor() {
       try {
         const response = await originalFetch(...args)
 
-        // Check for 401 BEFORE consuming the response
-        if (response.status === 401) {
-          console.log('🔒 401 Unauthorized - redirecting to login')
+        // Only handle 401 for auth-related endpoints (user authentication)
+        // Don't interfere with GitHub/Slack/Jira/etc integration auth
+        const url = typeof args[0] === 'string' ? args[0] : args[0]?.url || ''
+        const isAuthEndpoint = url.includes('/auth/') || url.includes('/user/me')
+
+        // Check for 401 BEFORE consuming the response (auth endpoints only)
+        if (response.status === 401 && isAuthEndpoint) {
+          console.log('🔒 401 Unauthorized on auth endpoint - redirecting to login')
 
           // Clear only auth-related data (not all localStorage)
           clearAuthData()
@@ -77,7 +82,7 @@ export default function AuthInterceptor() {
           return response.clone()
         }
 
-        // Clone response for non-401 responses to prevent "body already consumed" errors
+        // Clone response for all responses to prevent "body already consumed" errors
         return response.clone()
       } catch (error) {
         // Re-throw errors to maintain normal error handling
