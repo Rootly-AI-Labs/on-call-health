@@ -8,6 +8,7 @@ import { GettingStartedProvider } from '@/contexts/GettingStartedContext'
 import { GettingStartedDialog } from '@/components/GettingStartedDialog'
 import { ChartModeProvider } from '@/contexts/ChartModeContext'
 import { baseMetadata } from '@/lib/metadata'
+import AuthInterceptor from '@/components/AuthInterceptor'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -51,6 +52,7 @@ export default function RootLayout({
         <NewRelicProvider>
           <GettingStartedProvider>
             <ChartModeProvider>
+              <AuthInterceptor />
               <ErrorBoundary>
                 {children}
               </ErrorBoundary>
