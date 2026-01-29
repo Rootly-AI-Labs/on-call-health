@@ -358,7 +358,7 @@ async def get_linear_status(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Get Linear integration status."""
+    """Get Linear integration status, including token validation."""
     integration = db.query(LinearIntegration).filter(
         LinearIntegration.user_id == current_user.id
     ).first()
@@ -374,11 +374,21 @@ async def get_linear_status(
     except Exception:
         pass
 
+    # Validate token
+    from app.services.integration_validator import IntegrationValidator
+    validator = IntegrationValidator(db)
+    validation_result = await validator._validate_linear(current_user.id)
+
+    token_valid = validation_result.get("valid", False) if validation_result else False
+    token_error = validation_result.get("error") if validation_result and not token_valid else None
+
     workspace_mapping = None
     if current_user.organization_id:
+        # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
         workspace_mapping = db.query(LinearWorkspaceMapping).filter(
             LinearWorkspaceMapping.workspace_id == integration.workspace_id,
             LinearWorkspaceMapping.organization_id == current_user.organization_id,
+            LinearWorkspaceMapping.organization_id.isnot(None),
         ).first()
 
     response = {
@@ -397,6 +407,8 @@ async def get_linear_status(
             "token_expires_at": integration.token_expires_at.isoformat() if integration.token_expires_at else None,
             "updated_at": integration.updated_at.isoformat() if integration.updated_at else None,
             "token_preview": token_preview,
+            "token_valid": token_valid,
+            "token_error": token_error
         },
     }
 
@@ -440,9 +452,11 @@ async def list_linear_teams(
     # Get workspace mapping to mark selected teams
     selected_team_ids = []
     if current_user.organization_id:
+        # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
         mapping = db.query(LinearWorkspaceMapping).filter(
             LinearWorkspaceMapping.workspace_id == integration.workspace_id,
             LinearWorkspaceMapping.organization_id == current_user.organization_id,
+            LinearWorkspaceMapping.organization_id.isnot(None),
         ).first()
         if mapping and mapping.team_ids:
             selected_team_ids = mapping.team_ids
@@ -501,9 +515,11 @@ async def select_linear_teams(
         )
 
     # Update workspace mapping
+    # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
     mapping = db.query(LinearWorkspaceMapping).filter(
         LinearWorkspaceMapping.workspace_id == integration.workspace_id,
         LinearWorkspaceMapping.organization_id == current_user.organization_id,
+        LinearWorkspaceMapping.organization_id.isnot(None),
     ).first()
 
     if mapping:
@@ -716,8 +732,10 @@ async def sync_linear_users(
             continue
 
         # Find existing correlation by email
+        # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
         corr = db.query(UserCorrelation).filter(
             UserCorrelation.organization_id == current_user.organization_id,
+            UserCorrelation.organization_id.isnot(None),
             UserCorrelation.email == linear_email,
         ).first()
 
@@ -781,8 +799,10 @@ async def disconnect_linear(
 
     # Clear Linear fields from UserCorrelation
     if integration.linear_user_id and current_user.organization_id:
+        # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
         correlations = db.query(UserCorrelation).filter(
             UserCorrelation.organization_id == current_user.organization_id,
+            UserCorrelation.organization_id.isnot(None),
             UserCorrelation.linear_user_id == integration.linear_user_id,
         ).all()
         for c in correlations:
@@ -791,9 +811,11 @@ async def disconnect_linear(
 
     # Remove workspace mapping if exists
     if current_user.organization_id:
+        # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
         db.query(LinearWorkspaceMapping).filter(
             LinearWorkspaceMapping.workspace_id == integration.workspace_id,
             LinearWorkspaceMapping.organization_id == current_user.organization_id,
+            LinearWorkspaceMapping.organization_id.isnot(None),
         ).delete()
 
     # Remove integration
@@ -1083,8 +1105,10 @@ async def remove_linear_mapping(
 
         # Clear Linear fields from UserCorrelation
         if current_user.organization_id:
+            # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
             corr = db.query(UserCorrelation).filter(
                 UserCorrelation.organization_id == current_user.organization_id,
+                UserCorrelation.organization_id.isnot(None),
                 UserCorrelation.email == email,
             ).first()
 

@@ -1217,7 +1217,12 @@ class MigrationRunner:
                 "sql_file": "2026_01_23_repair_survey_periods_migration.sql"
             },
             {
-                "name": "042_add_checkpoint_fields",
+                "name": "042_add_last_modified_to_survey_schedules",
+                "description": "Add last_modified_by_user_id and last_modified_at columns to track survey schedule changes",
+                "sql_file": "2026_01_26_add_last_modified_to_survey_schedules.sql"
+            },
+            {
+                "name": "043_add_checkpoint_fields",
                 "description": "Add checkpoint/resume fields to analyses table for deployment resilience",
                 "sql_file": "2026_01_27_add_checkpoint_fields.sql"
             },

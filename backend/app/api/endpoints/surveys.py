@@ -5,7 +5,7 @@ import logging
 from datetime import time, datetime, timedelta
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from pydantic import BaseModel
 
 from ...models import get_db, User
@@ -103,6 +103,9 @@ class SurveyScheduleResponse(BaseModel):
     reminder_message_template: str
     follow_up_reminders_enabled: bool
     follow_up_message_template: Optional[str]
+    last_modified_by_user_id: Optional[int]
+    last_modified_by_name: Optional[str]
+    last_modified_at: Optional[str]
 
 
 class UserPreferenceUpdate(BaseModel):
@@ -157,7 +160,9 @@ async def create_or_update_survey_schedule(
         raise HTTPException(status_code=400, detail="Invalid time format. Use HH:MM (e.g., 09:00)")
 
     # Check if schedule exists (order by id desc for deterministic results)
-    existing_schedule = db.query(SurveySchedule).filter(
+    existing_schedule = db.query(SurveySchedule).options(
+        joinedload(SurveySchedule.last_modified_by)
+    ).filter(
         SurveySchedule.organization_id == organization_id
     ).order_by(SurveySchedule.id.desc()).first()
 
@@ -182,10 +187,13 @@ async def create_or_update_survey_schedule(
         if schedule_data.follow_up_message_template:
             existing_schedule.follow_up_message_template = schedule_data.follow_up_message_template
 
+        # Track who made this change
+        existing_schedule.last_modified_by_user_id = current_user.id
+
         db.commit()
         db.refresh(existing_schedule)
         schedule = existing_schedule
-        logger.info(f"Updated survey schedule for org {organization_id}")
+        logger.info(f"Updated survey schedule for org {organization_id} by user {current_user.id}")
     else:
         # Create new
         schedule = SurveySchedule(
@@ -199,7 +207,8 @@ async def create_or_update_survey_schedule(
             send_reminder=schedule_data.send_reminder,
             reminder_time=reminder_time,
             reminder_hours_after=schedule_data.reminder_hours_after,
-            follow_up_reminders_enabled=schedule_data.follow_up_reminders_enabled
+            follow_up_reminders_enabled=schedule_data.follow_up_reminders_enabled,
+            last_modified_by_user_id=current_user.id
         )
 
         if schedule_data.message_template:
@@ -212,7 +221,7 @@ async def create_or_update_survey_schedule(
         db.add(schedule)
         db.commit()
         db.refresh(schedule)
-        logger.info(f"Created survey schedule for org {organization_id}")
+        logger.info(f"Created survey schedule for org {organization_id} by user {current_user.id}")
 
     # Reload scheduler with new schedule
     if SCHEDULER_AVAILABLE and survey_scheduler:
@@ -221,6 +230,15 @@ async def create_or_update_survey_schedule(
         except Exception as e:
             logger.error(f"Failed to reload scheduler: {e}")
             # Continue anyway - schedule is saved in DB
+
+    # Get last modified by user info
+    last_modified_by_name = None
+    if schedule.last_modified_by_user_id:
+        try:
+            if schedule.last_modified_by and hasattr(schedule.last_modified_by, 'name'):
+                last_modified_by_name = schedule.last_modified_by.name
+        except Exception as e:
+            logger.warning(f"Failed to load last_modified_by user for schedule {schedule.id}: {e}")
 
     return {
         "id": schedule.id,
@@ -238,6 +256,9 @@ async def create_or_update_survey_schedule(
         "reminder_message_template": schedule.reminder_message_template,
         "follow_up_reminders_enabled": schedule.follow_up_reminders_enabled,
         "follow_up_message_template": schedule.follow_up_message_template,
+        "last_modified_by_user_id": schedule.last_modified_by_user_id,
+        "last_modified_by_name": last_modified_by_name,
+        "last_modified_at": schedule.last_modified_at.isoformat() if schedule.last_modified_at else None,
         "message": "Survey schedule configured successfully"
     }
 
@@ -248,8 +269,12 @@ async def get_survey_schedule(
     db: Session = Depends(get_db)
 ):
     """Get current survey schedule for user's organization."""
-    schedule = db.query(SurveySchedule).filter(
-        SurveySchedule.organization_id == current_user.organization_id
+    schedule = db.query(SurveySchedule).options(
+        joinedload(SurveySchedule.last_modified_by)
+    ).filter(
+        # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
+        SurveySchedule.organization_id == current_user.organization_id,
+        SurveySchedule.organization_id.isnot(None)
     ).first()
 
     if not schedule:
@@ -266,11 +291,23 @@ async def get_survey_schedule(
             "reminder_hours_after": 5,
             "follow_up_reminders_enabled": True,
             "follow_up_message_template": None,
+            "last_modified_by_user_id": None,
+            "last_modified_by_name": None,
+            "last_modified_at": None,
             "message": "No survey schedule configured"
         }
 
     # Derive frequency_type with fallback for legacy data
     effective_frequency = schedule.frequency_type or ('weekday' if schedule.send_weekdays_only else 'daily')
+
+    # Get last modified by user info
+    last_modified_by_name = None
+    if schedule.last_modified_by_user_id:
+        try:
+            if schedule.last_modified_by and hasattr(schedule.last_modified_by, 'name'):
+                last_modified_by_name = schedule.last_modified_by.name
+        except Exception as e:
+            logger.warning(f"Failed to load last_modified_by user for schedule {schedule.id}: {e}")
 
     return {
         "id": schedule.id,
@@ -287,7 +324,10 @@ async def get_survey_schedule(
         "message_template": schedule.message_template,
         "reminder_message_template": schedule.reminder_message_template,
         "follow_up_reminders_enabled": schedule.follow_up_reminders_enabled if schedule.follow_up_reminders_enabled is not None else True,
-        "follow_up_message_template": schedule.follow_up_message_template
+        "follow_up_message_template": schedule.follow_up_message_template,
+        "last_modified_by_user_id": schedule.last_modified_by_user_id,
+        "last_modified_by_name": last_modified_by_name,
+        "last_modified_at": schedule.last_modified_at.isoformat() if schedule.last_modified_at else None
     }
 
 
@@ -477,7 +517,8 @@ async def manual_survey_delivery(
                     slack_user_id=user['slack_user_id'],
                     user_id=user['user_id'],
                     organization_id=organization_id,
-                    message=message_template
+                    message=message_template,
+                    user_email=user['email']
                 )
                 sent_count += 1
             except Exception as e:

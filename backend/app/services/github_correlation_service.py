@@ -71,7 +71,7 @@ class GitHubCorrelationService:
             for mapping in github_mappings:
                 email = mapping['email'].lower().strip()
                 email_to_github[email] = mapping
-                self.logger.info(f"Integration mapping: {email} → {mapping['username']} (data points: {mapping.get('data_points', 0)})")
+                self.logger.debug(f"Integration mapping: {email} → {mapping['username']} (data points: {mapping.get('data_points', 0)})")
             
             # Correlate with team members
             correlations_made = 0
@@ -98,7 +98,7 @@ class GitHubCorrelationService:
                         updated_members.append(member)
                     else:
                         # No existing data, create from integration mapping
-                        self.logger.info(f"🔄 [CORRELATION] Creating activity for {member_email} from mapping with data_points={github_mapping.get('data_points', 0)}")
+                        self.logger.debug(f"🔄 Creating activity for {member_email} from mapping with data_points={github_mapping.get('data_points', 0)}")
                         github_activity = self._create_github_activity_from_integration_mapping(github_mapping)
 
                         if github_activity:
@@ -112,7 +112,7 @@ class GitHubCorrelationService:
                             updated_members.append(updated_member)
                             correlations_made += 1
 
-                            self.logger.info(f"✅ [CORRELATION_SUCCESS] {member_email} → {github_mapping['username']}: commits={github_activity.get('commits_count', 0)}, data_points={github_activity.get('data_points_available', 0)}")
+                            self.logger.debug(f"Correlated {member_email} → {github_mapping['username']}: commits={github_activity.get('commits_count', 0)}")
                         else:
                             # Mapping exists but no activity data
                             updated_members.append(member)
@@ -141,9 +141,6 @@ class GitHubCorrelationService:
             try:
                 mappings = []
 
-                # Log the analysis_id being used for filtering
-                self.logger.info(f"📋 [FETCH_MAPPINGS] Fetching integration_mappings for analysis_id={self.analysis_id}")
-
                 # First, get mappings from integration_mappings table (auto-detected)
                 query = db.query(IntegrationMapping).filter(
                     IntegrationMapping.target_platform == 'github',
@@ -154,12 +151,10 @@ class GitHubCorrelationService:
 
                 if self.analysis_id:
                     query = query.filter(IntegrationMapping.analysis_id == self.analysis_id)
-                    self.logger.info(f"📋 [FETCH_MAPPINGS] Applied analysis_id filter: {self.analysis_id}")
                 else:
-                    self.logger.warning(f"⚠️ [FETCH_MAPPINGS] No analysis_id provided - fetching ALL mappings!")
+                    self.logger.warning(f"⚠️ No analysis_id provided - fetching ALL GitHub mappings!")
 
                 auto_mappings = query.order_by(IntegrationMapping.created_at.desc()).all()
-                self.logger.info(f"📋 [FETCH_MAPPINGS] Found {len(auto_mappings)} auto-detected mappings")
             
                 # Process auto-detected mappings
                 seen_emails = set()
@@ -168,8 +163,6 @@ class GitHubCorrelationService:
                     username = mapping.target_identifier
                     data_points = mapping.data_points_count or 0
                     email_lower = email.lower()
-
-                    self.logger.info(f"📊 [MAPPING_FETCH] {email} → {username}: data_points_count={mapping.data_points_count} (analysis_id={mapping.analysis_id})")
 
                     if email_lower not in seen_emails:
                         mappings.append({
@@ -227,14 +220,14 @@ class GitHubCorrelationService:
             finally:
                 db.close()
             
-            self.logger.info(f"Fetched {len(mappings)} total GitHub mappings:")
-            self.logger.info(f"  - Auto-detected: {len([m for m in mappings if m['source'] == 'auto_detected'])}")
-            self.logger.info(f"  - Manual: {len([m for m in mappings if m['source'] == 'manual'])}")
-            
-            # Log manual mappings for debugging
+            auto_count = len([m for m in mappings if m['source'] == 'auto_detected'])
+            manual_count = len([m for m in mappings if m['source'] == 'manual'])
+            self.logger.info(f"Fetched {len(mappings)} GitHub mappings ({auto_count} auto-detected, {manual_count} manual)")
+
+            # Log manual mappings at DEBUG level
             for mapping in mappings:
                 if mapping['source'] == 'manual':
-                    self.logger.info(f"  Manual mapping: {mapping['email']} → {mapping['username']}")
+                    self.logger.debug(f"  Manual mapping: {mapping['email']} → {mapping['username']}")
             
             return mappings
             
@@ -257,7 +250,7 @@ class GitHubCorrelationService:
             data_points = mapping.get('data_points', 0)
             email = mapping.get('email', '')
 
-            self.logger.info(f"📈 [ACTIVITY_CREATE] Creating activity for {email} → {username}: data_points={data_points}")
+            self.logger.debug(f"Creating activity for {email} → {username}: data_points={data_points}")
             
             # If we have data points, use them; otherwise create a basic structure
             if data_points > 0:
@@ -295,7 +288,7 @@ class GitHubCorrelationService:
                 'mapping_status': 'successful_with_data' if data_points > 0 else 'successful_no_data'
             }
 
-            self.logger.info(f"✅ [ACTIVITY_CREATED] {email}: commits={estimated_commits}, PRs={estimated_prs}, status={github_activity['mapping_status']}")
+            self.logger.debug(f"Activity created for {email}: commits={estimated_commits}, PRs={estimated_prs}")
             
             return github_activity
             

@@ -126,7 +126,22 @@ async def collect_team_github_data_with_mapping(
             failure_count += 1
 
     logger.info(f"📊 [GITHUB_COLLECTION_SUMMARY] Processed {len(team_emails)} members: {success_count} succeeded, {failure_count} failed")
-    
+
+    # Log final rate limit status
+    if github_token:
+        try:
+            import aiohttp
+            headers = {'Authorization': f'token {github_token}'}
+            async with aiohttp.ClientSession() as session:
+                async with session.get("https://api.github.com/rate_limit", headers=headers) as resp:
+                    if resp.status == 200:
+                        rate_data = await resp.json()
+                        remaining = rate_data['rate']['remaining']
+                        reset_time = rate_data['rate']['reset']
+                        logger.info(f"GITHUB API: Rate limit remaining: {remaining}, resets at {datetime.fromtimestamp(reset_time)}")
+        except Exception as e:
+            logger.debug(f"Could not log final GitHub rate limit: {e}")
+
     # Record mapping attempts if we have user context
     if recorder and user_id:
         for email in team_emails:
@@ -174,7 +189,7 @@ async def collect_team_github_data_with_mapping(
                         mapping_method=mapping_method,
                         data_points_count=data_points
                     )
-                    logger.info(f"💻 GitHub: {email} -> {github_username} ({data_points} data points)")
+                    logger.debug(f"GitHub: {email} -> {github_username} ({data_points} data points)")
                 else:
                     # Data collected but no clear username
                     recorder.record_successful_mapping(

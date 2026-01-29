@@ -23,10 +23,10 @@ LOG_LEVEL = getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO)
 # Create and configure the UserContextFilter to add user identity to all log records
 user_context_filter = UserContextFilter()
 
-# Configure logging with user identifier (email preferred) in the format
+# Configure logging with user identifier and analysis ID in the format
 logging.basicConfig(
     level=LOG_LEVEL,
-    format='%(asctime)s - %(name)s - %(levelname)s - [user_id=%(user_id)s] - %(message)s',
+    format='%(asctime)s - %(name)s - %(levelname)s - [user=%(user_id)s]%(analysis_ref)s - %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 

@@ -5,6 +5,9 @@
 
 # Testing
 /coverage
+/test-results/
+/playwright-report/
+/playwright/.cache/
 
 # Next.js
 /.next/
@@ -25,6 +28,7 @@ yarn-error.log*
 # Local env files
 .env.local
 .env.dev
+.env.test
 .env.development.local
 .env.test.local
 .env.production.local

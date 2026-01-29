@@ -2,7 +2,14 @@ import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { AlertCircle, CheckCircle, Calendar, Globe, Key, Trash2, TestTube, Loader2 } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { AlertCircle, CheckCircle, Calendar, Globe, Key, Trash2, Zap, Loader2, ChevronDown, AlertTriangle } from "lucide-react"
 import type { LinearIntegration } from "../types"
 
 interface LinearConnectedCardProps {
@@ -18,8 +25,11 @@ export function LinearConnectedCard({
   onTest,
   isLoading = false
 }: LinearConnectedCardProps) {
+  // Check if token is invalid
+  const hasTokenError = integration.token_valid === false
+
   return (
-    <Card className="border-2 border-green-200 bg-green-50/50 max-w-2xl mx-auto">
+    <Card className={`border-2 ${hasTokenError ? 'border-red-200 bg-red-50/50' : 'border-green-200 bg-green-50/50'} max-w-2xl mx-auto`}>
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
@@ -27,18 +37,62 @@ export function LinearConnectedCard({
             <div>
               <CardTitle className="text-lg flex items-center space-x-2">
                 <span>Linear</span>
-                <Badge variant="secondary" className="bg-green-100 text-green-700">
-                  <CheckCircle className="w-3 h-3 mr-1" />
-                  Connected
-                </Badge>
+                {hasTokenError ? (
+                  <Badge variant="secondary" className="bg-red-100 text-red-700">
+                    <AlertTriangle className="w-3 h-3 mr-1" />
+                    Token Invalid
+                  </Badge>
+                ) : (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Badge
+                        variant="secondary"
+                        className="bg-green-100 text-green-700 cursor-pointer hover:bg-green-200 transition-colors"
+                      >
+                        <CheckCircle className="w-3 h-3 mr-1" />
+                        Connected
+                        <ChevronDown className="w-3 h-3 ml-1" />
+                      </Badge>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start">
+                      <DropdownMenuItem onClick={onTest} disabled={isLoading}>
+                        {isLoading ? (
+                          <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                        ) : (
+                          <Zap className="w-3 h-3 mr-2" />
+                        )}
+                        Test Connection
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
               </CardTitle>
               <p className="text-sm text-slate-600">Project management and issue tracking</p>
             </div>
           </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onDisconnect}
+            disabled={isLoading}
+            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+          >
+            <Trash2 className="w-5 h-5" />
+          </Button>
         </div>
       </CardHeader>
 
       <CardContent className="space-y-4">
+        {/* Token Validation Error Alert */}
+        {hasTokenError && integration.token_error && (
+          <Alert className="border-red-200 bg-red-50">
+            <AlertTriangle className="w-4 h-4 text-red-600" />
+            <AlertDescription className="text-red-800 text-sm">
+              <strong>Authentication Error:</strong> {integration.token_error}
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Integration Details */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
           {integration.workspace_name && (
@@ -112,33 +166,6 @@ export function LinearConnectedCard({
             </div>
           </div>
         )}
-
-        {/* Action Buttons */}
-        <div className="flex items-center flex-wrap gap-2 pt-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={onTest}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            ) : (
-              <TestTube className="w-4 h-4 mr-2" />
-            )}
-            Test Connection
-          </Button>
-
-          <Button
-            size="sm"
-            variant="destructive"
-            onClick={onDisconnect}
-            disabled={isLoading}
-          >
-            <Trash2 className="w-4 h-4 mr-2" />
-            Disconnect
-          </Button>
-        </div>
 
         {/* Info Note */}
         <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs text-slate-600">

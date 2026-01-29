@@ -69,9 +69,9 @@ def load_exported_burnout_reports(db, user_id: int, mock_data: dict, dry_run: bo
 
         if dry_run:
             print(f"    [DRY-RUN] Would load {len(reports_data)} burnout reports for user_id {user_id}")
-            for report in reports_data[:3]:  # Show first 3 as example
+            for i, report in enumerate(reports_data[:3]):  # Show first 3 as example
                 submitted = report.get('submitted_at', 'unknown')
-                print(f"      - {report.get('email', 'unknown')}: feeling={report.get('feeling_score')}, workload={report.get('workload_score')}, submitted={submitted}")
+                print(f"      - Report #{i+1}: feeling={report.get('feeling_score')}, workload={report.get('workload_score')}, submitted={submitted}")
             if len(reports_data) > 3:
                 print(f"      ... and {len(reports_data) - 3} more")
             return len(reports_data)
