@@ -15,7 +15,7 @@ export default function AuthInterceptor() {
         console.log('🔒 401 Unauthorized - redirecting to login')
         localStorage.clear()
         // Use window.location for hard redirect (more reliable than Next.js router)
-        window.location.href = '/'
+        window.location.href = '/auth/login'
         // Return response even though we're redirecting (prevents errors)
       }
 
