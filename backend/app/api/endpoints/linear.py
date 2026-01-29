@@ -822,6 +822,10 @@ async def disconnect_linear(
     db.delete(integration)
     db.commit()
 
+    # Invalidate validation cache so error doesn't persist
+    from ...services.integration_validator import invalidate_validation_cache
+    invalidate_validation_cache(current_user.id)
+
     logger.info("[Linear] Disconnected for user %s", current_user.id)
 
     return {"success": True, "message": "Linear integration disconnected."}
