@@ -54,7 +54,13 @@ export default function AuthInterceptor() {
 
         // Only handle 401 for auth-related endpoints (user authentication)
         // Don't interfere with GitHub/Slack/Jira/etc integration auth
-        const url = typeof args[0] === 'string' ? args[0] : args[0]?.url || ''
+        const url = typeof args[0] === 'string'
+          ? args[0]
+          : args[0] instanceof Request
+            ? args[0].url
+            : args[0] instanceof URL
+              ? args[0].toString()
+              : ''
         const isAuthEndpoint = url.includes('/auth/') || url.includes('/user/me')
 
         // Check for 401 BEFORE consuming the response (auth endpoints only)
