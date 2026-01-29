@@ -22,6 +22,10 @@ class Settings:
     JWT_ALGORITHM: str = "HS256"
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
 
+    # Token Encryption (separate from JWT signing for security)
+    # Falls back to JWT_SECRET_KEY for backward compatibility
+    ENCRYPTION_KEY: str = os.getenv("ENCRYPTION_KEY", os.getenv("JWT_SECRET_KEY", "your-secret-key-change-in-production"))
+
     # Frontend URL for survey links
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
     
