@@ -729,6 +729,10 @@ async def disconnect_slack(
 
         db.commit()
 
+        # Invalidate validation cache so error doesn't persist
+        from ...services.integration_validator import invalidate_validation_cache
+        invalidate_validation_cache(current_user.id)
+
         # Reload scheduler to remove scheduled jobs for this org
         try:
             from ..services.survey_scheduler import survey_scheduler
