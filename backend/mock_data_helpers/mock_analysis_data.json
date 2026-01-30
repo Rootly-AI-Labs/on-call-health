@@ -56,7 +56,7 @@
       },
       "team_health": {
         "overall_score": 64.38,
-        "scoring_method": "OCB",
+        "scoring_method": "OCH",
         "risk_distribution": {
           "low": 9,
           "medium": 1,
@@ -82,7 +82,7 @@
             "pagerduty_user_id": null,
             "avatar_url": "/images/male/marcus_thompson.png",
             "burnout_score": 6.26,
-            "ocb_score": 94.06,
+            "och_score": 94.06,
             "risk_level": "high",
             "incident_count": 27,
             "factors": {
@@ -95,13 +95,13 @@
               "work_related_burnout": 5.99,
               "accomplishment_burnout": 6.0
             },
-            "ocb_breakdown": {
+            "och_breakdown": {
               "personal": 126.73,
               "work_related": 51.7,
               "interpretation": "high"
             },
-            "ocb_reasoning": [
-              "Critical burnout risk (OCB: 89/100) - immediate attention needed",
+            "och_reasoning": [
+              "Critical burnout risk (OCH: 89/100) - immediate attention needed",
               "PERSONAL:",
               "\u00e2\u20ac\u00a2 Non-business hours incident activity (60.4 points)",
               "\u00e2\u20ac\u00a2 High-severity incident stress (52.5 points)",
@@ -113,7 +113,7 @@
               "\u00e2\u20ac\u00a2 Critical production incident frequency: 19 sev2, 5 sev3, 2 unknown, 1 sev1 (1.2 points total for 27 incidents)",
               "Personal stress significantly higher than work stress - focus on recovery and boundaries"
             ],
-            "ocb_factors": {
+            "och_factors": {
               "personal": [
                 {
                   "key": "after_hours_activity",
@@ -392,7 +392,7 @@
               }
             ],
             "jira_burnout_breakdown": {
-              "jira_ocb_score": 45.5,
+              "jira_och_score": 45.5,
               "original_ocb": 89.22,
               "final_ocb": 94.72,
               "jira_added_risk": 5.5,
@@ -521,7 +521,7 @@
               }
             ],
             "linear_burnout_breakdown": {
-              "linear_ocb_score": 48.0,
+              "linear_och_score": 48.0,
               "original_ocb": 92.08,
               "final_ocb": 96.08,
               "linear_added_risk": 4.0,
@@ -549,7 +549,7 @@
             "pagerduty_user_id": null,
             "avatar_url": "/images/female/maya_fernandez.png",
             "burnout_score": 5.9,
-            "ocb_score": 66.75,
+            "och_score": 66.75,
             "risk_level": "high",
             "incident_count": 28,
             "factors": {
@@ -562,13 +562,13 @@
               "work_related_burnout": 5.92,
               "accomplishment_burnout": 6.0
             },
-            "ocb_breakdown": {
+            "och_breakdown": {
               "personal": 83.01,
               "work_related": 50.5,
               "interpretation": "moderate"
             },
-            "ocb_reasoning": [
-              "High burnout risk (OCB: 67/100) - monitor closely",
+            "och_reasoning": [
+              "High burnout risk (OCH: 67/100) - monitor closely",
               "PERSONAL:",
               "\u00e2\u20ac\u00a2 High-severity incident stress (52.5 points)",
               "\u00e2\u20ac\u00a2 Non-business hours incident activity (16.6 points)",
@@ -579,7 +579,7 @@
               "\u00e2\u20ac\u00a2 Incident response meeting load (7.5 points)",
               "Personal stress significantly higher than work stress - focus on recovery and boundaries"
             ],
-            "ocb_factors": {
+            "och_factors": {
               "personal": [
                 {
                   "key": "sleep_quality_proxy",
@@ -887,7 +887,7 @@
               }
             ],
             "jira_burnout_breakdown": {
-              "jira_ocb_score": 52.0,
+              "jira_och_score": 52.0,
               "original_ocb": 60.75,
               "final_ocb": 66.75,
               "jira_added_risk": 6.0,
@@ -902,7 +902,7 @@
               }
             },
             "linear_burnout_breakdown": {
-              "linear_ocb_score": 45.0,
+              "linear_och_score": 45.0,
               "original_ocb": 66.75,
               "final_ocb": 71.75,
               "linear_added_risk": 5.0,
@@ -930,7 +930,7 @@
             "pagerduty_user_id": null,
             "avatar_url": "/images/male/jamal_williams.png",
             "burnout_score": 3.25,
-            "ocb_score": 54.24,
+            "och_score": 54.24,
             "risk_level": "medium",
             "incident_count": 11,
             "factors": {
@@ -943,13 +943,13 @@
               "work_related_burnout": 3.14,
               "accomplishment_burnout": 3.57
             },
-            "ocb_breakdown": {
+            "och_breakdown": {
               "personal": 62.41,
               "work_related": 46.07,
               "interpretation": "moderate"
             },
-            "ocb_reasoning": [
-              "High burnout risk (OCB: 54/100) - monitor closely",
+            "och_reasoning": [
+              "High burnout risk (OCH: 54/100) - monitor closely",
               "PERSONAL:",
               "\u00e2\u20ac\u00a2 High-severity incident stress (52.5 points)",
               "\u00e2\u20ac\u00a2 High task workload (9.9 points)",
@@ -959,7 +959,7 @@
               "\u00e2\u20ac\u00a2 Incident response meeting load (5.4 points)",
               "Personal stress significantly higher than work stress - focus on recovery and boundaries"
             ],
-            "ocb_factors": {
+            "och_factors": {
               "personal": [
                 {
                   "key": "sleep_quality_proxy",
@@ -1172,7 +1172,7 @@
               }
             ],
             "jira_burnout_breakdown": {
-              "jira_ocb_score": 42.0,
+              "jira_och_score": 42.0,
               "original_ocb": 50.24,
               "final_ocb": 55.24,
               "jira_added_risk": 5.0,
@@ -1237,7 +1237,7 @@
               }
             ],
             "linear_burnout_breakdown": {
-              "linear_ocb_score": 40.0,
+              "linear_och_score": 40.0,
               "original_ocb": 55.24,
               "final_ocb": 59.24,
               "linear_added_risk": 4.0,
@@ -1265,7 +1265,7 @@
             "pagerduty_user_id": null,
             "avatar_url": "/images/male/david_chen.png",
             "burnout_score": 2.62,
-            "ocb_score": 91.75,
+            "och_score": 91.75,
             "risk_level": "low",
             "incident_count": 5,
             "factors": {
@@ -1278,13 +1278,13 @@
               "work_related_burnout": 1.1,
               "accomplishment_burnout": 2.17
             },
-            "ocb_breakdown": {
+            "och_breakdown": {
               "personal": 133.51,
               "work_related": 38.37,
               "interpretation": "high"
             },
-            "ocb_reasoning": [
-              "Critical burnout risk (OCB: 86/100) - immediate attention needed",
+            "och_reasoning": [
+              "Critical burnout risk (OCH: 86/100) - immediate attention needed",
               "PERSONAL:",
               "\u00e2\u20ac\u00a2 Non-business hours incident activity (75.0 points)",
               "\u00e2\u20ac\u00a2 High-severity incident stress (52.5 points)",
@@ -1295,7 +1295,7 @@
               "\u00e2\u20ac\u00a2 Incident response meeting load (3.0 points)",
               "Personal stress significantly higher than work stress - focus on recovery and boundaries"
             ],
-            "ocb_factors": {
+            "och_factors": {
               "personal": [
                 {
                   "key": "after_hours_activity",
@@ -1534,7 +1534,7 @@
               }
             ],
             "jira_burnout_breakdown": {
-              "jira_ocb_score": 48.3,
+              "jira_och_score": 48.3,
               "original_ocb": 85.94,
               "final_ocb": 91.94,
               "jira_added_risk": 6.0,
@@ -1639,7 +1639,7 @@
               }
             ],
             "linear_burnout_breakdown": {
-              "linear_ocb_score": 22.5,
+              "linear_och_score": 22.5,
               "original_ocb": 89.36,
               "final_ocb": 91.75,
               "linear_added_risk": 2.39,
@@ -1665,7 +1665,7 @@
             "pagerduty_user_id": null,
             "avatar_url": "/images/male/minjun_park.png",
             "burnout_score": 2.16,
-            "ocb_score": 87.28,
+            "och_score": 87.28,
             "risk_level": "low",
             "incident_count": 3,
             "factors": {
@@ -1678,13 +1678,13 @@
               "work_related_burnout": 0.79,
               "accomplishment_burnout": 1.7
             },
-            "ocb_breakdown": {
+            "och_breakdown": {
               "personal": 131.4,
               "work_related": 34.94,
               "interpretation": "high"
             },
-            "ocb_reasoning": [
-              "Critical burnout risk (OCB: 83/100) - immediate attention needed",
+            "och_reasoning": [
+              "Critical burnout risk (OCH: 83/100) - immediate attention needed",
               "PERSONAL:",
               "\u00e2\u20ac\u00a2 Non-business hours incident activity (75.0 points)",
               "\u00e2\u20ac\u00a2 High-severity incident stress (52.5 points)",
@@ -1696,7 +1696,7 @@
               "\u00e2\u20ac\u00a2 Critical production incident frequency: 1 sev1, 2 sev4 (1.2 points total for 3 incidents)",
               "Personal stress significantly higher than work stress - focus on recovery and boundaries"
             ],
-            "ocb_factors": {
+            "och_factors": {
               "personal": [
                 {
                   "key": "after_hours_activity",
@@ -1914,7 +1914,7 @@
               }
             ],
             "jira_burnout_breakdown": {
-              "jira_ocb_score": 18.3,
+              "jira_och_score": 18.3,
               "original_ocb": 83.17,
               "final_ocb": 86.25,
               "jira_added_risk": 3.08,
@@ -1937,7 +1937,7 @@
               }
             ],
             "linear_burnout_breakdown": {
-              "linear_ocb_score": 7.5,
+              "linear_och_score": 7.5,
               "original_ocb": 86.25,
               "final_ocb": 87.28,
               "linear_added_risk": 1.03,
@@ -1963,7 +1963,7 @@
             "pagerduty_user_id": null,
             "avatar_url": "/images/female/zara_ali.png",
             "burnout_score": 2.0,
-            "ocb_score": 52.12,
+            "och_score": 52.12,
             "risk_level": "low",
             "incident_count": 6,
             "factors": {
@@ -1976,13 +1976,13 @@
               "work_related_burnout": 1.78,
               "accomplishment_burnout": 2.4
             },
-            "ocb_breakdown": {
+            "och_breakdown": {
               "personal": 59.55,
               "work_related": 44.69,
               "interpretation": "moderate"
             },
-            "ocb_reasoning": [
-              "High burnout risk (OCB: 52/100) - monitor closely",
+            "och_reasoning": [
+              "High burnout risk (OCH: 52/100) - monitor closely",
               "PERSONAL:",
               "\u00e2\u20ac\u00a2 High-severity incident stress (52.5 points)",
               "\u00e2\u20ac\u00a2 High task workload (7.0 points)",
@@ -1992,7 +1992,7 @@
               "\u00e2\u20ac\u00a2 Incident response meeting load (3.5 points)",
               "\u00e2\u20ac\u00a2 Critical production incident frequency: 2 sev0, 4 unknown (2.4 points total for 6 incidents)"
             ],
-            "ocb_factors": {
+            "och_factors": {
               "personal": [
                 {
                   "key": "sleep_quality_proxy",
@@ -2200,7 +2200,7 @@
             "pagerduty_user_id": null,
             "avatar_url": "/images/male/kenji_tanaka.png",
             "burnout_score": 1.86,
-            "ocb_score": 51.52,
+            "och_score": 51.52,
             "risk_level": "low",
             "incident_count": 6,
             "factors": {
@@ -2213,13 +2213,13 @@
               "work_related_burnout": 1.35,
               "accomplishment_burnout": 2.4
             },
-            "ocb_breakdown": {
+            "och_breakdown": {
               "personal": 59.55,
               "work_related": 43.48,
               "interpretation": "moderate"
             },
-            "ocb_reasoning": [
-              "High burnout risk (OCB: 52/100) - monitor closely",
+            "och_reasoning": [
+              "High burnout risk (OCH: 52/100) - monitor closely",
               "PERSONAL:",
               "\u00e2\u20ac\u00a2 High-severity incident stress (52.5 points)",
               "\u00e2\u20ac\u00a2 High task workload (7.0 points)",
@@ -2230,7 +2230,7 @@
               "\u00e2\u20ac\u00a2 Critical production incident frequency: 5 unknown, 1 sev0 (1.2 points total for 6 incidents)",
               "Personal stress significantly higher than work stress - focus on recovery and boundaries"
             ],
-            "ocb_factors": {
+            "och_factors": {
               "personal": [
                 {
                   "key": "sleep_quality_proxy",
@@ -2546,7 +2546,7 @@
             "pagerduty_user_id": null,
             "avatar_url": "/images/female/sophia_nguyen.png",
             "burnout_score": 1.81,
-            "ocb_score": 81.96,
+            "och_score": 81.96,
             "risk_level": "low",
             "incident_count": 3,
             "factors": {
@@ -2559,13 +2559,13 @@
               "work_related_burnout": 0.75,
               "accomplishment_burnout": 1.7
             },
-            "ocb_breakdown": {
+            "och_breakdown": {
               "personal": 131.4,
               "work_related": 32.52,
               "interpretation": "high"
             },
-            "ocb_reasoning": [
-              "Critical burnout risk (OCB: 82/100) - immediate attention needed",
+            "och_reasoning": [
+              "Critical burnout risk (OCH: 82/100) - immediate attention needed",
               "PERSONAL:",
               "\u00e2\u20ac\u00a2 Non-business hours incident activity (75.0 points)",
               "\u00e2\u20ac\u00a2 High-severity incident stress (52.5 points)",
@@ -2576,7 +2576,7 @@
               "\u00e2\u20ac\u00a2 Incident response meeting load (1.9 points)",
               "Personal stress significantly higher than work stress - focus on recovery and boundaries"
             ],
-            "ocb_factors": {
+            "och_factors": {
               "personal": [
                 {
                   "key": "after_hours_activity",
@@ -2853,7 +2853,7 @@
               }
             ],
             "jira_burnout_breakdown": {
-              "jira_ocb_score": 42.0,
+              "jira_och_score": 42.0,
               "original_ocb": 78.96,
               "final_ocb": 83.96,
               "jira_added_risk": 5.0,
@@ -2868,7 +2868,7 @@
               }
             },
             "linear_burnout_breakdown": {
-              "linear_ocb_score": 38.0,
+              "linear_och_score": 38.0,
               "original_ocb": 83.96,
               "final_ocb": 86.96,
               "linear_added_risk": 3.0,
@@ -2896,7 +2896,7 @@
             "pagerduty_user_id": null,
             "avatar_url": "/images/male/arjun_reddy.png",
             "burnout_score": 1.57,
-            "ocb_score": 47.86,
+            "och_score": 47.86,
             "risk_level": "low",
             "incident_count": 1,
             "factors": {
@@ -2909,13 +2909,13 @@
               "work_related_burnout": 0.15,
               "accomplishment_burnout": 1.23
             },
-            "ocb_breakdown": {
+            "och_breakdown": {
               "personal": 89.4,
               "work_related": 6.31,
               "interpretation": "mild"
             },
-            "ocb_reasoning": [
-              "Moderate stress levels (OCB: 48/100) - manageable with care",
+            "och_reasoning": [
+              "Moderate stress levels (OCH: 48/100) - manageable with care",
               "PERSONAL:",
               "\u00e2\u20ac\u00a2 Non-business hours incident activity (75.0 points)",
               "\u00e2\u20ac\u00a2 High-severity incident stress (13.0 points)",
@@ -2926,7 +2926,7 @@
               "\u00e2\u20ac\u00a2 Incident response meeting load (0.7 points)",
               "Personal stress significantly higher than work stress - focus on recovery and boundaries"
             ],
-            "ocb_factors": {
+            "och_factors": {
               "personal": [
                 {
                   "key": "after_hours_activity",
@@ -3243,7 +3243,7 @@
             "pagerduty_user_id": null,
             "avatar_url": "/images/female/isabella_rossi.png",
             "burnout_score": 1.39,
-            "ocb_score": 46.73,
+            "och_score": 46.73,
             "risk_level": "low",
             "incident_count": 4,
             "factors": {
@@ -3256,13 +3256,13 @@
               "work_related_burnout": 0.95,
               "accomplishment_burnout": 1.93
             },
-            "ocb_breakdown": {
+            "och_breakdown": {
               "personal": 57.44,
               "work_related": 36.03,
               "interpretation": "mild"
             },
-            "ocb_reasoning": [
-              "Moderate stress levels (OCB: 47/100) - manageable with care",
+            "och_reasoning": [
+              "Moderate stress levels (OCH: 47/100) - manageable with care",
               "PERSONAL:",
               "\u00e2\u20ac\u00a2 High-severity incident stress (52.5 points)",
               "\u00e2\u20ac\u00a2 High task workload (4.9 points)",
@@ -3272,7 +3272,7 @@
               "\u00e2\u20ac\u00a2 Incident response meeting load (2.5 points)",
               "Personal stress significantly higher than work stress - focus on recovery and boundaries"
             ],
-            "ocb_factors": {
+            "och_factors": {
               "personal": [
                 {
                   "key": "sleep_quality_proxy",
@@ -3466,7 +3466,7 @@
             "pagerduty_user_id": null,
             "avatar_url": "/images/female/priya_shah.png",
             "burnout_score": 0.81,
-            "ocb_score": 19.5,
+            "och_score": 19.5,
             "risk_level": "low",
             "incident_count": 2,
             "factors": {
@@ -3479,13 +3479,13 @@
               "work_related_burnout": 0.31,
               "accomplishment_burnout": 1.47
             },
-            "ocb_breakdown": {
+            "och_breakdown": {
               "personal": 27.02,
               "work_related": 11.99,
               "interpretation": "low"
             },
-            "ocb_reasoning": [
-              "Low burnout risk (OCB: 20/100) - healthy stress levels",
+            "och_reasoning": [
+              "Low burnout risk (OCH: 20/100) - healthy stress levels",
               "PERSONAL:",
               "\u00e2\u20ac\u00a2 High-severity incident stress (24.2 points)",
               "\u00e2\u20ac\u00a2 High task workload (2.8 points)",
@@ -3495,7 +3495,7 @@
               "\u00e2\u20ac\u00a2 Incident response meeting load (1.4 points)",
               "Personal stress significantly higher than work stress - focus on recovery and boundaries"
             ],
-            "ocb_factors": {
+            "och_factors": {
               "personal": [
                 {
                   "key": "sleep_quality_proxy",
@@ -3688,7 +3688,7 @@
             "pagerduty_user_id": null,
             "avatar_url": "/images/male/lucas_moreau.png",
             "burnout_score": 0,
-            "ocb_score": 0.0,
+            "och_score": 0.0,
             "risk_level": "low",
             "incident_count": 0,
             "factors": {
@@ -3701,15 +3701,15 @@
               "work_related_burnout": 0,
               "client_related_burnout": 0
             },
-            "ocb_breakdown": {
+            "och_breakdown": {
               "personal": 0.0,
               "work_related": 0.0,
               "interpretation": "low"
             },
-            "ocb_reasoning": [
-              "Low burnout risk (OCB: 0/100) - healthy stress levels"
+            "och_reasoning": [
+              "Low burnout risk (OCH: 0/100) - healthy stress levels"
             ],
-            "ocb_factors": {
+            "och_factors": {
               "personal": [],
               "work_related": [],
               "all": []
@@ -3749,7 +3749,7 @@
             "pagerduty_user_id": null,
             "avatar_url": "/images/female/emily_oconnor.png",
             "burnout_score": 0,
-            "ocb_score": 0.0,
+            "och_score": 0.0,
             "risk_level": "low",
             "incident_count": 0,
             "factors": {
@@ -3762,15 +3762,15 @@
               "work_related_burnout": 0,
               "client_related_burnout": 0
             },
-            "ocb_breakdown": {
+            "och_breakdown": {
               "personal": 0.0,
               "work_related": 0.0,
               "interpretation": "low"
             },
-            "ocb_reasoning": [
-              "Low burnout risk (OCB: 0/100) - healthy stress levels"
+            "och_reasoning": [
+              "Low burnout risk (OCH: 0/100) - healthy stress levels"
             ],
-            "ocb_factors": {
+            "och_factors": {
               "personal": [],
               "work_related": [],
               "all": []
@@ -3810,7 +3810,7 @@
             "pagerduty_user_id": null,
             "avatar_url": "/images/male/john_tzikas.png",
             "burnout_score": 0,
-            "ocb_score": 0.0,
+            "och_score": 0.0,
             "risk_level": "low",
             "incident_count": 0,
             "factors": {
@@ -3823,15 +3823,15 @@
               "work_related_burnout": 0,
               "client_related_burnout": 0
             },
-            "ocb_breakdown": {
+            "och_breakdown": {
               "personal": 0.0,
               "work_related": 0.0,
               "interpretation": "low"
             },
-            "ocb_reasoning": [
-              "Low burnout risk (OCB: 0/100) - healthy stress levels"
+            "och_reasoning": [
+              "Low burnout risk (OCH: 0/100) - healthy stress levels"
             ],
-            "ocb_factors": {
+            "och_factors": {
               "personal": [],
               "work_related": [],
               "all": []
@@ -3871,7 +3871,7 @@
             "pagerduty_user_id": null,
             "avatar_url": "/images/female/ava_reynolds.png",
             "burnout_score": 0,
-            "ocb_score": 0.0,
+            "och_score": 0.0,
             "risk_level": "low",
             "incident_count": 0,
             "factors": {
@@ -3884,15 +3884,15 @@
               "work_related_burnout": 0,
               "client_related_burnout": 0
             },
-            "ocb_breakdown": {
+            "och_breakdown": {
               "personal": 0.0,
               "work_related": 0.0,
               "interpretation": "low"
             },
-            "ocb_reasoning": [
-              "Low burnout risk (OCB: 0/100) - healthy stress levels"
+            "och_reasoning": [
+              "Low burnout risk (OCH: 0/100) - healthy stress levels"
             ],
-            "ocb_factors": {
+            "och_factors": {
               "personal": [],
               "work_related": [],
               "all": []
@@ -26173,7 +26173,7 @@
                 "Implement explicit rotation schedule limiting consecutive incidents per responder",
                 "Target: Reduce top responder load from 29.2% to 8-10% within 2 weeks"
               ],
-              "expected_impact": "Reduce top responder OCB by 30-40 points, bring all engineers below 60 OCB threshold"
+              "expected_impact": "Reduce top responder OCH by 30-40 points, bring all engineers below 60 OCH threshold"
             },
             {
               "priority": "high",

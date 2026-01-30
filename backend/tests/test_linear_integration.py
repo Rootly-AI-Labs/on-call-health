@@ -1,7 +1,7 @@
 """
 Unit tests for Linear integration.
 
-Tests OAuth flow, API endpoints, user mapping, and OCB scoring contribution.
+Tests OAuth flow, API endpoints, user mapping, and OCH scoring contribution.
 """
 
 import unittest
@@ -180,8 +180,8 @@ class TestLinearPriorityMapping(unittest.TestCase):
         self.assertEqual(min_priority, 0)  # No priority
 
 
-class TestLinearOCBContribution(unittest.TestCase):
-    """Test Linear OCB score contribution calculations."""
+class TestLinearOCHContribution(unittest.TestCase):
+    """Test Linear OCH score contribution calculations."""
 
     def setUp(self):
         """Set up test fixtures with mock issues."""
@@ -208,25 +208,25 @@ class TestLinearOCBContribution(unittest.TestCase):
 
     def test_empty_issues_returns_zero(self):
         """Test that empty issue list returns 0 score."""
-        score = self._calculate_linear_ocb_contribution([])
+        score = self._calculate_linear_och_contribution([])
         self.assertEqual(score, 0.0)
 
     def test_none_issues_returns_zero(self):
         """Test that None issues returns 0 score."""
-        score = self._calculate_linear_ocb_contribution(None)
+        score = self._calculate_linear_och_contribution(None)
         self.assertEqual(score, 0.0)
 
     def test_urgent_issues_higher_score(self):
         """Test that urgent issues result in higher score."""
-        urgent_score = self._calculate_linear_ocb_contribution(self.urgent_issues)
-        low_score = self._calculate_linear_ocb_contribution(self.low_priority_issues)
+        urgent_score = self._calculate_linear_och_contribution(self.urgent_issues)
+        low_score = self._calculate_linear_och_contribution(self.low_priority_issues)
 
         self.assertGreater(urgent_score, low_score)
 
     def test_score_in_valid_range(self):
         """Test that score is always between 0 and 100."""
         for issues in [self.mixed_issues, self.urgent_issues, self.low_priority_issues]:
-            score = self._calculate_linear_ocb_contribution(issues)
+            score = self._calculate_linear_och_contribution(issues)
             self.assertGreaterEqual(score, 0.0)
             self.assertLessEqual(score, 100.0)
 
@@ -236,14 +236,14 @@ class TestLinearOCBContribution(unittest.TestCase):
         small_set = [{"priority": 3, "dueDate": None} for _ in range(3)]
         large_set = [{"priority": 3, "dueDate": None} for _ in range(15)]
 
-        small_score = self._calculate_linear_ocb_contribution(small_set)
-        large_score = self._calculate_linear_ocb_contribution(large_set)
+        small_score = self._calculate_linear_och_contribution(small_set)
+        large_score = self._calculate_linear_och_contribution(large_set)
 
         self.assertGreater(large_score, small_score)
 
-    def _calculate_linear_ocb_contribution(self, issues):
+    def _calculate_linear_och_contribution(self, issues):
         """
-        Calculate Linear OCB contribution locally for testing.
+        Calculate Linear OCH contribution locally for testing.
         Mirrors the actual implementation logic.
         """
         if not issues:
@@ -399,10 +399,10 @@ class TestLinearDateParsing(unittest.TestCase):
 
 
 class TestLinearHeadroomModel(unittest.TestCase):
-    """Test the headroom model for combining OCB scores."""
+    """Test the headroom model for combining OCH scores."""
 
     def test_headroom_never_reduces_score(self):
-        """Test that Linear contribution never reduces original OCB."""
+        """Test that Linear contribution never reduces original OCH."""
         original_ocb = 50.0
         linear_ocb = 30.0
 
@@ -441,7 +441,7 @@ class TestLinearHeadroomModel(unittest.TestCase):
 
     def test_example_calculation(self):
         """Test specific example from implementation plan."""
-        # If OCB from incidents = 50, and Linear = 30:
+        # If OCH from incidents = 50, and Linear = 30:
         # Final = 50 + (100-50) × (30/100) = 50 + 15 = 65
         original_ocb = 50.0
         linear_ocb = 30.0

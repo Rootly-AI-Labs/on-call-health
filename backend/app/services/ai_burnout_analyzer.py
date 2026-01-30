@@ -371,8 +371,8 @@ class AIBurnoutAnalyzerService:
                     "name": member_name,
                     "email": member_email,
                     "user_id": member.get("user_id"),
-                    "health_score": member.get("ocb_score") if member.get("ocb_score") is not None else member.get("burnout_score", 0),
-                    "scoring_type": "OCB" if member.get("ocb_score") is not None else "Legacy",
+                    "health_score": member.get("och_score") if member.get("och_score") is not None else member.get("burnout_score", 0),
+                    "scoring_type": "OCH" if member.get("och_score") is not None else "Legacy",
                     "incident_count": len(member.get("incidents", []))
                 })
 
@@ -616,30 +616,30 @@ class AIBurnoutAnalyzerService:
         risk_dist = self._analyze_team_risk_distribution(team_members)
         total_incidents = sum(len(member.get("incidents", [])) for member in team_members)
 
-        # Use OCB scores if available, otherwise fall back to legacy scoring
-        ocb_scores = []
+        # Use OCH scores if available, otherwise fall back to legacy scoring
+        och_scores = []
         legacy_scores = []
 
         for member in team_members:
-            ocb_score = member.get("ocb_score")
-            if ocb_score is not None:
-                ocb_scores.append(ocb_score)
+            och_score = member.get("och_score")
+            if och_score is not None:
+                och_scores.append(och_score)
             else:
                 legacy_score = member.get("burnout_score", 0)
                 legacy_scores.append(legacy_score)
 
         # Calculate average stress level
-        if ocb_scores:
-            avg_ocb_score = sum(ocb_scores) / len(ocb_scores)
+        if och_scores:
+            avg_och_score = sum(och_scores) / len(och_scores)
             avg_legacy_score = 0  # Not used but defined for consistency
             using_ocb = True
-            # For display, convert OCB to health score (100 - OCB score)
-            overall_health_score = round(100 - avg_ocb_score, 1)
-            avg_stress_display = round(avg_ocb_score, 1)
-            trajectory_score = avg_ocb_score
+            # For display, convert OCH to health score (100 - OCH score)
+            overall_health_score = round(100 - avg_och_score, 1)
+            avg_stress_display = round(avg_och_score, 1)
+            trajectory_score = avg_och_score
         else:
             avg_legacy_score = sum(legacy_scores) / len(legacy_scores) if legacy_scores else 0
-            avg_ocb_score = 0  # Not used but defined for consistency
+            avg_och_score = 0  # Not used but defined for consistency
             using_ocb = False
             overall_health_score = round(100 - (avg_legacy_score * 10), 1)
             avg_stress_display = round(avg_legacy_score, 2)
@@ -1149,11 +1149,11 @@ You are an Engineering Manager who is mindful of your on-call team workload and 
         active_responders = [m for m in team_members if m.get("incident_count", 0) > 0]
 
         # Calculate comprehensive metrics using OCH when available
-        ocb_scores = [m.get("ocb_score") for m in team_members if m.get("ocb_score") is not None]
-        legacy_scores = [m.get("burnout_score", 0) for m in team_members if m.get("ocb_score") is None]
+        och_scores = [m.get("och_score") for m in team_members if m.get("och_score") is not None]
+        legacy_scores = [m.get("burnout_score", 0) for m in team_members if m.get("och_score") is None]
 
-        if ocb_scores:
-            avg_stress = sum(ocb_scores) / len(ocb_scores)
+        if och_scores:
+            avg_stress = sum(och_scores) / len(och_scores)
             using_ocb = True
             stress_scale = "OCH (0-100)"
         else:
@@ -1214,8 +1214,8 @@ You are an Engineering Manager who is mindful of your on-call team workload and 
         # Individual patterns with more detail - use appropriate risk criteria
         if using_ocb:
             high_risk_members = sorted(
-                [m for m in team_members if m.get("ocb_score", 0) >= 75],
-                key=lambda x: x.get("ocb_score", 0),
+                [m for m in team_members if m.get("och_score", 0) >= 75],
+                key=lambda x: x.get("och_score", 0),
                 reverse=True
             )
             risk_criteria = "OCH score ≥75/100 (severe stress)"
@@ -1235,7 +1235,7 @@ You are an Engineering Manager who is mindful of your on-call team workload and 
 
             # Use appropriate scoring method
             if using_ocb:
-                score = member.get("ocb_score", 0)
+                score = member.get("och_score", 0)
                 score_display = f"{score:.1f}/100 OCH"
             else:
                 score = member.get("burnout_score", 0)
