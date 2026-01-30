@@ -23,10 +23,10 @@ function getCardDescription(currentAnalysis: any, historicalTrends: any): string
   return "No daily trend data available for this analysis"
 }
 
-function getRiskLevel(ocbScore: number): string {
-  if (ocbScore < 25) return 'healthy'
-  if (ocbScore < 50) return 'fair'
-  if (ocbScore < 75) return 'poor'
+function getRiskLevel(ochScore: number): string {
+  if (ochScore < 25) return 'healthy'
+  if (ochScore < 50) return 'fair'
+  if (ochScore < 75) return 'poor'
   return 'critical'
 }
 
@@ -42,12 +42,12 @@ function transformDailyTrends(dailyTrends: any[]): any[] {
   return dailyTrends.map((trend: any, index: number) => {
     const incidentCount = trend.incident_count || trend.analysis_count || 0
     const hasRealData = incidentCount > 0
-    const ocbScore = 100 - Math.round(trend.overall_score * 10)
+    const ochScore = 100 - Math.round(trend.overall_score * 10)
 
     const entry = {
       date: new Date(trend.date).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }),
-      score: hasRealData ? Math.max(0, Math.min(100, ocbScore)) : 0,
-      riskLevel: hasRealData ? getRiskLevel(ocbScore) : null,
+      score: hasRealData ? Math.max(0, Math.min(100, ochScore)) : 0,
+      riskLevel: hasRealData ? getRiskLevel(ochScore) : null,
       membersAtRisk: hasRealData ? trend.members_at_risk : null,
       totalMembers: hasRealData ? trend.total_members : null,
       healthStatus: hasRealData ? trend.health_status : null,
