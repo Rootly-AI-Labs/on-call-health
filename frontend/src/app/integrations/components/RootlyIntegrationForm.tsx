@@ -122,6 +122,7 @@ export function RootlyIntegrationForm({
                         type={showToken ? "text" : "password"}
                         placeholder="rootly_********************************"
                         className="pr-20"
+                        onChange={(e) => field.onChange(e.target.value.trim())}
                       />
                       <div className="absolute inset-y-0 right-0 flex items-center space-x-1 pr-3">
                         {field.value && (

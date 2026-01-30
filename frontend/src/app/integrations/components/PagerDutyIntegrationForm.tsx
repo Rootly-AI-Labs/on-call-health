@@ -108,6 +108,7 @@ export function PagerDutyIntegrationForm({
                         type={showToken ? "text" : "password"}
                         placeholder="Enter your PagerDuty API token"
                         className="pr-20"
+                        onChange={(e) => field.onChange(e.target.value.trim())}
                       />
                       <div className="absolute inset-y-0 right-0 flex items-center space-x-1 pr-3">
                         {field.value && (
