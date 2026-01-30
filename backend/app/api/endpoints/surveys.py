@@ -429,6 +429,13 @@ async def manual_survey_delivery(
     """
     organization_id, workspace_mapping = verify_survey_workspace_access(db, current_user)
 
+    # Check if scheduler is available
+    if not SCHEDULER_AVAILABLE or survey_scheduler is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Survey scheduler is not available. Please try again later."
+        )
+
     # Helper to filter recipients by email list
     def filter_recipients(all_recipients, email_filter):
         if not email_filter:
