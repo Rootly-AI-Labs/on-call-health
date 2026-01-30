@@ -449,11 +449,184 @@ class IntegrationValidator:
             logger.error(f"Linear validation unexpected error for user {user_id}: {e}", exc_info=True)
             return self._error_response("Unexpected error validating Linear. Please try again later.")
 
+    async def _get_valid_jira_token(self, integration: JiraIntegration) -> str:
+        """Get a valid Jira access token, refreshing if necessary.
+
+        Uses distributed lock via Redis to prevent race conditions when multiple
+        concurrent requests try to refresh the token. Falls back to database
+        row locking if Redis is unavailable.
+        """
+        if not integration.access_token:
+            raise ValueError("No access token available for Jira integration")
+
+        self.db.refresh(integration)
+
+        # Determine if refresh is needed and possible
+        token_needs_refresh = needs_refresh(integration.token_expires_at)
+        has_refresh_token = bool(integration.refresh_token)
+
+        # Return current token if still valid (most common path)
+        if not token_needs_refresh:
+            return decrypt_token(integration.access_token)
+
+        # Token needs refresh - verify we can refresh before proceeding
+        if not has_refresh_token:
+            raise ValueError("Authentication error. Please reconnect Jira.")
+
+        # Use coordinator with distributed locking
+        logger.info(f"[Jira] Token refresh initiated for user {integration.user_id}")
+
+        try:
+            token = await refresh_token_with_lock(
+                provider="jira",
+                integration_id=integration.id,
+                user_id=integration.user_id,
+                refresh_func=lambda: self._perform_jira_token_refresh(integration),
+                fallback_func=lambda: self._perform_jira_token_refresh_with_db_lock(integration)
+            )
+            return token
+
+        except RuntimeError:
+            # RuntimeError from database lock timeout already handled rollback in fallback
+            raise
+        except Exception as e:
+            # Other exceptions from refresh need rollback
+            logger.warning(
+                f"[Jira] Token refresh failed for user {integration.user_id}: {e}",
+                exc_info=True
+            )
+            self._safe_rollback(e)
+            raise ValueError("Authentication error. Please reconnect Jira.") from e
+
+    async def _perform_jira_token_refresh(self, integration: JiraIntegration) -> str:
+        """
+        Perform Jira token refresh without database locking (for use with Redis lock).
+
+        Returns:
+            New access token (decrypted)
+        """
+        # Verify integration still needs refresh
+        self.db.refresh(integration)
+        if not needs_refresh(integration.token_expires_at):
+            logger.info(f"[Jira] Token already refreshed for user {integration.user_id}")
+            return decrypt_token(integration.access_token)
+
+        logger.info(f"[Jira] Refreshing access token for user {integration.user_id}")
+        refresh_token = decrypt_token(integration.refresh_token)
+
+        token_data = await self._call_jira_token_refresh_api(refresh_token)
+        new_access_token = self._update_jira_integration_tokens(integration, token_data, refresh_token)
+        self.db.commit()
+
+        logger.info(f"[Jira] Token refreshed successfully for user {integration.user_id}")
+        return new_access_token
+
+    async def _perform_jira_token_refresh_with_db_lock(self, integration: JiraIntegration) -> str:
+        """
+        Perform Jira token refresh with database row locking (fallback when Redis unavailable).
+
+        Returns:
+            New access token (decrypted)
+        """
+        logger.info(f"[Jira] Using database lock for token refresh (user {integration.user_id})")
+        lock_timeout_seconds = 10  # Same as Linear
+
+        try:
+            with self.db.begin_nested():
+                self.db.execute(
+                    text("SET LOCAL lock_timeout = :lock_timeout"),
+                    {"lock_timeout": f"{lock_timeout_seconds}s"}
+                )
+
+                locked_integration = self.db.query(JiraIntegration).filter(
+                    JiraIntegration.id == integration.id
+                ).with_for_update().first()
+
+                if not locked_integration:
+                    raise ValueError("Authentication error. Please reconnect Jira.")
+
+                # Double-check: another request may have refreshed while we waited
+                if not needs_refresh(locked_integration.token_expires_at):
+                    logger.info(f"[Jira] Token already refreshed for user {integration.user_id}")
+                    return decrypt_token(locked_integration.access_token)
+
+                logger.info(f"[Jira] Refreshing access token for user {integration.user_id}")
+                refresh_token = decrypt_token(locked_integration.refresh_token)
+
+                token_data = await self._call_jira_token_refresh_api(refresh_token)
+                new_access_token = self._update_jira_integration_tokens(
+                    locked_integration, token_data, refresh_token
+                )
+
+            logger.info(f"[Jira] Token refreshed successfully for user {integration.user_id}")
+            return new_access_token
+
+        except OperationalError as db_error:
+            error_type = "lock_timeout" if "lock" in str(db_error).lower() else "db_error"
+            logger.warning(
+                f"[Jira] Database contention during token refresh: "
+                f"user_id={integration.user_id}, error_type={error_type}, "
+                f"lock_timeout_setting={lock_timeout_seconds}s"
+            )
+            logger.debug(f"[Jira] Full database error: {db_error}", exc_info=True)
+            self._safe_rollback(db_error)
+            raise RuntimeError("Temporary error. Please retry.") from db_error
+
+    async def _call_jira_token_refresh_api(self, refresh_token: str) -> dict:
+        """Call Jira OAuth token refresh API."""
+        if not settings.JIRA_CLIENT_ID or not settings.JIRA_CLIENT_SECRET:
+            raise ValueError("Jira OAuth credentials not configured")
+
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(
+                "https://auth.atlassian.com/oauth/token",
+                json={
+                    "grant_type": "refresh_token",
+                    "client_id": settings.JIRA_CLIENT_ID,
+                    "client_secret": settings.JIRA_CLIENT_SECRET,
+                    "refresh_token": refresh_token
+                },
+                headers={"Content-Type": "application/json"}
+            )
+
+        if response.status_code != 200:
+            logger.error(f"[Jira] Token refresh failed: {response.status_code} {response.text}")
+            raise ValueError(f"Jira token refresh failed: {response.status_code}")
+
+        return response.json()
+
+    def _update_jira_integration_tokens(
+        self,
+        integration: JiraIntegration,
+        token_data: dict,
+        old_refresh_token: str
+    ) -> str:
+        """Update Jira integration with new tokens."""
+        new_access_token = token_data.get("access_token")
+        new_refresh_token = token_data.get("refresh_token")
+        expires_in = token_data.get("expires_in", 3600)
+
+        if not new_access_token:
+            raise ValueError("No access token in refresh response")
+
+        # Encrypt new tokens
+        encrypted_access = encrypt_token(new_access_token)
+        encrypted_refresh = encrypt_token(new_refresh_token) if new_refresh_token else encrypt_token(old_refresh_token)
+
+        # Update integration
+        integration.access_token = encrypted_access
+        integration.refresh_token = encrypted_refresh
+        integration.token_expires_at = datetime.now(dt_timezone.utc) + timedelta(seconds=expires_in)
+        integration.updated_at = datetime.now(dt_timezone.utc)
+
+        return new_access_token
+
     async def _validate_jira(self, user_id: int) -> Optional[Dict[str, Any]]:
         """
         Validate Jira integration by making a lightweight API call.
 
         Makes a GET request to /api/3/myself endpoint to verify token is valid.
+        Automatically refreshes OAuth tokens if they are expired.
         """
         try:
             integration = self.db.query(JiraIntegration).filter(
@@ -464,11 +637,12 @@ class IntegrationValidator:
                 return None
 
             try:
-                token = decrypt_token(integration.access_token)
-            except Exception as decrypt_error:
-                logger.error(f"Failed to decrypt Jira token for user {user_id}: {decrypt_error}")
+                # Get valid token (refreshing if needed)
+                token = await self._get_valid_jira_token(integration)
+            except Exception as token_error:
+                logger.error(f"Failed to get Jira token for user {user_id}: {token_error}")
                 return self._error_response(
-                    "Jira token decryption failed. Please reconnect your Jira integration."
+                    "Jira token refresh failed. Please reconnect your Jira integration."
                 )
 
             headers = {
