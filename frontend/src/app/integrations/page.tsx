@@ -5202,8 +5202,34 @@ export default function IntegrationsPage() {
         onClose={() => setShowPostIntegrationSyncModal(false)}
         onSyncNow={() => {
           setShowPostIntegrationSyncModal(false)
-          // Open sync confirmation modal
-          setShowSyncConfirmModal(true)
+          // Open drawer first, then sync modal after drawer renders
+          setTeamMembersDrawerOpen(true)
+
+          // Load cached data if available, otherwise fetch
+          if (selectedOrganization && syncedUsersCache.current.has(selectedOrganization)) {
+            const cachedUsers = syncedUsersCache.current.get(selectedOrganization)!
+            setSyncedUsers(cachedUsers)
+            setShowSyncedUsers(true)
+
+            // Also restore cached recipient selections
+            if (recipientsCache.current.has(selectedOrganization)) {
+              const cachedRecipients = recipientsCache.current.get(selectedOrganization)!
+              const validUserIds = new Set(cachedUsers.map(u => u.id))
+              const validCachedRecipients = new Set(
+                Array.from(cachedRecipients).filter(id => validUserIds.has(id))
+              )
+              setSelectedRecipients(validCachedRecipients)
+              setSavedRecipients(validCachedRecipients)
+            }
+          } else {
+            // Otherwise fetch from API
+            fetchSyncedUsers(false, false)
+          }
+
+          // Wait for drawer to render before showing sync modal
+          setTimeout(() => {
+            setShowSyncConfirmModal(true)
+          }, 300)
         }}
         integrationType={postIntegrationModalType || 'github'}
       />
@@ -5284,18 +5310,6 @@ export default function IntegrationsPage() {
                         )}
                       </div>
                     </div>
-
-                    <div className="flex justify-end">
-                      <Button
-                        onClick={() => {
-                          setShowSyncConfirmModal(false)
-                          setSyncProgress(null)
-                        }}
-                        className="bg-purple-700 hover:bg-purple-800"
-                      >
-                        Done
-                      </Button>
-                    </div>
                   </div>
                 ) : syncProgress?.isLoading ? (
                   <div className="space-y-4">
@@ -5341,7 +5355,17 @@ export default function IntegrationsPage() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            {!syncProgress?.isLoading && !syncProgress?.results && (
+            {syncProgress?.results ? (
+              <Button
+                onClick={() => {
+                  setShowSyncConfirmModal(false)
+                  setSyncProgress(null)
+                }}
+                className="bg-purple-700 hover:bg-purple-800"
+              >
+                Done
+              </Button>
+            ) : !syncProgress?.isLoading ? (
               <>
                 <Button variant="outline" onClick={() => setShowSyncConfirmModal(false)}>
                   Cancel
@@ -5353,7 +5377,7 @@ export default function IntegrationsPage() {
                   Sync Now
                 </Button>
               </>
-            )}
+            ) : null}
           </DialogFooter>
         </DialogContent>
       </Dialog>
