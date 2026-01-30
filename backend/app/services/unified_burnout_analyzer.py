@@ -1864,9 +1864,12 @@ class UnifiedBurnoutAnalyzer:
         for severity_level, count in severity_dist.items():
             weight = severity_weights.get(severity_level, 1.5)  # Default weight for unknown severities
             severity_weighted_total += count * weight
-            
-        # Convert to per-week basis (assuming 30-day analysis period)
-        severity_weighted_per_week = severity_weighted_total / 4.3  # 30 days ≈ 4.3 weeks
+
+        # Convert to per-week basis using actual analysis period (not hardcoded 30 days)
+        # This ensures consistent scoring across 7, 30, and 90-day analyses
+        days_analyzed_for_rate = metrics.get("days_analyzed") or 30
+        weeks_analyzed = max(1, days_analyzed_for_rate / 7)
+        severity_weighted_per_week = severity_weighted_total / weeks_analyzed
 
         # Apply Rootly's tiered scaling to all OCB metrics
         # CRITICAL: after_hours_pct is a decimal (0.0-1.0), must convert to percentage (0-100) for OCB scale_max
