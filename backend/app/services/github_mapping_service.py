@@ -223,7 +223,8 @@ class GitHubMappingService:
                 user_id=user_id,
                 analysis_id=analysis_id,
                 source_platform=source_platform,
-                email_to_name=email_to_name
+                email_to_name=email_to_name,
+                db=self.db
             )
         except Exception as e:
             logger.error(f"Failed to create new mappings: {e}")

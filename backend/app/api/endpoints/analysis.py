@@ -542,7 +542,8 @@ async def _run_analysis_task_impl(db, analysis_id: int, integration_id: int, day
                 slack_token=slack_token,
                 jira_token=jira_token,
                 synced_users=synced_users,
-                current_user_id=user_id
+                current_user_id=user_id,
+                db=db  # Reuse DB session to prevent connection pool exhaustion
             )
             
             # Run analysis
