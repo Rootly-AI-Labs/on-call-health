@@ -243,6 +243,7 @@ class GitHubMappingService:
                 # Create new mapping record for this analysis with updated data points
                 self.recorder.record_successful_mapping(
                     user_id=mapping.user_id,
+                    organization_id=mapping.organization_id,
                     analysis_id=analysis_id,
                     source_platform=mapping.source_platform,
                     source_identifier=mapping.source_identifier,
