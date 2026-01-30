@@ -823,6 +823,10 @@ async def disconnect_linear(
     db.delete(integration)
     db.commit()
 
+    # Invalidate token cache
+    from ...services.token_refresh_coordinator import invalidate_token_cache
+    await invalidate_token_cache("linear", integration.id)
+
     # Invalidate validation cache so error doesn't persist
     from ...services.integration_validator import invalidate_validation_cache
     invalidate_validation_cache(current_user.id)
