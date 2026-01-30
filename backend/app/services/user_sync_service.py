@@ -7,8 +7,10 @@ import logging
 from typing import Dict, List, Any, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
+
 from sqlalchemy.exc import IntegrityError, OperationalError
-from app.models import User, UserCorrelation, RootlyIntegration, GitHubIntegration, UserMapping
+from app.models import User, UserCorrelation, RootlyIntegration, GitHubIntegration, UserMapping, SurveyPeriod
+
 from app.core.rootly_client import RootlyAPIClient
 from app.core.pagerduty_client import PagerDutyAPIClient
 from app.services.enhanced_github_matcher import EnhancedGitHubMatcher
@@ -672,6 +674,21 @@ class UserSyncService:
             if dup.user_id and not keep_record.user_id:
                 keep_record.user_id = dup.user_id
                 logger.info(f"    ➕ Added user_id: {dup.user_id}")
+
+            # Update all foreign key references before deleting
+            # Update survey_periods that reference this duplicate correlation
+            survey_periods = self.db.query(SurveyPeriod).filter(
+                SurveyPeriod.user_correlation_id == dup.id
+            ).all()
+
+            if survey_periods:
+                logger.info(f"    🔗 Updating {len(survey_periods)} survey_periods to reference ID={keep_record.id}")
+                for period in survey_periods:
+                    period.user_correlation_id = keep_record.id
+
+                # Flush to persist the updates before deleting
+                self.db.flush()
+                logger.info(f"    ✅ Flushed survey_periods updates to database")
 
             # Delete the duplicate record
             logger.info(f"    ❌ DELETING duplicate ID={dup.id}")

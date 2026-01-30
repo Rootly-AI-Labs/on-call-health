@@ -11,9 +11,13 @@ class SurveySchedule(Base):
     Organization-level configuration for automated survey delivery.
     """
     __tablename__ = "survey_schedules"
+    __table_args__ = (
+        # Ensure only one schedule per organization
+        {'sqlite_autoincrement': True},
+    )
 
     id = Column(Integer, primary_key=True, index=True)
-    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False, unique=True)
 
     # Schedule settings
     enabled = Column(Boolean, default=True)

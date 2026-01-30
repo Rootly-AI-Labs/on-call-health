@@ -23,19 +23,10 @@ from ...core.config import settings
 router = APIRouter(prefix="/github", tags=["github-integration"])
 logger = logging.getLogger(__name__)
 
-# Helper function to validate user has organization
-def require_organization(user: User) -> None:
-    """Raise HTTPException if user doesn't belong to an organization."""
-    if not user.organization_id:
-        raise HTTPException(
-            status_code=400,
-            detail="You must belong to an organization to use this feature. Please contact support."
-        )
-
 # Simple encryption for tokens (in production, use proper key management)
 def get_encryption_key():
     """Get or create encryption key for tokens."""
-    key = settings.JWT_SECRET_KEY.encode()
+    key = settings.ENCRYPTION_KEY.encode()
     # Ensure key is 32 bytes for Fernet
     key = base64.urlsafe_b64encode(key[:32].ljust(32, b'\0'))
     return key
@@ -641,6 +632,10 @@ async def disconnect_github(
         # Delete the integration
         db.delete(integration)
         db.commit()
+
+        # Invalidate validation cache so error doesn't persist
+        from ...services.integration_validator import invalidate_validation_cache
+        invalidate_validation_cache(current_user.id)
 
         return {
             "success": True,

@@ -62,7 +62,7 @@ def get_active_workspace_mapping(db: Session, user: User) -> SlackWorkspaceMappi
 # Simple encryption for tokens (in production, use proper key management)
 def get_encryption_key():
     """Get or create encryption key for tokens."""
-    key = settings.JWT_SECRET_KEY.encode()
+    key = settings.ENCRYPTION_KEY.encode()
     # Ensure key is 32 bytes for Fernet
     key = base64.urlsafe_b64encode(key[:32].ljust(32, b'\0'))
     return key
@@ -728,6 +728,10 @@ async def disconnect_slack(
                 logger.info(f"Disabled survey schedule for org {organization_id} due to Slack disconnection")
 
         db.commit()
+
+        # Invalidate validation cache so error doesn't persist
+        from ...services.integration_validator import invalidate_validation_cache
+        invalidate_validation_cache(current_user.id)
 
         # Reload scheduler to remove scheduled jobs for this org
         try:

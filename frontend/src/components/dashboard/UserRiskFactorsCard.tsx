@@ -5,7 +5,7 @@ import { Loader2 } from "lucide-react"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
 import { FACTOR_DESCRIPTIONS } from "./TeamRiskFactorsCard"
 
-interface OCBFactor {
+interface OCHFactor {
   key: string
   name: string
   percentage: number
@@ -15,8 +15,8 @@ interface OCBFactor {
 interface UserRiskFactorsCardProps {
   selectedMember: {
     user_name?: string
-    ocb_factors?: {
-      all?: OCBFactor[]
+    och_factors?: {
+      all?: OCHFactor[]
     }
   }
   loading?: boolean
@@ -27,7 +27,7 @@ export function UserRiskFactorsCard({
   loading = false
 }: UserRiskFactorsCardProps): React.ReactElement {
   const memberName = selectedMember?.user_name || 'Team Member'
-  const factors = selectedMember?.ocb_factors?.all || []
+  const factors = selectedMember?.och_factors?.all || []
 
   if (loading) {
     return (
@@ -81,7 +81,7 @@ export function UserRiskFactorsCard({
       </CardHeader>
       <CardContent className="p-4 pb-6">
         <div className="space-y-3">
-          {factors.slice(0, 5).map((factor: OCBFactor) => {
+          {factors.slice(0, 5).map((factor: OCHFactor) => {
             const factorDescription = FACTOR_DESCRIPTIONS[factor.name]
             return (
               <div key={factor.key}>

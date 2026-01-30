@@ -26,19 +26,18 @@ logger = logging.getLogger(__name__)
 
 class CrossPlatformCorrelatorTool(BaseTool):
     """Tool for finding correlations across different data platforms."""
-    
+
+    name = "cross_platform_correlator"
+    description = "Analyzes correlations between incidents, code activity, and communication patterns"
+    inputs = {
+        "incidents": {"type": "array", "description": "List of incident events"},
+        "github_data": {"type": "object", "description": "GitHub activity data"},
+        "slack_data": {"type": "object", "description": "Slack communication data"}
+    }
+    output_type = "object"
+
     def __init__(self):
-        try:
-            # Try the smolagents BaseTool signature
-            super().__init__()
-            self.name = "cross_platform_correlator"
-            self.description = "Analyzes correlations between incidents, code activity, and communication patterns"
-        except TypeError:
-            # Fallback to our custom BaseTool signature  
-            super().__init__(
-                name="cross_platform_correlator",
-                description="Analyzes correlations between incidents, code activity, and communication patterns"
-            )
+        super().__init__()
         
     def __call__(
         self, 

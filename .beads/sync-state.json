@@ -1,7 +1,0 @@
-{
-  "last_failure": "2026-01-26T09:44:33.123431-08:00",
-  "failure_count": 1,
-  "backoff_until": "2026-01-26T09:45:03.123432-08:00",
-  "needs_manual_sync": false,
-  "failure_reason": "git pull failed: exit status 1\nfatal: couldn't find remote ref fix-slack-survey-synced-members\n"
-}
