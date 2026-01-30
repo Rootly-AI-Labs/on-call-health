@@ -2048,7 +2048,7 @@ export default function useDashboard() {
   // Include ALL members with burnout scores, not just those with incidents
   // Members with high GitHub activity but no incidents should still be included
   // Filter members with OCH risk levels only
-  const membersWithOcbScores = useMemo(() => members.filter((m: any) =>
+  const membersWithOchScores = useMemo(() => members.filter((m: any) =>
     m?.och_score !== undefined && m?.och_score !== null && m?.och_score > 0
   ), [members]);
 
@@ -2069,7 +2069,7 @@ export default function useDashboard() {
   const membersWithGitHubData = members.filter((m: any) =>
     m?.github_activity && (m.github_activity.commits_count > 0 || m.github_activity.commits_per_week > 0));
 
-  const allActiveMembers = membersWithOcbScores;
+  const allActiveMembers = membersWithOchScores;
 
   const burnoutFactors = useMemo(() => (allActiveMembers.length > 0) ? [
     {

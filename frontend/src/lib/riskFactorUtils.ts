@@ -37,8 +37,8 @@ export function getAffectedMembers(
   }
 
   const filtered = members.filter(member => {
-    // Only include members with OCB scores (active members)
-    if (!member.ocb_score) {
+    // Only include members with OCH scores (active members)
+    if (!member.och_score) {
       return false
     }
 
@@ -90,22 +90,22 @@ export function getFactorDisplayName(factorType: RiskFactorType): string {
 }
 
 /**
- * Get color for OCB score badge
+ * Get color for OCH score badge
  */
-export function getOCBBadgeColor(ocbScore: number): string {
-  if (ocbScore >= 70) return 'red'
-  if (ocbScore >= 50) return 'orange'
-  if (ocbScore >= 30) return 'yellow'
+export function getOCHBadgeColor(ochScore: number): string {
+  if (ochScore >= 70) return 'red'
+  if (ochScore >= 50) return 'orange'
+  if (ochScore >= 30) return 'yellow'
   return 'green'
 }
 
 /**
- * Get Tailwind color classes for OCB badge
+ * Get Tailwind color classes for OCH badge
  */
-export function getOCBBadgeColorClasses(ocbScore: number): string {
-  if (ocbScore >= 70) return 'bg-red-100 text-red-800 border-red-300'
-  if (ocbScore >= 50) return 'bg-orange-100 text-orange-800 border-orange-300'
-  if (ocbScore >= 30) return 'bg-yellow-100 text-yellow-800 border-yellow-300'
+export function getOCHBadgeColorClasses(ochScore: number): string {
+  if (ochScore >= 70) return 'bg-red-100 text-red-800 border-red-300'
+  if (ochScore >= 50) return 'bg-orange-100 text-orange-800 border-orange-300'
+  if (ochScore >= 30) return 'bg-yellow-100 text-yellow-800 border-yellow-300'
   return 'bg-green-100 text-green-800 border-green-300'
 }
 
@@ -130,7 +130,7 @@ export function getVulnerabilityTags(member: any, factorType: RiskFactorType): V
   const tags: VulnerabilityTag[] = []
   const riskScore = calculateRiskScore(member, factorType)
   const riskLevel = getRiskLevel(riskScore)
-  const ocbScore = member.ocb_score || 0
+  const ochScore = member.och_score || 0
 
   // Risk level tag
   if (riskLevel === 'high') {
@@ -145,11 +145,11 @@ export function getVulnerabilityTags(member: any, factorType: RiskFactorType): V
     })
   }
 
-  // OCB score tag
-  const ocbLevel = getOCBBadgeColor(ocbScore)
+  // OCH score tag
+  const ochLevel = getOCHBadgeColor(ochScore)
   tags.push({
-    label: `OCB: ${ocbScore}/100`,
-    color: ocbLevel as 'red' | 'orange' | 'yellow' | 'green' | 'blue'
+    label: `OCH: ${ochScore}/100`,
+    color: ochLevel as 'red' | 'orange' | 'yellow' | 'green' | 'blue'
   })
 
   // Factor-specific metric tag

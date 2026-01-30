@@ -30,12 +30,12 @@ function calculateTeamOCHScore(currentAnalysis: any): number | null {
   const members = getTeamMembers(currentAnalysis)
   if (!members || members.length === 0) return null
 
-  const ocbScores = members
+  const ochScores = members
     .map((m: any) => m.och_score)
     .filter((s: any) => s !== undefined && s !== null && s > 0)
 
-  if (ocbScores.length === 0) return null
-  return Math.round(ocbScores.reduce((a: number, b: number) => a + b, 0) / ocbScores.length)
+  if (ochScores.length === 0) return null
+  return Math.round(ochScores.reduce((a: number, b: number) => a + b, 0) / ochScores.length)
 }
 
 // Get health percentage from on-call members or fallback sources
@@ -43,12 +43,12 @@ function getHealthPercentage(currentAnalysis: any, historicalTrends: any): numbe
   const onCallMembers = getOnCallMembers(currentAnalysis)
 
   if (onCallMembers.length > 0) {
-    const ocbScores = onCallMembers
+    const ochScores = onCallMembers
       .map((m: any) => m.och_score)
       .filter((s: any) => s !== undefined && s !== null)
 
-    if (ocbScores.length > 0) {
-      return ocbScores.reduce((a: number, b: number) => a + b, 0) / ocbScores.length
+    if (ochScores.length > 0) {
+      return ochScores.reduce((a: number, b: number) => a + b, 0) / ochScores.length
     }
   }
 
@@ -71,18 +71,18 @@ function getHealthPercentage(currentAnalysis: any, historicalTrends: any): numbe
 }
 
 // Convert OCH score to health status label
-function getHealthStatusLabel(ocbScore: number): string {
-  if (ocbScore < 25) return 'Healthy'
-  if (ocbScore < 50) return 'Fair'
-  if (ocbScore < 75) return 'Poor'
+function getHealthStatusLabel(ochScore: number): string {
+  if (ochScore < 25) return 'Healthy'
+  if (ochScore < 50) return 'Fair'
+  if (ochScore < 75) return 'Poor'
   return 'Critical'
 }
 
 // Get health status description
-function getHealthStatusDescription(ocbScore: number): string {
-  if (ocbScore < 25) return 'Sustainable workload'
-  if (ocbScore < 50) return 'Monitor for trends'
-  if (ocbScore < 75) return 'Consider intervention'
+function getHealthStatusDescription(ochScore: number): string {
+  if (ochScore < 25) return 'Sustainable workload'
+  if (ochScore < 50) return 'Monitor for trends'
+  if (ochScore < 75) return 'Consider intervention'
   return 'Action needed'
 }
 
@@ -113,7 +113,7 @@ export function TeamHealthOverview({
     <>
       {/* OCH Risk Level Tooltip Portal */}
       <div className="fixed z-[99999] invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-neutral-900 text-white text-xs rounded-lg p-3 w-72 shadow-lg pointer-events-none"
-        id="ocb-score-tooltip"
+        id="och-score-tooltip"
         style={{ top: '-200px', left: '-200px' }}>
         <div className="space-y-2">
           <div className="text-purple-300 font-semibold mb-2">On-Call Health Risk Level</div>
