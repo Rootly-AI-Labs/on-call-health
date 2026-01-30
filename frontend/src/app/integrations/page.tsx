@@ -987,6 +987,12 @@ export default function IntegrationsPage() {
       const firstIntegrationId = firstIntegration.id.toString()
       setSelectedOrganization(firstIntegrationId)
       localStorage.setItem('selected_organization', firstIntegrationId)
+
+      // Show sync modal after auto-selecting (same as manual switch)
+      setTimeout(() => {
+        setPostIntegrationModalType(firstIntegration.platform as 'rootly' | 'pagerduty')
+        setShowPostIntegrationSyncModal(true)
+      }, 500)
     }
   }, [integrations, selectedOrganization])
 
