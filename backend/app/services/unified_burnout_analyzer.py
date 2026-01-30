@@ -1718,7 +1718,7 @@ class UnifiedBurnoutAnalyzer:
             }
         
         # Calculate base metrics from incidents and GitHub data
-        days_analyzed = metadata.get("days_analyzed", 30) or 30
+        days_analyzed = metadata.get("days_analyzed") or 30
         user_tz = self.user_tz_by_id.get(str(user_id), "UTC")
         base_metrics = self._calculate_member_metrics(
             incidents,
@@ -1864,9 +1864,12 @@ class UnifiedBurnoutAnalyzer:
         for severity_level, count in severity_dist.items():
             weight = severity_weights.get(severity_level, 1.5)  # Default weight for unknown severities
             severity_weighted_total += count * weight
-            
-        # Convert to per-week basis (assuming 30-day analysis period)
-        severity_weighted_per_week = severity_weighted_total / 4.3  # 30 days ≈ 4.3 weeks
+
+        # Convert to per-week basis using actual analysis period (not hardcoded 30 days)
+        # This ensures consistent scoring across 7, 30, and 90-day analyses
+        days_analyzed_for_rate = metrics.get("days_analyzed") or 30
+        weeks_analyzed = max(1, days_analyzed_for_rate / 7)
+        severity_weighted_per_week = severity_weighted_total / weeks_analyzed
 
         # Apply Rootly's tiered scaling to all OCB metrics
         # CRITICAL: after_hours_pct is a decimal (0.0-1.0), must convert to percentage (0-100) for OCB scale_max
@@ -1926,7 +1929,7 @@ class UnifiedBurnoutAnalyzer:
         
         # Prepare enhanced metrics with research insights for OCB reasoning
         # Use rate-based compound trauma calculation (CBI/sRPE methodology)
-        days_analyzed = metrics.get("days_analyzed", 30) or 30
+        days_analyzed = metrics.get("days_analyzed") or 30
         weeks_analyzed = max(1, days_analyzed / 7)
         critical_incidents_raw = severity_dist.get('sev0', 0) + severity_dist.get('sev1', 0)
         critical_per_week = critical_incidents_raw / weeks_analyzed
@@ -2804,7 +2807,7 @@ class UnifiedBurnoutAnalyzer:
         severity_dist = metrics.get("severity_distribution", {}) or {}
 
         # Get time period for rate normalization
-        days_analyzed = metrics.get("days_analyzed", 30) or 30
+        days_analyzed = metrics.get("days_analyzed") or 30
         weeks_analyzed = max(1, days_analyzed / 7)
 
         # Apply research-based severity weights (SEV0=15.0, SEV1=12.0, etc.)
@@ -3976,7 +3979,7 @@ class UnifiedBurnoutAnalyzer:
     def _generate_daily_trends(self, incidents: List[Dict[str, Any]], team_analysis: List[Dict[str, Any]], metadata: Dict[str, Any], team_health: Dict[str, Any] = None, github_data_by_user: Optional[Dict[str, Dict[str, Any]]] = None) -> List[Dict[str, Any]]:
         """Generate daily trend data from incidents and team analysis - includes individual user daily tracking and GitHub after-hours commits."""
         try:
-            days_analyzed = metadata.get("days_analyzed", 30) or 30 if isinstance(metadata, dict) else 30
+            days_analyzed = metadata.get("days_analyzed") or 30 if isinstance(metadata, dict) else 30
 
             # Initialize daily data structures - team level and individual level
             daily_data = {}
