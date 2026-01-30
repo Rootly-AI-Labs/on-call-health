@@ -166,7 +166,7 @@ async def _process_callback(code: str, state: Optional[str], db: Session, curren
 
         access_token = token_data.get("access_token")
         refresh_token = token_data.get("refresh_token")
-        expires_in = token_data.get("expires_in", 86400)  # Linear default is 24 hours
+        expires_in = _parse_expires_in(token_data.get("expires_in"))
 
         if not access_token:
             raise HTTPException(status_code=400, detail="Failed to get access token from Linear")
