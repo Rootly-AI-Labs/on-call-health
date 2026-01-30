@@ -111,20 +111,24 @@ class SurveyScheduler:
         from sqlalchemy.exc import IntegrityError
 
         try:
-            # Calculate today's date in organization timezone for idempotency check
+            # Calculate today's date boundaries in organization timezone
             org_tz = pytz.timezone(org_timezone)
             today_local = self._get_org_date(org_timezone)
             today_start_local = org_tz.localize(datetime.combine(today_local, time.min))
+            today_end_local = org_tz.localize(datetime.combine(today_local, time.max))
             today_start_utc = today_start_local.astimezone(timezone.utc)
+            today_end_utc = today_end_local.astimezone(timezone.utc)
 
-            # IDEMPOTENCY CHECK: First check if we already sent for this period today
+            # IDEMPOTENCY CHECK: First check if we already sent for this period today (in org timezone)
             # This handles the common case without attempting an insert
+            # Use BETWEEN to handle timezone boundaries correctly (e.g., PST 11:30 PM = UTC next day)
             existing_period_today = db.query(SurveyPeriod).filter(
                 SurveyPeriod.organization_id == organization_id,
                 SurveyPeriod.user_correlation_id == user_correlation.id,
                 SurveyPeriod.period_start_date == period_start,
                 SurveyPeriod.period_end_date == period_end,
-                SurveyPeriod.initial_sent_at >= today_start_utc
+                SurveyPeriod.initial_sent_at >= today_start_utc,
+                SurveyPeriod.initial_sent_at <= today_end_utc
             ).first()
 
             if existing_period_today:
@@ -173,7 +177,8 @@ class SurveyScheduler:
                     SurveyPeriod.user_correlation_id == user_correlation.id,
                     SurveyPeriod.period_start_date == period_start,
                     SurveyPeriod.period_end_date == period_end,
-                    SurveyPeriod.initial_sent_at >= today_start_utc
+                    SurveyPeriod.initial_sent_at >= today_start_utc,
+                    SurveyPeriod.initial_sent_at <= today_end_utc
                 ).first()
                 return existing
 
@@ -276,22 +281,24 @@ class SurveyScheduler:
             skipped_completed = 0
             failed_count = 0
 
-            # Calculate today's start in org timezone for accurate date comparisons
+            # Calculate today's date boundaries in org timezone for accurate date comparisons
             org_tz = pytz.timezone(org_timezone)
             today_start_local = org_tz.localize(datetime.combine(today, time.min))
+            today_end_local = org_tz.localize(datetime.combine(today, time.max))
             today_start_utc = today_start_local.astimezone(timezone.utc)
+            today_end_utc = today_end_local.astimezone(timezone.utc)
 
             for period in pending_periods:
                 try:
                     # Skip if initial was sent today (don't double-send on first day)
-                    # Use org timezone for accurate date comparison
-                    if period.initial_sent_at and period.initial_sent_at >= today_start_utc:
+                    # Use org timezone boundaries to handle edge cases (e.g., PST 11:30 PM = UTC next day)
+                    if period.initial_sent_at and today_start_utc <= period.initial_sent_at <= today_end_utc:
                         skipped_initial += 1
                         continue
 
                     # IDEMPOTENCY CHECK: Skip if we already sent a reminder today
-                    # Use org timezone for accurate date comparison
-                    if period.last_reminder_sent_at and period.last_reminder_sent_at >= today_start_utc:
+                    # Use org timezone boundaries for accurate comparison
+                    if period.last_reminder_sent_at and today_start_utc <= period.last_reminder_sent_at <= today_end_utc:
                         skipped_already_sent += 1
                         logger.debug(f"Skipping period {period.id} - reminder already sent today")
                         continue
