@@ -47,6 +47,9 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - DEBUG=True
+      # Required secrets - override via backend/.env file
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-insecure-jwt-key-for-local-docker-only}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-insecure-encryption-key-for-local-docker-only}
       # Add your API keys here or use .env file
       - ROOTLY_API_KEY=${ROOTLY_API_KEY:-}
       - PAGERDUTY_API_KEY=${PAGERDUTY_API_KEY:-}
