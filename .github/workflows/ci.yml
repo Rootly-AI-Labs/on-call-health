@@ -37,7 +37,7 @@ jobs:
         run: docker run --rm backend-test pip check
 
       - name: Test FastAPI app imports
-        run: docker run --rm -e DATABASE_URL=postgresql://test:test@localhost/test backend-test python -c "from app.main import app; print('FastAPI app loaded successfully')"
+        run: docker run --rm -e DATABASE_URL=postgresql://test:test@localhost/test -e JWT_SECRET_KEY=test-key-for-ci -e ENCRYPTION_KEY=test-encryption-key-for-ci backend-test python -c "from app.main import app; print('FastAPI app loaded successfully')"
 
   docker-compose:
     runs-on: ubuntu-latest
