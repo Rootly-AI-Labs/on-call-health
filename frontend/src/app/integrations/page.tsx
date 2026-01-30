@@ -1968,7 +1968,8 @@ export default function IntegrationsPage() {
       setDeleteDialogOpen,
       setIntegrationToDelete,
       syncedUsersCache.current,
-      recipientsCache.current
+      recipientsCache.current,
+      setSelectedOrganization
     )
   }
 
