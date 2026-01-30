@@ -4,20 +4,24 @@ Enhanced GitHub collector that records mapping data with smart caching.
 import logging
 import os
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional
-from .github_collector import collect_team_github_data as original_collect_team_github_data
+from typing import Dict, List, Optional, TYPE_CHECKING
+
 from .mapping_recorder import MappingRecorder
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
 async def collect_team_github_data_with_mapping(
-    team_emails: List[str], 
-    days: int = 30, 
+    team_emails: List[str],
+    days: int = 30,
     github_token: str = None,
     user_id: Optional[int] = None,
     analysis_id: Optional[int] = None,
     source_platform: str = "rootly",
-    email_to_name: Optional[Dict[str, str]] = None
+    email_to_name: Optional[Dict[str, str]] = None,
+    db: Optional["Session"] = None
 ) -> Dict[str, Dict]:
     """
     Enhanced version of collect_team_github_data that records mapping attempts.
@@ -37,22 +41,34 @@ async def collect_team_github_data_with_mapping(
     if fast_mode and user_id:
         from .github_collector import GitHubCollector
         from ..models import UserCorrelation
-        from ..models import SessionLocal
 
-        db = SessionLocal()
+        # Reuse passed db session or create new one if not provided/invalid
+        session_to_use = db
+        should_close = False
+        if session_to_use is None or not session_to_use.is_active:
+            from ..models import SessionLocal
+            session_to_use = SessionLocal()
+            should_close = True
+
         try:
             collector = GitHubCollector()
             github_data = {}
 
             # Query UserCorrelation for synced GitHub usernames
             # Don't filter by user_id - allow lookups across the organization
-            user_correlations = db.query(UserCorrelation).filter(
+            user_correlations = session_to_use.query(UserCorrelation).filter(
                 UserCorrelation.email.in_(team_emails),
                 UserCorrelation.github_username.isnot(None)
             ).all()
 
-            # Create a lookup dict: email -> github_username
-            email_to_github = {uc.email: uc.github_username for uc in user_correlations}
+            # Create a lookup dict: email -> github_username (skip null emails)
+            # Note: If duplicate emails exist, last entry wins (log warning for visibility)
+            email_to_github = {}
+            for uc in user_correlations:
+                if uc.email is not None:
+                    if uc.email in email_to_github:
+                        logger.warning(f"Duplicate email {uc.email} in UserCorrelation, using latest github_username")
+                    email_to_github[uc.email] = uc.github_username
 
             if len(email_to_github) == 0:
                 logger.warning(f"💻 GitHub: No synced usernames found in UserCorrelation")
@@ -69,12 +85,13 @@ async def collect_team_github_data_with_mapping(
 
             return github_data
         finally:
-            db.close()
+            if should_close:
+                session_to_use.close()
     
     if use_smart_caching and user_id:
         try:
             from .github_mapping_service import GitHubMappingService
-            mapping_service = GitHubMappingService()
+            mapping_service = GitHubMappingService(db=db)
             return await mapping_service.get_smart_github_data(
                 team_emails=team_emails,
                 days=days,
@@ -87,7 +104,7 @@ async def collect_team_github_data_with_mapping(
         except Exception as e:
             logger.error(f"💻 GitHub: Smart caching failed: {e}")
             # Fall through to original logic
-    recorder = MappingRecorder() if user_id else None
+    recorder = MappingRecorder(db=db) if user_id else None
     
     # Phase 1.3: Track processed emails to prevent duplicates within this analysis session
     processed_emails = set()

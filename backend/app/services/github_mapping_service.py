@@ -210,21 +210,24 @@ class GitHubMappingService:
         source_platform: str,
         email_to_name: Optional[Dict[str, str]] = None
     ) -> Dict[str, Dict]:
-        """Create new mappings using the enhanced GitHub collector."""
-        from .enhanced_github_collector import collect_team_github_data_with_mapping
+        """
+        Create new mappings using the original GitHub collector.
 
-        logger.info(f"🆕 Creating new mappings for {len(emails)} emails")
+        Uses collect_team_github_data directly (not the wrapper) to avoid infinite recursion:
+        collect_team_github_data_with_mapping -> get_smart_github_data -> _create_new_mappings -> loop
+        """
+        logger.info(f"Creating new mappings for {len(emails)} emails")
 
         try:
-            return await collect_team_github_data_with_mapping(
+            result = await collect_team_github_data(
                 team_emails=emails,
                 days=days,
-                github_token=github_token,
-                user_id=user_id,
-                analysis_id=analysis_id,
-                source_platform=source_platform,
-                email_to_name=email_to_name
+                github_token=github_token
             )
+            if result is None:
+                logger.warning("collect_team_github_data returned None - possible API or auth issue")
+                return {}
+            return result
         except Exception as e:
             logger.error(f"Failed to create new mappings: {e}")
             return {}
@@ -232,6 +235,11 @@ class GitHubMappingService:
     def _update_mapping_data_points(self, mapping, refreshed_data: Dict, analysis_id: int):
         """Update mapping record with fresh data points count."""
         try:
+            # Validate required mapping fields before DB call
+            if mapping.organization_id is None:
+                logger.warning(f"Skipping mapping update: organization_id is None for {mapping.source_identifier}")
+                return
+
             if isinstance(refreshed_data, dict):
                 metrics = refreshed_data.get("metrics", {})
                 data_points = (
@@ -239,10 +247,11 @@ class GitHubMappingService:
                     metrics.get("total_pull_requests", 0) +
                     metrics.get("total_reviews", 0)
                 )
-                
+
                 # Create new mapping record for this analysis with updated data points
                 self.recorder.record_successful_mapping(
                     user_id=mapping.user_id,
+                    organization_id=mapping.organization_id,
                     analysis_id=analysis_id,
                     source_platform=mapping.source_platform,
                     source_identifier=mapping.source_identifier,
