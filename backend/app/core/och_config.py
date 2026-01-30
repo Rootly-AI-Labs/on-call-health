@@ -604,14 +604,3 @@ def validate_factor_consistency(personal_result: Dict, work_result: Dict, raw_me
 
 # Global singleton instance
 DEFAULT_OCH_CONFIG = OCHConfig()
-
-
-# Backward compatibility aliases (deprecated - will be removed in future version)
-OCBDimension = OCHDimension
-OCBConfig = OCHConfig
-calculate_composite_ocb_score = calculate_composite_och_score
-get_ocb_interpretation = get_och_interpretation
-validate_ocb_config = validate_och_config
-generate_ocb_score_reasoning = generate_och_score_reasoning
-get_structured_ocb_factors = get_structured_och_factors
-DEFAULT_OCB_CONFIG = DEFAULT_OCH_CONFIG
