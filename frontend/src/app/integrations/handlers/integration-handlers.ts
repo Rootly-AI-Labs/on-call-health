@@ -253,11 +253,17 @@ export async function addIntegration(
       ? {
           token: token,
           name: nickname || previewData.suggested_name || previewData.organization_name,
+          organization_name: previewData.organization_name,
+          total_users: previewData.total_users || 0,
+          permissions: previewData.permissions || {},
         }
       : {
           token: token,
           name: nickname || previewData.suggested_name || previewData.organization_name,
-          platform: 'pagerduty'
+          platform: 'pagerduty',
+          organization_name: previewData.organization_name,
+          total_users: previewData.total_users || 0,
+          total_services: previewData.total_services || 0,
         }
 
     const response = await fetch(endpoint, {
