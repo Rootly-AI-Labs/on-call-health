@@ -111,29 +111,28 @@ class SurveyScheduler:
         from sqlalchemy.exc import IntegrityError
 
         try:
-            # Calculate today's start time in organization timezone, then convert to UTC
-            # This ensures we compare dates in the org's local time, not UTC
+            # Calculate today's date in organization timezone for idempotency check
             org_tz = pytz.timezone(org_timezone)
             today_local = self._get_org_date(org_timezone)
             today_start_local = org_tz.localize(datetime.combine(today_local, time.min))
             today_start_utc = today_start_local.astimezone(timezone.utc)
 
-            # IDEMPOTENCY CHECK: Don't create if we already sent for this exact period today
-            # Check for any period (pending, completed, or expired) for this date range sent today
-            # Use SELECT FOR UPDATE SKIP LOCKED to avoid blocking other transactions
+            # IDEMPOTENCY CHECK: First check if we already sent for this period today
+            # This handles the common case without attempting an insert
             existing_period_today = db.query(SurveyPeriod).filter(
                 SurveyPeriod.organization_id == organization_id,
                 SurveyPeriod.user_correlation_id == user_correlation.id,
                 SurveyPeriod.period_start_date == period_start,
                 SurveyPeriod.period_end_date == period_end,
                 SurveyPeriod.initial_sent_at >= today_start_utc
-            ).with_for_update(skip_locked=True).first()
+            ).first()
 
             if existing_period_today:
                 logger.debug(f"Skipping survey period creation - already exists (ID {existing_period_today.id}) for correlation {user_correlation.id}")
                 return existing_period_today
 
             # Expire any other pending periods (from different date ranges)
+            # Use skip_locked to avoid blocking - if another transaction is expiring, that's fine
             other_pending_periods = db.query(SurveyPeriod).filter(
                 SurveyPeriod.organization_id == organization_id,
                 SurveyPeriod.user_correlation_id == user_correlation.id,
@@ -145,7 +144,7 @@ class SurveyScheduler:
                 period.mark_expired()
                 logger.debug(f"Expired old period {period.id} for user (correlation {user_correlation.id})")
 
-            # Create new period
+            # Create new period - IntegrityError will be caught if concurrent transaction creates it
             new_period = SurveyPeriod(
                 organization_id=organization_id,
                 user_correlation_id=user_correlation.id,
@@ -165,15 +164,16 @@ class SurveyScheduler:
                 logger.debug(f"Created survey period {new_period.id}: {frequency_type} period {period_start} to {period_end}")
                 return new_period
             except IntegrityError as ie:
-                # Race condition: another transaction created the period
-                # Roll back and query for the existing period
+                # Race condition: another transaction created the period between our check and insert
+                # Roll back this transaction and query for the existing period
                 db.rollback()
-                logger.debug(f"IntegrityError creating period - another transaction created it: {str(ie)}")
+                logger.debug(f"IntegrityError creating period - concurrent transaction created it: {str(ie)}")
                 existing = db.query(SurveyPeriod).filter(
                     SurveyPeriod.organization_id == organization_id,
                     SurveyPeriod.user_correlation_id == user_correlation.id,
                     SurveyPeriod.period_start_date == period_start,
-                    SurveyPeriod.period_end_date == period_end
+                    SurveyPeriod.period_end_date == period_end,
+                    SurveyPeriod.initial_sent_at >= today_start_utc
                 ).first()
                 return existing
 
@@ -276,22 +276,28 @@ class SurveyScheduler:
             skipped_completed = 0
             failed_count = 0
 
+            # Calculate today's start in org timezone for accurate date comparisons
+            org_tz = pytz.timezone(org_timezone)
+            today_start_local = org_tz.localize(datetime.combine(today, time.min))
+            today_start_utc = today_start_local.astimezone(timezone.utc)
+
             for period in pending_periods:
                 try:
                     # Skip if initial was sent today (don't double-send on first day)
-                    if period.initial_sent_at and period.initial_sent_at.date() == today:
+                    # Use org timezone for accurate date comparison
+                    if period.initial_sent_at and period.initial_sent_at >= today_start_utc:
                         skipped_initial += 1
                         continue
 
                     # IDEMPOTENCY CHECK: Skip if we already sent a reminder today
-                    if period.last_reminder_sent_at and period.last_reminder_sent_at.date() == today:
+                    # Use org timezone for accurate date comparison
+                    if period.last_reminder_sent_at and period.last_reminder_sent_at >= today_start_utc:
                         skipped_already_sent += 1
                         logger.debug(f"Skipping period {period.id} - reminder already sent today")
                         continue
 
                     # Check if user has already completed the survey in this period
                     # Use organization timezone to create proper date boundaries, then convert to UTC
-                    org_tz = pytz.timezone(org_timezone)
                     period_start_local = org_tz.localize(datetime.combine(period.period_start_date, time.min))
                     period_end_local = org_tz.localize(datetime.combine(period.period_end_date, time.max))
                     period_start_utc = period_start_local.astimezone(pytz.UTC)
