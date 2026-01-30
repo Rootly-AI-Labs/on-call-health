@@ -102,18 +102,34 @@ class SurveyScheduler:
         """
         Create a new SurveyPeriod record, expiring any existing pending period.
         Uses row-level locking to prevent race conditions.
+        Includes idempotency check to prevent duplicate sends.
         """
         try:
-            # Use FOR UPDATE to lock the row and prevent race conditions
-            existing_period = db.query(SurveyPeriod).filter(
+            # IDEMPOTENCY CHECK: Don't create if we already sent for this exact period today
+            # Check for any period (pending, completed, or expired) for this date range
+            existing_period_today = db.query(SurveyPeriod).filter(
                 SurveyPeriod.organization_id == organization_id,
                 SurveyPeriod.user_correlation_id == user_correlation.id,
-                SurveyPeriod.status == 'pending'
+                SurveyPeriod.period_start_date == period_start,
+                SurveyPeriod.period_end_date == period_end,
+                SurveyPeriod.initial_sent_at >= datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
             ).with_for_update().first()
 
-            if existing_period:
-                existing_period.mark_expired()
-                logger.debug(f"Expired old period {existing_period.id} for user (correlation {user_correlation.id})")
+            if existing_period_today:
+                logger.debug(f"Skipping survey period creation - already exists (ID {existing_period_today.id}) for correlation {user_correlation.id}")
+                return existing_period_today
+
+            # Expire any other pending periods (from different date ranges)
+            other_pending_periods = db.query(SurveyPeriod).filter(
+                SurveyPeriod.organization_id == organization_id,
+                SurveyPeriod.user_correlation_id == user_correlation.id,
+                SurveyPeriod.status == 'pending',
+                SurveyPeriod.period_start_date != period_start  # Different period
+            ).with_for_update().all()
+
+            for period in other_pending_periods:
+                period.mark_expired()
+                logger.debug(f"Expired old period {period.id} for user (correlation {user_correlation.id})")
 
             new_period = SurveyPeriod(
                 organization_id=organization_id,
