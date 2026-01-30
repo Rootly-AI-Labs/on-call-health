@@ -40,6 +40,9 @@ for handler in root_logger.handlers:
 # Store reference for handlers added later (e.g., by uvicorn)
 logging.user_context_filter = user_context_filter
 
+# Suppress verbose SQLAlchemy SQL logs (always - they're too noisy)
+logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
+
 # Set specific loggers to WARNING in production to reduce noise
 if settings.ENVIRONMENT == "production" or LOG_LEVEL >= logging.WARNING:
     # Reduce verbosity for noisy modules
