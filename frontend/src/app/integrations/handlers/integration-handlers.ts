@@ -362,7 +362,8 @@ export async function deleteIntegration(
   setDeleteDialogOpen: (open: boolean) => void,
   setIntegrationToDelete: (integration: Integration | null) => void,
   syncedUsersCache?: Map<string, any[]>,
-  recipientsCache?: Map<string, Set<number>>
+  recipientsCache?: Map<string, Set<number>>,
+  setSelectedOrganization?: (orgId: string) => void
 ): Promise<void> {
   setIsDeleting(true)
   try {
@@ -421,6 +422,10 @@ export async function deleteIntegration(
       const selectedOrg = localStorage.getItem('selected_organization')
       if (selectedOrg === integrationIdStr) {
         localStorage.removeItem('selected_organization')
+        // Clear React state to trigger auto-select
+        if (setSelectedOrganization) {
+          setSelectedOrganization("")
+        }
       }
 
       setDeleteDialogOpen(false)
