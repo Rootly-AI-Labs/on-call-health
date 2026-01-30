@@ -25,17 +25,17 @@ function getOnCallMembers(currentAnalysis: any): any[] {
   return getTeamMembers(currentAnalysis).filter((m: any) => m.incident_count > 0)
 }
 
-// Calculate team OCB score from member scores
-function calculateTeamOCBScore(currentAnalysis: any): number | null {
+// Calculate team OCH score from member scores
+function calculateTeamOCHScore(currentAnalysis: any): number | null {
   const members = getTeamMembers(currentAnalysis)
   if (!members || members.length === 0) return null
 
-  const ocbScores = members
-    .map((m: any) => m.ocb_score)
+  const ochScores = members
+    .map((m: any) => m.och_score)
     .filter((s: any) => s !== undefined && s !== null && s > 0)
 
-  if (ocbScores.length === 0) return null
-  return Math.round(ocbScores.reduce((a: number, b: number) => a + b, 0) / ocbScores.length)
+  if (ochScores.length === 0) return null
+  return Math.round(ochScores.reduce((a: number, b: number) => a + b, 0) / ochScores.length)
 }
 
 // Get health percentage from on-call members or fallback sources
@@ -43,12 +43,12 @@ function getHealthPercentage(currentAnalysis: any, historicalTrends: any): numbe
   const onCallMembers = getOnCallMembers(currentAnalysis)
 
   if (onCallMembers.length > 0) {
-    const ocbScores = onCallMembers
-      .map((m: any) => m.ocb_score)
+    const ochScores = onCallMembers
+      .map((m: any) => m.och_score)
       .filter((s: any) => s !== undefined && s !== null)
 
-    if (ocbScores.length > 0) {
-      return ocbScores.reduce((a: number, b: number) => a + b, 0) / ocbScores.length
+    if (ochScores.length > 0) {
+      return ochScores.reduce((a: number, b: number) => a + b, 0) / ochScores.length
     }
   }
 
@@ -70,19 +70,19 @@ function getHealthPercentage(currentAnalysis: any, historicalTrends: any): numbe
   return 0
 }
 
-// Convert OCB score to health status label
-function getHealthStatusLabel(ocbScore: number): string {
-  if (ocbScore < 25) return 'Healthy'
-  if (ocbScore < 50) return 'Fair'
-  if (ocbScore < 75) return 'Poor'
+// Convert OCH score to health status label
+function getHealthStatusLabel(ochScore: number): string {
+  if (ochScore < 25) return 'Healthy'
+  if (ochScore < 50) return 'Fair'
+  if (ochScore < 75) return 'Poor'
   return 'Critical'
 }
 
 // Get health status description
-function getHealthStatusDescription(ocbScore: number): string {
-  if (ocbScore < 25) return 'Sustainable workload'
-  if (ocbScore < 50) return 'Monitor for trends'
-  if (ocbScore < 75) return 'Consider intervention'
+function getHealthStatusDescription(ochScore: number): string {
+  if (ochScore < 25) return 'Sustainable workload'
+  if (ochScore < 50) return 'Monitor for trends'
+  if (ochScore < 75) return 'Consider intervention'
   return 'Action needed'
 }
 
@@ -113,7 +113,7 @@ export function TeamHealthOverview({
     <>
       {/* OCH Risk Level Tooltip Portal */}
       <div className="fixed z-[99999] invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-neutral-900 text-white text-xs rounded-lg p-3 w-72 shadow-lg pointer-events-none"
-        id="ocb-score-tooltip"
+        id="och-score-tooltip"
         style={{ top: '-200px', left: '-200px' }}>
         <div className="space-y-2">
           <div className="text-purple-300 font-semibold mb-2">On-Call Health Risk Level</div>
@@ -197,11 +197,11 @@ export function TeamHealthOverview({
                   <div>
                     <div className="text-2xl font-bold text-gray-900">
                       {(() => {
-                        const teamOcbScore = calculateTeamOCBScore(currentAnalysis)
-                        if (teamOcbScore !== null) {
+                        const teamOchScore = calculateTeamOCHScore(currentAnalysis)
+                        if (teamOchScore !== null) {
                           return (
                             <>
-                              <span>{teamOcbScore}</span>
+                              <span>{teamOchScore}</span>
                               <span
                                 className="text-xs text-gray-500 cursor-help ml-1"
                                 onMouseEnter={(e) => showTooltip('ocb-score-tooltip', e.currentTarget.getBoundingClientRect(), 180, 120)}
@@ -268,7 +268,7 @@ export function TeamHealthOverview({
               <div>
                 <div className="space-y-1">
                   {(() => {
-                    // Calculate OCB-based risk distribution from team members
+                    // Calculate OCH-based risk distribution from team members
                     const teamAnalysis = currentAnalysis?.analysis_data?.team_analysis;
                     const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members;
 
@@ -279,11 +279,11 @@ export function TeamHealthOverview({
                       const riskCounts = { critical: 0, high: 0, medium: 0, low: 0 };
 
                       onCallMembers.forEach((member: any) => {
-                        if (member.ocb_score !== undefined && member.ocb_score !== null) {
-                          // Use OCB scoring (0-100, higher = worse)
-                          if (member.ocb_score >= 75) riskCounts.critical++;
-                          else if (member.ocb_score >= 50) riskCounts.high++;
-                          else if (member.ocb_score >= 25) riskCounts.medium++;
+                        if (member.och_score !== undefined && member.och_score !== null) {
+                          // Use OCH scoring (0-100, higher = worse)
+                          if (member.och_score >= 75) riskCounts.critical++;
+                          else if (member.och_score >= 50) riskCounts.high++;
+                          else if (member.och_score >= 25) riskCounts.medium++;
                           else riskCounts.low++;
                         }
                         // No fallback - only count members with OCH risk levels

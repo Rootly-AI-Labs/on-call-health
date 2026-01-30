@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 from ..core.rootly_client import RootlyAPIClient
 from ..core.pagerduty_client import PagerDutyAPIClient, PagerDutyDataCollector
-from ..core.ocb_config import calculate_composite_ocb_score, calculate_personal_burnout, calculate_work_related_burnout, generate_ocb_score_reasoning, get_structured_ocb_factors
+from ..core.och_config import calculate_composite_och_score, calculate_personal_burnout, calculate_work_related_burnout, generate_och_score_reasoning, get_structured_och_factors
 from .ai_burnout_analyzer import get_ai_burnout_analyzer
 from .github_correlation_service import GitHubCorrelationService
 from ..utils.incident_utils import slim_incidents, calculate_severity_breakdown
@@ -127,7 +127,7 @@ class UnifiedBurnoutAnalyzer:
         self.jira_token = jira_token
         self.linear_token = linear_token
 
-        # Using Copenhagen Burnout Inventory (OCB) methodology
+        # Using On-Call Health (OCH) methodology (inspired by Copenhagen Burnout Inventory)
         logger.info("Unified analyzer using Copenhagen Burnout Inventory methodology")
         self.organization_name = organization_name
 
@@ -788,7 +788,7 @@ class UnifiedBurnoutAnalyzer:
                 logger.info(f"GITHUB BURNOUT: Recalculating scores with GitHub activity data")
                 team_analysis["members"] = self._recalculate_burnout_with_github(team_analysis["members"], metadata)
 
-            # JIRA OCB ADJUSTMENT: Update OCB scores using Jira ticket workload
+            # JIRA OCH ADJUSTMENT: Update OCH scores using Jira ticket workload
             if self.features['jira'] and self.current_user_id:
                 try:
                     jira_substep_start = datetime.now()
@@ -1657,8 +1657,8 @@ class UnifiedBurnoutAnalyzer:
 
         # If no incidents, return minimal analysis
         if not incidents:
-            # Calculate zero-incident OCB metrics for consistency
-            zero_ocb_metrics = {
+            # Calculate zero-incident OCH metrics for consistency
+            zero_och_metrics = {
                 'incident_frequency': 0,
                 'incident_severity': 0,
                 'response_urgency': 0,
@@ -1669,17 +1669,17 @@ class UnifiedBurnoutAnalyzer:
                 'oncall_burden': 0
             }
             
-            # Calculate OCB dimensions for zero incidents
-            personal_ocb = calculate_personal_burnout(zero_ocb_metrics)
-            work_ocb = calculate_work_related_burnout(zero_ocb_metrics) 
-            composite_ocb = calculate_composite_ocb_score(personal_ocb['score'], work_ocb['score'])
+            # Calculate OCH dimensions for zero incidents
+            personal_och = calculate_personal_burnout(zero_och_metrics)
+            work_och = calculate_work_related_burnout(zero_och_metrics) 
+            composite_och = calculate_composite_och_score(personal_och['score'], work_och['score'])
             
-            # Generate reasoning for zero-incident OCB scores
-            ocb_reasoning = generate_ocb_score_reasoning(
-                personal_ocb, 
-                work_ocb, 
-                composite_ocb,
-                zero_ocb_metrics
+            # Generate reasoning for zero-incident OCH scores
+            och_reasoning = generate_och_score_reasoning(
+                personal_och, 
+                work_och, 
+                composite_och,
+                zero_och_metrics
             )
             
             return {
@@ -1695,7 +1695,7 @@ class UnifiedBurnoutAnalyzer:
                 "pagerduty_user_id": pagerduty_user_id,  # Include PagerDuty mapping for logo display
                 "avatar_url": avatar_url,  # Profile image URL from PagerDuty/Rootly
                 "burnout_score": 0,
-                "ocb_score": round(min(100, composite_ocb['composite_score']), 2),  # Cap display at 100 for UI
+                "och_score": round(min(100, composite_och['composite_score']), 2),  # Cap display at 100 for UI
                 "risk_level": "low",
                 "incident_count": 0,
                 "factors": {
@@ -1708,13 +1708,13 @@ class UnifiedBurnoutAnalyzer:
                     "work_related_burnout": 0,
                     "client_related_burnout": 0
                 },
-                "ocb_breakdown": {  # ✅ Add OCB breakdown for consistency
-                    "personal": round(personal_ocb['score'], 2),
-                    "work_related": round(work_ocb['score'], 2),
-                    "interpretation": composite_ocb['interpretation']
+                "och_breakdown": {  # ✅ Add OCH breakdown for consistency
+                    "personal": round(personal_och['score'], 2),
+                    "work_related": round(work_och['score'], 2),
+                    "interpretation": composite_och['interpretation']
                 },
-                "ocb_reasoning": ocb_reasoning,  # ✅ Add explanations
-                "ocb_factors": get_structured_ocb_factors(personal_ocb, work_ocb, composite_ocb['composite_score']),
+                "och_reasoning": och_reasoning,  # ✅ Add explanations
+                "och_factors": get_structured_och_factors(personal_och, work_och, composite_och['composite_score']),
                 "metrics": {
                     "incidents_per_week": 0,
                     "after_hours_percentage": 0,
@@ -1755,7 +1755,7 @@ class UnifiedBurnoutAnalyzer:
         # Calculate confidence intervals and data quality
         confidence = self._calculate_confidence_intervals(metrics, incidents, github_data, slack_data, jira_data, user_tz)
         
-        # OCB DEBUG LOGGING - Removed to reduce Railway log noise
+        # OCH DEBUG LOGGING - Removed to reduce Railway log noise
         
         # Calculate overall burnout score using three-factor methodology (equal weighting)
         burnout_score = (dimensions["personal_burnout"] * 0.333 + 
@@ -1770,8 +1770,8 @@ class UnifiedBurnoutAnalyzer:
         # Determine risk level
         risk_level = self._determine_risk_level(burnout_score)
         
-        # Calculate OCB (Copenhagen Burnout Inventory) score
-        # Map existing metrics to OCB format with severity weighting
+        # Calculate OCH (On-Call Health) score
+        # Map existing metrics to OCH format with severity weighting
         severity_dist = metrics.get('severity_distribution', {})
 
         # Calculate research-based impact factors
@@ -1878,8 +1878,8 @@ class UnifiedBurnoutAnalyzer:
         weeks_analyzed = max(1, days_analyzed_for_rate / 7)
         severity_weighted_per_week = severity_weighted_total / weeks_analyzed
 
-        # Apply Rootly's tiered scaling to all OCB metrics
-        # CRITICAL: after_hours_pct is a decimal (0.0-1.0), must convert to percentage (0-100) for OCB scale_max
+        # Apply Rootly's tiered scaling to all OCH metrics
+        # CRITICAL: after_hours_pct is a decimal (0.0-1.0), must convert to percentage (0-100) for OCH scale_max
         after_hours_percentage = after_hours_pct * 100  # Convert 0.25 → 25%
 
         # Apply time-based multipliers to increase impact of off-hours incidents
@@ -1911,30 +1911,30 @@ class UnifiedBurnoutAnalyzer:
         logger.debug(f"   after_hours: {after_hours_percentage:.1f}% → {scaled_after_hours:.1f}% (scaled)")
         logger.debug(f"   oncall_burden: {apply_rootly_incident_tiers(severity_weighted_per_week) * 10:.1f} → {scaled_oncall_burden:.1f} (scaled)")
 
-        ocb_metrics = {
+        och_metrics = {
             # Personal burnout factors (65% of total)
-            # OCB scale_max values: work_hours_trend=100, after_hours_activity=30, sleep_quality_proxy=30
+            # OCH scale_max values: work_hours_trend=100, after_hours_activity=30, sleep_quality_proxy=30
             'work_hours_trend': task_load_score,                                    # Task load: 10% (0-100 scale)
             'after_hours_activity': scaled_after_hours,                             # After-hours: 30% (volume-scaled %)
             'sleep_quality_proxy': severity_weighted_per_week,                      # High-severity: 25% (raw weekly rate, scale_max=30)
 
             # Work-related burnout factors (35% of total)
-            # OCB scale_max values: sprint_completion=7, oncall_burden=100
+            # OCH scale_max values: sprint_completion=7, oncall_burden=100
             'sprint_completion': consecutive_days_data['max_consecutive_days'],     # Consecutive days: 15% (raw days 0-7+)
             'oncall_burden': scaled_oncall_burden  # On-call load: 20% (volume-scaled)
         }
 
-        # Check if all OCB metrics are 0
-        non_zero_metrics = {k: v for k, v in ocb_metrics.items() if v > 0}
+        # Check if all OCH metrics are 0
+        non_zero_metrics = {k: v for k, v in och_metrics.items() if v > 0}
         if not non_zero_metrics:
-            logger.warning(f"ALL OCB metrics are 0 for {user_name} with {len(incidents)} incidents!")
+            logger.warning(f"ALL OCH metrics are 0 for {user_name} with {len(incidents)} incidents!")
 
-        # Calculate OCB dimensions
-        personal_ocb = calculate_personal_burnout(ocb_metrics)
-        work_ocb = calculate_work_related_burnout(ocb_metrics)
-        composite_ocb = calculate_composite_ocb_score(personal_ocb['score'], work_ocb['score'])
+        # Calculate OCH dimensions
+        personal_och = calculate_personal_burnout(och_metrics)
+        work_och = calculate_work_related_burnout(och_metrics)
+        composite_och = calculate_composite_och_score(personal_och['score'], work_och['score'])
         
-        # Prepare enhanced metrics with research insights for OCB reasoning
+        # Prepare enhanced metrics with research insights for OCH reasoning
         # Use rate-based compound trauma calculation (CBI/sRPE methodology)
         days_analyzed = metrics.get("days_analyzed") or 30
         weeks_analyzed = max(1, days_analyzed / 7)
@@ -1951,11 +1951,11 @@ class UnifiedBurnoutAnalyzer:
             "compound_factor": self._calculate_compound_trauma_factor_rate(critical_per_week)
         }
 
-        # Generate reasoning for the OCB scores
-        ocb_reasoning = generate_ocb_score_reasoning(
-            personal_ocb,
-            work_ocb,
-            composite_ocb,
+        # Generate reasoning for the OCH scores
+        och_reasoning = generate_och_score_reasoning(
+            personal_och,
+            work_och,
+            composite_och,
             enhanced_metrics  # Pass enhanced metrics with research insights
         )
         
@@ -1972,18 +1972,18 @@ class UnifiedBurnoutAnalyzer:
             "pagerduty_user_id": pagerduty_user_id,  # Include PagerDuty mapping for logo display
             "avatar_url": avatar_url,  # Profile image URL from PagerDuty/Rootly
             "burnout_score": round(burnout_score, 2),
-            "ocb_score": round(min(100, composite_ocb['composite_score']), 2),  # Cap display at 100 for UI
+            "och_score": round(min(100, composite_och['composite_score']), 2),  # Cap display at 100 for UI
             "risk_level": risk_level,
             "incident_count": len(incidents),
             "factors": factors,
             "burnout_dimensions": dimensions,
-            "ocb_breakdown": {  # Add OCB breakdown for comparison
-                "personal": round(personal_ocb['score'], 2),
-                "work_related": round(work_ocb['score'], 2),
-                "interpretation": composite_ocb['interpretation']
+            "och_breakdown": {  # Add OCH breakdown for comparison
+                "personal": round(personal_och['score'], 2),
+                "work_related": round(work_och['score'], 2),
+                "interpretation": composite_och['interpretation']
             },
-            "ocb_reasoning": ocb_reasoning,  # Add explanations for the score
-            "ocb_factors": get_structured_ocb_factors(personal_ocb, work_ocb, composite_ocb['composite_score']),
+            "och_reasoning": och_reasoning,  # Add explanations for the score
+            "och_factors": get_structured_och_factors(personal_och, work_och, composite_och['composite_score']),
             "metrics": metrics,
             "confidence": confidence,  # Add confidence intervals and data quality
             # Research-based insights
@@ -2750,13 +2750,13 @@ class UnifiedBurnoutAnalyzer:
         # GitHub (15%) and Slack (15%) components to be added later
         
         # Personal Burnout (33.3% of final score)
-        personal_burnout = self._calculate_personal_burnout_ocb(metrics)
+        personal_burnout = self._calculate_personal_burnout_och(metrics)
         
         # Work-Related Burnout (33.3% of final score)  
-        work_related_burnout = self._calculate_work_burnout_ocb(metrics)
+        work_related_burnout = self._calculate_work_burnout_och(metrics)
         
         # Accomplishment Burnout (33.4% of final score)
-        accomplishment_burnout = self._calculate_accomplishment_burnout_ocb(metrics)
+        accomplishment_burnout = self._calculate_accomplishment_burnout_och(metrics)
         
         # Ensure all dimension values are numeric before rounding
         safe_personal_burnout = personal_burnout if personal_burnout is not None else 0.0
@@ -2769,8 +2769,8 @@ class UnifiedBurnoutAnalyzer:
             "accomplishment_burnout": round(safe_accomplishment_burnout, 2)
         }
     
-    def _calculate_personal_burnout_ocb(self, metrics: Dict[str, Any]) -> float:
-        """Calculate Personal Burnout from incident data using OCB methodology (0-10 scale)."""
+    def _calculate_personal_burnout_och(self, metrics: Dict[str, Any]) -> float:
+        """Calculate Personal Burnout from incident data using OCH methodology (0-10 scale)."""
         # NEW: Much more aggressive incident frequency scaling based on research
         ipw = metrics.get("incidents_per_week", 0)
         ipw = float(ipw) if ipw is not None else 0.0
@@ -2802,7 +2802,7 @@ class UnifiedBurnoutAnalyzer:
         
         return weighted_score
     
-    def _calculate_work_burnout_ocb(self, metrics: Dict[str, Any]) -> float:
+    def _calculate_work_burnout_och(self, metrics: Dict[str, Any]) -> float:
         """
         Calculate Work-Related Burnout using CBI/sRPE-inspired methodology (0-10 scale).
 
@@ -2873,8 +2873,8 @@ class UnifiedBurnoutAnalyzer:
         # Combined score using real metrics only
         return (escalation_score * 0.4 + response_stress * 0.3 + volume_stress * 0.3)
     
-    def _calculate_accomplishment_burnout_ocb(self, metrics: Dict[str, Any]) -> float:
-        """Calculate Accomplishment Burnout from incident data using OCB methodology (0-10 scale)."""
+    def _calculate_accomplishment_burnout_och(self, metrics: Dict[str, Any]) -> float:
+        """Calculate Accomplishment Burnout from incident data using OCH methodology (0-10 scale)."""
         # Use REAL data only - calculate based on actual performance
         # Resolution effectiveness based on incident data
         total_incidents = metrics.get("total_incidents", 0) 
@@ -3308,19 +3308,19 @@ class UnifiedBurnoutAnalyzer:
         eligible_members = members_with_incidents  # Only those with actual incident activity
         logger.info(f"🏥 TEAM_HEALTH: Filtering to {len(eligible_members)} members with incidents (from {len(member_analyses)} total)")
         
-        # Calculate average burnout for ELIGIBLE members only - prioritize OCB scores when available  
-        ocb_scores = [m.get("ocb_score") for m in eligible_members if m and isinstance(m, dict) and m.get("ocb_score") is not None]
+        # Calculate average burnout for ELIGIBLE members only - prioritize OCH scores when available  
+        och_scores = [m.get("och_score") for m in eligible_members if m and isinstance(m, dict) and m.get("och_score") is not None]
         
-        if ocb_scores and len(ocb_scores) > 0:
-            # Use OCB scores (0-100 scale where higher = more burnout)
-            avg_burnout = sum(ocb_scores) / len(ocb_scores)
-            using_ocb = True
-            logger.info(f"Team health calculation using OCB scores: avg={avg_burnout:.1f}, count={len(ocb_scores)}")
+        if och_scores and len(och_scores) > 0:
+            # Use OCH scores (0-100 scale where higher = more burnout)
+            avg_burnout = sum(och_scores) / len(och_scores)
+            using_och = True
+            logger.info(f"Team health calculation using OCH scores: avg={avg_burnout:.1f}, count={len(och_scores)}")
         else:
             # Fallback to legacy burnout scores (0-10 scale where higher = more burnout)
             legacy_scores = [m.get("burnout_score", 0) for m in eligible_members if m and isinstance(m, dict) and m.get("burnout_score") is not None]
             avg_burnout = sum(legacy_scores) / len(legacy_scores) if legacy_scores and len(legacy_scores) > 0 else 0
-            using_ocb = False
+            using_och = False
             logger.info(f"Team health calculation using legacy scores: avg={avg_burnout:.1f}, count={len(legacy_scores)}")
         
         # Count risk levels (updated for 4-tier system) - ONLY include eligible members with incidents
@@ -3334,11 +3334,11 @@ class UnifiedBurnoutAnalyzer:
                     risk_dist["low"] += 1
         
         # Calculate overall health score using appropriate scale
-        if using_ocb:
-            # OCB scoring (0-100 where higher = more burnout)
-            # Store raw OCB score as overall_score for frontend consumption
+        if using_och:
+            # OCH scoring (0-100 where higher = more burnout)
+            # Store raw OCH score as overall_score for frontend consumption
             overall_score = avg_burnout
-            logger.info(f"Using raw OCB score as overall_score: {overall_score}")
+            logger.info(f"Using raw OCH score as overall_score: {overall_score}")
         else:
             # Legacy scoring - convert 0-10 burnout to 0-10 health scale (inverse)
             overall_score = 10 - avg_burnout
@@ -3346,8 +3346,8 @@ class UnifiedBurnoutAnalyzer:
             logger.info(f"Using legacy health calculation: burnout={avg_burnout} -> health={overall_score}")
         
         # Determine health status based on scoring method
-        if using_ocb:
-            # OCB scoring (0-100 where higher = more burnout)
+        if using_och:
+            # OCH scoring (0-100 where higher = more burnout)
             if overall_score < 25:
                 health_status = "excellent"  # Low/minimal burnout
             elif overall_score < 50:
@@ -3356,7 +3356,7 @@ class UnifiedBurnoutAnalyzer:
                 health_status = "fair"       # Moderate burnout risk
             else:
                 health_status = "poor"       # High/severe burnout risk
-            logger.info(f"OCB health status: score={overall_score} -> {health_status}")
+            logger.info(f"OCH health status: score={overall_score} -> {health_status}")
         else:
             # Legacy scoring (0-10 health scale where higher = better health)
             if overall_score >= 9:  # 90%+
@@ -3373,7 +3373,7 @@ class UnifiedBurnoutAnalyzer:
         
         return {
             "overall_score": round(overall_score, 2),
-            "scoring_method": "OCB" if using_ocb else "Legacy",
+            "scoring_method": "OCH" if using_och else "Legacy",
             "risk_distribution": risk_dist,
             "average_burnout_score": round(avg_burnout, 2),
             "health_status": health_status,
@@ -4613,7 +4613,7 @@ class UnifiedBurnoutAnalyzer:
                         complete_individual_data[user_email][date_str].update(original_data)
                         complete_individual_data[user_email][date_str]["has_data"] = True
                         
-                        # Calculate individual burnout score for this user on this day (CONSISTENT with OCB)
+                        # Calculate individual burnout score for this user on this day (CONSISTENT with OCH)
                         burnout_score = self._calculate_individual_daily_health_score(
                             original_data, 
                             date_obj, 
@@ -4646,27 +4646,27 @@ class UnifiedBurnoutAnalyzer:
                 date_obj = datetime.now() - timedelta(days=days_analyzed - day_offset - 1)
                 date_str = date_obj.strftime('%Y-%m-%d')
                 
-                # Calculate team average OCB burnout score for this day
-                daily_ocb_scores = []
+                # Calculate team average OCH burnout score for this day
+                daily_och_scores = []
                 for user_email in complete_individual_data:
                     if date_str in complete_individual_data[user_email]:
-                        user_ocb_score = complete_individual_data[user_email][date_str].get("health_score")
-                        if user_ocb_score is not None:
-                            daily_ocb_scores.append(user_ocb_score)
+                        user_och_score = complete_individual_data[user_email][date_str].get("health_score")
+                        if user_och_score is not None:
+                            daily_och_scores.append(user_och_score)
                 
                 # Calculate team average from actual data (no hardcoded fallback)
-                if daily_ocb_scores:
-                    team_avg_ocb = int(sum(daily_ocb_scores) / len(daily_ocb_scores))
+                if daily_och_scores:
+                    team_avg_och = int(sum(daily_och_scores) / len(daily_och_scores))
                 else:
                     # If no data, calculate from team incident load
                     team_avg_incidents = sum(m.get("incident_count", 0) for m in team_analysis) / len(team_analysis) if team_analysis else 0
                     team_health_baseline = max(70, int(100 - (team_avg_incidents * 2)))
-                    team_avg_ocb = 100 - team_health_baseline  # Convert health to OCB burnout score
+                    team_avg_och = 100 - team_health_baseline  # Convert health to OCH burnout score
                 
                 # Add team average to each user's data for this day
                 for user_email in complete_individual_data:
                     if date_str in complete_individual_data[user_email]:
-                        complete_individual_data[user_email][date_str]["team_health"] = team_avg_ocb
+                        complete_individual_data[user_email][date_str]["team_health"] = team_avg_och
                         
                         # Add formatted day name for frontend display
                         complete_individual_data[user_email][date_str]["day_name"] = date_obj.strftime("%a, %b %d")
@@ -4699,9 +4699,9 @@ class UnifiedBurnoutAnalyzer:
         team_analysis: List[Dict[str, Any]]
     ) -> int:
         """
-        Calculate individual daily OCB burnout score (0-100 scale, higher = worse burnout).
+        Calculate individual daily OCH burnout score (0-100 scale, higher = worse burnout).
         
-        Aligned with main OCB Risk Level Scale:
+        Aligned with main OCH Risk Level Scale:
         - 0-24: Healthy (green)
         - 25-49: Fair (yellow) 
         - 50-74: Poor (orange)
@@ -4804,19 +4804,19 @@ class UnifiedBurnoutAnalyzer:
             # Apply bounds (0-100 range, higher = better health)
             final_health_score = max(0, min(100, int(final_health_score)))
             
-            # Convert health score to OCB burnout score for alignment with main chart
-            # Health: 100 = excellent, 0 = poor → OCB: 0 = healthy, 100 = critical
-            ocb_burnout_score = 100 - final_health_score
-            
-            return ocb_burnout_score
+            # Convert health score to OCH burnout score for alignment with main chart
+            # Health: 100 = excellent, 0 = poor → OCH: 0 = healthy, 100 = critical
+            och_burnout_score = 100 - final_health_score
+
+            return och_burnout_score
             
         except Exception as e:
             logger.error(f"Error calculating individual daily health score for {user_email}: {e}")
-            # OCB FALLBACK: Calculate from incident count (no hardcoded values)
+            # OCH FALLBACK: Calculate from incident count (no hardcoded values)
             incident_count = daily_data.get("incident_count", 0)
             fallback_health = max(20, 90 - (incident_count * 15))  # Dynamic health fallback
-            fallback_ocb = 100 - fallback_health  # Convert to OCB burnout score
-            return fallback_ocb
+            fallback_och = 100 - fallback_health  # Convert to OCH burnout score
+            return fallback_och
     
     def _determine_health_status_from_score(self, score: float) -> str:
         """Determine health status from burnout score (SimpleBurnoutAnalyzer approach)."""
@@ -5132,12 +5132,12 @@ class UnifiedBurnoutAnalyzer:
     # TODO: adjust if needed
     def _recalculate_burnout_with_jira(self, members: List[Dict[str, Any]], metadata: Dict[str, Any]) -> List[Dict[str, Any]]:
         """
-        Recalculate OCB scores incorporating Jira ticket workload data.
+        Recalculate OCH scores incorporating Jira ticket workload data.
 
         Jira is treated as an increasing burnout factor:
-        - It can never reduce the original OCB score
+        - It can never reduce the original OCH score
         - It can increase the score up to a maximum of 100
-        - The higher the Jira OCB contribution, the more of the remaining
+        - The higher the Jira OCH contribution, the more of the remaining
         "headroom" to 100 it fills.
         """
         try:
@@ -5154,35 +5154,35 @@ class UnifiedBurnoutAnalyzer:
                 member_name = member.get("user_name") or member.get("name") or "Unknown"
 
                 if jira_tickets:
-                    # Baseline OCB score (from incidents / other signals)
-                    original_ocb = float(member.get("ocb_score") or 0.0)
+                    # Baseline OCH score (from incidents / other signals)
+                    original_och = float(member.get("och_score") or 0.0)
                     # Clamp to 0–100 just in case
-                    original_ocb = max(0.0, min(100.0, original_ocb))
+                    original_och = max(0.0, min(100.0, original_och))
 
                     # Jira workload → 0–100 burnout-style score
-                    jira_ocb_contribution = self._calculate_jira_ocb_contribution(jira_tickets)
-                    jira_ocb_contribution = max(0.0, min(100.0, jira_ocb_contribution))
+                    jira_och_contribution = self._calculate_jira_och_contribution(jira_tickets)
+                    jira_och_contribution = max(0.0, min(100.0, jira_och_contribution))
 
                     # Combine using "headroom" model:
                     # final = original + (100 - original) * (jira / 100)
                     # - If jira = 0 → no change
                     # - If jira = 100 → jump to 100
-                    # - Always >= original_ocb, <= 100
-                    final_ocb = original_ocb + (100.0 - original_ocb) * (jira_ocb_contribution / 100.0)
+                    # - Always >= original_och, <= 100
+                    final_och = original_och + (100.0 - original_och) * (jira_och_contribution / 100.0)
 
                     # Just in case of any float weirdness, clamp again
-                    final_ocb = max(original_ocb, min(100.0, final_ocb))
+                    final_och = max(original_och, min(100.0, final_och))
 
-                    jira_added_risk = final_ocb - original_ocb
-                    updated_member["ocb_score"] = round(final_ocb, 2)
+                    jira_added_risk = final_och - original_och
+                    updated_member["och_score"] = round(final_och, 2)
 
                     logger.info(
-                        f"🔍 JIRA OCB {member_name}: "
+                        f"🔍 JIRA OCH {member_name}: "
                         f"tickets={len(jira_tickets)}, "
-                        f"original_ocb={original_ocb:.2f}, "
-                        f"jira_ocb={jira_ocb_contribution:.2f}, "
+                        f"original_och={original_och:.2f}, "
+                        f"jira_och={jira_och_contribution:.2f}, "
                         f"jira_added_risk={jira_added_risk:.2f}, "
-                        f"final_ocb={final_ocb:.2f}"
+                        f"final_och={final_och:.2f}"
                     )
 
                     # Jira breakdown for transparency
@@ -5194,9 +5194,9 @@ class UnifiedBurnoutAnalyzer:
                     critical_ratio = (critical_count / ticket_count * 100) if ticket_count > 0 else 0.0
 
                     updated_member["jira_burnout_breakdown"] = {
-                        "jira_ocb_score": round(jira_ocb_contribution, 2),
-                        "original_ocb": round(original_ocb, 2),
-                        "final_ocb": round(final_ocb, 2),
+                        "jira_och_score": round(jira_och_contribution, 2),
+                        "original_och": round(original_och, 2),
+                        "final_och": round(final_och, 2),
                         "jira_added_risk": round(jira_added_risk, 2),
                         "jira_indicators": {
                             "ticket_count": ticket_count,
@@ -5212,7 +5212,7 @@ class UnifiedBurnoutAnalyzer:
                 updated_members.append(updated_member)
 
             logger.info(
-                f"JIRA OCB: Updated OCB scores for {jira_adjustments_made}/{len(members)} members with Jira workload"
+                f"JIRA OCH: Updated OCH scores for {jira_adjustments_made}/{len(members)} members with Jira workload"
             )
 
             return updated_members
@@ -5224,7 +5224,7 @@ class UnifiedBurnoutAnalyzer:
 
 
         # TODO: finetune - fix so that we use deadline date, priority and number of tickets for user to contribute to the score
-    def _calculate_jira_ocb_contribution(
+    def _calculate_jira_och_contribution(
         self,
         tickets: Optional[List[Dict[str, Any]]]
     ) -> float:
@@ -5335,7 +5335,7 @@ class UnifiedBurnoutAnalyzer:
             return round(jira_score, 1)
 
         except Exception as e:
-            logger.error(f"Error calculating Jira OCB contribution: {e}")
+            logger.error(f"Error calculating Jira OCH contribution: {e}")
             return 0.0
 
     # ============================================================
@@ -5507,10 +5507,10 @@ class UnifiedBurnoutAnalyzer:
 
     def _recalculate_burnout_with_linear(self, members: List[Dict[str, Any]], metadata: Dict[str, Any]) -> List[Dict[str, Any]]:
         """
-        Recalculate OCB scores incorporating Linear issue workload data.
+        Recalculate OCH scores incorporating Linear issue workload data.
 
         Linear is treated as an increasing burnout factor (same as Jira):
-        - It can never reduce the original OCB score
+        - It can never reduce the original OCH score
         - It can increase the score up to a maximum of 100
         """
         try:
@@ -5527,18 +5527,18 @@ class UnifiedBurnoutAnalyzer:
                 member_name = member.get("user_name") or member.get("name") or "Unknown"
 
                 if linear_issues:
-                    original_ocb = float(member.get("ocb_score") or 0.0)
-                    original_ocb = max(0.0, min(100.0, original_ocb))
+                    original_och = float(member.get("och_score") or 0.0)
+                    original_och = max(0.0, min(100.0, original_och))
 
-                    linear_ocb_contribution = self._calculate_linear_ocb_contribution(linear_issues)
-                    linear_ocb_contribution = max(0.0, min(100.0, linear_ocb_contribution))
+                    linear_och_contribution = self._calculate_linear_och_contribution(linear_issues)
+                    linear_och_contribution = max(0.0, min(100.0, linear_och_contribution))
 
                     # Combine using "headroom" model (same as Jira)
-                    final_ocb = original_ocb + (100.0 - original_ocb) * (linear_ocb_contribution / 100.0)
-                    final_ocb = max(original_ocb, min(100.0, final_ocb))
+                    final_och = original_och + (100.0 - original_och) * (linear_och_contribution / 100.0)
+                    final_och = max(original_och, min(100.0, final_och))
 
-                    linear_added_risk = final_ocb - original_ocb
-                    updated_member["ocb_score"] = round(final_ocb, 2)
+                    linear_added_risk = final_och - original_och
+                    updated_member["och_score"] = round(final_och, 2)
 
                     issue_count = len(linear_issues)
                     # Linear priorities: 1=Urgent, 2=High, 3=Medium, 4=Low, 0=None
@@ -5549,9 +5549,9 @@ class UnifiedBurnoutAnalyzer:
                     urgent_high_ratio = (urgent_high_count / issue_count * 100) if issue_count > 0 else 0.0
 
                     updated_member["linear_burnout_breakdown"] = {
-                        "linear_ocb_score": round(linear_ocb_contribution, 2),
-                        "original_ocb": round(original_ocb, 2),
-                        "final_ocb": round(final_ocb, 2),
+                        "linear_och_score": round(linear_och_contribution, 2),
+                        "original_och": round(original_och, 2),
+                        "final_och": round(final_och, 2),
                         "linear_added_risk": round(linear_added_risk, 2),
                         "linear_indicators": {
                             "issue_count": issue_count,
@@ -5567,7 +5567,7 @@ class UnifiedBurnoutAnalyzer:
                 updated_members.append(updated_member)
 
             logger.info(
-                f"LINEAR OCB: Updated OCB scores for {linear_adjustments_made}/{len(members)} members with Linear workload"
+                f"LINEAR OCH: Updated OCH scores for {linear_adjustments_made}/{len(members)} members with Linear workload"
             )
 
             return updated_members
@@ -5576,7 +5576,7 @@ class UnifiedBurnoutAnalyzer:
             logger.error(f"Error in _recalculate_burnout_with_linear: {e}")
             return members
 
-    def _calculate_linear_ocb_contribution(
+    def _calculate_linear_och_contribution(
         self,
         issues: Optional[List[Dict[str, Any]]]
     ) -> float:
@@ -5686,7 +5686,7 @@ class UnifiedBurnoutAnalyzer:
             return round(linear_score, 1)
 
         except Exception as e:
-            logger.error(f"Error calculating Linear OCB contribution: {e}")
+            logger.error(f"Error calculating Linear OCH contribution: {e}")
             return 0.0
 
     def _calculate_github_burnout_score(
