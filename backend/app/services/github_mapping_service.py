@@ -210,15 +210,16 @@ class GitHubMappingService:
         source_platform: str,
         email_to_name: Optional[Dict[str, str]] = None
     ) -> Dict[str, Dict]:
-        """Create new mappings using the original GitHub collector (not the wrapper to avoid recursion)."""
-        from .github_collector import collect_team_github_data as original_collect_team_github_data
+        """
+        Create new mappings using the original GitHub collector.
 
-        logger.info(f"🆕 Creating new mappings for {len(emails)} emails")
+        Uses collect_team_github_data directly (not the wrapper) to avoid infinite recursion:
+        collect_team_github_data_with_mapping -> get_smart_github_data -> _create_new_mappings -> loop
+        """
+        logger.info(f"Creating new mappings for {len(emails)} emails")
 
         try:
-            # Use original collector directly to avoid infinite recursion
-            # (collect_team_github_data_with_mapping -> get_smart_github_data -> _create_new_mappings -> loop)
-            return await original_collect_team_github_data(
+            return await collect_team_github_data(
                 team_emails=emails,
                 days=days,
                 github_token=github_token
