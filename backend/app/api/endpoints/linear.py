@@ -853,19 +853,34 @@ async def _get_valid_token(integration: LinearIntegration, db: Session) -> str:
 
     logger.info("[Linear] Token refresh initiated for user %s", integration.user_id)
 
+    token = await refresh_token_with_lock(
+        provider="linear",
+        integration_id=integration.id,
+        user_id=integration.user_id,
+        refresh_func=lambda: _perform_token_refresh(integration, db),
+        fallback_func=lambda: _perform_token_refresh(integration, db)
+    )
+    return token
+
+
+def _parse_expires_in(raw_expires_in) -> int:
+    """
+    Parse expires_in from OAuth response with bounds checking.
+
+    Returns value between 60 seconds and 30 days, defaulting to 24 hours.
+    """
+    EXPIRES_IN_MIN = 60  # 1 minute
+    EXPIRES_IN_MAX = 2592000  # 30 days
+    EXPIRES_IN_DEFAULT = 86400  # 24 hours
+
+    if raw_expires_in is None:
+        return EXPIRES_IN_DEFAULT
+
     try:
-        token = await refresh_token_with_lock(
-            provider="linear",
-            integration_id=integration.id,
-            user_id=integration.user_id,
-            refresh_func=lambda: _perform_token_refresh(integration, db),
-            fallback_func=None  # No fallback for simple endpoints
-        )
-        return token
-    except Exception as e:
-        logger.warning("[Linear] Token refresh failed for user %s: %s", integration.user_id, e)
-        # Return existing token as last resort
-        return decrypt_token(integration.access_token)
+        expires_in = int(raw_expires_in)
+        return max(EXPIRES_IN_MIN, min(expires_in, EXPIRES_IN_MAX))
+    except (ValueError, TypeError):
+        return EXPIRES_IN_DEFAULT
 
 
 async def _perform_token_refresh(integration: LinearIntegration, db: Session) -> str:
@@ -891,7 +906,7 @@ async def _perform_token_refresh(integration: LinearIntegration, db: Session) ->
         raise ValueError("No access token in refresh response")
 
     new_refresh_token = token_data.get("refresh_token") or refresh_token
-    expires_in = token_data.get("expires_in", 86400)
+    expires_in = _parse_expires_in(token_data.get("expires_in"))
 
     integration.access_token = encrypt_token(new_access_token)
     integration.refresh_token = encrypt_token(new_refresh_token)

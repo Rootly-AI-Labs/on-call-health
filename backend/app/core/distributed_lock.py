@@ -45,7 +45,7 @@ class DistributedLock:
         key: str,
         ttl_seconds: int = 30,
         timeout_seconds: float = 10,
-        poll_interval_seconds: float = 0.1
+        poll_interval_seconds: float = 0.5
     ):
         """
         Initialize distributed lock.
