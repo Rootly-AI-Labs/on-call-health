@@ -66,7 +66,7 @@ def _get_integration_for_user(
         integration = db.query(RootlyIntegration).filter(
             RootlyIntegration.id == integration_id,
             RootlyIntegration.user_id == user_id,
-            RootlyIntegration.is_active.is_(True),
+            RootlyIntegration.is_active == True,  # noqa: E712
         ).first()
         if not integration:
             raise LookupError("Integration not found")
@@ -74,15 +74,15 @@ def _get_integration_for_user(
 
     integration = db.query(RootlyIntegration).filter(
         RootlyIntegration.user_id == user_id,
-        RootlyIntegration.is_active.is_(True),
-        RootlyIntegration.is_default.is_(True),
+        RootlyIntegration.is_active == True,  # noqa: E712
+        RootlyIntegration.is_default == True,  # noqa: E712
     ).first()
     if integration:
         return integration
 
     integration = db.query(RootlyIntegration).filter(
         RootlyIntegration.user_id == user_id,
-        RootlyIntegration.is_active.is_(True),
+        RootlyIntegration.is_active == True,  # noqa: E712
     ).first()
     if integration:
         return integration
