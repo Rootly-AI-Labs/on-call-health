@@ -89,4 +89,11 @@ class Settings:
     LATE_NIGHT_START: int = int(os.getenv("LATE_NIGHT_START", "22"))          # 10 PM
     LATE_NIGHT_END: int = int(os.getenv("LATE_NIGHT_END", "6"))               # 6 AM
 
+    # Redis Configuration (for distributed locking)
+    REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379")
+
+    # Token Refresh Distributed Lock Configuration
+    TOKEN_REFRESH_LOCK_TTL: int = int(os.getenv("TOKEN_REFRESH_LOCK_TTL", "30"))  # seconds
+    TOKEN_REFRESH_LOCK_TIMEOUT: float = float(os.getenv("TOKEN_REFRESH_LOCK_TIMEOUT", "10"))  # seconds
+
 settings = Settings()

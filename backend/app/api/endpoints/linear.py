@@ -21,6 +21,7 @@ from ...models import get_db, User, LinearIntegration, LinearWorkspaceMapping, U
 from ...auth.dependencies import get_current_user
 from ...auth.integration_oauth import linear_integration_oauth, LinearIntegrationOAuth
 from ...core.config import settings
+from ...services.token_refresh_coordinator import refresh_token_with_lock
 
 router = APIRouter(prefix="/linear", tags=["linear-integration"])
 logger = logging.getLogger(__name__)
@@ -165,7 +166,7 @@ async def _process_callback(code: str, state: Optional[str], db: Session, curren
 
         access_token = token_data.get("access_token")
         refresh_token = token_data.get("refresh_token")
-        expires_in = token_data.get("expires_in", 86400)  # Linear default is 24 hours
+        expires_in = _parse_expires_in(token_data.get("expires_in"))
 
         if not access_token:
             raise HTTPException(status_code=400, detail="Failed to get access token from Linear")
@@ -822,6 +823,10 @@ async def disconnect_linear(
     db.delete(integration)
     db.commit()
 
+    # Invalidate token cache
+    from ...services.token_refresh_coordinator import invalidate_token_cache
+    await invalidate_token_cache("linear", integration.id)
+
     # Invalidate validation cache so error doesn't persist
     from ...services.integration_validator import invalidate_validation_cache
     invalidate_validation_cache(current_user.id)
@@ -835,28 +840,86 @@ async def disconnect_linear(
 # Helper functions
 # -------------------------------
 async def _get_valid_token(integration: LinearIntegration, db: Session) -> str:
-    """Get a valid access token, refreshing if necessary."""
-    if needs_refresh(integration.token_expires_at) and integration.refresh_token:
-        logger.info("[Linear] Refreshing access token for user %s", integration.user_id)
-        try:
-            refresh_token = decrypt_token(integration.refresh_token)
-            token_data = await linear_integration_oauth.refresh_access_token(refresh_token)
+    """Get a valid access token, refreshing if necessary.
 
-            new_access_token = token_data.get("access_token")
-            new_refresh_token = token_data.get("refresh_token") or refresh_token
-            expires_in = token_data.get("expires_in", 86400)
+    Uses distributed lock via Redis to prevent concurrent refreshes.
+    No fallback to DB locking in this simplified implementation (only used
+    by non-critical endpoints).
+    """
+    # Return current token if still valid (most common path)
+    if not needs_refresh(integration.token_expires_at):
+        return decrypt_token(integration.access_token)
 
-            if new_access_token:
-                integration.access_token = encrypt_token(new_access_token)
-                integration.refresh_token = encrypt_token(new_refresh_token)
-                integration.token_expires_at = datetime.now(dt_timezone.utc) + timedelta(seconds=expires_in)
-                integration.updated_at = datetime.now(dt_timezone.utc)
-                db.commit()
-                return new_access_token
-        except Exception as e:
-            logger.warning("[Linear] Token refresh failed: %s", e)
+    # Token needs refresh
+    if not integration.refresh_token:
+        logger.warning("[Linear] No refresh token available for user %s", integration.user_id)
+        return decrypt_token(integration.access_token)
 
-    return decrypt_token(integration.access_token)
+    logger.info("[Linear] Token refresh initiated for user %s", integration.user_id)
+
+    token = await refresh_token_with_lock(
+        provider="linear",
+        integration_id=integration.id,
+        user_id=integration.user_id,
+        refresh_func=lambda: _perform_token_refresh(integration, db),
+        fallback_func=lambda: _perform_token_refresh(integration, db)
+    )
+    return token
+
+
+def _parse_expires_in(raw_expires_in) -> int:
+    """
+    Parse expires_in from OAuth response with bounds checking.
+
+    Returns value between 60 seconds and 30 days, defaulting to 24 hours.
+    """
+    EXPIRES_IN_MIN = 60  # 1 minute
+    EXPIRES_IN_MAX = 2592000  # 30 days
+    EXPIRES_IN_DEFAULT = 86400  # 24 hours
+
+    if raw_expires_in is None:
+        return EXPIRES_IN_DEFAULT
+
+    try:
+        expires_in = int(raw_expires_in)
+        return max(EXPIRES_IN_MIN, min(expires_in, EXPIRES_IN_MAX))
+    except (ValueError, TypeError):
+        return EXPIRES_IN_DEFAULT
+
+
+async def _perform_token_refresh(integration: LinearIntegration, db: Session) -> str:
+    """
+    Perform Linear token refresh (no locking - caller handles coordination).
+
+    Returns:
+        New access token (decrypted)
+    """
+    db.refresh(integration)
+
+    # Double-check: another process may have refreshed while we waited
+    if not needs_refresh(integration.token_expires_at):
+        logger.info("[Linear] Token already refreshed for user %s", integration.user_id)
+        return decrypt_token(integration.access_token)
+
+    logger.info("[Linear] Refreshing access token for user %s", integration.user_id)
+    refresh_token = decrypt_token(integration.refresh_token)
+    token_data = await linear_integration_oauth.refresh_access_token(refresh_token)
+
+    new_access_token = token_data.get("access_token")
+    if not new_access_token:
+        raise ValueError("No access token in refresh response")
+
+    new_refresh_token = token_data.get("refresh_token") or refresh_token
+    expires_in = _parse_expires_in(token_data.get("expires_in"))
+
+    integration.access_token = encrypt_token(new_access_token)
+    integration.refresh_token = encrypt_token(new_refresh_token)
+    integration.token_expires_at = datetime.now(dt_timezone.utc) + timedelta(seconds=expires_in)
+    integration.updated_at = datetime.now(dt_timezone.utc)
+    db.commit()
+
+    logger.info("[Linear] Token refreshed successfully for user %s", integration.user_id)
+    return new_access_token
 
 
 def _priority_to_name(priority: int) -> str:
