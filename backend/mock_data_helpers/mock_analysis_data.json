@@ -393,8 +393,8 @@
             ],
             "jira_burnout_breakdown": {
               "jira_och_score": 45.5,
-              "original_ocb": 89.22,
-              "final_ocb": 94.72,
+              "original_och": 89.22,
+              "final_och": 94.72,
               "jira_added_risk": 5.5,
               "jira_indicators": {
                 "ticket_count": 12,
@@ -522,8 +522,8 @@
             ],
             "linear_burnout_breakdown": {
               "linear_och_score": 48.0,
-              "original_ocb": 92.08,
-              "final_ocb": 96.08,
+              "original_och": 92.08,
+              "final_och": 96.08,
               "linear_added_risk": 4.0,
               "linear_indicators": {
                 "issue_count": 14,
@@ -888,8 +888,8 @@
             ],
             "jira_burnout_breakdown": {
               "jira_och_score": 52.0,
-              "original_ocb": 60.75,
-              "final_ocb": 66.75,
+              "original_och": 60.75,
+              "final_och": 66.75,
               "jira_added_risk": 6.0,
               "jira_indicators": {
                 "ticket_count": 8,
@@ -903,8 +903,8 @@
             },
             "linear_burnout_breakdown": {
               "linear_och_score": 45.0,
-              "original_ocb": 66.75,
-              "final_ocb": 71.75,
+              "original_och": 66.75,
+              "final_och": 71.75,
               "linear_added_risk": 5.0,
               "linear_indicators": {
                 "issue_count": 7,
@@ -1173,8 +1173,8 @@
             ],
             "jira_burnout_breakdown": {
               "jira_och_score": 42.0,
-              "original_ocb": 50.24,
-              "final_ocb": 55.24,
+              "original_och": 50.24,
+              "final_och": 55.24,
               "jira_added_risk": 5.0,
               "jira_indicators": {
                 "ticket_count": 7,
@@ -1238,8 +1238,8 @@
             ],
             "linear_burnout_breakdown": {
               "linear_och_score": 40.0,
-              "original_ocb": 55.24,
-              "final_ocb": 59.24,
+              "original_och": 55.24,
+              "final_och": 59.24,
               "linear_added_risk": 4.0,
               "linear_indicators": {
                 "issue_count": 6,
@@ -1535,8 +1535,8 @@
             ],
             "jira_burnout_breakdown": {
               "jira_och_score": 48.3,
-              "original_ocb": 85.94,
-              "final_ocb": 91.94,
+              "original_och": 85.94,
+              "final_och": 91.94,
               "jira_added_risk": 6.0,
               "jira_indicators": {
                 "ticket_count": 9,
@@ -1640,8 +1640,8 @@
             ],
             "linear_burnout_breakdown": {
               "linear_och_score": 22.5,
-              "original_ocb": 89.36,
-              "final_ocb": 91.75,
+              "original_och": 89.36,
+              "final_och": 91.75,
               "linear_added_risk": 2.39,
               "linear_indicators": {
                 "issue_count": 11,
@@ -1915,8 +1915,8 @@
             ],
             "jira_burnout_breakdown": {
               "jira_och_score": 18.3,
-              "original_ocb": 83.17,
-              "final_ocb": 86.25,
+              "original_och": 83.17,
+              "final_och": 86.25,
               "jira_added_risk": 3.08,
               "jira_indicators": {
                 "ticket_count": 2,
@@ -1938,8 +1938,8 @@
             ],
             "linear_burnout_breakdown": {
               "linear_och_score": 7.5,
-              "original_ocb": 86.25,
-              "final_ocb": 87.28,
+              "original_och": 86.25,
+              "final_och": 87.28,
               "linear_added_risk": 1.03,
               "linear_indicators": {
                 "issue_count": 1,
@@ -2854,8 +2854,8 @@
             ],
             "jira_burnout_breakdown": {
               "jira_och_score": 42.0,
-              "original_ocb": 78.96,
-              "final_ocb": 83.96,
+              "original_och": 78.96,
+              "final_och": 83.96,
               "jira_added_risk": 5.0,
               "jira_indicators": {
                 "ticket_count": 6,
@@ -2869,8 +2869,8 @@
             },
             "linear_burnout_breakdown": {
               "linear_och_score": 38.0,
-              "original_ocb": 83.96,
-              "final_ocb": 86.96,
+              "original_och": 83.96,
+              "final_och": 86.96,
               "linear_added_risk": 3.0,
               "linear_indicators": {
                 "issue_count": 5,
