@@ -163,15 +163,15 @@ class GitHubOnlyBurnoutAnalyzer:
             
             # Calculate burnout dimensions using OCH methodology (inspired by Copenhagen Burnout Inventory)
             logger.debug(f"Using OCH methodology for {email}")
-            personal_burnout = self._calculate_personal_burnout_ocb(
+            personal_burnout = self._calculate_personal_burnout_och(
                 metrics, baselines, time_range_days
             )
             
-            work_related_burnout = self._calculate_work_burnout_ocb(
+            work_related_burnout = self._calculate_work_burnout_och(
                 metrics, baselines, activity_data
             )
             
-            accomplishment_burnout = self._calculate_accomplishment_burnout_ocb(
+            accomplishment_burnout = self._calculate_accomplishment_burnout_och(
                 metrics, baselines, activity_data
             )
             
@@ -222,7 +222,7 @@ class GitHubOnlyBurnoutAnalyzer:
     # Burnout assessment inspired by Copenhagen Burnout Inventory
     # =============================================================================
     
-    def _calculate_personal_burnout_ocb(
+    def _calculate_personal_burnout_och(
         self,
         metrics: Dict[str, Any], 
         baselines: Dict[str, float],
@@ -297,7 +297,7 @@ class GitHubOnlyBurnoutAnalyzer:
         logger.debug(f"Personal Burnout (OCH) components: {score_components}, total: {total_score}")
         return min(10, max(0, total_score))
     
-    def _calculate_work_burnout_ocb(
+    def _calculate_work_burnout_och(
         self,
         metrics: Dict[str, Any],
         baselines: Dict[str, float],
@@ -383,7 +383,7 @@ class GitHubOnlyBurnoutAnalyzer:
         logger.debug(f"Work-Related Burnout (OCH) components: {score_components}, total: {total_score}")
         return min(10, max(0, total_score))
     
-    def _calculate_accomplishment_burnout_ocb(
+    def _calculate_accomplishment_burnout_och(
         self,
         metrics: Dict[str, Any],
         baselines: Dict[str, float], 
