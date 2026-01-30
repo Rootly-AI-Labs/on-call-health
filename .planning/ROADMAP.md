@@ -11,7 +11,7 @@ This roadmap breaks down the API Key Management v1.0 implementation into 4 seque
 
 **Total Requirements:** 31 (21 functional, 10 non-functional)
 **Estimated Phases:** 4
-**Build Order:** Model → Auth → API → UI
+**Build Order:** Model -> Auth -> API -> UI
 
 ## Phase Architecture
 
@@ -23,9 +23,9 @@ Phase 1: Database Model & Core Logic
 ```
 
 **Dependency Rationale:**
-- Can't authenticate without model to store keys (Phase 1 → 2)
-- Can't build endpoints without auth middleware (Phase 2 → 3)
-- Can't build UI without API endpoints (Phase 3 → 4)
+- Can't authenticate without model to store keys (Phase 1 -> 2)
+- Can't build endpoints without auth middleware (Phase 2 -> 3)
+- Can't build UI without API endpoints (Phase 3 -> 4)
 - Each phase is independently testable
 
 ---
@@ -35,6 +35,13 @@ Phase 1: Database Model & Core Logic
 **Goal:** Create APIKey model with hashing, validation, and database schema
 
 **Phase Requirements:** 11 requirements
+
+**Plans:** 3 plans
+
+Plans:
+- [ ] 01-01-PLAN.md - Add argon2-cffi dependency, create APIKey model, update exports
+- [ ] 01-02-PLAN.md - Create API key service with dual-hash generation and SQL migration
+- [ ] 01-03-PLAN.md - Unit tests for model and service functions
 
 ### Functional Requirements
 - REQ-F-001: API Key Creation (data model)
@@ -64,29 +71,29 @@ Phase 1: Database Model & Core Logic
 ### Key Files
 **Backend:**
 - `backend/app/models/api_key.py` - SQLAlchemy model
-- `backend/alembic/versions/XXXX_add_api_key_model.py` - Migration
+- `backend/migrations/2026_01_30_add_api_keys.sql` - Migration
 - `backend/app/services/api_key_service.py` - Business logic
 - `backend/tests/test_api_key_model.py` - Unit tests
 
 **Database Schema:**
 ```sql
 CREATE TABLE api_keys (
-    id UUID PRIMARY KEY,
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
     key_hash_sha256 VARCHAR(64) NOT NULL,  -- Fast indexed lookup
     key_hash_argon2 TEXT NOT NULL,          -- Cryptographic verification
     prefix VARCHAR(20) NOT NULL DEFAULT 'och_live_',
     last_four VARCHAR(4) NOT NULL,
     scope VARCHAR(50) NOT NULL DEFAULT 'full_access',
-    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    last_used_at TIMESTAMP,
-    expires_at TIMESTAMP,
-    revoked_at TIMESTAMP,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    last_used_at TIMESTAMP WITH TIME ZONE,
+    expires_at TIMESTAMP WITH TIME ZONE,
+    revoked_at TIMESTAMP WITH TIME ZONE,
 
-    INDEX idx_key_hash_sha256 (key_hash_sha256),
-    INDEX idx_user_id (user_id),
-    INDEX idx_last_used_at (last_used_at),
+    INDEX idx_api_keys_key_hash_sha256 (key_hash_sha256),
+    INDEX idx_api_keys_user_id (user_id),
+    INDEX idx_api_keys_last_used_at (last_used_at),
     UNIQUE (user_id, name)
 );
 ```
@@ -96,9 +103,10 @@ CREATE TABLE api_keys (
 - Dual-hash pattern: SHA-256 for fast lookup, Argon2id for verification
 - Store `last_four` separately for masked display (never compute from hash)
 - Soft delete pattern: `revoked_at` timestamp instead of hard delete
+- Use Integer primary keys to match existing codebase pattern (not UUID)
 
 ### Dependencies
-- Existing: User model, database connection, Alembic migrations
+- Existing: User model, database connection, SQL migrations
 - New: `argon2-cffi==25.1.0` package
 
 ### Risks & Mitigations
@@ -131,7 +139,7 @@ CREATE TABLE api_keys (
 
 ### Success Criteria
 - [ ] Unified `get_current_user` dependency supports both JWT and API keys
-- [ ] Precedence order: JWT header → Cookie → API Key header
+- [ ] Precedence order: JWT header -> Cookie -> API Key header
 - [ ] API key validation <50ms (p95) in benchmarks
 - [ ] Revoked keys rejected with clear error message
 - [ ] Expired keys rejected with expiration date in error
@@ -422,7 +430,7 @@ Each phase must satisfy:
 ### v1.0 Launch Criteria
 Before declaring v1.0 complete:
 - [ ] All 4 phases complete
-- [ ] End-to-end test: Create key via UI → Use key in MCP → Revoke key
+- [ ] End-to-end test: Create key via UI -> Use key in MCP -> Revoke key
 - [ ] Performance benchmarks met (<50ms auth, <500ms UI operations)
 - [ ] Security checklist completed (timing attacks, indexing, no plaintext)
 - [ ] Documentation written (API usage, curl examples)
@@ -482,5 +490,5 @@ JWT Auth (existing)
 ---
 
 *Created: 2026-01-30*
-*Status: Active - Ready for Phase 1 planning*
-*Next: Initialize STATE.md and begin Phase 1 planning*
+*Status: Active - Phase 1 planned*
+*Next: Execute Phase 1*
