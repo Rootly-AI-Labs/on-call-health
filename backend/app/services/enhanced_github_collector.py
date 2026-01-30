@@ -41,16 +41,22 @@ async def collect_team_github_data_with_mapping(
     if fast_mode and user_id:
         from .github_collector import GitHubCollector
         from ..models import UserCorrelation
-        from ..models import SessionLocal
 
-        db = SessionLocal()
+        # Reuse passed db session or create new one if not provided
+        session_to_use = db
+        should_close = False
+        if session_to_use is None:
+            from ..models import SessionLocal
+            session_to_use = SessionLocal()
+            should_close = True
+
         try:
             collector = GitHubCollector()
             github_data = {}
 
             # Query UserCorrelation for synced GitHub usernames
             # Don't filter by user_id - allow lookups across the organization
-            user_correlations = db.query(UserCorrelation).filter(
+            user_correlations = session_to_use.query(UserCorrelation).filter(
                 UserCorrelation.email.in_(team_emails),
                 UserCorrelation.github_username.isnot(None)
             ).all()
@@ -73,7 +79,8 @@ async def collect_team_github_data_with_mapping(
 
             return github_data
         finally:
-            db.close()
+            if should_close:
+                session_to_use.close()
     
     if use_smart_caching and user_id:
         try:
