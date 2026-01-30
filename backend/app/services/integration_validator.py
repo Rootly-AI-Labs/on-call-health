@@ -529,7 +529,7 @@ class IntegrationValidator:
             New access token (decrypted)
         """
         logger.info(f"[Jira] Using database lock for token refresh (user {integration.user_id})")
-        lock_timeout_seconds = 10  # Same as Linear
+        lock_timeout_seconds = _get_linear_lock_timeout_seconds()  # Reuse Linear config
 
         try:
             with self.db.begin_nested():
@@ -573,9 +573,9 @@ class IntegrationValidator:
             raise RuntimeError("Temporary error. Please retry.") from db_error
 
     async def _call_jira_token_refresh_api(self, refresh_token: str) -> dict:
-        """Call Jira OAuth token refresh API."""
+        """Call Jira OAuth token refresh API. Returns token data dict or raises ValueError."""
         if not settings.JIRA_CLIENT_ID or not settings.JIRA_CLIENT_SECRET:
-            raise ValueError("Jira OAuth credentials not configured")
+            raise ValueError("Authentication error. Please reconnect Jira.")
 
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.post(
@@ -591,31 +591,27 @@ class IntegrationValidator:
 
         if response.status_code != 200:
             logger.error(f"[Jira] Token refresh failed: {response.status_code} {response.text}")
-            raise ValueError(f"Jira token refresh failed: {response.status_code}")
+            raise ValueError("Authentication error. Please reconnect Jira.")
 
-        return response.json()
+        token_data = response.json()
+        if not token_data.get("access_token"):
+            raise ValueError("Authentication error. Please reconnect Jira.")
+
+        return token_data
 
     def _update_jira_integration_tokens(
         self,
         integration: JiraIntegration,
         token_data: dict,
-        old_refresh_token: str
+        original_refresh_token: str
     ) -> str:
-        """Update Jira integration with new tokens."""
-        new_access_token = token_data.get("access_token")
-        new_refresh_token = token_data.get("refresh_token")
-        expires_in = token_data.get("expires_in", 3600)
+        """Update Jira integration with new tokens. Returns decrypted access token."""
+        new_access_token = token_data["access_token"]
+        new_refresh_token = token_data.get("refresh_token") or original_refresh_token
+        expires_in = _parse_expires_in(token_data.get("expires_in"))
 
-        if not new_access_token:
-            raise ValueError("No access token in refresh response")
-
-        # Encrypt new tokens
-        encrypted_access = encrypt_token(new_access_token)
-        encrypted_refresh = encrypt_token(new_refresh_token) if new_refresh_token else encrypt_token(old_refresh_token)
-
-        # Update integration
-        integration.access_token = encrypted_access
-        integration.refresh_token = encrypted_refresh
+        integration.access_token = encrypt_token(new_access_token)
+        integration.refresh_token = encrypt_token(new_refresh_token)
         integration.token_expires_at = datetime.now(dt_timezone.utc) + timedelta(seconds=expires_in)
         integration.updated_at = datetime.now(dt_timezone.utc)
 
