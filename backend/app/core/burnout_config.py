@@ -5,7 +5,7 @@ This module provides a single source of truth for all burnout calculation parame
 risk thresholds, scoring weights, and factor calculations. This ensures consistency
 across all analyzers and components.
 
-Based on the Maslach Burnout Inventory methodology and scientific validation.
+Inspired by the Maslach Burnout Inventory methodology and scientific validation.
 """
 from typing import Dict, Tuple, Any
 from dataclasses import dataclass
@@ -16,7 +16,7 @@ class BurnoutConfig:
     """Centralized configuration for burnout analysis."""
     
     # Risk Level Thresholds (0-10 scale where higher = more burnout)
-    # Based on MBI percentile distributions and clinical research
+    # Inspired by MBI percentile distributions and clinical research
     RISK_THRESHOLDS = {
         'low': (0.0, 3.0),        # 0-30% - Healthy work patterns
         'medium': (3.0, 5.5),     # 30-55% - Some stress signals 
