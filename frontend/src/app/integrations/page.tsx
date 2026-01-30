@@ -1965,7 +1965,8 @@ export default function IntegrationsPage() {
       setAddingPlatform,
       setReloadingIntegrations,
       loadRootlyIntegrations,
-      loadPagerDutyIntegrations
+      loadPagerDutyIntegrations,
+      setSelectedOrganization
     )
   }
 

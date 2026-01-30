@@ -223,7 +223,8 @@ export async function addIntegration(
   setAddingPlatform: React.Dispatch<React.SetStateAction<"rootly" | "pagerduty" | null>>,
   setReloadingIntegrations: (loading: boolean) => void,
   loadRootlyIntegrations: (forceRefresh: boolean) => Promise<void>,
-  loadPagerDutyIntegrations: (forceRefresh: boolean) => Promise<void>
+  loadPagerDutyIntegrations: (forceRefresh: boolean) => Promise<void>,
+  setSelectedOrganization?: (organizationId: string) => void
 ): Promise<void> {
   if (!previewData) return
 
@@ -288,7 +289,12 @@ export async function addIntegration(
       try {
         const newIntegrationId = responseData.integration?.id || responseData.id
         if (newIntegrationId && integrations.length === 0) {
-          localStorage.setItem('selected_organization', newIntegrationId.toString())
+          const integrationIdStr = newIntegrationId.toString()
+          localStorage.setItem('selected_organization', integrationIdStr)
+          // Update React state to reflect the selection in UI
+          if (setSelectedOrganization) {
+            setSelectedOrganization(integrationIdStr)
+          }
         }
       } catch (error) {
         console.error('Error setting default integration:', error)
