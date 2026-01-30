@@ -23,15 +23,6 @@ from ...core.config import settings
 router = APIRouter(prefix="/github", tags=["github-integration"])
 logger = logging.getLogger(__name__)
 
-# Helper function to validate user has organization
-def require_organization(user: User) -> None:
-    """Raise HTTPException if user doesn't belong to an organization."""
-    if not user.organization_id:
-        raise HTTPException(
-            status_code=400,
-            detail="You must belong to an organization to use this feature. Please contact support."
-        )
-
 # Simple encryption for tokens (in production, use proper key management)
 def get_encryption_key():
     """Get or create encryption key for tokens."""

@@ -93,7 +93,7 @@ class TestLinearOAuthPKCE(unittest.TestCase):
 
     def test_generate_pkce_pair(self):
         """Test PKCE code_verifier and code_challenge generation."""
-        from auth.integration_oauth import LinearIntegrationOAuth
+        from app.auth.integration_oauth import LinearIntegrationOAuth
 
         code_verifier, code_challenge = LinearIntegrationOAuth.generate_pkce_pair()
 
@@ -108,7 +108,7 @@ class TestLinearOAuthPKCE(unittest.TestCase):
 
     def test_authorization_url_with_pkce(self):
         """Test authorization URL generation with PKCE."""
-        from auth.integration_oauth import LinearIntegrationOAuth
+        from app.auth.integration_oauth import LinearIntegrationOAuth
 
         oauth = LinearIntegrationOAuth()
 
@@ -129,7 +129,7 @@ class TestLinearOAuthPKCE(unittest.TestCase):
 
     def test_authorization_url_without_pkce(self):
         """Test authorization URL generation without PKCE."""
-        from auth.integration_oauth import LinearIntegrationOAuth
+        from app.auth.integration_oauth import LinearIntegrationOAuth
 
         oauth = LinearIntegrationOAuth()
 

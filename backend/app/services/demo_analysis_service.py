@@ -412,16 +412,3 @@ def create_demo_analysis_for_new_user(db: Session, user: User) -> bool:
 
         # Don't raise - allow user registration to continue
         return False
-
-
-def clear_mock_data_cache():
-    """
-    Clear the cached mock data immediately.
-
-    Call this function if you update the mock_analysis_data.json file
-    in production and want changes to be picked up immediately.
-    """
-    global _MOCK_DATA_CACHE, _MOCK_DATA_CACHE_TIME
-    _MOCK_DATA_CACHE = None
-    _MOCK_DATA_CACHE_TIME = 0
-    logger.info("Mock data cache cleared")

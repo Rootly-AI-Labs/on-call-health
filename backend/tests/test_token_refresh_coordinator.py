@@ -135,7 +135,7 @@ class TestRefreshTokenWithLock(unittest.TestCase):
 
     @patch('app.services.token_refresh_coordinator.with_distributed_lock')
     @patch('app.services.token_refresh_coordinator._cache_token')
-    async def test_refresh_with_lock_acquired(self, mock_cache, mock_lock):
+    def test_refresh_with_lock_acquired(self, mock_cache, mock_lock):
         """Test token refresh when lock acquired."""
         # Mock successful lock acquisition
         mock_lock.return_value.__aenter__ = AsyncMock(return_value=True)
@@ -145,18 +145,20 @@ class TestRefreshTokenWithLock(unittest.TestCase):
         async def mock_refresh():
             return "new_token"
 
-        token = await refresh_token_with_lock(
-            provider="linear",
-            integration_id=123,
-            user_id=456,
-            refresh_func=mock_refresh
-        )
+        async def run_test():
+            return await refresh_token_with_lock(
+                provider="linear",
+                integration_id=123,
+                user_id=456,
+                refresh_func=mock_refresh
+            )
 
+        token = self._run_async(run_test())
         self.assertEqual(token, "new_token")
 
     @patch('app.services.token_refresh_coordinator.with_distributed_lock')
     @patch('app.services.token_refresh_coordinator._get_cached_token')
-    async def test_refresh_with_cached_token_on_timeout(self, mock_get_cached, mock_lock):
+    def test_refresh_with_cached_token_on_timeout(self, mock_get_cached, mock_lock):
         """Test using cached token when lock times out."""
         # Mock lock timeout
         mock_lock.return_value.__aenter__ = AsyncMock(return_value=False)
@@ -166,19 +168,21 @@ class TestRefreshTokenWithLock(unittest.TestCase):
         async def mock_refresh():
             return "new_token"
 
-        token = await refresh_token_with_lock(
-            provider="linear",
-            integration_id=123,
-            user_id=456,
-            refresh_func=mock_refresh
-        )
+        async def run_test():
+            return await refresh_token_with_lock(
+                provider="linear",
+                integration_id=123,
+                user_id=456,
+                refresh_func=mock_refresh
+            )
 
+        token = self._run_async(run_test())
         self.assertEqual(token, "cached_token")
         mock_get_cached.assert_called_once_with("linear", 123)
 
     @patch('app.services.token_refresh_coordinator.with_distributed_lock')
     @patch('app.services.token_refresh_coordinator._get_cached_token')
-    async def test_refresh_with_fallback(self, mock_get_cached, mock_lock):
+    def test_refresh_with_fallback(self, mock_get_cached, mock_lock):
         """Test fallback when lock unavailable and no cached token."""
         # Mock lock unavailable
         mock_lock.return_value.__aenter__ = AsyncMock(return_value=False)
@@ -191,19 +195,21 @@ class TestRefreshTokenWithLock(unittest.TestCase):
         async def mock_fallback():
             return "fallback_token"
 
-        token = await refresh_token_with_lock(
-            provider="linear",
-            integration_id=123,
-            user_id=456,
-            refresh_func=mock_refresh,
-            fallback_func=mock_fallback
-        )
+        async def run_test():
+            return await refresh_token_with_lock(
+                provider="linear",
+                integration_id=123,
+                user_id=456,
+                refresh_func=mock_refresh,
+                fallback_func=mock_fallback
+            )
 
+        token = self._run_async(run_test())
         self.assertEqual(token, "fallback_token")
 
     @patch('app.services.token_refresh_coordinator.with_distributed_lock')
     @patch('app.services.token_refresh_coordinator._get_cached_token')
-    async def test_refresh_no_fallback_raises_error(self, mock_get_cached, mock_lock):
+    def test_refresh_no_fallback_raises_error(self, mock_get_cached, mock_lock):
         """Test error when lock unavailable, no cache, no fallback."""
         # Mock lock unavailable
         mock_lock.return_value.__aenter__ = AsyncMock(return_value=False)
@@ -213,8 +219,8 @@ class TestRefreshTokenWithLock(unittest.TestCase):
         async def mock_refresh():
             return "new_token"
 
-        with self.assertRaises(RuntimeError) as context:
-            await refresh_token_with_lock(
+        async def run_test():
+            return await refresh_token_with_lock(
                 provider="linear",
                 integration_id=123,
                 user_id=456,
@@ -222,11 +228,14 @@ class TestRefreshTokenWithLock(unittest.TestCase):
                 fallback_func=None
             )
 
+        with self.assertRaises(RuntimeError) as context:
+            self._run_async(run_test())
+
         self.assertIn("Failed to acquire lock", str(context.exception))
 
     @patch('app.services.token_refresh_coordinator.with_distributed_lock')
     @patch('app.services.token_refresh_coordinator._cache_token')
-    async def test_refresh_func_exception_propagates(self, mock_cache, mock_lock):
+    def test_refresh_func_exception_propagates(self, mock_cache, mock_lock):
         """Test exceptions from refresh_func propagate correctly."""
         # Mock successful lock acquisition
         mock_lock.return_value.__aenter__ = AsyncMock(return_value=True)
@@ -235,13 +244,16 @@ class TestRefreshTokenWithLock(unittest.TestCase):
         async def mock_refresh():
             raise ValueError("Refresh failed")
 
-        with self.assertRaises(ValueError) as context:
-            await refresh_token_with_lock(
+        async def run_test():
+            return await refresh_token_with_lock(
                 provider="linear",
                 integration_id=123,
                 user_id=456,
                 refresh_func=mock_refresh
             )
+
+        with self.assertRaises(ValueError) as context:
+            self._run_async(run_test())
 
         self.assertEqual(str(context.exception), "Refresh failed")
 

@@ -366,17 +366,3 @@ async def delete_llm_token(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to delete LLM token"
         )
-
-def get_user_llm_token(user: User) -> Optional[str]:
-    """
-    Utility function to get decrypted LLM token for a user.
-    Used by other services that need the actual token.
-    """
-    if not user.has_llm_token():
-        return None
-    
-    try:
-        return decrypt_token(user.llm_token)
-    except Exception as e:
-        logger.error(f"Failed to decrypt LLM token for user {user.id}: {e}")
-        return None

@@ -2672,57 +2672,6 @@ async def get_member_daily_health(
     }
 
 
-def _calculate_individual_daily_health(day: dict, member_data: dict, analysis_results: dict) -> float:
-    """
-    Calculate individual daily health score using REAL data from analysis.
-    
-    Returns a value between 0.0 (poor health) and 1.0 (excellent health).
-    """
-    # Start with base health (inverted team stress)
-    team_health = day.get("overall_score", 0.8)
-    
-    # Get real member burnout factors (these are calculated from actual data)
-    member_factors = member_data.get("factors", {})
-    workload_factor = member_factors.get("workload", 0.1)  # 0-1 scale
-    after_hours_factor = member_factors.get("after_hours", 0.1)
-    response_time_factor = member_factors.get("response_time", 0.1)
-    weekend_factor = member_factors.get("weekend_work", 0.1)
-    
-    # Calculate stress multipliers based on REAL factors
-    workload_stress = min(workload_factor * 0.4, 0.4)  # Max 40% impact
-    after_hours_stress = min(after_hours_factor * 0.3, 0.3)  # Max 30% impact  
-    response_stress = min(response_time_factor * 0.2, 0.2)  # Max 20% impact
-    weekend_stress = min(weekend_factor * 0.1, 0.1)  # Max 10% impact
-    
-    # Day-specific factors
-    daily_incident_load = min(day.get("incident_count", 0) / 15.0, 1.0)  # Normalize to 0-1
-    day_stress = daily_incident_load * 0.2  # Max 20% impact
-    
-    # Weekend penalty (real calendar data)
-    import datetime
-    try:
-        date_obj = datetime.datetime.fromisoformat(day.get("date", "").replace("Z", ""))
-        is_weekend = date_obj.weekday() >= 5  # Saturday = 5, Sunday = 6
-        weekend_penalty = 0.15 if is_weekend else 0
-    except:
-        weekend_penalty = 0
-    
-    # Calculate total stress from real factors
-    total_stress = (
-        workload_stress +
-        after_hours_stress + 
-        response_stress +
-        weekend_stress +
-        day_stress +
-        weekend_penalty
-    )
-    
-    # Convert to health score (higher stress = lower health)
-    individual_health = max(0.1, min(1.0, team_health - total_stress))
-    
-    return individual_health
-
-
 async def run_analysis_task(
     analysis_id: int,
     analysis_uuid: str,
