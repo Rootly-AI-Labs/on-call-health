@@ -45,9 +45,29 @@ export function PagerDutyIntegrationForm({
 
   // Auto-validate token when it's fully entered and valid format
   useEffect(() => {
-    if (tokenValue && isValidToken(tokenValue) && tokenValue !== lastTestedToken) {
-      setLastTestedToken(tokenValue)
-      onTest('pagerduty', tokenValue)
+    let cancelled = false
+
+    const validateToken = async () => {
+      try {
+        if (!tokenValue || !isValidToken(tokenValue) || tokenValue === lastTestedToken) {
+          return
+        }
+
+        setLastTestedToken(tokenValue)
+
+        if (!cancelled) {
+          await onTest('pagerduty', tokenValue)
+        }
+      } catch (error) {
+        console.error('Token validation error:', error)
+        // Error is handled by the onTest function
+      }
+    }
+
+    validateToken()
+
+    return () => {
+      cancelled = true  // Cancel on unmount or dependency change
     }
   }, [tokenValue, lastTestedToken, isValidToken, onTest])
 

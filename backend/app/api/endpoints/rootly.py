@@ -59,9 +59,13 @@ async def test_rootly_token_preview(
     if test_result["status"] != "success":
         # Map error codes to user-friendly messages with actionable guidance
         error_code = test_result.get("error_code")
+        technical_error = test_result.get("message", "Unknown error")
+        # Security: Log technical details server-side, don't expose to client
+        logger.warning(f"Rootly connection test failed: {error_code} - {technical_error}")
+
         error_details = {
             "error_code": error_code,
-            "technical_message": test_result["message"]
+            # Do NOT include technical_message in response
         }
 
         # Determine appropriate HTTP status code and user message

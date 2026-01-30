@@ -7,7 +7,7 @@ import logging
 from typing import Dict, List, Any, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, OperationalError
 from app.models import User, UserCorrelation, RootlyIntegration, GitHubIntegration, UserMapping
 from app.core.rootly_client import RootlyAPIClient
 from app.core.pagerduty_client import PagerDutyAPIClient
@@ -323,7 +323,9 @@ class UserSyncService:
                 ).all()
             else:
                 # Multi-tenant team member: check (organization_id, email, user_id IS NULL)
+                # Security fix: Add explicit NULL check to prevent SQL injection via NULL bypass
                 all_correlations = self.db.query(UserCorrelation).filter(
+                    UserCorrelation.organization_id.isnot(None),
                     UserCorrelation.organization_id == organization_id,
                     UserCorrelation.email == email,
                     UserCorrelation.user_id.is_(None)
@@ -383,7 +385,7 @@ class UserSyncService:
                     self.db.add(correlation)
                     created += 1
 
-        # Commit all changes with retry logic for race conditions
+        # Commit all changes with retry logic for race conditions and transient errors
         max_retries = 3
         for attempt in range(max_retries):
             try:
@@ -402,11 +404,24 @@ class UserSyncService:
                         logger.error(f"Failed to commit after {max_retries} attempts: {e}")
                         raise
                 else:
+                    # Different IntegrityError, don't retry
                     logger.error(f"IntegrityError during commit: {e}")
                     raise
-            except Exception as e:
+            except OperationalError as e:
+                # Transient database errors (connection, deadlock, timeout)
                 self.db.rollback()
-                logger.error(f"Error committing user sync: {e}")
+                if attempt < max_retries - 1:
+                    logger.warning(
+                        f"Database operational error (attempt {attempt+1}/{max_retries}): {e}. Retrying..."
+                    )
+                    continue
+                else:
+                    logger.error(f"OperationalError after {max_retries} attempts: {e}")
+                    raise
+            except Exception as e:
+                # Non-retryable errors
+                self.db.rollback()
+                logger.error(f"Unexpected error committing user sync: {e}")
                 raise
 
         # Restore GitHub usernames from user_mappings table after sync

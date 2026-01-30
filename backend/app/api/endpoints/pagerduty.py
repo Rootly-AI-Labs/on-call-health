@@ -99,9 +99,13 @@ async def test_pagerduty_token(
     if not result["valid"]:
         # Map error codes to user-friendly messages with actionable guidance
         error_code = result.get("error_code")
+        technical_error = result.get("error", "Unknown error")
+        # Security: Log technical details server-side, don't expose to client
+        logger.warning(f"PagerDuty connection test failed: {error_code} - {technical_error}")
+
         error_details = {
             "error_code": error_code,
-            "technical_message": result.get("error", "Unknown error")
+            # Do NOT include technical_message in response
         }
 
         # Determine appropriate HTTP status code and user message

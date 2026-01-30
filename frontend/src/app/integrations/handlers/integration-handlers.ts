@@ -13,6 +13,20 @@ export async function testConnection(
   setDuplicateInfo: (info: any) => void,
   setErrorDetails?: (details: { user_message: string; user_guidance: string; error_code: string } | null) => void
 ): Promise<void> {
+  // Validate token not empty after trim
+  const trimmedToken = token.trim()
+  if (!trimmedToken) {
+    setConnectionStatus('error')
+    if (setErrorDetails) {
+      setErrorDetails({
+        user_message: 'Token cannot be empty',
+        user_guidance: 'Please enter a valid API token.',
+        error_code: 'EMPTY_TOKEN'
+      })
+    }
+    return
+  }
+
   setIsTestingConnection(true)
   setConnectionStatus('idle')
   setPreviewData(null)
@@ -36,7 +50,7 @@ export async function testConnection(
         'Authorization': `Bearer ${authToken}`
       },
       body: JSON.stringify({
-        token: token
+        token: trimmedToken
       })
     })
 
