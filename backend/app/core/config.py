@@ -18,13 +18,22 @@ class Settings:
         )
     
     # JWT
-    JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "your-secret-key-change-in-production")
+    JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY")
+    if not JWT_SECRET_KEY:
+        raise ValueError(
+            "JWT_SECRET_KEY environment variable is required. "
+            "Generate with: openssl rand -hex 32"
+        )
     JWT_ALGORITHM: str = "HS256"
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
 
     # Token Encryption (separate from JWT signing for security)
-    # Falls back to old default for backward compatibility with tokens encrypted before PR #269
-    ENCRYPTION_KEY: str = os.getenv("ENCRYPTION_KEY", "your-secret-key-change-in-production")
+    ENCRYPTION_KEY: str = os.getenv("ENCRYPTION_KEY")
+    if not ENCRYPTION_KEY:
+        raise ValueError(
+            "ENCRYPTION_KEY environment variable is required. "
+            "Set this to encrypt OAuth tokens in the database."
+        )
 
     # Frontend URL for survey links
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
