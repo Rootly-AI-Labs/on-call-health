@@ -97,23 +97,37 @@ class SurveyScheduler:
         frequency_type: str,
         period_start: date,
         period_end: date,
-        sent_at: datetime
+        sent_at: datetime,
+        org_timezone: str = 'UTC'
     ) -> Optional[SurveyPeriod]:
         """
         Create a new SurveyPeriod record, expiring any existing pending period.
-        Uses row-level locking to prevent race conditions.
+        Uses row-level locking and INSERT to prevent race conditions.
         Includes idempotency check to prevent duplicate sends.
+
+        Args:
+            org_timezone: Organization timezone for accurate date boundary calculation
         """
+        from sqlalchemy.exc import IntegrityError
+
         try:
+            # Calculate today's start time in organization timezone, then convert to UTC
+            # This ensures we compare dates in the org's local time, not UTC
+            org_tz = pytz.timezone(org_timezone)
+            today_local = self._get_org_date(org_timezone)
+            today_start_local = org_tz.localize(datetime.combine(today_local, time.min))
+            today_start_utc = today_start_local.astimezone(timezone.utc)
+
             # IDEMPOTENCY CHECK: Don't create if we already sent for this exact period today
-            # Check for any period (pending, completed, or expired) for this date range
+            # Check for any period (pending, completed, or expired) for this date range sent today
+            # Use SELECT FOR UPDATE SKIP LOCKED to avoid blocking other transactions
             existing_period_today = db.query(SurveyPeriod).filter(
                 SurveyPeriod.organization_id == organization_id,
                 SurveyPeriod.user_correlation_id == user_correlation.id,
                 SurveyPeriod.period_start_date == period_start,
                 SurveyPeriod.period_end_date == period_end,
-                SurveyPeriod.initial_sent_at >= datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-            ).with_for_update().first()
+                SurveyPeriod.initial_sent_at >= today_start_utc
+            ).with_for_update(skip_locked=True).first()
 
             if existing_period_today:
                 logger.debug(f"Skipping survey period creation - already exists (ID {existing_period_today.id}) for correlation {user_correlation.id}")
@@ -125,12 +139,13 @@ class SurveyScheduler:
                 SurveyPeriod.user_correlation_id == user_correlation.id,
                 SurveyPeriod.status == 'pending',
                 SurveyPeriod.period_start_date != period_start  # Different period
-            ).with_for_update().all()
+            ).with_for_update(skip_locked=True).all()
 
             for period in other_pending_periods:
                 period.mark_expired()
                 logger.debug(f"Expired old period {period.id} for user (correlation {user_correlation.id})")
 
+            # Create new period
             new_period = SurveyPeriod(
                 organization_id=organization_id,
                 user_correlation_id=user_correlation.id,
@@ -144,13 +159,31 @@ class SurveyScheduler:
                 reminder_count=0
             )
             db.add(new_period)
-            db.flush()
 
-            logger.debug(f"Created survey period {new_period.id}: {frequency_type} period {period_start} to {period_end}")
-            return new_period
+            try:
+                db.flush()
+                logger.debug(f"Created survey period {new_period.id}: {frequency_type} period {period_start} to {period_end}")
+                return new_period
+            except IntegrityError as ie:
+                # Race condition: another transaction created the period
+                # Roll back and query for the existing period
+                db.rollback()
+                logger.debug(f"IntegrityError creating period - another transaction created it: {str(ie)}")
+                existing = db.query(SurveyPeriod).filter(
+                    SurveyPeriod.organization_id == organization_id,
+                    SurveyPeriod.user_correlation_id == user_correlation.id,
+                    SurveyPeriod.period_start_date == period_start,
+                    SurveyPeriod.period_end_date == period_end
+                ).first()
+                return existing
 
+        except IntegrityError as e:
+            logger.error(f"Integrity error creating survey period for correlation {user_correlation.id}: {str(e)}")
+            db.rollback()
+            return None
         except Exception as e:
-            logger.error(f"Failed to create survey period for correlation {user_correlation.id}: {str(e)}")
+            logger.error(f"Unexpected error creating survey period for correlation {user_correlation.id}: {str(e)}")
+            db.rollback()
             return None
 
     def _expire_overdue_periods(self, db: Session, organization_id: int, org_timezone: str) -> int:
@@ -578,7 +611,8 @@ class SurveyScheduler:
                                 frequency_type=frequency_type,
                                 period_start=period_start,
                                 period_end=period_end,
-                                sent_at=datetime.now(timezone.utc)
+                                sent_at=datetime.now(timezone.utc),
+                                org_timezone=org_timezone
                             )
                         except Exception as period_error:
                             logger.error(f"Failed to create survey period: {str(period_error)}")
