@@ -219,11 +219,12 @@ class GitHubMappingService:
         logger.info(f"Creating new mappings for {len(emails)} emails")
 
         try:
-            return await collect_team_github_data(
+            result = await collect_team_github_data(
                 team_emails=emails,
                 days=days,
                 github_token=github_token
             )
+            return result if result is not None else {}
         except Exception as e:
             logger.error(f"Failed to create new mappings: {e}")
             return {}
