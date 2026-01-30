@@ -102,7 +102,6 @@ import { NotificationDrawer } from "@/components/notifications"
 import ManualSurveyDeliveryModal from "@/components/ManualSurveyDeliveryModal"
 import { SlackSurveyTabs } from "@/components/SlackSurveyTabs"
 import { TopPanel } from "@/components/TopPanel"
-import { TeamSyncPrompt } from "@/components/TeamSyncPrompt"
 import { TokenErrorModal } from "@/components/TokenErrorModal"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -244,7 +243,7 @@ export default function IntegrationsPage() {
 
   // Post-integration sync modal state
   const [showPostIntegrationSyncModal, setShowPostIntegrationSyncModal] = useState(false)
-  const [postIntegrationModalType, setPostIntegrationModalType] = useState<'github' | 'slack' | 'jira' | 'linear' | null>(null)
+  const [postIntegrationModalType, setPostIntegrationModalType] = useState<'github' | 'slack' | 'jira' | 'linear' | 'rootly' | 'pagerduty' | null>(null)
 
   const [syncProgress, setSyncProgress] = useState<{
     stage: string
@@ -309,10 +308,6 @@ export default function IntegrationsPage() {
   const [teamMembersDrawerOpen, setTeamMembersDrawerOpen] = useState(false)
   const [refreshingOnCall, setRefreshingOnCall] = useState(false)
   const [oncallCacheInfo, setOncallCacheInfo] = useState<any>(null)
-
-  // Team sync prompt state
-  const [showSyncPrompt, setShowSyncPrompt] = useState(false)
-  const [syncPromptMessage, setSyncPromptMessage] = useState("Team members affected - Resync recommended")
 
   // Cache to track which integrations have already been loaded
   const syncedUsersCache = useRef<Map<string, any[]>>(new Map())
@@ -985,19 +980,6 @@ export default function IntegrationsPage() {
     setTeamMembersPage(1)
   }, [teamMembersDrawerOpen, syncedUsers.length])
 
-  // Track previous organization to detect changes (not initial load)
-  const prevOrgRef = useRef<string>("")
-
-  // Show sync prompt when organization changes (not on initial load)
-  useEffect(() => {
-    if (prevOrgRef.current && prevOrgRef.current !== selectedOrganization && selectedOrganization) {
-      const orgName = integrations.find(i => i.id.toString() === selectedOrganization)?.name || "organization"
-      setSyncPromptMessage(`Switched to ${orgName} - Sync team members to update your roster`)
-      setShowSyncPrompt(true)
-    }
-    prevOrgRef.current = selectedOrganization
-  }, [selectedOrganization, integrations])
-
   // Auto-select first integration if none selected
   useEffect(() => {
     if (!selectedOrganization && integrations.length > 0) {
@@ -1005,6 +987,12 @@ export default function IntegrationsPage() {
       const firstIntegrationId = firstIntegration.id.toString()
       setSelectedOrganization(firstIntegrationId)
       localStorage.setItem('selected_organization', firstIntegrationId)
+
+      // Show sync modal after auto-selecting (same as manual switch)
+      setTimeout(() => {
+        setPostIntegrationModalType(firstIntegration.platform as 'rootly' | 'pagerduty')
+        setShowPostIntegrationSyncModal(true)
+      }, 500)
     }
   }, [integrations, selectedOrganization])
 
@@ -1953,7 +1941,7 @@ export default function IntegrationsPage() {
 
   const addIntegration = async (platform: "rootly" | "pagerduty") => {
     const form = platform === 'rootly' ? rootlyForm : pagerdutyForm
-    return IntegrationHandlers.addIntegration(
+    await IntegrationHandlers.addIntegration(
       platform,
       previewData,
       form,
@@ -1965,8 +1953,15 @@ export default function IntegrationsPage() {
       setAddingPlatform,
       setReloadingIntegrations,
       loadRootlyIntegrations,
-      loadPagerDutyIntegrations
+      loadPagerDutyIntegrations,
+      setSelectedOrganization
     )
+
+    // Show sync modal after successful integration addition
+    setTimeout(() => {
+      setPostIntegrationModalType(platform)
+      setShowPostIntegrationSyncModal(true)
+    }, 500)
   }
 
   const deleteIntegration = async () => {
@@ -1979,7 +1974,8 @@ export default function IntegrationsPage() {
       setDeleteDialogOpen,
       setIntegrationToDelete,
       syncedUsersCache.current,
-      recipientsCache.current
+      recipientsCache.current,
+      setSelectedOrganization
     )
   }
 
@@ -2286,22 +2282,6 @@ export default function IntegrationsPage() {
     }
   }
 
-  // Handle sync prompt actions
-  const handleSyncPromptAction = async () => {
-    // Close the prompt
-    setShowSyncPrompt(false)
-    // Open the sync modal immediately to show progress
-    setShowSyncConfirmModal(true)
-    // Open team members drawer
-    setTeamMembersDrawerOpen(true)
-    // Automatically start the sync
-    await performTeamSync()
-  }
-
-  const handleDismissSyncPrompt = () => {
-    setShowSyncPrompt(false)
-  }
-
   // Sync Slack user IDs to UserCorrelation records
   const syncSlackUserIds = async (suppressToast?: boolean) => {
     return TeamHandlers.syncSlackUserIds(setLoadingTeamMembers, fetchSyncedUsers, suppressToast)
@@ -2576,6 +2556,12 @@ export default function IntegrationsPage() {
                       const selected = integrations.find(i => i.id.toString() === value)
                       if (selected) {
                         toast.success(`${selected.name} set as default`)
+
+                        // Show sync modal after switching organizations
+                        setTimeout(() => {
+                          setPostIntegrationModalType(selected.platform as 'rootly' | 'pagerduty')
+                          setShowPostIntegrationSyncModal(true)
+                        }, 500)
 
                         // Check permissions in background (non-blocking)
                         try {
@@ -4824,11 +4810,12 @@ export default function IntegrationsPage() {
                             })}
                           </div>
                         </div>
-                      {/* GitHub username section - always show, with edit capability */}
-                      <div className="pl-13 mt-2" onClick={(e) => e.stopPropagation()}>
-                        {editingUserId === user.id ? (
-                          // Edit mode
-                          <div className="flex items-center space-x-2">
+                      {/* GitHub username section - only show if GitHub connected */}
+                      {githubIntegration && (
+                        <div className="pl-13 mt-2" onClick={(e) => e.stopPropagation()}>
+                          {editingUserId === user.id ? (
+                            // Edit mode
+                            <div className="flex items-center space-x-2">
                             <Select
                               value={editingUsername}
                               onValueChange={setEditingUsername}
@@ -4912,6 +4899,8 @@ export default function IntegrationsPage() {
                             )}
                           </div>
                         )}
+                        </div>
+                      )}
 
                         {/* Jira mapping section - always show if Jira connected */}
                         {jiraIntegration && (
@@ -5115,7 +5104,6 @@ export default function IntegrationsPage() {
                             )}
                           </div>
                         )}
-                      </div>
                     </div>
                     )
                   })}
@@ -5230,8 +5218,34 @@ export default function IntegrationsPage() {
         onClose={() => setShowPostIntegrationSyncModal(false)}
         onSyncNow={() => {
           setShowPostIntegrationSyncModal(false)
-          // Open sync confirmation modal
-          setShowSyncConfirmModal(true)
+          // Open drawer first, then sync modal after drawer renders
+          setTeamMembersDrawerOpen(true)
+
+          // Load cached data if available, otherwise fetch
+          if (selectedOrganization && syncedUsersCache.current.has(selectedOrganization)) {
+            const cachedUsers = syncedUsersCache.current.get(selectedOrganization)!
+            setSyncedUsers(cachedUsers)
+            setShowSyncedUsers(true)
+
+            // Also restore cached recipient selections
+            if (recipientsCache.current.has(selectedOrganization)) {
+              const cachedRecipients = recipientsCache.current.get(selectedOrganization)!
+              const validUserIds = new Set(cachedUsers.map(u => u.id))
+              const validCachedRecipients = new Set(
+                Array.from(cachedRecipients).filter(id => validUserIds.has(id))
+              )
+              setSelectedRecipients(validCachedRecipients)
+              setSavedRecipients(validCachedRecipients)
+            }
+          } else {
+            // Otherwise fetch from API
+            fetchSyncedUsers(false, false)
+          }
+
+          // Wait for drawer to render before showing sync modal
+          setTimeout(() => {
+            setShowSyncConfirmModal(true)
+          }, 300)
         }}
         integrationType={postIntegrationModalType || 'github'}
       />
@@ -5312,18 +5326,6 @@ export default function IntegrationsPage() {
                         )}
                       </div>
                     </div>
-
-                    <div className="flex justify-end">
-                      <Button
-                        onClick={() => {
-                          setShowSyncConfirmModal(false)
-                          setSyncProgress(null)
-                        }}
-                        className="bg-purple-700 hover:bg-purple-800"
-                      >
-                        Done
-                      </Button>
-                    </div>
                   </div>
                 ) : syncProgress?.isLoading ? (
                   <div className="space-y-4">
@@ -5369,7 +5371,17 @@ export default function IntegrationsPage() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            {!syncProgress?.isLoading && !syncProgress?.results && (
+            {syncProgress?.results ? (
+              <Button
+                onClick={() => {
+                  setShowSyncConfirmModal(false)
+                  setSyncProgress(null)
+                }}
+                className="bg-purple-700 hover:bg-purple-800"
+              >
+                Done
+              </Button>
+            ) : !syncProgress?.isLoading ? (
               <>
                 <Button variant="outline" onClick={() => setShowSyncConfirmModal(false)}>
                   Cancel
@@ -5381,18 +5393,10 @@ export default function IntegrationsPage() {
                   Sync Now
                 </Button>
               </>
-            )}
+            ) : null}
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Team Sync Prompt - floating bottom-right */}
-      <TeamSyncPrompt
-        isVisible={showSyncPrompt && !hasTokenError}
-        message={syncPromptMessage}
-        onSync={handleSyncPromptAction}
-        onDismiss={handleDismissSyncPrompt}
-      />
 
       {/* Token Error Modal */}
       <TokenErrorModal
