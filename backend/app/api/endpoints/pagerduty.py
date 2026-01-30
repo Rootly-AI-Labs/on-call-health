@@ -66,6 +66,9 @@ class AddIntegrationRequest(BaseModel):
     token: str
     name: Optional[str] = None
     platform: str = "pagerduty"
+    organization_name: Optional[str] = None
+    total_users: int = 0
+    total_services: int = 0
 
 class IntegrationResponse(BaseModel):
     id: int
@@ -96,9 +99,13 @@ async def test_pagerduty_token(
     if not result["valid"]:
         # Map error codes to user-friendly messages with actionable guidance
         error_code = result.get("error_code")
+        technical_error = result.get("error", "Unknown error")
+        # Security: Log technical details server-side, don't expose to client
+        logger.warning(f"PagerDuty connection test failed: {error_code} - {technical_error}")
+
         error_details = {
             "error_code": error_code,
-            "technical_message": result.get("error", "Unknown error")
+            # Do NOT include technical_message in response
         }
 
         # Determine appropriate HTTP status code and user message
@@ -276,54 +283,9 @@ async def add_pagerduty_integration(
     db: Session = Depends(get_db)
 ):
     """Add a new PagerDuty integration."""
-    # Test the token first
-    client = PagerDutyAPIClient(request.token)
-    test_result = await client.test_connection()
-
-    if not test_result["valid"]:
-        # Map error codes to user-friendly messages with actionable guidance
-        error_code = test_result.get("error_code")
-        error_details = {
-            "error_code": error_code,
-            "technical_message": test_result.get("error", "Unknown error")
-        }
-
-        # Determine appropriate HTTP status code and user message
-        if error_code == "UNAUTHORIZED":
-            status_code = status.HTTP_401_UNAUTHORIZED
-            user_message = "PagerDuty API token is no longer valid"
-            user_guidance = "The token may have been revoked. Please generate a new token from PagerDuty and try again."
-        elif error_code == "FORBIDDEN":
-            status_code = status.HTTP_403_FORBIDDEN
-            user_message = "PagerDuty API token lacks required permissions"
-            user_guidance = "The token needs read access to users and incidents. Please use a token with sufficient permissions."
-        elif error_code == "NOT_FOUND":
-            status_code = status.HTTP_404_NOT_FOUND
-            user_message = "Cannot connect to PagerDuty API"
-            user_guidance = "This may indicate:\n• The API endpoint is incorrect\n• Your token doesn't have access to the users endpoint"
-        elif error_code == "CONNECTION_ERROR":
-            status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-            user_message = "Cannot reach PagerDuty servers"
-            user_guidance = "Please check:\n• Your internet connection is working\n• api.pagerduty.com is accessible from your network\n• Your firewall/proxy isn't blocking the connection"
-        elif error_code == "API_ERROR":
-            status_code = status.HTTP_502_BAD_GATEWAY
-            user_message = "PagerDuty API returned an error"
-            user_guidance = "The PagerDuty API is experiencing issues. Please try again in a few moments."
-        else:  # UNKNOWN_ERROR or other
-            status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-            user_message = "Unexpected error connecting to PagerDuty"
-            user_guidance = "An unexpected error occurred. Please contact support if this persists."
-
-        error_details["user_message"] = user_message
-        error_details["user_guidance"] = user_guidance
-
-        raise HTTPException(
-            status_code=status_code,
-            detail=error_details
-        )
-    
-    account_info = test_result["account_info"]
-    org_name = account_info["organization_name"]
+    # Use organization info from frontend (already validated during test step)
+    # This avoids redundant API calls to PagerDuty
+    org_name = request.organization_name or "PagerDuty"
     
     # Check for duplicates
     existing = db.query(RootlyIntegration).filter(
@@ -351,21 +313,21 @@ async def add_pagerduty_integration(
         name=request.name or org_name,
         api_token=request.token,
         organization_name=org_name,
-        total_users=account_info["total_users"],
+        total_users=request.total_users,
         is_default=(existing_count == 0),
         platform="pagerduty"
     )
-    
+
     db.add(integration)
     db.commit()
     db.refresh(integration)
-    
+
     return IntegrationResponse(
         id=integration.id,
         name=integration.name,
         organization_name=integration.organization_name,
         total_users=integration.total_users,
-        total_services=account_info.get("total_services", 0),
+        total_services=request.total_services,
         is_default=integration.is_default,
         created_at=integration.created_at.isoformat(),
         last_used_at=None,

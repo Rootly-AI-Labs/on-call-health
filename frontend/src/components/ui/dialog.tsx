@@ -3,6 +3,7 @@
 import * as React from "react"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { cn } from "@/lib/utils"
+import { Z_INDEX } from "@/lib/z-index"
 import { Cross2Icon } from "@radix-ui/react-icons"
 
 const Dialog = DialogPrimitive.Root
