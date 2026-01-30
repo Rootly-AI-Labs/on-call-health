@@ -61,10 +61,8 @@ def sample_rootly_data():
                     "title": "Database outage",
                     "severity": "sev1",
                     "started_at": (base_time - timedelta(days=1)).isoformat(),
-                    "resolved_at": (base_time - timedelta(days=1, hours=-2)).isoformat()
-                },
-                "relationships": {
-                    "user": {"data": {"id": "1"}}
+                    "resolved_at": (base_time - timedelta(days=1, hours=-2)).isoformat(),
+                    "user": {"data": {"id": "1"}}  # User in attributes, not relationships
                 }
             },
             {
@@ -73,10 +71,8 @@ def sample_rootly_data():
                     "title": "API timeout",
                     "severity": "sev2",
                     "started_at": (base_time - timedelta(days=5)).isoformat(),
-                    "resolved_at": (base_time - timedelta(days=5, hours=-1)).isoformat()
-                },
-                "relationships": {
-                    "user": {"data": {"id": "2"}}
+                    "resolved_at": (base_time - timedelta(days=5, hours=-1)).isoformat(),
+                    "user": {"data": {"id": "2"}}  # User in attributes, not relationships
                 }
             }
         ],
@@ -691,9 +687,10 @@ class TestTimezoneHandling:
         """Test _build_user_tz_map for PagerDuty"""
         analyzer = UnifiedBurnoutAnalyzer(api_token="test_token", platform="pagerduty")
 
+        # PagerDuty API returns "timezone" (not "time_zone")
         users = [
-            {"id": "P1", "time_zone": "America/Los_Angeles"},
-            {"id": "P2", "time_zone": "Asia/Tokyo"}
+            {"id": "P1", "timezone": "America/Los_Angeles"},
+            {"id": "P2", "timezone": "Asia/Tokyo"}
         ]
 
         result = analyzer._build_user_tz_map(users)
@@ -941,28 +938,26 @@ class TestCoreCalculationMethods:
         metrics = {
             "incidents_per_week": 4.0,
             "after_hours_percentage": 0.25,
-            "weekend_percentage": 0.1,
-            "avg_response_time_minutes": 35
+            "severity_weighted_incidents_per_week": 8.0
         }
 
         result = analyzer._calculate_burnout_factors(metrics)
 
+        # Current implementation returns: workload, after_hours, incident_load
         assert "workload" in result
         assert "after_hours" in result
-        assert "weekend_work" in result
-        assert "response_time" in result
+        assert "incident_load" in result
         assert all(isinstance(v, (int, float)) for v in result.values())
 
     def test_calculate_burnout_score(self, mock_rootly_client):
         """Test _calculate_burnout_score"""
         analyzer = UnifiedBurnoutAnalyzer(api_token="test_token", platform="rootly")
 
+        # Current implementation uses: workload, after_hours, incident_load
         factors = {
-            "workload": 0.6,
-            "after_hours": 0.4,
-            "weekend_work": 0.3,
-            "response_time": 0.5,
-            "incident_load": 0.7
+            "workload": 6.0,
+            "after_hours": 4.0,
+            "incident_load": 7.0
         }
 
         result = analyzer._calculate_burnout_score(factors)
