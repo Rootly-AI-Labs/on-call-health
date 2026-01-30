@@ -37,7 +37,7 @@ export default function GitHubAllMetricsPopup({
       id: member.user_id || '',
       name: member.user_name || 'Unknown',
       email: member.user_email || '',
-      burnoutScore: member.ocb_score || 0,
+      burnoutScore: member.och_score || 0,
       riskLevel: (member.risk_level || 'low') as 'high' | 'medium' | 'low',
       trend: 'stable' as const,
       incidentsHandled: member.incident_count || 0,
@@ -94,8 +94,8 @@ export default function GitHubAllMetricsPopup({
                   <div className="space-y-2">
                     {metric.members.map((member) => {
                       const allTags = getVulnerabilityTags(member, metric.metricType)
-                      // Filter out OCB tag
-                      const tags = allTags.filter(tag => !tag.label.startsWith('OCB:'))
+                      // Filter out OCH tag
+                      const tags = allTags.filter(tag => !tag.label.startsWith('OCH:'))
                       const remainingTags = getRemainingTagCount(member, metric.metricType) - (allTags.length - tags.length)
 
                       return (

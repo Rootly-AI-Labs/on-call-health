@@ -8,11 +8,11 @@ interface BurnoutFactor {
 }
 
 interface BurnoutFactorsV0Props {
-  ocbReasoning: string[];
+  ochReasoning: string[];
 }
 
-export function BurnoutFactorsV0({ ocbReasoning }: BurnoutFactorsV0Props) {
-  // Parse factors from OCB reasoning
+export function BurnoutFactorsV0({ ochReasoning }: BurnoutFactorsV0Props) {
+  // Parse factors from OCH reasoning
   let currentSection = 'personal';
   let personalPoints = 0;
   let workRelatedPoints = 0;
@@ -20,7 +20,7 @@ export function BurnoutFactorsV0({ ocbReasoning }: BurnoutFactorsV0Props) {
   let workRelatedFactors: BurnoutFactor[] = [];
   let currentFactors = personalFactors;
 
-  ocbReasoning.slice(1).forEach((reason: string) => {
+  ochReasoning.slice(1).forEach((reason: string) => {
     const cleanReason = reason.replace(/^[\s]*[•·\-*]\s*/, '').trim();
     if (cleanReason === 'PERSONAL:') {
       currentSection = 'personal';

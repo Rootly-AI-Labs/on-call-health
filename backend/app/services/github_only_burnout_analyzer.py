@@ -30,8 +30,8 @@ class GitHubOnlyBurnoutAnalyzer:
     """
     
     def __init__(self):
-        # Using Copenhagen Burnout Inventory (CBI) methodology
-        logger.info("GitHub analyzer using On-Call Burnout methodology")
+        # Using On-Call Health (OCH) methodology (inspired by Copenhagen Burnout Inventory)
+        logger.info("GitHub analyzer using On-Call Health methodology")
         
         # GitHub-specific thresholds for burnout detection
         self.thresholds = {
@@ -161,21 +161,21 @@ class GitHubOnlyBurnoutAnalyzer:
                 logger.warning(f"No GitHub metrics for {email}")
                 return None
             
-            # Calculate burnout dimensions using OCB (Copenhagen Burnout Inventory) methodology
-            logger.debug(f"Using OCB methodology for {email}")
-            personal_burnout = self._calculate_personal_burnout_ocb(
+            # Calculate burnout dimensions using OCH methodology (inspired by Copenhagen Burnout Inventory)
+            logger.debug(f"Using OCH methodology for {email}")
+            personal_burnout = self._calculate_personal_burnout_och(
                 metrics, baselines, time_range_days
             )
             
-            work_related_burnout = self._calculate_work_burnout_ocb(
+            work_related_burnout = self._calculate_work_burnout_och(
                 metrics, baselines, activity_data
             )
             
-            accomplishment_burnout = self._calculate_accomplishment_burnout_ocb(
+            accomplishment_burnout = self._calculate_accomplishment_burnout_och(
                 metrics, baselines, activity_data
             )
             
-            # Calculate overall burnout score using equal weights (OCB methodology)
+            # Calculate overall burnout score using equal weights (OCH methodology)
             burnout_score = (
                 personal_burnout * 0.333 +
                 work_related_burnout * 0.333 + 
@@ -218,21 +218,21 @@ class GitHubOnlyBurnoutAnalyzer:
     
     
     # =============================================================================
-    # OCB (Copenhagen Burnout Inventory) CALCULATION METHODS
-    # Scientific burnout assessment using established OCB methodology
+    # OCH (On-Call Health) CALCULATION METHODS
+    # Burnout assessment inspired by Copenhagen Burnout Inventory
     # =============================================================================
     
-    def _calculate_personal_burnout_ocb(
+    def _calculate_personal_burnout_och(
         self,
         metrics: Dict[str, Any], 
         baselines: Dict[str, float],
         time_range_days: int
     ) -> float:
         """
-        Calculate Personal Burnout using OCB methodology from GitHub data (0-10 scale).
+        Calculate Personal Burnout using OCH methodology from GitHub data (0-10 scale).
         
         Personal Burnout focuses on physical and psychological exhaustion.
-        OCB indicators:
+        OCH indicators:
         - Overwhelming workload patterns
         - Sustained high-intensity activity  
         - Loss of work-life boundaries
@@ -244,7 +244,7 @@ class GitHubOnlyBurnoutAnalyzer:
         commits_per_week = metrics.get("commits_per_week", 0)
         baseline_commits = baselines.get("commits_per_week", self.industry_baselines["commits_per_week"])
         
-        # OCB: Focus on sustained overload rather than peaks
+        # OCH: Focus on sustained overload rather than peaks
         workload_ratio = commits_per_week / baseline_commits if baseline_commits > 0 else 0
         if workload_ratio >= 2.5:  # Consistently overwhelming
             overwhelm_score = 10
@@ -259,7 +259,7 @@ class GitHubOnlyBurnoutAnalyzer:
         
         # 2. Boundary violations - after hours activity (25% weight)
         after_hours_ratio = metrics.get("after_hours_commit_ratio", 0)
-        # OCB: Even small boundary violations accumulate to exhaustion
+        # OCH: Even small boundary violations accumulate to exhaustion
         boundary_score = min(10, after_hours_ratio * 25)  # More sensitive to after-hours work
         score_components.append(("boundary_violations", boundary_score, 0.25))
         
@@ -268,7 +268,7 @@ class GitHubOnlyBurnoutAnalyzer:
         baseline_lines = baselines.get("avg_lines_per_commit", self.industry_baselines.get("avg_lines_per_commit", 50))
         
         intensity_ratio = avg_lines_per_commit / baseline_lines if baseline_lines > 0 else 0
-        # OCB: Large commits often indicate time pressure and exhaustion
+        # OCH: Large commits often indicate time pressure and exhaustion
         if intensity_ratio >= 3.0:  # Very large commits
             intensity_score = 10
         elif intensity_ratio >= 2.0:  # Large commits
@@ -294,20 +294,20 @@ class GitHubOnlyBurnoutAnalyzer:
         # Calculate weighted total
         total_score = sum(score * weight for _, score, weight in score_components)
         
-        logger.debug(f"Personal Burnout (OCB) components: {score_components}, total: {total_score}")
+        logger.debug(f"Personal Burnout (OCH) components: {score_components}, total: {total_score}")
         return min(10, max(0, total_score))
     
-    def _calculate_work_burnout_ocb(
+    def _calculate_work_burnout_och(
         self,
         metrics: Dict[str, Any],
         baselines: Dict[str, float],
         activity_data: Dict[str, Any]
     ) -> float:
         """
-        Calculate Work-Related Burnout using OCB methodology from GitHub data (0-10 scale).
+        Calculate Work-Related Burnout using OCH methodology from GitHub data (0-10 scale).
         
         Work-Related Burnout focuses on fatigue specifically attributed to work.
-        OCB indicators:
+        OCH indicators:
         - Work context frustration
         - Inefficient work patterns
         - Collaboration strain
@@ -317,7 +317,7 @@ class GitHubOnlyBurnoutAnalyzer:
         
         # 1. Work inefficiency - PR revision patterns (30% weight)
         avg_pr_revisions = metrics.get("avg_pr_revisions", 2)
-        # OCB: High revisions indicate work process problems
+        # OCH: High revisions indicate work process problems
         if avg_pr_revisions >= 5:  # Many revisions = process issues
             inefficiency_score = 10
         elif avg_pr_revisions >= 3:  # Moderate revisions
@@ -331,7 +331,7 @@ class GitHubOnlyBurnoutAnalyzer:
         reviews_per_week = metrics.get("reviews_per_week", 0)
         prs_per_week = metrics.get("prs_per_week", 0)
         
-        # OCB: Disproportionate review load indicates work distribution issues
+        # OCH: Disproportionate review load indicates work distribution issues
         if prs_per_week > 0:
             review_ratio = reviews_per_week / prs_per_week
             if review_ratio >= 3:  # Heavy review burden
@@ -347,7 +347,7 @@ class GitHubOnlyBurnoutAnalyzer:
         
         # 3. Work fragmentation - commit frequency patterns (25% weight)
         commits_per_week = metrics.get("commits_per_week", 0)
-        # OCB: Very high or very low commit frequency both indicate work problems
+        # OCH: Very high or very low commit frequency both indicate work problems
         if commits_per_week >= 40:  # Fragmented work
             fragmentation_score = 8 + min(2, (commits_per_week - 40) * 0.05)  # 8-10 range
         elif commits_per_week <= 5 and commits_per_week > 0:  # Too few commits
@@ -370,7 +370,7 @@ class GitHubOnlyBurnoutAnalyzer:
         pr_merge_rate = metrics.get("pr_merge_rate", 0.8)
         commit_revert_rate = metrics.get("commit_revert_rate", 0)
         
-        # OCB: Poor merge rates and reverts indicate dysfunctional work processes
+        # OCH: Poor merge rates and reverts indicate dysfunctional work processes
         merge_dysfunction = (1 - pr_merge_rate) * 10  # Lower merge rate = higher dysfunction
         revert_dysfunction = commit_revert_rate * 20  # Reverts indicate process issues
         process_dysfunction_score = min(10, (merge_dysfunction + revert_dysfunction) / 2)
@@ -380,20 +380,20 @@ class GitHubOnlyBurnoutAnalyzer:
         # Calculate weighted total
         total_score = sum(score * weight for _, score, weight in score_components)
         
-        logger.debug(f"Work-Related Burnout (OCB) components: {score_components}, total: {total_score}")
+        logger.debug(f"Work-Related Burnout (OCH) components: {score_components}, total: {total_score}")
         return min(10, max(0, total_score))
     
-    def _calculate_accomplishment_burnout_ocb(
+    def _calculate_accomplishment_burnout_och(
         self,
         metrics: Dict[str, Any],
         baselines: Dict[str, float], 
         activity_data: Dict[str, Any]
     ) -> float:
         """
-        Calculate Accomplishment Burnout using OCB methodology from GitHub data (0-10 scale).
+        Calculate Accomplishment Burnout using OCH methodology from GitHub data (0-10 scale).
         
         Accomplishment Burnout focuses on reduced sense of effectiveness and achievement.
-        OCB indicators:
+        OCH indicators:
         - Declining output quality
         - Reduced meaningful contributions
         - Loss of technical growth
@@ -405,7 +405,7 @@ class GitHubOnlyBurnoutAnalyzer:
         pr_merge_rate = metrics.get("pr_merge_rate", 0.8)
         avg_pr_revisions = metrics.get("avg_pr_revisions", 2)
         
-        # OCB: Quality issues indicate reduced sense of effectiveness
+        # OCH: Quality issues indicate reduced sense of effectiveness
         # Merge rate component
         quality_merge_score = (1 - pr_merge_rate) * 10  # Lower merge rate = quality issues
         
@@ -423,7 +423,7 @@ class GitHubOnlyBurnoutAnalyzer:
         commit_size_variance = metrics.get("commit_size_variance", 0.5)
         lines_per_commit = metrics.get("avg_lines_per_commit", 0)
         
-        # OCB: Very low variance suggests repetitive, unmeaningful work
+        # OCH: Very low variance suggests repetitive, unmeaningful work
         # Very high variance might suggest unfocused work
         if commit_size_variance < 0.2:  # Too repetitive
             meaningfulness_score = 8 + (0.2 - commit_size_variance) * 10  # 8-10 range
@@ -452,7 +452,7 @@ class GitHubOnlyBurnoutAnalyzer:
         
         activity_ratio = commits_per_week / baseline_commits if baseline_commits > 0 else 0
         
-        # OCB: Both very low and very high activity can indicate stagnation
+        # OCH: Both very low and very high activity can indicate stagnation
         if activity_ratio < 0.5:  # Very low activity = disengagement
             stagnation_score = 8 + (0.5 - activity_ratio) * 4  # 8-10 range
         elif activity_ratio > 3.0:  # Very high activity = no time for growth
@@ -474,7 +474,7 @@ class GitHubOnlyBurnoutAnalyzer:
         # Use PR creation rate vs completion rate as proxy for progress perception
         prs_per_week = metrics.get("prs_per_week", 0)
         
-        # OCB: Very low PR creation suggests reduced sense of making progress
+        # OCH: Very low PR creation suggests reduced sense of making progress
         if prs_per_week < 1:  # Less than 1 PR per week
             progress_score = 8 + (1 - prs_per_week) * 2  # 8-10 range
         elif prs_per_week > 10:  # Too many PRs might indicate rushed work
@@ -492,11 +492,11 @@ class GitHubOnlyBurnoutAnalyzer:
         # Calculate weighted total
         total_score = sum(score * weight for _, score, weight in score_components)
         
-        logger.debug(f"Accomplishment Burnout (OCB) components: {score_components}, total: {total_score}")
+        logger.debug(f"Accomplishment Burnout (OCH) components: {score_components}, total: {total_score}")
         return min(10, max(0, total_score))
     
     # =============================================================================
-    # END OF OCB METHODS
+    # END OF OCH METHODS
     # =============================================================================
     
     def _analyze_flow_state(
