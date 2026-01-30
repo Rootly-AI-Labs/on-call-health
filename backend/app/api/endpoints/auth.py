@@ -436,12 +436,12 @@ async def unlink_provider(
 
 @router.get("/user/me")
 @auth_rate_limit("auth_refresh")
-async def get_current_user_info(
+async def get_current_user_basic_info(
     request: Request,
     current_user: User = Depends(get_current_active_user)
 ):
     """
-    ✅ SECURITY: Get current authenticated user information.
+    ✅ SECURITY: Get current authenticated user basic information.
     Used to verify authentication works.
     """
     return {

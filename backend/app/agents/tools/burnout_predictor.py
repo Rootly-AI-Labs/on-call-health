@@ -27,19 +27,18 @@ logger = logging.getLogger(__name__)
 
 class BurnoutPredictorTool(BaseTool):
     """Tool for predicting future burnout risk based on trends and patterns."""
-    
+
+    name = "burnout_predictor"
+    description = "Predicts future burnout risk using trend analysis and pattern recognition"
+    inputs = {
+        "current_analysis": {"type": "object", "description": "Current burnout analysis results"},
+        "historical_data": {"type": "array", "description": "Historical analysis results"},
+        "prediction_window_days": {"type": "integer", "description": "Days to predict ahead (default 14)"}
+    }
+    output_type = "object"
+
     def __init__(self):
-        try:
-            # Try the smolagents BaseTool signature
-            super().__init__()
-            self.name = "burnout_predictor"
-            self.description = "Predicts future burnout risk using trend analysis and pattern recognition"
-        except TypeError:
-            # Fallback to our custom BaseTool signature  
-            super().__init__(
-                name="burnout_predictor",
-                description="Predicts future burnout risk using trend analysis and pattern recognition"
-            )
+        super().__init__()
         
     def __call__(
         self, 

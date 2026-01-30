@@ -5,7 +5,7 @@ Separates stable mapping data (email -> username) from dynamic activity data (co
 Implements intelligent caching to optimize performance and reduce API calls.
 """
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple, Any
 from sqlalchemy.orm import Session
 
@@ -156,12 +156,18 @@ class GitHubMappingService:
         """Check if failed mapping should be retried."""
         if mapping.mapping_successful:
             return False
-        age_hours = (datetime.utcnow() - mapping.created_at).total_seconds() / 3600
+        # Ensure timezone-aware comparison
+        now = datetime.now(timezone.utc)
+        created_at = mapping.created_at.replace(tzinfo=timezone.utc) if mapping.created_at.tzinfo is None else mapping.created_at
+        age_hours = (now - created_at).total_seconds() / 3600
         return age_hours >= self.FAILED_RETRY_HOURS
-    
+
     def _get_mapping_age_days(self, mapping) -> float:
         """Get age of mapping in days."""
-        return (datetime.utcnow() - mapping.created_at).total_seconds() / 86400
+        # Ensure timezone-aware comparison
+        now = datetime.now(timezone.utc)
+        created_at = mapping.created_at.replace(tzinfo=timezone.utc) if mapping.created_at.tzinfo is None else mapping.created_at
+        return (now - created_at).total_seconds() / 86400
     
     async def _refresh_activity_data(
         self, 
@@ -224,7 +230,10 @@ class GitHubMappingService:
                 days=days,
                 github_token=github_token
             )
-            return result if result is not None else {}
+            if result is None:
+                logger.warning("collect_team_github_data returned None - possible API or auth issue")
+                return {}
+            return result
         except Exception as e:
             logger.error(f"Failed to create new mappings: {e}")
             return {}
@@ -232,6 +241,11 @@ class GitHubMappingService:
     def _update_mapping_data_points(self, mapping, refreshed_data: Dict, analysis_id: int):
         """Update mapping record with fresh data points count."""
         try:
+            # Validate required mapping fields before DB call
+            if mapping.organization_id is None:
+                logger.warning(f"Skipping mapping update: organization_id is None for {mapping.source_identifier}")
+                return
+
             if isinstance(refreshed_data, dict):
                 metrics = refreshed_data.get("metrics", {})
                 data_points = (
@@ -239,10 +253,11 @@ class GitHubMappingService:
                     metrics.get("total_pull_requests", 0) +
                     metrics.get("total_reviews", 0)
                 )
-                
+
                 # Create new mapping record for this analysis with updated data points
                 self.recorder.record_successful_mapping(
                     user_id=mapping.user_id,
+                    organization_id=mapping.organization_id,
                     analysis_id=analysis_id,
                     source_platform=mapping.source_platform,
                     source_identifier=mapping.source_identifier,
@@ -265,7 +280,7 @@ class GitHubMappingService:
         recent_mappings = self.db.query(IntegrationMapping).filter(
             IntegrationMapping.user_id == user_id,
             IntegrationMapping.target_platform == "github",
-            IntegrationMapping.created_at >= datetime.utcnow() - timedelta(days=30)
+            IntegrationMapping.created_at >= datetime.now(timezone.utc) - timedelta(days=30)
         ).all()
         
         stats = {
