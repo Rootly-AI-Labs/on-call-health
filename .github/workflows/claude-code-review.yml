@@ -27,6 +27,7 @@ jobs:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           model: claude-sonnet-4-20250514
           timeout_minutes: 30
+          allowed_bots: '*'
 
   # Automatic code review on every PR
   auto-review:
@@ -47,6 +48,7 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           model: claude-sonnet-4-20250514
+          allowed_bots: '*'
           direct_prompt: |
             Review this PR for issues only. Check for:
 
