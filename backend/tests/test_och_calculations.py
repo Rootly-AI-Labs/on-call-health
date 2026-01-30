@@ -1,7 +1,7 @@
 """
-Unit tests for On-Call Burnout (OCB) calculations.
+Unit tests for On-Call Health (OCH) calculations.
 
-Tests all OCB calculation functions, validation, and edge cases.
+Tests all OCH calculation functions, validation, and edge cases.
 """
 
 import unittest
@@ -12,24 +12,24 @@ import os
 # Add the app directory to the Python path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'app'))
 
-from core.ocb_config import (
-    OCBConfig,
-    OCBDimension,
+from core.och_config import (
+    OCHConfig,
+    OCHDimension,
     calculate_personal_burnout,
     calculate_work_related_burnout,
-    calculate_composite_ocb_score,
-    get_ocb_interpretation,
-    validate_ocb_config,
-    DEFAULT_OCB_CONFIG
+    calculate_composite_och_score,
+    get_och_interpretation,
+    validate_och_config,
+    DEFAULT_OCH_CONFIG
 )
 
 
-class TestOCBConfig(unittest.TestCase):
+class TestOCHConfig(unittest.TestCase):
     """Test ocb configuration and validation."""
 
     def setUp(self):
         """Set up test fixtures."""
-        self.config = OCBConfig()
+        self.config = OCHConfig()
 
     def test_dimension_weights_sum_to_one(self):
         """Test that dimension weights sum to 1.0."""
@@ -47,9 +47,9 @@ class TestOCBConfig(unittest.TestCase):
         factors_sum = sum(factor['weight'] for factor in self.config.WORK_RELATED_BURNOUT_FACTORS.values())
         self.assertAlmostEqual(factors_sum, 1.0, places=3)
 
-    def test_ocb_score_ranges_coverage(self):
+    def test_och_score_ranges_coverage(self):
         """Test that ocb score ranges cover 0-100 without gaps."""
-        ranges = self.config.OCB_SCORE_RANGES
+        ranges = self.config.OCH_SCORE_RANGES
         self.assertEqual(ranges['low'][0], 0)
         self.assertEqual(ranges['high'][1], 100)
 
@@ -85,11 +85,11 @@ class TestPersonalBurnoutCalculation(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures."""
-        self.config = OCBConfig()
+        self.config = OCHConfig()
 
     def test_calculate_personal_burnout_all_metrics(self):
         """Test personal burnout calculation with all metrics present."""
-        # Use metrics that match current OCB config factors
+        # Use metrics that match current OCH config factors
         metrics = {
             'after_hours_activity': 25.0,  # 25% after hours (scale_max=30)
             'sleep_quality_proxy': 15.0,   # severity-weighted incidents (scale_max=30)
@@ -111,7 +111,7 @@ class TestPersonalBurnoutCalculation(unittest.TestCase):
         self.assertEqual(len(result['components']), 3)
 
         # Dimension should be correct
-        self.assertEqual(result['dimension'], OCBDimension.PERSONAL.value)
+        self.assertEqual(result['dimension'], OCHDimension.PERSONAL.value)
 
     def test_calculate_personal_burnout_partial_metrics(self):
         """Test personal burnout calculation with only some metrics."""
@@ -166,11 +166,11 @@ class TestWorkRelatedBurnoutCalculation(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures."""
-        self.config = OCBConfig()
+        self.config = OCHConfig()
 
     def test_calculate_work_related_burnout_all_metrics(self):
         """Test work-related burnout calculation with all metrics present."""
-        # Use metrics that match current OCB config factors
+        # Use metrics that match current OCH config factors
         metrics = {
             'oncall_burden': 50.0,       # on-call load (scale_max=100)
             'sprint_completion': 5.0     # consecutive incident days (scale_max=7)
@@ -191,7 +191,7 @@ class TestWorkRelatedBurnoutCalculation(unittest.TestCase):
         self.assertEqual(len(result['components']), 2)
 
         # Dimension should be correct
-        self.assertEqual(result['dimension'], OCBDimension.WORK_RELATED.value)
+        self.assertEqual(result['dimension'], OCHDimension.WORK_RELATED.value)
 
     def test_calculate_work_related_burnout_high_stress(self):
         """Test work-related burnout calculation with high stress indicators."""
@@ -207,19 +207,19 @@ class TestWorkRelatedBurnoutCalculation(unittest.TestCase):
         self.assertIn(result['interpretation'], ['moderate', 'high'])
 
 
-class TestCompositeOCBScore(unittest.TestCase):
+class TestCompositeOCHScore(unittest.TestCase):
     """Test composite ocb score calculation."""
 
     def setUp(self):
         """Set up test fixtures."""
-        self.config = OCBConfig()
+        self.config = OCHConfig()
 
-    def test_calculate_composite_ocb_score(self):
+    def test_calculate_composite_och_score(self):
         """Test composite ocb score calculation."""
         personal_score = 60.0
         work_related_score = 40.0
 
-        result = calculate_composite_ocb_score(personal_score, work_related_score, self.config)
+        result = calculate_composite_och_score(personal_score, work_related_score, self.config)
 
         self.assertIn('composite_score', result)
         self.assertIn('personal_score', result)
@@ -254,19 +254,19 @@ class TestCompositeOCBScore(unittest.TestCase):
         ]
 
         for personal, work_related, expected_interpretation in test_cases:
-            result = calculate_composite_ocb_score(personal, work_related, self.config)
+            result = calculate_composite_och_score(personal, work_related, self.config)
             self.assertEqual(result['interpretation'], expected_interpretation,
                            f"Personal={personal}, Work={work_related} should be '{expected_interpretation}'")
 
 
-class TestOCBInterpretation(unittest.TestCase):
+class TestOCHInterpretation(unittest.TestCase):
     """Test ocb score interpretation functions."""
 
     def setUp(self):
         """Set up test fixtures."""
-        self.config = OCBConfig()
+        self.config = OCHConfig()
 
-    def test_get_ocb_interpretation_ranges(self):
+    def test_get_och_interpretation_ranges(self):
         """Test ocb interpretation for different score ranges."""
         test_cases = [
             (0.0, 'low'),
@@ -284,17 +284,17 @@ class TestOCBInterpretation(unittest.TestCase):
         ]
 
         for score, expected_interpretation in test_cases:
-            result = get_ocb_interpretation(score, self.config)
+            result = get_och_interpretation(score, self.config)
             self.assertEqual(result, expected_interpretation,
                            f"Score {score} should be '{expected_interpretation}', got '{result}'")
 
 
-class TestOCBValidation(unittest.TestCase):
+class TestOCHValidation(unittest.TestCase):
     """Test ocb configuration validation."""
 
     def test_validate_default_config(self):
         """Test validation of default ocb configuration."""
-        validation = validate_ocb_config()
+        validation = validate_och_config()
 
         self.assertIn('dimension_weights_sum', validation)
         self.assertIn('personal_factors_sum', validation)
@@ -312,17 +312,17 @@ class TestOCBValidation(unittest.TestCase):
 
     def test_validate_custom_config(self):
         """Test validation of custom configuration."""
-        config = OCBConfig()
+        config = OCHConfig()
 
         # Save original weights to restore later (DIMENSION_WEIGHTS is class-level)
         original_weights = config.DIMENSION_WEIGHTS.copy()
 
         try:
             # Modify weights to create invalid configuration
-            config.DIMENSION_WEIGHTS[OCBDimension.PERSONAL] = 0.6
-            config.DIMENSION_WEIGHTS[OCBDimension.WORK_RELATED] = 0.5  # Sum > 1.0
+            config.DIMENSION_WEIGHTS[OCHDimension.PERSONAL] = 0.6
+            config.DIMENSION_WEIGHTS[OCHDimension.WORK_RELATED] = 0.5  # Sum > 1.0
 
-            validation = validate_ocb_config(config)
+            validation = validate_och_config(config)
             self.assertFalse(validation['dimension_weights_sum'])
         finally:
             # Restore original weights to avoid affecting other tests
@@ -330,7 +330,7 @@ class TestOCBValidation(unittest.TestCase):
             config.DIMENSION_WEIGHTS.update(original_weights)
 
 
-class TestOCBEdgeCases(unittest.TestCase):
+class TestOCHEdgeCases(unittest.TestCase):
     """Test ocb calculations with edge cases."""
 
     def test_zero_values(self):

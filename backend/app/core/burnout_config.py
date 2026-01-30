@@ -25,8 +25,8 @@ class BurnoutConfig:
     }
     
     # Copenhagen Burnout Inventory Dimension Weights (must sum to 1.0)
-    # Based on OCB methodology - only 2 dimensions for software engineers
-    OCB_WEIGHTS = {
+    # Based on OCH methodology - only 2 dimensions for software engineers
+    OCH_WEIGHTS = {
         'personal_burnout': 0.50,        # Physical/psychological fatigue and exhaustion
         'work_related_burnout': 0.50     # Fatigue/exhaustion specifically tied to work
         # Note: client_related_burnout omitted - not applicable to software engineers
@@ -36,7 +36,7 @@ class BurnoutConfig:
     MASLACH_WEIGHTS = {
         'emotional_exhaustion': 0.40,    # Maps to personal_burnout
         'depersonalization': 0.35,       # Maps to work_related_burnout  
-        'personal_accomplishment': 0.25  # Removed - not in OCB framework
+        'personal_accomplishment': 0.25  # Removed - not in OCH framework
     }
     
     # Factor Calculation Weights
@@ -252,9 +252,9 @@ def validate_config(config: BurnoutConfig = None) -> Dict[str, bool]:
     
     results = {}
     
-    # Check OCB weights sum to 1.0
-    ocb_sum = sum(config.OCB_WEIGHTS.values())
-    results['ocb_weights_sum'] = abs(ocb_sum - 1.0) < 0.001
+    # Check OCH weights sum to 1.0
+    och_sum = sum(config.OCH_WEIGHTS.values())
+    results['och_weights_sum'] = abs(och_sum - 1.0) < 0.001
     
     # Check Maslach weights sum to 1.0 (legacy)
     maslach_sum = sum(config.MASLACH_WEIGHTS.values())
@@ -281,22 +281,22 @@ def validate_config(config: BurnoutConfig = None) -> Dict[str, bool]:
     return results
 
 
-def convert_ocb_to_legacy_scale(ocb_score: float) -> float:
+def convert_och_to_legacy_scale(och_score: float) -> float:
     """
-    Convert OCB score (0-100) to legacy Maslach scale (0-10) for compatibility.
-    
+    Convert OCH score (0-100) to legacy Maslach scale (0-10) for compatibility.
+
     Args:
-        ocb_score: OCB score on 0-100 scale
-        
+        och_score: OCH score on 0-100 scale
+
     Returns:
         Equivalent score on 0-10 scale
     """
-    return (ocb_score / 100.0) * 10.0
+    return (och_score / 100.0) * 10.0
 
 
-def convert_legacy_to_ocb_scale(legacy_score: float) -> float:
+def convert_legacy_to_och_scale(legacy_score: float) -> float:
     """
-    Convert legacy Maslach score (0-10) to OCB scale (0-100) for comparison.
+    Convert legacy Maslach score (0-10) to OCH scale (0-100) for comparison.
     
     Args:
         legacy_score: Legacy score on 0-10 scale

@@ -349,7 +349,7 @@ class TestAnalyzeMemberBurnout:
         assert result["user_id"] == "1"
         assert result["incident_count"] == 2
         assert "burnout_score" in result
-        assert "ocb_score" in result
+        assert "och_score" in result
         assert "risk_level" in result
         assert "factors" in result
         assert "metrics" in result
@@ -408,9 +408,9 @@ class TestCalculationMethods:
         analyzer = UnifiedBurnoutAnalyzer(api_token="test_token", platform="rootly")
 
         member_analyses = [
-            {"burnout_score": 2.0, "ocb_score": 20, "risk_level": "low", "user_name": "John", "incident_count": 1},
-            {"burnout_score": 4.5, "ocb_score": 45, "risk_level": "medium", "user_name": "Jane", "incident_count": 3},
-            {"burnout_score": 7.0, "ocb_score": 70, "risk_level": "high", "user_name": "Bob", "incident_count": 5}
+            {"burnout_score": 2.0, "och_score": 20, "risk_level": "low", "user_name": "John", "incident_count": 1},
+            {"burnout_score": 4.5, "och_score": 45, "risk_level": "medium", "user_name": "Jane", "incident_count": 3},
+            {"burnout_score": 7.0, "och_score": 70, "risk_level": "high", "user_name": "Bob", "incident_count": 5}
         ]
 
         result = analyzer._calculate_team_health(member_analyses)
@@ -475,7 +475,7 @@ class TestCalculationMethods:
         result_very_high = analyzer._calculate_compound_trauma_factor_rate(12.0)
         assert result_very_high == 2.0  # Maximum cap
 
-    def test_work_burnout_ocb_rate_normalization_consistency(self, mock_rootly_client):
+    def test_work_burnout_och_rate_normalization_consistency(self, mock_rootly_client):
         """
         Test that same workload RATE produces same score across different time periods.
 
@@ -519,7 +519,7 @@ class TestCalculationMethods:
         assert abs(score_30day - score_90day) < 0.5, f"30-day ({score_30day}) vs 90-day ({score_90day}) differ too much"
         assert abs(score_7day - score_90day) < 0.5, f"7-day ({score_7day}) vs 90-day ({score_90day}) differ too much"
 
-    def test_work_burnout_ocb_with_severity_distribution(self, mock_rootly_client):
+    def test_work_burnout_och_with_severity_distribution(self, mock_rootly_client):
         """Test _calculate_work_burnout_ocb with severity_distribution and days_analyzed"""
         analyzer = UnifiedBurnoutAnalyzer(api_token="test_token", platform="rootly")
 
@@ -553,7 +553,7 @@ class TestCalculationMethods:
         score_high = analyzer._calculate_work_burnout_ocb(metrics_high)
         assert score_high >= 6.0  # Should be HIGH range
 
-    def test_work_burnout_ocb_missing_days_analyzed_defaults(self, mock_rootly_client):
+    def test_work_burnout_och_missing_days_analyzed_defaults(self, mock_rootly_client):
         """Test that missing days_analyzed defaults to 30 days"""
         analyzer = UnifiedBurnoutAnalyzer(api_token="test_token", platform="rootly")
 
@@ -577,7 +577,7 @@ class TestCalculationMethods:
         # Should produce same result
         assert score_no_days == score_with_days
 
-    def test_work_burnout_ocb_empty_severity_distribution(self, mock_rootly_client):
+    def test_work_burnout_och_empty_severity_distribution(self, mock_rootly_client):
         """Test handling of empty or missing severity_distribution"""
         analyzer = UnifiedBurnoutAnalyzer(api_token="test_token", platform="rootly")
 
@@ -603,7 +603,7 @@ class TestCalculationMethods:
         assert score_empty < 2.0  # Should be very low
         assert score_none < 2.0
 
-    def test_work_burnout_ocb_pagerduty_severity_weights(self, mock_pagerduty_client):
+    def test_work_burnout_och_pagerduty_severity_weights(self, mock_pagerduty_client):
         """Test that PagerDuty uses correct severity weights (sev1-sev5 instead of sev0-sev4)"""
         analyzer = UnifiedBurnoutAnalyzer(api_token="test_token", platform="pagerduty")
 
@@ -619,7 +619,7 @@ class TestCalculationMethods:
         assert isinstance(score, (int, float))
         assert 0 <= score <= 10
 
-    def test_work_burnout_ocb_very_short_period(self, mock_rootly_client):
+    def test_work_burnout_och_very_short_period(self, mock_rootly_client):
         """Test scoring for very short analysis periods (edge case)"""
         analyzer = UnifiedBurnoutAnalyzer(api_token="test_token", platform="rootly")
 
@@ -897,7 +897,7 @@ class TestCoreCalculationMethods:
 
         assert isinstance(result, (int, float))
         assert result >= 0
-        assert result <= 100  # OCB scores are 0-100
+        assert result <= 100  # OCH scores are 0-100
 
     def test_calculate_work_burnout_ocb(self, mock_rootly_client):
         """Test _calculate_work_burnout_ocb"""
@@ -1056,18 +1056,18 @@ class TestOffHoursContribution:
 
     def test_after_hours_percentage_unit_conversion(self, mock_rootly_client):
         """Test that after_hours_percentage is correctly converted from decimal to percentage"""
-        from app.core.ocb_config import calculate_personal_burnout
+        from app.core.och_config import calculate_personal_burnout
 
         # After hours percentage of 25% (0.25 decimal)
         # After conversion and time multiplier (1.4x): 0.25 * 100 * 1.4 = 35%
         # With scale_max of 30, this should give high normalized score
-        ocb_metrics = {
+        och_metrics = {
             'work_hours_trend': 0,
             'after_hours_activity': 35,  # 25% * 1.4 multiplier = 35
             'sleep_quality_proxy': 0
         }
 
-        result = calculate_personal_burnout(ocb_metrics)
+        result = calculate_personal_burnout(och_metrics)
 
         # after_hours_activity normalized: (35 / 30) * 100 = 116.67, capped at 150
         # weighted: 116.67 * 0.50 = 58.33 contribution
@@ -1079,16 +1079,16 @@ class TestOffHoursContribution:
 
     def test_off_hours_is_largest_contributor(self, mock_rootly_client):
         """Test that off-hours is the largest contributor to personal burnout score"""
-        from app.core.ocb_config import calculate_personal_burnout
+        from app.core.och_config import calculate_personal_burnout
 
         # All factors at moderate levels
-        ocb_metrics = {
+        och_metrics = {
             'work_hours_trend': 50,      # 50% of scale_max
             'after_hours_activity': 15,  # 50% of scale_max (15/30)
             'sleep_quality_proxy': 15    # 50% of scale_max (15/30)
         }
 
-        result = calculate_personal_burnout(ocb_metrics)
+        result = calculate_personal_burnout(och_metrics)
 
         components = result['components']
         after_hours_weighted = components['after_hours_activity']['weighted_score']
@@ -1103,7 +1103,7 @@ class TestOffHoursContribution:
 
     def test_high_off_hours_pushes_to_critical_risk(self, mock_rootly_client):
         """Test that high off-hours activity can push someone to critical risk level"""
-        from app.core.ocb_config import calculate_personal_burnout, calculate_work_related_burnout, calculate_composite_ocb_score
+        from app.core.och_config import calculate_personal_burnout, calculate_work_related_burnout, calculate_composite_och_score
 
         # High off-hours activity (40% raw = 56% with 1.4 multiplier)
         personal_metrics = {
@@ -1124,7 +1124,7 @@ class TestOffHoursContribution:
 
         personal_result = calculate_personal_burnout(personal_metrics)
         work_result = calculate_work_related_burnout(work_metrics)
-        composite = calculate_composite_ocb_score(personal_result['score'], work_result['score'])
+        composite = calculate_composite_och_score(personal_result['score'], work_result['score'])
 
         # High off-hours should push into high/critical range
         assert composite['composite_score'] >= 50, \
@@ -1274,7 +1274,7 @@ class TestSeverityBreakdownInDailyTrends:
 class TestIndividualDailyHealthScore:
     """Tests for _calculate_individual_daily_health_score function.
 
-    This function calculates daily OCB burnout risk scores (0-100, higher = worse).
+    This function calculates daily OCH burnout risk scores (0-100, higher = worse).
     Critical test coverage to prevent regression of risk calculation bugs.
     """
 
