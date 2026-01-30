@@ -1221,6 +1221,11 @@ class MigrationRunner:
                 "description": "Add last_modified_by_user_id and last_modified_at columns to track survey schedule changes",
                 "sql_file": "2026_01_26_add_last_modified_to_survey_schedules.sql"
             },
+            {
+                "name": "043_add_unique_organization_to_survey_schedules",
+                "description": "Add unique constraint on organization_id to prevent multiple schedules per org",
+                "sql_file": "2026_01_30_add_unique_organization_to_survey_schedules.sql"
+            },
             # Add future migrations here with incrementing numbers
         ]
 
