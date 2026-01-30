@@ -5,7 +5,7 @@ interface PostIntegrationSyncModalProps {
   isOpen: boolean
   onClose: () => void
   onSyncNow: () => void
-  integrationType: 'github' | 'slack' | 'jira' | 'linear'
+  integrationType: 'github' | 'slack' | 'jira' | 'linear' | 'rootly' | 'pagerduty'
 }
 
 const integrationContent = {
@@ -24,6 +24,14 @@ const integrationContent = {
   linear: {
     title: "Sync your team members",
     message: "We need to match Linear users with your existing team to include their data in your analyses."
+  },
+  rootly: {
+    title: "Sync your team members",
+    message: "We need to match GitHub users with your existing team to include their data in your analyses."
+  },
+  pagerduty: {
+    title: "Sync your team members",
+    message: "We need to match GitHub users with your existing team to include their data in your analyses."
   }
 }
 

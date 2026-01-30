@@ -25,6 +25,9 @@ class RootlyTokenUpdate(BaseModel):
 class RootlyIntegrationAdd(BaseModel):
     token: str
     name: str
+    organization_name: str = None
+    total_users: int = 0
+    permissions: Dict[str, Any] = None
 
 class RootlyIntegrationUpdate(BaseModel):
     name: str = None
@@ -56,9 +59,13 @@ async def test_rootly_token_preview(
     if test_result["status"] != "success":
         # Map error codes to user-friendly messages with actionable guidance
         error_code = test_result.get("error_code")
+        technical_error = test_result.get("message", "Unknown error")
+        # Security: Log technical details server-side, don't expose to client
+        logger.warning(f"Rootly connection test failed: {error_code} - {technical_error}")
+
         error_details = {
             "error_code": error_code,
-            "technical_message": test_result["message"]
+            # Do NOT include technical_message in response
         }
 
         # Determine appropriate HTTP status code and user message
@@ -169,59 +176,18 @@ async def add_rootly_integration(
     # Strip whitespace from token
     token = integration_data.token.strip()
 
-    # Test the token again to ensure it's still valid
-    client = RootlyAPIClient(token)
-    test_result = await client.test_connection()
-    
-    if test_result["status"] != "success":
-        # Map error codes to user-friendly messages with actionable guidance
-        error_code = test_result.get("error_code")
-        error_details = {
-            "error_code": error_code,
-            "technical_message": test_result["message"]
-        }
+    # Use organization info from frontend (already validated during test step)
+    # This avoids redundant API calls to Rootly
+    organization_name = integration_data.organization_name
+    total_users = integration_data.total_users
 
-        # Determine appropriate HTTP status code and user message
-        if error_code == "UNAUTHORIZED":
-            status_code = status.HTTP_401_UNAUTHORIZED
-            user_message = "Rootly API token is no longer valid"
-            user_guidance = "The token may have been revoked. Please generate a new token from Rootly and try again."
-        elif error_code == "NOT_FOUND":
-            status_code = status.HTTP_404_NOT_FOUND
-            user_message = "Cannot connect to Rootly API"
-            user_guidance = "This may indicate:\n• Your organization uses a self-hosted Rootly instance (contact support)\n• The API endpoint is incorrect\n• Your token doesn't have access to the users endpoint"
-        elif error_code == "CONNECTION_ERROR":
-            status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-            user_message = "Cannot reach Rootly servers"
-            user_guidance = "Please check:\n• Your internet connection is working\n• api.rootly.com is accessible from your network\n• Your firewall/proxy isn't blocking the connection"
-        elif error_code == "API_ERROR":
-            status_code = status.HTTP_502_BAD_GATEWAY
-            user_message = "Rootly API returned an error"
-            user_guidance = "The Rootly API is experiencing issues. Please try again in a few moments."
-        elif error_code == "INVALID_RESPONSE":
-            status_code = status.HTTP_502_BAD_GATEWAY
-            user_message = "Received invalid response from Rootly"
-            user_guidance = "This may be a temporary issue with Rootly's API. Please try again."
-        else:  # UNKNOWN_ERROR or other
-            status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-            user_message = "Unexpected error connecting to Rootly"
-            user_guidance = "An unexpected error occurred. Please contact support if this persists."
-
-        error_details["user_message"] = user_message
-        error_details["user_guidance"] = user_guidance
-
-        raise HTTPException(
-            status_code=status_code,
-            detail=error_details
-        )
-    
     # Check if user already has this exact token (prevent duplicates, only active integrations)
     existing_token = db.query(RootlyIntegration).filter(
         RootlyIntegration.user_id == current_user.id,
         RootlyIntegration.api_token == token,  # Use stripped token
         RootlyIntegration.is_active == True
     ).first()
-    
+
     if existing_token:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -234,14 +200,10 @@ async def add_rootly_integration(
                 }
             }
         )
-    
-    # Extract organization info from test result
-    account_info = test_result.get("account_info", {})
-    organization_name = account_info.get("organization_name")
-    total_users = account_info.get("total_users", 0)
 
-    # Check permissions for the token
-    permissions = await client.check_permissions()
+    # Use permissions from frontend (already checked during test step)
+    # This makes save instant - no API calls needed!
+    permissions = integration_data.permissions or {}
 
     # Check if this will be the user's first Rootly integration (make it default)
     existing_integrations = db.query(RootlyIntegration).filter(

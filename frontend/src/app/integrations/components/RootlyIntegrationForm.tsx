@@ -47,9 +47,29 @@ export function RootlyIntegrationForm({
 
   // Auto-validate token when it's fully entered and valid format
   useEffect(() => {
-    if (tokenValue && isValidToken(tokenValue) && tokenValue !== lastTestedToken) {
-      setLastTestedToken(tokenValue)
-      onTest('rootly', tokenValue)
+    let cancelled = false
+
+    const validateToken = async () => {
+      try {
+        if (!tokenValue || !isValidToken(tokenValue) || tokenValue === lastTestedToken) {
+          return
+        }
+
+        setLastTestedToken(tokenValue)
+
+        if (!cancelled) {
+          await onTest('rootly', tokenValue)
+        }
+      } catch (error) {
+        console.error('Token validation error:', error)
+        // Error is handled by the onTest function
+      }
+    }
+
+    validateToken()
+
+    return () => {
+      cancelled = true  // Cancel on unmount or dependency change
     }
   }, [tokenValue, lastTestedToken, isValidToken, onTest])
 
@@ -122,6 +142,7 @@ export function RootlyIntegrationForm({
                         type={showToken ? "text" : "password"}
                         placeholder="rootly_********************************"
                         className="pr-20"
+                        onChange={(e) => field.onChange(e.target.value.trim())}
                       />
                       <div className="absolute inset-y-0 right-0 flex items-center space-x-1 pr-3">
                         {field.value && (

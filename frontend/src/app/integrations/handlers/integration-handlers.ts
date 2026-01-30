@@ -13,6 +13,20 @@ export async function testConnection(
   setDuplicateInfo: (info: any) => void,
   setErrorDetails?: (details: { user_message: string; user_guidance: string; error_code: string } | null) => void
 ): Promise<void> {
+  // Validate token not empty after trim
+  const trimmedToken = token.trim()
+  if (!trimmedToken) {
+    setConnectionStatus('error')
+    if (setErrorDetails) {
+      setErrorDetails({
+        user_message: 'Token cannot be empty',
+        user_guidance: 'Please enter a valid API token.',
+        error_code: 'EMPTY_TOKEN'
+      })
+    }
+    return
+  }
+
   setIsTestingConnection(true)
   setConnectionStatus('idle')
   setPreviewData(null)
@@ -36,7 +50,7 @@ export async function testConnection(
         'Authorization': `Bearer ${authToken}`
       },
       body: JSON.stringify({
-        token: token
+        token: trimmedToken
       })
     })
 
@@ -223,7 +237,8 @@ export async function addIntegration(
   setAddingPlatform: React.Dispatch<React.SetStateAction<"rootly" | "pagerduty" | null>>,
   setReloadingIntegrations: (loading: boolean) => void,
   loadRootlyIntegrations: (forceRefresh: boolean) => Promise<void>,
-  loadPagerDutyIntegrations: (forceRefresh: boolean) => Promise<void>
+  loadPagerDutyIntegrations: (forceRefresh: boolean) => Promise<void>,
+  setSelectedOrganization?: (organizationId: string) => void
 ): Promise<void> {
   if (!previewData) return
 
@@ -252,11 +267,17 @@ export async function addIntegration(
       ? {
           token: token,
           name: nickname || previewData.suggested_name || previewData.organization_name,
+          organization_name: previewData.organization_name,
+          total_users: previewData.total_users || 0,
+          permissions: previewData.permissions || {},
         }
       : {
           token: token,
           name: nickname || previewData.suggested_name || previewData.organization_name,
-          platform: 'pagerduty'
+          platform: 'pagerduty',
+          organization_name: previewData.organization_name,
+          total_users: previewData.total_users || 0,
+          total_services: previewData.total_services || 0,
         }
 
     const response = await fetch(endpoint, {
@@ -288,7 +309,12 @@ export async function addIntegration(
       try {
         const newIntegrationId = responseData.integration?.id || responseData.id
         if (newIntegrationId && integrations.length === 0) {
-          localStorage.setItem('selected_organization', newIntegrationId.toString())
+          const integrationIdStr = newIntegrationId.toString()
+          localStorage.setItem('selected_organization', integrationIdStr)
+          // Update React state to reflect the selection in UI
+          if (setSelectedOrganization) {
+            setSelectedOrganization(integrationIdStr)
+          }
         }
       } catch (error) {
         console.error('Error setting default integration:', error)
@@ -350,7 +376,8 @@ export async function deleteIntegration(
   setDeleteDialogOpen: (open: boolean) => void,
   setIntegrationToDelete: (integration: Integration | null) => void,
   syncedUsersCache?: Map<string, any[]>,
-  recipientsCache?: Map<string, Set<number>>
+  recipientsCache?: Map<string, Set<number>>,
+  setSelectedOrganization?: (orgId: string) => void
 ): Promise<void> {
   setIsDeleting(true)
   try {
@@ -409,6 +436,10 @@ export async function deleteIntegration(
       const selectedOrg = localStorage.getItem('selected_organization')
       if (selectedOrg === integrationIdStr) {
         localStorage.removeItem('selected_organization')
+        // Clear React state to trigger auto-select
+        if (setSelectedOrganization) {
+          setSelectedOrganization("")
+        }
       }
 
       setDeleteDialogOpen(false)

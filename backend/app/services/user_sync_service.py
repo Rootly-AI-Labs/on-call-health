@@ -7,7 +7,10 @@ import logging
 from typing import Dict, List, Any, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
+
+from sqlalchemy.exc import IntegrityError, OperationalError
 from app.models import User, UserCorrelation, RootlyIntegration, GitHubIntegration, UserMapping, SurveyPeriod
+
 from app.core.rootly_client import RootlyAPIClient
 from app.core.pagerduty_client import PagerDutyAPIClient
 from app.services.enhanced_github_matcher import EnhancedGitHubMatcher
@@ -296,73 +299,66 @@ class UserSyncService:
             # - For current user's email: use (user_id, email) - personal correlation
             # - For team members: use (organization_id, email, user_id=NULL) - org-scoped roster
             # This prevents one user from overwriting another user's correlations
+
+            # Determine user_id assignment FIRST (before querying)
             if email.lower() == current_user.email.lower():
-                # This is the current user's own correlation
-                # First, get ALL correlations for this email (personal + org-scoped)
+                # Current user's own email always gets user_id=current_user.id
+                assigned_user_id = current_user.id
+                logger.debug(f"Assigning correlation for {email} to current user {current_user.id}")
+            else:
+                # Team members:
+                # - In multi-tenant mode: user_id=NULL (org-scoped roster data)
+                # - In beta mode: user_id=current_user.id (personal isolation)
+                if organization_id:
+                    assigned_user_id = None  # Org-scoped
+                    logger.debug(f"Creating org-scoped correlation for team member {email}")
+                else:
+                    assigned_user_id = current_user.id  # Beta mode: isolate by user_id
+                    logger.debug(f"Creating personal correlation for team member {email} (beta mode)")
+
+            # Query with correct uniqueness key based on assigned_user_id
+            if assigned_user_id is not None:
+                # Beta mode OR current user: check (user_id, email)
                 all_correlations = self.db.query(UserCorrelation).filter(
-                    UserCorrelation.organization_id == organization_id,
+                    UserCorrelation.user_id == assigned_user_id,
                     UserCorrelation.email == email
                 ).all()
-
-                # Merge duplicates if found
-                if len(all_correlations) > 1:
-                    logger.info(f"Found {len(all_correlations)} records for current user's email {email}")
-                    correlation = self._merge_duplicate_correlations(all_correlations, organization_id, email)
-                    # After merge, ensure user_id is set for the current user
-                    if correlation and not correlation.user_id:
-                        correlation.user_id = current_user.id
-                        logger.info(f"Set user_id={current_user.id} on merged correlation")
-                elif len(all_correlations) == 1:
-                    correlation = all_correlations[0]
-                    # Ensure user_id is set for the current user
-                    if correlation and not correlation.user_id:
-                        correlation.user_id = current_user.id
-                        logger.info(f"Migrated org-scoped correlation {correlation.id} to user {current_user.id}")
-                else:
-                    correlation = None
             else:
-                # This is a team member - check by organization and email
-                # IMPORTANT: Check for ANY record with this org+email, regardless of user_id
-                # This prevents creating duplicates when user_id gets set by other processes
+                # Multi-tenant team member: check (organization_id, email, user_id IS NULL)
+                # Security fix: Add explicit NULL check to prevent SQL injection via NULL bypass
                 all_correlations = self.db.query(UserCorrelation).filter(
+                    UserCorrelation.organization_id.isnot(None),
                     UserCorrelation.organization_id == organization_id,
-                    UserCorrelation.email == email
-                ).all()  # Get ALL duplicates, not just one
+                    UserCorrelation.email == email,
+                    UserCorrelation.user_id.is_(None)
+                ).all()
 
-                # If duplicates exist, merge them into the best one
-                if len(all_correlations) > 1:
-                    correlation = self._merge_duplicate_correlations(all_correlations, organization_id, email)
-                elif len(all_correlations) == 1:
-                    correlation = all_correlations[0]
-                else:
-                    correlation = None
+            # Handle found correlations
+            if len(all_correlations) > 1:
+                logger.info(f"Found {len(all_correlations)} records for email {email}")
+                correlation = self._merge_duplicate_correlations(all_correlations, organization_id, email)
+            elif len(all_correlations) == 1:
+                correlation = all_correlations[0]
+            else:
+                correlation = None
 
             if correlation:
                 # Update existing correlation
                 updated += self._update_correlation(correlation, user, platform, integration_id)
             else:
-                # Determine user_id assignment based on mode
-                if email.lower() == current_user.email.lower():
-                    # Current user's own email always gets user_id=current_user.id
-                    assigned_user_id = current_user.id
-                    logger.info(f"Assigning correlation for {email} to current user {current_user.id}")
-                else:
-                    # Team members:
-                    # - In multi-tenant mode: user_id=NULL (org-scoped roster data)
-                    # - In beta mode: user_id=current_user.id (personal isolation)
-                    if organization_id:
-                        assigned_user_id = None  # Org-scoped
-                        logger.debug(f"Creating org-scoped correlation for team member {email}")
-                    else:
-                        assigned_user_id = current_user.id  # Beta mode: isolate by user_id
-                        logger.debug(f"Creating personal correlation for team member {email} (beta mode)")
-
-                # Final safety check: ensure no record exists for this org+email
+                # Final safety check: ensure no record exists for the correct uniqueness key
                 # This is a last-resort check in case the query above missed something
-                existing_record = self.db.query(UserCorrelation).filter(
-                    UserCorrelation.organization_id == organization_id,
-                    UserCorrelation.email == email
-                ).first()
+                if assigned_user_id is not None:
+                    existing_record = self.db.query(UserCorrelation).filter(
+                        UserCorrelation.user_id == assigned_user_id,
+                        UserCorrelation.email == email
+                    ).first()
+                else:
+                    existing_record = self.db.query(UserCorrelation).filter(
+                        UserCorrelation.organization_id == organization_id,
+                        UserCorrelation.email == email,
+                        UserCorrelation.user_id.is_(None)
+                    ).first()
 
                 if existing_record:
                     # Record exists but wasn't found by previous query
@@ -391,13 +387,44 @@ class UserSyncService:
                     self.db.add(correlation)
                     created += 1
 
-        # Commit all changes
-        try:
-            self.db.commit()
-        except Exception as e:
-            self.db.rollback()
-            logger.error(f"Error committing user sync: {e}")
-            raise
+        # Commit all changes with retry logic for race conditions and transient errors
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                self.db.commit()
+                break
+            except IntegrityError as e:
+                self.db.rollback()
+                if 'uq_user_correlation_user_email' in str(e.orig):
+                    if attempt < max_retries - 1:
+                        logger.warning(
+                            f"Duplicate key violation on commit (attempt {attempt+1}/{max_retries}). "
+                            f"Retrying after concurrent insert..."
+                        )
+                        continue
+                    else:
+                        logger.error(f"Failed to commit after {max_retries} attempts: {e}")
+                        raise
+                else:
+                    # Different IntegrityError, don't retry
+                    logger.error(f"IntegrityError during commit: {e}")
+                    raise
+            except OperationalError as e:
+                # Transient database errors (connection, deadlock, timeout)
+                self.db.rollback()
+                if attempt < max_retries - 1:
+                    logger.warning(
+                        f"Database operational error (attempt {attempt+1}/{max_retries}): {e}. Retrying..."
+                    )
+                    continue
+                else:
+                    logger.error(f"OperationalError after {max_retries} attempts: {e}")
+                    raise
+            except Exception as e:
+                # Non-retryable errors
+                self.db.rollback()
+                logger.error(f"Unexpected error committing user sync: {e}")
+                raise
 
         # Restore GitHub usernames from user_mappings table after sync
         # This ensures manually set GitHub usernames persist across syncs
