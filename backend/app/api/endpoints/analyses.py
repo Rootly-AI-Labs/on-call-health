@@ -2672,57 +2672,6 @@ async def get_member_daily_health(
     }
 
 
-def _calculate_individual_daily_health(day: dict, member_data: dict, analysis_results: dict) -> float:
-    """
-    Calculate individual daily health score using REAL data from analysis.
-    
-    Returns a value between 0.0 (poor health) and 1.0 (excellent health).
-    """
-    # Start with base health (inverted team stress)
-    team_health = day.get("overall_score", 0.8)
-    
-    # Get real member burnout factors (these are calculated from actual data)
-    member_factors = member_data.get("factors", {})
-    workload_factor = member_factors.get("workload", 0.1)  # 0-1 scale
-    after_hours_factor = member_factors.get("after_hours", 0.1)
-    response_time_factor = member_factors.get("response_time", 0.1)
-    weekend_factor = member_factors.get("weekend_work", 0.1)
-    
-    # Calculate stress multipliers based on REAL factors
-    workload_stress = min(workload_factor * 0.4, 0.4)  # Max 40% impact
-    after_hours_stress = min(after_hours_factor * 0.3, 0.3)  # Max 30% impact  
-    response_stress = min(response_time_factor * 0.2, 0.2)  # Max 20% impact
-    weekend_stress = min(weekend_factor * 0.1, 0.1)  # Max 10% impact
-    
-    # Day-specific factors
-    daily_incident_load = min(day.get("incident_count", 0) / 15.0, 1.0)  # Normalize to 0-1
-    day_stress = daily_incident_load * 0.2  # Max 20% impact
-    
-    # Weekend penalty (real calendar data)
-    import datetime
-    try:
-        date_obj = datetime.datetime.fromisoformat(day.get("date", "").replace("Z", ""))
-        is_weekend = date_obj.weekday() >= 5  # Saturday = 5, Sunday = 6
-        weekend_penalty = 0.15 if is_weekend else 0
-    except:
-        weekend_penalty = 0
-    
-    # Calculate total stress from real factors
-    total_stress = (
-        workload_stress +
-        after_hours_stress + 
-        response_stress +
-        weekend_stress +
-        day_stress +
-        weekend_penalty
-    )
-    
-    # Convert to health score (higher stress = lower health)
-    individual_health = max(0.1, min(1.0, team_health - total_stress))
-    
-    return individual_health
-
-
 async def run_analysis_task(
     analysis_id: int,
     analysis_uuid: str,
@@ -2889,47 +2838,21 @@ async def run_analysis_task(
         
         # Check if user has LLM token and AI is enabled
         use_ai_analyzer = False
-        logger.info(f"BACKGROUND_TASK: Checking AI analyzer conditions - enable_ai: {enable_ai}, user_id: {user_id}")
-        print(f"BACKGROUND_TASK: Checking AI analyzer conditions - enable_ai: {enable_ai}, user_id: {user_id}")
-        
+
         if enable_ai and user_id:
             user = db.query(User).filter(User.id == user_id).first()
-            logger.info(f"BACKGROUND_TASK: User query result - user exists: {user is not None}")
-            print(f"BACKGROUND_TASK: User query result - user exists: {user is not None}")
-            
+
             # Check if Railway system token is available for AI analysis
             system_api_key = os.getenv('ANTHROPIC_API_KEY')
-            
-            if user:
-                logger.info(f"BACKGROUND_TASK: User details - has_llm_token: {user.llm_token is not None}, provider: {user.llm_provider}")
-                logger.info(f"BACKGROUND_TASK: Railway system token available: {system_api_key is not None}")
-                print(f"BACKGROUND_TASK: User details - has_llm_token: {user.llm_token is not None}, provider: {user.llm_provider}")
-                print(f"BACKGROUND_TASK: Railway system token available: {system_api_key is not None}")
-                
+
             # Use AI if user requested it AND Railway token is available (or user has their own token)
             if system_api_key or (user and user.llm_token and user.llm_provider):
                 use_ai_analyzer = True
-                logger.info(f"BACKGROUND_TASK: AI available via Railway token or user token, using AI-enhanced analyzer")
-                print(f"BACKGROUND_TASK: AI available via Railway token or user token, using AI-enhanced analyzer")
-            else:
-                logger.info(f"BACKGROUND_TASK: No AI tokens available (Railway or user), using standard analyzer")
-                print(f"BACKGROUND_TASK: No AI tokens available (Railway or user), using standard analyzer")
-        else:
-            logger.info(f"BACKGROUND_TASK: AI not enabled or no user_id, using standard analyzer")
-            print(f"BACKGROUND_TASK: AI not enabled or no user_id, using standard analyzer")
-        
-        logger.info(f"BACKGROUND_TASK: Final analyzer decision - use_ai_analyzer: {use_ai_analyzer}")
-        print(f"BACKGROUND_TASK: Final analyzer decision - use_ai_analyzer: {use_ai_analyzer}")
-
-        # Use UnifiedBurnoutAnalyzer for all analyses
-        logger.info(f"BACKGROUND_TASK: Using UnifiedBurnoutAnalyzer")
-        print(f"BACKGROUND_TASK: Using UnifiedBurnoutAnalyzer")
 
         # Fetch user object if not already fetched (needed for synced users query and oncall data)
         if user_id:
             if 'user' not in locals():
                 user = db.query(User).filter(User.id == user_id).first()
-                logger.info(f"BACKGROUND_TASK: Fetched user object for user_id={user_id}")
         else:
             user = None
 
@@ -3128,7 +3051,8 @@ async def run_analysis_task(
             linear_token=linear_token if include_linear else None,
             organization_name=organization_name,
             synced_users=synced_users,  # Pass synced users from Team Sync
-            current_user_id=user_id  # Pass the current user ID for Jira integration lookup
+            current_user_id=user_id,  # Pass the current user ID for Jira integration lookup
+            db=db  # Reuse DB session to prevent connection pool exhaustion
         )
         logger.info(f"BACKGROUND_TASK: UnifiedBurnoutAnalyzer initialized - Features: AI={use_ai_analyzer}, GitHub={include_github}, Slack={include_slack}, Jira={include_jira}, Linear={include_linear}, current_user_id={user_id}")
         
@@ -3140,11 +3064,11 @@ async def run_analysis_task(
                 raise Exception("Analyzer service is None - initialization failed")
 
             # Log analyzer type for debugging
-            logger.info(f"BACKGROUND_TASK: Using analyzer type: {type(analyzer_service).__name__}")
+            logger.debug(f"BACKGROUND_TASK: Using analyzer type: {type(analyzer_service).__name__}")
 
             # Call UnifiedBurnoutAnalyzer
-            logger.info(f"BACKGROUND_TASK: Calling UnifiedBurnoutAnalyzer.analyze_burnout()")
-            logger.info(f"BACKGROUND_TASK: Analysis parameters - time_range_days={time_range}, include_weekends={include_weekends}, user_id={user_id}, analysis={analysis_ref}")
+            logger.debug(f"BACKGROUND_TASK: Calling UnifiedBurnoutAnalyzer.analyze_burnout()")
+            logger.debug(f"BACKGROUND_TASK: Analysis parameters - time_range_days={time_range}, include_weekends={include_weekends}, user_id={user_id}, analysis={analysis_ref}")
 
             logger.info(f"⏳ Analysis {analysis_ref}: Starting analyze_burnout()")
             try:

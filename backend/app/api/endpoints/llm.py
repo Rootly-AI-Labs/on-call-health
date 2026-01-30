@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 # Token encryption utilities (same pattern as Slack/GitHub)
 def get_encryption_key():
     """Get or create encryption key for tokens."""
-    key = settings.JWT_SECRET_KEY.encode()
+    key = settings.ENCRYPTION_KEY.encode()
     # Ensure key is 32 bytes for Fernet
     key = base64.urlsafe_b64encode(key[:32].ljust(32, b'\0'))
     return key
@@ -366,17 +366,3 @@ async def delete_llm_token(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to delete LLM token"
         )
-
-def get_user_llm_token(user: User) -> Optional[str]:
-    """
-    Utility function to get decrypted LLM token for a user.
-    Used by other services that need the actual token.
-    """
-    if not user.has_llm_token():
-        return None
-    
-    try:
-        return decrypt_token(user.llm_token)
-    except Exception as e:
-        logger.error(f"Failed to decrypt LLM token for user {user.id}: {e}")
-        return None

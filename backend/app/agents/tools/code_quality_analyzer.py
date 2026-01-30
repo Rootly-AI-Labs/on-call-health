@@ -26,19 +26,17 @@ logger = logging.getLogger(__name__)
 
 class CodeQualityAnalyzerTool(BaseTool):
     """Tool for analyzing code quality patterns that may indicate burnout."""
-    
+
+    name = "code_quality_analyzer"
+    description = "Analyzes GitHub activity to detect code quality issues and rushed development patterns"
+    inputs = {
+        "github_data": {"type": "object", "description": "GitHub activity data including commits, PRs, and reviews"},
+        "time_window_days": {"type": "integer", "description": "Number of days to analyze (default 30)"}
+    }
+    output_type = "object"
+
     def __init__(self):
-        try:
-            # Try the smolagents BaseTool signature
-            super().__init__()
-            self.name = "code_quality_analyzer"
-            self.description = "Analyzes GitHub activity to detect code quality issues and rushed development patterns"
-        except TypeError:
-            # Fallback to our custom BaseTool signature  
-            super().__init__(
-                name="code_quality_analyzer",
-                description="Analyzes GitHub activity to detect code quality issues and rushed development patterns"
-            )
+        super().__init__()
         
     def __call__(self, github_data: Dict[str, Any], time_window_days: int = 30) -> Dict[str, Any]:
         """

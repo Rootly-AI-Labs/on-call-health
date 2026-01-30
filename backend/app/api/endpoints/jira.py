@@ -47,7 +47,7 @@ REQUESTED_SCOPES = [
 # Encryption helpers
 # -------------------------------
 def get_encryption_key() -> bytes:
-    key = settings.JWT_SECRET_KEY.encode()
+    key = settings.ENCRYPTION_KEY.encode()
     # Ensure 32 bytes for Fernet
     return base64.urlsafe_b64encode(key[:32].ljust(32, b"\0"))
 
@@ -1030,6 +1030,11 @@ async def disconnect_jira(
 
         db.delete(integration)
         db.commit()
+
+        # Invalidate validation cache so error doesn't persist
+        from ...services.integration_validator import invalidate_validation_cache
+        invalidate_validation_cache(current_user.id)
+
         logger.info("[Jira] Disconnected Jira integration for user %s", current_user.id)
         return {"success": True, "message": "Jira integration disconnected successfully"}
     except Exception as e:
