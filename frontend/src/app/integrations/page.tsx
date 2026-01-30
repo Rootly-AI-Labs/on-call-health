@@ -4802,11 +4802,12 @@ export default function IntegrationsPage() {
                             })}
                           </div>
                         </div>
-                      {/* GitHub username section - always show, with edit capability */}
-                      <div className="pl-13 mt-2" onClick={(e) => e.stopPropagation()}>
-                        {editingUserId === user.id ? (
-                          // Edit mode
-                          <div className="flex items-center space-x-2">
+                      {/* GitHub username section - only show if GitHub connected */}
+                      {githubIntegration && (
+                        <div className="pl-13 mt-2" onClick={(e) => e.stopPropagation()}>
+                          {editingUserId === user.id ? (
+                            // Edit mode
+                            <div className="flex items-center space-x-2">
                             <Select
                               value={editingUsername}
                               onValueChange={setEditingUsername}
@@ -4890,6 +4891,8 @@ export default function IntegrationsPage() {
                             )}
                           </div>
                         )}
+                        </div>
+                      )}
 
                         {/* Jira mapping section - always show if Jira connected */}
                         {jiraIntegration && (
@@ -5093,7 +5096,6 @@ export default function IntegrationsPage() {
                             )}
                           </div>
                         )}
-                      </div>
                     </div>
                     )
                   })}
