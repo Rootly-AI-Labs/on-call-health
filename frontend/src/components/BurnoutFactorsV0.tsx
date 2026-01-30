@@ -12,7 +12,7 @@ interface BurnoutFactorsV0Props {
 }
 
 export function BurnoutFactorsV0({ ocbReasoning }: BurnoutFactorsV0Props) {
-  // Parse factors from OCB reasoning
+  // Parse factors from OCH reasoning
   let currentSection = 'personal';
   let personalPoints = 0;
   let workRelatedPoints = 0;

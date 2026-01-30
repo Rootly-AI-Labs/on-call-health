@@ -403,52 +403,52 @@ class TestLinearHeadroomModel(unittest.TestCase):
 
     def test_headroom_never_reduces_score(self):
         """Test that Linear contribution never reduces original OCH."""
-        original_ocb = 50.0
-        linear_ocb = 30.0
+        original_och = 50.0
+        linear_och = 30.0
 
         # Headroom formula: final = original + (100 - original) * (linear / 100)
-        final_ocb = original_ocb + (100.0 - original_ocb) * (linear_ocb / 100.0)
+        final_och = original_och + (100.0 - original_och) * (linear_och / 100.0)
 
-        self.assertGreaterEqual(final_ocb, original_ocb)
+        self.assertGreaterEqual(final_och, original_och)
 
     def test_headroom_caps_at_100(self):
         """Test that final score never exceeds 100."""
-        original_ocb = 90.0
-        linear_ocb = 100.0
+        original_och = 90.0
+        linear_och = 100.0
 
-        final_ocb = original_ocb + (100.0 - original_ocb) * (linear_ocb / 100.0)
-        final_ocb = min(100.0, final_ocb)
+        final_och = original_och + (100.0 - original_och) * (linear_och / 100.0)
+        final_och = min(100.0, final_och)
 
-        self.assertLessEqual(final_ocb, 100.0)
+        self.assertLessEqual(final_och, 100.0)
 
     def test_zero_linear_no_change(self):
         """Test that zero Linear contribution means no change."""
-        original_ocb = 50.0
-        linear_ocb = 0.0
+        original_och = 50.0
+        linear_och = 0.0
 
-        final_ocb = original_ocb + (100.0 - original_ocb) * (linear_ocb / 100.0)
+        final_och = original_och + (100.0 - original_och) * (linear_och / 100.0)
 
-        self.assertEqual(final_ocb, original_ocb)
+        self.assertEqual(final_och, original_och)
 
     def test_full_linear_reaches_100(self):
         """Test that 100 Linear contribution reaches 100."""
-        original_ocb = 50.0
-        linear_ocb = 100.0
+        original_och = 50.0
+        linear_och = 100.0
 
-        final_ocb = original_ocb + (100.0 - original_ocb) * (linear_ocb / 100.0)
+        final_och = original_och + (100.0 - original_och) * (linear_och / 100.0)
 
-        self.assertEqual(final_ocb, 100.0)
+        self.assertEqual(final_och, 100.0)
 
     def test_example_calculation(self):
         """Test specific example from implementation plan."""
         # If OCH from incidents = 50, and Linear = 30:
         # Final = 50 + (100-50) × (30/100) = 50 + 15 = 65
-        original_ocb = 50.0
-        linear_ocb = 30.0
+        original_och = 50.0
+        linear_och = 30.0
 
-        final_ocb = original_ocb + (100.0 - original_ocb) * (linear_ocb / 100.0)
+        final_och = original_och + (100.0 - original_och) * (linear_och / 100.0)
 
-        self.assertEqual(final_ocb, 65.0)
+        self.assertEqual(final_och, 65.0)
 
 
 if __name__ == '__main__':
