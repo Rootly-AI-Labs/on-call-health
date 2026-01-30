@@ -62,7 +62,13 @@ async def collect_team_github_data_with_mapping(
             ).all()
 
             # Create a lookup dict: email -> github_username (skip null emails)
-            email_to_github = {uc.email: uc.github_username for uc in user_correlations if uc.email is not None}
+            # Note: If duplicate emails exist, last entry wins (log warning for visibility)
+            email_to_github = {}
+            for uc in user_correlations:
+                if uc.email is not None:
+                    if uc.email in email_to_github:
+                        logger.warning(f"Duplicate email {uc.email} in UserCorrelation, using latest github_username")
+                    email_to_github[uc.email] = uc.github_username
 
             if len(email_to_github) == 0:
                 logger.warning(f"💻 GitHub: No synced usernames found in UserCorrelation")

@@ -224,7 +224,10 @@ class GitHubMappingService:
                 days=days,
                 github_token=github_token
             )
-            return result if result is not None else {}
+            if result is None:
+                logger.warning("collect_team_github_data returned None - possible API or auth issue")
+                return {}
+            return result
         except Exception as e:
             logger.error(f"Failed to create new mappings: {e}")
             return {}
@@ -232,6 +235,11 @@ class GitHubMappingService:
     def _update_mapping_data_points(self, mapping, refreshed_data: Dict, analysis_id: int):
         """Update mapping record with fresh data points count."""
         try:
+            # Validate required mapping fields before DB call
+            if mapping.organization_id is None:
+                logger.warning(f"Skipping mapping update: organization_id is None for {mapping.source_identifier}")
+                return
+
             if isinstance(refreshed_data, dict):
                 metrics = refreshed_data.get("metrics", {})
                 data_points = (
@@ -239,7 +247,7 @@ class GitHubMappingService:
                     metrics.get("total_pull_requests", 0) +
                     metrics.get("total_reviews", 0)
                 )
-                
+
                 # Create new mapping record for this analysis with updated data points
                 self.recorder.record_successful_mapping(
                     user_id=mapping.user_id,
