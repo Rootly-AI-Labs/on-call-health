@@ -8,6 +8,10 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
+# Detect environment early for error message customization
+_ENV = os.getenv("ENVIRONMENT", "development")
+_IS_PRODUCTION = _ENV in ("production", "staging")
+
 class Settings:
     # Database
     DATABASE_URL: str = os.getenv("DATABASE_URL")
@@ -18,13 +22,28 @@ class Settings:
         )
     
     # JWT
-    JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "your-secret-key-change-in-production")
+    JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY")
+    if not JWT_SECRET_KEY:
+        if _IS_PRODUCTION:
+            raise ValueError("JWT_SECRET_KEY environment variable is required")
+        else:
+            raise ValueError(
+                "JWT_SECRET_KEY environment variable is required. "
+                "Generate with: openssl rand -hex 32"
+            )
     JWT_ALGORITHM: str = "HS256"
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
 
     # Token Encryption (separate from JWT signing for security)
-    # Falls back to old default for backward compatibility with tokens encrypted before PR #269
-    ENCRYPTION_KEY: str = os.getenv("ENCRYPTION_KEY", "your-secret-key-change-in-production")
+    ENCRYPTION_KEY: str = os.getenv("ENCRYPTION_KEY")
+    if not ENCRYPTION_KEY:
+        if _IS_PRODUCTION:
+            raise ValueError("ENCRYPTION_KEY environment variable is required")
+        else:
+            raise ValueError(
+                "ENCRYPTION_KEY environment variable is required. "
+                "Generate with: openssl rand -base64 32"
+            )
 
     # Frontend URL for survey links
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
@@ -53,7 +72,7 @@ class Settings:
     LINEAR_CLIENT_ID: Optional[str] = os.getenv("LINEAR_CLIENT_ID")
     LINEAR_CLIENT_SECRET: Optional[str] = os.getenv("LINEAR_CLIENT_SECRET")
 
-    # Environment detection
+    # Environment detection (must be set early for error message handling)
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
 
     # Logging configuration
