@@ -349,12 +349,12 @@ class TestSeverityWeighting(unittest.TestCase):
         self.assertEqual(severity_weighted_per_week, expected)
 
 
-class TestOCBMetricMapping(unittest.TestCase):
-    """Test mapping of incident metrics to OCB metrics."""
+class TestOCHMetricMapping(unittest.TestCase):
+    """Test mapping of incident metrics to OCH metrics."""
 
-    def test_ocb_metric_names(self):
-        """Test that OCB metric names are correct."""
-        ocb_metrics = {
+    def test_och_metric_names(self):
+        """Test that OCH metric names are correct."""
+        och_metrics = {
             'work_hours_trend': 0,
             'weekend_work': 0,
             'after_hours_activity': 0,
@@ -367,7 +367,7 @@ class TestOCBMetricMapping(unittest.TestCase):
             'oncall_burden': 0
         }
 
-        # Verify all expected OCB metrics are present
+        # Verify all expected OCH metrics are present
         expected_metrics = [
             'work_hours_trend', 'weekend_work', 'after_hours_activity',
             'sleep_quality_proxy', 'sprint_completion',
@@ -376,10 +376,10 @@ class TestOCBMetricMapping(unittest.TestCase):
         ]
 
         for metric in expected_metrics:
-            self.assertIn(metric, ocb_metrics)
+            self.assertIn(metric, och_metrics)
 
-    def test_ocb_personal_burnout_factors(self):
-        """Test OCB personal burnout factor mapping."""
+    def test_och_personal_burnout_factors(self):
+        """Test OCH personal burnout factor mapping."""
         # Personal burnout factors derived from incidents:
         # - work_hours_trend: incidents_per_week
         # - weekend_work: after_hours_percentage
@@ -402,8 +402,8 @@ class TestOCBMetricMapping(unittest.TestCase):
         self.assertGreater(personal_factors['weekend_work'], 0)
         self.assertGreater(personal_factors['after_hours_activity'], 0)
 
-    def test_ocb_work_related_factors(self):
-        """Test OCB work-related burnout factor mapping."""
+    def test_och_work_related_factors(self):
+        """Test OCH work-related burnout factor mapping."""
         # Work-related factors derived from incidents:
         # - sprint_completion: avg_response_time_minutes
         # - code_review_speed: avg_response_time_minutes

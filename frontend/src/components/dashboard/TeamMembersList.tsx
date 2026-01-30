@@ -66,8 +66,8 @@ export function TeamMembersList({
   
   const isLoading = !currentAnalysis || !currentAnalysis.analysis_data
 
-  // OCB risk level from score (0-100 scale, higher = more burnout)
-  function getOCBRiskLevel(score: number | undefined | null): string {
+  // OCH risk level from score (0-100 scale, higher = more burnout)
+  function getOCHRiskLevel(score: number | undefined | null): string {
     if (score === undefined || score === null) return 'low'
     if (score < 25) return 'healthy'
     if (score < 50) return 'fair'
@@ -75,8 +75,8 @@ export function TeamMembersList({
     return 'critical'
   }
 
-  // OCB 4-color system for progress bars (0-100 scale, higher = more burnout)
-  function getOCBProgressColor(score: number): string {
+  // OCH 4-color system for progress bars (0-100 scale, higher = more burnout)
+  function getOCHProgressColor(score: number): string {
     const clampedScore = Math.max(0, Math.min(100, score))
     if (clampedScore < 25) return '#10b981'  // Green - Low/minimal burnout (0-24)
     if (clampedScore < 50) return '#eab308'  // Yellow - Mild burnout symptoms (25-49)
@@ -93,7 +93,7 @@ export function TeamMembersList({
         name: member.user_name || 'Unknown',
         email: member.user_email || '',
         avatar_url: member.avatar_url || null,
-        burnoutScore: member.ocb_score || 0, // Use OCH risk level directly
+        burnoutScore: member.och_score || 0, // Use OCH risk level directly
         riskLevel: (member.risk_level || 'low') as 'high' | 'medium' | 'low',
         trend: 'stable' as const,
         incidentsHandled: member.incident_count || 0,
@@ -179,15 +179,15 @@ export function TeamMembersList({
                 ON-CALL
               </Badge>
             )}
-            {member?.ocb_score !== undefined && (() => {
-              const getOCBRiskLevel = (ocb_score: number): string => {
-                if (ocb_score < 25) return 'healthy';
-                if (ocb_score < 50) return 'fair';
-                if (ocb_score < 75) return 'poor';
+            {member?.och_score !== undefined && (() => {
+              const getOCHRiskLevel = (och_score: number): string => {
+                if (och_score < 25) return 'healthy';
+                if (och_score < 50) return 'fair';
+                if (och_score < 75) return 'poor';
                 return 'critical';
               };
 
-              const riskLevel = getOCBRiskLevel(member.ocb_score);
+              const riskLevel = getOCHRiskLevel(member.och_score);
               const displayLabel = riskLevel === 'healthy' ? 'HEALTHY' :
                                  riskLevel === 'fair' ? 'FAIR' :
                                  riskLevel === 'poor' ? 'POOR' :
@@ -199,7 +199,7 @@ export function TeamMembersList({
         </div>
 
         <div className="space-y-2">
-          {member?.ocb_score !== undefined ? (
+          {member?.och_score !== undefined ? (
             <div className="text-sm">
               <span>Risk Level</span>
             </div>
@@ -212,9 +212,9 @@ export function TeamMembersList({
             <div 
               className="h-full transition-all"
               style={{ 
-                width: `${member?.ocb_score || 0}%`,
-                backgroundColor: member?.ocb_score !== undefined 
-                  ? getOCBProgressColor(member.ocb_score)
+                width: `${member?.och_score || 0}%`,
+                backgroundColor: member?.och_score !== undefined 
+                  ? getOCHProgressColor(member.och_score)
                   : undefined
               }}
             />
@@ -250,24 +250,24 @@ export function TeamMembersList({
             
             // Filter members with valid scores
             const validMembers = allMembers.filter((member) => {
-              return member.ocb_score !== undefined && member.ocb_score !== null
+              return member.och_score !== undefined && member.och_score !== null
             })
             
             // Separate members with incidents/burnout and those with neither
             // Include members with incidents OR OCH risk level (e.g., from Jira) in main section
             const membersWithIncidents = validMembers.filter(member =>
-              (member.incident_count || 0) > 0 || (member.ocb_score || 0) > 0
+              (member.incident_count || 0) > 0 || (member.och_score || 0) > 0
             )
             // Only hide members with BOTH zero incidents AND zero OCH risk level
             const membersWithoutIncidents = validMembers.filter(member =>
-              (member.incident_count || 0) === 0 && (member.ocb_score || 0) === 0
+              (member.incident_count || 0) === 0 && (member.och_score || 0) === 0
             )
 
             
             // Sort members by score (highest risk first)
             const sortMembers = (members: any[]) => members.sort((a, b) => {
               // Sort by OCH risk level only (higher score = higher risk)
-              return (b.ocb_score || 0) - (a.ocb_score || 0);
+              return (b.och_score || 0) - (a.och_score || 0);
             })
 
             // Sort members alphabetically by name

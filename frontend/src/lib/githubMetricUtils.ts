@@ -18,7 +18,7 @@ export interface VulnerabilityTag {
 
 /**
  * Get team members affected by a specific GitHub metric
- * Filters based purely on GitHub-specific metrics (not OCB factors)
+ * Filters based purely on GitHub-specific metrics (not OCH factors)
  * Only includes members who have GitHub integration data
  */
 export function getAffectedMembers(
@@ -281,22 +281,22 @@ export function getTagColorClasses(color: VulnerabilityTag['color']): string {
 }
 
 /**
- * Get OCB score badge color class based on score
+ * Get OCH score badge color class based on score
  */
-export function getOCBBadgeColor(ocbScore: number): string {
-  if (ocbScore < 25) return 'bg-green-100 text-green-800'
-  if (ocbScore < 50) return 'bg-yellow-100 text-yellow-800'
-  if (ocbScore < 75) return 'bg-orange-100 text-orange-800'
+export function getOCHBadgeColor(ochScore: number): string {
+  if (ochScore < 25) return 'bg-green-100 text-green-800'
+  if (ochScore < 50) return 'bg-yellow-100 text-yellow-800'
+  if (ochScore < 75) return 'bg-orange-100 text-orange-800'
   return 'bg-red-100 text-red-800'
 }
 
 /**
- * Get Tailwind color classes for OCB badge (with borders for outlined variant)
+ * Get Tailwind color classes for OCH badge (with borders for outlined variant)
  */
-export function getOCBBadgeColorClasses(ocbScore: number): string {
-  if (ocbScore < 25) return 'bg-green-100 text-green-800 border-green-300'
-  if (ocbScore < 50) return 'bg-yellow-100 text-yellow-800 border-yellow-300'
-  if (ocbScore < 75) return 'bg-orange-100 text-orange-800 border-orange-300'
+export function getOCHBadgeColorClasses(ochScore: number): string {
+  if (ochScore < 25) return 'bg-green-100 text-green-800 border-green-300'
+  if (ochScore < 50) return 'bg-yellow-100 text-yellow-800 border-yellow-300'
+  if (ochScore < 75) return 'bg-orange-100 text-orange-800 border-orange-300'
   return 'bg-red-100 text-red-800 border-red-300'
 }
 

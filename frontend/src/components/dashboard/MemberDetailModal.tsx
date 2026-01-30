@@ -15,8 +15,8 @@ import { UserIncidentCard } from "@/components/dashboard/UserIncidentCard"
 import { SurveyResultsCard } from "@/components/dashboard/SurveyResultsCard"
 import { TicketingCard } from "@/components/dashboard/TicketingCard"
 
-// OCB risk level helpers
-function getOCBRiskInfo(score: number | undefined | null): { level: string; label: string } {
+// OCH risk level helpers
+function getOCHRiskInfo(score: number | undefined | null): { level: string; label: string } {
   if (score === undefined || score === null) {
     return { level: 'unknown', label: 'Unknown Risk' }
   }
@@ -26,7 +26,7 @@ function getOCBRiskInfo(score: number | undefined | null): { level: string; labe
   return { level: 'healthy', label: 'Healthy' }
 }
 
-function getOCBBadgeColor(level: string): string {
+function getOCHBadgeColor(level: string): string {
   switch (level) {
     case 'critical': return 'bg-red-100 text-red-800'
     case 'poor': return 'bg-red-50 text-red-600'
@@ -36,7 +36,7 @@ function getOCBBadgeColor(level: string): string {
   }
 }
 
-function getOCBScoreColor(score: number | undefined): string {
+function getOCHScoreColor(score: number | undefined): string {
   if (score === undefined) return 'text-gray-900'
   if (score >= 75) return 'text-red-600'
   if (score >= 50) return 'text-orange-600'
@@ -387,9 +387,9 @@ export function MemberDetailModal({
                         <CardDescription>On-Call Health assessment</CardDescription>
                       </div>
                       {(() => {
-                        const riskInfo = getOCBRiskInfo(memberData?.ocb_score)
+                        const riskInfo = getOCHRiskInfo(memberData?.och_score)
                         return (
-                          <Badge className={`px-3 py-1 text-sm ${getOCBBadgeColor(riskInfo.level)}`}>
+                          <Badge className={`px-3 py-1 text-sm ${getOCHBadgeColor(riskInfo.level)}`}>
                             {riskInfo.label}
                           </Badge>
                         )
@@ -399,24 +399,24 @@ export function MemberDetailModal({
                   <CardContent className="pt-0 pb-6">
                     {/* Overall score */}
                     <div className="text-center mb-4">
-                      <div className={`text-3xl font-bold ${getOCBScoreColor(memberData?.ocb_score)}`}>
-                        {memberData?.ocb_score !== undefined
-                          ? `${memberData.ocb_score.toFixed(0)}/100`
+                      <div className={`text-3xl font-bold ${getOCHScoreColor(memberData?.och_score)}`}>
+                        {memberData?.och_score !== undefined
+                          ? `${memberData.och_score.toFixed(0)}/100`
                           : 'N/A'}
                       </div>
                       <p className="text-sm text-neutral-500">Overall Risk Score</p>
                     </div>
 
                     {/* Personal/Work-Related breakdown */}
-                    {memberData?.ocb_personal_score !== undefined && memberData?.ocb_work_score !== undefined && (
+                    {memberData?.och_personal_score !== undefined && memberData?.och_work_score !== undefined && (
                       <div className="grid grid-cols-2 gap-2">
                         <div className="bg-blue-50 rounded-lg p-2 text-center">
                           <div className="text-xs font-semibold text-blue-600">Personal</div>
-                          <div className="text-lg font-bold text-blue-600">{memberData.ocb_personal_score.toFixed(0)}</div>
+                          <div className="text-lg font-bold text-blue-600">{memberData.och_personal_score.toFixed(0)}</div>
                         </div>
                         <div className="bg-orange-50 rounded-lg p-2 text-center">
                           <div className="text-xs font-semibold text-orange-600">Work-Related</div>
-                          <div className="text-lg font-bold text-orange-600">{memberData.ocb_work_score.toFixed(0)}</div>
+                          <div className="text-lg font-bold text-orange-600">{memberData.och_work_score.toFixed(0)}</div>
                         </div>
                       </div>
                     )}
@@ -442,7 +442,7 @@ export function MemberDetailModal({
                     },
                     {
                       id: 'riskFactors',
-                      hasData: (memberData?.ocb_factors?.all?.length || 0) > 0,
+                      hasData: (memberData?.och_factors?.all?.length || 0) > 0,
                       component: (
                         <UserRiskFactorsCard key="riskFactors" selectedMember={memberData || selectedMember} />
                       )

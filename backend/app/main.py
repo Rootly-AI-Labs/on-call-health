@@ -23,22 +23,30 @@ LOG_LEVEL = getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO)
 # Create and configure the UserContextFilter to add user identity to all log records
 user_context_filter = UserContextFilter()
 
+# Get root logger and clear any existing handlers to prevent duplicates
+root_logger = logging.getLogger()
+root_logger.handlers.clear()
+
 # Configure logging with user identifier and analysis ID in the format
 logging.basicConfig(
     level=LOG_LEVEL,
     format='%(asctime)s - %(name)s - %(levelname)s - [user=%(user_id)s]%(analysis_ref)s - %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
+    datefmt='%Y-%m-%d %H:%M:%S',
+    force=True  # Force reconfiguration to prevent duplicate handlers
 )
 
 # Add user context filter to root logger and all handlers
 # This ensures user_id is set before formatting for %(user_id)s to work
-root_logger = logging.getLogger()
 root_logger.addFilter(user_context_filter)
 for handler in root_logger.handlers:
     handler.addFilter(user_context_filter)
 
 # Store reference for handlers added later (e.g., by uvicorn)
 logging.user_context_filter = user_context_filter
+
+# Suppress verbose logs (always - they're too noisy)
+logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 # Set specific loggers to WARNING in production to reduce noise
 if settings.ENVIRONMENT == "production" or LOG_LEVEL >= logging.WARNING:

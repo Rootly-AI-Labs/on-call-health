@@ -66,8 +66,7 @@ def store_oauth_code(db: Session, code: str, jwt_token: str, user_id: int) -> No
         db.commit()
     except Exception as e:
         db.rollback()
-        import logging
-        logging.error(f"Failed to store OAuth code: {e}")
+        logger.error(f"Failed to store OAuth code: {e}")
         raise
 
 def get_oauth_code(db: Session, code: str) -> Optional[Dict[str, Any]]:
@@ -105,8 +104,7 @@ def get_oauth_code(db: Session, code: str) -> Optional[Dict[str, Any]]:
         }
     except Exception as e:
         db.rollback()
-        import logging
-        logging.error(f"Failed to retrieve OAuth code: {e}")
+        logger.error(f"Failed to retrieve OAuth code: {e}")
         return None
 
 # ===== VALIDATION MODELS =====
@@ -219,8 +217,6 @@ async def google_callback(
             try:
                 create_demo_analysis_for_new_user(db, user)
             except Exception as e:
-                import logging
-                logger = logging.getLogger(__name__)
                 logger.error(f"Failed to create demo analysis for new user {user.id}: {e}")
                 # Don't fail the auth flow if demo creation fails
 
@@ -232,18 +228,10 @@ async def google_callback(
         if state and state in ALLOWED_OAUTH_ORIGINS:
             frontend_url = state
             
-        # ✅ SECURITY FIX: Use httpOnly cookie instead of URL parameter  
-        response = RedirectResponse(url=f"{frontend_url}/auth/success")
-        
-        # Determine if we should use secure cookies (HTTPS only in production)
-        is_production = not frontend_url.startswith("http://localhost")
-        
         # ✅ ENTERPRISE PATTERN: 2-Step Server-Side Token Exchange
         # 1. Create temporary auth code (not JWT)
         # 2. Frontend exchanges code for JWT via secure API call
         import secrets
-        import logging
-        logger = logging.getLogger(__name__)
 
         # Create temporary authorization code
         auth_code = secrets.token_urlsafe(32)
@@ -345,8 +333,6 @@ async def github_callback(
             try:
                 create_demo_analysis_for_new_user(db, user)
             except Exception as e:
-                import logging
-                logger = logging.getLogger(__name__)
                 logger.error(f"Failed to create demo analysis for new user {user.id}: {e}")
                 # Don't fail the auth flow if demo creation fails
 
@@ -358,18 +344,10 @@ async def github_callback(
         if state and state in ALLOWED_OAUTH_ORIGINS:
             frontend_url = state
             
-        # ✅ SECURITY FIX: Use httpOnly cookie instead of URL parameter  
-        response = RedirectResponse(url=f"{frontend_url}/auth/success")
-        
-        # Determine if we should use secure cookies (HTTPS only in production)
-        is_production = not frontend_url.startswith("http://localhost")
-        
         # ✅ ENTERPRISE PATTERN: 2-Step Server-Side Token Exchange
         # 1. Create temporary auth code (not JWT)
         # 2. Frontend exchanges code for JWT via secure API call
         import secrets
-        import logging
-        logger = logging.getLogger(__name__)
 
         # Create temporary authorization code
         auth_code = secrets.token_urlsafe(32)
@@ -458,12 +436,12 @@ async def unlink_provider(
 
 @router.get("/user/me")
 @auth_rate_limit("auth_refresh")
-async def get_current_user_info(
+async def get_current_user_basic_info(
     request: Request,
     current_user: User = Depends(get_current_active_user)
 ):
     """
-    ✅ SECURITY: Get current authenticated user information.
+    ✅ SECURITY: Get current authenticated user basic information.
     Used to verify authentication works.
     """
     return {
@@ -490,9 +468,6 @@ async def exchange_auth_code_for_token(
     1. OAuth callback creates temporary auth code
     2. Frontend securely exchanges code for JWT token
     """
-    import logging
-    logger = logging.getLogger(__name__)
-
     logger.info(f"🔍 Token exchange request for code: {code[:10]}...")
 
     # Get code from database (single-use, auto-deleted)
@@ -687,9 +662,6 @@ async def delete_current_user_account(
 
     Requires email confirmation for safety.
     """
-    import logging
-    logger = logging.getLogger(__name__)
-
     # Verify email confirmation matches
     if delete_request.email_confirmation != current_user.email.lower():
         logger.warning(f"Account deletion failed - email mismatch for user {current_user.id}")

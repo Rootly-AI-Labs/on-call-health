@@ -21,17 +21,26 @@ from ..core.validation_cache import (
     invalidate_validation_cache,
 )
 from ..models import GitHubIntegration, LinearIntegration, JiraIntegration
+from .token_refresh_coordinator import refresh_token_with_lock
 
 logger = logging.getLogger(__name__)
 
 
 def get_encryption_key() -> bytes:
-    """Get the encryption key from settings."""
+    """Get the encryption key from settings.
+
+    Uses ENCRYPTION_KEY if set, otherwise falls back to old default
+    for backward compatibility with tokens encrypted before PR #269.
+    """
     from base64 import urlsafe_b64encode
 
-    key = settings.JWT_SECRET_KEY.encode()
+    key = settings.ENCRYPTION_KEY.encode()
     # Ensure key is 32 bytes for Fernet (consistent with other integration files)
     key = urlsafe_b64encode(key[:32].ljust(32, b'\0'))
+
+    # Debug logging to verify correct key is being used
+    logger.debug(f"Using encryption key (first 40 chars): {key.decode()[:40]}")
+
     return key
 
 
@@ -220,15 +229,16 @@ class IntegrationValidator:
     async def _get_valid_linear_token(self, integration: LinearIntegration) -> str:
         """Get a valid Linear access token, refreshing if necessary.
 
-        Uses database row locking to prevent race conditions when multiple
-        concurrent requests try to refresh the token simultaneously.
+        Uses distributed lock via Redis to prevent race conditions when multiple
+        concurrent requests try to refresh the token. Falls back to database
+        row locking if Redis is unavailable.
         """
         if not integration.access_token:
             raise ValueError("No access token available for Linear integration")
 
         self.db.refresh(integration)
 
-        # Determine if refresh is needed and possible in a single logical block
+        # Determine if refresh is needed and possible
         token_needs_refresh = needs_refresh(integration.token_expires_at)
         has_refresh_token = bool(integration.refresh_token)
 
@@ -240,25 +250,112 @@ class IntegrationValidator:
         if not has_refresh_token:
             raise ValueError("Authentication error. Please reconnect Linear.")
 
-        # Proceed with refresh: token_needs_refresh=True, has_refresh_token=True
+        # Use coordinator with distributed locking
         logger.info(f"[Linear] Token refresh initiated for user {integration.user_id}")
 
         try:
-            lock_timeout_seconds = _get_linear_lock_timeout_seconds()
+            token = await refresh_token_with_lock(
+                provider="linear",
+                integration_id=integration.id,
+                user_id=integration.user_id,
+                refresh_func=lambda: self._perform_linear_token_refresh(integration),
+                fallback_func=lambda: self._perform_linear_token_refresh_with_db_lock(integration)
+            )
+            return token
 
-            refreshed_token = None
-            token_to_return = None
+        except RuntimeError:
+            # RuntimeError from database lock timeout already handled rollback in fallback
+            raise
+        except Exception as e:
+            # Other exceptions from refresh need rollback
+            logger.warning(
+                f"[Linear] Token refresh failed: user_id={integration.user_id}, "
+                f"error_type={type(e).__name__}, message={e}"
+            )
+            self._safe_rollback(e)
+            raise
 
-            # begin_nested() creates a savepoint (or starts transaction if needed)
+    async def _call_linear_token_refresh_api(self, refresh_token: str) -> dict:
+        """Call Linear OAuth token refresh API. Returns token data dict or raises ValueError."""
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(
+                "https://api.linear.app/oauth/token",
+                data={
+                    "grant_type": "refresh_token",
+                    "refresh_token": refresh_token,
+                    "client_id": settings.LINEAR_CLIENT_ID,
+                    "client_secret": settings.LINEAR_CLIENT_SECRET,
+                }
+            )
+
+        if response.status_code != 200:
+            raise ValueError("Authentication error. Please reconnect Linear.")
+
+        token_data = response.json()
+        if not token_data.get("access_token"):
+            raise ValueError("Authentication error. Please reconnect Linear.")
+
+        return token_data
+
+    def _update_linear_integration_tokens(
+        self,
+        integration: LinearIntegration,
+        token_data: dict,
+        original_refresh_token: str
+    ) -> str:
+        """Update integration with new tokens. Returns decrypted access token."""
+        new_access_token = token_data["access_token"]
+        new_refresh_token = token_data.get("refresh_token") or original_refresh_token
+        expires_in = _parse_expires_in(token_data.get("expires_in"))
+
+        integration.access_token = encrypt_token(new_access_token)
+        integration.refresh_token = encrypt_token(new_refresh_token)
+        integration.token_expires_at = datetime.now(dt_timezone.utc) + timedelta(seconds=expires_in)
+        integration.updated_at = datetime.now(dt_timezone.utc)
+
+        return new_access_token
+
+    async def _perform_linear_token_refresh(self, integration: LinearIntegration) -> str:
+        """
+        Perform Linear token refresh (no locking - caller handles coordination).
+
+        Returns:
+            New access token (decrypted)
+        """
+        self.db.refresh(integration)
+
+        # Double-check: another process may have refreshed while we waited for lock
+        if not needs_refresh(integration.token_expires_at):
+            logger.info(f"[Linear] Token already refreshed for user {integration.user_id}")
+            return decrypt_token(integration.access_token)
+
+        logger.info(f"[Linear] Refreshing access token for user {integration.user_id}")
+        refresh_token = decrypt_token(integration.refresh_token)
+
+        token_data = await self._call_linear_token_refresh_api(refresh_token)
+        new_access_token = self._update_linear_integration_tokens(integration, token_data, refresh_token)
+        self.db.commit()
+
+        logger.info(f"[Linear] Token refreshed successfully for user {integration.user_id}")
+        return new_access_token
+
+    async def _perform_linear_token_refresh_with_db_lock(self, integration: LinearIntegration) -> str:
+        """
+        Perform Linear token refresh with database row locking (fallback when Redis unavailable).
+
+        Returns:
+            New access token (decrypted)
+        """
+        logger.info(f"[Linear] Using database lock for token refresh (user {integration.user_id})")
+        lock_timeout_seconds = _get_linear_lock_timeout_seconds()
+
+        try:
             with self.db.begin_nested():
-                # SET LOCAL is transaction-scoped, resets after commit/rollback
-                # https://www.postgresql.org/docs/current/sql-set.html
                 self.db.execute(
                     text("SET LOCAL lock_timeout = :lock_timeout"),
                     {"lock_timeout": f"{lock_timeout_seconds}s"}
                 )
 
-                # Re-query with FOR UPDATE to lock the row
                 locked_integration = self.db.query(LinearIntegration).filter(
                     LinearIntegration.id == integration.id
                 ).with_for_update().first()
@@ -266,59 +363,23 @@ class IntegrationValidator:
                 if not locked_integration:
                     raise ValueError("Authentication error. Please reconnect Linear.")
 
-                # Double-check: another request may have refreshed while we waited for lock
-                locked_token_expires_at = locked_integration.token_expires_at
-                if not needs_refresh(locked_token_expires_at):
+                # Double-check: another request may have refreshed while we waited
+                if not needs_refresh(locked_integration.token_expires_at):
                     logger.info(f"[Linear] Token already refreshed for user {integration.user_id}")
-                    token_to_return = decrypt_token(locked_integration.access_token)
-                else:
-                    logger.info(f"[Linear] Refreshing access token for user {integration.user_id}")
-                    refresh_token = decrypt_token(locked_integration.refresh_token)
+                    return decrypt_token(locked_integration.access_token)
 
-                    async with httpx.AsyncClient(timeout=10.0) as client:
-                        response = await client.post(
-                            "https://api.linear.app/oauth/token",
-                            data={
-                                "grant_type": "refresh_token",
-                                "refresh_token": refresh_token,
-                                "client_id": settings.LINEAR_CLIENT_ID,
-                                "client_secret": settings.LINEAR_CLIENT_SECRET,
-                            }
-                        )
+                logger.info(f"[Linear] Refreshing access token for user {integration.user_id}")
+                refresh_token = decrypt_token(locked_integration.refresh_token)
 
-                    if response.status_code != 200:
-                        # Log user context for debugging; error message is generic for security
-                        logger.warning(f"[Linear] Token refresh failed for user {integration.user_id}")
-                        raise ValueError("Authentication error. Please reconnect Linear.")
+                token_data = await self._call_linear_token_refresh_api(refresh_token)
+                new_access_token = self._update_linear_integration_tokens(
+                    locked_integration, token_data, refresh_token
+                )
 
-                    token_data = response.json()
-                    new_access_token = token_data.get("access_token")
-                    if not new_access_token:
-                        # Log user context for debugging; error message is generic for security
-                        logger.warning(f"[Linear] Token refresh failed for user {integration.user_id}")
-                        raise ValueError("Authentication error. Please reconnect Linear.")
-
-                    # Update the locked integration with new tokens
-                    new_refresh_token = token_data.get("refresh_token") or refresh_token
-                    expires_in = _parse_expires_in(token_data.get("expires_in"))
-
-                    locked_integration.access_token = encrypt_token(new_access_token)
-                    locked_integration.refresh_token = encrypt_token(new_refresh_token)
-                    locked_integration.token_expires_at = datetime.now(dt_timezone.utc) + timedelta(seconds=expires_in)
-                    locked_integration.updated_at = datetime.now(dt_timezone.utc)
-                    refreshed_token = new_access_token
-                    token_to_return = new_access_token
-
-            if refreshed_token:
-                logger.info(f"[Linear] Token refreshed successfully for user {integration.user_id}")
-
-            if token_to_return is None:
-                raise ValueError("Authentication error. Please reconnect Linear.")
-
-            return token_to_return
+            logger.info(f"[Linear] Token refreshed successfully for user {integration.user_id}")
+            return new_access_token
 
         except OperationalError as db_error:
-            # Lock timeout or deadlock - transient error, retry should succeed
             error_type = "lock_timeout" if "lock" in str(db_error).lower() else "db_error"
             logger.warning(
                 f"[Linear] Database contention during token refresh: "
@@ -328,14 +389,6 @@ class IntegrationValidator:
             logger.debug(f"[Linear] Full database error: {db_error}", exc_info=True)
             self._safe_rollback(db_error)
             raise RuntimeError("Temporary error. Please retry.") from db_error
-
-        except Exception as e:
-            logger.warning(
-                f"[Linear] Token refresh failed: user_id={integration.user_id}, "
-                f"error_type={type(e).__name__}, message={e}"
-            )
-            self._safe_rollback(e)
-            raise
 
     def _safe_rollback(self, original_error: Optional[BaseException] = None):
         """Safely rollback a transaction, handling potential rollback failures."""

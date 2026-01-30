@@ -20,19 +20,17 @@ logger = logging.getLogger(__name__)
 
 class SentimentAnalyzerTool(BaseTool):
     """Tool for analyzing sentiment patterns in communication data."""
-    
+
+    name = "sentiment_analyzer"
+    description = "Analyzes sentiment patterns in messages to detect communication stress indicators"
+    inputs = {
+        "messages": {"type": "array", "description": "List of message texts to analyze"},
+        "context": {"type": "string", "description": "Context for analysis (e.g., 'slack', 'incident_comments', 'pr_comments')"}
+    }
+    output_type = "object"
+
     def __init__(self):
-        try:
-            # Try the smolagents BaseTool signature
-            super().__init__()
-            self.name = "sentiment_analyzer"
-            self.description = "Analyzes sentiment patterns in messages to detect communication stress indicators"
-        except TypeError:
-            # Fallback to our custom BaseTool signature
-            super().__init__(
-                name="sentiment_analyzer",
-                description="Analyzes sentiment patterns in messages to detect communication stress indicators"
-            )
+        super().__init__()
         self.analyzer = SentimentIntensityAnalyzer()
     
     def __call__(self, messages: List[str], context: str = "general") -> Dict[str, Any]:

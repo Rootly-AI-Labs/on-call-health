@@ -1,10 +1,10 @@
 """
-On-Call Burnout (OCB) Configuration Module
+On-Call Health (OCH) Configuration Module
 
-This module implements the On-Call Burnout methodology for burnout assessment.
-OCB is inspired by the Copenhagen Burnout Inventory (CBI) which is scientifically validated and more applicable to software engineers than the Maslach approach.
+This module implements the On-Call Health methodology for burnout assessment.
+OCH is inspired by the Copenhagen Burnout Inventory (CBI) which is scientifically validated and more applicable to software engineers than the Maslach approach.
 
-OCB uses two dimensions for software engineers:
+OCH uses two dimensions for software engineers:
 1. Personal Burnout (6 items) - Physical and psychological fatigue/exhaustion
 2. Work-Related Burnout (7 items) - Fatigue/exhaustion specifically tied to work
 
@@ -16,25 +16,25 @@ from dataclasses import dataclass
 from enum import Enum
 
 
-class OCBDimension(Enum):
-    """OCB Burnout Dimensions"""
+class OCHDimension(Enum):
+    """OCH Burnout Dimensions"""
     PERSONAL = "personal_burnout"
     WORK_RELATED = "work_related_burnout"
 
 
 @dataclass
-class OCBConfig:
-    """Copenhagen Burnout Inventory Configuration"""
-    
-    # OCB Dimension Weights (must sum to 1.0)
+class OCHConfig:
+    """On-Call Health Configuration - inspired by Copenhagen Burnout Inventory"""
+
+    # OCH Dimension Weights (must sum to 1.0)
     # Research-informed: Personal factors (work-life balance) contribute more to burnout
     DIMENSION_WEIGHTS = {
-        OCBDimension.PERSONAL: 0.65,        # Physical/psychological fatigue (65%)
-        OCBDimension.WORK_RELATED: 0.35     # Work-specific fatigue (35%)
+        OCHDimension.PERSONAL: 0.65,        # Physical/psychological fatigue (65%)
+        OCHDimension.WORK_RELATED: 0.35     # Work-specific fatigue (35%)
     }
-    
+
     # Personal Burnout Factor Mappings
-    # Maps current metrics to OCB Personal Burnout items (0-100 scale)
+    # Maps current metrics to OCH Personal Burnout items (0-100 scale)
     # Research-informed weighting: Work-life balance factors (after-hours, severity, task load)
     # Weights must sum to 1.0 within this dimension
     PERSONAL_BURNOUT_FACTORS = {
@@ -57,9 +57,9 @@ class OCBConfig:
             'scale_max': 100
         }
     }
-    
+
     # Work-Related Burnout Factor Mappings
-    # Maps current metrics to OCB Work-Related Burnout items (0-100 scale)
+    # Maps current metrics to OCH Work-Related Burnout items (0-100 scale)
     # Research-informed weighting: On-call burden and sustained stress
     # Weights must sum to 1.0 within this dimension
     WORK_RELATED_BURNOUT_FACTORS = {
@@ -76,50 +76,50 @@ class OCBConfig:
             'scale_max': 7  # 7+ consecutive days = 100 burnout
         }
     }
-    
-    # OCB Score Interpretation Ranges (0-100 scale, sum of Personal + Work-Related points capped at 100)
-    OCB_SCORE_RANGES = {
+
+    # OCH Score Interpretation Ranges (0-100 scale, sum of Personal + Work-Related points capped at 100)
+    OCH_SCORE_RANGES = {
         'low': (0, 25),           # Minimal burnout (0-25 total points)
         'mild': (25, 50),         # Some burnout symptoms (25-50 total points)
         'moderate': (50, 75),     # Significant burnout (50-75 total points)
         'high': (75, 100)         # Severe burnout (75-100 total points)
     }
-    
+
     # Risk Level Mapping (for compatibility with existing system)
     RISK_LEVEL_MAPPING = {
-        'low': 'low',           # 0-25 OCB -> low risk
-        'mild': 'medium',       # 25-50 OCB -> medium risk  
-        'moderate': 'high',     # 50-75 OCB -> high risk
-        'high': 'critical'      # 75-100 OCB -> critical risk
+        'low': 'low',           # 0-25 OCH -> low risk
+        'mild': 'medium',       # 25-50 OCH -> medium risk
+        'moderate': 'high',     # 50-75 OCH -> high risk
+        'high': 'critical'      # 75-100 OCH -> critical risk
     }
 
 
-def calculate_personal_burnout(metrics: Dict[str, float], config: OCBConfig = None) -> Dict[str, Any]:
+def calculate_personal_burnout(metrics: Dict[str, float], config: OCHConfig = None) -> Dict[str, Any]:
     """
-    Calculate Personal Burnout score using OCB methodology.
-    
+    Calculate Personal Burnout score using OCH methodology.
+
     Args:
         metrics: Dict of metric values
         config: Optional config override
-        
+
     Returns:
         Dict with score, components, and details
     """
     if config is None:
-        config = OCBConfig()
-    
+        config = OCHConfig()
+
     factors = config.PERSONAL_BURNOUT_FACTORS
     component_scores = {}
     weighted_sum = 0.0
     total_weight = 0.0
-    
+
     for factor_name, factor_config in factors.items():
         if factor_name in metrics:
             raw_value = max(0.0, metrics[factor_name])  # Ensure non-negative
-            
+
             # Calculate score with reasonable cap (allow 150% for extreme cases)
             normalized_score = min(150.0, (raw_value / factor_config['scale_max']) * 100.0)
-            
+
             # Apply weight
             weighted_score = normalized_score * factor_config['weight']
             component_scores[factor_name] = {
@@ -129,51 +129,51 @@ def calculate_personal_burnout(metrics: Dict[str, float], config: OCBConfig = No
                 'weight': factor_config['weight'],
                 'description': factor_config['description']
             }
-            
+
             weighted_sum += weighted_score
             total_weight += factor_config['weight']
-    
+
     # Calculate final score
     if total_weight > 0:
         final_score = weighted_sum / total_weight
     else:
         final_score = 0.0
-    
+
     return {
         'score': round(final_score, 2),
         'components': component_scores,
-        'dimension': OCBDimension.PERSONAL.value,
-        'interpretation': get_ocb_interpretation(final_score, config),
+        'dimension': OCHDimension.PERSONAL.value,
+        'interpretation': get_och_interpretation(final_score, config),
         'data_completeness': total_weight
     }
 
 
-def calculate_work_related_burnout(metrics: Dict[str, float], config: OCBConfig = None) -> Dict[str, Any]:
+def calculate_work_related_burnout(metrics: Dict[str, float], config: OCHConfig = None) -> Dict[str, Any]:
     """
-    Calculate Work-Related Burnout score using OCB methodology.
-    
+    Calculate Work-Related Burnout score using OCH methodology.
+
     Args:
         metrics: Dict of metric values
         config: Optional config override
-        
+
     Returns:
         Dict with score, components, and details
     """
     if config is None:
-        config = OCBConfig()
-    
+        config = OCHConfig()
+
     factors = config.WORK_RELATED_BURNOUT_FACTORS
     component_scores = {}
     weighted_sum = 0.0
     total_weight = 0.0
-    
+
     for factor_name, factor_config in factors.items():
         if factor_name in metrics:
             raw_value = max(0.0, metrics[factor_name])  # Ensure non-negative
-            
+
             # Calculate score with reasonable cap (allow 150% for extreme cases)
             normalized_score = min(150.0, (raw_value / factor_config['scale_max']) * 100.0)
-            
+
             # Apply weight
             weighted_score = normalized_score * factor_config['weight']
             component_scores[factor_name] = {
@@ -183,52 +183,52 @@ def calculate_work_related_burnout(metrics: Dict[str, float], config: OCBConfig 
                 'weight': factor_config['weight'],
                 'description': factor_config['description']
             }
-            
+
             weighted_sum += weighted_score
             total_weight += factor_config['weight']
-    
+
     # Calculate final score
     if total_weight > 0:
         final_score = weighted_sum / total_weight
     else:
         final_score = 0.0
-    
+
     return {
         'score': round(final_score, 2),
         'components': component_scores,
-        'dimension': OCBDimension.WORK_RELATED.value,
-        'interpretation': get_ocb_interpretation(final_score, config),
+        'dimension': OCHDimension.WORK_RELATED.value,
+        'interpretation': get_och_interpretation(final_score, config),
         'data_completeness': total_weight
     }
 
 
-def calculate_composite_ocb_score(personal_score: float, work_related_score: float, 
-                                config: OCBConfig = None) -> Dict[str, Any]:
+def calculate_composite_och_score(personal_score: float, work_related_score: float,
+                                config: OCHConfig = None) -> Dict[str, Any]:
     """
-    Calculate composite OCB score from dimension scores.
-    
+    Calculate composite OCH score from dimension scores.
+
     Args:
         personal_score: Personal Burnout score (0-100)
         work_related_score: Work-Related Burnout score (0-100)
         config: Optional config override
-        
+
     Returns:
         Dict with composite score and analysis
     """
     if config is None:
-        config = OCBConfig()
-    
+        config = OCHConfig()
+
     weights = config.DIMENSION_WEIGHTS
-    
-    # Calculate weighted average as per OCB methodology
+
+    # Calculate weighted average as per OCH methodology
     composite_score = (
-        personal_score * weights[OCBDimension.PERSONAL] +
-        work_related_score * weights[OCBDimension.WORK_RELATED]
+        personal_score * weights[OCHDimension.PERSONAL] +
+        work_related_score * weights[OCHDimension.WORK_RELATED]
     )
-    
-    interpretation = get_ocb_interpretation(composite_score, config)
+
+    interpretation = get_och_interpretation(composite_score, config)
     risk_level = config.RISK_LEVEL_MAPPING[interpretation]
-    
+
     return {
         'composite_score': round(composite_score, 2),
         'personal_score': round(personal_score, 2),
@@ -237,68 +237,68 @@ def calculate_composite_ocb_score(personal_score: float, work_related_score: flo
         'risk_level': risk_level,
         'dimension_weights': dict(weights),
         'score_breakdown': {
-            'personal_contribution': round(personal_score * weights[OCBDimension.PERSONAL], 2),
-            'work_related_contribution': round(work_related_score * weights[OCBDimension.WORK_RELATED], 2)
+            'personal_contribution': round(personal_score * weights[OCHDimension.PERSONAL], 2),
+            'work_related_contribution': round(work_related_score * weights[OCHDimension.WORK_RELATED], 2)
         }
     }
 
 
-def get_ocb_interpretation(score: float, config: OCBConfig = None) -> str:
+def get_och_interpretation(score: float, config: OCHConfig = None) -> str:
     """
-    Get OCB score interpretation based on standard ranges.
+    Get OCH score interpretation based on standard ranges.
 
     Args:
-        score: OCB score (0-100)
+        score: OCH score (0-100)
         config: Optional config override
-        
+
     Returns:
         Interpretation string: 'low', 'mild', 'moderate', or 'high'
     """
     if config is None:
-        config = OCBConfig()
-    
-    ranges = config.OCB_SCORE_RANGES
-    
+        config = OCHConfig()
+
+    ranges = config.OCH_SCORE_RANGES
+
     for level, (min_score, max_score) in ranges.items():
         if min_score <= score < max_score:
             return level
-    
+
     # Handle edge case for score = 100
     if score >= 75:
         return 'high'
-    
+
     return 'low'
 
 
-def validate_ocb_config(config: OCBConfig = None) -> Dict[str, bool]:
+def validate_och_config(config: OCHConfig = None) -> Dict[str, bool]:
     """
-    Validate OCB configuration for mathematical consistency.
-    
+    Validate OCH configuration for mathematical consistency.
+
     Args:
         config: Config to validate
-        
+
     Returns:
         Dict of validation results
     """
     if config is None:
-        config = OCBConfig()
-    
+        config = OCHConfig()
+
     results = {}
-    
+
     # Check dimension weights sum to 1.0
     dimension_sum = sum(config.DIMENSION_WEIGHTS.values())
     results['dimension_weights_sum'] = abs(dimension_sum - 1.0) < 0.001
-    
+
     # Check personal burnout factor weights sum to 1.0
     personal_sum = sum(factor['weight'] for factor in config.PERSONAL_BURNOUT_FACTORS.values())
     results['personal_factors_sum'] = abs(personal_sum - 1.0) < 0.001
-    
+
     # Check work-related burnout factor weights sum to 1.0
     work_sum = sum(factor['weight'] for factor in config.WORK_RELATED_BURNOUT_FACTORS.values())
     results['work_related_factors_sum'] = abs(work_sum - 1.0) < 0.001
-    
+
     # Check score ranges are properly ordered and cover 0-100
-    ranges = config.OCB_SCORE_RANGES
+    ranges = config.OCH_SCORE_RANGES
     results['score_ranges_valid'] = (
         ranges['low'][0] == 0 and
         ranges['low'][1] == ranges['mild'][0] and
@@ -306,36 +306,36 @@ def validate_ocb_config(config: OCBConfig = None) -> Dict[str, bool]:
         ranges['moderate'][1] == ranges['high'][0] and
         ranges['high'][1] == 100
     )
-    
+
     # Check all scale_max values are positive
     personal_scales_valid = all(
-        factor['scale_max'] > 0 
+        factor['scale_max'] > 0
         for factor in config.PERSONAL_BURNOUT_FACTORS.values()
     )
     work_scales_valid = all(
-        factor['scale_max'] > 0 
+        factor['scale_max'] > 0
         for factor in config.WORK_RELATED_BURNOUT_FACTORS.values()
     )
     results['scale_max_positive'] = personal_scales_valid and work_scales_valid
-    
+
     return results
 
 
-def generate_ocb_score_reasoning(
-    personal_result: Dict[str, Any], 
-    work_result: Dict[str, Any], 
+def generate_och_score_reasoning(
+    personal_result: Dict[str, Any],
+    work_result: Dict[str, Any],
     composite_result: Dict[str, Any],
     raw_metrics: Dict[str, Any] = None
 ) -> List[str]:
     """
-    Generate human-readable explanations for why someone has their OCB score.
-    
+    Generate human-readable explanations for why someone has their OCH score.
+
     Args:
         personal_result: Personal burnout calculation result
         work_result: Work-related burnout calculation result
-        composite_result: Composite OCB score result
+        composite_result: Composite OCH score result
         raw_metrics: Original metrics data for context
-        
+
     Returns:
         List of reasoning strings explaining the score
     """
@@ -343,17 +343,17 @@ def generate_ocb_score_reasoning(
     personal_score = personal_result['score']
     work_score = work_result['score']
     composite_score = composite_result['composite_score']
-    
+
     # Overall score context
     if composite_score >= 75:
-        reasons.append(f"Critical burnout risk (OCB: {composite_score:.0f}/100) - immediate attention needed")
+        reasons.append(f"Critical burnout risk (OCH: {composite_score:.0f}/100) - immediate attention needed")
     elif composite_score >= 50:
-        reasons.append(f"High burnout risk (OCB: {composite_score:.0f}/100) - monitor closely")
+        reasons.append(f"High burnout risk (OCH: {composite_score:.0f}/100) - monitor closely")
     elif composite_score >= 25:
-        reasons.append(f"Moderate stress levels (OCB: {composite_score:.0f}/100) - manageable with care")
+        reasons.append(f"Moderate stress levels (OCH: {composite_score:.0f}/100) - manageable with care")
     else:
-        reasons.append(f"Low burnout risk (OCB: {composite_score:.0f}/100) - healthy stress levels")
-    
+        reasons.append(f"Low burnout risk (OCH: {composite_score:.0f}/100) - healthy stress levels")
+
     # Organize factors by dimension with clean separation and avoid redundancy
     personal_factors = []
     work_factors = []
@@ -366,7 +366,7 @@ def generate_ocb_score_reasoning(
     personal_components = personal_result.get('components', {})
     if personal_components:
         top_personal = sorted(personal_components.items(), key=lambda x: x[1].get('weighted_score', 0), reverse=True)
-        
+
         # Use the same total_weight that was used in the final score calculation
         # This is stored in data_completeness and represents the sum of weights for all factors with data
         total_weight = personal_result.get('data_completeness', 0)
@@ -400,7 +400,7 @@ def generate_ocb_score_reasoning(
     work_components = work_result.get('components', {})
     if work_components:
         top_work = sorted(work_components.items(), key=lambda x: x[1].get('weighted_score', 0), reverse=True)
-        
+
         # Use the same total_weight that was used in the final score calculation
         # This is stored in data_completeness and represents the sum of weights for all factors with data
         total_weight = work_result.get('data_completeness', 0)
@@ -451,7 +451,7 @@ def generate_ocb_score_reasoning(
 
                 elif factor_name == 'meeting_load':
                     work_factors.append(f"Incident response meeting load ({display_score:.1f} points)")
-                
+
                 elif factor_name == 'code_review_speed':
                     work_factors.append(f"Code review speed pressure ({display_score:.1f} points)")
 
@@ -467,18 +467,18 @@ def generate_ocb_score_reasoning(
         for factor in work_factors:
             reasons.append(f"• {factor}")
 
-    
+
     # Dimensional comparison
     if abs(personal_score - work_score) > 15:
         if personal_score > work_score:
             reasons.append("Personal stress significantly higher than work stress - focus on recovery and boundaries")
         else:
             reasons.append("Work stress significantly higher than personal stress - address workload and processes")
-    
+
     return reasons
 
 
-def get_structured_ocb_factors(
+def get_structured_och_factors(
     personal_result: Dict[str, Any],
     work_result: Dict[str, Any],
     composite_score: float
@@ -489,7 +489,7 @@ def get_structured_ocb_factors(
     Args:
         personal_result: Personal burnout calculation result
         work_result: Work-related burnout calculation result
-        composite_score: Total OCB composite score
+        composite_score: Total OCH composite score
 
     Returns:
         Dict with 'personal' and 'work_related' lists of factor objects
@@ -522,7 +522,7 @@ def get_structured_ocb_factors(
                 # Calculate contribution to the dimension score
                 contribution = weighted_score / total_weight if total_weight > 0 else 0
 
-                # Calculate percentage of total OCB score
+                # Calculate percentage of total OCH score
                 # Composite score is average of personal and work scores (50/50 weight)
                 # So each dimension contributes 50% to the total
                 percentage = (contribution / composite_score * 100 * 0.5) if composite_score > 0 else 0
@@ -555,7 +555,7 @@ def get_structured_ocb_factors(
 
 def validate_factor_consistency(personal_result: Dict, work_result: Dict, raw_metrics: Dict) -> Dict[str, Any]:
     """
-    Validate that OCB factors don't double count underlying data sources.
+    Validate that OCH factors don't double count underlying data sources.
 
     Args:
         personal_result: Personal burnout calculation result
@@ -603,4 +603,4 @@ def validate_factor_consistency(personal_result: Dict, work_result: Dict, raw_me
 
 
 # Global singleton instance
-DEFAULT_OCB_CONFIG = OCBConfig()
+DEFAULT_OCH_CONFIG = OCHConfig()

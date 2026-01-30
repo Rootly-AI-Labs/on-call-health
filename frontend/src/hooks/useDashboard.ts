@@ -1980,16 +1980,16 @@ export default function useDashboard() {
     return members
       ?.filter((member) => {
         // Only include members with OCH risk levels
-        const memberWithOcb = member as any;
-        return memberWithOcb.ocb_score !== undefined && memberWithOcb.ocb_score !== null && memberWithOcb.ocb_score > 0
+        const memberWithOch = member as any;
+        return memberWithOch.och_score !== undefined && memberWithOch.och_score !== null && memberWithOch.och_score > 0
       })
       ?.map((member) => {
-        // Use OCB scoring system (0-100 scale, higher = more burnout)
-        const score = (member as any).ocb_score || 0
+        // Use OCH scoring system (0-100 scale, higher = more burnout)
+        const score = (member as any).och_score || 0
         
         const burnoutScore = Math.max(0, score);
         
-        // Official OCB 4-color system based on burnout score (higher = worse)
+        // Official OCH 4-color system based on burnout score (higher = worse)
         const getRiskFromBurnoutScore = (burnoutScore: number) => {
           if (burnoutScore < 25) return { level: 'low', color: '#10b981' };      // Green - Low/minimal burnout (0-24)
           if (burnoutScore < 50) return { level: 'mild', color: '#eab308' };     // Yellow - Mild burnout symptoms (25-49)  
@@ -2005,7 +2005,7 @@ export default function useDashboard() {
           score: burnoutScore,
           riskLevel: riskInfo.level,
           backendRiskLevel: member.risk_level, // Keep original for reference
-          scoreType: 'OCB',
+          scoreType: 'OCH',
           fill: riskInfo.color,
         }
       })
@@ -2048,8 +2048,8 @@ export default function useDashboard() {
   // Include ALL members with burnout scores, not just those with incidents
   // Members with high GitHub activity but no incidents should still be included
   // Filter members with OCH risk levels only
-  const membersWithOcbScores = useMemo(() => members.filter((m: any) =>
-    m?.ocb_score !== undefined && m?.ocb_score !== null && m?.ocb_score > 0
+  const membersWithOchScores = useMemo(() => members.filter((m: any) =>
+    m?.och_score !== undefined && m?.och_score !== null && m?.och_score > 0
   ), [members]);
 
   // For backward compatibility, keep membersWithIncidents for other parts of the code
@@ -2069,7 +2069,7 @@ export default function useDashboard() {
   const membersWithGitHubData = members.filter((m: any) =>
     m?.github_activity && (m.github_activity.commits_count > 0 || m.github_activity.commits_per_week > 0));
 
-  const allActiveMembers = membersWithOcbScores;
+  const allActiveMembers = membersWithOchScores;
 
   const burnoutFactors = useMemo(() => (allActiveMembers.length > 0) ? [
     {
@@ -2086,7 +2086,7 @@ export default function useDashboard() {
 
         const sum = workloadScores.reduce((total, score) => total + score, 0);
         const average = sum / workloadScores.length;
-        // Convert 0-10 scale to OCB 0-100 scale (whole integer)
+        // Convert 0-10 scale to OCH 0-100 scale (whole integer)
         return Math.round(average * 10);
       })(),
       metrics: (() => {
@@ -2108,7 +2108,7 @@ export default function useDashboard() {
 
         const sum = afterHoursScores.reduce((total, score) => total + score, 0);
         const average = sum / afterHoursScores.length;
-        // Convert 0-10 scale to OCB 0-100 scale (whole integer)
+        // Convert 0-10 scale to OCH 0-100 scale (whole integer)
         return Math.round(average * 10);
       })(),
       metrics: (() => {
@@ -2130,7 +2130,7 @@ export default function useDashboard() {
 
         const sum = incidentLoadScores.reduce((a: number, b: number) => a + b, 0);
         const average = sum / incidentLoadScores.length;
-        // Convert 0-10 scale to OCB 0-100 scale (whole integer)
+        // Convert 0-10 scale to OCH 0-100 scale (whole integer)
         return Math.round(average * 10);
       })(),
       metrics: (() => {
@@ -2145,7 +2145,7 @@ export default function useDashboard() {
     severity: factor.value! >= 70 ? 'Critical' : factor.value! >= 50 ? 'Poor' : factor.value! >= 30 ? 'Fair' : 'Good'
   })) : [], [allActiveMembers]);
   
-  // Get high-risk factors for emphasis (OCB scale 0-100)
+  // Get high-risk factors for emphasis (OCH scale 0-100)
   const highRiskFactors = burnoutFactors.filter(f => f.value >= 50).sort((a, b) => b.value - a.value);
 
   // sort descending for RiskFactors 
