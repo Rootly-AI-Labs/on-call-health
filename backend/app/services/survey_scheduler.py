@@ -175,11 +175,15 @@ class SurveyScheduler:
             period_name=period.period_name
         )
 
-    async def _send_follow_up_reminders(self, organization_id: int, db: Session):
+    async def _send_follow_up_reminders(self, organization_id: int):
         """
         Send follow-up reminders to users with pending survey periods.
         Includes idempotency checks to prevent duplicate sends on the same day.
         """
+        # Create fresh database session for this job execution
+        from app.core.database import SessionLocal
+        db = SessionLocal()
+
         try:
             logger.debug(f"Starting follow-up reminder delivery for organization {organization_id}")
 
@@ -320,6 +324,8 @@ class SurveyScheduler:
         except Exception as e:
             logger.error(f"Error in follow-up reminder delivery for org {organization_id}: {str(e)}")
             db.rollback()
+        finally:
+            db.close()
 
     def schedule_organization_surveys(self, db: Session):
         """
@@ -335,11 +341,11 @@ class SurveyScheduler:
         ).all()
 
         for schedule in schedules:
-            self._add_schedule_job(schedule, db)
+            self._add_schedule_job(schedule)
 
         logger.debug(f"Scheduled surveys for {len(schedules)} organizations")
 
-    def _add_schedule_job(self, schedule: SurveySchedule, db: Session):
+    def _add_schedule_job(self, schedule: SurveySchedule):
         """
         Add a cron job for a specific organization's survey schedule.
         Supports daily, weekday, and weekly frequencies.
@@ -381,7 +387,7 @@ class SurveyScheduler:
         self.scheduler.add_job(
             self._send_organization_surveys,
             trigger=trigger,
-            args=[schedule.organization_id, db, False],  # False = not a reminder
+            args=[schedule.organization_id, False],  # False = not a reminder
             id=job_id,
             replace_existing=True
         )
@@ -414,7 +420,7 @@ class SurveyScheduler:
             self.scheduler.add_job(
                 self._send_organization_surveys,
                 trigger=reminder_trigger,
-                args=[schedule.organization_id, db, True],
+                args=[schedule.organization_id, True],
                 id=reminder_job_id,
                 replace_existing=True
             )
@@ -436,7 +442,7 @@ class SurveyScheduler:
             self.scheduler.add_job(
                 self._send_follow_up_reminders,
                 trigger=followup_trigger,
-                args=[schedule.organization_id, db],
+                args=[schedule.organization_id],
                 id=followup_job_id,
                 replace_existing=True
             )
@@ -446,15 +452,18 @@ class SurveyScheduler:
                 f"daily at {send_hour:02d}:{send_minute:02d} {schedule.timezone}"
             )
 
-    async def _send_organization_surveys(self, organization_id: int, db: Session, is_reminder: bool = False):
+    async def _send_organization_surveys(self, organization_id: int, is_reminder: bool = False):
         """
         Send surveys to all opted-in users in an organization.
 
         Args:
             organization_id: ID of the organization
-            db: Database session
             is_reminder: If True, only send to users who haven't completed survey today
         """
+        # Create fresh database session for this job execution
+        from app.core.database import SessionLocal
+        db = SessionLocal()
+
         try:
             message_type = "reminder" if is_reminder else "initial survey"
             logger.debug(f"Starting {message_type} delivery for organization {organization_id}")
@@ -597,6 +606,9 @@ class SurveyScheduler:
 
         except Exception as e:
             logger.error(f"Error in daily survey delivery for org {organization_id}: {str(e)}")
+            db.rollback()
+        finally:
+            db.close()
 
     def _get_survey_recipients(self, organization_id: int, db: Session, is_reminder: bool = False, apply_saved_recipients: bool = True) -> List[Dict]:
         """
