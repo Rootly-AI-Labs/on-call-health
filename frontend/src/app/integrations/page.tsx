@@ -102,7 +102,6 @@ import { NotificationDrawer } from "@/components/notifications"
 import ManualSurveyDeliveryModal from "@/components/ManualSurveyDeliveryModal"
 import { SlackSurveyTabs } from "@/components/SlackSurveyTabs"
 import { TopPanel } from "@/components/TopPanel"
-import { TeamSyncPrompt } from "@/components/TeamSyncPrompt"
 import { TokenErrorModal } from "@/components/TokenErrorModal"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -244,7 +243,7 @@ export default function IntegrationsPage() {
 
   // Post-integration sync modal state
   const [showPostIntegrationSyncModal, setShowPostIntegrationSyncModal] = useState(false)
-  const [postIntegrationModalType, setPostIntegrationModalType] = useState<'github' | 'slack' | 'jira' | 'linear' | null>(null)
+  const [postIntegrationModalType, setPostIntegrationModalType] = useState<'github' | 'slack' | 'jira' | 'linear' | 'rootly' | 'pagerduty' | null>(null)
 
   const [syncProgress, setSyncProgress] = useState<{
     stage: string
@@ -309,10 +308,6 @@ export default function IntegrationsPage() {
   const [teamMembersDrawerOpen, setTeamMembersDrawerOpen] = useState(false)
   const [refreshingOnCall, setRefreshingOnCall] = useState(false)
   const [oncallCacheInfo, setOncallCacheInfo] = useState<any>(null)
-
-  // Team sync prompt state
-  const [showSyncPrompt, setShowSyncPrompt] = useState(false)
-  const [syncPromptMessage, setSyncPromptMessage] = useState("Team members affected - Resync recommended")
 
   // Cache to track which integrations have already been loaded
   const syncedUsersCache = useRef<Map<string, any[]>>(new Map())
@@ -984,19 +979,6 @@ export default function IntegrationsPage() {
   useEffect(() => {
     setTeamMembersPage(1)
   }, [teamMembersDrawerOpen, syncedUsers.length])
-
-  // Track previous organization to detect changes (not initial load)
-  const prevOrgRef = useRef<string>("")
-
-  // Show sync prompt when organization changes (not on initial load)
-  useEffect(() => {
-    if (prevOrgRef.current && prevOrgRef.current !== selectedOrganization && selectedOrganization) {
-      const orgName = integrations.find(i => i.id.toString() === selectedOrganization)?.name || "organization"
-      setSyncPromptMessage(`Switched to ${orgName} - Sync team members to update your roster`)
-      setShowSyncPrompt(true)
-    }
-    prevOrgRef.current = selectedOrganization
-  }, [selectedOrganization, integrations])
 
   // Auto-select first integration if none selected
   useEffect(() => {
@@ -1953,7 +1935,7 @@ export default function IntegrationsPage() {
 
   const addIntegration = async (platform: "rootly" | "pagerduty") => {
     const form = platform === 'rootly' ? rootlyForm : pagerdutyForm
-    return IntegrationHandlers.addIntegration(
+    await IntegrationHandlers.addIntegration(
       platform,
       previewData,
       form,
@@ -1968,6 +1950,12 @@ export default function IntegrationsPage() {
       loadPagerDutyIntegrations,
       setSelectedOrganization
     )
+
+    // Show sync modal after successful integration addition
+    setTimeout(() => {
+      setPostIntegrationModalType(platform)
+      setShowPostIntegrationSyncModal(true)
+    }, 500)
   }
 
   const deleteIntegration = async () => {
@@ -2287,22 +2275,6 @@ export default function IntegrationsPage() {
     }
   }
 
-  // Handle sync prompt actions
-  const handleSyncPromptAction = async () => {
-    // Close the prompt
-    setShowSyncPrompt(false)
-    // Open the sync modal immediately to show progress
-    setShowSyncConfirmModal(true)
-    // Open team members drawer
-    setTeamMembersDrawerOpen(true)
-    // Automatically start the sync
-    await performTeamSync()
-  }
-
-  const handleDismissSyncPrompt = () => {
-    setShowSyncPrompt(false)
-  }
-
   // Sync Slack user IDs to UserCorrelation records
   const syncSlackUserIds = async (suppressToast?: boolean) => {
     return TeamHandlers.syncSlackUserIds(setLoadingTeamMembers, fetchSyncedUsers, suppressToast)
@@ -2577,6 +2549,12 @@ export default function IntegrationsPage() {
                       const selected = integrations.find(i => i.id.toString() === value)
                       if (selected) {
                         toast.success(`${selected.name} set as default`)
+
+                        // Show sync modal after switching organizations
+                        setTimeout(() => {
+                          setPostIntegrationModalType(selected.platform as 'rootly' | 'pagerduty')
+                          setShowPostIntegrationSyncModal(true)
+                        }, 500)
 
                         // Check permissions in background (non-blocking)
                         try {
@@ -5378,14 +5356,6 @@ export default function IntegrationsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Team Sync Prompt - floating bottom-right */}
-      <TeamSyncPrompt
-        isVisible={showSyncPrompt && !hasTokenError}
-        message={syncPromptMessage}
-        onSync={handleSyncPromptAction}
-        onDismiss={handleDismissSyncPrompt}
-      />
 
       {/* Token Error Modal */}
       <TokenErrorModal
