@@ -659,6 +659,10 @@ class UserSyncService:
                 for period in survey_periods:
                     period.user_correlation_id = keep_record.id
 
+                # Flush to persist the updates before deleting
+                self.db.flush()
+                logger.info(f"    ✅ Flushed survey_periods updates to database")
+
             # Delete the duplicate record
             logger.info(f"    ❌ DELETING duplicate ID={dup.id}")
             self.db.delete(dup)
