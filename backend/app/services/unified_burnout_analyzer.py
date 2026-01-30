@@ -8,8 +8,11 @@ import math
 import os
 import random
 from datetime import datetime, timedelta
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, TYPE_CHECKING
 from collections import defaultdict
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
 
 from ..core.rootly_client import RootlyAPIClient
 from ..core.pagerduty_client import PagerDutyAPIClient, PagerDutyDataCollector
@@ -82,7 +85,8 @@ class UnifiedBurnoutAnalyzer:
         linear_token: Optional[str] = None,
         organization_name: Optional[str] = None,
         synced_users: Optional[List[Dict[str, Any]]] = None,
-        current_user_id: Optional[int] = None
+        current_user_id: Optional[int] = None,
+        db: Optional["Session"] = None
     ):
         # Check for mock data mode from environment
         self.use_mock_data = os.getenv('USE_MOCK_DATA', 'false').lower() == 'true'
@@ -90,6 +94,9 @@ class UnifiedBurnoutAnalyzer:
 
         # Store current_user_id for Jira integration lookup (will not change during analysis)
         self.current_user_id = current_user_id
+
+        # Store db session for reuse (prevents connection pool exhaustion)
+        self.db = db
 
         # Initialize mock data loader if available and enabled
         self.mock_loader = None
@@ -497,7 +504,7 @@ class UnifiedBurnoutAnalyzer:
                         github_data = await collect_team_github_data_with_mapping(
                             team_emails, time_range_days, self.github_token,
                             user_id=self.current_user_id, analysis_id=analysis_id, source_platform=self.platform,
-                            email_to_name=email_to_name
+                            email_to_name=email_to_name, db=self.db
                         )
                         github_duration = (datetime.now() - github_start).total_seconds()
                         log_substep_complete(
