@@ -27,7 +27,7 @@ on:
 jobs:
   e2e-tests:
     name: E2E Tests (${{ matrix.browser }})
-    # Skip for bot PRs since they don't have access to secrets
+    # Skip for Dependabot PRs - they don't have access to secrets for security
     if: github.actor != 'dependabot[bot]' && github.actor != 'renovate[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -91,6 +91,8 @@ jobs:
         env:
           PLAYWRIGHT_BASE_URL: http://localhost:3000
           PLAYWRIGHT_API_URL: ${{ secrets.PLAYWRIGHT_API_URL }}
+          E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL_AVERY }}
+          E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD_AVERY }}
           E2E_TEST_EMAIL_AVERY: ${{ secrets.E2E_TEST_EMAIL_AVERY }}
           E2E_TEST_PASSWORD_AVERY: ${{ secrets.E2E_TEST_PASSWORD_AVERY }}
           E2E_ROOTLY_API_KEY: ${{ secrets.E2E_ROOTLY_API_KEY }}
