@@ -48,7 +48,7 @@ class TestOCHConfig(unittest.TestCase):
         self.assertAlmostEqual(factors_sum, 1.0, places=3)
 
     def test_och_score_ranges_coverage(self):
-        """Test that ocb score ranges cover 0-100 without gaps."""
+        """Test that OCH score ranges cover 0-100 without gaps."""
         ranges = self.config.OCH_SCORE_RANGES
         self.assertEqual(ranges['low'][0], 0)
         self.assertEqual(ranges['high'][1], 100)

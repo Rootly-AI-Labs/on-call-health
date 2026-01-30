@@ -21,19 +21,18 @@ logger = logging.getLogger(__name__)
 
 class PatternAnalyzerTool(BaseTool):
     """Tool for analyzing work patterns and detecting burnout indicators."""
-    
+
+    name = "pattern_analyzer"
+    description = "Analyzes work patterns across different data sources to identify burnout risk factors"
+    inputs = {
+        "data_type": {"type": "string", "description": "Type of data ('incidents', 'commits', 'messages', 'prs')"},
+        "events": {"type": "array", "description": "List of events with timestamp and metadata"},
+        "analysis_window_days": {"type": "integer", "description": "Days to analyze (default 30)"}
+    }
+    output_type = "object"
+
     def __init__(self):
-        try:
-            # Try the smolagents BaseTool signature
-            super().__init__()
-            self.name = "pattern_analyzer"
-            self.description = "Analyzes work patterns across different data sources to identify burnout risk factors"
-        except TypeError:
-            # Fallback to our custom BaseTool signature  
-            super().__init__(
-                name="pattern_analyzer",
-                description="Analyzes work patterns across different data sources to identify burnout risk factors"
-            )
+        super().__init__()
     
     def __call__(self, data_type: str, events: List[Dict[str, Any]], analysis_window_days: int = 30) -> Dict[str, Any]:
         """

@@ -3289,11 +3289,7 @@ class UnifiedBurnoutAnalyzer:
     def _calculate_team_health(self, member_analyses: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Calculate overall team health metrics."""
         logger.info(f"🏥 TEAM_HEALTH: Calculating health for {len(member_analyses)} team members")
-        
-        # Log member details for debugging
-        if member_analyses:
-            logger.info(f"🏥 TEAM_HEALTH: Calculating health for {len(member_analyses)} team members")
-        
+
         if not member_analyses:
             logger.warning(f"🏥 TEAM_HEALTH: No member analyses provided, returning neutral baseline")
             return {
@@ -5677,7 +5673,7 @@ class UnifiedBurnoutAnalyzer:
             LINEAR_SCALING = 0.5
             linear_score = max(0.0, min(100.0, combined * 100 * LINEAR_SCALING))
 
-            logger.info(
+            logger.debug(
                 f"📊 Linear Workload Score:"
                 f" issues={issue_count},"
                 f" priority_score={priority_score:.2f},"

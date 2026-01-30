@@ -2838,47 +2838,21 @@ async def run_analysis_task(
         
         # Check if user has LLM token and AI is enabled
         use_ai_analyzer = False
-        logger.info(f"BACKGROUND_TASK: Checking AI analyzer conditions - enable_ai: {enable_ai}, user_id: {user_id}")
-        print(f"BACKGROUND_TASK: Checking AI analyzer conditions - enable_ai: {enable_ai}, user_id: {user_id}")
-        
+
         if enable_ai and user_id:
             user = db.query(User).filter(User.id == user_id).first()
-            logger.info(f"BACKGROUND_TASK: User query result - user exists: {user is not None}")
-            print(f"BACKGROUND_TASK: User query result - user exists: {user is not None}")
-            
+
             # Check if Railway system token is available for AI analysis
             system_api_key = os.getenv('ANTHROPIC_API_KEY')
-            
-            if user:
-                logger.info(f"BACKGROUND_TASK: User details - has_llm_token: {user.llm_token is not None}, provider: {user.llm_provider}")
-                logger.info(f"BACKGROUND_TASK: Railway system token available: {system_api_key is not None}")
-                print(f"BACKGROUND_TASK: User details - has_llm_token: {user.llm_token is not None}, provider: {user.llm_provider}")
-                print(f"BACKGROUND_TASK: Railway system token available: {system_api_key is not None}")
-                
+
             # Use AI if user requested it AND Railway token is available (or user has their own token)
             if system_api_key or (user and user.llm_token and user.llm_provider):
                 use_ai_analyzer = True
-                logger.info(f"BACKGROUND_TASK: AI available via Railway token or user token, using AI-enhanced analyzer")
-                print(f"BACKGROUND_TASK: AI available via Railway token or user token, using AI-enhanced analyzer")
-            else:
-                logger.info(f"BACKGROUND_TASK: No AI tokens available (Railway or user), using standard analyzer")
-                print(f"BACKGROUND_TASK: No AI tokens available (Railway or user), using standard analyzer")
-        else:
-            logger.info(f"BACKGROUND_TASK: AI not enabled or no user_id, using standard analyzer")
-            print(f"BACKGROUND_TASK: AI not enabled or no user_id, using standard analyzer")
-        
-        logger.info(f"BACKGROUND_TASK: Final analyzer decision - use_ai_analyzer: {use_ai_analyzer}")
-        print(f"BACKGROUND_TASK: Final analyzer decision - use_ai_analyzer: {use_ai_analyzer}")
-
-        # Use UnifiedBurnoutAnalyzer for all analyses
-        logger.info(f"BACKGROUND_TASK: Using UnifiedBurnoutAnalyzer")
-        print(f"BACKGROUND_TASK: Using UnifiedBurnoutAnalyzer")
 
         # Fetch user object if not already fetched (needed for synced users query and oncall data)
         if user_id:
             if 'user' not in locals():
                 user = db.query(User).filter(User.id == user_id).first()
-                logger.info(f"BACKGROUND_TASK: Fetched user object for user_id={user_id}")
         else:
             user = None
 
@@ -3090,11 +3064,11 @@ async def run_analysis_task(
                 raise Exception("Analyzer service is None - initialization failed")
 
             # Log analyzer type for debugging
-            logger.info(f"BACKGROUND_TASK: Using analyzer type: {type(analyzer_service).__name__}")
+            logger.debug(f"BACKGROUND_TASK: Using analyzer type: {type(analyzer_service).__name__}")
 
             # Call UnifiedBurnoutAnalyzer
-            logger.info(f"BACKGROUND_TASK: Calling UnifiedBurnoutAnalyzer.analyze_burnout()")
-            logger.info(f"BACKGROUND_TASK: Analysis parameters - time_range_days={time_range}, include_weekends={include_weekends}, user_id={user_id}, analysis={analysis_ref}")
+            logger.debug(f"BACKGROUND_TASK: Calling UnifiedBurnoutAnalyzer.analyze_burnout()")
+            logger.debug(f"BACKGROUND_TASK: Analysis parameters - time_range_days={time_range}, include_weekends={include_weekends}, user_id={user_id}, analysis={analysis_ref}")
 
             logger.info(f"⏳ Analysis {analysis_ref}: Starting analyze_burnout()")
             try:
