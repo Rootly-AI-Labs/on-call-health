@@ -21,11 +21,12 @@ from .jira_workspace_mapping import JiraWorkspaceMapping
 from .linear_integration import LinearIntegration
 from .linear_workspace_mapping import LinearWorkspaceMapping
 from .survey_period import SurveyPeriod
+from .api_key import APIKey
 
 __all__ = [
     "Base", "get_db", "create_tables", "SessionLocal", "Organization", "OrganizationInvitation", "UserNotification", "User", "Analysis",
     "RootlyIntegration", "OAuthProvider", "UserEmail", "GitHubIntegration",
     "SlackIntegration", "UserCorrelation", "IntegrationMapping", "UserMapping",
     "UserBurnoutReport", "SlackWorkspaceMapping", "JiraIntegration", "JiraWorkspaceMapping",
-    "LinearIntegration", "LinearWorkspaceMapping", "SurveyPeriod"
+    "LinearIntegration", "LinearWorkspaceMapping", "SurveyPeriod", "APIKey"
 ]
