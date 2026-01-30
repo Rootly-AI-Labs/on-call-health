@@ -109,7 +109,7 @@ export function GitHubIntegrationCard({ onConnect, isConnecting }: GitHubIntegra
               placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
               className="pr-10"
               value={token}
-              onChange={(e) => setToken(e.target.value)}
+              onChange={(e) => setToken(e.target.value.trim())}
             />
             <Button
               type="button"
