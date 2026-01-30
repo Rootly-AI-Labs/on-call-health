@@ -5,7 +5,7 @@ import logging
 import os
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, TYPE_CHECKING
-from .github_collector import collect_team_github_data as original_collect_team_github_data
+
 from .mapping_recorder import MappingRecorder
 
 if TYPE_CHECKING:
