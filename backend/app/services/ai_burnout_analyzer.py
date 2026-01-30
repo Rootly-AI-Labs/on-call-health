@@ -632,7 +632,7 @@ class AIBurnoutAnalyzerService:
         if och_scores:
             avg_och_score = sum(och_scores) / len(och_scores)
             avg_legacy_score = 0  # Not used but defined for consistency
-            using_ocb = True
+            using_och = True
             # For display, convert OCH to health score (100 - OCH score)
             overall_health_score = round(100 - avg_och_score, 1)
             avg_stress_display = round(avg_och_score, 1)
@@ -640,7 +640,7 @@ class AIBurnoutAnalyzerService:
         else:
             avg_legacy_score = sum(legacy_scores) / len(legacy_scores) if legacy_scores else 0
             avg_och_score = 0  # Not used but defined for consistency
-            using_ocb = False
+            using_och = False
             overall_health_score = round(100 - (avg_legacy_score * 10), 1)
             avg_stress_display = round(avg_legacy_score, 2)
             trajectory_score = avg_legacy_score * 10  # Convert to 0-100 scale
@@ -651,7 +651,7 @@ class AIBurnoutAnalyzerService:
         # Generate narrative summary
         if high_risk_count > 0:
             urgency_level = "Critical"
-            if using_ocb:
+            if using_och:
                 primary_concern = f"{high_risk_count} team member(s) showing severe stress symptoms (>75/100) requiring immediate intervention"
             else:
                 primary_concern = f"{high_risk_count} team member(s) showing severe stress symptoms requiring immediate intervention"
@@ -660,13 +660,13 @@ class AIBurnoutAnalyzerService:
             primary_concern = f"Over half the team ({medium_risk_count} members) showing elevated stress levels"
         elif medium_risk_count > 0:
             urgency_level = "Moderate"
-            if using_ocb:
+            if using_och:
                 primary_concern = f"{medium_risk_count} team member(s) showing moderate stress warning signs (25-74/100)"
             else:
                 primary_concern = f"{medium_risk_count} team member(s) showing early stress warning signs"
         else:
             urgency_level = "Low"
-            primary_concern = "Team appears to be managing workload effectively with healthy scores" if using_ocb else "Team appears to be managing workload effectively"
+            primary_concern = "Team appears to be managing workload effectively with healthy scores" if using_och else "Team appears to be managing workload effectively"
 
         return {
             "urgency_level": urgency_level,
@@ -675,17 +675,17 @@ class AIBurnoutAnalyzerService:
             "key_metrics": {
                 "total_team_incidents": total_incidents,
                 "average_stress_score": avg_stress_display,
-                "scoring_methodology": "OCH (0-100)" if using_ocb else "Legacy (0-10)",
+                "scoring_methodology": "OCH (0-100)" if using_och else "Legacy (0-10)",
                 "high_risk_percentage": risk_dist["high_risk_percentage"],
                 "data_completeness": len(available_integrations)
             },
             "immediate_actions_needed": high_risk_count > 0,
-            "team_trajectory": self._determine_team_trajectory(trajectory_score, using_ocb)
+            "team_trajectory": self._determine_team_trajectory(trajectory_score, using_och)
         }
 
-    def _determine_team_trajectory(self, stress_score: float, is_ocb: bool) -> str:
+    def _determine_team_trajectory(self, stress_score: float, is_och: bool) -> str:
         """Determine team trajectory based on stress score and methodology."""
-        if is_ocb:
+        if is_och:
             # OCH scoring: 0-100 where higher = more stress
             if stress_score >= 75:
                 return "Critical Risk"
@@ -1154,11 +1154,11 @@ You are an Engineering Manager who is mindful of your on-call team workload and 
 
         if och_scores:
             avg_stress = sum(och_scores) / len(och_scores)
-            using_ocb = True
+            using_och = True
             stress_scale = "OCH (0-100)"
         else:
             avg_stress = sum(legacy_scores) / len(legacy_scores) if legacy_scores else 0
-            using_ocb = False
+            using_och = False
             stress_scale = "Legacy (0-10)"
 
         total_incidents = sum(m.get("incident_count", 0) for m in team_members)
@@ -1212,7 +1212,7 @@ You are an Engineering Manager who is mindful of your on-call team workload and 
             }
 
         # Individual patterns with more detail - use appropriate risk criteria
-        if using_ocb:
+        if using_och:
             high_risk_members = sorted(
                 [m for m in team_members if m.get("och_score", 0) >= 75],
                 key=lambda x: x.get("och_score", 0),
@@ -1234,7 +1234,7 @@ You are an Engineering Manager who is mindful of your on-call team workload and 
             risk_level = member.get("risk_level", "unknown")
 
             # Use appropriate scoring method
-            if using_ocb:
+            if using_och:
                 score = member.get("och_score", 0)
                 score_display = f"{score:.1f}/100 OCH"
             else:
@@ -1284,7 +1284,7 @@ You are an Engineering Manager who is mindful of your on-call team workload and 
             "responder_percentage": len(active_responders) / len(team_members) * 100 if team_members else 0,
             "avg_stress_score": avg_stress,
             "stress_scale": stress_scale,
-            "scoring_explanation": self._get_scoring_explanation(using_ocb),
+            "scoring_explanation": self._get_scoring_explanation(using_och),
             "high_risk_count": len(high_risk_members),
             "risk_criteria": risk_criteria,
             "total_incidents": total_incidents,
@@ -1296,9 +1296,9 @@ You are an Engineering Manager who is mindful of your on-call team workload and 
             "slack_stats": slack_stats
         }
 
-    def _get_scoring_explanation(self, using_ocb: bool) -> str:
+    def _get_scoring_explanation(self, using_och: bool) -> str:
         """Get explanation of the scoring methodology for the LLM."""
-        if using_ocb:
+        if using_och:
             return """This team uses the On-Call Health (OCH) methodology:
 - Scale: 0-100 where HIGHER scores = MORE stress (opposite of health scores)
 - 0-24: Low/minimal stress (healthy)

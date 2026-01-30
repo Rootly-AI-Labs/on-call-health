@@ -2750,13 +2750,13 @@ class UnifiedBurnoutAnalyzer:
         # GitHub (15%) and Slack (15%) components to be added later
         
         # Personal Burnout (33.3% of final score)
-        personal_burnout = self._calculate_personal_burnout_ocb(metrics)
+        personal_burnout = self._calculate_personal_burnout_och(metrics)
         
         # Work-Related Burnout (33.3% of final score)  
-        work_related_burnout = self._calculate_work_burnout_ocb(metrics)
+        work_related_burnout = self._calculate_work_burnout_och(metrics)
         
         # Accomplishment Burnout (33.4% of final score)
-        accomplishment_burnout = self._calculate_accomplishment_burnout_ocb(metrics)
+        accomplishment_burnout = self._calculate_accomplishment_burnout_och(metrics)
         
         # Ensure all dimension values are numeric before rounding
         safe_personal_burnout = personal_burnout if personal_burnout is not None else 0.0
@@ -2769,7 +2769,7 @@ class UnifiedBurnoutAnalyzer:
             "accomplishment_burnout": round(safe_accomplishment_burnout, 2)
         }
     
-    def _calculate_personal_burnout_ocb(self, metrics: Dict[str, Any]) -> float:
+    def _calculate_personal_burnout_och(self, metrics: Dict[str, Any]) -> float:
         """Calculate Personal Burnout from incident data using OCH methodology (0-10 scale)."""
         # NEW: Much more aggressive incident frequency scaling based on research
         ipw = metrics.get("incidents_per_week", 0)
@@ -2802,7 +2802,7 @@ class UnifiedBurnoutAnalyzer:
         
         return weighted_score
     
-    def _calculate_work_burnout_ocb(self, metrics: Dict[str, Any]) -> float:
+    def _calculate_work_burnout_och(self, metrics: Dict[str, Any]) -> float:
         """
         Calculate Work-Related Burnout using CBI/sRPE-inspired methodology (0-10 scale).
 
@@ -2873,7 +2873,7 @@ class UnifiedBurnoutAnalyzer:
         # Combined score using real metrics only
         return (escalation_score * 0.4 + response_stress * 0.3 + volume_stress * 0.3)
     
-    def _calculate_accomplishment_burnout_ocb(self, metrics: Dict[str, Any]) -> float:
+    def _calculate_accomplishment_burnout_och(self, metrics: Dict[str, Any]) -> float:
         """Calculate Accomplishment Burnout from incident data using OCH methodology (0-10 scale)."""
         # Use REAL data only - calculate based on actual performance
         # Resolution effectiveness based on incident data
@@ -3314,13 +3314,13 @@ class UnifiedBurnoutAnalyzer:
         if och_scores and len(och_scores) > 0:
             # Use OCH scores (0-100 scale where higher = more burnout)
             avg_burnout = sum(och_scores) / len(och_scores)
-            using_ocb = True
+            using_och = True
             logger.info(f"Team health calculation using OCH scores: avg={avg_burnout:.1f}, count={len(och_scores)}")
         else:
             # Fallback to legacy burnout scores (0-10 scale where higher = more burnout)
             legacy_scores = [m.get("burnout_score", 0) for m in eligible_members if m and isinstance(m, dict) and m.get("burnout_score") is not None]
             avg_burnout = sum(legacy_scores) / len(legacy_scores) if legacy_scores and len(legacy_scores) > 0 else 0
-            using_ocb = False
+            using_och = False
             logger.info(f"Team health calculation using legacy scores: avg={avg_burnout:.1f}, count={len(legacy_scores)}")
         
         # Count risk levels (updated for 4-tier system) - ONLY include eligible members with incidents
@@ -3334,7 +3334,7 @@ class UnifiedBurnoutAnalyzer:
                     risk_dist["low"] += 1
         
         # Calculate overall health score using appropriate scale
-        if using_ocb:
+        if using_och:
             # OCH scoring (0-100 where higher = more burnout)
             # Store raw OCH score as overall_score for frontend consumption
             overall_score = avg_burnout
@@ -3346,7 +3346,7 @@ class UnifiedBurnoutAnalyzer:
             logger.info(f"Using legacy health calculation: burnout={avg_burnout} -> health={overall_score}")
         
         # Determine health status based on scoring method
-        if using_ocb:
+        if using_och:
             # OCH scoring (0-100 where higher = more burnout)
             if overall_score < 25:
                 health_status = "excellent"  # Low/minimal burnout
@@ -3373,7 +3373,7 @@ class UnifiedBurnoutAnalyzer:
         
         return {
             "overall_score": round(overall_score, 2),
-            "scoring_method": "OCH" if using_ocb else "Legacy",
+            "scoring_method": "OCH" if using_och else "Legacy",
             "risk_distribution": risk_dist,
             "average_burnout_score": round(avg_burnout, 2),
             "health_status": health_status,
