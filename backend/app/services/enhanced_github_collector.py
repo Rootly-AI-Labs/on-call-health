@@ -4,20 +4,24 @@ Enhanced GitHub collector that records mapping data with smart caching.
 import logging
 import os
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, TYPE_CHECKING
 from .github_collector import collect_team_github_data as original_collect_team_github_data
 from .mapping_recorder import MappingRecorder
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
 async def collect_team_github_data_with_mapping(
-    team_emails: List[str], 
-    days: int = 30, 
+    team_emails: List[str],
+    days: int = 30,
     github_token: str = None,
     user_id: Optional[int] = None,
     analysis_id: Optional[int] = None,
     source_platform: str = "rootly",
-    email_to_name: Optional[Dict[str, str]] = None
+    email_to_name: Optional[Dict[str, str]] = None,
+    db: Optional["Session"] = None
 ) -> Dict[str, Dict]:
     """
     Enhanced version of collect_team_github_data that records mapping attempts.
@@ -74,7 +78,7 @@ async def collect_team_github_data_with_mapping(
     if use_smart_caching and user_id:
         try:
             from .github_mapping_service import GitHubMappingService
-            mapping_service = GitHubMappingService()
+            mapping_service = GitHubMappingService(db=db)
             return await mapping_service.get_smart_github_data(
                 team_emails=team_emails,
                 days=days,
@@ -87,7 +91,7 @@ async def collect_team_github_data_with_mapping(
         except Exception as e:
             logger.error(f"💻 GitHub: Smart caching failed: {e}")
             # Fall through to original logic
-    recorder = MappingRecorder() if user_id else None
+    recorder = MappingRecorder(db=db) if user_id else None
     
     # Phase 1.3: Track processed emails to prevent duplicates within this analysis session
     processed_emails = set()
