@@ -15,6 +15,8 @@ from ...models.user_notification import UserNotification
 from ...auth.dependencies import get_current_user
 from ...services.notification_service import NotificationService
 
+logger = logging.getLogger(__name__)
+
 # Import survey_scheduler conditionally to prevent crashes
 try:
     from ...services.survey_scheduler import survey_scheduler
@@ -23,8 +25,6 @@ except Exception as e:
     logger.warning(f"Survey scheduler not available: {e}")
     survey_scheduler = None
     SCHEDULER_AVAILABLE = False
-
-logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
